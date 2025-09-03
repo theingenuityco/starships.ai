@@ -17,7 +17,7 @@ export interface WaitlistStatusResponse {
  * Check if an email is approved for early access
  */
 export async function checkWaitlistApproval(email: string): Promise<WaitlistCheckResponse> {
-  const response = await fetch('/api/waitlist/check', {
+  const response = await fetch('/api/v1/waitlist/check', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -37,7 +37,7 @@ export async function checkWaitlistApproval(email: string): Promise<WaitlistChec
  * Get current waitlist validation status
  */
 export async function getWaitlistStatus(): Promise<WaitlistStatusResponse> {
-  const response = await fetch('/api/waitlist/status', {
+  const response = await fetch('/api/v1/waitlist/status', {
     credentials: 'include'
   });
 
@@ -52,7 +52,7 @@ export async function getWaitlistStatus(): Promise<WaitlistStatusResponse> {
  * Clear waitlist session
  */
 export async function clearWaitlistSession(): Promise<void> {
-  const response = await fetch('/api/waitlist/logout', {
+  const response = await fetch('/api/v1/waitlist/logout', {
     method: 'POST',
     credentials: 'include'
   });

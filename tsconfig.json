@@ -6,6 +6,7 @@
     { "path": "./packages/models" },
     { "path": "./packages/autopilot" },
     { "path": "./packages/server" },
-    { "path": "./packages/client" }
+    { "path": "./packages/client" },
+    { "path": "./package/errors" }
   ]
 }

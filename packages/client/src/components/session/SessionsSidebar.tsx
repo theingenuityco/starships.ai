@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { motion } from 'motion/react'
 import { MessageSquare, Bot, Clock, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { chatAPI } from '@/lib/api'
-import type { Session, SessionSourceType } from '@starships/protocol'
+import { useStarshipSessions } from '@/hooks/useSessions'
+import type { SessionModel, SessionSourceType } from '@starships/protocol'
 
 interface SessionsSidebarProps {
   starshipId: string
@@ -15,41 +14,23 @@ interface SessionsSidebarProps {
 }
 
 
-export function SessionsSidebar({ 
-  starshipId, 
-  currentSessionId, 
-  onSessionSelect, 
-  className = "" 
+export function SessionsSidebar({
+  starshipId,
+  currentSessionId,
+  onSessionSelect,
+  className = ""
 }: SessionsSidebarProps) {
-  const { isAuthenticated, userId } = useAuth()
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { isAuthenticated } = useAuth()
+  
+  // Use TanStack Query to fetch sessions
+  const {
+    data: sessionData,
+    isLoading: loading,
+    error: queryError
+  } = useStarshipSessions(starshipId, !!isAuthenticated)
 
-  // Fetch chat sessions for the starship
-  useEffect(() => {
-    if (!isAuthenticated || !starshipId) {
-      setLoading(false)
-      return
-    }
-
-    const fetchSessions = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const data = await chatAPI.getSessionsByStarship(starshipId)
-        setSessions(data.sessions || [])
-      } catch (err) {
-        console.error('Error fetching chat sessions:', err)
-        setError(err instanceof Error ? err.message : 'Failed to fetch sessions')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchSessions()
-  }, [isAuthenticated, starshipId])
+  const sessions = sessionData?.sessions || []
+  const error = queryError ? 'Failed to fetch sessions' : null
 
   const formatSessionTime = (timestamp: string) => {
     const date = new Date(timestamp)
@@ -71,7 +52,7 @@ export function SessionsSidebar({
     }
   }
 
-  const getSessionTitle = (session: Session) => {
+  const getSessionTitle = (session: SessionModel) => {
     if (session.source === 'agent') {
       return session.agentId ? `Agent Chat` : 'Agent Session'
     }
@@ -116,7 +97,7 @@ export function SessionsSidebar({
           </div>
         ) : (
           <div className="p-2 space-y-1">
-            {sessions.map((session) => (
+            {sessions.map((session: SessionModel) => (
               <motion.button
                 key={session.id}
                 whileHover={{ scale: 1.01 }}

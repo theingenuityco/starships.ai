@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import type { MessageModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 
@@ -142,12 +141,10 @@ export class MessageRepository extends BaseRepository {
       this.validateRequired(entity, ['role', 'content', 'starshipId'], 'create');
       this.validateEnums(entity, { role: ['system', 'user', 'assistant'] }, 'create');
 
-      const connection = getConnection();
       const now = new Date().toISOString();
       
-      const message: MessageModel = {
+      const messageData = {
         // From base Message interface
-        id: uuidv4(),
         timestamp: entity.timestamp || now,
         role: entity.role,
         content: entity.content,
@@ -174,12 +171,9 @@ export class MessageRepository extends BaseRepository {
         processingTimeMs: entity.processingTimeMs,
       };
 
-      const messageForStorage = this.serializeComplexFields(message);
+      const messageForStorage = this.serializeComplexFields(messageData as MessageModel);
 
-      await connection.executeWrite(
-        'CREATE (m:Message $props) RETURN m',
-        { props: messageForStorage }
-      );
+      const message = await this.createEntityWithAutoId<MessageModel>('Message', messageForStorage);
       
       return convertNeo4jIntsInObject(message);
     }, 'create', 'Message');

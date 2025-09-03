@@ -6,9 +6,9 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { AgentRepository, RepositoryFactory } from '@starships/models';
+import { AgentRepository } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
+import { Agent, AgentMemory, Blueprint } from '@starships/autopilot';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
 import { ValidationError, NotFoundError, InternalServerError } from '@starships/errors';
 import getStore, { type MemoryStore } from '../store';
@@ -340,7 +340,7 @@ export class AgentService {
     });
 
     // Get agent from database
-    const agentRepo = RepositoryFactory.getAgentRepository();
+    const agentRepo = new AgentRepository();
     const dbAgent = await agentRepo.findById(agentId);
 
     if (!dbAgent) {
@@ -414,7 +414,7 @@ export class AgentService {
     warnings: string[];
   }> {
     try {
-      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agentRepo = new AgentRepository();
       const dbAgent = await agentRepo.findById(agentId);
 
       if (!dbAgent) {
@@ -544,8 +544,11 @@ export class AgentService {
     dbAgent: AgentModel,
     options: AgentOptions
   ): Promise<Agent> {
-    // Get or create blueprint
-    const blueprint = dbAgent.blueprint || this.createDefaultBlueprint(dbAgent);
+    // Get or create blueprint - ensure it has proper nodes and edges arrays
+    let blueprint = dbAgent.blueprint;
+    if (!blueprint || !blueprint.nodes || !blueprint.edges) {
+      blueprint = this.createDefaultBlueprint(dbAgent);
+    }
 
     // Create default memory config if missing
     const memoryConfig = dbAgent.memory || {
@@ -590,7 +593,7 @@ export class AgentService {
     }
   ): Promise<AgentMemory> {
     // Initialize memory with default prompt
-    const memory = createAgentMemory();
+    const memory = new AgentMemory();
     memory.addMessage('system', 'You are a helpful AI assistant.');
 
     // Set structured context from database configuration

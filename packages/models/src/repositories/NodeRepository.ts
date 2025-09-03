@@ -1,11 +1,13 @@
-import { getConnection } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import type { NodeModel } from '@starships/protocol';
 
 export class NodeRepository extends BaseRepository {
-  constructor() {
+  private connection: Neo4jConnection;
+
+  constructor(connection?: Neo4jConnection) {
     super('NodeRepository');
+    this.connection = connection || getConnection();
   }
 
   async createNode(blueprintId: string, nodeData: Omit<NodeModel, 'id'>): Promise<NodeModel> {
@@ -13,8 +15,7 @@ export class NodeRepository extends BaseRepository {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'createNode');
       this.validateRequired(nodeData, ['type', 'name'], 'createNode');
 
-      const connection = getConnection();
-      const nodeId = uuidv4();
+      const connection = this.connection;
 
       // Check if blueprint exists
       const blueprintCheck = await connection.executeQuery<{ id: string }>(
@@ -26,27 +27,27 @@ export class NodeRepository extends BaseRepository {
         this.handleNotFound('Blueprint', blueprintId, 'createNode');
       }
 
-      const node: NodeModel = {
-        id: nodeId,
-        ...nodeData,
-        parameters: nodeData.parameters || {}
-      };
-
-      // Serialize parameters as JSON string for Neo4j storage
+      // Prepare node data with serialized parameters
       const nodeProps = {
-        ...node,
-        parameters: JSON.stringify(node.parameters)
+        ...nodeData,
+        parameters: JSON.stringify(nodeData.parameters || {})
       };
 
+      const node = await this.createEntityWithAutoId<NodeModel>('Node', nodeProps, this.connection);
+
+      // Create relationship with blueprint
       await connection.executeWrite(`
-        MATCH (b:Blueprint {id: $blueprintId})
-        CREATE (b)-[:CONTAINS]->(n:Node $nodeProps)
+        MATCH (b:Blueprint {id: $blueprintId}), (n:Node {id: $nodeId})
+        CREATE (b)-[:CONTAINS]->(n)
       `, {
         blueprintId,
-        nodeProps
+        nodeId: node.id
       });
 
-      return node;
+      return {
+        ...node,
+        parameters: nodeData.parameters || {}
+      };
     }, 'createNode', 'Node');
   }
 
@@ -62,7 +63,7 @@ export class NodeRepository extends BaseRepository {
         }], 'createNodes');
       }
 
-      const connection = getConnection();
+      const connection = this.connection;
       
       // Check if blueprint exists
       const blueprintCheck = await connection.executeQuery<{ id: string }>(
@@ -78,35 +79,44 @@ export class NodeRepository extends BaseRepository {
       const idMapping = new Map<string, string>();
 
       for (const nodeData of nodesData) {
-        const nodeId = uuidv4();
         const { aiId, ...nodeWithoutAiId } = nodeData as any;
         
-        const node: NodeModel = {
-          id: nodeId,
-          ...nodeWithoutAiId
-        };
-
-        // Serialize parameters as JSON string for Neo4j storage
+        // Prepare node data with serialized parameters
         const nodeProps = {
-          ...node,
-          parameters: JSON.stringify(node.parameters || {}),
-          ref: node.ref || nodeId
+          ...nodeWithoutAiId,
+          parameters: JSON.stringify(nodeWithoutAiId.parameters || {}),
+          ref: nodeWithoutAiId.ref || null
         };
 
+        const node = await this.createEntityWithAutoId<NodeModel>('Node', nodeProps, this.connection);
+
+        // Set ref to node ID if not provided
+        if (!node.ref) {
+          node.ref = node.id;
+          await connection.executeWrite(
+            'MATCH (n:Node {id: $nodeId}) SET n.ref = $ref',
+            { nodeId: node.id, ref: node.id }
+          );
+        }
+
+        // Create relationship with blueprint
         await connection.executeWrite(`
-          MATCH (b:Blueprint {id: $blueprintId})
-          CREATE (b)-[:CONTAINS]->(n:Node $nodeProps)
+          MATCH (b:Blueprint {id: $blueprintId}), (n:Node {id: $nodeId})
+          CREATE (b)-[:CONTAINS]->(n)
         `, {
           blueprintId,
-          nodeProps
+          nodeId: node.id
         });
 
         // Map AI-provided ID to real UUID for edge creation
         if (aiId) {
-          idMapping.set(aiId, nodeId);
+          idMapping.set(aiId, node.id);
         }
         
-        nodes.push(node);
+        nodes.push({
+          ...node,
+          parameters: nodeWithoutAiId.parameters || {}
+        });
       }
 
       return { nodes, idMapping };
@@ -117,7 +127,7 @@ export class NodeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'getNodesByBlueprintId');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       const result = await connection.executeQuery<{ n: NodeModel }>(
         `MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(n:Node)
@@ -147,7 +157,7 @@ export class NodeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ nodeId }, ['nodeId'], 'getNodeById');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       const result = await connection.executeQuery<{ n: NodeModel }>(
         'MATCH (n:Node {id: $nodeId}) RETURN n',
@@ -186,7 +196,7 @@ export class NodeRepository extends BaseRepository {
         }], 'updateNode');
       }
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       // Check if node exists
       const existingResult = await connection.executeQuery<{ n: NodeModel }>(
@@ -268,7 +278,7 @@ export class NodeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ nodeId }, ['nodeId'], 'deleteNode');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       // Check if node exists
       const existingResult = await connection.executeQuery<{ n: NodeModel }>(
@@ -294,7 +304,7 @@ export class NodeRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'deleteNodesByBlueprintId');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       // Check if blueprint exists
       const blueprintCheck = await connection.executeQuery<{ id: string }>(

@@ -23,7 +23,7 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript 5.8+
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **State Management**: Zustand with sophisticated starship store
+- **State Management**: TanStack Query for data operations + Zustand for UI state
 - **Animations**: Framer Motion for smooth transitions
 - **Theme**: next-themes for dark/light mode
 - **Authentication**: Kinde integration
@@ -61,8 +61,8 @@ src/
 │   ├── ui/                      # shadcn/ui components
 │   └── theme-provider.tsx       # Theme system provider
 ├── store/
-│   └── starship-store.ts        # Zustand store (556 lines)
-├── hooks/                       # Custom React hooks
+│   └── starship-ui-store.ts     # Zustand UI state store
+├── hooks/                       # Custom React hooks (including TanStack Query hooks)
 └── lib/                         # Utilities and configurations
 ```
 
@@ -129,13 +129,18 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - **Core Systems**: `/crew`, `/drive` - Starship management
 - **Operations**: `/expeditions`, `/logbook`, `/sibil` - Mission operations
 
-## 💾 Data Persistence
+## 💾 Data Management
+
+### Architecture
+- **TanStack Query**: Server state management with optimistic updates, caching, and background refetching
+- **UI State**: Zustand store for client-side UI state (active starship selection, navigation)
+- **Persistence**: localStorage integration for UI preferences
 
 ### Starship Management
-- **Starship Selection**: Multi-starship support with status tracking
-- **Power Management**: Real-time power level monitoring
-- **Expedition Tracking**: Active expedition counting
-- **Insights**: AI-generated insights and recommendations
+- **Starship Selection**: Multi-starship support with status tracking via TanStack Query
+- **Real-time Data**: Automatic background refetching and cache invalidation
+- **Optimistic Updates**: Instant UI updates with rollback on errors
+- **Error Handling**: Comprehensive error boundaries and user feedback
 
 ## 🧪 Testing
 
@@ -200,8 +205,8 @@ CMD ["npm", "start"]
 
 3. **Chat History Lost**
    - Check browser localStorage quota
-   - Verify session ID consistency
    - Check for incognito/private browsing mode
+   - Verify backend session endpoints are accessible
 
 4. **TypeScript Errors**
    ```bash

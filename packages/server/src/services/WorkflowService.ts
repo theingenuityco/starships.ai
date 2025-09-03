@@ -6,9 +6,9 @@
  * stateless execution engine (autopilot Workflow).
  */
 
-import { WorkflowRepository, RepositoryFactory } from '@starships/models';
+import { WorkflowRepository } from '@starships/models';
 import type { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/protocol';
-import { Workflow, Blueprint, Execution, createAgentMemory } from '@starships/autopilot';
+import { Workflow, Blueprint, Execution, AgentMemory } from '@starships/autopilot';
 
 export interface WorkflowOptions {
   includeMemory?: boolean;
@@ -326,7 +326,7 @@ export class WorkflowService {
       console.log(`✅ [WORKFLOW-SERVICE] Executing workflow: ${dbWorkflow.name} (${context.workflowId})`);
 
       // Create agent memory for execution context
-      const agentMemory = createAgentMemory();
+      const agentMemory = new AgentMemory();
       agentMemory.addMessage('system', 'Workflow execution context');
 
       // Create initial execution context
@@ -393,7 +393,7 @@ export class WorkflowService {
     const warnings: string[] = [];
 
     try {
-      const workflowRepo = RepositoryFactory.getWorkflowRepository();
+      const workflowRepo = new WorkflowRepository();
       const dbWorkflow = await workflowRepo.findById(workflowId);
 
       if (!dbWorkflow) {

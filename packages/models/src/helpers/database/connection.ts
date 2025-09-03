@@ -7,9 +7,7 @@ export interface Neo4jConfig {
   database?: string;
 }
 
-/**
- * Neo4j database connection manager
- */
+/** Neo4j database connection manager */
 export class Neo4jConnection {
   private driver: Driver | null = null;
   private config: Neo4jConfig;
@@ -201,12 +199,7 @@ export class Neo4jConnection {
     }
   }
 
-  /**
-   * Recursively converts Map objects and other incompatible types to Neo4j-compatible values
-   * - Converts Map objects to plain objects
-   * - Preserves Neo4j Integer objects as-is
-   * - Preserves primitive types and Neo4j-compatible objects
-   */
+  /** Recursively converts Map objects and other incompatible types to Neo4j-compatible values */
   private sanitizeParameters(params: any, depth: number = 0): any {
     // Prevent infinite recursion
     if (depth > 10) {

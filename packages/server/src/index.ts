@@ -12,15 +12,16 @@ import {
   AgentRepository,
   UserRepository,
   StarshipRepository,
-  RepositoryFactory,
   createConnection,
+  getConnection,
+  WaitlistRepository,
 } from '@starships/models';
 import { migrationRunner, seedWaitlist } from '@starships/models';
 import { getServerConfig } from '@starships/env-config';
 
 // Route imports
 import agentRoutes from './routes/agents';
-import chatRoutes from './routes/chat';
+import sessionRoutes from './routes/sessions';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
@@ -82,8 +83,6 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-// Health check routes (comprehensive)
-app.use('/health', healthRoutes);
 
 // ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies
@@ -100,7 +99,7 @@ initializeWebhookRoutes({
 
 
 // Public pricing endpoint - must be before auth-protected routes
-app.get('/api/starships/pricing', async (req, res) => {
+app.get('/api/v1/starships/pricing', async (req, res) => {
   try {
     const { SubscriptionService } = await import('./services/SubscriptionService');
     const subscriptionService = new SubscriptionService(userRepository, starshipRepository);
@@ -113,17 +112,17 @@ app.get('/api/starships/pricing', async (req, res) => {
 });
 
 // API Routes
-app.use('/api/health', healthRoutes);
-app.use('/api/waitlist', waitlistRoutes); // Add waitlist routes early for unauthenticated access
-app.use('/api/agents', agentRoutes);
-app.use('/api/agent-templates', agentTemplateRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/memory', memoryRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api', starshipRoutes);
+app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', agentTemplateRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', sessionRoutes); // Updated to OpenAPI standard with v1 prefix - now using session routes
+app.use('/api/v1', memoryRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', missionRoutes); // Updated to OpenAPI standard with v1 prefix
 // app.use('/api', expeditionRoutes);
 app.use('/api', redeployRoutes);
-app.use('/api/missions', missionRoutes);
 app.use('/api', nativeApiKeysRoutes);
 
 // Add 404 handler for unmatched routes
@@ -156,14 +155,10 @@ httpServer.listen(PORT, async () => {
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
 
-    // Initialize RepositoryFactory AFTER database connection is established
-    console.log('🔧 Initializing RepositoryFactory...');
-    await RepositoryFactory.initialize();
-    console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
-
-    // Ensure WaitlistRepository is properly initialized
+    // Initialize WaitlistRepository with database connection
     try {
-      RepositoryFactory.getWaitlistRepository();
+      const waitlistConnection = getConnection();
+      const waitlistRepo = new WaitlistRepository(waitlistConnection);
       console.log('✅ WaitlistRepository initialized and ready');
     } catch (error) {
       console.error('❌ Failed to initialize WaitlistRepository:', error);

@@ -1,40 +1,23 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  ArrowLeft, Zap, Loader2, Activity, 
+import {
+  ArrowLeft, Zap, Loader2, Activity,
   Gauge, Battery
 } from 'lucide-react'
 import '@/styles/animations.css'
 import Link from 'next/link'
-import { starshipAPI, Starship } from '@/lib/api'
+import { useStarshipBySlug } from '@/hooks/useStarships'
 
 interface DriveContentProps {
   slug: string
 }
 
 export function DriveContent({ slug }: DriveContentProps) {
-  const [starship, setStarship] = useState<Starship | null>(null)
-  const [starshipLoading, setStarshipLoading] = useState(true)
-
-  // Fetch starship data
-  useEffect(() => {
-    const fetchStarship = async () => {
-      try {
-        setStarshipLoading(true)
-        const data = await starshipAPI.getStarshipBySlug(slug)
-        setStarship(data.starship)
-      } catch (error) {
-        console.error('Failed to fetch starship:', error)
-      } finally {
-        setStarshipLoading(false)
-      }
-    }
-
-    fetchStarship()
-  }, [slug])
+  const { data: starshipData, isLoading: starshipLoading } = useStarshipBySlug(slug)
+  const starship = starshipData?.starship || null
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background to-muted/5">
@@ -52,7 +35,7 @@ export function DriveContent({ slug }: DriveContentProps) {
               className="text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all -ml-2 px-2"
               asChild
             >
-              <Link href="/fleet">
+              <Link href="/">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>

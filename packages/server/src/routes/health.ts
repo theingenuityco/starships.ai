@@ -1,17 +1,22 @@
 /**
- * Health Check Routes
- * 
+ * Health Check Routes (OpenAPI pattern)
+ *
  * Comprehensive health monitoring endpoints for the expedition orchestration system.
  * Provides detailed system status, dependency health, and performance metrics.
  */
 
-import express from 'express';
-import { getConnection } from '@starships/models';
-import { RepositoryFactory } from '@starships/models';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import { getConnection, StarshipRepository, UserRepository, AgentRepository } from '@starships/models';
 import { logger } from '@starships/models';
 import { ErrorUtils } from '@starships/errors';
+import {
+  sendSuccess,
+  sendError,
+  handleCommonError,
+} from '../utils/responseHelpers';
 
-const router: express.Router = express.Router();
+const router: Router = Router();
 
 /**
  * Health check response interface
@@ -46,11 +51,8 @@ interface HealthCheckResponse {
   };
 }
 
-/**
- * Basic health check endpoint
- * GET /health
- */
-router.get('/', async (req, res) => {
+// GET /health - Basic health check endpoint (OpenAPI pattern)
+router.get('/health', async (req: Request, res: Response): Promise<void> => {
   const requestId = ErrorUtils.generateRequestId();
   const startTime = Date.now();
 
@@ -85,7 +87,7 @@ router.get('/', async (req, res) => {
     // Check repository health
     try {
       const repoStart = Date.now();
-      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const starshipRepo = new StarshipRepository();
       
       // Test basic repository functionality
       await starshipRepo.findAll();
@@ -136,11 +138,11 @@ router.get('/', async (req, res) => {
       },
     });
 
-    // Set appropriate HTTP status code
-    const statusCode = healthCheck.status === 'healthy' ? 200 : 
+    // Set appropriate HTTP status code and send response
+    const statusCode = healthCheck.status === 'healthy' ? 200 :
                       healthCheck.status === 'degraded' ? 200 : 503;
 
-    res.status(statusCode).json(healthCheck);
+    sendSuccess(res, healthCheck, statusCode);
 
   } catch (error) {
     const errorResponse: HealthCheckResponse = {
@@ -165,15 +167,14 @@ router.get('/', async (req, res) => {
       },
     });
 
-    res.status(503).json(errorResponse);
+    if (!handleCommonError(error, res, 'health check')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Health check system failure', 503);
+    }
   }
 });
 
-/**
- * Detailed health check endpoint
- * GET /health/detailed
- */
-router.get('/detailed', async (req, res) => {
+// GET /health/detailed - Detailed health check endpoint (OpenAPI pattern)
+router.get('/health/detailed', async (req: Request, res: Response): Promise<void> => {
   const requestId = ErrorUtils.generateRequestId();
   const startTime = Date.now();
 
@@ -224,26 +225,26 @@ router.get('/detailed', async (req, res) => {
     }
 
     // Check all repository types
-    const repositoryTypes = [
-      'StarshipRepository',
-      'UserRepository',
-      'AgentRepository',
+    const repositories = [
+      { name: 'starshiprepository', instance: () => new StarshipRepository() },
+      { name: 'userrepository', instance: () => new UserRepository() },
+      { name: 'agentrepository', instance: () => new AgentRepository() },
     ];
 
-    for (const repoType of repositoryTypes) {
+    for (const repo of repositories) {
       try {
         const repoStart = Date.now();
-        const repo = (RepositoryFactory as any)[`get${repoType}`]();
+        const repoInstance = repo.instance();
         
         // Test basic functionality
-        await repo.findAll();
+        await repoInstance.findAll();
         
-        healthCheck.services[repoType.toLowerCase()] = {
+        healthCheck.services[repo.name] = {
           status: 'healthy',
           responseTime: Date.now() - repoStart,
         };
       } catch (error) {
-        healthCheck.services[repoType.toLowerCase()] = {
+        healthCheck.services[repo.name] = {
           status: 'degraded',
           error: error instanceof Error ? error.message : 'Repository error',
         };
@@ -307,10 +308,10 @@ router.get('/detailed', async (req, res) => {
       },
     });
 
-    const statusCode = healthCheck.status === 'healthy' ? 200 : 
+    const statusCode = healthCheck.status === 'healthy' ? 200 :
                       healthCheck.status === 'degraded' ? 200 : 503;
 
-    res.status(statusCode).json(healthCheck);
+    sendSuccess(res, healthCheck, statusCode);
 
   } catch (error) {
     logger.error('Detailed health check failed', {
@@ -321,29 +322,24 @@ router.get('/detailed', async (req, res) => {
       },
     });
 
-    res.status(503).json({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: 'Health check system failure',
-    });
+    if (!handleCommonError(error, res, 'detailed health check')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Health check system failure', 503);
+    }
   }
 });
 
-/**
- * Readiness probe endpoint
- * GET /health/ready
- */
-router.get('/ready', async (req, res) => {
+// GET /health/ready - Readiness probe endpoint (OpenAPI pattern)
+router.get('/health/ready', async (req: Request, res: Response): Promise<void> => {
   try {
     // Check if system is ready to accept requests
     const connection = getConnection();
     await connection.executeQuery('RETURN 1 as readiness_check');
     
     // Check if essential repositories are available
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     await starshipRepo.findAll();
 
-    res.status(200).json({
+    sendSuccess(res, {
       status: 'ready',
       timestamp: new Date().toISOString(),
     });
@@ -353,32 +349,24 @@ router.get('/ready', async (req, res) => {
       error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
-    res.status(503).json({
-      status: 'not_ready',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'System not ready',
-    });
+    if (!handleCommonError(error, res, 'readiness check')) {
+      sendError(res, "SERVICE_UNAVAILABLE", error instanceof Error ? error.message : 'System not ready', 503);
+    }
   }
 });
 
-/**
- * Liveness probe endpoint
- * GET /health/live
- */
-router.get('/live', (req, res) => {
+// GET /health/live - Liveness probe endpoint (OpenAPI pattern)
+router.get('/health/live', (req: Request, res: Response): void => {
   // Simple liveness check - if we can respond, we're alive
-  res.status(200).json({
+  sendSuccess(res, {
     status: 'alive',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   });
 });
 
-/**
- * System metrics endpoint
- * GET /health/metrics
- */
-router.get('/metrics', (req, res) => {
+// GET /health/metrics - System metrics endpoint (OpenAPI pattern)
+router.get('/health/metrics', (req: Request, res: Response): void => {
   try {
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
@@ -413,17 +401,16 @@ router.get('/metrics', (req, res) => {
       },
     };
 
-    res.status(200).json(metrics);
+    sendSuccess(res, metrics);
 
   } catch (error) {
     logger.error('Metrics collection failed', {
       error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
-    res.status(500).json({
-      error: 'Failed to collect metrics',
-      timestamp: new Date().toISOString(),
-    });
+    if (!handleCommonError(error, res, 'metrics collection')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to collect metrics');
+    }
   }
 });
 

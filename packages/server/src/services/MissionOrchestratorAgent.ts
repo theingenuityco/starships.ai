@@ -5,20 +5,19 @@
  * using direct LLM integration with mission context awareness.
  */
 
-import { RepositoryFactory } from '@starships/models';
+import { MissionRepository, AgentRepository, StarshipRepository, MissionClarityRepository } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionService } from './MissionService';
 import { WorkflowParsingService } from './WorkflowParsingService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import { MISSION_PHASES } from '@starships/protocol';
-import { Workflow, createAgentMemory, AgentMemory, LLM, createLLM } from '@starships/autopilot';
+import { Workflow, AgentMemory, LLM } from '@starships/autopilot';
 import type { LlmNodeParameters } from '@starships/autopilot';
 import type {
   MissionModel,
   MissionPhase,
   MissionClarityModel,
-  UpdateBlueprintApprovalRequest,
   CreateMissionClarityRequest
 } from '@starships/protocol';
 import type { BlueprintModel } from '@starships/protocol';
@@ -405,7 +404,7 @@ export class MissionOrchestratorAgent {
       const autopilotWorkflow = this.convertToAutopilotWorkflow(blueprint);
       
       // Create agent memory for workflow execution context
-      const agentMemory = createAgentMemory();
+      const agentMemory = new AgentMemory();
       agentMemory.addMessage('system', 'Mission execution coordinator');
       agentMemory.setIdentity({
         name: 'Mission Executor',
@@ -532,14 +531,14 @@ export class MissionOrchestratorAgent {
    */
   private async getAssignedAgents(missionId: string): Promise<AgentModel[]> {
     try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
+      const missionRepo = new MissionRepository();
       const mission = await missionRepo.getMissionById(missionId);
       
       if (!mission.agentIds || mission.agentIds.length === 0) {
         throw new Error('No agents assigned to mission');
       }
 
-      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agentRepo = new AgentRepository();
       const agents: AgentModel[] = [];
       
       for (const agentId of mission.agentIds) {
@@ -565,14 +564,14 @@ export class MissionOrchestratorAgent {
    */
   private async loadMissionMetadata(missionId: string): Promise<MissionMetadata> {
     try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
+      const missionRepo = new MissionRepository();
       const mission = await missionRepo.getMissionById(missionId);
 
       if (!mission.starshipId) {
         throw new Error(`Mission ${missionId} has no associated starship`);
       }
 
-      const starshipRepo = RepositoryFactory.getStarshipRepository();
+      const starshipRepo = new StarshipRepository();
       const starship = await starshipRepo.findById(mission.starshipId);
 
       if (!starship) {
@@ -601,7 +600,7 @@ export class MissionOrchestratorAgent {
         openrouterApiKey: this.config.openrouterApiKey
       };
 
-      const llm = createLLM(llmConfig);
+      const llm = new LLM(llmConfig);
       const result = await llm.execute();
 
       if (result.status === 'completed' && result.data?.llmResponse) {
@@ -638,7 +637,7 @@ export class MissionOrchestratorAgent {
       const clarityRequest = await this.assessMissionClarity(stateWithClarity, iteration);
       clarityRequest.missionId = state.missionId;
       
-      const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+      const clarityRepo = new MissionClarityRepository();
       const updatedClarity = await clarityRepo.upsertByMissionId(state.missionId, clarityRequest);
       
       const missionEventService = MissionEventService.getInstance();
@@ -694,7 +693,7 @@ export class MissionOrchestratorAgent {
    */
   private async getClarityFromDB(missionId: string): Promise<MissionClarityModel | null> {
     try {
-      const clarityRepo = RepositoryFactory.getMissionClarityRepository();
+      const clarityRepo = new MissionClarityRepository();
       return await clarityRepo.getByMissionId(missionId);
     } catch (error) {
       this.logger.error('Failed to get clarity from database', { missionId, error });

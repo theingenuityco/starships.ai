@@ -118,10 +118,15 @@ describe('BaseRepository', () => {
       const context = repository.testCreateContext('create');
       
       expect(context).toEqual({
-        service: 'TestService',
+        component: 'TestService',
+        layer: 'repository',
         operation: 'create',
         resource: undefined,
         resourceId: undefined,
+        requestId: undefined,
+        timestamp: expect.any(Date),
+        userAgent: undefined,
+        userId: undefined,
         metadata: { component: 'repository' }
       });
     });
@@ -130,10 +135,15 @@ describe('BaseRepository', () => {
       const context = repository.testCreateContext('update', 'User', 'user-123');
       
       expect(context).toEqual({
-        service: 'TestService',
+        component: 'TestService',
+        layer: 'repository',
         operation: 'update',
         resource: 'User',
         resourceId: 'user-123',
+        requestId: undefined,
+        timestamp: expect.any(Date),
+        userAgent: undefined,
+        userId: undefined,
         metadata: { component: 'repository' }
       });
     });

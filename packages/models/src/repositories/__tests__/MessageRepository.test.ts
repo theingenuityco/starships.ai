@@ -270,7 +270,8 @@ describe('MessageRepository', () => {
   describe('create', () => {
     it('should create message successfully', async () => {
       const createInput = createMockCreateInput();
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage();
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
@@ -280,7 +281,7 @@ describe('MessageRepository', () => {
         contentLength: 13
       });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (m:Message $props)'),
+        expect.stringContaining('CREATE (n:Message)'),
         expect.objectContaining({
           props: expect.objectContaining({
             role: 'user',
@@ -317,7 +318,8 @@ describe('MessageRepository', () => {
         contentLength: 12,
         hasAttachments: false
       };
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage(minimalInput);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(minimalInput);
 
@@ -333,7 +335,8 @@ describe('MessageRepository', () => {
         metadata: { complex: { nested: 'data' } },
         processingMetadata: { tokens: 150 }
       });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage(inputWithMetadata);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       await repository.create(inputWithMetadata);
 
@@ -785,7 +788,8 @@ describe('MessageRepository', () => {
     it('should handle very long messages', async () => {
       const longContent = 'x'.repeat(10000);
       const createInput = createMockCreateInput({ content: longContent });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage({ content: longContent, contentLength: 10000 });
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
@@ -795,7 +799,8 @@ describe('MessageRepository', () => {
     it('should handle special characters in content', async () => {
       const specialContent = 'Message with émojis 🚀 and "quotes" & symbols: <>&';
       const createInput = createMockCreateInput({ content: specialContent });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage({ content: specialContent });
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
@@ -814,7 +819,8 @@ describe('MessageRepository', () => {
         tokenCount: 500,
         processingTimeMs: 2500
       });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage(fullMessage);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(fullMessage);
 

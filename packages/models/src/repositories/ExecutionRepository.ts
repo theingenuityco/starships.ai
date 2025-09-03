@@ -105,7 +105,8 @@ export class ExecutionRepository extends BaseRepository {
         { workflowId: execution.workflowId, executionId: execution.id }
       );
 
-      return convertNeo4jIntsInObject(execution);
+      // Deserialize complex fields before returning
+      return convertNeo4jIntsInObject(this.deserializeComplexFields(execution));
     }, 'create', 'Execution');
   }
 

@@ -163,16 +163,20 @@ describe('WorkflowRepository', () => {
           { id: 'workflow-1', name: 'Workflow 1' },
           { id: 'workflow-2', name: 'Workflow 2' },
         ];
+        const expectedResult = [
+          { id: 'workflow-1', name: 'Workflow 1', blueprint: null, tags: [], allowedStarshipClasses: [] },
+          { id: 'workflow-2', name: 'Workflow 2', blueprint: null, tags: [], allowedStarshipClasses: [] },
+        ];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w }))
         );
-
+  
         const result = await repository.findAll();
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC'
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
 
       it('should handle empty result', async () => {
@@ -235,17 +239,21 @@ describe('WorkflowRepository', () => {
       };
 
       it('should create workflow successfully', async () => {
-        mockConnection.executeWrite.mockResolvedValue([]);
+        const createdWorkflow = {
+          id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          name: 'Test Workflow',
+          authorId: 'author-123',
+          usageCount: 0
+        };
+        
+        // Mock createEntityWithAutoId format
+        mockConnection.executeWrite
+          .mockResolvedValueOnce([{ n: createdWorkflow }]) // createEntityWithAutoId result
+          .mockResolvedValueOnce([]); // relationship creation
 
         const result = await repository.create(mockWorkflowData);
 
         expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2); // Workflow + relationship
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          'CREATE (w:Workflow $props) RETURN w',
-          expect.objectContaining({
-            props: expect.any(Object)
-          })
-        );
         expect(result.id).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
         expect(result.name).toBe('Test Workflow');
         expect(result.authorId).toBe('author-123');
@@ -259,7 +267,14 @@ describe('WorkflowRepository', () => {
       });
 
       it('should create with default blueprint when none provided', async () => {
-        mockConnection.executeWrite.mockResolvedValue([]);
+        const createdWorkflow = {
+          id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          name: 'Test Workflow',
+          authorId: 'author-123',
+          blueprint: '{"nodes":[],"edges":[],"metadata":{}}'
+        };
+        
+        mockConnection.executeWrite.mockResolvedValueOnce([{ n: createdWorkflow }]);
 
         const dataWithoutBlueprint = {
           name: 'Test Workflow',
@@ -272,7 +287,14 @@ describe('WorkflowRepository', () => {
       });
 
       it('should create Neo4j relationship when starshipId provided', async () => {
-        mockConnection.executeWrite.mockResolvedValue([]);
+        const createdWorkflow = {
+          id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+          starshipId: 'starship-123'
+        };
+        
+        mockConnection.executeWrite
+          .mockResolvedValueOnce([{ n: createdWorkflow }]) // createEntityWithAutoId result
+          .mockResolvedValueOnce([]); // relationship creation
 
         await repository.create(mockWorkflowData);
 
@@ -296,11 +318,12 @@ describe('WorkflowRepository', () => {
     describe('update', () => {
       it('should update workflow successfully', async () => {
         const mockWorkflow = { id: 'workflow-1', name: 'Updated Workflow' };
+        const expectedResult = { id: 'workflow-1', name: 'Updated Workflow', blueprint: null, tags: [], allowedStarshipClasses: [] };
         const updates = { name: 'Updated Workflow' };
         mockConnection.executeWrite.mockResolvedValue([{ w: mockWorkflow }]);
-
+  
         const result = await repository.update('workflow-1', updates);
-
+  
         expect(mockConnection.executeWrite).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.id = $id SET w += $updates RETURN w',
           {
@@ -311,7 +334,7 @@ describe('WorkflowRepository', () => {
             })
           }
         );
-        expect(result).toEqual(mockWorkflow);
+        expect(result).toEqual(expectedResult);
       });
 
       it('should validate id parameter', async () => {
@@ -374,7 +397,7 @@ describe('WorkflowRepository', () => {
           allowedStarshipClasses: []
         }];
         mockConnection.executeQuery.mockResolvedValue(
-          mockWorkflows.map(w => ({ w }))
+          mockWorkflows.map(w => ({ w: { ...w, blueprint: null, tags: [], allowedStarshipClasses: [] } }))
         );
 
         const result = await repository.findByUser('user-123');
@@ -474,17 +497,18 @@ describe('WorkflowRepository', () => {
     describe('findUndeployedWorkflows', () => {
       it('should return workflows without starshipId', async () => {
         const mockWorkflows = [{ id: 'workflow-1', starshipId: null }];
+        const expectedResult = [{ id: 'workflow-1', starshipId: null, blueprint: null, tags: [], allowedStarshipClasses: [] }];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w }))
         );
-
+  
         const result = await repository.findUndeployedWorkflows();
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.starshipId IS NULL OR w.starshipId = "" RETURN w ORDER BY w.createdAt DESC',
           {}
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
     });
   });
@@ -493,63 +517,67 @@ describe('WorkflowRepository', () => {
     describe('findByAuthor', () => {
       it('should return workflows by author', async () => {
         const mockWorkflows = [{ id: 'workflow-1', authorId: 'author-123' }];
+        const expectedResult = [{ id: 'workflow-1', authorId: 'author-123', blueprint: null, tags: [], allowedStarshipClasses: [] }];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w }))
         );
-
+  
         const result = await repository.findByAuthor('author-123');
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
           { authorId: 'author-123' }
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
     });
 
     describe('findByCategory', () => {
       it('should return workflows by category', async () => {
         const mockWorkflows = [{ id: 'workflow-1', category: 'automation' }];
+        const expectedResult = [{ id: 'workflow-1', category: 'automation', blueprint: null, tags: [], allowedStarshipClasses: [] }];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w }))
         );
-
+  
         const result = await repository.findByCategory('automation');
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
           { category: 'automation' }
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
     });
 
     describe('findByTags', () => {
       it('should return workflows by tags', async () => {
         const mockWorkflows = [{ id: 'workflow-1', tags: ['automation', 'test'] }];
+        const expectedResult = [{ id: 'workflow-1', tags: ['automation', 'test'], blueprint: null, allowedStarshipClasses: [] }];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w }))
         );
-
+  
         const result = await repository.findByTags(['automation', 'test']);
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
           { tags: ['automation', 'test'] }
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
     });
 
     describe('findPublic', () => {
       it('should return public workflows with pagination', async () => {
         const mockWorkflows = [{ id: 'workflow-1', isPublic: true }];
+        const expectedResult = [{ id: 'workflow-1', isPublic: true, blueprint: null, tags: [], allowedStarshipClasses: [] }];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w }))
         );
-
+  
         const result = await repository.findPublic(10, 5);
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.isPublic = true RETURN w ORDER BY w.usageCount DESC, w.rating DESC SKIP $offset LIMIT $limit',
           {
@@ -557,7 +585,7 @@ describe('WorkflowRepository', () => {
             offset: 5,
           }
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
 
       it('should use default pagination values', async () => {
@@ -578,27 +606,29 @@ describe('WorkflowRepository', () => {
     describe('searchWorkflows', () => {
       it('should search workflows with fulltext search', async () => {
         const mockWorkflows = [{ id: 'workflow-1', name: 'Matching Workflow' }];
+        const expectedResult = [{ id: 'workflow-1', name: 'Matching Workflow', blueprint: null, tags: [], allowedStarshipClasses: [] }];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w, score: 0.95 }))
         );
-
+  
         const result = await repository.searchWorkflows('test query');
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'CALL db.index.fulltext.queryNodes("workflowSearch", $query) YIELD node as w, score RETURN w, score ORDER BY score DESC LIMIT 20',
           { query: 'test query' }
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
     });
 
     describe('findWithFilters', () => {
       it('should filter workflows by multiple criteria', async () => {
         const mockWorkflows = [{ id: 'workflow-1', category: 'automation' }];
+        const expectedResult = [{ id: 'workflow-1', category: 'automation', blueprint: null, tags: [], allowedStarshipClasses: [] }];
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map(w => ({ w }))
         );
-
+  
         const filters = {
           category: 'automation',
           authorId: 'author-123',
@@ -606,9 +636,9 @@ describe('WorkflowRepository', () => {
           tags: ['test'],
           starshipClass: 'scout' as const,
         };
-
+  
         const result = await repository.findWithFilters(filters);
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           expect.stringContaining('WHERE 1=1'),
           expect.objectContaining({
@@ -619,7 +649,7 @@ describe('WorkflowRepository', () => {
             starshipClass: 'scout',
           })
         );
-        expect(result).toEqual(mockWorkflows);
+        expect(result).toEqual(expectedResult);
       });
 
       it('should handle empty filters', async () => {

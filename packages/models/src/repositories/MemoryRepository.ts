@@ -135,7 +135,8 @@ export class MemoryRepository extends BaseRepository {
         }
       );
       
-      return convertNeo4jIntsInObject(memory);
+      // Deserialize complex fields before returning
+      return convertNeo4jIntsInObject(this.deserializeComplexFields(memory));
     }, 'create', 'Memory');
   }
 

@@ -709,7 +709,8 @@ describe('SessionRepository', () => {
         status: 'active',
         metadata: null
       };
-      mockConnection.executeWrite.mockResolvedValue([mockCreated]);
+      // Mock createEntityWithAutoId format
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
       const created = await repository.create(createInput);
       expect(created.id).toBe('test-session-id');
 

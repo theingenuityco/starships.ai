@@ -57,7 +57,7 @@ export class WorkflowRepository extends BaseRepository {
       const result = await connection.executeQuery<{ w: WorkflowModel }>(
         'MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC'
       );
-      return convertNeo4jIntsInArray(result.map((record) => record.w));
+      return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
     }, 'findAll', 'Workflow');
   }
 
@@ -155,7 +155,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE w.starshipId IS NULL OR w.starshipId = "" RETURN w ORDER BY w.createdAt DESC',
       {}
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async create(
@@ -218,7 +218,8 @@ export class WorkflowRepository extends BaseRepository {
         }
       }
 
-      return convertNeo4jIntsInObject(workflow);
+      // Deserialize complex fields before returning
+      return convertNeo4jIntsInObject(this.deserializeComplexFields(workflow));
     }, 'create', 'Workflow');
   }
 
@@ -238,7 +239,7 @@ export class WorkflowRepository extends BaseRepository {
       );
 
       const workflow = result[0]?.w || null;
-      return workflow ? convertNeo4jIntsInObject(workflow) : null;
+      return workflow ? convertNeo4jIntsInObject(this.deserializeComplexFields(workflow)) : null;
     }, 'update', 'Workflow', id);
   }
 
@@ -260,7 +261,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
       { authorId }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findByCategory(category: string): Promise<WorkflowModel[]> {
@@ -269,7 +270,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
       { category }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findByTags(tags: string[]): Promise<WorkflowModel[]> {
@@ -278,7 +279,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
       { tags }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findPublic(limit: number = 50, offset: number = 0): Promise<WorkflowModel[]> {
@@ -290,7 +291,7 @@ export class WorkflowRepository extends BaseRepository {
         offset: (offset)
       }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async searchWorkflows(query: string): Promise<WorkflowModel[]> {
@@ -299,7 +300,7 @@ export class WorkflowRepository extends BaseRepository {
       'CALL db.index.fulltext.queryNodes("workflowSearch", $query) YIELD node as w, score RETURN w, score ORDER BY score DESC LIMIT 20',
       { query }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async incrementUsageCount(id: string): Promise<void> {
@@ -357,7 +358,7 @@ export class WorkflowRepository extends BaseRepository {
     query += ' RETURN w ORDER BY w.usageCount DESC, w.rating DESC';
 
     const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
 }

@@ -58,10 +58,11 @@ export class AgentMemory extends Memory {
   protected state: AgentMemoryState = {};
 
   constructor(params: AgentMemoryParams = {}) {
-    // Extract messages from state for parent constructor
+    // Extract messages from state for parent constructor, ensuring proper type
+    const stateMessages = Array.isArray(params.state?.messages) ? params.state.messages : undefined;
     const memoryParams = {
       ...params,
-      messages: params.state?.messages || params.messages
+      messages: stateMessages || params.messages
     };
     
     // Call parent constructor first

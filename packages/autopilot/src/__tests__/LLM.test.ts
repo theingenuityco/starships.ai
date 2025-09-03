@@ -32,7 +32,7 @@ describe('LLM', () => {
       getParameters: jest.fn(),
       clone: jest.fn(),
       updateParameters: jest.fn()
-    } as unknown;
+    } as jest.Mocked<HttpRequest>;
     
     // Make constructor return our mock
     MockedHttpRequest.mockImplementation(() => mockHttpRequest);
@@ -890,8 +890,8 @@ describe('LLM', () => {
 
     it('should handle parsing errors in response extraction gracefully', async () => {
       // Create a circular reference that will cause JSON.stringify to fail
-      const circularObj: unknown = { data: 'test' };
-      circularObj.self = circularObj;
+      const circularObj: Record<string, unknown> = { data: 'test' };
+      (circularObj as Record<string, unknown>).self = circularObj;
 
       mockHttpRequest.execute.mockResolvedValue({
         status: 'completed',

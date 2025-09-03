@@ -1,8 +1,8 @@
 import type { NextConfig } from 'next'
-import { getClientConfig } from '@starships/env-config'
+import { getServerConfig } from '@starships/env-config'
 
 // Load client configuration for public variables
-const clientEnv = getClientConfig()
+const s = getServerConfig()
 
 const nextConfig: NextConfig = {
   eslint: {
@@ -18,11 +18,13 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   async rewrites() {
+    console.log(s)
+    console.log(process.env)
     return [
       {
-        // Proxy /api/* requests to backend /api/* endpoints
+        // rewrite /api/* requests to backend /api/* endpoints
         source: '/api/:path*',
-        destination: 'http://localhost:4000/api/:path*',
+        destination: `${s.SERVER_URL}/api/:path*`,
       },
     ]
   },
@@ -45,14 +47,6 @@ const nextConfig: NextConfig = {
       }
     }
     return config
-  },
-  // DON'T set server-side env vars here - Next.js automatically provides them at runtime
-  // The env config is ONLY for:
-  // 1. Client-side variables (NEXT_PUBLIC_*)
-  // 2. Providing build-time defaults
-  env: {
-    // Public environment variables (exposed to browser)
-    NEXT_PUBLIC_API_URL: clientEnv.NEXT_PUBLIC_API_URL,
   },
 }
 

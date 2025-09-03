@@ -56,7 +56,7 @@ export interface ServerEnvironmentConfig {
  */
 export interface ClientEnvironmentConfig {
   // API Configuration
-  NEXT_PUBLIC_API_URL?: string;
+  SERVER_URL?: string;
 }
 
 /**

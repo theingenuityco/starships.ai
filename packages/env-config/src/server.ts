@@ -41,6 +41,8 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     // JWT Authentication
     JWT_SECRET: process.env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production',
     
+    SERVER_URL: process.env.SERVER_URL || 'http://localhost:4000',
+    
     // Stripe Configuration - use test keys as defaults for development/CI
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || (process.env.NODE_ENV === 'production' ? '' : 'sk_test_dummy_key_for_development'),
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || (process.env.NODE_ENV === 'production' ? '' : 'pk_test_dummy_key_for_development'),

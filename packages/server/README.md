@@ -53,7 +53,7 @@ src/
 │   ├── native-api-keys.ts   # Encrypted tool API key management
 │   ├── agent-communication.ts # Bidirectional agent communication
 │   ├── webhooks.ts          # Stripe webhook handling
-│   ├── users.ts             # User management and Kinde sync
+│   ├── users.ts             # User management
 │   ├── memory.ts            # Memory management endpoints
 │   └── health.ts            # Comprehensive health monitoring
 ├── services/
@@ -71,7 +71,7 @@ src/
 │   ├── agentHandlers.ts             # Agent communication events
 │   └── sibilHandlers.ts             # Sibil assistant events
 └── middleware/
-    ├── auth.ts                      # JWT authentication with Kinde
+    ├── auth.ts                      # JWT authentication
     ├── starship-access.ts           # Resource ownership validation
     ├── expedition.ts                # Expedition access control
     └── validation.ts                # Request validation
@@ -531,8 +531,7 @@ ANTHROPIC_API_KEY=your_anthropic_key
 DEFAULT_LLM_PROVIDER=openai
 
 # Authentication (JWT)
-# JWT authentication is handled through API endpoints
-# No environment configuration needed for JWT tokens
+JWT_SECRET=your_jwt_secret_key_32_chars_min
 
 # Stripe Payment Integration
 STRIPE_SECRET_KEY=sk_test_...

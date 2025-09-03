@@ -1,7 +1,7 @@
 /**
  * Authentication Routes
  *
- * Lean authentication system with JWT tokens replacing Kinde
+ * JWT-based authentication system for user registration, login, and token management
  */
 
 import { Router } from 'express';

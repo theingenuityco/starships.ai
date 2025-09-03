@@ -1,15 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
-import { jwtVerify, createRemoteJWKSet } from 'jose';
+import { jwtVerify } from 'jose';
 import { UserService } from '../services/UserService';
 import { loadServerEnvironment } from '@starships/env-config';
 
-// Kinde JWKS endpoint for token verification
 const env = loadServerEnvironment();
-const kindeIssuerUrl = env.KINDE_ISSUER_URL;
-const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));
+
+// JWT configuration
+const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');
+const JWT_ISSUER = 'starships.ai';
+const JWT_AUDIENCE = 'starships-users';
 
 /**
- * Authentication middleware that validates Kinde JWT tokens
+ * Authentication middleware that validates JWT tokens
  * and resolves the user from the database
  */
 export const authMiddleware = async (
@@ -20,9 +22,8 @@ export const authMiddleware = async (
   try {
     // TESTING BACKDOOR: Only activate when explicitly enabled via environment variable
     const enableTestingBackdoor = process.env.ENABLE_AUTH_TESTING_BACKDOOR === 'true';
-    const hasKindeConfig = process.env.KINDE_CLIENT_ID && process.env.KINDE_ISSUER_URL;
 
-    if (enableTestingBackdoor && !hasKindeConfig) {
+    if (enableTestingBackdoor) {
       console.log(`[AUTH] Testing backdoor activated for ${req.method} ${req.path}`);
 
       // Create a mock user for testing
@@ -32,13 +33,11 @@ export const authMiddleware = async (
         displayName: 'Test User',
         username: 'test-user',
         avatar: undefined,
-        kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       req.user = mockUser;
-      req.kindeId = 'test-user-1';
 
       console.log(`[AUTH] Mock user attached: ${mockUser.id} (${mockUser.displayName})`);
       next();
@@ -76,13 +75,11 @@ export const authMiddleware = async (
         displayName: 'Test User',
         username: 'test-user',
         avatar: undefined,
-        kindeId: 'test-user-1',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
       req.user = mockUser;
-      req.kindeId = 'test-user-1';
 
       console.log(`[AUTH] Test token validated: ${mockUser.id} (${mockUser.displayName})`);
       next();
@@ -90,48 +87,20 @@ export const authMiddleware = async (
     }
 
     // Verify JWT token
-    let payload: any;
-
-    // In development, also accept tokens signed with the client secret
-    if (process.env.NODE_ENV === 'development' && process.env.KINDE_CLIENT_SECRET) {
-      try {
-        // First try with JWKS (production tokens)
-        const result = await jwtVerify(token, JWKS, {
-          issuer: kindeIssuerUrl,
-        });
-        payload = result.payload;
-      } catch (jwksError) {
-        // If JWKS fails in dev, try with client secret (dev tokens)
-        console.log('[AUTH] JWKS validation failed, trying development token validation');
-        try {
-          const secret = new TextEncoder().encode(process.env.KINDE_CLIENT_SECRET);
-          const result = await jwtVerify(token, secret, {
-            issuer: kindeIssuerUrl,
-          });
-          payload = result.payload;
-          console.log('[AUTH] Development token validated successfully');
-        } catch (devError) {
-          console.error('[AUTH] Both JWKS and development token validation failed');
-          throw jwksError; // Throw original error
-        }
-      }
-    } else {
-      // Production: only use JWKS
-      const result = await jwtVerify(token, JWKS, {
-        issuer: kindeIssuerUrl,
-      });
-      payload = result.payload;
-    }
+    const { payload } = await jwtVerify(token, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
 
     console.log(`[AUTH] Token validated for user: ${payload.sub}`);
 
-    // Look up user in database by Kinde ID
+    // Look up user in database by ID
     let user;
     try {
-      console.log(`[AUTH] Attempting database lookup for Kinde ID: ${payload.sub}`);
-      user = await UserService.getUserByKindeId(payload.sub as string);
+      console.log(`[AUTH] Attempting database lookup for user ID: ${payload.sub}`);
+      user = await UserService.getUserById(payload.sub as string);
       console.log(
-        `[AUTH] Database lookup completed for Kinde ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`
+        `[AUTH] Database lookup completed for user ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`
       );
     } catch (dbError: any) {
       console.error(`[AUTH] Database error when looking up user: ${payload.sub}`);
@@ -144,32 +113,13 @@ export const authMiddleware = async (
     }
 
     if (!user) {
-      console.log(
-        `[AUTH] User not found in database for Kinde ID: ${payload.sub}, attempting auto-sync`
-      );
-
-      // Auto-sync user if they don't exist
-      try {
-        user = await UserService.syncUser({
-          kindeId: payload.sub as string,
-          email: (payload.email as string) || `user-${payload.sub}@unknown.com`,
-          name: (payload.given_name as string) || (payload.name as string),
-          avatar: payload.picture as string,
-        });
-        console.log(`[AUTH] User auto-synced: ${user.id} (${user.displayName || user.username})`);
-      } catch (syncError: any) {
-        console.error(`[AUTH] Failed to auto-sync user for Kinde ID: ${payload.sub}`, syncError);
-        res.status(500).json({
-          error: 'Failed to sync user',
-          details: syncError?.message || 'Unknown sync error',
-        });
-        return;
-      }
+      console.error(`[AUTH] User not found in database for user ID: ${payload.sub}`);
+      res.status(401).json({ error: 'User not found' });
+      return;
     }
 
     // Attach user info to request for use in route handlers
     req.user = user;
-    req.kindeId = payload.sub as string;
 
     console.log(`[AUTH] User resolved: ${user.id} (${user.displayName || user.username})`);
 
@@ -182,7 +132,7 @@ export const authMiddleware = async (
       res.status(401).json({ error: 'Token expired' });
     } else if (error?.name === 'JWTInvalid') {
       res.status(401).json({ error: 'Invalid token' });
-    } else if (error?.message?.includes('JWKSNoMatchingKey')) {
+    } else if (error?.message?.includes('signature verification failed')) {
       res.status(401).json({ error: 'Token signature verification failed' });
     } else {
       res.status(500).json({

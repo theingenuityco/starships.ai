@@ -12,7 +12,7 @@ import { MissionService } from './MissionService';
 import { WorkflowParsingService } from './WorkflowParsingService';
 import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
 import { MISSION_PHASES } from '@starships/protocol';
-import { Workflow, createAgentMemory, AgentMemory, LLM, createLLM } from '@starships/autopilot';
+import { Workflow, AgentMemory, LLM } from '@starships/autopilot';
 import type { LlmNodeParameters } from '@starships/autopilot';
 import type {
   MissionModel,
@@ -405,7 +405,7 @@ export class MissionOrchestratorAgent {
       const autopilotWorkflow = this.convertToAutopilotWorkflow(blueprint);
       
       // Create agent memory for workflow execution context
-      const agentMemory = createAgentMemory();
+      const agentMemory = new AgentMemory();
       agentMemory.addMessage('system', 'Mission execution coordinator');
       agentMemory.setIdentity({
         name: 'Mission Executor',
@@ -601,7 +601,7 @@ export class MissionOrchestratorAgent {
         openrouterApiKey: this.config.openrouterApiKey
       };
 
-      const llm = createLLM(llmConfig);
+      const llm = new LLM(llmConfig);
       const result = await llm.execute();
 
       if (result.status === 'completed' && result.data?.llmResponse) {

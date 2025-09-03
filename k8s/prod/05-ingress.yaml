@@ -26,9 +26,41 @@ spec:
   - host: starships.ai
     http:
       paths:
-      # Auth routes must go to frontend (Next.js/Kinde handles these)
-      # This must come BEFORE the general /api rule
+      # Next.js API routes (must come BEFORE general /api rule)
+      # Auth routes (Kinde)
       - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Runtime config route
+      - path: /api/config
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Backend proxy route
+      - path: /api/backend
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Pricing route
+      - path: /api/pricing
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Waitlist routes
+      - path: /api/waitlist
         pathType: Prefix
         backend:
           service:
@@ -62,9 +94,41 @@ spec:
   - host: www.starships.ai
     http:
       paths:
-      # Auth routes must go to frontend (Next.js/Kinde handles these)
-      # This must come BEFORE the general /api rule
+      # Next.js API routes (must come BEFORE general /api rule)
+      # Auth routes (Kinde)
       - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Runtime config route
+      - path: /api/config
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Backend proxy route
+      - path: /api/backend
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Pricing route
+      - path: /api/pricing
+        pathType: Prefix
+        backend:
+          service:
+            name: starships-app-internal
+            port:
+              number: 3000
+      # Waitlist routes
+      - path: /api/waitlist
         pathType: Prefix
         backend:
           service:

@@ -530,12 +530,9 @@ OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 DEFAULT_LLM_PROVIDER=openai
 
-# Authentication (Kinde)
-KINDE_DOMAIN=your-domain.kinde.com
-KINDE_CLIENT_ID=your_client_id
-KINDE_CLIENT_SECRET=your_client_secret
-KINDE_REDIRECT_URI=http://localhost:3000/api/auth/kinde_callback
-KINDE_LOGOUT_REDIRECT_URI=http://localhost:3000
+# Authentication (JWT)
+# JWT authentication is handled through API endpoints
+# No environment configuration needed for JWT tokens
 
 # Stripe Payment Integration
 STRIPE_SECRET_KEY=sk_test_...
@@ -919,7 +916,7 @@ node --inspect-brk dist/index.js
 - **express**: Web framework for Node.js with Socket.IO integration
 - **socket.io**: Real-time bidirectional communication
 - **stripe**: Payment processing and subscription management
-- **@kinde-oss/kinde-node-express**: JWT authentication
+- **jose**: JWT token validation and management
 - **@starships/agent-engine**: Advanced AI orchestration with MCP tools
 - **@starships/models**: Neo4j database with migration system
 - **@starships/protocol**: Shared types for missions, workflows, and Socket.IO events

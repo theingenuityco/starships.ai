@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadApiRuntimeConfig } from '@starships/env-config';
-import { getKindeServerSession } from '@kinde-oss/kinde-auth-nextjs/server';
 
 /**
  * API Proxy Route - Forwards requests to the backend with runtime configuration
  * This replaces direct client-to-backend calls that used NEXT_PUBLIC_API_URL
- * Following the same pattern as the Kinde auth route for runtime configuration
+ * Uses JWT authentication for secure backend communication
  */
 async function proxyRequest(
   request: NextRequest,
@@ -28,12 +27,11 @@ async function proxyRequest(
       headers['Content-Type'] = contentType;
     }
     
-    // Add authentication if available
+    // Add JWT authentication if available
     try {
-      const { getAccessToken } = getKindeServerSession();
-      const token = await getAccessToken();
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      const authHeader = request.headers.get('authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        headers['Authorization'] = authHeader;
       }
     } catch (error) {
       // Auth not available, continue without token

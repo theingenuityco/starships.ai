@@ -47,7 +47,7 @@ cp .env.example .env
 
 2. Configure essential services:
 - **Neo4j**: Run with Docker: `docker run -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/[NEO4J-PASSWORD] neo4j`
-- **Kinde Auth**: Set up at [kinde.com](https://kinde.com)
+- **JWT Authentication**: Built-in JWT token-based authentication system
 - **OpenAI/Anthropic**: Add your API keys
 - **Stripe**: Configure for payments (optional for development)
 

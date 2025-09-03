@@ -37,7 +37,7 @@ import { env, getApiBaseUrl } from '@starships/client/src/lib/env';
 
 // Access environment variables
 const apiUrl = getApiBaseUrl();
-const kindeClientId = env.kinde.CLIENT_ID;
+// JWT authentication doesn't require client-side environment variables
 ```
 
 ### Full Configuration

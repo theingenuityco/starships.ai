@@ -1,7 +1,6 @@
 import axios, { AxiosResponse } from 'axios'
 import type { ApiResponse } from '@starships/protocol'
 
-import { getApiBaseUrl } from './env'
 import {
   apiCache,
   CACHE_KEYS,
@@ -10,10 +9,7 @@ import {
 } from './cache'
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 
-const API_BASE_URL = getApiBaseUrl()
-
 const api = axios.create({
-  baseURL: API_BASE_URL,
   timeout: 120000, // Increased to 120s (2 minutes) for long-running operations
   headers: {
     'Content-Type': 'application/json',

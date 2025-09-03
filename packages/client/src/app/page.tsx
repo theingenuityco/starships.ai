@@ -5,7 +5,7 @@ import { useEffect, useState, memo, lazy, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DynamicLoginButton } from '@/components/auth/DynamicLoginButton';
+import { LoginButton } from '@/components/auth/LoginButton';
 import { StarTheme } from '@/components/theme-context';
 import { useAuth } from '@/hooks/useAuth';
 import { useStarships } from '@/hooks/useStarships';
@@ -156,15 +156,12 @@ export default function HomePage() {
           {/* Right side buttons */}
           <div className="flex gap-4">
             {!isAuthenticated && (
-              <DynamicLoginButton 
-                size="default" 
-                data-login-button
+              <LoginButton
+                size="default"
                 className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full"
-                preserveOnboarding={true}
-                showIcon={false}
               >
                 Login
-              </DynamicLoginButton>
+              </LoginButton>
             )}
             <Button 
               variant="outline" 
@@ -374,14 +371,13 @@ export default function HomePage() {
 
             {/* Login Button - Only for unauthenticated users */}
             {!isAuthenticated && (
-              <DynamicLoginButton
+              <LoginButton
                 size="lg"
                 variant="outline"
                 className="px-8 py-4 text-lg rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
-                showIcon={true}
               >
                 Sign In
-              </DynamicLoginButton>
+              </LoginButton>
             )}
           </motion.div>
           

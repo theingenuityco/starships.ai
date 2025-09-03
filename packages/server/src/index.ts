@@ -113,7 +113,7 @@ app.get('/api/v1/starships/pricing', async (req, res) => {
 });
 
 // API Routes
-app.use('/api/v1/auth', authRoutes); // Authentication routes (public)
+app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix

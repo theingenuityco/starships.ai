@@ -21,16 +21,18 @@ describe('NodeRepository', () => {
   let mockConnection: any;
 
   beforeEach(() => {
-    // Create fresh mock connection for each test
+    // Clear all mocks to ensure clean state
+    jest.clearAllMocks();
+    
+    // Create fresh mock connection for each test BEFORE creating repository
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
-    repository = new NodeRepository();
     
-    // Clear all mocks to ensure clean state
-    jest.clearAllMocks();
+    // Now create repository which will use the mocked connection
+    repository = new NodeRepository();
   });
 
   describe('constructor', () => {
@@ -929,7 +931,19 @@ describe('NodeRepository', () => {
       };
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockNodeId = 'large-node-123';
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'agent',
+            name: 'Large Node',
+            description: 'Node with large parameters',
+            parameters: JSON.stringify(largeParameters),
+            ref: 'large'
+          }
+        }])
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.createNode('blueprint-123', nodeData);
 
@@ -968,7 +982,19 @@ describe('NodeRepository', () => {
       };
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockNodeId = 'special-node-123';
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{
+          n: {
+            id: mockNodeId,
+            type: 'agent',
+            name: 'Node with "quotes" & <symbols>',
+            description: 'Description with émojis 🚀 and unicode ñ',
+            parameters: JSON.stringify({ text: 'Special chars: @#$%^&*()' }),
+            ref: 'special-node'
+          }
+        }])
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.createNode('blueprint-123', nodeData);
 

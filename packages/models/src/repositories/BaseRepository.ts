@@ -503,7 +503,16 @@ export abstract class BaseRepository {
     connection?: any
   ): Promise<T> {
     // Use provided connection or get from module - this helps with testing
-    const conn = connection || (await import('../helpers/database').then(m => m.getConnection()));
+    let conn = connection;
+    if (!conn) {
+      try {
+        const dbModule = await import('../helpers/database');
+        conn = dbModule.getConnection();
+      } catch (error) {
+        // Fallback for testing scenarios where import might fail
+        throw new Error('Database connection not available');
+      }
+    }
     
     // Remove any existing 'id' from properties - Neo4j will generate it
     const { id, ...propsWithoutId } = properties;
@@ -515,6 +524,10 @@ export abstract class BaseRepository {
        RETURN n`,
       { props: propsWithoutId }
     );
+    
+    if (!result || result.length === 0) {
+      throw new Error(`Failed to create ${nodeLabel}`);
+    }
     
     return result[0].n;
   }

@@ -18,7 +18,6 @@ interface AuthContextValue {
   userEmail?: string;
   userName?: string;
   userAvatar?: string;
-  kindeUser: AuthUser | null; // For backward compatibility
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

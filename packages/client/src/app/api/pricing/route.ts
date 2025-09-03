@@ -4,7 +4,6 @@ import { loadApiRuntimeConfig } from '@starships/env-config';
 export async function GET() {
   try {
     // Load server URL at runtime (not build time!)
-    // Following the same pattern as Kinde runtime configuration
     const { serverUrl } = loadApiRuntimeConfig();
     
     const endpoint = `${serverUrl}/api/starships/pricing`;

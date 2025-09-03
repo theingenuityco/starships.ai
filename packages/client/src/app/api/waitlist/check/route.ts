@@ -5,10 +5,10 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Load server URL at runtime (not build time!)
-    const { serverUrl } = loadApiRuntimeConfig();
+    // Load API URL at runtime (not build time!)
+    const { apiUrl } = loadApiRuntimeConfig();
     
-    const response = await fetch(`${serverUrl}/api/waitlist/check`, {
+    const response = await fetch(`${apiUrl}/waitlist/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

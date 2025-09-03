@@ -12,12 +12,12 @@ async function proxyRequest(
   { params }: { params: { path: string[] } }
 ) {
   try {
-    // Load server config at runtime (not build time!)
-    const { serverUrl } = loadApiRuntimeConfig();
+    // Load API config at runtime (not build time!)
+    const { apiUrl } = loadApiRuntimeConfig();
     
     // Reconstruct the API path
     const path = params.path.join('/');
-    const url = new URL(`${serverUrl}/${path}${request.nextUrl.search}`);
+    const url = new URL(`${apiUrl}/${path}${request.nextUrl.search}`);
     
     // Prepare headers
     const headers: HeadersInit = {};

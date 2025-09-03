@@ -73,7 +73,12 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: CLIENT_URL
-        # Runtime server configuration (not NEXT_PUBLIC!)
+        # Runtime API configuration (not NEXT_PUBLIC!)
+        - name: API_URL
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: API_URL
         - name: SERVER_URL
           valueFrom:
             secretKeyRef:

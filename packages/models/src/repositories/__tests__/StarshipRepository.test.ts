@@ -21,12 +21,15 @@ describe('StarshipRepository', () => {
   let mockConnection: any;
 
   beforeEach(() => {
-    repository = new StarshipRepository();
+    // Create fresh mock connection for each test
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    repository = new StarshipRepository();
+    
+    // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });
 
@@ -294,7 +297,9 @@ describe('StarshipRepository', () => {
       const existingStarship = global.createMockStarship({ id: 'starship-123', ownerId: 'owner-123' });
       const updatedStarship = global.createMockStarship({
         id: 'starship-123',
-        ...updates
+        name: 'Updated Name',
+        description: 'Updated description',
+        slug: 'updated-name'
       });
 
       // Mock findById call for slug generation

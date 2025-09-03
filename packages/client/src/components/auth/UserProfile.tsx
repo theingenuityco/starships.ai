@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LogoutLink } from "@kinde-oss/kinde-auth-nextjs/components";
 import { LogOut, User } from "lucide-react";
 
 interface UserProfileProps {
@@ -50,12 +49,19 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
                 <User className="w-4 h-4 mr-3" />
                 My Profile
               </Button>
-              <LogoutLink className="block">
-                <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground">
-                  <LogOut className="w-4 h-4 mr-3" />
-                  Sign Out
-                </Button>
-              </LogoutLink>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
+                onClick={async () => {
+                  const { useAuth } = await import("@/hooks/useAuth");
+                  // This won't work in onClick, let's use a different approach
+                  window.location.href = '/logout';
+                }}
+              >
+                <LogOut className="w-4 h-4 mr-3" />
+                Sign Out
+              </Button>
             </div>
           </div>
         </TooltipContent>
@@ -97,12 +103,18 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
               <User className="w-4 h-4 mr-3" />
               My Profile
             </Button>
-            <LogoutLink className="block">
-              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground">
-                <LogOut className="w-4 h-4 mr-3" />
-                Sign Out
-              </Button>
-            </LogoutLink>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
+              onClick={async () => {
+                // Since we can't use hooks in onClick, redirect to logout page
+                window.location.href = '/logout';
+              }}
+            >
+              <LogOut className="w-4 h-4 mr-3" />
+              Sign Out
+            </Button>
           </div>
         </div>
       </TooltipContent>

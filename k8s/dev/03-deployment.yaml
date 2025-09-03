@@ -73,22 +73,21 @@ spec:
             secretKeyRef:
               name: starships-secrets
               key: CLIENT_URL
-        # Runtime API configuration (not NEXT_PUBLIC!)
-        - name: API_URL
+        - name: NEXT_PUBLIC_API_URL
           valueFrom:
             secretKeyRef:
               name: starships-secrets
-              key: API_URL
+              key: NEXT_PUBLIC_API_URL
+        - name: NEXT_PUBLIC_SERVER_URL
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEXT_PUBLIC_SERVER_URL
         - name: SERVER_URL
           valueFrom:
             secretKeyRef:
               name: starships-secrets
               key: SERVER_URL
-        - name: ENABLE_AUTH_TESTING_BACKDOOR
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: ENABLE_AUTH_TESTING_BACKDOOR
         
         # Neo4j Configuration
         - name: NEO4J_URI
@@ -134,7 +133,12 @@ spec:
               name: starships-secrets
               key: KINDE_POST_LOGOUT_REDIRECT_URL
         
-        # Security: Enable debug for dev
+        # Security: Disable testing backdoor, enable debug for dev
+        - name: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
+          valueFrom:
+            secretKeyRef:
+              name: starships-secrets
+              key: NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR
         - name: KINDE_DEBUG_MODE
           valueFrom:
             secretKeyRef:

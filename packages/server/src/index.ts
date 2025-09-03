@@ -12,7 +12,6 @@ import {
   AgentRepository,
   UserRepository,
   StarshipRepository,
-  RepositoryFactory,
   createConnection,
 } from '@starships/models';
 import { migrationRunner, seedWaitlist } from '@starships/models';

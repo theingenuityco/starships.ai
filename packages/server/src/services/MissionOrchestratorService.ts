@@ -8,7 +8,7 @@
 import { MissionOrchestratorAgent, type MissionChatState } from './MissionOrchestratorAgent';
 import { SYSTEM_INSTRUCTIONS } from '../prompts/MissionPromptBuilder';
 import { MissionService } from './MissionService';
-import { RepositoryFactory } from '@starships/models';
+import { MissionRepository, MissionMessageRepository } from '@starships/models';
 import { Logger } from '../utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ValidationError, InternalServerError } from '@starships/errors';
@@ -77,7 +77,7 @@ export class MissionOrchestratorService {
     } = {}
   ): Promise<string> {
     // Check if mission exists
-    const missionRepo = RepositoryFactory.getMissionRepository();
+    const missionRepo = new MissionRepository();
     await missionRepo.getMissionById(missionId);
 
     // Validate message content
@@ -164,8 +164,8 @@ export class MissionOrchestratorService {
     this.logger.info('Retrieving message history', context);
 
     try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
+      const missionRepo = new MissionRepository();
+      const missionMessageRepo = new MissionMessageRepository();
       
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
@@ -205,8 +205,8 @@ export class MissionOrchestratorService {
     };
 
     try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
+      const missionRepo = new MissionRepository();
+      const missionMessageRepo = new MissionMessageRepository();
       
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
@@ -239,8 +239,8 @@ export class MissionOrchestratorService {
    */
   private async saveUserMessage(missionId: string, userId: string, content: string): Promise<MissionMessageModel> {
     try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
+      const missionRepo = new MissionRepository();
+      const missionMessageRepo = new MissionMessageRepository();
       
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
@@ -275,8 +275,8 @@ export class MissionOrchestratorService {
    */
   private async saveOrchestratorMessage(missionId: string, content: string): Promise<MissionMessageModel> {
     try {
-      const missionRepo = RepositoryFactory.getMissionRepository();
-      const missionMessageRepo = RepositoryFactory.getMissionMessageRepository();
+      const missionRepo = new MissionRepository();
+      const missionMessageRepo = new MissionMessageRepository();
       
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);

@@ -156,7 +156,8 @@ router.get('/starships/:starshipId/agents', authMiddleware, async (req: Request,
     }
 
     // Validate starship access
-    const starshipRepository = await import('@starships/models').then(m => m.RepositoryFactory.getStarshipRepository());
+    const { StarshipRepository } = await import('@starships/models');
+    const starshipRepository = new StarshipRepository();
     const starship = await starshipRepository.findById(starshipId);
     
     if (!starship) {
@@ -347,7 +348,8 @@ router.get('/agents', authMiddleware, async (req: Request, res: Response): Promi
       agents = await AgentService.getAgentsByAuthor(authorId as string);
     } else if (starshipId) {
       // Validate starship access
-      const starshipRepository = await import('@starships/models').then(m => m.RepositoryFactory.getStarshipRepository());
+      const { StarshipRepository } = await import('@starships/models');
+      const starshipRepository = new StarshipRepository();
       const starship = await starshipRepository.findById(starshipId as string);
       
       if (!starship) {

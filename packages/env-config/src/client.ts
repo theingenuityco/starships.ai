@@ -6,7 +6,7 @@ import { ClientEnvironmentConfig } from './types';
  */
 export function loadClientEnvironment(): ClientEnvironmentConfig {
   const env = {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+    SERVER_URL: process.env.SERVER_URL,
   };
 
   return env;

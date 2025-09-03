@@ -265,6 +265,19 @@ importers:
         specifier: ^3.6.2
         version: 3.6.2
 
+  packages/env:
+    dependencies:
+      dotenv:
+        specifier: ^17.1.0
+        version: 17.1.0
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.10
+        version: 24.0.15
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+
   packages/env-config:
     dependencies:
       dotenv:

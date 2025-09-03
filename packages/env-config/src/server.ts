@@ -41,14 +41,6 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
     // JWT Authentication
     JWT_SECRET: process.env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production',
     
-    KINDE_CLIENT_ID: process.env.KINDE_CLIENT_ID,
-    KINDE_CLIENT_SECRET: process.env.KINDE_CLIENT_SECRET,
-    KINDE_ISSUER_URL: process.env.KINDE_ISSUER_URL,
-    KINDE_SITE_URL: process.env.KINDE_SITE_URL,
-    KINDE_POST_LOGIN_REDIRECT_URL: process.env.KINDE_POST_LOGIN_REDIRECT_URL,
-    KINDE_POST_LOGOUT_REDIRECT_URL: process.env.KINDE_POST_LOGOUT_REDIRECT_URL,
-    KINDE_DEBUG_MODE: process.env.KINDE_DEBUG_MODE === 'true',
-    
     // Stripe Configuration - use test keys as defaults for development/CI
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || (process.env.NODE_ENV === 'production' ? '' : 'sk_test_dummy_key_for_development'),
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || (process.env.NODE_ENV === 'production' ? '' : 'pk_test_dummy_key_for_development'),
@@ -108,61 +100,14 @@ export function loadServerEnvironment(): ServerEnvironmentConfig {
       );
     }
 
-    // Skip Kinde validation - these are resolved at runtime
-    // The dynamic imports in Next.js will handle missing values
   }
 
   return env;
 }
 
 /**
- * Loads Kinde configuration at runtime and sets it in process.env
- * This is specifically for Next.js API routes that need Kinde auth
- * It ensures the Kinde SDK has access to the necessary environment variables
- */
-export function loadKindeRuntimeConfig(): ServerEnvironmentConfig {
-  // Force reload from root .env file to ensure runtime values
-  // Use process.cwd() which is more reliable in Next.js context
-  // Next.js runs from packages/client, so we go up two directories to reach root
-  const rootEnvPath = path.resolve(process.cwd(), '../../.env');
-  
-  // Load the .env file again to ensure we have the latest values
-  dotenv.config({ path: rootEnvPath, override: true });
-  
-  // Get the server config with freshly loaded values
-  const config = loadServerEnvironment();
-  
-  // Set Kinde environment variables in process.env for the SDK to use
-  // The Kinde SDK reads directly from process.env, not from our config object
-  if (config.KINDE_ISSUER_URL) {
-    process.env.KINDE_ISSUER_URL = config.KINDE_ISSUER_URL;
-  }
-  if (config.KINDE_CLIENT_ID) {
-    process.env.KINDE_CLIENT_ID = config.KINDE_CLIENT_ID;
-  }
-  if (config.KINDE_CLIENT_SECRET) {
-    process.env.KINDE_CLIENT_SECRET = config.KINDE_CLIENT_SECRET;
-  }
-  if (config.KINDE_SITE_URL) {
-    process.env.KINDE_SITE_URL = config.KINDE_SITE_URL;
-  }
-  if (config.KINDE_POST_LOGIN_REDIRECT_URL) {
-    process.env.KINDE_POST_LOGIN_REDIRECT_URL = config.KINDE_POST_LOGIN_REDIRECT_URL;
-  }
-  if (config.KINDE_POST_LOGOUT_REDIRECT_URL) {
-    process.env.KINDE_POST_LOGOUT_REDIRECT_URL = config.KINDE_POST_LOGOUT_REDIRECT_URL;
-  }
-  if (config.KINDE_DEBUG_MODE !== undefined) {
-    process.env.KINDE_DEBUG_MODE = String(config.KINDE_DEBUG_MODE);
-  }
-  
-  return config;
-}
-
-/**
  * Loads runtime API configuration for server-side routes
  * This enables environment-specific server URLs without rebuilding
- * Following the same pattern as loadKindeRuntimeConfig
  */
 export function loadApiRuntimeConfig(): { serverUrl: string; enableAuthTestingBackdoor: boolean } {
   // Use environment variables that can be set at runtime

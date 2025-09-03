@@ -5,7 +5,7 @@
  * Orchestrates between database persistence (MessageRepository) and business logic.
  */
 
-import { MessageRepository, RepositoryFactory } from '@starships/models';
+import { MessageRepository } from '@starships/models';
 import type { 
   MessageModel, 
   CreateMessageRequest, 
@@ -45,85 +45,6 @@ export class MessageService {
     this.messageRepository = new MessageRepository();
   }
 
-  // ============================================================================
-  // STATIC APIs FOR BACKWARD COMPATIBILITY
-  // ============================================================================
-
-  /**
-   * Create message - Static method
-   */
-  static async createMessage(request: CreateMessageRequest): Promise<MessageModel> {
-    const repository = RepositoryFactory.getMessageRepository();
-    return await repository.create({
-      ...request,
-      timestamp: request.metadata?.timestamp as string || new Date().toISOString(),
-      version: '1.0.0',
-      // Provide defaults for required fields
-      threadDepth: request.threadDepth || 0,
-      processingStatus: request.processingStatus || 'pending',
-      messageType: request.messageType || 'user_input',
-      importance: request.importance || 'medium',
-      hasAttachments: request.hasAttachments || false
-    });
-  }
-
-  /**
-   * Get message by ID - Static method
-   */
-  static async getMessage(messageId: string): Promise<MessageModel | null> {
-    const repository = RepositoryFactory.getMessageRepository();
-    return await repository.findById(messageId);
-  }
-
-  /**
-   * Update message - Static method
-   */
-  static async updateMessage(messageId: string, updates: UpdateMessageRequest): Promise<MessageModel | null> {
-    const repository = RepositoryFactory.getMessageRepository();
-    return await repository.update(messageId, updates as Partial<MessageModel>);
-  }
-
-  /**
-   * Delete message - Static method
-   */
-  static async deleteMessage(messageId: string): Promise<boolean> {
-    const repository = RepositoryFactory.getMessageRepository();
-    return await repository.delete(messageId);
-  }
-
-  /**
-   * Get messages by starship - Static method
-   */
-  static async getMessagesByStarship(starshipId: string): Promise<MessageModel[]> {
-    const repository = RepositoryFactory.getMessageRepository();
-    return await repository.findByStarshipId(starshipId);
-  }
-
-  /**
-   * Search messages - Static method
-   */
-  static async searchMessages(request: SearchMessagesRequest): Promise<SearchMessagesResponse> {
-    const repository = RepositoryFactory.getMessageRepository();
-    const messages = await repository.searchMessages(request.query, {
-      starshipId: request.starshipId,
-      agentId: request.agentId,
-      memoryId: request.memoryId,
-      conversationId: request.conversationId,
-      role: request.role,
-      messageType: request.messageType,
-      importance: request.importance,
-      dateFrom: request.dateFrom,
-      dateTo: request.dateTo,
-      limit: request.limit,
-      offset: request.offset
-    });
-
-    return {
-      messages,
-      total: messages.length,
-      searchQuery: request.query
-    };
-  }
 
   // ============================================================================
   // MESSAGE MANAGEMENT APIs

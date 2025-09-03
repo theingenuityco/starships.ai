@@ -681,24 +681,9 @@ export const mcpServerAPI = {
 
 
 export const userAPI = {
-  // Sync Kinde user to backend database
-  syncUser: async (userData: {
-    kindeId: string
-    email: string
-    name?: string
-    avatar?: string
-  }): Promise<SyncedUser> => {
-    const response = await api.post('/api/v1/users/sync', userData)
-    return extractResponseData<SyncedUser>(response)
-  },
-
   // Get user by ID
   getById: (id: string): Promise<SyncedUser> =>
     api.get(`/api/v1/users/${id}`).then((res) => extractResponseData<SyncedUser>(res)),
-
-  // Get user by Kinde ID
-  getByKindeId: (kindeId: string): Promise<SyncedUser> =>
-    api.get(`/api/v1/users/kinde/${kindeId}`).then((res) => extractResponseData<SyncedUser>(res)),
 }
 
 // Memory API

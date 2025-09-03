@@ -215,19 +215,15 @@ export function useJwtAuth() {
           error: null
         });
         
-        // Try to sync user data
-        try {
-          const syncedUserData = await userAPI.syncUser({
-            kindeId: user.id, // Use JWT user ID as kindeId for compatibility
-            email: user.email,
-            name: user.name,
-            avatar: user.avatar,
-          });
-          setSyncedUser(syncedUserData);
-        } catch (syncError) {
-          console.error('[JWT-AUTH] User sync failed:', syncError);
-          // Don't fail auth if sync fails
-        }
+        // Set synced user data directly from JWT token
+        setSyncedUser({
+          id: user.id,
+          username: user.name || user.email.split('@')[0],
+          email: user.email,
+          displayName: user.name,
+          avatar: user.avatar,
+          createdAt: new Date().toISOString(),
+        });
       } else {
         // Invalid token, clear it
         setStoredToken(null);
@@ -250,6 +246,7 @@ export function useJwtAuth() {
     login,
     register,
     logout,
+    getToken: getStoredToken, // Expose token getter
     
     // Compatibility properties for existing components
     userId: syncedUser?.id || state.user?.id,

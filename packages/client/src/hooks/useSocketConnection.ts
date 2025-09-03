@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from './useAuth';
+import { useJwtAuth } from './useJwtAuth';
 import SocketClient from '@/lib/socket-client';
 import type { ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ interface UseSocketConnectionReturn {
 }
 
 export function useSocketConnection(): UseSocketConnectionReturn {
-  const { getToken, userId, isAuthenticated } = useAuth();
+  const { getToken, userId, isAuthenticated } = useJwtAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [connectionState, setConnectionState] = useState<SocketConnectionState>({
     connected: false,

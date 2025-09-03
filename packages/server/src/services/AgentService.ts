@@ -544,8 +544,11 @@ export class AgentService {
     dbAgent: AgentModel,
     options: AgentOptions
   ): Promise<Agent> {
-    // Get or create blueprint
-    const blueprint = dbAgent.blueprint || this.createDefaultBlueprint(dbAgent);
+    // Get or create blueprint - ensure it has proper nodes and edges arrays
+    let blueprint = dbAgent.blueprint;
+    if (!blueprint || !blueprint.nodes || !blueprint.edges) {
+      blueprint = this.createDefaultBlueprint(dbAgent);
+    }
 
     // Create default memory config if missing
     const memoryConfig = dbAgent.memory || {

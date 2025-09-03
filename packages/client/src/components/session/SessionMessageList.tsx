@@ -26,10 +26,12 @@ export function SessionMessageList({
 }: SessionMessageListProps) {
   // Use TanStack Query to fetch messages
   const {
-    data: messages = [],
+    data: messageData,
     isLoading: loading,
     error: queryError
   } = useSessionMessages(sessionId || '', !!sessionId)
+  
+  const messages = messageData?.messages || []
   
   const error = queryError ? 'Failed to load session history' : null
 

@@ -39,7 +39,8 @@ export function useStarshipSessions(starshipId: string, enabled: boolean = true)
     queryKey: SESSION_QUERY_KEYS.byStarship(starshipId),
     queryFn: async () => {
       const response = await api.get(`/api/v1/starships/${starshipId}/sessions`);
-      return response.data; // This returns { sessions: Session[] } directly from chatAPI pattern
+      const sessions = extractResponseData<SessionModel[]>(response);
+      return { sessions };
     },
     enabled: !!starshipId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -80,7 +81,7 @@ export function useSessionMessages(sessionId: string, enabled: boolean = true) {
 
       // Convert database messages to client Message format
       const messages = response.data.messages || [];
-      return messages.map((dbMsg: any) => ({
+      const formattedMessages = messages.map((dbMsg: any) => ({
         id: dbMsg.id,
         content: dbMsg.content,
         role: dbMsg.role as 'user' | 'assistant',
@@ -88,6 +89,8 @@ export function useSessionMessages(sessionId: string, enabled: boolean = true) {
         sessionId: dbMsg.session_id || sessionId,
         ...(dbMsg.structured_content && { structuredContent: dbMsg.structured_content })
       }));
+      
+      return { messages: formattedMessages };
     },
     enabled: !!sessionId && enabled,
     staleTime: 5 * 1000, // 5 seconds - messages change frequently
@@ -104,7 +107,8 @@ export function useUserSessions(userId: string, onlyActive: boolean = false, ena
       const response = await api.get(`/api/v1/users/${userId}/sessions`, {
         params: { active: onlyActive ? 'true' : undefined }
       });
-      return extractResponseData<SessionModel[]>(response);
+      const sessions = extractResponseData<SessionModel[]>(response);
+      return { sessions };
     },
     enabled: !!userId && enabled,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -137,13 +141,12 @@ export function useCreateSession() {
       if (variables.starshipId) {
         queryClient.setQueryData(
           SESSION_QUERY_KEYS.byStarship(variables.starshipId),
-          (old: any) => {
+          (old: { sessions: SessionModel[] } | undefined) => {
             if (!old) return { sessions: [session] };
-            // Ensure old.sessions exists and is an array
-            const existingSessions = Array.isArray(old.sessions) ? old.sessions : [];
+            // Add to beginning (most recent)
             return {
               ...old,
-              sessions: [session, ...existingSessions] // Add to beginning (most recent)
+              sessions: [session, ...old.sessions]
             };
           }
         );
@@ -195,9 +198,9 @@ export function useSendMessage() {
         sending: true
       };
 
-      queryClient.setQueryData(SESSION_QUERY_KEYS.messages(sessionId), (old: Message[] | undefined) => {
-        const messages = old || [];
-        return [...messages, userMessage];
+      queryClient.setQueryData(SESSION_QUERY_KEYS.messages(sessionId), (old: { messages: Message[] } | undefined) => {
+        const messages = old?.messages || [];
+        return { messages: [...messages, userMessage] };
       });
 
       return { previousMessages, userMessage, sessionId };
@@ -291,8 +294,8 @@ export function useDeleteSession() {
 
       // Optimistically remove the session
       if (starshipId) {
-        queryClient.setQueryData(SESSION_QUERY_KEYS.byStarship(starshipId), (old: any) => {
-          if (!old?.sessions) return old;
+        queryClient.setQueryData(SESSION_QUERY_KEYS.byStarship(starshipId), (old: { sessions: SessionModel[] } | undefined) => {
+          if (!old) return old;
           return {
             ...old,
             sessions: old.sessions.filter((session: SessionModel) => session.id !== sessionId)

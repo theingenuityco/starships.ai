@@ -22,21 +22,13 @@ export const env = {
 }
 
 /**
- * Get API base URL with fallback logic
+ * Get API base URL - Now uses proxy route for runtime configuration
+ * This enables environment-specific URLs without rebuilding
  */
 export function getApiBaseUrl(): string {
-  // Use NEXT_PUBLIC_API_URL or default to server URL in development
-  if (env.client.NEXT_PUBLIC_API_URL) {
-    return env.client.NEXT_PUBLIC_API_URL
-  }
-
-  // In development, point to the server directly
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:4000'
-  }
-
-  // In production, use empty string for Next.js proxy
-  return ''
+  // Always use the proxy route which reads runtime configuration
+  // This follows the same pattern as Kinde auth routes
+  return '/api/backend'
 }
 
 /**

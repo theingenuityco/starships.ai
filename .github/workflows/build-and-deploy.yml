@@ -157,8 +157,6 @@ jobs:
             kinde_site_url=${{ vars.KINDE_SITE_URL }}
             kinde_post_login_redirect_url=${{ vars.KINDE_POST_LOGIN_REDIRECT_URL }}
             kinde_post_logout_redirect_url=${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}
-            next_public_api_url=${{ vars.NEXT_PUBLIC_API_URL }}
-            next_public_server_url=${{ vars.NEXT_PUBLIC_SERVER_URL }}
 
   # REMOVED: Production build job - we now use the same image as dev
   # Production deployments are handled manually via deploy-production.yml
@@ -267,15 +265,25 @@ jobs:
             --from-literal=NEO4J_USERNAME="${{ secrets.NEO4J_USERNAME }}" \
             --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
             --from-literal=NEO4J_DATABASE="${{ secrets.NEO4J_DATABASE }}" \
-            --from-literal=SERVER_URL="${{ secrets.SERVER_URL }}" \
+            --from-literal=API_URL="${{ vars.API_URL }}" \
+            --from-literal=SERVER_URL="${{ vars.SERVER_URL }}" \
+            --from-literal=ENABLE_AUTH_TESTING_BACKDOOR="${{ vars.ENABLE_AUTH_TESTING_BACKDOOR }}" \
             --from-literal=KINDE_SITE_URL="${{ vars.KINDE_SITE_URL }}" \
             --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${{ vars.KINDE_POST_LOGIN_REDIRECT_URL }}" \
             --from-literal=KINDE_POST_LOGOUT_REDIRECT_URL="${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}" \
             --from-literal=KINDE_DEBUG_MODE="${{ vars.KINDE_DEBUG_MODE }}" \
             --from-literal=CLIENT_URL="${{ vars.CLIENT_URL }}" \
-            --from-literal=NEXT_PUBLIC_API_URL="${{ vars.NEXT_PUBLIC_API_URL }}" \
-            --from-literal=NEXT_PUBLIC_SERVER_URL="${{ vars.NEXT_PUBLIC_SERVER_URL }}" \
-            --from-literal=NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR="${{ vars.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR }}" \
+            --from-literal=PORT="${{ vars.PORT }}" \
+            --from-literal=LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
+            --from-literal=DEFAULT_LLM_PROVIDER="${{ vars.DEFAULT_LLM_PROVIDER }}" \
+            --from-literal=DEFAULT_CHAT_MODEL="${{ vars.DEFAULT_CHAT_MODEL }}" \
+            --from-literal=DEFAULT_EMBEDDING_MODEL="${{ vars.DEFAULT_EMBEDDING_MODEL }}" \
+            --from-literal=SSE_CLIENT_TIMEOUT="${{ vars.SSE_CLIENT_TIMEOUT }}" \
+            --from-literal=SSE_HEARTBEAT_INTERVAL="${{ vars.SSE_HEARTBEAT_INTERVAL }}" \
+            --from-literal=STRIPE_PRICE_CRUISER_MONTHLY="${{ vars.STRIPE_PRICE_CRUISER_MONTHLY }}" \
+            --from-literal=STRIPE_PRICE_CRUISER_YEARLY="${{ vars.STRIPE_PRICE_CRUISER_YEARLY }}" \
+            --from-literal=STRIPE_PRICE_DRAUGHT_MONTHLY="${{ vars.STRIPE_PRICE_DRAUGHT_MONTHLY }}" \
+            --from-literal=STRIPE_PRICE_DRAUGHT_YEARLY="${{ vars.STRIPE_PRICE_DRAUGHT_YEARLY }}" \
             -n starships-dev
           
           kubectl create secret generic kinde-auth-secret \

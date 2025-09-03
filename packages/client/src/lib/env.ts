@@ -22,16 +22,6 @@ export const env = {
 }
 
 /**
- * Get API base URL - Now uses proxy route for runtime configuration
- * This enables environment-specific URLs without rebuilding
- */
-export function getApiBaseUrl(): string {
-  // Always use the proxy route which reads runtime configuration
-  // This follows the same pattern as Kinde auth routes
-  return '/api/backend'
-}
-
-/**
  * Get server configuration (server-side only)
  * This function will throw an error if called in the browser
  */

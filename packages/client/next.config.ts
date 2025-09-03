@@ -20,8 +20,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        // Proxy /v1/* requests to backend /api/* endpoints
-        source: '/v1/:path*',
+        // Proxy /api/* requests to backend /api/* endpoints
+        source: '/api/:path*',
         destination: 'http://localhost:4000/api/:path*',
       },
     ]

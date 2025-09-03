@@ -136,12 +136,14 @@ export function useCreateSession() {
       // Add new session to cache optimistically
       if (variables.starshipId) {
         queryClient.setQueryData(
-          SESSION_QUERY_KEYS.byStarship(variables.starshipId), 
+          SESSION_QUERY_KEYS.byStarship(variables.starshipId),
           (old: any) => {
             if (!old) return { sessions: [session] };
+            // Ensure old.sessions exists and is an array
+            const existingSessions = Array.isArray(old.sessions) ? old.sessions : [];
             return {
               ...old,
-              sessions: [session, ...old.sessions] // Add to beginning (most recent)
+              sessions: [session, ...existingSessions] // Add to beginning (most recent)
             };
           }
         );

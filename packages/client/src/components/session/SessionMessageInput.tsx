@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import { generateId } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { useCreateSession } from '@/hooks/useSessions'
 import type { Agent } from '@/lib/api'
 import type { ChatMode } from './ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
@@ -47,6 +48,7 @@ export function SessionMessageInput({
   const [isRecording, setIsRecording] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const currentStreamRef = useRef<{ abort: () => void } | null>(null)
+  const createSession = useCreateSession()
 
   const handleSubmit = async () => {
     const messageToSend = message.trim()
@@ -66,28 +68,34 @@ export function SessionMessageInput({
     try {
       setSending(true)
       
-      // Use existing session ID or let server create one
+      // Create session if one doesn't exist
       let currentSessionId = sessionId
       if (!currentSessionId) {
-        // Don't generate complex client-side session IDs
-        // Let the server create and provide the actual database session ID
-        currentSessionId = undefined
+        console.log('Creating new session for agent chat...')
+        const newSession = await createSession.mutateAsync({
+          source: 'agent',
+          agentId: selectedAgent!.id,
+          starshipId: starshipId
+        })
+        currentSessionId = newSession.id
+        onSessionStart?.(currentSessionId)
+        console.log('Session created:', currentSessionId)
       }
 
-      // Create user message (sessionId will be provided by server)
+      // Create user message
       const userMessage: Message = {
         id: generateId(),
         content: messageToSend,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentSessionId || 'pending', // Temporary until server provides real sessionId
+        sessionId: currentSessionId,
         agentId: selectedAgent!.id
       }
 
-      // Emit user message (no need to store manually - server handles this)
+      // Emit user message
       onMessageSent?.(userMessage)
 
-      // Send to agent API
+      // Send to agent API with valid sessionId
       currentStreamRef.current = agentSocketAPI.sendMessageStream(
         selectedAgent!.id,
         { sessionId: currentSessionId, message: messageToSend },
@@ -96,11 +104,10 @@ export function SessionMessageInput({
             // Handle streaming updates if needed
           },
           onComplete: (assistantMessage) => {
-            // Always use the session ID from server response for future requests
+            // Use the session ID from server response
             if (assistantMessage.sessionId) {
               onSessionStart?.(assistantMessage.sessionId)
             }
-            // No need to store manually - server handles this via socket handlers
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null
           },
@@ -142,28 +149,34 @@ export function SessionMessageInput({
     try {
       setSending(true)
       
-      // Use existing session ID or let server create one
+      // Create session if one doesn't exist
       let currentSessionId = sessionId
       if (!currentSessionId) {
-        // Don't generate complex client-side session IDs
-        // Let the server create and provide the actual database session ID
-        currentSessionId = undefined
+        console.log('Creating new session for agent chat suggestion...')
+        const newSession = await createSession.mutateAsync({
+          source: 'agent',
+          agentId: selectedAgent!.id,
+          starshipId: starshipId
+        })
+        currentSessionId = newSession.id
+        onSessionStart?.(currentSessionId)
+        console.log('Session created:', currentSessionId)
       }
 
-      // Create user message (sessionId will be provided by server)
+      // Create user message
       const userMessage: Message = {
         id: generateId(),
         content: suggestionText,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentSessionId || 'pending', // Temporary until server provides real sessionId
+        sessionId: currentSessionId,
         agentId: selectedAgent!.id
       }
 
-      // Emit user message (no need to store manually - server handles this)
+      // Emit user message
       onMessageSent?.(userMessage)
 
-      // Send to agent API
+      // Send to agent API with valid sessionId
       currentStreamRef.current = agentSocketAPI.sendMessageStream(
         selectedAgent!.id,
         { sessionId: currentSessionId, message: suggestionText },
@@ -172,11 +185,10 @@ export function SessionMessageInput({
             // Handle streaming updates if needed
           },
           onComplete: (assistantMessage) => {
-            // Always use the session ID from server response for future requests
+            // Use the session ID from server response
             if (assistantMessage.sessionId) {
               onSessionStart?.(assistantMessage.sessionId)
             }
-            // No need to store manually - server handles this via socket handlers
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null
           },

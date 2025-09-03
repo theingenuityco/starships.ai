@@ -3,12 +3,6 @@
   "globalDependencies": ["**/.env.*local"],
   "globalEnv": [
     "NODE_ENV",
-    "KINDE_CLIENT_ID",
-    "KINDE_CLIENT_SECRET",
-    "KINDE_ISSUER_URL",
-    "KINDE_SITE_URL",
-    "KINDE_POST_LOGOUT_REDIRECT_URL",
-    "KINDE_POST_LOGIN_REDIRECT_URL",
     "NEO4J_URI",
     "NEO4J_USERNAME",
     "NEO4J_PASSWORD",

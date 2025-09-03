@@ -4,6 +4,7 @@ import { AgentService } from '../services/AgentService';
 import { SocketIOService } from '../services/SocketIOService';
 import { RepositoryFactory } from '@starships/models';
 import { SessionService } from '../services/SessionService';
+import { UserService } from '../services/UserService';
 import getStore from '../store';
 
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
@@ -34,13 +35,18 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
   };
 
   io.on('connection', (socket: Socket) => {
-    const userId = socket.data.userId;
     const socketService = SocketIOService.getInstance();
 
     // Handle agent stream start
     socket.on('session:start-stream', async (request: SessionRequest) => {
       if (request.source !== 'agent' || !request.agentId) return;
-      console.log(`[AGENT SOCKET] Starting stream for user ${userId}, agent ${request.agentId}:`, request.streamId);
+      
+      // Get current userId (may be temporary or resolved)
+      const currentUserId = socket.data.userId;
+      const kindeId = socket.data.kindeId;
+      const isUserResolved = socket.data.userResolved;
+      
+      console.log(`[AGENT SOCKET] Starting stream for user ${currentUserId} (resolved: ${isUserResolved}), agent ${request.agentId}:`, request.streamId);
 
       try {
         // Validate request
@@ -93,8 +99,40 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
             throw new Error('Session not found');
           }
           
+          // Enhanced user validation - handle both temporary and resolved user IDs
+          let userMatches = false;
+          
+          if (isUserResolved) {
+            // If user is resolved, use direct comparison
+            userMatches = existingSession.userId === currentUserId;
+          } else {
+            // If user is not resolved yet, try to match against Kinde ID
+            // We need to get the user by Kinde ID and check if it matches the session
+            try {
+              const user = await UserService.getUserByKindeId(kindeId);
+              if (user) {
+                userMatches = existingSession.userId === user.id;
+                // Update socket with resolved user ID for future requests
+                socket.data.userId = user.id;
+                socket.data.userResolved = true;
+                console.log(`[AGENT SOCKET] Resolved user during session validation: ${kindeId} -> ${user.id}`);
+              }
+            } catch (userLookupError) {
+              console.error(`[AGENT SOCKET] Failed to resolve user during session validation:`, userLookupError);
+            }
+          }
+          
           // Validate session ownership and agent match
-          if (existingSession.userId !== userId || existingSession.agentId !== request.agentId) {
+          if (!userMatches || existingSession.agentId !== request.agentId) {
+            console.error(`[AGENT SOCKET] Session validation failed:`, {
+              sessionUserId: existingSession.userId,
+              currentUserId: currentUserId,
+              kindeId: kindeId,
+              userResolved: isUserResolved,
+              userMatches: userMatches,
+              sessionAgentId: existingSession.agentId,
+              requestAgentId: request.agentId
+            });
             throw new Error('Session access denied - ownership or agent mismatch');
           }
           
@@ -122,7 +160,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
         });
 
         // Send typing start indication
-        socket.emit('session:typing-start', { userId, sessionId, isTyping: true });
+        socket.emit('session:typing-start', { userId: socket.data.userId, sessionId, isTyping: true });
 
         // Track agent usage
         try {
@@ -136,7 +174,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
         const sessionRequest: SessionRequest = {
           source: 'agent',
           agentId: request.agentId,
-          userId: userId,
+          userId: socket.data.userId, // Use current (potentially updated) userId
           message: request.message,
           sessionId: sessionId, // Use the session ID
           stream: true // Enable true streaming
@@ -207,7 +245,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           });
 
           // Send completion with sessionId in metadata
-          socket.emit('session:typing-stop', { userId, sessionId, isTyping: false });
+          socket.emit('session:typing-stop', { userId: socket.data.userId, sessionId, isTyping: false });
           socket.emit('session:stream-complete', {
             source: 'agent' as const,
             streamId: request.streamId || `stream-${Date.now()}`,
@@ -224,11 +262,11 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           throw agentError;
         }
 
-        console.log(`[AGENT SOCKET] Stream completed for user ${userId}, agent ${request.agentId}`);
+        console.log(`[AGENT SOCKET] Stream completed for user ${socket.data.userId}, agent ${request.agentId}`);
 
       } catch (error) {
-        console.error(`[AGENT SOCKET] Stream error for user ${userId}, agent ${request.agentId}:`, error);
-        socket.emit('session:typing-stop', { userId, sessionId: 'unknown', isTyping: false });
+        console.error(`[AGENT SOCKET] Stream error for user ${socket.data.userId}, agent ${request.agentId}:`, error);
+        socket.emit('session:typing-stop', { userId: socket.data.userId, sessionId: 'unknown', isTyping: false });
         socket.emit('session:stream-error', {
           streamId: request.streamId,
           agentId: request.agentId,
@@ -242,29 +280,32 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
 
     // Handle agent stream stop
     socket.on('session:stop-stream', (streamId: string) => {
-      console.log(`[AGENT SOCKET] Stream stopped by user ${userId}:`, streamId);
+      const currentUserId = socket.data.userId;
+      console.log(`[AGENT SOCKET] Stream stopped by user ${currentUserId}:`, streamId);
       // TODO: Implement stream cancellation logic
       // For now, just stop typing indicator
-      socket.emit('session:typing-stop', { userId, sessionId: 'unknown', isTyping: false });
+      socket.emit('session:typing-stop', { userId: currentUserId, sessionId: 'unknown', isTyping: false });
     });
 
     // Handle agent room management
     socket.on('session:join-room', (data: { roomId: string, userId: string, sessionId?: string }) => {
+      const currentUserId = socket.data.userId;
       // Only allow users to join their own agent rooms
-      if (data.userId === userId) {
+      if (data.userId === currentUserId) {
         socket.join(data.roomId);
-        console.log(`[AGENT SOCKET] User ${userId} joined room ${data.roomId}`);
+        console.log(`[AGENT SOCKET] User ${currentUserId} joined room ${data.roomId}`);
       } else {
-        console.warn(`[AGENT SOCKET] User ${userId} attempted to join room for user ${data.userId}`);
+        console.warn(`[AGENT SOCKET] User ${currentUserId} attempted to join room for user ${data.userId}`);
       }
     });
 
     socket.on('session:leave-room', (data: { roomId: string, userId: string, sessionId?: string }) => {
-      if (data.userId === userId) {
+      const currentUserId = socket.data.userId;
+      if (data.userId === currentUserId) {
         socket.leave(data.roomId);
-        console.log(`[AGENT SOCKET] User ${userId} left room ${data.roomId}`);
+        console.log(`[AGENT SOCKET] User ${currentUserId} left room ${data.roomId}`);
       } else {
-        console.warn(`[AGENT SOCKET] User ${userId} attempted to leave room for user ${data.userId}`);
+        console.warn(`[AGENT SOCKET] User ${currentUserId} attempted to leave room for user ${data.userId}`);
       }
     });
   });

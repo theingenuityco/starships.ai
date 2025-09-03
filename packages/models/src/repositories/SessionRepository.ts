@@ -1,7 +1,6 @@
 import { getConnection } from '../helpers/database';
 import { SessionModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 
 export class SessionRepository extends BaseRepository {
   constructor() {
@@ -77,41 +76,24 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired(entity, ['source', 'userId'], 'create');
       
-      const connection = getConnection();
-      const id = uuidv4();
       const now = new Date().toISOString();
       
-      const result = await connection.executeWrite<{ s: any }>(
-        `CREATE (s:SessionModel {
-          id: $id,
-          source: $source,
-          created_by: $userId,
-          starship_id: $starshipId,
-          agent_id: $agentId,
-          created_at: $createdAt,
-          last_activity_at: $lastActivityAt,
-          message_count: $messageCount,
-          total_tokens: $totalTokens,
-          status: $status,
-          metadata: $metadata
-        })
-        RETURN s`,
-        { 
-          id,
-          source: entity.source,
-          userId: entity.userId,
-          starshipId: entity.starshipId,
-          agentId: entity.agentId,
-          createdAt: now,
-          lastActivityAt: entity.lastActivityAt || now,
-          messageCount: entity.messageCount || 0,
-          totalTokens: entity.totalTokens || 0,
-          status: entity.status || 'active',
-          metadata: entity.metadata ? JSON.stringify(entity.metadata) : null
-        }
-      );
+      const sessionData = {
+        source: entity.source,
+        created_by: entity.userId,
+        starship_id: entity.starshipId,
+        agent_id: entity.agentId,
+        created_at: now,
+        last_activity_at: entity.lastActivityAt || now,
+        message_count: entity.messageCount || 0,
+        total_tokens: entity.totalTokens || 0,
+        status: entity.status || 'active',
+        metadata: entity.metadata ? JSON.stringify(entity.metadata) : null
+      };
       
-      return this.mapToSession(result[0].s);
+      const result = await this.createEntityWithAutoId<any>('SessionModel', sessionData);
+      
+      return this.mapToSession(result);
     }, 'create', 'Session');
   }
 

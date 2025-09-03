@@ -10,7 +10,6 @@ import { getConnection } from '../helpers/database';
 import { NodeRepository } from './NodeRepository';
 import { EdgeRepository } from './EdgeRepository';
 import type { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
-import { v4 as uuidv4 } from 'uuid';
 
 export class BlueprintRepository extends BaseRepository {
   private nodeRepo: NodeRepository;
@@ -43,13 +42,10 @@ export class BlueprintRepository extends BaseRepository {
         }], 'createBlueprint');
       }
 
-      const connection = getConnection();
-      const blueprintId = uuidv4();
       const now = new Date().toISOString();
 
-      // Create blueprint
-      const blueprintProps = {
-        id: blueprintId,
+      // Create blueprint with auto-generated ID
+      const blueprintData = {
         name: request.name,
         description: request.description || '',
         category: request.category || 'general',
@@ -59,19 +55,16 @@ export class BlueprintRepository extends BaseRepository {
         metadata: JSON.stringify(request.metadata || {})
       };
 
-      await connection.executeWrite(
-        'CREATE (b:Blueprint $blueprintProps)',
-        { blueprintProps }
-      );
+      const blueprint = await this.createEntityWithAutoId<any>('Blueprint', blueprintData);
 
       // Create nodes using NodeRepository
-      const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprintId, request.nodes);
+      const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprint.id, request.nodes);
 
       // Create edges using EdgeRepository with ID mapping
-      const edges = await this.edgeRepo.createEdges(blueprintId, request.edges, idMapping);
+      const edges = await this.edgeRepo.createEdges(blueprint.id, request.edges, idMapping);
 
       return {
-        id: blueprintId,
+        id: blueprint.id,
         name: request.name,
         description: request.description,
         category: request.category,

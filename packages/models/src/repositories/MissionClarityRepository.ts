@@ -12,7 +12,6 @@ import {
   CreateMissionClarityRequest,
   UpdateMissionClarityRequest
 } from '@starships/protocol';
-import { v4 as uuidv4 } from 'uuid';
 
 export class MissionClarityRepository extends BaseRepository {
   constructor() {
@@ -50,47 +49,50 @@ export class MissionClarityRepository extends BaseRepository {
       ) / 4;
 
       const now = new Date().toISOString();
-      
-      // Generate ID for new clarity or reuse existing
-      const clarityId = uuidv4();
-
-      const cypher = `
-        MATCH (m:Mission {id: $missionId})
-        MERGE (m)-[:HAS_CLARITY]->(mc:MissionClarityModel {missionId: $missionId})
-        ON CREATE SET 
-          mc.id = $clarityId,
-          mc.createdAt = $now
-        SET 
-          mc.objectiveClarity = $objectiveClarity,
-          mc.successMetrics = $successMetrics,
-          mc.timelineDefinition = $timelineDefinition,
-          mc.scopeBoundaries = $scopeBoundaries,
-          mc.overallScore = $overallScore,
-          mc.reasoning = $reasoning,
-          mc.iteration = $iteration,
-          mc.updatedAt = $now
-        RETURN mc
-      `;
-
       const connection = getConnection();
-      const result = await connection.executeWrite(cypher, {
-        missionId,
-        clarityId,
-        objectiveClarity: request.objectiveClarity,
-        successMetrics: request.successMetrics,
-        timelineDefinition: request.timelineDefinition,
-        scopeBoundaries: request.scopeBoundaries,
-        overallScore,
-        reasoning: request.reasoning,
-        iteration: request.iteration,
-        now
-      });
+      
+      // Check if mission exists
+      const missionCheck = await connection.executeQuery<{ id: string }>(
+        'MATCH (m:Mission {id: $missionId}) RETURN m.id as id',
+        { missionId }
+      );
 
-      if (result.length === 0) {
+      if (!missionCheck || missionCheck.length === 0) {
         this.handleNotFound('Mission', missionId, 'upsert');
       }
 
-      return result[0].mc as MissionClarityModel;
+      // Use MERGE pattern with createEntityWithAutoId for new entities
+      const existingClarity = await this.getByMissionId(missionId);
+      
+      if (existingClarity) {
+        // Update existing clarity
+        return this.updateByMissionId(missionId, request);
+      } else {
+        // Create new clarity with auto-generated ID
+        const clarityData = {
+          missionId,
+          objectiveClarity: request.objectiveClarity,
+          successMetrics: request.successMetrics,
+          timelineDefinition: request.timelineDefinition,
+          scopeBoundaries: request.scopeBoundaries,
+          overallScore,
+          reasoning: request.reasoning,
+          iteration: request.iteration,
+          createdAt: now,
+          updatedAt: now
+        };
+
+        const clarity = await this.createEntityWithAutoId<MissionClarityModel>('MissionClarityModel', clarityData);
+
+        // Create relationship with mission
+        await connection.executeWrite(
+          `MATCH (m:Mission {id: $missionId}), (mc:MissionClarityModel {id: $clarityId})
+           CREATE (m)-[:HAS_CLARITY]->(mc)`,
+          { missionId, clarityId: clarity.id }
+        );
+
+        return clarity;
+      }
     }, 'upsertByMissionId', 'MissionClarityModel', missionId);
   }
 

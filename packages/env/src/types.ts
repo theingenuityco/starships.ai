@@ -13,14 +13,6 @@ export interface EnvironmentConfig {
   CLIENT_URL: string;
   SERVER_URL: string;
 
-  // Deployment
-  REDEPLOY_SECRET: string;
-
-  // External Services
-  DISCORD_BOT_TOKEN?: string;
-  OPEN_WEBUI_BASE_URL?: string;
-  ENABLE_AUTH_TESTING_BACKDOOR: boolean;
-
   // Neo4j Database Configuration
   NEO4J_URI: string;
   NEO4J_USERNAME: string;
@@ -34,9 +26,6 @@ export interface EnvironmentConfig {
   // Default Model Configuration
   DEFAULT_LLM_PROVIDER: 'openai' | 'anthropic' | '';
   DEFAULT_CHAT_MODEL: string;
-  DEFAULT_MODEL_ID: string;
-  DEFAULT_TEMPERATURE: number;
-  DEFAULT_MAX_TOKENS: number;
 
   // JWT Authentication Configuration
   JWT_SECRET: string;

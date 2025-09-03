@@ -17,11 +17,15 @@ export type ChatMode = 'agent'
 interface SessionInterfaceProps {
   defaultMode?: ChatMode
   starshipId?: string
+  sessionId?: string | null
+  onSessionChange?: (sessionId: string | null) => void
 }
 
 export function SessionInterface({
   defaultMode = 'agent',
-  starshipId
+  starshipId,
+  sessionId: externalSessionId,
+  onSessionChange
 }: SessionInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected } = useSocketConnection()
@@ -40,7 +44,12 @@ export function SessionInterface({
   // Reset session when mode/agent/starship changes - let server manage session IDs
   useEffect(() => {
     if (userId && isAuthenticated) {
-      if (chatMode === 'agent' && selectedAgent) {
+      if (externalSessionId !== undefined) {
+        // Use external session ID when provided
+        setCurrentSessionId(externalSessionId)
+        setHasMessages(!!externalSessionId)
+        setRefreshMessages(prev => prev + 1)
+      } else if (chatMode === 'agent' && selectedAgent) {
         // Reset session for agent mode - server will provide actual session ID
         setCurrentSessionId(null)
         setHasMessages(false)
@@ -51,7 +60,7 @@ export function SessionInterface({
         setHasMessages(false)
       }
     }
-  }, [userId, isAuthenticated, chatMode, selectedAgent, starshipId])
+  }, [userId, isAuthenticated, chatMode, selectedAgent, starshipId, externalSessionId])
 
   // Show loading state
   if (isLoading) {
@@ -93,6 +102,7 @@ export function SessionInterface({
   const handleSessionStart = (sessionId: string) => {
     console.log('[SessionInterface] Session started with ID:', sessionId)
     setCurrentSessionId(sessionId)
+    onSessionChange?.(sessionId)
   }
 
   // Handle first message to trigger layout transition

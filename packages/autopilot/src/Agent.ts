@@ -22,8 +22,8 @@ export class Agent {
       // Ensure blueprint has a deep copy to avoid mutations
       blueprint: {
         ...params.blueprint,
-        nodes: params.blueprint.nodes.map(node => ({ ...node })),
-        edges: params.blueprint.edges.map(edge => ({ ...edge })),
+        nodes: (params.blueprint.nodes || []).map(node => ({ ...node })),
+        edges: (params.blueprint.edges || []).map(edge => ({ ...edge })),
         metadata: { ...params.blueprint.metadata }
       }
     };
@@ -96,14 +96,14 @@ export class Agent {
    * Get agent nodes
    */
   getNodes(): Node[] {
-    return [...this.params.blueprint.nodes];
+    return [...(this.params.blueprint.nodes || [])];
   }
 
   /**
    * Get agent edges
    */
   getEdges(): Edge[] {
-    return [...this.params.blueprint.edges];
+    return [...(this.params.blueprint.edges || [])];
   }
 
   /**
@@ -146,21 +146,24 @@ export class Agent {
     if (!this.params.blueprint) {
       errors.push('Agent blueprint is required');
     } else {
+      const nodes = this.params.blueprint.nodes || [];
+      const edges = this.params.blueprint.edges || [];
+      
       // Check for start node
-      const hasStartNode = this.params.blueprint.nodes.some(node => node.type === 'start');
+      const hasStartNode = nodes.some(node => node.type === 'start');
       if (!hasStartNode) {
         errors.push('Agent blueprint must have a start node');
       }
 
       // Check that all node types have handlers (delegate to engine)
-      const unsupportedNodes = this.params.blueprint.nodes.filter(node => !this.engine.hasHandler(node.type));
+      const unsupportedNodes = nodes.filter(node => !this.engine.hasHandler(node.type));
       if (unsupportedNodes.length > 0) {
         errors.push(`Unsupported node types in agent blueprint: ${unsupportedNodes.map(n => n.type).join(', ')}`);
       }
 
       // Check edge references
-      const nodeRefs = new Set(this.params.blueprint.nodes.map(n => n.ref));
-      const invalidEdges = this.params.blueprint.edges.filter(
+      const nodeRefs = new Set(nodes.map(n => n.ref));
+      const invalidEdges = edges.filter(
         edge => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
       );
       if (invalidEdges.length > 0) {
@@ -206,8 +209,8 @@ export class Agent {
       memory: memoryState,
       blueprint: {
         ...this.params.blueprint,
-        nodes: this.params.blueprint.nodes.map(node => ({ ...node })),
-        edges: this.params.blueprint.edges.map(edge => ({ ...edge }))
+        nodes: (this.params.blueprint.nodes || []).map(node => ({ ...node })),
+        edges: (this.params.blueprint.edges || []).map(edge => ({ ...edge }))
       }
     };
 

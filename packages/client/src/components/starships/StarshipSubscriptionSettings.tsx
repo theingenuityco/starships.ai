@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, AlertTriangle, XCircle } from 'lucide-react';
-import api from '@/lib/api';
+import { starshipAPI } from '@/lib/api';
 
 interface StarshipSubscriptionSettingsProps {
   starship: {
@@ -22,9 +22,9 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
   const handleManageSubscription = async () => {
     setLoading(true);
     try {
-      const response = await api.post(`/v1/${starship.id}/billing-portal`);
-      if (response.data.url) {
-        window.location.href = response.data.url;
+      const response = await starshipAPI.createBillingPortal(starship.id);
+      if (response.url) {
+        window.location.href = response.url;
       }
     } catch (error) {
       console.error('Failed to open billing portal:', error);

@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { UnifiedChatInterface } from '@/components/chat/UnifiedChatInterface';
-import { SessionsSidebar } from '@/components/chat/SessionsSidebar';
+import { SessionInterface } from '@/components/session/SessionInterface';
+import { SessionsSidebar } from '@/components/session/SessionsSidebar';
 import { starshipAPI, type Starship } from '@/lib/api';
 
-export default function StarshipChatPage() {
+export default function StarshipSessionPage() {
   const params = useParams();
   const slug = params?.slug as string;
   const [starship, setStarship] = useState<Starship | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStarshipData = async () => {
@@ -23,7 +24,7 @@ export default function StarshipChatPage() {
         const data = await starshipAPI.getStarshipBySlug(slug);
         setStarship(data.starship);
       } catch (error) {
-        console.error('Failed to fetch starship for chat:', error);
+        console.error('Failed to fetch starship for session:', error);
         setError('Failed to load starship data');
       } finally {
         setLoading(false);
@@ -59,20 +60,22 @@ export default function StarshipChatPage() {
   
   return (
     <div className="h-full flex">
-      {/* Chat Sessions Sidebar */}
+      {/* Sessions Sidebar */}
       <div className="w-80 shrink-0">
         <SessionsSidebar
           starshipId={starship.id}
-          onSessionSelect={(sessionId) => {
-            // TODO: Handle session selection
-            console.log('Selected session:', sessionId);
-          }}
+          currentSessionId={currentSessionId}
+          onSessionSelect={setCurrentSessionId}
         />
       </div>
       
-      {/* Main Chat Interface */}
+      {/* Main Session Interface */}
       <div className="flex-1 min-w-0">
-        <UnifiedChatInterface starshipId={starship.id} />
+        <SessionInterface
+          starshipId={starship.id}
+          sessionId={currentSessionId}
+          onSessionChange={setCurrentSessionId}
+        />
       </div>
     </div>
   );

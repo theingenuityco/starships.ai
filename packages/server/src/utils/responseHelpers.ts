@@ -4,59 +4,14 @@
 
 import type { Response } from 'express';
 import { BaseError, ErrorUtils } from '@starships/errors';
+import type {
+  ApiResponse,
+  ApiErrorResponse,
+  ApiResponseMeta,
+  PaginationMeta,
+  StandardErrorCode
+} from '@starships/protocol';
 
-// Standard response interfaces
-export interface ApiResponse<T = any> {
-  data: T;
-  meta?: {
-    pagination?: {
-      page: number;
-      limit: number;
-      total: number;
-      has_next: boolean;
-      has_prev: boolean;
-    };
-    filters?: Record<string, any>;
-    sort?: Record<string, any>;
-  };
-}
-
-export interface ApiErrorResponse {
-  error: {
-    code: string;
-    message: string;
-    details?: Record<string, any>;
-  };
-}
-
-// Error code constants
-export const ERROR_CODES = {
-  // Validation errors (4xx)
-  VALIDATION_ERROR: 'VALIDATION_ERROR',
-  REQUIRED_FIELD_MISSING: 'REQUIRED_FIELD_MISSING',
-  INVALID_FORMAT: 'INVALID_FORMAT',
-  INVALID_VALUE: 'INVALID_VALUE',
-  
-  // Authentication/Authorization (4xx)
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  FORBIDDEN: 'FORBIDDEN',
-  INVALID_TOKEN: 'INVALID_TOKEN',
-  
-  // Resource errors (4xx)
-  RESOURCE_NOT_FOUND: 'RESOURCE_NOT_FOUND',
-  RESOURCE_CONFLICT: 'RESOURCE_CONFLICT',
-  RESOURCE_CONSTRAINT_VIOLATION: 'RESOURCE_CONSTRAINT_VIOLATION',
-  
-  // Business logic errors (4xx)
-  BUSINESS_RULE_VIOLATION: 'BUSINESS_RULE_VIOLATION',
-  INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
-  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
-  
-  // System errors (5xx)
-  INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
-  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
-  DATABASE_ERROR: 'DATABASE_ERROR',
-} as const;
 
 /**
  * Send standardized success response
@@ -65,7 +20,7 @@ export function sendSuccess<T>(
   res: Response,
   data: T,
   statusCode: number = 200,
-  meta?: ApiResponse<T>['meta']
+  meta?: ApiResponseMeta
 ): void {
   const response: ApiResponse<T> = { data };
   if (meta) {
@@ -79,7 +34,7 @@ export function sendSuccess<T>(
  */
 export function sendError(
   res: Response,
-  code: string,
+  code: StandardErrorCode,
   message: string,
   statusCode: number = 500,
   details?: Record<string, any>
@@ -101,7 +56,7 @@ export function createPaginationMeta(
   page: number,
   limit: number,
   total: number
-): ApiResponse['meta'] {
+): ApiResponseMeta {
   return {
     pagination: {
       page,
@@ -119,7 +74,7 @@ export function createPaginationMeta(
 export function validatePagination(page?: string, limit?: string): {
   page: number;
   limit: number;
-  error?: { code: string; message: string };
+  error?: { code: StandardErrorCode; message: string };
 } {
   const pageNum = page ? parseInt(page, 10) : 1;
   const limitNum = limit ? parseInt(limit, 10) : 50;
@@ -129,7 +84,7 @@ export function validatePagination(page?: string, limit?: string): {
       page: 1,
       limit: 50,
       error: {
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: 'VALIDATION_ERROR',
         message: 'Page must be a positive integer',
       },
     };
@@ -140,7 +95,7 @@ export function validatePagination(page?: string, limit?: string): {
       page: pageNum,
       limit: 50,
       error: {
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: 'VALIDATION_ERROR',
         message: 'Limit must be between 1 and 200',
       },
     };
@@ -152,15 +107,15 @@ export function validatePagination(page?: string, limit?: string): {
 /**
  * UUID validation helper
  */
-export function validateUUID(id: string, fieldName: string): { 
-  isValid: boolean; 
-  error?: { code: string; message: string; details?: any } 
+export function validateUUID(id: string, fieldName: string): {
+  isValid: boolean;
+  error?: { code: StandardErrorCode; message: string; details?: any }
 } {
   if (!id || typeof id !== 'string') {
     return {
       isValid: false,
       error: {
-        code: ERROR_CODES.REQUIRED_FIELD_MISSING,
+        code: 'MISSING_REQUIRED_FIELD',
         message: `${fieldName} is required and must be a string`,
         details: { field: fieldName },
       },
@@ -172,7 +127,7 @@ export function validateUUID(id: string, fieldName: string): {
     return {
       isValid: false,
       error: {
-        code: ERROR_CODES.INVALID_FORMAT,
+        code: 'INVALID_FORMAT',
         message: `${fieldName} must be a valid UUID format`,
         details: { field: fieldName, provided: id },
       },
@@ -191,20 +146,20 @@ export function handleCommonError(error: any, res: Response, context: string): b
   // Check if it's already a structured error from @starships/errors
   if (ErrorUtils.isApplicationError(error)) {
     const response = error.toResponse();
-    sendError(res, response.code, response.message, response.statusCode, response.details);
+    sendError(res, response.code as StandardErrorCode, response.message, response.statusCode, response.details as Record<string, any> | undefined);
     return true;
   }
 
   // Handle known error types by name for backward compatibility
   if (error.name === 'ValidationError' || error.constructor.name === 'ValidationError') {
-    sendError(res, ERROR_CODES.VALIDATION_ERROR, error.message, 400, {
+    sendError(res, 'VALIDATION_ERROR', error.message, 400, {
       field: error.field,
     });
     return true;
   }
 
   if (error.name === 'NotFoundError' || error.constructor.name === 'NotFoundError') {
-    sendError(res, ERROR_CODES.RESOURCE_NOT_FOUND, error.message, 404, {
+    sendError(res, 'RESOURCE_NOT_FOUND', error.message, 404, {
       entityType: error.entityType,
       entityId: error.entityId,
     });
@@ -212,7 +167,7 @@ export function handleCommonError(error: any, res: Response, context: string): b
   }
 
   if (error.name === 'ConflictError' || error.constructor.name === 'ConflictError') {
-    sendError(res, ERROR_CODES.RESOURCE_CONFLICT, error.message, 409, {
+    sendError(res, 'RESOURCE_CONFLICT', error.message, 409, {
       conflictType: error.conflictType,
     });
     return true;

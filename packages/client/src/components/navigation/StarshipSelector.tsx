@@ -12,8 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { useStarshipStore } from '@/store/starship-store';
-import { useStarshipsLoader } from '@/hooks/useStarshipsLoader';
+import { useStarships, useCreateStarship } from '@/hooks/useStarships';
+import { useStarshipUIStore } from '@/store/starship-ui-store';
 import { cn } from '@/lib/utils';
 
 interface StarshipSelectorProps {
@@ -23,39 +23,35 @@ interface StarshipSelectorProps {
 export function StarshipSelector({ className }: StarshipSelectorProps) {
   const pathname = usePathname();
   
-  // All hooks must be called before any conditional returns
-  const {
-    starships,
-    activeStarshipId,
-    loading,
-    error,
-    setActiveStarship,
-    createStarship
-  } = useStarshipStore();
+  // Use new hooks
+  const { data: starshipsData, isLoading, error } = useStarships();
+  const { activeStarshipId, setActiveStarship } = useStarshipUIStore();
+  const createStarshipMutation = useCreateStarship();
 
-  const [isCreatingStarship, setIsCreatingStarship] = useState(false);
-
-  // Use centralized loader - only loads once on mount and deduplicates calls
-  const { loadStarships } = useStarshipsLoader({ enabled: true });
+  // Extract starships from response
+  const starships = starshipsData?.starships || [];
   
   // Don't show StarshipSelector when inside individual starship routes
   if (pathname.startsWith('/ship/')) {
     return null;
   }
 
-  const activeStarship = starships.find(s => s.id === activeStarshipId);
+  const activeStarship = starships.find((s: any) => s.id === activeStarshipId);
 
-  const handleCreateStarship = async (starshipClass: 'scout' | 'cruiser') => {
-    setIsCreatingStarship(true);
+  const handleCreateStarship = async (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     try {
-      await createStarship({
-        name: `${starshipClass.charAt(0).toUpperCase() + starshipClass.slice(1)} ${Date.now()}`,
+      const result = await createStarshipMutation.mutateAsync({
+        name: `${starshipClass.charAt(0).toUpperCase() + starshipClass.slice(1)} Starship`,
         class: starshipClass
       });
+      
+      // Set the newly created starship as active
+      if (result.starship) {
+        setActiveStarship(result.starship.id);
+      }
     } catch (error) {
+      // Error handling is already done in the mutation
       console.error('Failed to create starship:', error);
-    } finally {
-      setIsCreatingStarship(false);
     }
   };
 
@@ -72,7 +68,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
     }
   };
 
-  if (loading && starships.length === 0) {
+  if (isLoading && starships.length === 0) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
         <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
@@ -84,11 +80,11 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
   if (error) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
-        <span className="text-sm text-red-400">Error: {error}</span>
+        <span className="text-sm text-red-400">Error: {error?.message || 'Failed to load starships'}</span>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => loadStarships()}
+          onClick={() => window.location.reload()}
           className="border-red-500/30 text-red-400 hover:bg-red-500/10"
         >
           Retry
@@ -137,7 +133,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
         >
           {starships.length > 0 && (
             <>
-              {starships.map((starship) => (
+              {starships.map((starship: any) => (
                 <DropdownMenuItem
                   key={starship.id}
                   onClick={() => setActiveStarship(starship.id)}
@@ -170,7 +166,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
 
           <DropdownMenuItem
             onClick={() => handleCreateStarship('scout')}
-            disabled={isCreatingStarship}
+            disabled={createStarshipMutation.isPending}
             className="flex items-center gap-3 px-3 py-2 text-blue-400 hover:bg-blue-500/10 focus:bg-blue-500/10 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -179,7 +175,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
 
           <DropdownMenuItem
             onClick={() => handleCreateStarship('cruiser')}
-            disabled={isCreatingStarship}
+            disabled={createStarshipMutation.isPending}
             className="flex items-center gap-3 px-3 py-2 text-purple-400 hover:bg-purple-500/10 focus:bg-purple-500/10 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -196,7 +192,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {loading && (
+      {(isLoading || createStarshipMutation.isPending) && (
         <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
       )}
     </div>

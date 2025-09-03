@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Agent } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
-import { ChatInterface } from '@/components/chat/ChatInterface'
+import { ChatInterface } from '@/components/session/ChatInterface'
 import { AuthGate } from '@/components/auth/AuthGate'
 import { Users } from 'lucide-react'
 

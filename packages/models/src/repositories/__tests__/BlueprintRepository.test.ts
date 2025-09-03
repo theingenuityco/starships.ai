@@ -31,12 +31,15 @@ describe('BlueprintRepository', () => {
     // Clear all mocks before each test
     jest.clearAllMocks();
     
-    repository = new BlueprintRepository();
+    // Set up mock connection BEFORE creating repository
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    
+    // Now create repository which will use the mocked connection
+    repository = new BlueprintRepository();
 
     // Get mocked instances
     mockNodeRepo = (repository as any).nodeRepo;
@@ -79,24 +82,38 @@ describe('BlueprintRepository', () => {
       ];
       const mockIdMapping = new Map([['start', 'node-1'], ['end', 'node-2']]);
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      // Mock the createEntityWithAutoId call for blueprint creation
+      const mockBlueprintId = 'blueprint-test-123';
+      mockConnection.executeWrite.mockResolvedValue([{
+        n: {
+          id: mockBlueprintId,
+          name: validRequest.name,
+          description: validRequest.description,
+          category: validRequest.category,
+          usageCount: 0,
+          metadata: JSON.stringify(validRequest.metadata || {}),
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String)
+        }
+      }]);
       mockNodeRepo.createNodes.mockResolvedValue({ nodes: mockNodes, idMapping: mockIdMapping });
       mockEdgeRepo.createEdges.mockResolvedValue(mockEdges);
 
       const result = await repository.createBlueprint(validRequest);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'CREATE (b:Blueprint $blueprintProps)',
-        {
-          blueprintProps: expect.objectContaining({
-            id: expect.any(String),
+        expect.stringContaining('CREATE (n:Blueprint)'),
+        expect.objectContaining({
+          props: expect.objectContaining({
             name: 'Test Blueprint',
             description: 'A test blueprint',
             category: 'test',
             usageCount: 0,
-            metadata: '{"version":"1.0"}'
+            metadata: '{"version":"1.0"}',
+            createdAt: expect.any(String),
+            updatedAt: expect.any(String)
           })
-        }
+        })
       );
 
       expect(mockNodeRepo.createNodes).toHaveBeenCalledWith(expect.any(String), validRequest.nodes);
@@ -120,7 +137,19 @@ describe('BlueprintRepository', () => {
         edges: []
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockBlueprintId = 'minimal-blueprint-123';
+      mockConnection.executeWrite.mockResolvedValue([{
+        n: {
+          id: mockBlueprintId,
+          name: minimalRequest.name,
+          description: '',
+          category: 'general',
+          usageCount: 0,
+          metadata: '{}',
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String)
+        }
+      }]);
       mockNodeRepo.createNodes.mockResolvedValue({ nodes: [], idMapping: new Map() });
       mockEdgeRepo.createEdges.mockResolvedValue([]);
 
@@ -245,8 +274,8 @@ describe('BlueprintRepository', () => {
   describe('getAllBlueprints', () => {
     it('should return all blueprints with nodes and edges', async () => {
       const mockBlueprints = [
-        { id: 'blueprint-1', name: 'Blueprint 1', metadata: {} },
-        { id: 'blueprint-2', name: 'Blueprint 2', metadata: {} }
+        { id: 'blueprint-1', name: 'Blueprint 1', metadata: '{}' },
+        { id: 'blueprint-2', name: 'Blueprint 2', metadata: '{}' }
       ];
 
       mockConnection.executeQuery.mockResolvedValue([
@@ -262,8 +291,8 @@ describe('BlueprintRepository', () => {
         'MATCH (b:Blueprint)\n        RETURN b\n        ORDER BY b.createdAt DESC'
       );
       expect(result).toHaveLength(2);
-      expect(result[0]).toMatchObject(mockBlueprints[0]);
-      expect(result[1]).toMatchObject(mockBlueprints[1]);
+      expect(result[0]).toMatchObject({ ...mockBlueprints[0], metadata: {} });
+      expect(result[1]).toMatchObject({ ...mockBlueprints[1], metadata: {} });
     });
 
     it('should return empty array when no blueprints found', async () => {
@@ -445,8 +474,8 @@ describe('BlueprintRepository', () => {
     it('should return blueprints filtered by category', async () => {
       const category = 'automation';
       const mockBlueprints = [
-        { id: 'blueprint-1', name: 'Blueprint 1', category, metadata: {} },
-        { id: 'blueprint-2', name: 'Blueprint 2', category, metadata: {} }
+        { id: 'blueprint-1', name: 'Blueprint 1', category, metadata: '{}' },
+        { id: 'blueprint-2', name: 'Blueprint 2', category, metadata: '{}' }
       ];
 
       mockConnection.executeQuery.mockResolvedValue([
@@ -463,7 +492,7 @@ describe('BlueprintRepository', () => {
         { category }
       );
       expect(result).toHaveLength(2);
-      expect(result[0]).toMatchObject(mockBlueprints[0]);
+      expect(result[0]).toMatchObject({ ...mockBlueprints[0], metadata: {} });
     });
 
     it('should return empty array when no blueprints found for category', async () => {
@@ -536,7 +565,19 @@ describe('BlueprintRepository', () => {
       };
 
       // Mock creation
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockBlueprintId = 'lifecycle-blueprint-123';
+      mockConnection.executeWrite.mockResolvedValue([{
+        n: {
+          id: mockBlueprintId,
+          name: createRequest.name,
+          description: '',
+          category: 'general',
+          usageCount: 0,
+          metadata: '{}',
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String)
+        }
+      }]);
       mockNodeRepo.createNodes.mockResolvedValue({ nodes: [], idMapping: new Map() });
       mockEdgeRepo.createEdges.mockResolvedValue([]);
 
@@ -581,10 +622,22 @@ describe('BlueprintRepository', () => {
       const mockNodes = complexRequest.nodes.map((node, i) => ({ id: `node-${i}`, ...node }));
       const mockEdges = complexRequest.edges.map((edge, i) => ({ id: `edge-${i}`, ...edge }));
 
-      mockConnection.executeWrite.mockResolvedValue([]);
-      mockNodeRepo.createNodes.mockResolvedValue({ 
-        nodes: mockNodes, 
-        idMapping: new Map([['start', 'node-0'], ['process', 'node-1'], ['end', 'node-2']]) 
+      const mockComplexBlueprintId = 'complex-blueprint-123';
+      mockConnection.executeWrite.mockResolvedValue([{
+        n: {
+          id: mockComplexBlueprintId,
+          name: complexRequest.name,
+          description: complexRequest.description,
+          category: complexRequest.category,
+          usageCount: 0,
+          metadata: JSON.stringify(complexRequest.metadata),
+          createdAt: expect.any(String),
+          updatedAt: expect.any(String)
+        }
+      }]);
+      mockNodeRepo.createNodes.mockResolvedValue({
+        nodes: mockNodes,
+        idMapping: new Map([['start', 'node-0'], ['process', 'node-1'], ['end', 'node-2']])
       });
       mockEdgeRepo.createEdges.mockResolvedValue(mockEdges);
 

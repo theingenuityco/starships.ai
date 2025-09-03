@@ -1,6 +1,5 @@
 import { getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
 import {
@@ -43,7 +42,6 @@ export class MissionMessageRepository extends BaseRepository {
       }, 'saveMessage');
 
       const connection = getConnection();
-      const id = uuidv4();
 
       // Check if mission exists
       const missionCheck = await connection.executeQuery<{ id: string }>(
@@ -55,52 +53,27 @@ export class MissionMessageRepository extends BaseRepository {
         this.handleNotFound('Mission', message.missionId, 'saveMessage');
       }
 
-      // Prepare message data
-      const messageData: MissionMessageModel = {
-        ...message,
-        id
-      };
+      // Create message with auto-generated ID
+      const createdMessage = await this.createEntityWithAutoId<MissionMessageModel>('MissionMessageModel', message);
 
-      // Create the message node and relationships
-      let query: string;
-      let params: any;
-
+      // Create relationships
       if (message.role === 'user' && message.userId) {
-        // Create message with user relationship
-        query = `
-          MATCH (m:Mission {id: $missionId})
-          MATCH (u:User {id: $userId})
-          CREATE (msg:MissionMessageModel $messageProps)
-          CREATE (u)-[:SENT]->(msg)
-          CREATE (msg)-[:BELONGS_TO]->(m)
-          RETURN msg
-        `;
-        params = {
-          missionId: message.missionId,
-          userId: message.userId,
-          messageProps: messageData
-        };
-      } else {
-        // Create message without user relationship (orchestrator/system)
-        query = `
-          MATCH (m:Mission {id: $missionId})
-          CREATE (msg:MissionMessageModel $messageProps)
-          CREATE (msg)-[:BELONGS_TO]->(m)
-          RETURN msg
-        `;
-        params = {
-          missionId: message.missionId,
-          messageProps: messageData
-        };
+        // Create user relationship
+        await connection.executeWrite(
+          `MATCH (u:User {id: $userId}), (msg:MissionMessageModel {id: $messageId})
+           CREATE (u)-[:SENT]->(msg)`,
+          { userId: message.userId, messageId: createdMessage.id }
+        );
       }
 
-      const result = await connection.executeWrite<{ msg: MissionMessageModel }>(query, params);
+      // Create mission relationship
+      await connection.executeWrite(
+        `MATCH (m:Mission {id: $missionId}), (msg:MissionMessageModel {id: $messageId})
+         CREATE (msg)-[:BELONGS_TO]->(m)`,
+        { missionId: message.missionId, messageId: createdMessage.id }
+      );
 
-      if (!result || result.length === 0) {
-        throw new Error('Failed to save message');
-      }
-
-      return convertNeo4jIntsInObject(result[0].msg);
+      return convertNeo4jIntsInObject(createdMessage);
     }, 'saveMessage', 'MissionMessageModel');
   }
 

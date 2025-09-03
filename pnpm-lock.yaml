@@ -137,6 +137,9 @@ importers:
       '@starships/env-config':
         specifier: workspace:*
         version: link:../env-config
+      '@starships/errors':
+        specifier: workspace:*
+        version: link:../errors
       '@starships/models':
         specifier: workspace:*
         version: link:../models
@@ -280,6 +283,9 @@ importers:
 
   packages/errors:
     dependencies:
+      '@starships/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       uuid:
         specifier: ^10.0.0
         version: 10.0.0

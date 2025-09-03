@@ -22,7 +22,7 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   {
     title: "Starship Systems",
     items: [
-      { href: `/ship/${starshipSlug}/chat`, label: "Unified Chat", icon: MessageSquare, status: "optimal" },
+      { href: `/ship/${starshipSlug}/session`, label: "Session", icon: MessageSquare, status: "optimal" },
       { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
       { href: `/ship/${starshipSlug}/missions`, label: "Missions", icon: Target, status: "optimal" }
     ]
@@ -30,7 +30,6 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   {
     title: "Coming Soon",
     items: [
-      { href: `/ship/${starshipSlug}/command-deck`, label: "Command Deck", icon: Command, status: "optimal" },
       { href: `/ship/${starshipSlug}/drive`, label: "Drive", icon: Zap, status: "optimal" },
       { href: `/ship/${starshipSlug}/logbook`, label: "Logbook", icon: BookOpen, status: "optimal" }
     ]
@@ -71,7 +70,7 @@ export function Navigation({
       return getStarshipNavigationSections(starshipSlug);
     }
     
-    // No navigation for fleet-level routes
+    // No navigation for non-starship routes
     return [];
   };
 

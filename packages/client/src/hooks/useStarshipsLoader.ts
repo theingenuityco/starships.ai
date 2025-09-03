@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useStarshipStore } from '@/store/starship-store';
+import { useStarships } from '@/hooks/useStarships';
 
 interface UseStarshipsLoaderOptions {
   enabled?: boolean;
@@ -20,9 +20,8 @@ export function useStarshipsLoader(options: UseStarshipsLoaderOptions = {}) {
     refetchInterval = 0
   } = options;
 
-  const loadUserStarships = useStarshipStore(state => state.loadUserStarships);
-  const starships = useStarshipStore(state => state.starships);
-  const loadingStarships = useStarshipStore(state => state.loadingStarships);
+  const { data: starshipsResponse, isLoading: loadingStarships, refetch } = useStarships();
+  const starships = starshipsResponse?.starships || [];
   
   const isLoadingRef = useRef(false);
   const lastFetchRef = useRef<number>(0);
@@ -42,13 +41,13 @@ export function useStarshipsLoader(options: UseStarshipsLoaderOptions = {}) {
     lastFetchRef.current = now;
     
     try {
-      await loadUserStarships();
+      await refetch();
     } finally {
       isLoadingRef.current = false;
     }
   };
 
-  // Initial load
+  // Initial load - TanStack Query handles this automatically, but respecting the enabled option
   useEffect(() => {
     if (enabled && !loadingStarships && starships.length === 0) {
       loadStarshipsDebounced();

@@ -1,15 +1,22 @@
-import { Router, Request, Response } from 'express';
-import { RepositoryFactory } from '@starships/models';
+import { Router } from 'express';
+import type { Request, Response } from 'express';
+import { WaitlistRepository, getConnection } from '@starships/models';
 import { WaitlistService } from '../services/WaitlistService';
 import { logger } from '../utils/logger';
 import { asyncHandler } from '../middleware/errorHandler';
+import {
+  sendSuccess,
+  sendError,
+  handleCommonError,
+} from '../utils/responseHelpers';
 
 const router: Router = Router();
 
 // Initialize waitlist service with proper error handling
 const getWaitlistService = () => {
   try {
-    const waitlistRepo = RepositoryFactory.getWaitlistRepository();
+    const connection = getConnection();
+    const waitlistRepo = new WaitlistRepository(connection);
     return new WaitlistService(waitlistRepo);
   } catch (error) {
     logger.error('Failed to get WaitlistRepository:', {
@@ -19,20 +26,28 @@ const getWaitlistService = () => {
   }
 };
 
-/**
- * POST /api/waitlist/check
- * Check if an email is approved for early access
- */
-router.post('/check', asyncHandler(async (req: Request, res: Response) => {
+// POST /waitlist/check - Check if an email is approved for early access (OpenAPI pattern)
+router.post('/waitlist/check', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
     const { email } = req.body;
 
     // Validate input
-    if (!email) {
-      return res.status(400).json({
-        isApproved: false,
-        message: 'Please provide a valid email address'
+    if (!email || typeof email !== 'string') {
+      sendError(res, "MISSING_REQUIRED_FIELD", 'Please provide a valid email address', 400, {
+        field: 'email',
+        provided: typeof email,
       });
+      return;
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      sendError(res, "VALIDATION_ERROR", 'Please provide a valid email address', 400, {
+        field: 'email',
+        constraint: 'email_format',
+      });
+      return;
     }
 
     // Use service to check approval
@@ -43,10 +58,8 @@ router.post('/check', asyncHandler(async (req: Request, res: Response) => {
       logger.error('Failed to initialize waitlist service:', {
         error: error instanceof Error ? error.message : 'Unknown error'
       });
-      return res.status(503).json({
-        isApproved: false,
-        message: 'Service temporarily unavailable. Please try again.'
-      });
+      sendError(res, "SERVICE_UNAVAILABLE", 'Service temporarily unavailable. Please try again.', 503);
+      return;
     }
     
     const result = await waitlistService.checkApproval(email);
@@ -61,52 +74,64 @@ router.post('/check', asyncHandler(async (req: Request, res: Response) => {
       });
     }
 
-    return res.json(result);
+    sendSuccess(res, result);
 
   } catch (error) {
-    logger.error('Error checking waitlist approval', { 
+    logger.error('Error checking waitlist approval', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     
-    // Return generic error message (no information leakage)
-    return res.status(500).json({
-      isApproved: false,
-      message: 'Service temporarily unavailable. Please try again.'
-    });
+    if (!handleCommonError(error, res, 'checking waitlist approval')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Service temporarily unavailable. Please try again.');
+    }
   }
 }));
 
-/**
- * GET /api/waitlist/status
- * Check current session status
- */
-router.get('/status', (req: Request, res: Response): void => {
-  const validatedEmail = req.cookies?.waitlist_validated;
-  
-  if (validatedEmail) {
-    res.json({
-      isValidated: true,
-      email: validatedEmail
-    });
-    return;
-  }
+// GET /waitlist/status - Check current session status (OpenAPI pattern)
+router.get('/waitlist/status', (req: Request, res: Response): void => {
+  try {
+    const validatedEmail = req.cookies?.waitlist_validated;
+    
+    if (validatedEmail) {
+      sendSuccess(res, {
+        isValidated: true,
+        email: validatedEmail
+      });
+      return;
+    }
 
-  res.json({
-    isValidated: false
-  });
+    sendSuccess(res, {
+      isValidated: false
+    });
+  } catch (error) {
+    logger.error('Error checking waitlist status', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    
+    if (!handleCommonError(error, res, 'checking waitlist status')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to check session status');
+    }
+  }
 });
 
-/**
- * POST /api/waitlist/logout
- * Clear waitlist session
- */
-router.post('/logout', (req: Request, res: Response): void => {
-  res.clearCookie('waitlist_validated');
-  
-  res.json({
-    success: true,
-    message: 'Session cleared'
-  });
+// POST /waitlist/logout - Clear waitlist session (OpenAPI pattern)
+router.post('/waitlist/logout', (req: Request, res: Response): void => {
+  try {
+    res.clearCookie('waitlist_validated');
+    
+    sendSuccess(res, {
+      success: true,
+      message: 'Session cleared'
+    });
+  } catch (error) {
+    logger.error('Error clearing waitlist session', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    
+    if (!handleCommonError(error, res, 'clearing waitlist session')) {
+      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to clear session');
+    }
+  }
 });
 
 export default router;

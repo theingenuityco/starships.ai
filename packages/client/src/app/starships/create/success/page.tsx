@@ -21,7 +21,7 @@ export default function CheckoutSuccess() {
     // Simple delay then redirect - webhook handles starship creation
     const timer = setTimeout(() => {
       setStatus('success');
-      setTimeout(() => router.push('/fleet'), 3000);
+      setTimeout(() => router.push('/'), 3000);
     }, 2000);
 
     return () => clearTimeout(timer);
@@ -55,7 +55,7 @@ export default function CheckoutSuccess() {
             </motion.div>
             <h1 className="text-xl font-semibold">🚀 Starship Created!</h1>
             <p className="text-muted-foreground">
-              Payment successful. Redirecting to your fleet...
+              Payment successful. Redirecting to your starship...
             </p>
           </CardContent>
         </Card>
@@ -69,10 +69,10 @@ export default function CheckoutSuccess() {
         <CardContent className="p-8 text-center space-y-4">
           <h1 className="text-xl font-semibold">Something went wrong</h1>
           <p className="text-muted-foreground">
-            Please check your fleet or contact support.
+            Please check your starships or contact support.
           </p>
-          <Button onClick={() => router.push('/fleet')}>
-            Go to Fleet
+          <Button onClick={() => router.push('/')}>
+            Go to Home
           </Button>
         </CardContent>
       </Card>

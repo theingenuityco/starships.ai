@@ -1,4 +1,4 @@
-import { RepositoryFactory } from '@starships/models';
+import { NativeToolApiKeyRepository } from '@starships/models';
 // Note: LLMToolDefinition type needs to be defined based on the actual interface needed
 // For now, creating a local interface until the proper type is available
 interface LLMToolDefinition {
@@ -53,7 +53,7 @@ export class ToolService {
    */
   async getAllTools(): Promise<AgentTool[]> {
     try {
-      const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+      const apiKeyRepo = new NativeToolApiKeyRepository();
       const apiKeys = await apiKeyRepo.getAllApiKeys(this.starshipId);
       
       const tools: AgentTool[] = [];

@@ -1,15 +1,8 @@
-/**
- * Structured Logging and Monitoring System for Starships.ai
- *
- * This module provides structured logging with proper context, correlation IDs,
- * performance monitoring, and error tracking capabilities.
- */
+/** Structured logging and monitoring system */
 
 import { BaseError, ErrorUtils } from '@starships/errors';
 
-/**
- * Log levels in order of severity
- */
+/** Log levels in order of severity */
 export enum LogLevel {
   DEBUG = 'debug',
   INFO = 'info',
@@ -18,9 +11,7 @@ export enum LogLevel {
   FATAL = 'fatal',
 }
 
-/**
- * Log context interface for structured logging
- */
+/** Log context interface for structured logging */
 export interface LogContext {
   requestId?: string;
   userId?: string;
@@ -61,9 +52,7 @@ export interface LogContext {
   stack?: string;
 }
 
-/**
- * Performance metrics interface
- */
+/** Performance metrics interface */
 export interface PerformanceMetrics {
   operation: string;
   duration: number;
@@ -73,9 +62,7 @@ export interface PerformanceMetrics {
   metadata?: Record<string, any>;
 }
 
-/**
- * Health check status interface
- */
+/** Health check status interface */
 export interface HealthStatus {
   service: string;
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -84,9 +71,7 @@ export interface HealthStatus {
   details?: Record<string, any>;
 }
 
-/**
- * Logger configuration interface
- */
+/** Logger configuration interface */
 export interface LoggerConfig {
   logLevel?: string;
   enableConsole?: boolean;
@@ -94,9 +79,7 @@ export interface LoggerConfig {
   enableMetrics?: boolean;
 }
 
-/**
- * Structured logger class
- */
+/** Structured logger class */
 export class Logger {
   private static instance: Logger;
   private logLevel: LogLevel;
@@ -111,9 +94,7 @@ export class Logger {
     this.enableMetrics = config?.enableMetrics ?? (process.env.LOG_METRICS === 'true');
   }
 
-  /**
-   * Get singleton logger instance
-   */
+  /** Get singleton logger instance */
   public static getInstance(config?: LoggerConfig): Logger {
     if (!Logger.instance) {
       Logger.instance = new Logger(config);
@@ -121,23 +102,17 @@ export class Logger {
     return Logger.instance;
   }
 
-  /**
-   * Reset singleton instance (for testing purposes)
-   */
+  /** Reset singleton instance (for testing) */
   public static resetInstance(): void {
     Logger.instance = undefined as any;
   }
 
-  /**
-   * Create a new logger instance with specific configuration (for testing)
-   */
+  /** Create logger instance with specific configuration (for testing) */
   public static createInstance(config: LoggerConfig): Logger {
     return new Logger(config);
   }
 
-  /**
-   * Parse log level from string
-   */
+  /** Parse log level from string */
   private parseLogLevel(level: string): LogLevel {
     const normalizedLevel = level.toLowerCase();
     if (Object.values(LogLevel).includes(normalizedLevel as LogLevel)) {
@@ -146,9 +121,7 @@ export class Logger {
     return LogLevel.INFO;
   }
 
-  /**
-   * Check if log level should be logged
-   */
+  /** Check if log level should be logged */
   private shouldLog(level: LogLevel): boolean {
     const levels = [LogLevel.DEBUG, LogLevel.INFO, LogLevel.WARN, LogLevel.ERROR, LogLevel.FATAL];
     const currentLevelIndex = levels.indexOf(this.logLevel);
@@ -156,9 +129,7 @@ export class Logger {
     return messageLevelIndex >= currentLevelIndex;
   }
 
-  /**
-   * Format log message with context
-   */
+  /** Format log message with context */
   private formatMessage(
     level: LogLevel,
     message: string,
@@ -187,9 +158,7 @@ export class Logger {
     return logEntry;
   }
 
-  /**
-   * Output log message
-   */
+  /** Output log message */
   private output(logEntry: Record<string, any>): void {
     if (this.enableConsole) {
       const { level, timestamp, message, ...rest } = logEntry;
@@ -234,9 +203,7 @@ export class Logger {
     }
   }
 
-  /**
-   * Log debug message
-   */
+  /** Log debug message */
   public debug(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.DEBUG)) {
       const logEntry = this.formatMessage(LogLevel.DEBUG, message, context);
@@ -244,9 +211,7 @@ export class Logger {
     }
   }
 
-  /**
-   * Log info message
-   */
+  /** Log info message */
   public info(message: string, context?: LogContext): void {
     if (this.shouldLog(LogLevel.INFO)) {
       const logEntry = this.formatMessage(LogLevel.INFO, message, context);
@@ -254,9 +219,7 @@ export class Logger {
     }
   }
 
-  /**
-   * Log warning message
-   */
+  /** Log warning message */
   public warn(message: string, context?: LogContext, error?: Error | BaseError): void {
     if (this.shouldLog(LogLevel.WARN)) {
       const logEntry = this.formatMessage(LogLevel.WARN, message, context, error);
@@ -264,9 +227,7 @@ export class Logger {
     }
   }
 
-  /**
-   * Log error message
-   */
+  /** Log error message */
   public error(message: string, context?: LogContext, error?: Error | BaseError): void {
     if (this.shouldLog(LogLevel.ERROR)) {
       const logEntry = this.formatMessage(LogLevel.ERROR, message, context, error);
@@ -274,9 +235,7 @@ export class Logger {
     }
   }
 
-  /**
-   * Log fatal error message
-   */
+  /** Log fatal error message */
   public fatal(message: string, context?: LogContext, error?: Error | BaseError): void {
     if (this.shouldLog(LogLevel.FATAL)) {
       const logEntry = this.formatMessage(LogLevel.FATAL, message, context, error);
@@ -324,29 +283,21 @@ export class Logger {
   }
 }
 
-/**
- * Performance monitoring utility
- */
+/** Performance monitoring utility */
 class PerformanceMonitorClass {
   private static timers: Map<string, number> = new Map();
 
-  /**
-   * Get current logger instance
-   */
+  /** Get current logger instance */
   private static getLogger(): Logger {
     return Logger.getInstance();
   }
 
-  /**
-   * Start timing an operation
-   */
+  /** Start timing an operation */
   public static start(operationId: string): void {
     this.timers.set(operationId, performance.now());
   }
 
-  /**
-   * End timing and log performance metrics
-   */
+  /** End timing and log performance metrics */
   public static end(
     operationId: string,
     operation: string,
@@ -376,9 +327,7 @@ class PerformanceMonitorClass {
     return duration;
   }
 
-  /**
-   * Measure async operation
-   */
+  /** Measure async operation */
   public static async measure<T>(
     operation: string,
     fn: () => Promise<T>,
@@ -398,9 +347,7 @@ class PerformanceMonitorClass {
     }
   }
 
-  /**
-   * Measure sync operation
-   */
+  /** Measure sync operation */
   public static measureSync<T>(operation: string, fn: () => T, metadata?: Record<string, any>): T {
     const operationId = ErrorUtils.generateRequestId();
     this.start(operationId);
@@ -417,22 +364,16 @@ class PerformanceMonitorClass {
   }
 }
 
-/**
- * Health monitoring utility
- */
+/** Health monitoring utility */
 class HealthMonitorClass {
   private static healthChecks: Map<string, HealthStatus> = new Map();
 
-  /**
-   * Get current logger instance
-   */
+  /** Get current logger instance */
   private static getLogger(): Logger {
     return Logger.getInstance();
   }
 
-  /**
-   * Register a health check
-   */
+  /** Register a health check */
   public static async checkService(
     serviceName: string,
     healthCheckFn: () => Promise<boolean>,
@@ -485,9 +426,7 @@ class HealthMonitorClass {
     }
   }
 
-  /**
-   * Get all health check statuses
-   */
+  /** Get all health check statuses */
   public static getAllHealthStatuses(): Record<string, HealthStatus> {
     const statuses: Record<string, HealthStatus> = {};
     this.healthChecks.forEach((status, service) => {
@@ -496,9 +435,7 @@ class HealthMonitorClass {
     return statuses;
   }
 
-  /**
-   * Get overall system health
-   */
+  /** Get overall system health */
   public static getOverallHealth(): {
     status: 'healthy' | 'unhealthy' | 'degraded';
     services: Record<string, HealthStatus>;
@@ -528,15 +465,11 @@ class HealthMonitorClass {
   }
 }
 
-/**
- * Request context utility for tracking requests across the application
- */
+/** Request context utility for tracking requests across the application */
 class RequestContextClass {
   private static contexts: Map<string, LogContext> = new Map();
 
-  /**
-   * Create new request context
-   */
+  /** Create new request context */
   public static create(requestId: string, initialContext: Partial<LogContext> = {}): LogContext {
     const context: LogContext = {
       requestId,
@@ -546,16 +479,12 @@ class RequestContextClass {
     return context;
   }
 
-  /**
-   * Get request context
-   */
+  /** Get request context */
   public static get(requestId: string): LogContext | undefined {
     return this.contexts.get(requestId);
   }
 
-  /**
-   * Update request context
-   */
+  /** Update request context */
   public static update(requestId: string, updates: Partial<LogContext>): LogContext | undefined {
     const existing = this.contexts.get(requestId);
     if (existing) {
@@ -566,16 +495,12 @@ class RequestContextClass {
     return undefined;
   }
 
-  /**
-   * Remove request context (cleanup)
-   */
+  /** Remove request context (cleanup) */
   public static remove(requestId: string): void {
     this.contexts.delete(requestId);
   }
 
-  /**
-   * Clean up old contexts (call periodically)
-   */
+  /** Clean up old contexts (call periodically) */
   public static cleanup(maxAge: number = 3600000): void {
     // 1 hour default
     const now = Date.now();

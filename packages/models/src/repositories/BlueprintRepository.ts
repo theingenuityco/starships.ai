@@ -6,20 +6,21 @@
  */
 
 import { BaseRepository } from './BaseRepository';
-import { getConnection } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '../helpers/database';
 import { NodeRepository } from './NodeRepository';
 import { EdgeRepository } from './EdgeRepository';
 import type { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
-import { v4 as uuidv4 } from 'uuid';
 
 export class BlueprintRepository extends BaseRepository {
+  private connection: Neo4jConnection;
   private nodeRepo: NodeRepository;
   private edgeRepo: EdgeRepository;
 
-  constructor() {
+  constructor(connection?: Neo4jConnection) {
     super('BlueprintRepository');
-    this.nodeRepo = new NodeRepository();
-    this.edgeRepo = new EdgeRepository();
+    this.connection = connection || getConnection();
+    this.nodeRepo = new NodeRepository(this.connection);
+    this.edgeRepo = new EdgeRepository(this.connection);
   }
 
   async createBlueprint(request: CreateBlueprintRequest): Promise<BlueprintModel> {
@@ -43,13 +44,10 @@ export class BlueprintRepository extends BaseRepository {
         }], 'createBlueprint');
       }
 
-      const connection = getConnection();
-      const blueprintId = uuidv4();
       const now = new Date().toISOString();
 
-      // Create blueprint
-      const blueprintProps = {
-        id: blueprintId,
+      // Create blueprint with auto-generated ID
+      const blueprintData = {
         name: request.name,
         description: request.description || '',
         category: request.category || 'general',
@@ -59,19 +57,16 @@ export class BlueprintRepository extends BaseRepository {
         metadata: JSON.stringify(request.metadata || {})
       };
 
-      await connection.executeWrite(
-        'CREATE (b:Blueprint $blueprintProps)',
-        { blueprintProps }
-      );
+      const blueprint = await this.createEntityWithAutoId<any>('Blueprint', blueprintData, this.connection);
 
       // Create nodes using NodeRepository
-      const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprintId, request.nodes);
+      const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprint.id, request.nodes);
 
       // Create edges using EdgeRepository with ID mapping
-      const edges = await this.edgeRepo.createEdges(blueprintId, request.edges, idMapping);
+      const edges = await this.edgeRepo.createEdges(blueprint.id, request.edges, idMapping);
 
       return {
-        id: blueprintId,
+        id: blueprint.id,
         name: request.name,
         description: request.description,
         category: request.category,
@@ -89,7 +84,7 @@ export class BlueprintRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'getBlueprintById');
 
-      const connection = getConnection();
+      const connection = this.connection;
       
       // Get blueprint metadata
       const blueprintResult = await connection.executeQuery<{ b: any }>(
@@ -126,7 +121,7 @@ export class BlueprintRepository extends BaseRepository {
 
   async getAllBlueprints(): Promise<BlueprintModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
+      const connection = this.connection;
       
       // Get all blueprints
       const blueprintResults = await connection.executeQuery<{ b: any }>(
@@ -182,7 +177,7 @@ export class BlueprintRepository extends BaseRepository {
         }], 'updateBlueprint');
       }
 
-      const connection = getConnection();
+      const connection = this.connection;
       const now = new Date().toISOString();
 
       // Build SET clause dynamically
@@ -235,7 +230,7 @@ export class BlueprintRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ blueprintId }, ['blueprintId'], 'incrementUsageCount');
 
-      const connection = getConnection();
+      const connection = this.connection;
 
       await connection.executeWrite(`
         MATCH (b:Blueprint {id: $blueprintId})
@@ -257,7 +252,7 @@ export class BlueprintRepository extends BaseRepository {
       await this.edgeRepo.deleteEdgesByBlueprintId(blueprintId);
 
       // Delete the blueprint itself
-      const connection = getConnection();
+      const connection = this.connection;
       await connection.executeWrite(
         'MATCH (b:Blueprint {id: $blueprintId})\n        DELETE b',
         { blueprintId }
@@ -269,7 +264,7 @@ export class BlueprintRepository extends BaseRepository {
     return this.executeWithErrorHandling(async () => {
       this.validateRequired({ category }, ['category'], 'getBlueprintsByCategory');
 
-      const connection = getConnection();
+      const connection = this.connection;
       
       // Get blueprints by category
       const blueprintResults = await connection.executeQuery<{ b: any }>(

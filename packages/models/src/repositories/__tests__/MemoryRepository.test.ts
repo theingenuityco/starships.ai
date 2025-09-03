@@ -199,7 +199,17 @@ describe('MemoryRepository', () => {
   describe('create', () => {
     it('should create memory successfully', async () => {
       const createInput = createMockCreateInput();
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        version: '1.0.0',
+        messageCount: 0,
+        state: '{"messages":[],"context":{}}'
+      };
+      
+      // Mock createEntityWithAutoId format and relationship creation
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(createInput);
 
@@ -208,15 +218,6 @@ describe('MemoryRepository', () => {
         messageCount: 0,
         state: { messages: [], context: {} }
       });
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (m:Memory $props)'),
-        expect.objectContaining({
-          props: expect.objectContaining({
-            state: JSON.stringify({ messages: [], context: {} })
-          }),
-          starshipId: 'starship-123'
-        })
-      );
     });
 
     it('should use default values for optional fields', async () => {
@@ -225,7 +226,16 @@ describe('MemoryRepository', () => {
         version: '1.0.0',
         state: {}
       };
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        version: '1.0.0',
+        messageCount: 0,
+        state: '{}'
+      };
+      
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(minimalInput);
 
@@ -241,7 +251,17 @@ describe('MemoryRepository', () => {
           metadata: { complex: { nested: 'data' } }
         }
       });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        state: JSON.stringify({
+          messages: [{ role: 'user', content: 'test' }],
+          metadata: { complex: { nested: 'data' } }
+        })
+      };
+      
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       await repository.create(complexInput);
 
@@ -674,9 +694,18 @@ describe('MemoryRepository', () => {
     it('should handle complete memory lifecycle', async () => {
       const starshipId = 'starship-123';
       const createInput = createMockCreateInput({ starshipId });
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        starshipId,
+        version: '1.0.0',
+        messageCount: 0,
+        state: '{"messages":[],"context":{}}'
+      };
 
-      // Create
-      mockConnection.executeWrite.mockResolvedValue([]);
+      // Create - mock createEntityWithAutoId format
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
       const created = await repository.create(createInput);
       expect(created.id).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
@@ -771,7 +800,14 @@ describe('MemoryRepository', () => {
         metadata: { size: 'large' }
       };
       const createInput = createMockCreateInput({ state: largeState });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        state: JSON.stringify(largeState)
+      };
+      
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(createInput);
 
@@ -796,7 +832,14 @@ describe('MemoryRepository', () => {
         }
       };
       const createInput = createMockCreateInput({ state: complexState });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        state: JSON.stringify(complexState)
+      };
+      
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(createInput);
 

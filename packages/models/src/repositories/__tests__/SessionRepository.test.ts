@@ -222,9 +222,22 @@ describe('SessionRepository', () => {
         messageCount: 0,
         status: 'active' as const
       };
-      const mockCreated = createMockSession(createInput);
+      const mockCreated = {
+        id: 'test-session-id',
+        source: 'agent',
+        created_by: 'user-123',
+        starship_id: 'starship-123',
+        agent_id: 'agent-123',
+        created_at: expect.any(String),
+        last_activity_at: '2024-01-01T00:00:00.000Z',
+        message_count: 0,
+        total_tokens: 0,
+        status: 'active',
+        metadata: null
+      };
       
-      mockConnection.executeWrite.mockResolvedValue([{ s: createMockSessionRecord(mockCreated) }]);
+      // Mock createEntityWithAutoId call
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
@@ -233,10 +246,14 @@ describe('SessionRepository', () => {
         userId: 'user-123'
       });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (s:SessionModel'),
+        expect.stringContaining('CREATE (n:SessionModel)'),
         expect.objectContaining({
-          source: 'agent',
-          userId: 'user-123'
+          props: expect.objectContaining({
+            source: 'agent',
+            created_by: 'user-123',
+            starship_id: 'starship-123',
+            agent_id: 'agent-123'
+          })
         })
       );
     });
@@ -255,18 +272,30 @@ describe('SessionRepository', () => {
         messageCount: 0,
         status: 'active' as const
       };
-      const mockCreated = createMockSession();
+      const mockCreated = {
+        id: 'test-session-id',
+        source: 'agent',
+        created_by: 'user-123',
+        created_at: expect.any(String),
+        last_activity_at: '2024-01-01T00:00:00.000Z',
+        message_count: 0,
+        total_tokens: 0,
+        status: 'active',
+        metadata: null
+      };
       
-      mockConnection.executeWrite.mockResolvedValue([{ s: createMockSessionRecord(mockCreated) }]);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       await repository.create(minimalInput);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          messageCount: 0,
-          totalTokens: 0,
-          status: 'active'
+          props: expect.objectContaining({
+            message_count: 0,
+            total_tokens: 0,
+            status: 'active'
+          })
         })
       );
     });
@@ -280,16 +309,28 @@ describe('SessionRepository', () => {
         status: 'active' as const,
         metadata: { theme: 'dark', language: 'en' }
       };
-      const mockCreated = createMockSession();
+      const mockCreated = {
+        id: 'test-session-id',
+        source: 'agent',
+        created_by: 'user-123',
+        created_at: expect.any(String),
+        last_activity_at: '2024-01-01T00:00:00.000Z',
+        message_count: 0,
+        total_tokens: 0,
+        status: 'active',
+        metadata: JSON.stringify({ theme: 'dark', language: 'en' })
+      };
       
-      mockConnection.executeWrite.mockResolvedValue([{ s: createMockSessionRecord(mockCreated) }]);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       await repository.create(inputWithMetadata);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          metadata: JSON.stringify({ theme: 'dark', language: 'en' })
+          props: expect.objectContaining({
+            metadata: JSON.stringify({ theme: 'dark', language: 'en' })
+          })
         })
       );
     });
@@ -656,8 +697,20 @@ describe('SessionRepository', () => {
       };
 
       // Create
-      const mockCreated = createMockSession({ ...createInput, id: 'test-session-id' });
-      mockConnection.executeWrite.mockResolvedValue([{ s: createMockSessionRecord(mockCreated) }]);
+      const mockCreated = {
+        id: 'test-session-id',
+        source: 'agent',
+        created_by: 'user-123',
+        starship_id: 'starship-123',
+        created_at: expect.any(String),
+        last_activity_at: '2024-01-01T00:00:00.000Z',
+        message_count: 0,
+        total_tokens: 0,
+        status: 'active',
+        metadata: null
+      };
+      // Mock createEntityWithAutoId format
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
       const created = await repository.create(createInput);
       expect(created.id).toBe('test-session-id');
 

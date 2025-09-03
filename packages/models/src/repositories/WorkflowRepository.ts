@@ -2,7 +2,6 @@ import { getConnection } from '../helpers/database';
 import type { WorkflowModel } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
-import { v4 as uuidv4 } from 'uuid';
 import { Blueprint } from '@starships/autopilot';
 
 /**
@@ -58,7 +57,7 @@ export class WorkflowRepository extends BaseRepository {
       const result = await connection.executeQuery<{ w: WorkflowModel }>(
         'MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC'
       );
-      return convertNeo4jIntsInArray(result.map((record) => record.w));
+      return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
     }, 'findAll', 'Workflow');
   }
 
@@ -156,7 +155,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE w.starshipId IS NULL OR w.starshipId = "" RETURN w ORDER BY w.createdAt DESC',
       {}
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async create(
@@ -166,7 +165,6 @@ export class WorkflowRepository extends BaseRepository {
       this.validateRequired(entity, ['name', 'authorId'], 'create');
 
       const connection = getConnection();
-      const id = uuidv4();
       const now = new Date().toISOString();
 
       // Create default blueprint if none provided
@@ -176,8 +174,8 @@ export class WorkflowRepository extends BaseRepository {
         metadata: {}
       };
 
-      // Create workflow with only essential fields from WorkflowNodeParameters + database fields
-      const workflow: WorkflowModel = {
+      // Create workflow data with only essential fields from WorkflowNodeParameters + database fields
+      const workflowData = {
         // Core WorkflowNodeParameters fields
         blueprint: (entity.blueprint && typeof entity.blueprint === 'object' && 'nodes' in entity.blueprint)
           ? entity.blueprint as Blueprint
@@ -185,7 +183,6 @@ export class WorkflowRepository extends BaseRepository {
         timeout: this.getSafeValue(entity.timeout, 30000) as number,
         
         // Database fields
-        id,
         name: entity.name as string,
         createdAt: now,
         updatedAt: now,
@@ -201,27 +198,24 @@ export class WorkflowRepository extends BaseRepository {
         allowedStarshipClasses: entity.allowedStarshipClasses as string[] | undefined
       };
 
-      const workflowForStorage = this.serializeComplexFields(workflow);
+      const workflowForStorage = this.serializeComplexFields(workflowData as unknown as WorkflowModel);
 
-      await connection.executeWrite('CREATE (w:Workflow $props) RETURN w', { props: workflowForStorage });
+      const workflow = await this.createEntityWithAutoId<WorkflowModel>('Workflow', workflowForStorage);
 
       // For backward compatibility, also create Neo4j relationship during transition
       if (workflow.starshipId) {
-        try {
-          await connection.executeWrite(
-            `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
-             CREATE (w)-[:DEPLOYED_ON {
-               deployedAt: $timestamp,
-               deployedBy: 'system'
-             }]->(s)`,
-            { starshipId: workflow.starshipId, workflowId: workflow.id, timestamp: now }
-          );
-        } catch (error) {
-          console.warn('Failed to create Neo4j relationship for new workflow:', error);
-        }
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
+           CREATE (w)-[:DEPLOYED_ON {
+             deployedAt: $timestamp,
+             deployedBy: 'system'
+           }]->(s)`,
+          { starshipId: workflow.starshipId, workflowId: workflow.id, timestamp: now }
+        );
       }
 
-      return convertNeo4jIntsInObject(workflow);
+      // Deserialize complex fields before returning
+      return convertNeo4jIntsInObject(this.deserializeComplexFields(workflow));
     }, 'create', 'Workflow');
   }
 
@@ -241,7 +235,7 @@ export class WorkflowRepository extends BaseRepository {
       );
 
       const workflow = result[0]?.w || null;
-      return workflow ? convertNeo4jIntsInObject(workflow) : null;
+      return workflow ? convertNeo4jIntsInObject(this.deserializeComplexFields(workflow)) : null;
     }, 'update', 'Workflow', id);
   }
 
@@ -263,7 +257,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
       { authorId }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findByCategory(category: string): Promise<WorkflowModel[]> {
@@ -272,7 +266,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
       { category }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findByTags(tags: string[]): Promise<WorkflowModel[]> {
@@ -281,7 +275,7 @@ export class WorkflowRepository extends BaseRepository {
       'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
       { tags }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findPublic(limit: number = 50, offset: number = 0): Promise<WorkflowModel[]> {
@@ -293,7 +287,7 @@ export class WorkflowRepository extends BaseRepository {
         offset: (offset)
       }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async searchWorkflows(query: string): Promise<WorkflowModel[]> {
@@ -302,7 +296,7 @@ export class WorkflowRepository extends BaseRepository {
       'CALL db.index.fulltext.queryNodes("workflowSearch", $query) YIELD node as w, score RETURN w, score ORDER BY score DESC LIMIT 20',
       { query }
     );
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async incrementUsageCount(id: string): Promise<void> {
@@ -360,7 +354,7 @@ export class WorkflowRepository extends BaseRepository {
     query += ' RETURN w ORDER BY w.usageCount DESC, w.rating DESC';
 
     const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
-    return convertNeo4jIntsInArray(result.map((record) => record.w));
+    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
 }

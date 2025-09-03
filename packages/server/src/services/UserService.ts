@@ -1,5 +1,6 @@
-import { RepositoryFactory } from '@starships/models';
+import { UserRepository } from '@starships/models';
 import { UserModel } from '@starships/protocol';
+import { StarshipService } from './StarshipService';
 
 interface KindeUserData {
   kindeId: string;
@@ -17,7 +18,7 @@ export class UserService {
    * Creates new user or updates existing user
    */
   static async syncUser(kindeData: KindeUserData): Promise<UserModel> {
-    const userRepo = RepositoryFactory.getUserRepository();
+    const userRepo = new UserRepository();
 
     try {
       // First, try to find existing user by Kinde ID
@@ -63,6 +64,16 @@ export class UserService {
       });
 
       console.log(`[USER-SYNC] Created new user: ${newUser.id}`);
+
+      // Create a starship for the new user
+      try {
+        const starship = await StarshipService.createDefaultStarship(newUser.id);
+        console.log(`[USER-SYNC] Created default starship for user: ${newUser.id}, starship: ${starship.id}`);
+      } catch (starshipError) {
+        console.error(`[USER-SYNC] Failed to create default starship for user ${newUser.id}:`, starshipError);
+        // Don't fail user creation if starship creation fails
+      }
+
       return newUser;
     } catch (error) {
       console.error('[USER-SYNC] Failed to sync user:', error);
@@ -74,7 +85,7 @@ export class UserService {
    * Get user by internal ID
    */
   static async getUserById(id: string): Promise<UserModel | null> {
-    const userRepo = RepositoryFactory.getUserRepository();
+    const userRepo = new UserRepository();
     return await userRepo.findById(id);
   }
 
@@ -84,7 +95,7 @@ export class UserService {
   static async getUserByKindeId(kindeId: string): Promise<UserModel | null> {
     try {
       console.log(`[USER-SERVICE] Getting user repository for Kinde ID: ${kindeId}`);
-      const userRepo = RepositoryFactory.getUserRepository();
+      const userRepo = new UserRepository();
       console.log(`[USER-SERVICE] Repository obtained, executing findByKindeId for: ${kindeId}`);
       const result = await userRepo.findByKindeId(kindeId);
       console.log(`[USER-SERVICE] findByKindeId completed for ${kindeId}, result: ${result ? 'found' : 'not found'}`);
@@ -101,7 +112,8 @@ export class UserService {
    * Get user by email
    */
   static async getUserByEmail(email: string): Promise<UserModel | null> {
-    const userRepo = RepositoryFactory.getUserRepository();
+    const userRepo = new UserRepository();
     return await userRepo.findByEmail(email);
   }
+
 }

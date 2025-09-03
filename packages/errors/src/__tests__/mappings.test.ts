@@ -3,16 +3,12 @@
  */
 
 import {
-  StandardErrorCode,
   ERROR_HTTP_STATUS_MAP,
   ERROR_CATEGORY_MAP,
-  ErrorMappingUtils,
-  getHttpStatusCode,
-  getErrorCategory,
-  isRetryableError,
-  shouldLogError
+  ErrorMappingUtils
 } from '../mappings';
-import { ErrorCategory } from '../index';
+import { ErrorCategory } from '@starships/protocol';
+import type { StandardErrorCode } from '@starships/protocol';
 
 describe('ERROR_HTTP_STATUS_MAP', () => {
   it('should map validation errors to 400', () => {
@@ -321,31 +317,6 @@ describe('ErrorMappingUtils', () => {
   });
 });
 
-describe('Legacy function exports', () => {
-  it('should export getHttpStatusCode function', () => {
-    expect(typeof getHttpStatusCode).toBe('function');
-    expect(getHttpStatusCode('VALIDATION_ERROR')).toBe(400);
-    expect(getHttpStatusCode).toBe(ErrorMappingUtils.getHttpStatusCode);
-  });
-
-  it('should export getErrorCategory function', () => {
-    expect(typeof getErrorCategory).toBe('function');
-    expect(getErrorCategory('VALIDATION_ERROR')).toBe(ErrorCategory.VALIDATION);
-    expect(getErrorCategory).toBe(ErrorMappingUtils.getErrorCategory);
-  });
-
-  it('should export isRetryableError function', () => {
-    expect(typeof isRetryableError).toBe('function');
-    expect(isRetryableError('TIMEOUT_ERROR')).toBe(true);
-    expect(isRetryableError).toBe(ErrorMappingUtils.isRetryableError);
-  });
-
-  it('should export shouldLogError function', () => {
-    expect(typeof shouldLogError).toBe('function');
-    expect(shouldLogError(500)).toBe(true);
-    expect(shouldLogError).toBe(ErrorMappingUtils.shouldLogError);
-  });
-});
 
 describe('StandardErrorCode type', () => {
   it('should include all expected error codes', () => {

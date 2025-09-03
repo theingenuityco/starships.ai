@@ -1,7 +1,6 @@
 import type { AgentTemplateModel, AgentModel } from '@starships/protocol';
 import { Neo4jConnection, getConnection } from '../helpers/database';
 import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 import { AgentMemoryState } from '@starships/autopilot';
@@ -88,11 +87,10 @@ export class AgentTemplateRepository extends BaseRepository {
       
       this.validateRequired(entity, ['name', 'description'], 'create');
       
-      const id = uuidv4();
       const now = new Date().toISOString();
 
-      // Build template explicitly, ensuring no complex objects
-      const template = {
+      // Build template data, ensuring no complex objects for Neo4j storage
+      const templateData = {
         // Explicit primitive fields
         name: entity.name,
         description: entity.description,
@@ -109,7 +107,6 @@ export class AgentTemplateRepository extends BaseRepository {
         tags: entity.tags,
         
         // Database fields
-        id,
         createdAt: now,
         updatedAt: now,
         usageCount: 0,
@@ -119,27 +116,19 @@ export class AgentTemplateRepository extends BaseRepository {
         blueprint: entity.blueprint ? JSON.stringify(entity.blueprint) : null,
       };
 
-      console.log('[Repository] Template before Neo4j create (types):', {
-        memory: typeof template.memory,
-        blueprint: typeof template.blueprint,
-        memoryIsString: typeof template.memory === 'string',
-        blueprintIsString: typeof template.blueprint === 'string'
+      console.log('[Repository] Template data before Neo4j create (types):', {
+        memory: typeof templateData.memory,
+        blueprint: typeof templateData.blueprint,
+        memoryIsString: typeof templateData.memory === 'string',
+        blueprintIsString: typeof templateData.blueprint === 'string'
       });
 
-      const query = `
-        CREATE (t:AgentTemplate $template)
-        RETURN t
-      `;
-      
-      const results = await this.connection.executeWrite<{ t: any }>(query, { template });
-      const rawTemplate = results[0].t;
+      const created = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
       
       console.log('[Repository] Created successfully, deserializing...');
       
       // Deserialize JSON strings back to objects
-      const created = this.deserializeTemplate(convertNeo4jIntsInObject(rawTemplate));
-
-      return created;
+      return this.deserializeTemplate(convertNeo4jIntsInObject(created));
     }, 'create', 'AgentTemplate');
   }
 
@@ -357,12 +346,10 @@ export class AgentTemplateRepository extends BaseRepository {
     // Increment template usage count
     await this.incrementUsageCount(templateId);
 
-    // Create agent from template
-    const agentId = uuidv4();
     const now = new Date().toISOString();
 
-    // Serialize complex objects for Neo4j storage
-    const serializedAgent = {
+    // Prepare agent data for creation
+    const agentData = {
       // Core AgentNodeParameters fields from template
       name: agentName,
       description: template.description,
@@ -374,7 +361,6 @@ export class AgentTemplateRepository extends BaseRepository {
       blueprint: template.blueprint ? JSON.stringify(template.blueprint) : null,
       
       // Database-specific fields
-      id: agentId,
       createdAt: now,
       updatedAt: now,
       version: '1.0.0',
@@ -384,15 +370,19 @@ export class AgentTemplateRepository extends BaseRepository {
       starshipId: starshipId,
     };
 
-    const query = `
-      MATCH (s:Starship {id: $starshipId})
-      CREATE (a:Agent $agent)
-      CREATE (a)-[:DEPLOYED_ON]->(s)
-      RETURN a
-    `;
+    // Create agent with auto-generated ID
+    const rawAgent = await this.createEntityWithAutoId<any>('Agent', agentData, this.connection);
     
-    const results = await this.connection.executeWrite<{ a: any }>(query, { agent: serializedAgent, starshipId });
-    const rawAgent = results[0].a;
+    // Create relationship with starship
+    try {
+      await this.connection.executeWrite(
+        `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
+         CREATE (a)-[:DEPLOYED_ON]->(s)`,
+        { starshipId, agentId: rawAgent.id }
+      );
+    } catch (error) {
+      console.warn('Failed to create Agent-Starship relationship:', error);
+    }
     
     // Deserialize for return (assuming Agent has similar structure)
     const createdAgent = {
@@ -423,8 +413,6 @@ export class AgentTemplateRepository extends BaseRepository {
 
       const agent = agentResults[0].a;
 
-      // Create template from agent
-      const templateId = uuidv4();
       const now = new Date().toISOString();
 
       // Create default blueprint for simple chat
@@ -484,8 +472,8 @@ export class AgentTemplateRepository extends BaseRepository {
         }
       };
 
-      // Serialize complex objects for Neo4j storage
-      const serializedTemplate = {
+      // Prepare template data for creation
+      const templateData = {
         // Core AgentNodeParameters fields
         name: `${agent.name} Template`,
         description: this.getSafeValue(agent.description, '') as string,
@@ -497,7 +485,6 @@ export class AgentTemplateRepository extends BaseRepository {
         blueprint: JSON.stringify(defaultBlueprint),
         
         // Database-specific fields
-        id: templateId,
         createdAt: now,
         updatedAt: now,
         category: agent.category,
@@ -508,15 +495,8 @@ export class AgentTemplateRepository extends BaseRepository {
         previewPrompts: [],
       };
 
-      const createQuery = `
-        CREATE (t:AgentTemplate $template)
-        RETURN t
-      `;
-      
-      const results = await this.connection.executeWrite<{ t: any }>(createQuery, {
-        template: serializedTemplate,
-      });
-      const created = this.deserializeTemplate(convertNeo4jIntsInObject(results[0].t));
+      const rawCreated = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
+      const created = this.deserializeTemplate(convertNeo4jIntsInObject(rawCreated));
 
       // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
       try {

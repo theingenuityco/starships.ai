@@ -202,7 +202,8 @@ describe('AgentTemplateRepository', () => {
       const createInput = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
       
-      mockConnection.executeWrite.mockResolvedValue([{ t: mockCreatedRaw }]);
+      // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
       const result = await repository.create(createInput);
 
@@ -216,10 +217,11 @@ describe('AgentTemplateRepository', () => {
           nodes: expect.any(Array)
         })
       });
+      // The actual query uses CREATE (n:AgentTemplate) with randomUUID(), not CREATE (t:AgentTemplate $template)
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (t:AgentTemplate $template)'),
+        expect.stringContaining('CREATE (n:AgentTemplate)'),
         expect.objectContaining({
-          template: expect.objectContaining({
+          props: expect.objectContaining({
             name: 'Test Template',
             description: 'A test agent template',
             memory: expect.any(String), // Should be serialized
@@ -242,7 +244,8 @@ describe('AgentTemplateRepository', () => {
       };
       const mockCreatedRaw = createMockRawTemplate(minimalInput);
       
-      mockConnection.executeWrite.mockResolvedValue([{ t: mockCreatedRaw }]);
+      // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
       const result = await repository.create(minimalInput);
 
@@ -254,14 +257,15 @@ describe('AgentTemplateRepository', () => {
       const inputWithComplexObjects = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
       
-      mockConnection.executeWrite.mockResolvedValue([{ t: mockCreatedRaw }]);
+      // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
       await repository.create(inputWithComplexObjects);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          template: expect.objectContaining({
+          props: expect.objectContaining({
             memory: expect.any(String),
             blueprint: expect.any(String)
           })
@@ -616,12 +620,16 @@ describe('AgentTemplateRepository', () => {
         id: 'agent-123',
         name: 'Test Agent',
         starshipId: 'starship-123',
-        templateId: 'template-123'
+        templateId: 'template-123',
+        memory: JSON.stringify(mockTemplate.memory),
+        blueprint: JSON.stringify(mockTemplate.blueprint)
       };
 
       jest.spyOn(repository, 'findById').mockResolvedValue(mockTemplate);
       jest.spyOn(repository, 'incrementUsageCount').mockResolvedValue();
-      mockConnection.executeWrite.mockResolvedValue([{ a: mockAgent }]);
+      // Fix: createEntityWithAutoId expects result[0].n, not result[0].a
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockAgent }])
+        .mockResolvedValueOnce([]); // For the relationship creation
 
       const result = await repository.createAgentFromTemplate(
         'template-123',
@@ -661,7 +669,7 @@ describe('AgentTemplateRepository', () => {
 
       mockConnection.executeQuery.mockResolvedValue([{ a: mockAgent }]);
       mockConnection.executeWrite
-        .mockResolvedValueOnce([{ t: mockRawTemplate }]) // Template creation
+        .mockResolvedValueOnce([{ n: mockRawTemplate }]) // Fix: Template creation expects result[0].n
         .mockResolvedValueOnce([]); // Relationship creation
 
       const result = await repository.createTemplateFromAgent('agent-123');

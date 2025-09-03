@@ -2,30 +2,46 @@ import { Router } from "express";
 import { UserService } from "../services/UserService";
 import type { Request, Response } from "express";
 import { authMiddleware } from "../middleware/auth";
+import {
+  sendSuccess,
+  sendError,
+  handleCommonError,
+  validateUUID,
+} from '../utils/responseHelpers';
 
 const router: Router = Router();
 
-// Validation middleware for user sync requests
-const validateSyncRequest = (req: Request, res: Response, next: any) => {
-  const { kindeId, email } = req.body;
-  
-  if (!kindeId || typeof kindeId !== 'string') {
-    res.status(400).json({ error: 'kindeId is required and must be a string' });
-    return;
-  }
-  
-  if (!email || typeof email !== 'string') {
-    res.status(400).json({ error: 'email is required and must be a string' });
-    return;
-  }
-  
-  next();
-};
-
-// POST /v1/users/sync - Sync Kinde user to local database
-router.post("/sync", validateSyncRequest, async (req: Request, res: Response) => {
+// POST /users/sync - Sync Kinde user to local database (OpenAPI pattern)
+router.post("/users/sync", async (req: Request, res: Response): Promise<void> => {
   try {
     const { kindeId, email, name, avatar } = req.body;
+    
+    // Validate required fields
+    if (!kindeId || typeof kindeId !== 'string') {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'kindeId is required and must be a string', 400, {
+        field: 'kindeId',
+        provided: typeof kindeId,
+      });
+      return;
+    }
+    
+    if (!email || typeof email !== 'string') {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'email is required and must be a string', 400, {
+        field: 'email',
+        provided: typeof email,
+      });
+      return;
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      sendError(res, "VALIDATION_ERROR", 'Please provide a valid email address', 400, {
+        field: 'email',
+        constraint: 'email_format',
+      });
+      return;
+    }
     
     const user = await UserService.syncUser({
       kindeId,
@@ -34,48 +50,76 @@ router.post("/sync", validateSyncRequest, async (req: Request, res: Response) =>
       avatar
     });
     
-    res.json(user);
-  } catch (err) {
-    console.error('User sync error:', err);
-    res.status(500).json({ error: (err as Error).message });
+    sendSuccess(res, user, 201);
+
+  } catch (error) {
+    if (!handleCommonError(error, res, 'syncing user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to sync user');
+    }
   }
 });
 
-// GET /v1/users/:id - Get user by ID
-router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
+// GET /users/:id - Get user by ID (OpenAPI pattern)
+router.get("/users/:id", authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
+
+    // Validate ID format
+    const { isValid, error } = validateUUID(id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
     
     const user = await UserService.getUserById(id);
     
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        id: id,
+      });
       return;
     }
     
-    res.json(user);
-  } catch (err) {
-    console.error('Get user error:', err);
-    res.status(500).json({ error: (err as Error).message });
+    sendSuccess(res, user);
+
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
+    }
   }
 });
 
-// GET /v1/users/kinde/:kindeId - Get user by Kinde ID
-router.get("/kinde/:kindeId", authMiddleware, async (req: Request, res: Response) => {
+// GET /users/kinde/:kindeId - Get user by Kinde ID (OpenAPI pattern)
+router.get("/users/kinde/:kindeId", authMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { kindeId } = req.params;
+
+    // Validate kindeId is provided and is string
+    if (!kindeId || typeof kindeId !== 'string') {
+      sendError(res, 'MISSING_REQUIRED_FIELD', 'kindeId is required and must be a string', 400, {
+        field: 'kindeId',
+        provided: typeof kindeId,
+      });
+      return;
+    }
     
     const user = await UserService.getUserByKindeId(kindeId);
     
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        kindeId: kindeId,
+      });
       return;
     }
     
-    res.json(user);
-  } catch (err) {
-    console.error('Get user by Kinde ID error:', err);
-    res.status(500).json({ error: (err as Error).message });
+    sendSuccess(res, user);
+
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching user by Kinde ID')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
+    }
   }
 });
 

@@ -8,7 +8,6 @@
 
 // User constraints
 CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE;
-CREATE CONSTRAINT user_kinde_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.kindeId IS UNIQUE;
 CREATE CONSTRAINT user_email_unique IF NOT EXISTS FOR (u:User) REQUIRE u.email IS UNIQUE;
 
 // Starship constraints
@@ -72,7 +71,6 @@ CREATE CONSTRAINT waitlist_email_unique IF NOT EXISTS FOR (w:Waitlist) REQUIRE w
 // ============================================================================
 
 // Core entity lookups
-CREATE INDEX user_kinde_id IF NOT EXISTS FOR (u:User) ON (u.kindeId);
 CREATE INDEX starship_owner_id IF NOT EXISTS FOR (s:Starship) ON (s.ownerId);
 CREATE INDEX agent_starship_id IF NOT EXISTS FOR (a:Agent) ON (a.starshipId);
 CREATE INDEX mission_starship_id IF NOT EXISTS FOR (m:MissionModel) ON (m.starshipId);

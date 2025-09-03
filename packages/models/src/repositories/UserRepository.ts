@@ -49,67 +49,33 @@ export class UserRepository extends BaseRepository {
     }, 'findByUsername', 'User', username);
   }
 
-  async findByKindeId(kindeId: string): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ u: UserModel }>(
-        'MATCH (u:User) WHERE u.kindeId = $kindeId RETURN u',
-        { kindeId: kindeId }
-      );
-      return result.length > 0 ? result[0].u : null;
-    }, 'findByKindeId', 'User', kindeId);
-  }
 
   async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
     return this.executeWithErrorHandling(async () => {
-      // For new auth system, require email instead of kindeId
+      // For new auth system, require email
       this.validateRequired(entity, ['email'], 'create');
       
       const createdAt = new Date().toISOString();
       
-      // For password-based auth, use email as unique identifier
-      if (entity.password && !entity.kindeId) {
-        const user = await this.mergeEntityWithAutoId<UserModel>(
-          'User',
-          { email: entity.email },
-          {
-            username: entity.username,
-            email: entity.email,
-            displayName: entity.displayName,
-            avatar: entity.avatar,
-            password: entity.password,
-            createdAt: createdAt
-          },
-          {
-            displayName: entity.displayName || undefined,
-            avatar: entity.avatar || undefined,
-            username: entity.username || undefined,
-            password: entity.password || undefined
-          }
-        );
-        return user;
-      }
-      
-      // Original Kinde-based creation for backward compatibility
-      this.validateRequired(entity, ['kindeId'], 'create');
+      // Use email as unique identifier
       const user = await this.mergeEntityWithAutoId<UserModel>(
         'User',
-        { kindeId: entity.kindeId },
+        { email: entity.email },
         {
           username: entity.username,
           email: entity.email,
           displayName: entity.displayName,
           avatar: entity.avatar,
+          password: entity.password,
           createdAt: createdAt
         },
         {
-          email: entity.email,
           displayName: entity.displayName || undefined,
           avatar: entity.avatar || undefined,
-          username: entity.username || undefined
+          username: entity.username || undefined,
+          password: entity.password || undefined
         }
       );
-      
       return user;
     }, 'create', 'User');
   }
@@ -131,10 +97,9 @@ export class UserRepository extends BaseRepository {
         `MATCH (u:User) WHERE u.id = $id
          SET ${setClause}
          RETURN u`,
-        { 
-          id: id, 
-          kindeId: updates.kindeId,
-          username: updates.username, 
+        {
+          id: id,
+          username: updates.username,
           email: updates.email,
           displayName: updates.displayName,
           avatar: updates.avatar

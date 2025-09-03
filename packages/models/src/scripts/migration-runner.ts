@@ -2,12 +2,7 @@ import { getConnection } from '../helpers/database';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
-/**
- * Migration Runner with Error Handling and Validation
- * 
- * Provides safe migration execution with rollback capabilities,
- * dependency checking, and comprehensive error handling.
- */
+/** Migration runner with error handling and rollback capabilities */
 
 export interface MigrationInfo {
   id: string;
@@ -39,9 +34,7 @@ export class MigrationRunner {
     return this.connection;
   }
 
-  /**
-   * Initialize schema if not already done
-   */
+  /** Initialize schema if not already done */
   async initializeSchema(): Promise<MigrationResult> {
     const startTime = Date.now();
     const result: MigrationResult = {
@@ -115,9 +108,7 @@ export class MigrationRunner {
     return result;
   }
 
-  /**
-   * Execute a migration with full error handling (deprecated - use initializeSchema)
-   */
+  /** Execute a migration with full error handling (deprecated - use initializeSchema) */
   async runMigration(migrationId: string): Promise<MigrationResult> {
     console.warn('⚠️  runMigration is deprecated. Use initializeSchema() instead.');
     
@@ -136,9 +127,7 @@ export class MigrationRunner {
     };
   }
 
-  /**
-   * Rollback a migration
-   */
+  /** Rollback a migration */
   async rollbackMigration(migrationId: string): Promise<MigrationResult> {
     const startTime = Date.now();
     const result: MigrationResult = {
@@ -182,9 +171,7 @@ export class MigrationRunner {
     return result;
   }
 
-  /**
-   * Get list of applied migrations
-   */
+  /** Get list of applied migrations */
   async getAppliedMigrations(): Promise<MigrationInfo[]> {
     try {
       const result = await this.getConnection().executeQuery(
@@ -199,9 +186,7 @@ export class MigrationRunner {
     }
   }
 
-  /**
-   * Get list of pending migrations
-   */
+  /** Get list of pending migrations */
   async getPendingMigrations(): Promise<string[]> {
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedIds = new Set(appliedMigrations.map(m => m.id));
@@ -215,10 +200,7 @@ export class MigrationRunner {
     return migrationFiles.filter(id => !appliedIds.has(id));
   }
 
-  /**
-   * Validate migration dependencies
-   * Updated to handle gaps in migration numbering gracefully
-   */
+  /** Validate migration dependencies */
   private async validateDependencies(migrationId: string): Promise<{
     valid: boolean;
     missing?: string[];
@@ -261,9 +243,7 @@ export class MigrationRunner {
     };
   }
 
-  /**
-   * Check if migration is already applied
-   */
+  /** Check if migration is already applied */
   private async isMigrationApplied(migrationId: string): Promise<boolean> {
     try {
       const result = await this.getConnection().executeQuery(
@@ -277,9 +257,7 @@ export class MigrationRunner {
     }
   }
 
-  /**
-   * Execute migration content with transaction handling
-   */
+  /** Execute migration content with transaction handling */
   private async executeMigrationContent(content: string, migrationId: string): Promise<void> {
     // Clean content: remove comment lines and empty lines, but preserve multi-line statements
     const lines = content.split('\n');
@@ -323,9 +301,7 @@ export class MigrationRunner {
     console.log(`✅ Successfully executed all ${statements.length} statements`);
   }
 
-  /**
-   * Get a friendly description of statement type without revealing content
-   */
+  /** Get a friendly description of statement type without revealing content */
   private getStatementType(statement: string): string {
     const upperStatement = statement.toUpperCase().trim();
     
@@ -346,9 +322,7 @@ export class MigrationRunner {
     }
   }
 
-  /**
-   * Create backup point before migration
-   */
+  /** Create backup point before migration */
   private async createBackupPoint(migrationId: string): Promise<void> {
     try {
       await this.getConnection().executeWrite(
@@ -368,9 +342,7 @@ export class MigrationRunner {
     }
   }
 
-  /**
-   * Verify schema initialization was successful
-   */
+  /** Verify schema initialization was successful */
   private async verifySchemaInitialization(): Promise<{
     success: boolean;
     errors?: string[];
@@ -412,9 +384,7 @@ export class MigrationRunner {
     };
   }
 
-  /**
-   * Verify migration was applied correctly (deprecated)
-   */
+  /** Verify migration was applied correctly (deprecated) */
   private async verifyMigration(migrationId: string): Promise<{
     success: boolean;
     errors?: string[];
@@ -440,9 +410,7 @@ export class MigrationRunner {
     };
   }
 
-  /**
-   * Verify constraints and indexes were created
-   */
+  /** Verify constraints and indexes were created */
   private async verifyConstraintsAndIndexes(errors: string[]): Promise<void> {
     try {
       // Check basic constraints exist
@@ -469,9 +437,7 @@ export class MigrationRunner {
   }
 
 
-  /**
-   * Initialize database schema (replaces runAllPendingMigrations)
-   */
+  /** Initialize database schema (replaces runAllPendingMigrations) */
   async runAllPendingMigrations(): Promise<MigrationResult[]> {
     console.log('🚀 Checking database schema...');
     

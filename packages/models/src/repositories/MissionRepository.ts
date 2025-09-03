@@ -337,9 +337,7 @@ export class MissionRepository extends BaseRepository {
     }, 'delete', 'MissionModel', id);
   }
 
-  /**
-   * Parse mission from Neo4j record, handling JSON fields
-   */
+  /** Parse mission from Neo4j record, handling JSON fields */
   private parseMissionFromRecord(record: any): MissionModel {
     return {
       id: record.id,

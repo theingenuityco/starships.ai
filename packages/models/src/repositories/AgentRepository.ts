@@ -4,17 +4,12 @@ import { BaseRepository } from './BaseRepository';
 import { int } from 'neo4j-driver';
 import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
 
-/**
- * Neo4j-based agent repository
- */
 export class AgentRepository extends BaseRepository {
   constructor() {
     super('AgentRepository');
   }
 
-  /**
-   * Serialize complex objects for Neo4j storage
-   */
+  /** Serialize complex objects for Neo4j storage */
   private serializeComplexFields(agent: AgentModel | any): any {
     return {
       ...agent,
@@ -23,9 +18,7 @@ export class AgentRepository extends BaseRepository {
     };
   }
 
-  /**
-   * Helper to safely get value or default, handling empty objects from Neo4j
-   */
+  /** Get value or default, handling empty objects from Neo4j */
   private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
     if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
       return defaultValue;
@@ -33,9 +26,7 @@ export class AgentRepository extends BaseRepository {
     return value as T;
   }
 
-  /**
-   * Deserialize complex objects from Neo4j storage
-   */
+  /** Deserialize complex objects from Neo4j storage */
   private deserializeComplexFields(agent: any): AgentModel {
     try {
       return {
@@ -93,7 +84,6 @@ export class AgentRepository extends BaseRepository {
     return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.a)));
   }
 
-  // NEW: FK-based query methods for starshipId relationship
   async findByStarshipId(starshipId: string): Promise<AgentModel[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ a: AgentModel }>(
@@ -261,7 +251,6 @@ export class AgentRepository extends BaseRepository {
     }, 'delete', 'Agent', id);
   }
 
-  // ADD: New enhanced query methods
   async findByAuthor(authorId: string): Promise<AgentModel[]> {
     const connection = getConnection();
     const result = await connection.executeQuery<{ a: AgentModel }>(

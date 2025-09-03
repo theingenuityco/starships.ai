@@ -1,12 +1,5 @@
 /**
- * @fileoverview Base Repository with Standardized Error Handling and Utilities
- *
- * This module provides the foundational repository class that all data access
- * repositories extend from. It includes comprehensive error handling, validation
- * utilities, and common database operation patterns for the Starships.ai platform.
- *
- * @author Starships.ai Development Team
- * @version 1.0.0
+ * Base repository class with standardized error handling and validation utilities
  */
 
 import {
@@ -20,59 +13,16 @@ import {
 } from '@starships/errors';
 import type { RepositoryErrorContext } from '@starships/errors';
 
-// ============================================================================
-// BASE REPOSITORY CLASS
-// ============================================================================
-
 /**
- * Abstract base repository class providing standardized error handling,
- * validation utilities, and common database operation patterns.
- *
- * All repository classes should extend this base class to ensure consistent
- * error handling and validation across the data access layer.
- *
- * @abstract
- * @class BaseRepository
- *
- * @example
- * ```typescript
- * export class UserRepository extends BaseRepository {
- *   constructor() {
- *     super('UserRepository');
- *   }
- *
- *   async findById(id: string): Promise<UserModel | null> {
- *     return this.executeWithErrorHandling(async () => {
- *       // Database operations here
- *     }, 'findById', 'User', id);
- *   }
- * }
- * ```
+ * Base repository with standardized error handling and validation
  */
 export abstract class BaseRepository {
-  /** The name of the repository service for logging and error tracking */
   protected serviceName: string;
-
-  /**
-   * Constructor for BaseRepository
-   *
-   * @param serviceName - Name of the repository service (e.g., 'UserRepository')
-   */
   constructor(serviceName: string) {
     this.serviceName = serviceName;
   }
 
-  /**
-   * Create error context for repository operations
-   *
-   * @param operation - The operation being performed
-   * @param resource - The type of resource (optional)
-   * @param resourceId - The specific resource ID (optional)
-   * @param additionalMetadata - Additional metadata (optional)
-   * @returns Repository error context object with operation details
-   *
-   * @protected
-   */
+  /** Create error context for repository operations */
   protected createContext(
     operation: string,
     resource?: string,

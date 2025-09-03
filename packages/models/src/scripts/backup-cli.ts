@@ -3,9 +3,7 @@
 import { createConnection } from '../helpers/database';
 import { BackupManager } from './backup-restore';
 
-/**
- * CLI script for database backup operations
- */
+/** CLI script for database backup operations */
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];

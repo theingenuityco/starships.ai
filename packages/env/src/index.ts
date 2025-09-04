@@ -63,7 +63,7 @@ export function getEnvConfig(): EnvironmentConfig {
     STRIPE_PRICE_DRAUGHT_YEARLY: process.env.STRIPE_PRICE_DRAUGHT_YEARLY,
 
     // Google Analytics
-    NEXT_PUBLIC_GA_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
+    GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
   };
 }
 

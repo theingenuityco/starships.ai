@@ -42,5 +42,5 @@ export interface EnvironmentConfig {
   STRIPE_PRICE_DRAUGHT_YEARLY?: string;
 
   // Google Analytics
-  NEXT_PUBLIC_GA_MEASUREMENT_ID?: string;
+  GA_MEASUREMENT_ID?: string;
 }

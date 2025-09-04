@@ -107,11 +107,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: JWT_SECRET
-            - name: ENABLE_AUTH_TESTING_BACKDOOR
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: ENABLE_AUTH_TESTING_BACKDOOR
 
             # Neo4j Configuration (with auth enabled)
             - name: NEO4J_URI
@@ -195,28 +190,11 @@ spec:
                   key: STRIPE_PRICE_DRAUGHT_YEARLY
 
             # Analytics
-            - name: NEXT_PUBLIC_GA_MEASUREMENT_ID
+            - name: GA_MEASUREMENT_ID
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
-                  key: NEXT_PUBLIC_GA_MEASUREMENT_ID
-
-            # Legacy/Additional Environment Variables (kept for compatibility)
-            - name: DEFAULT_EMBEDDING_MODEL
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DEFAULT_EMBEDDING_MODEL
-            - name: SSE_CLIENT_TIMEOUT
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: SSE_CLIENT_TIMEOUT
-            - name: SSE_HEARTBEAT_INTERVAL
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: SSE_HEARTBEAT_INTERVAL
+                  key: GA_MEASUREMENT_ID
 
           # Resource Limits
           resources:

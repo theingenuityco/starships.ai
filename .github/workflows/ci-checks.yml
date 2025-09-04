@@ -132,7 +132,7 @@ jobs:
       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
 
       # Analytics (optional for CI)
-      NEXT_PUBLIC_GA_MEASUREMENT_ID: G-CI-TEST-ID
+      GA_MEASUREMENT_ID: G-CI-TEST-ID
 
     steps:
       - name: Checkout code

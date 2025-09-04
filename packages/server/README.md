@@ -535,7 +535,7 @@ GET /health/detailed
 
 ```env
 # Server Configuration
-PORT=4000
+SERVER_PORT=4000
 NODE_ENV=production
 CORS_ORIGIN=http://localhost:3000
 

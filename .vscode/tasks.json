@@ -1,0 +1,195 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Install Dependencies",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["install"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build All Packages",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "Type Check All",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "type-check"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "Build Server",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}/packages/server"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "Build Client",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}/packages/client"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "Build Autopilot",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}/packages/autopilot"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "Build Models",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "build"],
+      "options": {
+        "cwd": "${workspaceFolder}/packages/models"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "Start Neo4j Database",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "neo4j:install"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Stop and Reset Neo4j",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "neo4j:reset"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Lint All Packages",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "lint"],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [
+        "$eslint-stylish"
+      ]
+    },
+    {
+      "label": "Run All Tests",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "test"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Start Development (All Services)",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["run", "dev"],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [],
+      "isBackground": true
+    },
+    {
+      "label": "Pre-Debug Setup",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Install Dependencies",
+        "Type Check All"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    }
+  ]
+}

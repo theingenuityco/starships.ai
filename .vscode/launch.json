@@ -1,0 +1,60 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Next.js Client",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/packages/client/node_modules/next/dist/bin/next",
+      "args": ["dev", "-p", "3000"],
+      "cwd": "${workspaceFolder}/packages/client",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "serverReadyAction": {
+        "pattern": "ready - started server on .+, url: (https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "debugWithChrome"
+      }
+    },
+    {
+      "name": "Debug Express Server",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/packages/server/node_modules/tsx/dist/cli.mjs",
+      "args": ["watch", "src/index.ts"],
+      "cwd": "${workspaceFolder}/packages/server",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "restart": true,
+      "sourceMaps": true,
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "name": "Attach Process",
+      "type": "node",
+      "request": "attach",
+      "processId": "${command:PickProcess}",
+      "skipFiles": ["<node_internals>/**"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug Application",
+      "configurations": ["Debug Express Server", "Debug Next.js Client"],
+      "presentation": {
+        "hidden": false,
+        "group": "starships",
+        "order": 1
+      },
+      "stopAll": true
+    }
+  ]
+}

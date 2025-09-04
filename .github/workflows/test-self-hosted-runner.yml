@@ -63,4 +63,4 @@ jobs:
           echo "✅ Runner test completed successfully!"
           echo "💰 This run used your self-hosted infrastructure on AWS"
           echo "Triggered by: ${{ github.event_name }}"
-          echo "Test timestamp: $(date)"# Trigger workflow
+          echo "Test timestamp: $(date)"

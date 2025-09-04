@@ -51,3 +51,9 @@ variable "runner_instance_type" {
   type        = string
   default     = "t3.small"
 }
+
+variable "lambda_cryptography_layer" {
+  description = "ARN of Lambda layer for cryptography library (required for JWT signing)"
+  type        = string
+  default     = ""
+}

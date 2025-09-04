@@ -219,6 +219,9 @@ resource "aws_lambda_function" "webhook" {
   runtime         = "python3.11"
   timeout         = 60
   memory_size     = 256
+  
+  # Lambda layer for cryptography (required for JWT signing)
+  layers = var.lambda_cryptography_layer != "" ? [var.lambda_cryptography_layer] : []
 
   environment {
     variables = {

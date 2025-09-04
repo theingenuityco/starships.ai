@@ -1,6 +1,7 @@
 {
   "name": "@starships/autopilot",
   "version": "1.0.0",
+  "type": "module",
   "description": "Workflow execution engine and agent development framework for starships.ai",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

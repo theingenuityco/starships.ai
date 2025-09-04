@@ -200,61 +200,85 @@ def create_user_data_script(repo_url, registration_token, labels, job_id):
     labels_str = ','.join(labels)
     
     script = f"""#!/bin/bash
-set -e
+set -x  # Enable debug output
 
-# Logging
-exec > >(tee /var/log/runner-setup.log)
+# Logging to CloudWatch and file
+exec > >(tee /var/log/runner-setup.log | logger -t runner-setup)
 exec 2>&1
 
-echo "Starting runner setup at $(date)"
+echo "=== Starting GitHub Runner Setup ==="
+echo "Date: $(date)"
+echo "Repository: {repo_url}"
+echo "Runner name: {runner_name}"
+echo "Labels: {labels_str}"
 
 # Update system
-apt-get update
-apt-get install -y curl wget jq
-
-# Install Node.js 22
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-apt-get install -y nodejs
-
-# Install pnpm
-npm install -g pnpm
+echo "Updating system packages..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y curl wget jq git build-essential
 
 # Create runner user
-useradd -m -s /bin/bash runner
-cd /home/runner
+echo "Creating runner user..."
+useradd -m -s /bin/bash runner || echo "User already exists"
 
-# Download and install GitHub Actions runner
+# Download GitHub Actions runner
+echo "Downloading GitHub Actions runner..."
+cd /home/runner
 RUNNER_VERSION="2.321.0"
-curl -o actions-runner-linux-x64.tar.gz -L https://github.com/actions/runner/releases/download/v${{RUNNER_VERSION}}/actions-runner-linux-x64-${{RUNNER_VERSION}}.tar.gz
+wget -q -O actions-runner-linux-x64.tar.gz https://github.com/actions/runner/releases/download/v${{RUNNER_VERSION}}/actions-runner-linux-x64-${{RUNNER_VERSION}}.tar.gz
 tar xzf actions-runner-linux-x64.tar.gz
-chown -R runner:runner .
+chown -R runner:runner /home/runner
+
+# Install runner dependencies
+echo "Installing runner dependencies..."
+./bin/installdependencies.sh
 
 # Configure runner
+echo "Configuring runner..."
+echo "Token length: ${{#registration_token}}"
 sudo -u runner ./config.sh --url {repo_url} \
     --token {registration_token} \
     --name {runner_name} \
     --labels {labels_str} \
     --ephemeral \
     --unattended \
-    --disableupdate
+    --replace
+
+# Install Node.js for workflows
+echo "Installing Node.js 22..."
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt-get install -y nodejs
+npm install -g pnpm
 
 # Start runner
-sudo -u runner ./run.sh &
+echo "Starting runner..."
+cd /home/runner
+sudo -u runner nohup ./run.sh > /var/log/runner.log 2>&1 &
 
-# Wait for runner to pick up job
-echo "Waiting for runner to start..."
+# Give runner time to start
+sleep 15
+
+# Check if runner is running
+if pgrep -f "Runner.Listener" > /dev/null; then
+    echo "Runner started successfully!"
+    RUNNER_PID=$(pgrep -f "Runner.Listener")
+    echo "Runner PID: $RUNNER_PID"
+    
+    # Monitor runner
+    while kill -0 $RUNNER_PID 2>/dev/null; do
+        sleep 10
+    done
+    
+    echo "Runner process completed"
+else
+    echo "ERROR: Runner failed to start!"
+    echo "Config logs:"
+    cat /home/runner/_diag/*.log 2>/dev/null || echo "No logs found"
+fi
+
+echo "Shutting down in 10 seconds..."
 sleep 10
-
-# Monitor runner process
-RUNNER_PID=$(pgrep -f "Runner.Listener")
-
-while kill -0 $RUNNER_PID 2>/dev/null; do
-    sleep 5
-done
-
-echo "Runner process completed, initiating shutdown..."
-
-# Cleanup and shutdown
 shutdown -h now
 """
     

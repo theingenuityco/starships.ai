@@ -37,7 +37,7 @@ def lambda_handler(event, context):
         return {'statusCode': 400, 'body': json.dumps('Invalid JSON')}
     
     # Process workflow_job events
-    if 'workflow_job' not in event['headers'].get('x-github-event', ''):
+    if event['headers'].get('x-github-event', '') != 'workflow_job':
         return {'statusCode': 200, 'body': json.dumps('Not a workflow_job event')}
     
     action = body.get('action')

@@ -25,36 +25,27 @@ spec:
     - host: dev.starships.ai
       http:
         paths:
-          # Auth routes must go to frontend (Next.js handles these)
-          # This must come BEFORE the general /api rule
-          - path: /api/auth
-            pathType: Prefix
-            backend:
-              service:
-                name: starships-app-internal
-                port:
-                  number: 3000
-          # Socket.IO WebSocket route
+          # Socket.IO WebSocket route - goes to server
           - path: /socket.io
             pathType: Prefix
             backend:
               service:
                 name: starships-app-internal
                 port:
-                  number: 3001
-          # Other API routes go to backend
+                  name: backend
+          # ALL API routes go to server (backend) - no exceptions
           - path: /api
             pathType: Prefix
             backend:
               service:
                 name: starships-app-internal
                 port:
-                  number: 3001
-          # Everything else goes to frontend
+                  name: backend
+          # Everything else (static files, pages, etc.) goes to client (frontend)
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: starships-app-internal
                 port:
-                  number: 3000
+                  name: frontend

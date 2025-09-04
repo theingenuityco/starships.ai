@@ -16,8 +16,8 @@ spec:
       targetPort: 3000
       protocol: TCP
       name: frontend
-    - port: 3001
-      targetPort: 3001
+    - port: 4000
+      targetPort: 4000
       protocol: TCP
       name: backend
     - port: 7474

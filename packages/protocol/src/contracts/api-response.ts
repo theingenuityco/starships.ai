@@ -5,7 +5,7 @@
  * to ensure consistency across server and client implementations.
  */
 
-import type { StandardErrorCode } from './errors';
+import type { StandardErrorCode } from '@/contracts/errors';
 
 // Standard success response structure
 export interface ApiResponse<T = unknown> {

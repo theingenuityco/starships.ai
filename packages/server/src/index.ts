@@ -83,7 +83,6 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-
 // ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies
 initializeStarshipRoutes({
@@ -96,7 +95,6 @@ initializeStarshipRoutes({
 initializeWebhookRoutes({
   starshipRepository,
 });
-
 
 // Public pricing endpoint - must be before auth-protected routes
 app.get('/api/v1/starships/pricing', async (req, res) => {
@@ -129,12 +127,14 @@ app.use('/api', nativeApiKeysRoutes);
 app.use(notFoundHandler);
 
 // Add centralized error handling middleware (must be last)
-app.use(errorHandler({
-  includeStackTrace: config.NODE_ENV === 'development',
-  environment: config.NODE_ENV,
-  service: 'starships-api',
-  ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
-}));
+app.use(
+  errorHandler({
+    includeStackTrace: config.NODE_ENV === 'development',
+    environment: config.NODE_ENV,
+    service: 'starships-api',
+    ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
+  })
+);
 
 // Create HTTP server and initialize Socket.IO
 const httpServer = createServer(app);
@@ -176,7 +176,6 @@ httpServer.listen(PORT, async () => {
         error
       );
     }
-
 
     // Initialize Waitlist (seeds approved emails)
     try {

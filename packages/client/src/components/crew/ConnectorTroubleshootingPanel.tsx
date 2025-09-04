@@ -10,14 +10,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  AlertTriangle,
-  XCircle,
-  Lightbulb,
-  Clock,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react'
+import { AlertTriangle, XCircle, Lightbulb, Clock, ChevronDown, ChevronUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConnectorTroubleshootingPanelProps {

@@ -31,7 +31,7 @@ describe('AgentRepository', () => {
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     repository = new AgentRepository();
-    
+
     // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });
@@ -185,9 +185,7 @@ describe('AgentRepository', () => {
           { id: 'agent-1', name: 'Agent 1' },
           { id: 'agent-2', name: 'Agent 2' },
         ];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findAll();
 
@@ -272,7 +270,7 @@ describe('AgentRepository', () => {
           blueprint: '{"type":"test","nodes":[],"edges":[]}',
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
-          usageCount: 0
+          usageCount: 0,
         };
 
         // Mock createEntityWithAutoId call
@@ -282,15 +280,16 @@ describe('AgentRepository', () => {
 
         const result = await repository.create(mockAgentData);
 
-        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1,
+        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
+          1,
           expect.stringContaining('CREATE (n:Agent)'),
           expect.objectContaining({
             props: expect.objectContaining({
               name: 'Test Agent',
               starshipId: 'starship-123',
               memory: '{"data":"test"}',
-              blueprint: '{"type":"test","nodes":[],"edges":[]}'
-            })
+              blueprint: '{"type":"test","nodes":[],"edges":[]}',
+            }),
           })
         );
         expect(result.id).toBe('test-uuid-1234');
@@ -325,7 +324,7 @@ describe('AgentRepository', () => {
           blueprint: '{"type":"test","nodes":[],"edges":[]}',
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
-          usageCount: 0
+          usageCount: 0,
         };
 
         // Mock createEntityWithAutoId call first, then relationship creation
@@ -336,7 +335,8 @@ describe('AgentRepository', () => {
         await repository.create(mockAgentData);
 
         expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2); // Once for agent, once for relationship
-        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(2,
+        expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
+          2,
           expect.stringContaining('CREATE (a)-[:DEPLOYED_ON'),
           expect.objectContaining({
             starshipId: 'starship-123',
@@ -361,7 +361,7 @@ describe('AgentRepository', () => {
             updates: expect.objectContaining({
               ...updates,
               updatedAt: expect.any(String),
-            })
+            }),
           }
         );
         expect(result).toEqual(mockAgent);
@@ -378,7 +378,9 @@ describe('AgentRepository', () => {
       it('should handle database errors', async () => {
         mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-        await expect(repository.update('agent-1', { name: 'Updated' })).rejects.toThrow(DatabaseError);
+        await expect(repository.update('agent-1', { name: 'Updated' })).rejects.toThrow(
+          DatabaseError
+        );
       });
     });
 
@@ -415,9 +417,7 @@ describe('AgentRepository', () => {
     describe('findByUser', () => {
       it('should return user agents', async () => {
         const mockAgents = [{ id: 'agent-1', name: 'Agent 1' }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findByUser('user-123');
 
@@ -432,9 +432,7 @@ describe('AgentRepository', () => {
     describe('findByStarship', () => {
       it('should return starship agents', async () => {
         const mockAgents = [{ id: 'agent-1', name: 'Agent 1' }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findByStarship('starship-123');
 
@@ -449,9 +447,7 @@ describe('AgentRepository', () => {
     describe('findByStarshipId', () => {
       it('should return agents by starshipId property', async () => {
         const mockAgents = [{ id: 'agent-1', name: 'Agent 1', starshipId: 'starship-123' }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findByStarshipId('starship-123');
 
@@ -489,23 +485,25 @@ describe('AgentRepository', () => {
       it('should throw error when starship not found', async () => {
         mockConnection.executeQuery.mockResolvedValue([{ count: 0 }]); // Starship doesn't exist
 
-        await expect(repository.updateStarshipId('agent-123', 'non-existent')).rejects.toThrow(NotFoundError);
+        await expect(repository.updateStarshipId('agent-123', 'non-existent')).rejects.toThrow(
+          NotFoundError
+        );
       });
 
       it('should throw error when agent not found', async () => {
         mockConnection.executeQuery.mockResolvedValue([{ count: 1 }]); // Starship exists
         mockConnection.executeWrite.mockResolvedValue([{ count: 0 }]); // Agent doesn't exist
 
-        await expect(repository.updateStarshipId('non-existent', 'starship-456')).rejects.toThrow(NotFoundError);
+        await expect(repository.updateStarshipId('non-existent', 'starship-456')).rejects.toThrow(
+          NotFoundError
+        );
       });
     });
 
     describe('findUndeployedAgents', () => {
       it('should return agents without starshipId', async () => {
         const mockAgents = [{ id: 'agent-1', name: 'Agent 1', starshipId: null }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findUndeployedAgents();
 
@@ -522,9 +520,7 @@ describe('AgentRepository', () => {
     describe('findByAuthor', () => {
       it('should return agents by author', async () => {
         const mockAgents = [{ id: 'agent-1', authorId: 'author-123' }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findByAuthor('author-123');
 
@@ -539,9 +535,7 @@ describe('AgentRepository', () => {
     describe('findByCategory', () => {
       it('should return agents by category', async () => {
         const mockAgents = [{ id: 'agent-1', category: 'general' }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findByCategory('general');
 
@@ -556,9 +550,7 @@ describe('AgentRepository', () => {
     describe('findByTags', () => {
       it('should return agents by tags', async () => {
         const mockAgents = [{ id: 'agent-1', tags: ['ai', 'helper'] }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findByTags(['ai', 'helper']);
 
@@ -573,9 +565,7 @@ describe('AgentRepository', () => {
     describe('findPublic', () => {
       it('should return public agents with pagination', async () => {
         const mockAgents = [{ id: 'agent-1', isPublic: true }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const result = await repository.findPublic(10, 5);
 
@@ -607,9 +597,7 @@ describe('AgentRepository', () => {
     describe('searchAgents', () => {
       it('should search agents with fulltext search', async () => {
         const mockAgents = [{ id: 'agent-1', name: 'Matching Agent' }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a, score: 0.95 }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a, score: 0.95 })));
 
         const result = await repository.searchAgents('test query');
 
@@ -624,9 +612,7 @@ describe('AgentRepository', () => {
     describe('findWithFilters', () => {
       it('should filter agents by multiple criteria', async () => {
         const mockAgents = [{ id: 'agent-1', category: 'general' }];
-        mockConnection.executeQuery.mockResolvedValue(
-          mockAgents.map(a => ({ a }))
-        );
+        mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
         const filters = {
           category: 'general',

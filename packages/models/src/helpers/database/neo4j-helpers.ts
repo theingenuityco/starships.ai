@@ -41,10 +41,10 @@ export function convertNeo4jIntsInObject<T>(obj: T, visited = new WeakSet()): T 
   }
 
   const converted = { ...obj } as any;
-  
+
   for (const key in converted) {
     const value = converted[key];
-    
+
     if (isInt(value)) {
       converted[key] = value.toNumber();
     } else if (Array.isArray(value)) {
@@ -60,13 +60,13 @@ export function convertNeo4jIntsInObject<T>(obj: T, visited = new WeakSet()): T 
       converted[key] = convertNeo4jIntsInObject(value, visited);
     }
   }
-  
+
   return converted;
 }
 
 /** Converts an array of objects, handling Neo4j integers in each object */
 export function convertNeo4jIntsInArray<T extends Record<string, any>>(arr: T[]): T[] {
-  return arr.map(item => convertNeo4jIntsInObject(item, new WeakSet()));
+  return arr.map((item) => convertNeo4jIntsInObject(item, new WeakSet()));
 }
 
 /** Type guard to check if a value is a Neo4j Integer */

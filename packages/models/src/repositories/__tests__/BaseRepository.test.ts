@@ -8,7 +8,7 @@ import {
   ValidationError,
   NotFoundError,
   ConflictError,
-  DatabaseError
+  DatabaseError,
 } from '@starships/errors';
 
 // Test implementation of BaseRepository
@@ -22,7 +22,12 @@ class TestRepository extends BaseRepository {
     return this.createContext(operation, resource, resourceId);
   }
 
-  public testHandleDatabaseError(error: any, operation: string, resource?: string, resourceId?: string) {
+  public testHandleDatabaseError(
+    error: any,
+    operation: string,
+    resource?: string,
+    resourceId?: string
+  ) {
     return this.handleDatabaseError(error, operation, resource, resourceId);
   }
 
@@ -116,7 +121,7 @@ describe('BaseRepository', () => {
   describe('createContext', () => {
     it('should create basic context', () => {
       const context = repository.testCreateContext('create');
-      
+
       expect(context).toEqual({
         component: 'TestService',
         layer: 'repository',
@@ -127,13 +132,13 @@ describe('BaseRepository', () => {
         timestamp: expect.any(Date),
         userAgent: undefined,
         userId: undefined,
-        metadata: { component: 'repository' }
+        metadata: { component: 'repository' },
       });
     });
 
     it('should create context with resource details', () => {
       const context = repository.testCreateContext('update', 'User', 'user-123');
-      
+
       expect(context).toEqual({
         component: 'TestService',
         layer: 'repository',
@@ -144,7 +149,7 @@ describe('BaseRepository', () => {
         timestamp: expect.any(Date),
         userAgent: undefined,
         userId: undefined,
-        metadata: { component: 'repository' }
+        metadata: { component: 'repository' },
       });
     });
   });
@@ -152,7 +157,7 @@ describe('BaseRepository', () => {
   describe('handleDatabaseError', () => {
     it('should handle constraint violation error', () => {
       const error = { message: 'constraint violation error', code: 'UNIQUE_CONSTRAINT' };
-      
+
       expect(() => {
         repository.testHandleDatabaseError(error, 'create', 'User', 'user-123');
       }).toThrow(ConflictError);
@@ -160,7 +165,7 @@ describe('BaseRepository', () => {
 
     it('should handle connection error', () => {
       const error = { message: 'connection failed', code: 'ECONNREFUSED' };
-      
+
       expect(() => {
         repository.testHandleDatabaseError(error, 'connect');
       }).toThrow(DatabaseError);
@@ -168,7 +173,7 @@ describe('BaseRepository', () => {
 
     it('should handle timeout error', () => {
       const error = { message: 'operation timeout', code: 'ETIMEDOUT' };
-      
+
       expect(() => {
         repository.testHandleDatabaseError(error, 'query');
       }).toThrow(DatabaseError);
@@ -176,7 +181,7 @@ describe('BaseRepository', () => {
 
     it('should handle query error', () => {
       const error = { message: 'syntax error in query' };
-      
+
       expect(() => {
         repository.testHandleDatabaseError(error, 'execute');
       }).toThrow(DatabaseError);
@@ -184,7 +189,7 @@ describe('BaseRepository', () => {
 
     it('should handle generic database error', () => {
       const error = { message: 'unknown database error' };
-      
+
       expect(() => {
         repository.testHandleDatabaseError(error, 'generic');
       }).toThrow(DatabaseError);
@@ -192,7 +197,7 @@ describe('BaseRepository', () => {
 
     it('should handle error without message', () => {
       const error = {};
-      
+
       expect(() => {
         repository.testHandleDatabaseError(error, 'test');
       }).toThrow(DatabaseError);
@@ -204,7 +209,7 @@ describe('BaseRepository', () => {
       expect(() => {
         repository.testHandleNotFound('User', 'user-123', 'find');
       }).toThrow(NotFoundError);
-      
+
       try {
         repository.testHandleNotFound('User', 'user-123', 'find');
       } catch (error: any) {
@@ -218,7 +223,7 @@ describe('BaseRepository', () => {
       expect(() => {
         repository.testHandleNotFound('User');
       }).toThrow(NotFoundError);
-      
+
       try {
         repository.testHandleNotFound('User');
       } catch (error: any) {
@@ -231,13 +236,13 @@ describe('BaseRepository', () => {
     it('should throw ValidationError with field errors', () => {
       const fieldErrors = [
         { field: 'email', message: 'Invalid email format' },
-        { field: 'name', message: 'Name is required' }
+        { field: 'name', message: 'Name is required' },
       ];
-      
+
       expect(() => {
         repository.testHandleValidationError(fieldErrors, 'create');
       }).toThrow(ValidationError);
-      
+
       try {
         repository.testHandleValidationError(fieldErrors);
       } catch (error: any) {
@@ -259,7 +264,7 @@ describe('BaseRepository', () => {
       expect(() => {
         repository.testHandleConflict('User', 'Email already exists', 'create', 'user-123');
       }).toThrow(ConflictError);
-      
+
       try {
         repository.testHandleConflict('User', 'Email already exists', 'create', 'user-123');
       } catch (error: any) {
@@ -267,7 +272,7 @@ describe('BaseRepository', () => {
         expect(error.conflictType).toBe('resource_conflict');
         expect(error.details).toMatchObject({
           resource: 'User',
-          resourceId: 'user-123'
+          resourceId: 'user-123',
         });
       }
     });
@@ -276,12 +281,9 @@ describe('BaseRepository', () => {
   describe('executeWithErrorHandling', () => {
     it('should execute operation successfully', async () => {
       const operation = async () => 'success';
-      
-      const result = await repository.testExecuteWithErrorHandling(
-        operation,
-        'test_operation'
-      );
-      
+
+      const result = await repository.testExecuteWithErrorHandling(operation, 'test_operation');
+
       expect(result).toBe('success');
     });
 
@@ -289,17 +291,17 @@ describe('BaseRepository', () => {
       const operation = async () => {
         throw new ValidationError('Test validation error');
       };
-      
-      await expect(
-        repository.testExecuteWithErrorHandling(operation, 'test')
-      ).rejects.toThrow(ValidationError);
+
+      await expect(repository.testExecuteWithErrorHandling(operation, 'test')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should handle generic error', async () => {
       const operation = async () => {
         throw new Error('Generic error');
       };
-      
+
       await expect(
         repository.testExecuteWithErrorHandling(operation, 'test', 'User', 'user-123')
       ).rejects.toThrow(DatabaseError);
@@ -309,12 +311,9 @@ describe('BaseRepository', () => {
   describe('executeWithErrorHandlingSync', () => {
     it('should execute sync operation successfully', () => {
       const operation = () => 'sync_success';
-      
-      const result = repository.testExecuteWithErrorHandlingSync(
-        operation,
-        'sync_operation'
-      );
-      
+
+      const result = repository.testExecuteWithErrorHandlingSync(operation, 'sync_operation');
+
       expect(result).toBe('sync_success');
     });
 
@@ -322,7 +321,7 @@ describe('BaseRepository', () => {
       const operation = () => {
         throw new Error('Sync error');
       };
-      
+
       expect(() => {
         repository.testExecuteWithErrorHandlingSync(operation, 'sync_test');
       }).toThrow(DatabaseError);
@@ -332,7 +331,7 @@ describe('BaseRepository', () => {
   describe('validateRequired', () => {
     it('should pass validation for valid data', () => {
       const data = { name: 'John', email: 'john@example.com' };
-      
+
       expect(() => {
         repository.testValidateRequired(data, ['name', 'email']);
       }).not.toThrow();
@@ -340,11 +339,11 @@ describe('BaseRepository', () => {
 
     it('should throw ValidationError for missing fields', () => {
       const data = { name: 'John' };
-      
+
       expect(() => {
         repository.testValidateRequired(data, ['name', 'email'], 'create');
       }).toThrow(ValidationError);
-      
+
       try {
         repository.testValidateRequired(data, ['name', 'email']);
       } catch (error: any) {
@@ -354,7 +353,7 @@ describe('BaseRepository', () => {
 
     it('should validate against null, undefined, and empty string', () => {
       const data = { name: null, email: undefined, phone: '' };
-      
+
       expect(() => {
         repository.testValidateRequired(data, ['name', 'email', 'phone']);
       }).toThrow(ValidationError);
@@ -364,23 +363,23 @@ describe('BaseRepository', () => {
   describe('validateTypes', () => {
     it('should pass validation for correct types', () => {
       const data = { name: 'John', age: 30, active: true };
-      
+
       expect(() => {
         repository.testValidateTypes(data, {
           name: 'string',
           age: 'number',
-          active: 'boolean'
+          active: 'boolean',
         });
       }).not.toThrow();
     });
 
     it('should throw ValidationError for incorrect types', () => {
       const data = { name: 'John', age: '30' };
-      
+
       expect(() => {
         repository.testValidateTypes(data, { age: 'number' });
       }).toThrow(ValidationError);
-      
+
       try {
         repository.testValidateTypes(data, { age: 'number' });
       } catch (error: any) {
@@ -390,7 +389,7 @@ describe('BaseRepository', () => {
 
     it('should skip validation for undefined fields', () => {
       const data = { name: 'John' };
-      
+
       expect(() => {
         repository.testValidateTypes(data, { age: 'number' });
       }).not.toThrow();
@@ -400,22 +399,22 @@ describe('BaseRepository', () => {
   describe('validateStringLengths', () => {
     it('should pass validation for valid string lengths', () => {
       const data = { name: 'John', description: 'A test description' };
-      
+
       expect(() => {
         repository.testValidateStringLengths(data, {
           name: { min: 2, max: 10 },
-          description: { min: 5, max: 100 }
+          description: { min: 5, max: 100 },
         });
       }).not.toThrow();
     });
 
     it('should throw ValidationError for strings too short', () => {
       const data = { name: 'J' };
-      
+
       expect(() => {
         repository.testValidateStringLengths(data, { name: { min: 2 } });
       }).toThrow(ValidationError);
-      
+
       try {
         repository.testValidateStringLengths(data, { name: { min: 2 } });
       } catch (error: any) {
@@ -425,11 +424,11 @@ describe('BaseRepository', () => {
 
     it('should throw ValidationError for strings too long', () => {
       const data = { name: 'Very long name' };
-      
+
       expect(() => {
         repository.testValidateStringLengths(data, { name: { max: 5 } });
       }).toThrow(ValidationError);
-      
+
       try {
         repository.testValidateStringLengths(data, { name: { max: 5 } });
       } catch (error: any) {
@@ -439,7 +438,7 @@ describe('BaseRepository', () => {
 
     it('should skip validation for non-string values', () => {
       const data = { age: 30 };
-      
+
       expect(() => {
         repository.testValidateStringLengths(data, { age: { min: 2 } });
       }).not.toThrow();
@@ -449,27 +448,27 @@ describe('BaseRepository', () => {
   describe('validateEnums', () => {
     it('should pass validation for valid enum values', () => {
       const data = { status: 'active', role: 'admin' };
-      
+
       expect(() => {
         repository.testValidateEnums(data, {
           status: ['active', 'inactive', 'pending'],
-          role: ['admin', 'user', 'guest']
+          role: ['admin', 'user', 'guest'],
         });
       }).not.toThrow();
     });
 
     it('should throw ValidationError for invalid enum values', () => {
       const data = { status: 'invalid_status' };
-      
+
       expect(() => {
         repository.testValidateEnums(data, {
-          status: ['active', 'inactive']
+          status: ['active', 'inactive'],
         });
       }).toThrow(ValidationError);
-      
+
       try {
         repository.testValidateEnums(data, {
-          status: ['active', 'inactive']
+          status: ['active', 'inactive'],
         });
       } catch (error: any) {
         expect(error.message).toContain('status must be one of: active, inactive');
@@ -478,10 +477,10 @@ describe('BaseRepository', () => {
 
     it('should skip validation for undefined values', () => {
       const data = { name: 'John' };
-      
+
       expect(() => {
         repository.testValidateEnums(data, {
-          status: ['active', 'inactive']
+          status: ['active', 'inactive'],
         });
       }).not.toThrow();
     });
@@ -498,16 +497,13 @@ describe('BaseRepository', () => {
           'user-123'
         );
       }).toThrow(DatabaseError);
-      
+
       try {
-        repository.testCreateBusinessLogicError(
-          'BUSINESS_ERROR',
-          'Business rule violation'
-        );
+        repository.testCreateBusinessLogicError('BUSINESS_ERROR', 'Business rule violation');
       } catch (error: any) {
         expect(error.message).toBe('Business rule violation');
         expect(error.details).toMatchObject({
-          code: 'BUSINESS_ERROR'
+          code: 'BUSINESS_ERROR',
         });
       }
     });
@@ -522,10 +518,10 @@ describe('BaseRepository', () => {
         { message: 'foreign key constraint', code: '' },
         { message: 'check constraint failed', code: '' },
         { message: 'not null constraint', code: '' },
-        { message: 'primary key violation', code: '' }
+        { message: 'primary key violation', code: '' },
       ];
-      
-      constraintErrors.forEach(error => {
+
+      constraintErrors.forEach((error) => {
         expect(() => {
           repository.testHandleDatabaseError(error, 'test');
         }).toThrow(ConflictError);
@@ -537,10 +533,10 @@ describe('BaseRepository', () => {
         { message: 'connection failed', code: '' },
         { message: 'connect timeout', code: '' },
         { message: 'network error', code: 'ECONNREFUSED' },
-        { message: 'host not found', code: 'ENOTFOUND' }
+        { message: 'host not found', code: 'ENOTFOUND' },
       ];
-      
-      connectionErrors.forEach(error => {
+
+      connectionErrors.forEach((error) => {
         expect(() => {
           repository.testHandleDatabaseError(error, 'connect');
         }).toThrow(DatabaseError);
@@ -551,10 +547,10 @@ describe('BaseRepository', () => {
       const timeoutErrors = [
         { message: 'timeout exceeded', code: '' },
         { message: 'operation timed out', code: '' },
-        { message: 'query timeout', code: 'ETIMEDOUT' }
+        { message: 'query timeout', code: 'ETIMEDOUT' },
       ];
-      
-      timeoutErrors.forEach(error => {
+
+      timeoutErrors.forEach((error) => {
         expect(() => {
           repository.testHandleDatabaseError(error, 'query');
         }).toThrow(DatabaseError);
@@ -567,10 +563,10 @@ describe('BaseRepository', () => {
         { message: 'invalid query format' },
         { message: 'query failed to execute' },
         { message: 'sql error occurred' },
-        { message: 'cypher error in statement' }
+        { message: 'cypher error in statement' },
       ];
-      
-      queryErrors.forEach(error => {
+
+      queryErrors.forEach((error) => {
         expect(() => {
           repository.testHandleDatabaseError(error, 'execute');
         }).toThrow(DatabaseError);
@@ -581,14 +577,11 @@ describe('BaseRepository', () => {
   describe('logging', () => {
     it('should have log method that outputs to console', () => {
       const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
-      
+
       (repository as any).log('info', 'Test message', { data: 'test' });
-      
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[TESTSERVICE] Test message',
-        { data: 'test' }
-      );
-      
+
+      expect(consoleSpy).toHaveBeenCalledWith('[TESTSERVICE] Test message', { data: 'test' });
+
       consoleSpy.mockRestore();
     });
 
@@ -596,15 +589,15 @@ describe('BaseRepository', () => {
       const debugSpy = jest.spyOn(console, 'debug').mockImplementation();
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       const errorSpy = jest.spyOn(console, 'error').mockImplementation();
-      
+
       (repository as any).log('debug', 'Debug message');
       (repository as any).log('warn', 'Warning message');
       (repository as any).log('error', 'Error message');
-      
+
       expect(debugSpy).toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalled();
       expect(errorSpy).toHaveBeenCalled();
-      
+
       debugSpy.mockRestore();
       warnSpy.mockRestore();
       errorSpy.mockRestore();

@@ -32,10 +32,14 @@ export function StarshipSelector({
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     switch (starshipClass) {
-      case 'scout': return '🚀'
-      case 'cruiser': return '🛸'
-      case 'draught': return '🚢'
-      default: return '🚀'
+      case 'scout':
+        return '🚀'
+      case 'cruiser':
+        return '🛸'
+      case 'draught':
+        return '🚢'
+      default:
+        return '🚀'
     }
   }
 
@@ -52,7 +56,9 @@ export function StarshipSelector({
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-destructive/5 border-destructive/20">
         <AlertCircle className="w-4 h-4 text-destructive" />
-        <span className="text-sm text-destructive">{error?.message || 'Failed to load starships'}</span>
+        <span className="text-sm text-destructive">
+          {error?.message || 'Failed to load starships'}
+        </span>
       </div>
     )
   }
@@ -70,7 +76,6 @@ export function StarshipSelector({
       </div>
     )
   }
-
 
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>

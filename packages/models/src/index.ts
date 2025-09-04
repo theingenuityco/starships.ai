@@ -31,12 +31,7 @@ export {
   logger,
 } from './helpers/logging';
 
-export type {
-  LogLevel,
-  LogContext,
-  PerformanceMetrics,
-  HealthStatus
-} from './helpers/logging';
+export type { LogLevel, LogContext, PerformanceMetrics, HealthStatus } from './helpers/logging';
 
 // Management scripts
 export { seedWaitlist } from './scripts/seed-waitlist';

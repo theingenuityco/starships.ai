@@ -1,38 +1,40 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { missionApi } from '@/lib/missionApi';
+import React, { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+import { missionApi } from '@/lib/missionApi'
 
 export function DebugMissionList() {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string>('');
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<string>('')
 
   const testApiCall = async () => {
-    setLoading(true);
-    setResult('');
-    
+    setLoading(true)
+    setResult('')
+
     try {
-      console.log('Making API call to get all missions...');
-      const response = await missionApi.getAllMissions();
-      console.log('API Response:', response);
-      
+      console.log('Making API call to get all missions...')
+      const response = await missionApi.getAllMissions()
+      console.log('API Response:', response)
+
       if (response.error) {
-        setResult(`Error: ${response.error}`);
+        setResult(`Error: ${response.error}`)
       } else {
-        setResult(`Success: Found ${response.data?.missions.length || 0} missions\n${JSON.stringify(response.data, null, 2)}`);
+        setResult(
+          `Success: Found ${response.data?.missions.length || 0} missions\n${JSON.stringify(response.data, null, 2)}`
+        )
       }
     } catch (err) {
-      console.error('Exception:', err);
-      setResult(`Exception: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Exception:', err)
+      setResult(`Exception: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
-    testApiCall();
-  }, []);
+    testApiCall()
+  }, [])
 
   return (
     <div className="p-8">
@@ -42,13 +44,11 @@ export function DebugMissionList() {
           {loading ? 'Loading...' : 'Test API Call'}
         </Button>
       </div>
-      
+
       <div className="border rounded p-4 bg-gray-50 dark:bg-gray-900">
         <h3 className="font-semibold mb-2">Result:</h3>
-        <pre className="whitespace-pre-wrap text-sm">
-          {result || 'No result yet...'}
-        </pre>
+        <pre className="whitespace-pre-wrap text-sm">{result || 'No result yet...'}</pre>
       </div>
     </div>
-  );
+  )
 }

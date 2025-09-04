@@ -5,7 +5,12 @@
 
 import { Server } from 'socket.io';
 import { Logger } from '../utils/logger';
-import type { MissionModel, MissionClarityModel, MissionPhase, MissionStatus } from '@starships/protocol';
+import type {
+  MissionModel,
+  MissionClarityModel,
+  MissionPhase,
+  MissionStatus,
+} from '@starships/protocol';
 
 export class MissionEventService {
   private static instance: MissionEventService | null = null;
@@ -42,7 +47,7 @@ export class MissionEventService {
     const data = {
       missionId,
       clarity,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     this.io.to(roomName).emit(event, data);
@@ -56,15 +61,19 @@ export class MissionEventService {
         roomName,
         overallScore: clarity.overallScore,
         iteration: clarity.iteration,
-        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0
-      }
+        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0,
+      },
     });
   }
 
   /**
    * Emit phase change to all clients in mission room
    */
-  public emitPhaseChange(missionId: string, newPhase: MissionPhase, previousPhase: MissionPhase): void {
+  public emitPhaseChange(
+    missionId: string,
+    newPhase: MissionPhase,
+    previousPhase: MissionPhase
+  ): void {
     if (!this.io) {
       this.logger.warn('Socket.IO not initialized, cannot emit phase change');
       return;
@@ -76,7 +85,7 @@ export class MissionEventService {
       missionId,
       newPhase,
       previousPhase,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     this.io.to(roomName).emit(event, data);
@@ -90,15 +99,19 @@ export class MissionEventService {
         roomName,
         newPhase,
         previousPhase,
-        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0
-      }
+        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0,
+      },
     });
   }
 
   /**
    * Emit status change to all clients in mission room
    */
-  public emitStatusChange(missionId: string, newStatus: MissionStatus, previousStatus: MissionStatus): void {
+  public emitStatusChange(
+    missionId: string,
+    newStatus: MissionStatus,
+    previousStatus: MissionStatus
+  ): void {
     if (!this.io) {
       this.logger.warn('Socket.IO not initialized, cannot emit status change');
       return;
@@ -110,7 +123,7 @@ export class MissionEventService {
       missionId,
       newStatus,
       previousStatus,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     this.io.to(roomName).emit(event, data);
@@ -124,8 +137,8 @@ export class MissionEventService {
         roomName,
         newStatus,
         previousStatus,
-        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0
-      }
+        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0,
+      },
     });
   }
 
@@ -144,7 +157,7 @@ export class MissionEventService {
       missionId,
       mission,
       changeType,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     this.io.to(roomName).emit(event, data);
@@ -157,8 +170,8 @@ export class MissionEventService {
       metadata: {
         roomName,
         changeType,
-        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0
-      }
+        connectedClients: this.io.sockets.adapter.rooms.get(roomName)?.size || 0,
+      },
     });
   }
 }

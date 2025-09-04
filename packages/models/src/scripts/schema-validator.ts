@@ -2,7 +2,7 @@ import { getConnection } from '../helpers/database';
 
 /**
  * Schema Validation and Data Integrity Checker
- * 
+ *
  * Provides comprehensive validation of database schema,
  * data integrity checks, and performance monitoring.
  */
@@ -49,9 +49,9 @@ export class SchemaValidator {
     this.generateRecommendations(results, recommendations);
 
     // Calculate summary
-    const passedTests = results.filter(r => r.passed).length;
-    const failedTests = results.filter(r => !r.passed && r.severity === 'error').length;
-    const warningTests = results.filter(r => !r.passed && r.severity === 'warning').length;
+    const passedTests = results.filter((r) => r.passed).length;
+    const failedTests = results.filter((r) => !r.passed && r.severity === 'error').length;
+    const warningTests = results.filter((r) => !r.passed && r.severity === 'warning').length;
 
     const overallStatus = failedTests > 0 ? 'failed' : warningTests > 0 ? 'warnings' : 'passed';
 
@@ -63,7 +63,7 @@ export class SchemaValidator {
       failedTests,
       warningTests,
       results,
-      recommendations
+      recommendations,
     };
   }
 
@@ -94,13 +94,13 @@ export class SchemaValidator {
       ];
 
       for (const expected of expectedUniqueConstraints) {
-        const found = uniqueConstraints.some(c => c.name === expected);
+        const found = uniqueConstraints.some((c) => c.name === expected);
         results.push({
           category: 'Constraints',
           test: `Unique constraint: ${expected}`,
           passed: found,
           message: found ? 'Constraint exists' : 'Missing unique constraint',
-          severity: found ? 'info' : 'error'
+          severity: found ? 'info' : 'error',
         });
       }
 
@@ -120,7 +120,7 @@ export class SchemaValidator {
         passed: existenceConstraints.length >= 7,
         message: `Found ${existenceConstraints.length} property existence constraints`,
         severity: existenceConstraints.length >= 7 ? 'info' : 'warning',
-        details: { count: existenceConstraints.length, expected: 7 }
+        details: { count: existenceConstraints.length, expected: 7 },
       });
 
       // Check property type constraints
@@ -139,16 +139,15 @@ export class SchemaValidator {
         passed: typeConstraints.length >= 10,
         message: `Found ${typeConstraints.length} property type constraints`,
         severity: typeConstraints.length >= 10 ? 'info' : 'warning',
-        details: { count: typeConstraints.length, expected: 10 }
+        details: { count: typeConstraints.length, expected: 10 },
       });
-
     } catch (error) {
       results.push({
         category: 'Constraints',
         test: 'Constraint validation',
         passed: false,
         message: `Failed to validate constraints: ${error instanceof Error ? error.message : String(error)}`,
-        severity: 'error'
+        severity: 'error',
       });
     }
   }
@@ -171,8 +170,8 @@ export class SchemaValidator {
       );
 
       // Expedition system was removed - skipping expedition index checks
-      // const expeditionIndexes = indexes.filter(i => 
-      //   i.name.includes('expedition') || 
+      // const expeditionIndexes = indexes.filter(i =>
+      //   i.name.includes('expedition') ||
       //   i.labelsOrTypes.some(l => l.includes('Expedition'))
       // );
 
@@ -186,34 +185,33 @@ export class SchemaValidator {
       // });
 
       // Check composite indexes
-      const compositeIndexes = indexes.filter(i => i.properties.length > 1);
+      const compositeIndexes = indexes.filter((i) => i.properties.length > 1);
       results.push({
         category: 'Indexes',
         test: 'Composite indexes',
         passed: compositeIndexes.length >= 10,
         message: `Found ${compositeIndexes.length} composite indexes`,
         severity: compositeIndexes.length >= 10 ? 'info' : 'warning',
-        details: { count: compositeIndexes.length, expected: 10 }
+        details: { count: compositeIndexes.length, expected: 10 },
       });
 
       // Check range indexes
-      const rangeIndexes = indexes.filter(i => i.type === 'RANGE');
+      const rangeIndexes = indexes.filter((i) => i.type === 'RANGE');
       results.push({
         category: 'Indexes',
         test: 'Range indexes for date queries',
         passed: rangeIndexes.length >= 8,
         message: `Found ${rangeIndexes.length} range indexes`,
         severity: rangeIndexes.length >= 8 ? 'info' : 'warning',
-        details: { count: rangeIndexes.length, expected: 8 }
+        details: { count: rangeIndexes.length, expected: 8 },
       });
-
     } catch (error) {
       results.push({
         category: 'Indexes',
         test: 'Index validation',
         passed: false,
         message: `Failed to validate indexes: ${error instanceof Error ? error.message : String(error)}`,
-        severity: 'error'
+        severity: 'error',
       });
     }
   }
@@ -225,11 +223,10 @@ export class SchemaValidator {
     try {
       // Expedition system was removed - skipping orphaned expedition checks
       // const orphanedExpeditions = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition) 
+      //   `MATCH (e:Expedition)
       //    WHERE NOT EXISTS((s:Starship)-[:HAS_EXPEDITION]->(e))
       //    RETURN count(e) as count`
       // );
-
       // results.push({
       //   category: 'Relationships',
       //   test: 'Orphaned expeditions',
@@ -238,14 +235,12 @@ export class SchemaValidator {
       //   severity: orphanedExpeditions[0]?.count === 0 ? 'info' : 'error',
       //   details: { count: orphanedExpeditions[0]?.count || 0 }
       // });
-
       // Expedition system was removed - skipping orphaned task checks
       // const orphanedTasks = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (t:ExpeditionTask) 
+      //   `MATCH (t:ExpeditionTask)
       //    WHERE NOT EXISTS((e:Expedition)-[:HAS_TASK]->(t))
       //    RETURN count(t) as count`
       // );
-
       // results.push({
       //   category: 'Relationships',
       //   test: 'Orphaned tasks',
@@ -254,14 +249,12 @@ export class SchemaValidator {
       //   severity: orphanedTasks[0]?.count === 0 ? 'info' : 'error',
       //   details: { count: orphanedTasks[0]?.count || 0 }
       // });
-
       // Expedition system was removed - skipping orphaned message checks
       // const orphanedMessages = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (m:ExpeditionMessage) 
+      //   `MATCH (m:ExpeditionMessage)
       //    WHERE NOT EXISTS((e:Expedition)-[:HAS_MESSAGE]->(m))
       //    RETURN count(m) as count`
       // );
-
       // results.push({
       //   category: 'Relationships',
       //   test: 'Orphaned messages',
@@ -270,14 +263,12 @@ export class SchemaValidator {
       //   severity: orphanedMessages[0]?.count === 0 ? 'info' : 'warning',
       //   details: { count: orphanedMessages[0]?.count || 0 }
       // });
-
       // Expedition system was removed - skipping circular task dependency checks
       // const circularDependencies = await this.connection.executeQuery<{ count: number }>(
       //   `MATCH (t:ExpeditionTask)
       //    WHERE EXISTS((t)-[:DEPENDS_ON*]->(t))
       //    RETURN count(t) as count`
       // );
-
       // results.push({
       //   category: 'Relationships',
       //   test: 'Circular task dependencies',
@@ -286,14 +277,13 @@ export class SchemaValidator {
       //   severity: circularDependencies[0]?.count === 0 ? 'info' : 'error',
       //   details: { count: circularDependencies[0]?.count || 0 }
       // });
-
     } catch (error) {
       results.push({
         category: 'Relationships',
         test: 'Relationship validation',
         passed: false,
         message: `Failed to validate relationships: ${error instanceof Error ? error.message : String(error)}`,
-        severity: 'error'
+        severity: 'error',
       });
     }
   }
@@ -305,11 +295,10 @@ export class SchemaValidator {
     try {
       // Expedition system was removed - skipping expedition status validation
       // const invalidExpeditionStatuses = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition) 
+      //   `MATCH (e:Expedition)
       //    WHERE NOT e.status IN ['draft', 'planning', 'in-progress', 'review', 'completed', 'failed', 'cancelled']
       //    RETURN count(e) as count`
       // );
-
       // results.push({
       //   category: 'Data Integrity',
       //   test: 'Valid expedition statuses',
@@ -318,14 +307,12 @@ export class SchemaValidator {
       //   severity: invalidExpeditionStatuses[0]?.count === 0 ? 'info' : 'error',
       //   details: { count: invalidExpeditionStatuses[0]?.count || 0 }
       // });
-
       // Expedition system was removed - skipping expedition title validation
       // const expeditionsWithoutTitle = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition) 
+      //   `MATCH (e:Expedition)
       //    WHERE e.title IS NULL OR e.title = ''
       //    RETURN count(e) as count`
       // );
-
       // results.push({
       //   category: 'Data Integrity',
       //   test: 'Expeditions with titles',
@@ -334,14 +321,12 @@ export class SchemaValidator {
       //   severity: expeditionsWithoutTitle[0]?.count === 0 ? 'info' : 'error',
       //   details: { count: expeditionsWithoutTitle[0]?.count || 0 }
       // });
-
       // Expedition system was removed - skipping expedition date validation
       // const invalidDates = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition) 
+      //   `MATCH (e:Expedition)
       //    WHERE e.createdAt IS NULL OR NOT e.createdAt =~ '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*'
       //    RETURN count(e) as count`
       // );
-
       // results.push({
       //   category: 'Data Integrity',
       //   test: 'Valid date formats',
@@ -350,14 +335,12 @@ export class SchemaValidator {
       //   severity: invalidDates[0]?.count === 0 ? 'info' : 'warning',
       //   details: { count: invalidDates[0]?.count || 0 }
       // });
-
       // Expedition system was removed - skipping starship expedition capacity checks
       // const overCapacityStarships = await this.connection.executeQuery<{ count: number }>(
       //   `MATCH (s:Starship)
       //    WHERE s.activeExpeditions > s.maxActiveExpeditions
       //    RETURN count(s) as count`
       // );
-
       // results.push({
       //   category: 'Data Integrity',
       //   test: 'Starship capacity constraints',
@@ -366,14 +349,13 @@ export class SchemaValidator {
       //   severity: overCapacityStarships[0]?.count === 0 ? 'info' : 'warning',
       //   details: { count: overCapacityStarships[0]?.count || 0 }
       // });
-
     } catch (error) {
       results.push({
         category: 'Data Integrity',
         test: 'Data integrity validation',
         passed: false,
         message: `Failed to validate data integrity: ${error instanceof Error ? error.message : String(error)}`,
-        severity: 'error'
+        severity: 'error',
       });
     }
   }
@@ -385,13 +367,13 @@ export class SchemaValidator {
     try {
       // Test query performance for common operations
       const startTime = Date.now();
-      
+
       // Expedition system was removed - using basic starship query instead
       await this.connection.executeQuery(
         `MATCH (s:Starship {id: 'test'})
          RETURN count(s) as count`
       );
-      
+
       const queryTime = Date.now() - startTime;
 
       results.push({
@@ -400,7 +382,7 @@ export class SchemaValidator {
         passed: queryTime < 100,
         message: `Query executed in ${queryTime}ms`,
         severity: queryTime < 100 ? 'info' : queryTime < 500 ? 'warning' : 'error',
-        details: { executionTime: queryTime, threshold: 100 }
+        details: { executionTime: queryTime, threshold: 100 },
       });
 
       // Check index usage
@@ -416,16 +398,15 @@ export class SchemaValidator {
         passed: nodeCount < 1000000,
         message: `Database contains ${nodeCount} nodes`,
         severity: nodeCount < 1000000 ? 'info' : 'warning',
-        details: { nodeCount, threshold: 1000000 }
+        details: { nodeCount, threshold: 1000000 },
       });
-
     } catch (error) {
       results.push({
         category: 'Performance',
         test: 'Performance validation',
         passed: false,
         message: `Failed to validate performance: ${error instanceof Error ? error.message : String(error)}`,
-        severity: 'warning'
+        severity: 'warning',
       });
     }
   }
@@ -448,15 +429,15 @@ export class SchemaValidator {
         passed: fullTextIndexes.length > 0,
         message: `Found ${fullTextIndexes.length} full-text analyzers`,
         severity: fullTextIndexes.length > 0 ? 'info' : 'warning',
-        details: { count: fullTextIndexes.length }
+        details: { count: fullTextIndexes.length },
       });
 
       // Test search functionality
       try {
         // Expedition system was removed - skipping expedition search test
         // await this.connection.executeQuery(
-        //   `CALL db.index.fulltext.queryNodes("expeditionSearch", "test") 
-        //    YIELD node, score 
+        //   `CALL db.index.fulltext.queryNodes("expeditionSearch", "test")
+        //    YIELD node, score
         //    RETURN count(node) as results`
         // );
 
@@ -465,7 +446,7 @@ export class SchemaValidator {
           test: 'Full-text search analyzers available',
           passed: true,
           message: 'Full-text search analyzers are available (expedition search skipped)',
-          severity: 'info'
+          severity: 'info',
         });
       } catch {
         results.push({
@@ -473,17 +454,16 @@ export class SchemaValidator {
           test: 'Full-text search analyzers available',
           passed: false,
           message: 'Full-text search analyzers check failed',
-          severity: 'warning'
+          severity: 'warning',
         });
       }
-
     } catch (error) {
       results.push({
         category: 'Full-Text Search',
         test: 'Full-text search validation',
         passed: false,
         message: `Failed to validate full-text search: ${error instanceof Error ? error.message : String(error)}`,
-        severity: 'warning'
+        severity: 'warning',
       });
     }
   }
@@ -492,9 +472,9 @@ export class SchemaValidator {
    * Generate recommendations based on validation results
    */
   private generateRecommendations(results: ValidationResult[], recommendations: string[]): void {
-    const failedTests = results.filter(r => !r.passed);
-    const performanceIssues = results.filter(r => r.category === 'Performance' && !r.passed);
-    const integrityIssues = results.filter(r => r.category === 'Data Integrity' && !r.passed);
+    const failedTests = results.filter((r) => !r.passed);
+    const performanceIssues = results.filter((r) => r.category === 'Performance' && !r.passed);
+    const integrityIssues = results.filter((r) => r.category === 'Data Integrity' && !r.passed);
 
     if (failedTests.length === 0) {
       recommendations.push('✅ All validation tests passed! Your database is well-optimized.');
@@ -503,23 +483,27 @@ export class SchemaValidator {
 
     if (performanceIssues.length > 0) {
       recommendations.push('🚀 Consider running ANALYZE to update query planner statistics');
-      recommendations.push('📊 Monitor query performance and consider additional indexes for slow queries');
+      recommendations.push(
+        '📊 Monitor query performance and consider additional indexes for slow queries'
+      );
     }
 
     if (integrityIssues.length > 0) {
       recommendations.push('🔧 Run data cleanup procedures to fix integrity issues');
-      recommendations.push('📋 Implement data validation in application layer to prevent future issues');
+      recommendations.push(
+        '📋 Implement data validation in application layer to prevent future issues'
+      );
     }
 
-    const missingIndexes = results.filter(r => 
-      r.category === 'Indexes' && !r.passed && r.severity === 'warning'
+    const missingIndexes = results.filter(
+      (r) => r.category === 'Indexes' && !r.passed && r.severity === 'warning'
     );
     if (missingIndexes.length > 0) {
       recommendations.push('🔍 Run migration 003 and 004 to add missing performance indexes');
     }
 
-    const constraintIssues = results.filter(r => 
-      r.category === 'Constraints' && !r.passed && r.severity === 'error'
+    const constraintIssues = results.filter(
+      (r) => r.category === 'Constraints' && !r.passed && r.severity === 'error'
     );
     if (constraintIssues.length > 0) {
       recommendations.push('⚠️ Critical: Missing database constraints may lead to data corruption');
@@ -535,7 +519,7 @@ export class SchemaValidator {
    */
   async generateReport(): Promise<string> {
     const report = await this.validateSchema();
-    
+
     let output = `
 # Database Schema Validation Report
 **Generated:** ${report.timestamp}
@@ -550,19 +534,19 @@ export class SchemaValidator {
 ## Test Results by Category
 `;
 
-    const categories = [...new Set(report.results.map(r => r.category))];
-    
+    const categories = [...new Set(report.results.map((r) => r.category))];
+
     for (const category of categories) {
-      const categoryResults = report.results.filter(r => r.category === category);
-      const passed = categoryResults.filter(r => r.passed).length;
+      const categoryResults = report.results.filter((r) => r.category === category);
+      const passed = categoryResults.filter((r) => r.passed).length;
       const total = categoryResults.length;
-      
+
       output += `\n### ${category} (${passed}/${total})\n`;
-      
+
       for (const result of categoryResults) {
         const icon = result.passed ? '✅' : result.severity === 'error' ? '❌' : '⚠️';
         output += `${icon} **${result.test}:** ${result.message}\n`;
-        
+
         if (result.details) {
           output += `   *Details: ${JSON.stringify(result.details)}*\n`;
         }

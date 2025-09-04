@@ -22,7 +22,7 @@ async function verifySocketJWT(token: string) {
     // For our JWT auth system, we'll verify using the same secret as the auth routes
     const env = getEnvConfig();
     const jwtSecret = env.JWT_SECRET;
-    
+
     if (!jwtSecret) {
       throw new Error('JWT_SECRET not configured');
     }
@@ -129,9 +129,7 @@ export class SocketIOService {
         socket.data.connectedAt = Date.now();
         socket.data.userResolved = true; // With JWT, user is immediately resolved
 
-        console.log(
-          `[SOCKET.IO] JWT verified for user ID: ${payload.sub}, connection ready`
-        );
+        console.log(`[SOCKET.IO] JWT verified for user ID: ${payload.sub}, connection ready`);
 
         // Allow connection immediately - user resolution happens in background
         next();
@@ -147,9 +145,7 @@ export class SocketIOService {
       const userId = socket.data.userId;
       const socketId = socket.id;
 
-      console.log(
-        `[SOCKET.IO] Connection established for user ID: ${userId}, socket: ${socketId}`
-      );
+      console.log(`[SOCKET.IO] Connection established for user ID: ${userId}, socket: ${socketId}`);
 
       // Initialize connection state
       this.connections.set(socketId, {
@@ -286,7 +282,6 @@ export class SocketIOService {
       }
     }
   }
-
 
   private startHealthCheck() {
     this.healthCheckInterval = setInterval(() => {

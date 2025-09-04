@@ -1,13 +1,9 @@
-'use client';
+'use client'
 
 interface LayoutProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export default function ShipLayout({ children }: LayoutProps) {
-  return (
-    <>
-      {children}
-    </>
-  );
+  return <>{children}</>
 }

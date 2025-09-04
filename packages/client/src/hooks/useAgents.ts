@@ -18,20 +18,23 @@ export function useAgents(starshipId?: string): UseAgentsReturn {
       try {
         setLoading(true)
         setError(null)
-        
-        console.log('[AGENTS] Loading agents', starshipId ? `for starship: ${starshipId}` : '(all agents)')
-        
+
+        console.log(
+          '[AGENTS] Loading agents',
+          starshipId ? `for starship: ${starshipId}` : '(all agents)'
+        )
+
         // Use the proper agentAPI which handles authentication
         const loadedAgents = starshipId
           ? await agentAPI.getByStarshipId(starshipId)
           : await agentAPI.getAll()
-        
+
         console.log('[AGENTS] Loaded agents:', loadedAgents.length)
         setAgents(loadedAgents)
       } catch (err) {
         console.error('Failed to load agents:', err)
         setError(err instanceof Error ? err.message : 'Failed to load agents')
-        
+
         // Return empty array on error instead of mock data
         console.log('[AGENTS] Using empty array due to error')
         setAgents([])

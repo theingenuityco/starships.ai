@@ -6,7 +6,6 @@ import { StarshipService } from './StarshipService';
  * Service for managing users in local database
  */
 export class UserService {
-
   /**
    * Get user by internal ID
    */
@@ -14,7 +13,6 @@ export class UserService {
     const userRepo = new UserRepository();
     return await userRepo.findById(id);
   }
-
 
   /**
    * Get user by email
@@ -45,5 +43,4 @@ export class UserService {
     const userRepo = new UserRepository();
     return await userRepo.createWithPassword(userData);
   }
-
 }

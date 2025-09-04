@@ -1,6 +1,6 @@
 /**
  * WorkflowParsingService - AI response parsing for mission workflows
- * 
+ *
  * Handles parsing and validation of AI-generated workflow DSL responses.
  * Separated from orchestrator agent to follow separation of concerns pattern.
  */
@@ -16,7 +16,11 @@ export class WorkflowParsingService {
    * Parse AI response and convert to CreateWorkflowRequest with Blueprint
    * Migrated from legacy format to autopilot Blueprint pattern
    */
-  static parseAIResponse(aiResponse: string, missionId: string, agents: AgentModel[]): CreateWorkflowRequest {
+  static parseAIResponse(
+    aiResponse: string,
+    missionId: string,
+    agents: AgentModel[]
+  ): CreateWorkflowRequest {
     try {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -33,7 +37,7 @@ export class WorkflowParsingService {
       }
 
       // Validate agent assignments
-      const agentIds = agents.map(a => a.id);
+      const agentIds = agents.map((a) => a.id);
       for (const node of parsed.nodes) {
         if (node.type === 'agent' && node.parameters?.agentId) {
           if (!agentIds.includes(node.parameters.agentId)) {
@@ -45,11 +49,11 @@ export class WorkflowParsingService {
       // Validate workflow structure
       const hasStart = parsed.nodes.some((node: any) => node.type === 'start');
       const hasEnd = parsed.nodes.some((node: any) => node.type === 'end');
-      
+
       if (!hasStart) {
         throw new Error('Workflow must have a start node');
       }
-      
+
       if (!hasEnd) {
         throw new Error('Workflow must have an end node');
       }
@@ -61,7 +65,7 @@ export class WorkflowParsingService {
           type: node.type,
           name: node.name || '',
           description: node.description || '',
-          parameters: node.parameters || {}
+          parameters: node.parameters || {},
         };
       });
 
@@ -69,14 +73,14 @@ export class WorkflowParsingService {
       const blueprintEdges = parsed.edges.map((edge: any) => {
         return {
           from: edge.from,
-          to: edge.to
+          to: edge.to,
         };
       });
 
       // Create Blueprint structure
       const blueprint: Blueprint = {
         nodes: blueprintNodes,
-        edges: blueprintEdges
+        edges: blueprintEdges,
       };
 
       return {
@@ -85,12 +89,13 @@ export class WorkflowParsingService {
         category: 'generated',
         executionMode: 'workflow' as const,
         blueprint,
-        isPublic: false
+        isPublic: false,
       };
-
     } catch (error) {
       this.logger.error('Error parsing AI workflow response', { error });
-      throw new Error(`Failed to parse workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to parse workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 
@@ -111,11 +116,11 @@ export class WorkflowParsingService {
       // Check for required node types
       const hasStart = workflow.blueprint.nodes.some((node: any) => node.type === 'start');
       const hasEnd = workflow.blueprint.nodes.some((node: any) => node.type === 'end');
-      
+
       if (!hasStart) {
         throw new Error('Workflow must have a start node');
       }
-      
+
       if (!hasEnd) {
         throw new Error('Workflow must have an end node');
       }

@@ -6,7 +6,7 @@ import type { Server as HTTPServer } from 'http';
 
 export function initializeSocketIO(httpServer: HTTPServer) {
   console.log('[SOCKET.IO] Initializing Socket.IO server...');
-  
+
   const socketService = SocketIOService.initialize(httpServer);
   const io = socketService.getIO();
 
@@ -20,7 +20,6 @@ export function initializeSocketIO(httpServer: HTTPServer) {
   // Setup Agent-specific handlers
   setupAgentHandlers(io);
 
-
   // Setup Mission-specific handlers
   setupMissionHandlers(io);
 
@@ -31,7 +30,7 @@ export function initializeSocketIO(httpServer: HTTPServer) {
       totalConnections: stats.totalConnections,
       connectedUsers: stats.connectedUsers,
       averagePingTime: Math.round(stats.averagePingTime),
-      healthyConnections: stats.healthyConnections
+      healthyConnections: stats.healthyConnections,
     });
   }, 60000); // Log every minute
 

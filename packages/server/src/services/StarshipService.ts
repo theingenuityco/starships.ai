@@ -10,13 +10,15 @@ export class StarshipService {
    */
   static async createDefaultStarship(userId: string) {
     const starshipRepo = new StarshipRepository();
-    
+
     try {
       // Generate a random name for the starship
       const starshipName = getRandomStarshipName();
-      
-      console.log(`[STARSHIP-SERVICE] Creating default starship "${starshipName}" for user: ${userId}`);
-      
+
+      console.log(
+        `[STARSHIP-SERVICE] Creating default starship "${starshipName}" for user: ${userId}`
+      );
+
       // Create the starship with scout class (free tier)
       const starship = await starshipRepo.create({
         ownerId: userId,

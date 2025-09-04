@@ -1,6 +1,6 @@
 /**
  * Validation Types
- * 
+ *
  * Types related to workflow validation and error reporting
  */
 
@@ -69,7 +69,7 @@ export type ValidationErrorCode =
 /**
  * Validation warning codes
  */
-export type ValidationWarningCode = 
+export type ValidationWarningCode =
   | 'LONG_EXECUTION_PATH'
   | 'NO_ERROR_HANDLING'
   | 'MISSING_DESCRIPTIONS'

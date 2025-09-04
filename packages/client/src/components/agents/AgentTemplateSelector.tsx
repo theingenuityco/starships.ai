@@ -248,7 +248,9 @@ export function AgentTemplateSelector({
               <Input
                 placeholder="Search templates..."
                 value={searchQuery}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setSearchQuery(e.target.value)
+                }
                 className="pl-10 h-10"
               />
             </div>

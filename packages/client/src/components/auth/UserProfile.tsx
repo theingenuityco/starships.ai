@@ -1,25 +1,27 @@
-'use client';
+'use client'
 
-import React, { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { LogOut, User } from "lucide-react";
+import React, { useState } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { LogOut, User } from 'lucide-react'
 
 interface UserProfileProps {
-  mode?: 'collapsed' | 'expanded';
+  mode?: 'collapsed' | 'expanded'
 }
 
 /**
  * User profile component for navigation bottom
  * Shows user name and email with logout functionality via tooltip
  */
-export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }: UserProfileProps) {
-  const { user, userName, userEmail, isAuthenticated } = useAuth();
-  const [showTooltip, setShowTooltip] = useState(false);
+export const UserProfile = React.memo(function UserProfile({
+  mode = 'expanded',
+}: UserProfileProps) {
+  const { user, userName, userEmail, isAuthenticated } = useAuth()
+  const [showTooltip, setShowTooltip] = useState(false)
 
   if (!isAuthenticated || !user) {
-    return null;
+    return null
   }
 
   if (mode === 'collapsed') {
@@ -35,8 +37,8 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
             </div>
           </div>
         </TooltipTrigger>
-        <TooltipContent 
-          side="right" 
+        <TooltipContent
+          side="right"
           className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground z-[70]"
           sideOffset={15}
           avoidCollisions={true}
@@ -45,7 +47,11 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
           <div className="p-3">
             {/* Action buttons only */}
             <div className="space-y-1">
-              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-9 hover:bg-accent"
+              >
                 <User className="w-4 h-4 mr-3" />
                 My Profile
               </Button>
@@ -54,9 +60,9 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
                 size="sm"
                 className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
                 onClick={async () => {
-                  const { useAuth } = await import("@/hooks/useAuth");
+                  const { useAuth } = await import('@/hooks/useAuth')
                   // This won't work in onClick, let's use a different approach
-                  window.location.href = '/logout';
+                  window.location.href = '/logout'
                 }}
               >
                 <LogOut className="w-4 h-4 mr-3" />
@@ -66,14 +72,14 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
           </div>
         </TooltipContent>
       </Tooltip>
-    );
+    )
   }
 
-    // Expanded mode - Professional design
+  // Expanded mode - Professional design
   return (
     <Tooltip delayDuration={200} open={showTooltip} onOpenChange={setShowTooltip}>
       <TooltipTrigger asChild>
-        <div 
+        <div
           className="flex items-center gap-2.5 p-3 m-3 rounded-lg bg-gradient-to-r from-muted/30 to-muted/20 hover:from-muted/40 hover:to-muted/30 cursor-pointer transition-all duration-300 group border border-border/40 hover:border-border/60 shadow-sm hover:shadow-md"
           onClick={() => setShowTooltip(!showTooltip)}
         >
@@ -85,14 +91,12 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {userEmail}
-            </p>
+            <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent 
-        side="right" 
+      <TooltipContent
+        side="right"
         className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground"
         sideOffset={10}
       >
@@ -109,7 +113,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
               className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
               onClick={async () => {
                 // Since we can't use hooks in onClick, redirect to logout page
-                window.location.href = '/logout';
+                window.location.href = '/logout'
               }}
             >
               <LogOut className="w-4 h-4 mr-3" />
@@ -119,5 +123,5 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
         </div>
       </TooltipContent>
     </Tooltip>
-  );
-}); 
+  )
+})

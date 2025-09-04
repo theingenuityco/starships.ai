@@ -1,32 +1,38 @@
-'use client';
+'use client'
 
-import { usePathname } from 'next/navigation';
-import { motion } from 'motion/react';
-import {
-  Users, Command,
-  Target, MessageSquare
-} from 'lucide-react';
-import { UserProfile } from '@/components/auth/UserProfile';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { NavigationSection } from './NavigationSection';
+import { usePathname } from 'next/navigation'
+import { motion } from 'motion/react'
+import { Users, Command, Target, MessageSquare } from 'lucide-react'
+import { UserProfile } from '@/components/auth/UserProfile'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { NavigationSection } from './NavigationSection'
 
 interface NavigationProps {
-  mode?: 'sidebar' | 'module';
-  isMobile?: boolean;
+  mode?: 'sidebar' | 'module'
+  isMobile?: boolean
 }
-
 
 // Starship-internal navigation structure - function to generate paths based on current starship
 const getStarshipNavigationSections = (starshipSlug: string) => [
   {
-    title: "Starship Systems",
+    title: 'Starship Systems',
     items: [
-      { href: `/ship/${starshipSlug}/session`, label: "Session", icon: MessageSquare, status: "optimal" },
-      { href: `/ship/${starshipSlug}/crew`, label: "Crew", icon: Users, status: "optimal" },
-      { href: `/ship/${starshipSlug}/missions`, label: "Missions", icon: Target, status: "optimal" }
-    ]
-  }
-];
+      {
+        href: `/ship/${starshipSlug}/session`,
+        label: 'Session',
+        icon: MessageSquare,
+        status: 'optimal',
+      },
+      { href: `/ship/${starshipSlug}/crew`, label: 'Crew', icon: Users, status: 'optimal' },
+      {
+        href: `/ship/${starshipSlug}/missions`,
+        label: 'Missions',
+        icon: Target,
+        status: 'optimal',
+      },
+    ],
+  },
+]
 
 // Animation variants
 const containerVariants: any = {
@@ -37,43 +43,41 @@ const containerVariants: any = {
     transition: {
       duration: 0.5,
       staggerChildren: 0.2,
-      delayChildren: 0.3
-    }
-  }
-};
+      delayChildren: 0.3,
+    },
+  },
+}
 
 const itemVariants: any = {
   hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4 } }
-};
+  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+}
 
-export function Navigation({
-  mode = 'sidebar'
-}: NavigationProps) {
-  const pathname = usePathname();
+export function Navigation({ mode = 'sidebar' }: NavigationProps) {
+  const pathname = usePathname()
 
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {
     // Only show navigation inside starship context (/ship/<slug>/*)
     if (pathname.startsWith('/ship/')) {
       // Extract starship slug from path
-      const pathParts = pathname.split('/');
-      const starshipSlug = pathParts[2]; // /ship/<slug>/...
-      return getStarshipNavigationSections(starshipSlug);
+      const pathParts = pathname.split('/')
+      const starshipSlug = pathParts[2] // /ship/<slug>/...
+      return getStarshipNavigationSections(starshipSlug)
     }
-    
-    // No navigation for non-starship routes
-    return [];
-  };
 
-  const navigationSections = getNavigationSections();
+    // No navigation for non-starship routes
+    return []
+  }
+
+  const navigationSections = getNavigationSections()
 
   // Module mode - simplified layout
   if (mode === 'module') {
     return (
       <div className="h-full flex flex-col">
         <div className="flex-1 overflow-y-auto space-y-3">
-          {navigationSections.map((section) => (
+          {navigationSections.map(section => (
             <NavigationSection
               key={section.title}
               title={section.title}
@@ -84,7 +88,7 @@ export function Navigation({
           ))}
         </div>
       </div>
-    );
+    )
   }
 
   // Sidebar mode - professional layout
@@ -96,17 +100,19 @@ export function Navigation({
       animate="show"
     >
       {/* Enhanced Header */}
-      <motion.div className="p-3 pt-8 pb-8 border-b border-border/40 bg-card/50 backdrop-blur-sm flex-shrink-0" variants={itemVariants}>
-        <motion.div
-          variants={itemVariants}
-          className="flex items-center justify-between min-w-0"
-        >
+      <motion.div
+        className="p-3 pt-8 pb-8 border-b border-border/40 bg-card/50 backdrop-blur-sm flex-shrink-0"
+        variants={itemVariants}
+      >
+        <motion.div variants={itemVariants} className="flex items-center justify-between min-w-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-lg">
               <Command className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Navigation</h2>
+              <h2 className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                Navigation
+              </h2>
               <p className="text-xs text-muted-foreground">System Control</p>
             </div>
           </div>
@@ -116,9 +122,11 @@ export function Navigation({
         </motion.div>
       </motion.div>
 
-
       {/* Enhanced Navigation Sections */}
-      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
+      <motion.div
+        variants={itemVariants}
+        className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0"
+      >
         <div className="space-y-4 mt-4">
           {navigationSections.map((section, index) => (
             <motion.div
@@ -145,14 +153,14 @@ export function Navigation({
 
       {/* Separator */}
       <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-      
+
       {/* Enhanced User Profile Section */}
-      <motion.div 
-        variants={itemVariants} 
+      <motion.div
+        variants={itemVariants}
         className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0 pb-1"
       >
         <UserProfile mode="expanded" />
       </motion.div>
     </motion.div>
-  );
+  )
 }

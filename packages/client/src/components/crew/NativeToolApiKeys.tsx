@@ -1,26 +1,26 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
+import React, { useState, useEffect } from 'react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Eye, 
-  EyeOff, 
-  Save, 
-  ExternalLink, 
-  Zap, 
-  Shield, 
+} from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
+import {
+  Eye,
+  EyeOff,
+  Save,
+  ExternalLink,
+  Zap,
+  Shield,
   DollarSign,
   Trash2,
   Settings,
@@ -28,27 +28,27 @@ import {
   Key,
   Info,
   CheckCircle2,
-} from 'lucide-react';
-import api from '@/lib/api';
+} from 'lucide-react'
+import api from '@/lib/api'
 
 interface ConfigField {
-  name: string;
-  label: string;
-  placeholder: string;
-  description: string;
-  type: string;
+  name: string
+  label: string
+  placeholder: string
+  description: string
+  type: string
 }
 
 interface NativeToolConfig {
-  name: string;
-  displayName: string;
-  description: string;
-  apiKeyPlaceholder: string;
-  signupUrl: string;
-  pricing: string;
-  icon: string;
-  configFields?: ConfigField[];
-  helpText?: string;
+  name: string
+  displayName: string
+  description: string
+  apiKeyPlaceholder: string
+  signupUrl: string
+  pricing: string
+  icon: string
+  configFields?: ConfigField[]
+  helpText?: string
 }
 
 const NATIVE_TOOLS: NativeToolConfig[] = [
@@ -59,16 +59,17 @@ const NATIVE_TOOLS: NativeToolConfig[] = [
     apiKeyPlaceholder: 'BSA_xxxxx',
     signupUrl: 'https://brave.com/search/api/',
     pricing: '2,000 queries/month free',
-    icon: '🦁'
+    icon: '🦁',
   },
   {
     name: 'firecrawl',
     displayName: 'Firecrawl',
-    description: 'Web scraping with JavaScript rendering, clean markdown extraction, and structured data parsing',
+    description:
+      'Web scraping with JavaScript rendering, clean markdown extraction, and structured data parsing',
     apiKeyPlaceholder: 'fc_xxxxx',
     signupUrl: 'https://firecrawl.dev',
     pricing: '$19/month for 1,000 pages',
-    icon: '🔥'
+    icon: '🔥',
   },
   {
     name: 'notion',
@@ -78,160 +79,160 @@ const NATIVE_TOOLS: NativeToolConfig[] = [
     signupUrl: 'https://www.notion.so/my-integrations',
     helpText: 'Create an integration at notion.so/my-integrations and share pages with it',
     pricing: 'Free with Notion account',
-    icon: '📝'
+    icon: '📝',
   },
-];
+]
 
 interface NativeToolApiKeysProps {
-  starshipId: string;
-  onConfiguredCountChange?: (count: number) => void;
+  starshipId: string
+  onConfiguredCountChange?: (count: number) => void
 }
 
 export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: NativeToolApiKeysProps) {
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
-  const [toolConfigs, setToolConfigs] = useState<Record<string, Record<string, string>>>({});
-  const [showKey, setShowKey] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  
+  const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
+  const [toolConfigs, setToolConfigs] = useState<Record<string, Record<string, string>>>({})
+  const [showKey, setShowKey] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
   // Modal state
-  const [selectedTool, setSelectedTool] = useState<string>('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState('');
-  const [tempConfigs, setTempConfigs] = useState<Record<string, string>>({});
+  const [selectedTool, setSelectedTool] = useState<string>('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [tempApiKey, setTempApiKey] = useState('')
+  const [tempConfigs, setTempConfigs] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    loadApiKeys();
-  }, [starshipId]);
+    loadApiKeys()
+  }, [starshipId])
 
   useEffect(() => {
-    const configuredCount = getConfiguredTools().length;
+    const configuredCount = getConfiguredTools().length
     if (onConfiguredCountChange) {
-      onConfiguredCountChange(configuredCount);
+      onConfiguredCountChange(configuredCount)
     }
-  }, [apiKeys, onConfiguredCountChange]);
+  }, [apiKeys, onConfiguredCountChange])
 
   const loadApiKeys = async () => {
     try {
-      const response = await api.get(`/api/starships/${starshipId}/native-api-keys`);
-      
+      const response = await api.get(`/api/starships/${starshipId}/native-api-keys`)
+
       if (response.data) {
-        const keys: Record<string, string> = {};
+        const keys: Record<string, string> = {}
         NATIVE_TOOLS.forEach(tool => {
-          keys[tool.name] = response.data[tool.name] || '';
-        });
-        setApiKeys(keys);
+          keys[tool.name] = response.data[tool.name] || ''
+        })
+        setApiKeys(keys)
       }
     } catch (error) {
-      console.error('Failed to load API keys:', error);
-      const keys: Record<string, string> = {};
+      console.error('Failed to load API keys:', error)
+      const keys: Record<string, string> = {}
       NATIVE_TOOLS.forEach(tool => {
-        keys[tool.name] = '';
-      });
-      setApiKeys(keys);
+        keys[tool.name] = ''
+      })
+      setApiKeys(keys)
     }
-  };
+  }
 
   const openConfigModal = (toolName?: string) => {
     if (toolName) {
-      const tool = NATIVE_TOOLS.find(t => t.name === toolName);
-      if (!tool) return;
-      
-      setSelectedTool(toolName);
-      setTempApiKey(apiKeys[toolName] || '');
-      setTempConfigs(toolConfigs[toolName] || {});
+      const tool = NATIVE_TOOLS.find(t => t.name === toolName)
+      if (!tool) return
+
+      setSelectedTool(toolName)
+      setTempApiKey(apiKeys[toolName] || '')
+      setTempConfigs(toolConfigs[toolName] || {})
     } else {
-      setSelectedTool('');
-      setTempApiKey('');
-      setTempConfigs({});
+      setSelectedTool('')
+      setTempApiKey('')
+      setTempConfigs({})
     }
-    setIsModalOpen(true);
-    setShowKey(false);
-    setMessage(null);
-  };
+    setIsModalOpen(true)
+    setShowKey(false)
+    setMessage(null)
+  }
 
   const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedTool('');
-    setTempApiKey('');
-    setTempConfigs({});
-    setShowKey(false);
-    setMessage(null);
-  };
+    setIsModalOpen(false)
+    setSelectedTool('')
+    setTempApiKey('')
+    setTempConfigs({})
+    setShowKey(false)
+    setMessage(null)
+  }
 
   const saveApiKey = async () => {
-    if (!selectedTool) return;
-    
-    setDeleting(true);
-    setMessage(null);
+    if (!selectedTool) return
+
+    setDeleting(true)
+    setMessage(null)
 
     try {
       await api.post(`/api/starships/${starshipId}/native-api-keys`, {
         toolName: selectedTool,
         apiKey: tempApiKey,
-        config: tempConfigs
-      });
+        config: tempConfigs,
+      })
 
       setApiKeys(prev => ({
         ...prev,
-        [selectedTool]: tempApiKey
-      }));
-      
+        [selectedTool]: tempApiKey,
+      }))
+
       setToolConfigs(prev => ({
         ...prev,
-        [selectedTool]: tempConfigs
-      }));
+        [selectedTool]: tempConfigs,
+      }))
 
-      setMessage({ type: 'success', text: 'Configuration saved successfully!' });
-      
+      setMessage({ type: 'success', text: 'Configuration saved successfully!' })
+
       setTimeout(() => {
-        closeModal();
-      }, 1500);
+        closeModal()
+      }, 1500)
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to save configuration' });
-      console.error('Error saving API key:', error);
+      setMessage({ type: 'error', text: 'Failed to save configuration' })
+      console.error('Error saving API key:', error)
     } finally {
-      setDeleting(false);
+      setDeleting(false)
     }
-  };
+  }
 
   const deleteApiKey = async () => {
-    if (!selectedTool) return;
-    
-    setDeleting(true);
-    setMessage(null);
+    if (!selectedTool) return
+
+    setDeleting(true)
+    setMessage(null)
 
     try {
-      await api.delete(`/api/starships/${starshipId}/native-api-keys/${selectedTool}`);
+      await api.delete(`/api/starships/${starshipId}/native-api-keys/${selectedTool}`)
 
       setApiKeys(prev => ({
         ...prev,
-        [selectedTool]: ''
-      }));
-      
+        [selectedTool]: '',
+      }))
+
       setToolConfigs(prev => ({
         ...prev,
-        [selectedTool]: {}
-      }));
+        [selectedTool]: {},
+      }))
 
-      setMessage({ type: 'success', text: 'API key deleted successfully!' });
-      
+      setMessage({ type: 'success', text: 'API key deleted successfully!' })
+
       setTimeout(() => {
-        closeModal();
-      }, 1500);
+        closeModal()
+      }, 1500)
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to delete API key' });
-      console.error('Error deleting API key:', error);
+      setMessage({ type: 'error', text: 'Failed to delete API key' })
+      console.error('Error deleting API key:', error)
     } finally {
-      setDeleting(false);
+      setDeleting(false)
     }
-  };
+  }
 
-  const getSelectedTool = () => NATIVE_TOOLS.find(t => t.name === selectedTool);
+  const getSelectedTool = () => NATIVE_TOOLS.find(t => t.name === selectedTool)
 
   const getConfiguredTools = () => {
-    return NATIVE_TOOLS.filter(tool => apiKeys[tool.name] && apiKeys[tool.name].length > 0);
-  };
+    return NATIVE_TOOLS.filter(tool => apiKeys[tool.name] && apiKeys[tool.name].length > 0)
+  }
 
   return (
     <>
@@ -244,10 +245,12 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
             </span>
             <div className="flex-1 min-w-0 space-y-1">
               <h3 className="text-xl font-bold text-foreground">Tools</h3>
-              <p className="text-sm text-muted-foreground">Add external capabilities to your agents</p>
+              <p className="text-sm text-muted-foreground">
+                Add external capabilities to your agents
+              </p>
             </div>
           </div>
-          
+
           {/* Browse Tools Button */}
           <div className="flex justify-start">
             <Button
@@ -322,7 +325,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   Choose from available native tool integrations
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="grid gap-3 py-4">
                 {NATIVE_TOOLS.map(tool => (
                   <button
@@ -340,7 +343,10 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       </div>
                     </div>
                     {apiKeys[tool.name] ? (
-                      <Badge variant="outline" className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400">
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400"
+                      >
                         <Check className="mr-1 h-3 w-3" />
                         Configured
                       </Badge>
@@ -370,8 +376,12 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
 
               <div className="space-y-5 py-6">
                 {message && (
-                  <Alert className={`${message.type === 'success' ? 'border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400' : 'border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400'}`}>
-                    <AlertDescription className="text-sm font-medium">{message.text}</AlertDescription>
+                  <Alert
+                    className={`${message.type === 'success' ? 'border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400' : 'border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400'}`}
+                  >
+                    <AlertDescription className="text-sm font-medium">
+                      {message.text}
+                    </AlertDescription>
                   </Alert>
                 )}
 
@@ -406,12 +416,18 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                 {/* API Key Input Section */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="api-key" className="text-sm font-semibold flex items-center gap-2">
+                    <Label
+                      htmlFor="api-key"
+                      className="text-sm font-semibold flex items-center gap-2"
+                    >
                       <Key className="h-3.5 w-3.5 text-muted-foreground" />
                       API Key
                     </Label>
                     {tempApiKey && (
-                      <Badge variant="outline" className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400">
+                      <Badge
+                        variant="outline"
+                        className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400"
+                      >
                         <Check className="mr-1 h-3 w-3" />
                         Configured
                       </Badge>
@@ -423,7 +439,9 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       type={showKey ? 'text' : 'password'}
                       placeholder={getSelectedTool()!.apiKeyPlaceholder}
                       value={tempApiKey}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempApiKey(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setTempApiKey(e.target.value)
+                      }
                       className="pr-10 bg-background/50 border-border/50 font-mono text-sm focus:border-primary/50"
                     />
                     <Button
@@ -443,7 +461,9 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   {getSelectedTool()!.helpText && (
                     <div className="flex gap-2 rounded-md bg-yellow-500/5 border border-yellow-500/20 p-2.5">
                       <Info className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-500 mt-0.5 shrink-0" />
-                      <p className="text-xs text-yellow-700 dark:text-yellow-400">{getSelectedTool()!.helpText}</p>
+                      <p className="text-xs text-yellow-700 dark:text-yellow-400">
+                        {getSelectedTool()!.helpText}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -451,7 +471,10 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                 {/* Additional Config Fields */}
                 {getSelectedTool()!.configFields?.map(field => (
                   <div key={field.name} className="space-y-3">
-                    <Label htmlFor={field.name} className="text-sm font-semibold flex items-center gap-2">
+                    <Label
+                      htmlFor={field.name}
+                      className="text-sm font-semibold flex items-center gap-2"
+                    >
                       <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                       {field.label}
                     </Label>
@@ -460,10 +483,12 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       type={field.type}
                       placeholder={field.placeholder}
                       value={tempConfigs[field.name] || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempConfigs(prev => ({
-                        ...prev,
-                        [field.name]: e.target.value
-                      }))}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setTempConfigs(prev => ({
+                          ...prev,
+                          [field.name]: e.target.value,
+                        }))
+                      }
                       className="bg-background/50 border-border/50 text-sm focus:border-primary/50"
                     />
                     <p className="text-xs text-muted-foreground pl-5">{field.description}</p>
@@ -475,8 +500,8 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   <div className="flex gap-3">
                     <Shield className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Your API key will be encrypted and stored securely. It will only be used by your 
-                      agents to make API calls on your behalf.
+                      Your API key will be encrypted and stored securely. It will only be used by
+                      your agents to make API calls on your behalf.
                     </p>
                   </div>
                 </div>
@@ -539,5 +564,5 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
         </DialogContent>
       </Dialog>
     </>
-  );
+  )
 }

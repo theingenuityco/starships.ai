@@ -43,7 +43,7 @@ export class MigrationRunner {
       executionTime: 0,
       errors: [],
       warnings: [],
-      rollbackAvailable: false
+      rollbackAvailable: false,
     };
 
     try {
@@ -51,7 +51,7 @@ export class MigrationRunner {
       console.log('🔍 Checking for existing migration records...');
       const isApplied = await this.isMigrationApplied('000_complete_schema');
       console.log(`   └─ Schema initialization status: ${isApplied ? 'exists' : 'needed'}`);
-      
+
       if (isApplied) {
         // Force re-verification even if migration exists
         console.log('🔍 Migration exists but forcing verification check...');
@@ -62,9 +62,13 @@ export class MigrationRunner {
           result.executionTime = Date.now() - startTime;
           return result;
         } else {
-          console.log('⚠️ Migration exists but verification failed, clearing incomplete migration and re-running...');
+          console.log(
+            '⚠️ Migration exists but verification failed, clearing incomplete migration and re-running...'
+          );
           // Clear the incomplete migration record and re-run
-          await this.getConnection().executeWrite('MATCH (m:Migration {id: "000_complete_schema"}) DELETE m');
+          await this.getConnection().executeWrite(
+            'MATCH (m:Migration {id: "000_complete_schema"}) DELETE m'
+          );
           console.log('   └─ Cleared incomplete migration record');
         }
       }
@@ -79,7 +83,7 @@ export class MigrationRunner {
       // Execute schema initialization
       const schemaContent = readFileSync(migrationPath, 'utf-8');
       console.log('🚀 Initializing database schema...');
-      
+
       try {
         await this.executeMigrationContent(schemaContent, '000_complete_schema');
         console.log('✅ Migration content executed successfully, now verifying...');
@@ -98,9 +102,10 @@ export class MigrationRunner {
       result.success = true;
       result.executionTime = Date.now() - startTime;
       console.log(`✅ Schema initialized successfully in ${result.executionTime}ms`);
-
     } catch (error) {
-      result.errors?.push(`Schema initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+      result.errors?.push(
+        `Schema initialization failed: ${error instanceof Error ? error.message : String(error)}`
+      );
       console.error('❌ Schema initialization failed:', error);
     }
 
@@ -111,7 +116,7 @@ export class MigrationRunner {
   /** Execute a migration with full error handling (deprecated - use initializeSchema) */
   async runMigration(migrationId: string): Promise<MigrationResult> {
     console.warn('⚠️  runMigration is deprecated. Use initializeSchema() instead.');
-    
+
     if (migrationId === '001_initialize_schema') {
       return this.initializeSchema();
     }
@@ -123,7 +128,7 @@ export class MigrationRunner {
       executionTime: 0,
       errors: [`Migration ${migrationId} no longer exists. Use initializeSchema() instead.`],
       warnings: [],
-      rollbackAvailable: false
+      rollbackAvailable: false,
     };
   }
 
@@ -136,7 +141,7 @@ export class MigrationRunner {
       executionTime: 0,
       errors: [],
       warnings: [],
-      rollbackAvailable: true
+      rollbackAvailable: true,
     };
 
     try {
@@ -150,7 +155,10 @@ export class MigrationRunner {
       }
 
       // Find rollback file
-      const rollbackPath = join(this.migrationsPath, `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.cypher`);
+      const rollbackPath = join(
+        this.migrationsPath,
+        `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.cypher`
+      );
       if (!existsSync(rollbackPath)) {
         result.errors?.push(`Rollback file not found: ${rollbackPath}`);
         return result;
@@ -162,9 +170,10 @@ export class MigrationRunner {
 
       result.success = true;
       result.executionTime = Date.now() - startTime;
-
     } catch (error) {
-      result.errors?.push(`Rollback execution failed: ${error instanceof Error ? error.message : String(error)}`);
+      result.errors?.push(
+        `Rollback execution failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     result.executionTime = Date.now() - startTime;
@@ -189,15 +198,15 @@ export class MigrationRunner {
   /** Get list of pending migrations */
   async getPendingMigrations(): Promise<string[]> {
     const appliedMigrations = await this.getAppliedMigrations();
-    const appliedIds = new Set(appliedMigrations.map(m => m.id));
-    
+    const appliedIds = new Set(appliedMigrations.map((m) => m.id));
+
     // Scan the migrations directory for .cypher files (not rollback files)
     const migrationFiles = readdirSync(this.migrationsPath)
-      .filter(file => file.endsWith('.cypher') && !file.includes('rollback'))
-      .map(file => file.replace('.cypher', ''))
+      .filter((file) => file.endsWith('.cypher') && !file.includes('rollback'))
+      .map((file) => file.replace('.cypher', ''))
       .sort();
-    
-    return migrationFiles.filter(id => !appliedIds.has(id));
+
+    return migrationFiles.filter((id) => !appliedIds.has(id));
   }
 
   /** Validate migration dependencies */
@@ -207,7 +216,7 @@ export class MigrationRunner {
   }> {
     // Extract the migration number from the ID (e.g., "003" from "003_database_optimizations")
     const migrationNumber = parseInt(migrationId.split('_')[0]);
-    
+
     if (isNaN(migrationNumber)) {
       // No dependency validation for non-numbered migrations
       return { valid: true };
@@ -215,17 +224,17 @@ export class MigrationRunner {
 
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedNumbers = appliedMigrations
-      .map(m => parseInt(m.id.split('_')[0]))
-      .filter(num => !isNaN(num));
+      .map((m) => parseInt(m.id.split('_')[0]))
+      .filter((num) => !isNaN(num));
 
     // Get all available migration files to understand which ones actually exist
     const availableMigrationFiles = readdirSync(this.migrationsPath)
-      .filter(file => file.endsWith('.cypher') && !file.includes('rollback'))
-      .map(file => file.replace('.cypher', ''));
-    
+      .filter((file) => file.endsWith('.cypher') && !file.includes('rollback'))
+      .map((file) => file.replace('.cypher', ''));
+
     const availableNumbers = availableMigrationFiles
-      .map(id => parseInt(id.split('_')[0]))
-      .filter(num => !isNaN(num) && num < migrationNumber)
+      .map((id) => parseInt(id.split('_')[0]))
+      .filter((num) => !isNaN(num) && num < migrationNumber)
       .sort((a, b) => a - b);
 
     // Check if all available previous numbered migrations are applied
@@ -236,10 +245,10 @@ export class MigrationRunner {
         missing.push(`${availableNumber.toString().padStart(3, '0')}_*`);
       }
     }
-    
+
     return {
       valid: missing.length === 0,
-      missing: missing.length > 0 ? missing : undefined
+      missing: missing.length > 0 ? missing : undefined,
     };
   }
 
@@ -262,7 +271,7 @@ export class MigrationRunner {
     // Clean content: remove comment lines and empty lines, but preserve multi-line statements
     const lines = content.split('\n');
     const cleanedLines: string[] = [];
-    
+
     for (const line of lines) {
       const trimmedLine = line.trim();
       // Skip empty lines and comment-only lines
@@ -271,14 +280,14 @@ export class MigrationRunner {
       }
       cleanedLines.push(line);
     }
-    
+
     const cleanContent = cleanedLines.join('\n');
-    
+
     // Split content into individual statements by semicolons
     const statements = cleanContent
       .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0);
+      .map((stmt) => stmt.trim())
+      .filter((stmt) => stmt.length > 0);
 
     console.log(`📝 Executing ${statements.length} statements for schema initialization`);
 
@@ -289,22 +298,28 @@ export class MigrationRunner {
         try {
           // Show friendly progress without revealing statement content
           const statementType = this.getStatementType(statement);
-          console.log(`  └─ Executing statement ${i + 1}/${statements.length}: ${statementType}...`);
+          console.log(
+            `  └─ Executing statement ${i + 1}/${statements.length}: ${statementType}...`
+          );
           await this.getConnection().executeWrite(statement);
         } catch (error) {
-          console.error(`❌ Failed to execute statement ${i + 1}: ${this.getStatementType(statement)}`);
-          throw new Error(`Failed to execute statement ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
+          console.error(
+            `❌ Failed to execute statement ${i + 1}: ${this.getStatementType(statement)}`
+          );
+          throw new Error(
+            `Failed to execute statement ${i + 1}: ${error instanceof Error ? error.message : String(error)}`
+          );
         }
       }
     }
-    
+
     console.log(`✅ Successfully executed all ${statements.length} statements`);
   }
 
   /** Get a friendly description of statement type without revealing content */
   private getStatementType(statement: string): string {
     const upperStatement = statement.toUpperCase().trim();
-    
+
     if (upperStatement.startsWith('CREATE CONSTRAINT')) {
       return 'Creating database constraint';
     } else if (upperStatement.startsWith('CREATE INDEX')) {
@@ -334,7 +349,7 @@ export class MigrationRunner {
         })`,
         {
           backupId: `backup_${migrationId}_${Date.now()}`,
-          migrationId
+          migrationId,
         }
       );
     } catch (error) {
@@ -369,18 +384,21 @@ export class MigrationRunner {
       }
 
       // Check that migration completed successfully
-      const migrationCheck = await this.getConnection().executeQuery('MATCH (m:Migration {id: "000_complete_schema"}) RETURN m');
+      const migrationCheck = await this.getConnection().executeQuery(
+        'MATCH (m:Migration {id: "000_complete_schema"}) RETURN m'
+      );
       if (!migrationCheck || migrationCheck.length === 0) {
         errors.push('Migration record was not created properly');
       }
-
     } catch (error) {
-      errors.push(`Schema verification failed: ${error instanceof Error ? error.message : String(error)}`);
+      errors.push(
+        `Schema verification failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
 
     return {
       success: errors.length === 0,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors : undefined,
     };
   }
 
@@ -406,7 +424,7 @@ export class MigrationRunner {
 
     return {
       success: errors.length === 0,
-      errors: errors.length > 0 ? errors : undefined
+      errors: errors.length > 0 ? errors : undefined,
     };
   }
 
@@ -417,7 +435,7 @@ export class MigrationRunner {
       const constraints = await this.getConnection().executeQuery(
         'SHOW CONSTRAINTS YIELD name RETURN count(*) as count'
       );
-      
+
       if (constraints[0]?.count < 5) {
         errors.push('Expected constraints not found');
       }
@@ -426,29 +444,29 @@ export class MigrationRunner {
       const indexes = await this.getConnection().executeQuery(
         'SHOW INDEXES YIELD name RETURN count(*) as count'
       );
-      
+
       if (indexes[0]?.count < 5) {
         errors.push('Expected indexes not found');
       }
-
     } catch (error) {
-      errors.push(`Constraint/index verification failed: ${error instanceof Error ? error.message : String(error)}`);
+      errors.push(
+        `Constraint/index verification failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
-
 
   /** Initialize database schema (replaces runAllPendingMigrations) */
   async runAllPendingMigrations(): Promise<MigrationResult[]> {
     console.log('🚀 Checking database schema...');
-    
+
     const result = await this.initializeSchema();
-    
+
     if (result.success) {
       console.log('✅ Database schema is ready');
     } else {
       console.error('❌ Database schema initialization failed:', result.errors);
     }
-    
+
     return [result];
   }
 }

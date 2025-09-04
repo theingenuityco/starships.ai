@@ -11,7 +11,7 @@ jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(() => ({
     executeQuery: jest.fn(),
     executeWrite: jest.fn(),
-  }))
+  })),
 }));
 
 import { getConnection } from '../../helpers/database';
@@ -40,13 +40,10 @@ describe('UserRepository', () => {
     it('should return all users ordered by creation date', async () => {
       const mockUsers: UserModel[] = [
         global.createMockUser({ id: 'user-1', email: 'user1@example.com' }),
-        global.createMockUser({ id: 'user-2', email: 'user2@example.com' })
+        global.createMockUser({ id: 'user-2', email: 'user2@example.com' }),
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { u: mockUsers[0] },
-        { u: mockUsers[1] }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ u: mockUsers[0] }, { u: mockUsers[1] }]);
 
       const result = await repository.findAll();
 
@@ -132,20 +129,19 @@ describe('UserRepository', () => {
     });
   });
 
-
   describe('create', () => {
     it('should create new user with required fields', async () => {
       const userData = {
         email: 'test@example.com',
         username: 'testuser',
         displayName: 'Test User',
-        avatar: 'avatar-url'
+        avatar: 'avatar-url',
       };
 
       const createdUser = {
         ...userData,
         id: 'test-uuid-123',
-        createdAt: expect.any(String)
+        createdAt: expect.any(String),
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ n: createdUser }]);
@@ -156,20 +152,20 @@ describe('UserRepository', () => {
         expect.stringContaining('MERGE (n:User'),
         expect.objectContaining({
           match: expect.objectContaining({
-            email: 'test@example.com'
+            email: 'test@example.com',
           }),
           create: expect.objectContaining({
             email: 'test@example.com',
             username: 'testuser',
             displayName: 'Test User',
-            avatar: 'avatar-url'
+            avatar: 'avatar-url',
           }),
           update: expect.objectContaining({
             email: 'test@example.com',
             username: 'testuser',
             displayName: 'Test User',
-            avatar: 'avatar-url'
-          })
+            avatar: 'avatar-url',
+          }),
         })
       );
       expect(result).toEqual(createdUser);
@@ -177,7 +173,7 @@ describe('UserRepository', () => {
 
     it('should validate required fields', async () => {
       const incompleteData = {
-        username: 'testuser'
+        username: 'testuser',
         // Missing email
       };
 
@@ -188,13 +184,13 @@ describe('UserRepository', () => {
       const userData = {
         username: 'existinguser',
         email: 'updated@example.com',
-        displayName: 'Updated Name'
+        displayName: 'Updated Name',
       };
 
       const existingUser = global.createMockUser({
         username: 'existinguser',
         email: 'updated@example.com',
-        displayName: 'Updated Name'
+        displayName: 'Updated Name',
       });
 
       mockConnection.executeWrite.mockResolvedValue([{ n: existingUser }]);
@@ -210,12 +206,12 @@ describe('UserRepository', () => {
     it('should update user with valid data', async () => {
       const updates = {
         displayName: 'Updated Name',
-        avatar: 'new-avatar-url'
+        avatar: 'new-avatar-url',
       };
 
       const updatedUser = global.createMockUser({
         id: 'user-123',
-        ...updates
+        ...updates,
       });
 
       mockConnection.executeWrite.mockResolvedValue([{ u: updatedUser }]);
@@ -227,7 +223,7 @@ describe('UserRepository', () => {
         expect.objectContaining({
           id: 'user-123',
           displayName: 'Updated Name',
-          avatar: 'new-avatar-url'
+          avatar: 'new-avatar-url',
         })
       );
       expect(result).toEqual(updatedUser);
@@ -246,16 +242,16 @@ describe('UserRepository', () => {
     it('should throw NotFoundError when user does not exist', async () => {
       mockConnection.executeWrite.mockResolvedValue([]);
 
-      await expect(
-        repository.update('non-existent', { displayName: 'New Name' })
-      ).rejects.toThrow(NotFoundError);
+      await expect(repository.update('non-existent', { displayName: 'New Name' })).rejects.toThrow(
+        NotFoundError
+      );
     });
 
     it('should filter out protected fields from updates', async () => {
       const updates = {
         id: 'should-be-ignored',
         createdAt: 'should-be-ignored',
-        displayName: 'Valid Update'
+        displayName: 'Valid Update',
       };
 
       const updatedUser = global.createMockUser();
@@ -330,13 +326,13 @@ describe('UserRepository', () => {
     });
 
     it('should validate required parameters', async () => {
-      await expect(
-        repository.updateStripeCustomerId('', 'cus_123')
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.updateStripeCustomerId('', 'cus_123')).rejects.toThrow(
+        ValidationError
+      );
 
-      await expect(
-        repository.updateStripeCustomerId('user-123', '')
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.updateStripeCustomerId('user-123', '')).rejects.toThrow(
+        ValidationError
+      );
     });
   });
 
@@ -353,7 +349,7 @@ describe('UserRepository', () => {
 
       const userData = {
         username: 'testuser',
-        email: 'test@example.com'
+        email: 'test@example.com',
       };
 
       await expect(repository.create(userData)).rejects.toThrow();
@@ -372,7 +368,7 @@ describe('UserRepository', () => {
       const userData = {
         username: 'oauthuser',
         email: 'oauth@example.com',
-        displayName: 'OAuth User'
+        displayName: 'OAuth User',
       };
 
       // First check if user exists
@@ -394,12 +390,12 @@ describe('UserRepository', () => {
       const userId = 'user-123';
       const updates = {
         displayName: 'Updated Display Name',
-        avatar: 'https://example.com/new-avatar.jpg'
+        avatar: 'https://example.com/new-avatar.jpg',
       };
 
       const updatedUser = global.createMockUser({
         id: userId,
-        ...updates
+        ...updates,
       });
 
       mockConnection.executeWrite.mockResolvedValue([{ u: updatedUser }]);

@@ -1,38 +1,38 @@
-'use client';
+'use client'
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { SessionInterface } from '@/components/session/SessionInterface';
-import { SessionsSidebar } from '@/components/session/SessionsSidebar';
-import { starshipAPI, type Starship } from '@/lib/api';
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { SessionInterface } from '@/components/session/SessionInterface'
+import { SessionsSidebar } from '@/components/session/SessionsSidebar'
+import { starshipAPI, type Starship } from '@/lib/api'
 
 export default function StarshipSessionPage() {
-  const params = useParams();
-  const slug = params?.slug as string;
-  const [starship, setStarship] = useState<Starship | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const params = useParams()
+  const slug = params?.slug as string
+  const [starship, setStarship] = useState<Starship | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchStarshipData = async () => {
-      if (!slug) return;
-      
+      if (!slug) return
+
       try {
-        setLoading(true);
-        setError(null);
-        const data = await starshipAPI.getStarshipBySlug(slug);
-        setStarship(data.starship);
+        setLoading(true)
+        setError(null)
+        const data = await starshipAPI.getStarshipBySlug(slug)
+        setStarship(data.starship)
       } catch (error) {
-        console.error('Failed to fetch starship for session:', error);
-        setError('Failed to load starship data');
+        console.error('Failed to fetch starship for session:', error)
+        setError('Failed to load starship data')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
-    
-    fetchStarshipData();
-  }, [slug]);
+    }
+
+    fetchStarshipData()
+  }, [slug])
 
   if (loading) {
     return (
@@ -42,7 +42,7 @@ export default function StarshipSessionPage() {
           <p className="text-muted-foreground">Loading starship...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (error || !starship) {
@@ -51,13 +51,14 @@ export default function StarshipSessionPage() {
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-semibold text-foreground">Starship Not Found</h1>
           <p className="text-muted-foreground">
-            {error || "The starship you're looking for could not be found or you don't have access to it."}
+            {error ||
+              "The starship you're looking for could not be found or you don't have access to it."}
           </p>
         </div>
       </div>
-    );
+    )
   }
-  
+
   return (
     <div className="h-full flex">
       {/* Sessions Sidebar */}
@@ -68,7 +69,7 @@ export default function StarshipSessionPage() {
           onSessionSelect={setCurrentSessionId}
         />
       </div>
-      
+
       {/* Main Session Interface */}
       <div className="flex-1 min-w-0">
         <SessionInterface
@@ -78,5 +79,5 @@ export default function StarshipSessionPage() {
         />
       </div>
     </div>
-  );
+  )
 }

@@ -5,10 +5,7 @@
  * Imports workflow types from @starships/autopilot to avoid duplication.
  */
 
-import type {
-  Blueprint,
-  WorkflowNodeParameters
-} from '@starships/autopilot';
+import type { Blueprint, WorkflowNodeParameters } from '@starships/autopilot';
 
 // ============================================================================
 // CORE WORKFLOW MODEL TYPES (following Agent pattern)
@@ -23,11 +20,11 @@ export interface WorkflowModel extends WorkflowNodeParameters {
   id: string;
   createdAt: string;
   updatedAt: string;
-  
+
   // Ownership and deployment
   authorId: string;
   starshipId?: string;
-  
+
   // Marketplace fields
   isPublic: boolean;
   category: string;
@@ -35,7 +32,7 @@ export interface WorkflowModel extends WorkflowNodeParameters {
   version: string;
   usageCount: number;
   rating?: number;
-  
+
   // Execution settings
   executionMode: 'simple' | 'workflow';
   allowedStarshipClasses?: string[];
@@ -52,7 +49,7 @@ export interface CreateWorkflowRequest {
   isPublic?: boolean;
   tags?: string[];
   executionMode?: 'simple' | 'workflow';
-  
+
   // Core WorkflowNodeParameters fields
   blueprint?: Blueprint;
   timeout?: number;

@@ -281,19 +281,6 @@ importers:
         specifier: ^5.8.3
         version: 5.8.3
 
-  packages/env-config:
-    dependencies:
-      dotenv:
-        specifier: ^17.1.0
-        version: 17.1.0
-    devDependencies:
-      '@types/node':
-        specifier: ^24.0.10
-        version: 24.0.10
-      typescript:
-        specifier: ^5.8.3
-        version: 5.8.3
-
   packages/errors:
     dependencies:
       '@starships/protocol':

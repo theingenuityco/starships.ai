@@ -6,9 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type {
-  Node
-} from '@starships/autopilot';
+import type { Node } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE NODE INTERFACE
@@ -23,10 +21,10 @@ export interface NodeModel extends Node {
   id: string;
   createdAt?: string;
   updatedAt?: string;
-  
+
   // Workflow context fields
   workflowId?: string;
-  
+
   // Additional metadata for database storage
   metadata?: Record<string, unknown>;
 }

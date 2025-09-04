@@ -6,9 +6,9 @@
  * stateless execution engine (autopilot Workflow).
  */
 
-import { WorkflowRepository, RepositoryFactory } from '@starships/models';
+import { WorkflowRepository } from '@starships/models';
 import type { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/protocol';
-import { Workflow, Blueprint, Execution, createAgentMemory } from '@starships/autopilot';
+import { Workflow, Blueprint, Execution, AgentMemory } from '@starships/autopilot';
 
 export interface WorkflowOptions {
   includeMemory?: boolean;
@@ -102,7 +102,7 @@ export class WorkflowService {
     const workflowData = {
       ...request,
       blueprint: request.blueprint || { nodes: [], edges: [], metadata: {} },
-      timeout: request.timeout || 30000
+      timeout: request.timeout || 30000,
     };
 
     return await repository.create(workflowData as Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>);
@@ -179,10 +179,9 @@ export class WorkflowService {
       rating: workflow.rating || 0,
       isPublic: workflow.isPublic,
       createdAt: workflow.createdAt,
-      lastUpdated: workflow.updatedAt
+      lastUpdated: workflow.updatedAt,
     };
   }
-
 
   // ============================================================================
   // INSTANCE METHODS - Execution operations (returns Workflow instances)
@@ -203,10 +202,12 @@ export class WorkflowService {
     const workflowData = {
       ...request,
       blueprint: request.blueprint || this.createDefaultBlueprint(),
-      timeout: request.timeout || 30000
+      timeout: request.timeout || 30000,
     };
 
-    const dbWorkflow = await this.workflowRepository.create(workflowData as Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>);
+    const dbWorkflow = await this.workflowRepository.create(
+      workflowData as Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
+    );
     return await this.createWorkflowInstance(dbWorkflow, options);
   }
 
@@ -289,13 +290,16 @@ export class WorkflowService {
   /**
    * Get workflows with filters as Workflow instances
    */
-  async getWorkflowsWithFilters(filters: {
-    category?: string;
-    authorId?: string;
-    isPublic?: boolean;
-    tags?: string[];
-    starshipClass?: 'scout' | 'cruiser';
-  }, options: WorkflowOptions = {}): Promise<Workflow[]> {
+  async getWorkflowsWithFilters(
+    filters: {
+      category?: string;
+      authorId?: string;
+      isPublic?: boolean;
+      tags?: string[];
+      starshipClass?: 'scout' | 'cruiser';
+    },
+    options: WorkflowOptions = {}
+  ): Promise<Workflow[]> {
     const dbWorkflows = await this.workflowRepository.findWithFilters(filters);
     return Promise.all(dbWorkflows.map((dbWorkflow: WorkflowModel) => this.createWorkflowInstance(dbWorkflow, options)));
   }
@@ -307,10 +311,7 @@ export class WorkflowService {
   /**
    * Execute workflow using WorkflowExecutionContext
    */
-  async executeWorkflow(
-    context: WorkflowExecutionContext,
-    options: WorkflowOptions = {}
-  ): Promise<ExecuteWorkflowResponse> {
+  async executeWorkflow(context: WorkflowExecutionContext, options: WorkflowOptions = {}): Promise<ExecuteWorkflowResponse> {
     const startTime = Date.now();
 
     try {
@@ -326,7 +327,7 @@ export class WorkflowService {
       console.log(`✅ [WORKFLOW-SERVICE] Executing workflow: ${dbWorkflow.name} (${context.workflowId})`);
 
       // Create agent memory for execution context
-      const agentMemory = createAgentMemory();
+      const agentMemory = new AgentMemory();
       agentMemory.addMessage('system', 'Workflow execution context');
 
       // Create initial execution context
@@ -335,7 +336,7 @@ export class WorkflowService {
         status: 'running',
         executionResults: new Map(),
         agentMemory: agentMemory,
-        error: undefined
+        error: undefined,
       };
 
       // Execute workflow
@@ -350,9 +351,8 @@ export class WorkflowService {
       return {
         response: result,
         executionId: `exec-${Date.now()}`,
-        status: result.status === 'completed' ? 'completed' : 'failed'
+        status: result.status === 'completed' ? 'completed' : 'failed',
       };
-
     } catch (error: any) {
       const executionTime = Date.now() - startTime;
 
@@ -364,8 +364,8 @@ export class WorkflowService {
         status: 'failed',
         error: {
           message: error.message || 'Unknown error occurred',
-          code: error.code || 'EXECUTION_ERROR'
-        }
+          code: error.code || 'EXECUTION_ERROR',
+        },
       };
     }
   }
@@ -374,12 +374,8 @@ export class WorkflowService {
    * Test workflow execution
    */
   async testWorkflow(workflowId: string, testData: Record<string, unknown> = {}): Promise<ExecuteWorkflowResponse> {
-    return this.executeWorkflow(
-      { workflowId, initialData: testData },
-      { includeMemory: false }
-    );
+    return this.executeWorkflow({ workflowId, initialData: testData }, { includeMemory: false });
   }
-
 
   /**
    * Validate workflow
@@ -393,14 +389,14 @@ export class WorkflowService {
     const warnings: string[] = [];
 
     try {
-      const workflowRepo = RepositoryFactory.getWorkflowRepository();
+      const workflowRepo = new WorkflowRepository();
       const dbWorkflow = await workflowRepo.findById(workflowId);
 
       if (!dbWorkflow) {
         return {
           valid: false,
           errors: [`Workflow ${workflowId} not found`],
-          warnings: []
+          warnings: [],
         };
       }
 
@@ -409,7 +405,7 @@ export class WorkflowService {
         return {
           valid: false,
           errors: ['Workflow name and blueprint are required'],
-          warnings: []
+          warnings: [],
         };
       }
 
@@ -425,13 +421,13 @@ export class WorkflowService {
       return {
         valid: errors.length === 0,
         errors,
-        warnings
+        warnings,
       };
     } catch (error: any) {
       return {
         valid: false,
         errors: [`Validation failed: ${error.message}`],
-        warnings: []
+        warnings: [],
       };
     }
   }
@@ -443,16 +439,13 @@ export class WorkflowService {
   /**
    * Create Workflow instance from database model
    */
-  private async createWorkflowInstance(
-    dbWorkflow: WorkflowModel,
-    options: WorkflowOptions
-  ): Promise<Workflow> {
+  private async createWorkflowInstance(dbWorkflow: WorkflowModel, options: WorkflowOptions): Promise<Workflow> {
     // Get blueprint
     const blueprint = dbWorkflow.blueprint || this.createDefaultBlueprint();
 
     const workflowParams = {
       blueprint: blueprint,
-      timeout: dbWorkflow.timeout || 30000
+      timeout: dbWorkflow.timeout || 30000,
     };
 
     return new Workflow(workflowParams);
@@ -473,13 +466,13 @@ export class WorkflowService {
     }
 
     // Check for start node
-    if (blueprint.nodes && !blueprint.nodes.some(node => node.type === 'start')) {
+    if (blueprint.nodes && !blueprint.nodes.some((node) => node.type === 'start')) {
       errors.push('Blueprint must have a start node');
     }
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -495,7 +488,7 @@ export class WorkflowService {
           name: 'Start',
           description: 'Workflow start point',
           parameters: {},
-          metadata: {}
+          metadata: {},
         },
         {
           ref: 'end',
@@ -503,21 +496,21 @@ export class WorkflowService {
           name: 'End',
           description: 'Workflow end point',
           parameters: {},
-          metadata: {}
-        }
+          metadata: {},
+        },
       ],
       edges: [
         {
           ref: 'start-to-end',
           from: 'start',
           to: 'end',
-          metadata: {}
-        }
+          metadata: {},
+        },
       ],
       metadata: {
         generated: true,
-        createdAt: new Date().toISOString()
-      }
+        createdAt: new Date().toISOString(),
+      },
     };
   }
 }

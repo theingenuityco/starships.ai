@@ -7,38 +7,39 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
-import { initializeSocketIO } from './socket';
+import { initializeSocketIO } from '@/socket';
 import {
   AgentRepository,
   UserRepository,
   StarshipRepository,
-  RepositoryFactory,
   createConnection,
+  getConnection,
+  WaitlistRepository,
 } from '@starships/models';
 import { migrationRunner, seedWaitlist } from '@starships/models';
-import { getServerConfig } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 // Route imports
-import agentRoutes from './routes/agents';
-import chatRoutes from './routes/chat';
-import memoryRoutes from './routes/memory';
-import userRoutes from './routes/users';
-import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
-import redeployRoutes from './routes/redeploy';
-import agentTemplateRoutes from './routes/agent-templates';
-// import expeditionRoutes from './routes/expeditions';
-import missionRoutes from './routes/missions';
-import nativeApiKeysRoutes from './routes/native-api-keys';
-import waitlistRoutes from './routes/waitlist';
-import { AgentTemplateService } from './services/AgentTemplateService';
-import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
+import authRoutes from '@/routes/auth';
+import agentRoutes from '@/routes/agents';
+import sessionRoutes from '@/routes/sessions';
+import memoryRoutes from '@/routes/memory';
+import userRoutes from '@/routes/users';
+import starshipRoutes, { initializeStarshipRoutes } from '@/routes/starships';
+import agentTemplateRoutes from '@/routes/agent-templates';
+// import expeditionRoutes from '@/routes/expeditions';
+import missionRoutes from '@/routes/missions';
+import nativeApiKeysRoutes from '@/routes/native-api-keys';
+import waitlistRoutes from '@/routes/waitlist';
+import { AgentTemplateService } from '@/services/AgentTemplateService';
+import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
 
 // Import new error handling and health check routes
-import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware/errorHandler';
-import healthRoutes from './routes/health';
+import { requestIdMiddleware, errorHandler, notFoundHandler } from '@/middleware/errorHandler';
+import healthRoutes from '@/routes/health';
 
 // Load server configuration
-const config = getServerConfig();
+const config = getEnvConfig();
 
 /**
  * Validate URL format
@@ -52,7 +53,7 @@ function validateUrlFormat(url: string, name: string) {
 }
 
 const app: express.Application = express();
-const PORT = config.PORT || 3001;
+const PORT = config.SERVER_PORT || 3001;
 
 // Validate URL formats
 validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
@@ -82,9 +83,6 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-// Health check routes (comprehensive)
-app.use('/health', healthRoutes);
-
 // ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies
 initializeStarshipRoutes({
@@ -98,9 +96,8 @@ initializeWebhookRoutes({
   starshipRepository,
 });
 
-
 // Public pricing endpoint - must be before auth-protected routes
-app.get('/api/starships/pricing', async (req, res) => {
+app.get('/api/v1/starships/pricing', async (req, res) => {
   try {
     const { SubscriptionService } = await import('./services/SubscriptionService');
     const subscriptionService = new SubscriptionService(userRepository, starshipRepository);
@@ -113,29 +110,31 @@ app.get('/api/starships/pricing', async (req, res) => {
 });
 
 // API Routes
-app.use('/api/health', healthRoutes);
-app.use('/api/waitlist', waitlistRoutes); // Add waitlist routes early for unauthenticated access
-app.use('/api/agents', agentRoutes);
-app.use('/api/agent-templates', agentTemplateRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/memory', memoryRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api', starshipRoutes);
+app.use('/api/v1', authRoutes); // Authentication routes (public)
+app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', agentTemplateRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', sessionRoutes); // Updated to OpenAPI standard with v1 prefix - now using session routes
+app.use('/api/v1', memoryRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix
+app.use('/api/v1', missionRoutes); // Updated to OpenAPI standard with v1 prefix
 // app.use('/api', expeditionRoutes);
-app.use('/api', redeployRoutes);
-app.use('/api/missions', missionRoutes);
 app.use('/api', nativeApiKeysRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);
 
 // Add centralized error handling middleware (must be last)
-app.use(errorHandler({
-  includeStackTrace: config.NODE_ENV === 'development',
-  environment: config.NODE_ENV,
-  service: 'starships-api',
-  ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
-}));
+app.use(
+  errorHandler({
+    includeStackTrace: config.NODE_ENV === 'development',
+    environment: config.NODE_ENV,
+    service: 'starships-api',
+    ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
+  })
+);
 
 // Create HTTP server and initialize Socket.IO
 const httpServer = createServer(app);
@@ -156,14 +155,10 @@ httpServer.listen(PORT, async () => {
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
 
-    // Initialize RepositoryFactory AFTER database connection is established
-    console.log('🔧 Initializing RepositoryFactory...');
-    await RepositoryFactory.initialize();
-    console.log('✅ RepositoryFactory initialized - all repositories ready for socket operations');
-
-    // Ensure WaitlistRepository is properly initialized
+    // Initialize WaitlistRepository with database connection
     try {
-      RepositoryFactory.getWaitlistRepository();
+      const waitlistConnection = getConnection();
+      const waitlistRepo = new WaitlistRepository(waitlistConnection);
       console.log('✅ WaitlistRepository initialized and ready');
     } catch (error) {
       console.error('❌ Failed to initialize WaitlistRepository:', error);
@@ -176,12 +171,8 @@ httpServer.listen(PORT, async () => {
       await templateService.seedDefaultTemplates();
       console.log('✅ AgentTemplateService initialized with default templates');
     } catch (error) {
-      console.warn(
-        '⚠️ AgentTemplateService not available - database connection may be unavailable:',
-        error
-      );
+      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable:', error);
     }
-
 
     // Initialize Waitlist (seeds approved emails)
     try {

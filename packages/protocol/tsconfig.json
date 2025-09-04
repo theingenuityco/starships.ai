@@ -2,11 +2,12 @@
   "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["dist"],
-  "references": [
-    { "path": "../autopilot" }
-  ]
+  "exclude": ["dist"]
 }

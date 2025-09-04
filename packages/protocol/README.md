@@ -22,17 +22,11 @@ pnpm add @starships/protocol
 ### Collection Types
 
 ```typescript
-import {
-  Starship,
-  Mission,
-  Agent,
-  User,
-  Workflow,
-  NativeToolApiKey
-} from '@starships/protocol';
+import { Starship, Mission, Agent, User, Workflow, NativeToolApiKey } from '@starships/protocol';
 ```
 
 **Key domain types:**
+
 - [`Agent`](src/domains/agent.ts) - AI agent configurations and deployment management
 - [`Starship`](src/domains/starship.ts) - Starship management with billing integration
 - [`Mission`](src/domains/mission.ts) - Mission orchestration with workflow execution
@@ -43,16 +37,11 @@ import {
 ### API Contracts
 
 ```typescript
-import {
-  ChatRequest,
-  ChatResponse,
-  SibilRequest,
-  SibilResponse,
-  AgentSocketRequest
-} from '@starships/protocol';
+import { ChatRequest, ChatResponse, SibilRequest, SibilResponse, AgentSocketRequest } from '@starships/protocol';
 ```
 
 **Contract interfaces:**
+
 - [`Agent contracts`](src/contracts/agent.ts) - Agent creation and management APIs
 - [`Chat contracts`](src/contracts/chat.ts) - Chat system interfaces
 - [`LLM contracts`](src/contracts/llm.ts) - Language model provider APIs
@@ -64,15 +53,9 @@ import {
 ### Creating API Endpoints
 
 ```typescript
-import { 
-  CreateMissionRequest, 
-  MissionResponse,
-  UpdateMissionRequest 
-} from '@starships/protocol';
+import { CreateMissionRequest, MissionResponse, UpdateMissionRequest } from '@starships/protocol';
 
-export async function createMission(
-  req: CreateMissionRequest
-): Promise<MissionResponse> {
+export async function createMission(req: CreateMissionRequest): Promise<MissionResponse> {
   // Implementation
 }
 ```
@@ -80,11 +63,7 @@ export async function createMission(
 ### Socket.IO Communication
 
 ```typescript
-import {
-  SibilSocketRequest,
-  SibilSocketStreamChunk,
-  AgentSocketRequest
-} from '@starships/protocol';
+import { SibilSocketRequest, SibilSocketStreamChunk, AgentSocketRequest } from '@starships/protocol';
 
 // Handle real-time AI streaming
 socket.on('sibil:stream', (request: SibilSocketRequest) => {
@@ -131,15 +110,15 @@ All exports use strict TypeScript with comprehensive type definitions:
 // Mission with full type safety
 const mission: Mission = {
   id: 'mission-123',
-  starshipId: 'starship-456', 
+  starshipId: 'starship-456',
   name: 'Market Research',
   description: 'Analyze competitor landscape',
-  status: 'active',           // Type: MissionStatus
-  phase: 'analysis',          // Type: MissionPhase  
+  status: 'active', // Type: MissionStatus
+  phase: 'analysis', // Type: MissionPhase
   agentIds: ['agent-1'],
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
-  createdBy: 'user-789'
+  createdBy: 'user-789',
 };
 ```
 
@@ -149,7 +128,7 @@ const mission: Mission = {
 # Type checking
 pnpm run type-check
 
-# Linting  
+# Linting
 pnpm run lint
 
 # Build

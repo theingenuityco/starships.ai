@@ -1,7 +1,10 @@
 /**
- * Error Recovery Utilities for API Key Management
- * Provides comprehensive error handling, retry mechanisms, and user guidance
+ * Error Recovery Utilities for Client-Side Error Handling
+ * Provides retry mechanisms and user guidance using unified error system
  */
+
+import { BaseError, ErrorContextUtils, ErrorLayer, type ErrorContext } from '@starships/errors'
+import { ErrorCategory } from '@starships/protocol'
 
 export interface ErrorRecoveryOptions {
   maxRetries?: number
@@ -20,17 +23,9 @@ export interface RecoveryAction {
   destructive?: boolean
 }
 
-export interface ErrorContext {
-  operation: string
-  component: string
-  timestamp: Date
-  userAgent?: string
-  additionalData?: Record<string, any>
-}
-
 export interface EnhancedError extends Error {
   code?: string
-  category?: 'network' | 'validation' | 'authentication' | 'permission' | 'server' | 'client'
+  category?: ErrorCategory
   severity?: 'low' | 'medium' | 'high' | 'critical'
   recoverable?: boolean
   retryable?: boolean
@@ -45,24 +40,13 @@ export class ErrorRecoveryManager {
     baseDelay: 1000,
     maxDelay: 10000,
     backoffFactor: 2,
-    retryableErrors: [
-      'NetworkError',
-      'TimeoutError',
-      'ServiceUnavailable',
-      'InternalServerError',
-      'BadGateway',
-      'GatewayTimeout',
-    ],
+    retryableErrors: ['NetworkError', 'TimeoutError', 'ServiceUnavailable', 'InternalServerError', 'BadGateway', 'GatewayTimeout'],
   }
 
   /**
    * Enhanced error with recovery context and actions
    */
-  static enhanceError(
-    error: Error,
-    context: ErrorContext,
-    recoveryActions?: RecoveryAction[]
-  ): EnhancedError {
+  static enhanceError(error: Error, context: ErrorContext, recoveryActions?: RecoveryAction[]): EnhancedError {
     const enhanced = error as EnhancedError
     enhanced.context = context
     enhanced.recoveryActions = recoveryActions || []
@@ -84,10 +68,7 @@ export class ErrorRecoveryManager {
   /**
    * Retry mechanism with exponential backoff
    */
-  static async withRetry<T>(
-    operation: () => Promise<T>,
-    options: ErrorRecoveryOptions = {}
-  ): Promise<T> {
+  static async withRetry<T>(operation: () => Promise<T>, options: ErrorRecoveryOptions = {}): Promise<T> {
     const opts = { ...this.DEFAULT_OPTIONS, ...options }
     let lastError: Error
 
@@ -103,10 +84,7 @@ export class ErrorRecoveryManager {
         }
 
         // Calculate delay with exponential backoff
-        const delay = Math.min(
-          opts.baseDelay * Math.pow(opts.backoffFactor, attempt),
-          opts.maxDelay
-        )
+        const delay = Math.min(opts.baseDelay * Math.pow(opts.backoffFactor, attempt), opts.maxDelay)
 
         // Add jitter to prevent thundering herd
         const jitteredDelay = delay + Math.random() * 1000
@@ -119,41 +97,37 @@ export class ErrorRecoveryManager {
   }
 
   /**
-   * Categorize error type
+   * Categorize error type using protocol ErrorCategory
    */
   private static categorizeError(error: Error): EnhancedError['category'] {
     const message = error.message.toLowerCase()
     const name = error.name.toLowerCase()
 
     if (name.includes('network') || message.includes('network') || message.includes('fetch')) {
-      return 'network'
+      return ErrorCategory.NETWORK
     }
 
-    if (
-      name.includes('validation') ||
-      message.includes('invalid') ||
-      message.includes('required')
-    ) {
-      return 'validation'
+    if (name.includes('validation') || message.includes('invalid') || message.includes('required')) {
+      return ErrorCategory.VALIDATION
     }
 
-    if (
-      message.includes('unauthorized') ||
-      message.includes('forbidden') ||
-      message.includes('auth')
-    ) {
-      return 'authentication'
+    if (message.includes('unauthorized') || message.includes('auth')) {
+      return ErrorCategory.AUTHENTICATION
     }
 
-    if (message.includes('permission') || message.includes('access denied')) {
-      return 'permission'
+    if (message.includes('forbidden') || message.includes('permission') || message.includes('access denied')) {
+      return ErrorCategory.AUTHORIZATION
+    }
+
+    if (message.includes('not found')) {
+      return ErrorCategory.NOT_FOUND
     }
 
     if (message.includes('server error') || message.includes('internal server')) {
-      return 'server'
+      return ErrorCategory.INTERNAL
     }
 
-    return 'client'
+    return ErrorCategory.INTERNAL
   }
 
   /**
@@ -163,16 +137,15 @@ export class ErrorRecoveryManager {
     const category = this.categorizeError(error)
 
     switch (category) {
-      case 'network':
-        return context.operation.includes('save') || context.operation.includes('submit')
-          ? 'high'
-          : 'medium'
-      case 'validation':
+      case ErrorCategory.NETWORK:
+        return context.operation.includes('save') || context.operation.includes('submit') ? 'high' : 'medium'
+      case ErrorCategory.VALIDATION:
         return 'low'
-      case 'authentication':
-      case 'permission':
+      case ErrorCategory.AUTHENTICATION:
+      case ErrorCategory.AUTHORIZATION:
         return 'high'
-      case 'server':
+      case ErrorCategory.INTERNAL:
+      case ErrorCategory.SERVICE_UNAVAILABLE:
         return 'critical'
       default:
         return 'medium'
@@ -203,20 +176,9 @@ export class ErrorRecoveryManager {
     const message = error.message.toLowerCase()
 
     // Check against retryable error patterns
-    const retryablePatterns = [
-      'network',
-      'timeout',
-      'service unavailable',
-      'internal server error',
-      'bad gateway',
-      'gateway timeout',
-      'connection',
-      'fetch',
-    ]
+    const retryablePatterns = ['network', 'timeout', 'service unavailable', 'internal server error', 'bad gateway', 'gateway timeout', 'connection', 'fetch']
 
-    return retryablePatterns.some(
-      pattern => name.toLowerCase().includes(pattern) || message.includes(pattern)
-    )
+    return retryablePatterns.some(pattern => name.toLowerCase().includes(pattern) || message.includes(pattern))
   }
 
   /**
@@ -226,7 +188,7 @@ export class ErrorRecoveryManager {
     const actions: RecoveryAction[] = []
 
     switch (error.category) {
-      case 'network':
+      case ErrorCategory.NETWORK:
         actions.push(
           {
             id: 'retry',
@@ -246,7 +208,7 @@ export class ErrorRecoveryManager {
         )
         break
 
-      case 'validation':
+      case ErrorCategory.VALIDATION:
         actions.push({
           id: 'fix-validation',
           label: 'Fix Input',
@@ -256,7 +218,7 @@ export class ErrorRecoveryManager {
         })
         break
 
-      case 'authentication':
+      case ErrorCategory.AUTHENTICATION:
         actions.push(
           {
             id: 'refresh-auth',
@@ -276,7 +238,18 @@ export class ErrorRecoveryManager {
         )
         break
 
-      case 'server':
+      case ErrorCategory.AUTHORIZATION:
+        actions.push({
+          id: 'contact-admin',
+          label: 'Contact Administrator',
+          description: 'Request access permissions',
+          action: () => {}, // Will be replaced with contact form
+          primary: true,
+        })
+        break
+
+      case ErrorCategory.INTERNAL:
+      case ErrorCategory.SERVICE_UNAVAILABLE:
         actions.push(
           {
             id: 'retry-later',
@@ -311,41 +284,45 @@ export class ErrorRecoveryManager {
    * Get user-friendly error message
    */
   static getUserFriendlyMessage(error: EnhancedError): string {
-    const category = error.category || 'client'
+    const category = error.category || ErrorCategory.INTERNAL
     const operation = error.context?.operation || 'operation'
 
-    const messages: Record<string, string> = {
-      network: `Unable to connect to the server. Please check your internet connection and try again.`,
-      validation: `Please check the highlighted fields and correct any errors.`,
-      authentication: `Your session has expired. Please refresh the page and try again.`,
-      permission: `You don't have permission to perform this action. Please contact your administrator.`,
-      server: `The server is experiencing issues. Please try again in a few moments.`,
-      client: `Something went wrong while ${operation}. Please try again.`,
+    const messages: Record<ErrorCategory, string> = {
+      [ErrorCategory.NETWORK]: `Unable to connect to the server. Please check your internet connection and try again.`,
+      [ErrorCategory.VALIDATION]: `Please check the highlighted fields and correct any errors.`,
+      [ErrorCategory.AUTHENTICATION]: `Your session has expired. Please refresh the page and try again.`,
+      [ErrorCategory.AUTHORIZATION]: `You don't have permission to perform this action. Please contact your administrator.`,
+      [ErrorCategory.NOT_FOUND]: `The requested resource was not found.`,
+      [ErrorCategory.CONFLICT]: `There was a conflict with your request. Please try again.`,
+      [ErrorCategory.DATABASE]: `Database error occurred. Please try again later.`,
+      [ErrorCategory.RATE_LIMIT]: `Too many requests. Please wait before trying again.`,
+      [ErrorCategory.SERVICE_UNAVAILABLE]: `The service is temporarily unavailable. Please try again later.`,
+      [ErrorCategory.INTERNAL]: `Something went wrong while ${operation}. Please try again.`,
     }
 
-    return messages[category] || messages.client
+    return messages[category] || messages[ErrorCategory.INTERNAL]
   }
 
   /**
    * Get recovery guidance text
    */
   static getRecoveryGuidance(error: EnhancedError): string {
-    const category = error.category || 'client'
+    const category = error.category || ErrorCategory.INTERNAL
 
-    const guidance: Record<string, string> = {
-      network:
-        'This usually happens when there are connectivity issues. Check your internet connection and try again.',
-      validation:
-        'Make sure all required fields are filled out correctly and match the expected format.',
-      authentication:
-        'Your login session may have expired. Refreshing the page should resolve this.',
-      permission:
-        'Contact your system administrator if you believe you should have access to this feature.',
-      server: 'Our servers are experiencing temporary issues. Please wait a moment and try again.',
-      client: 'This is usually a temporary issue. Trying again often resolves the problem.',
+    const guidance: Record<ErrorCategory, string> = {
+      [ErrorCategory.NETWORK]: 'This usually happens when there are connectivity issues. Check your internet connection and try again.',
+      [ErrorCategory.VALIDATION]: 'Make sure all required fields are filled out correctly and match the expected format.',
+      [ErrorCategory.AUTHENTICATION]: 'Your login session may have expired. Refreshing the page should resolve this.',
+      [ErrorCategory.AUTHORIZATION]: 'Contact your system administrator if you believe you should have access to this feature.',
+      [ErrorCategory.NOT_FOUND]: 'The resource you are looking for may have been moved or deleted.',
+      [ErrorCategory.CONFLICT]: 'Another user may have modified this resource. Please refresh and try again.',
+      [ErrorCategory.DATABASE]: 'There was a database issue. This is usually temporary - please try again.',
+      [ErrorCategory.RATE_LIMIT]: 'You have exceeded the rate limit. Please wait a few moments before trying again.',
+      [ErrorCategory.SERVICE_UNAVAILABLE]: 'Our servers are experiencing temporary issues. Please wait a moment and try again.',
+      [ErrorCategory.INTERNAL]: 'This is usually a temporary issue. Trying again often resolves the problem.',
     }
 
-    return guidance[category] || guidance.client
+    return guidance[category] || guidance[ErrorCategory.INTERNAL]
   }
 
   /**
@@ -356,20 +333,12 @@ export class ErrorRecoveryManager {
   }
 
   /**
-   * Create error context
+   * Create error context using unified ErrorContextUtils
    */
-  static createContext(
-    operation: string,
-    component: string,
-    additionalData?: Record<string, any>
-  ): ErrorContext {
-    return {
-      operation,
-      component,
-      timestamp: new Date(),
-      userAgent: navigator.userAgent,
-      additionalData,
-    }
+  static createContext(operation: string, component: string, additionalData?: Record<string, any>): ErrorContext {
+    return ErrorContextUtils.client(component, operation, {
+      metadata: additionalData,
+    })
   }
 
   /**
@@ -402,20 +371,13 @@ export class ErrorRecoveryManager {
  * Hook for using error recovery in React components
  */
 export function useErrorRecovery() {
-  const handleError = (
-    error: Error,
-    context: ErrorContext,
-    recoveryActions?: RecoveryAction[]
-  ): EnhancedError => {
+  const handleError = (error: Error, context: ErrorContext, recoveryActions?: RecoveryAction[]): EnhancedError => {
     const enhanced = ErrorRecoveryManager.enhanceError(error, context, recoveryActions)
     ErrorRecoveryManager.logError(enhanced)
     return enhanced
   }
 
-  const withRetry = <T>(
-    operation: () => Promise<T>,
-    options?: ErrorRecoveryOptions
-  ): Promise<T> => {
+  const withRetry = <T>(operation: () => Promise<T>, options?: ErrorRecoveryOptions): Promise<T> => {
     return ErrorRecoveryManager.withRetry(operation, options)
   }
 

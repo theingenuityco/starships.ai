@@ -2,15 +2,15 @@
  * MessageRepository Unit Tests
  */
 
-import { MessageRepository } from '../MessageRepository';
-import { Neo4jConnection, getConnection } from '../../helpers/database';
+import { MessageRepository } from '@/repositories/MessageRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { ValidationError, DatabaseError } from '@starships/errors';
 import type { MessageModel } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-message-id')
+  v4: jest.fn(() => 'test-message-id'),
 }));
 
 describe('MessageRepository', () => {
@@ -56,7 +56,7 @@ describe('MessageRepository', () => {
     hasAttachments: false,
     tokenCount: 10,
     processingTimeMs: 1500,
-    ...overrides
+    ...overrides,
   });
 
   const createMockCreateInput = (overrides: any = {}) => ({
@@ -74,7 +74,7 @@ describe('MessageRepository', () => {
     importance: 'medium' as const,
     contentLength: 13,
     hasAttachments: false,
-    ...overrides
+    ...overrides,
   });
 
   describe('constructor', () => {
@@ -85,20 +85,13 @@ describe('MessageRepository', () => {
 
   describe('findAll', () => {
     it('should return all messages ordered by timestamp', async () => {
-      const mockMessages = [
-        createMockMessage({ id: 'message-1' }),
-        createMockMessage({ id: 'message-2' })
-      ];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      const mockMessages = [createMockMessage({ id: 'message-1' }), createMockMessage({ id: 'message-2' })];
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.timestamp DESC')
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp DESC'));
     });
 
     it('should return empty array when no messages found', async () => {
@@ -125,12 +118,9 @@ describe('MessageRepository', () => {
 
       expect(result).toMatchObject({
         id: 'message-123',
-        content: 'Hello, world!'
+        content: 'Hello, world!',
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.id = $id'),
-        { id: 'message-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id = $id'), { id: 'message-123' });
     });
 
     it('should return null when message not found', async () => {
@@ -151,75 +141,61 @@ describe('MessageRepository', () => {
   describe('findByStarshipId', () => {
     it('should return messages for starship', async () => {
       const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findByStarshipId('starship-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.starshipId = $starshipId'),
-        { starshipId: 'starship-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.starshipId = $starshipId'), {
+        starshipId: 'starship-123',
+      });
     });
   });
 
   describe('findByAgentId', () => {
     it('should return messages for agent', async () => {
       const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findByAgentId('agent-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.agentId = $agentId'),
-        { agentId: 'agent-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.agentId = $agentId'), {
+        agentId: 'agent-123',
+      });
     });
   });
 
   describe('findByMemoryId', () => {
     it('should return messages for memory ordered chronologically', async () => {
       const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findByMemoryId('memory-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.timestamp ASC'),
-        { memoryId: 'memory-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp ASC'), {
+        memoryId: 'memory-123',
+      });
     });
   });
 
   describe('findByConversationId', () => {
     it('should return conversation messages without pagination', async () => {
       const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findByConversationId('conversation-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.conversationId = $conversationId'),
-        { conversationId: 'conversation-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.conversationId = $conversationId'), {
+        conversationId: 'conversation-123',
+      });
     });
 
     it('should return conversation messages with pagination', async () => {
       const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findByConversationId('conversation-123', 10, 5);
 
@@ -229,7 +205,7 @@ describe('MessageRepository', () => {
         expect.objectContaining({
           conversationId: 'conversation-123',
           limit: expect.any(Object), // Neo4j int
-          offset: expect.any(Object)  // Neo4j int
+          offset: expect.any(Object), // Neo4j int
         })
       );
     });
@@ -238,55 +214,49 @@ describe('MessageRepository', () => {
   describe('findByRole', () => {
     it('should return messages by role', async () => {
       const mockMessages = [createMockMessage({ role: 'assistant' })];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findByRole('assistant');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.role = $role'),
-        { role: 'assistant' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.role = $role'), { role: 'assistant' });
     });
 
     it('should filter by role and starship', async () => {
       const mockMessages = [createMockMessage({ role: 'user' })];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findByRole('user', 'starship-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND m.starshipId = $starshipId'),
-        { role: 'user', starshipId: 'starship-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('AND m.starshipId = $starshipId'), {
+        role: 'user',
+        starshipId: 'starship-123',
+      });
     });
   });
 
   describe('create', () => {
     it('should create message successfully', async () => {
       const createInput = createMockCreateInput();
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage();
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
       expect(result).toMatchObject({
         role: 'user',
         content: 'Hello, world!',
-        contentLength: 13
+        contentLength: 13,
       });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (m:Message $props)'),
+        expect.stringContaining('CREATE (n:Message)'),
         expect.objectContaining({
           props: expect.objectContaining({
             role: 'user',
             content: 'Hello, world!',
-            contentLength: 13
-          })
+            contentLength: 13,
+          }),
         })
       );
     });
@@ -315,9 +285,10 @@ describe('MessageRepository', () => {
         messageType: 'user_input' as const,
         importance: 'medium' as const,
         contentLength: 12,
-        hasAttachments: false
+        hasAttachments: false,
       };
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage(minimalInput);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(minimalInput);
 
@@ -331,9 +302,10 @@ describe('MessageRepository', () => {
     it('should serialize complex metadata', async () => {
       const inputWithMetadata = createMockCreateInput({
         metadata: { complex: { nested: 'data' } },
-        processingMetadata: { tokens: 150 }
+        processingMetadata: { tokens: 150 },
       });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage(inputWithMetadata);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       await repository.create(inputWithMetadata);
 
@@ -342,8 +314,8 @@ describe('MessageRepository', () => {
         expect.objectContaining({
           props: expect.objectContaining({
             metadata: JSON.stringify({ complex: { nested: 'data' } }),
-            processingMetadata: JSON.stringify({ tokens: 150 })
-          })
+            processingMetadata: JSON.stringify({ tokens: 150 }),
+          }),
         })
       );
     });
@@ -359,7 +331,7 @@ describe('MessageRepository', () => {
     it('should update message successfully', async () => {
       const updates = { content: 'Updated content', processingStatus: 'completed' as const };
       const mockUpdated = createMockMessage(updates);
-      
+
       mockConnection.executeWrite.mockResolvedValue([{ m: mockUpdated }]);
 
       const result = await repository.update('message-123', updates);
@@ -371,8 +343,8 @@ describe('MessageRepository', () => {
           id: 'message-123',
           updates: expect.objectContaining({
             content: 'Updated content',
-            contentLength: 15 // Should be calculated
-          })
+            contentLength: 15, // Should be calculated
+          }),
         })
       );
     });
@@ -395,8 +367,8 @@ describe('MessageRepository', () => {
         expect.any(String),
         expect.objectContaining({
           updates: expect.objectContaining({
-            contentLength: 26 // Length of new content
-          })
+            contentLength: 26, // Length of new content
+          }),
         })
       );
     });
@@ -404,7 +376,7 @@ describe('MessageRepository', () => {
     it('should serialize complex fields in updates', async () => {
       const complexUpdates = {
         metadata: { updated: true },
-        processingMetadata: { newField: 'value' }
+        processingMetadata: { newField: 'value' },
       };
       mockConnection.executeWrite.mockResolvedValue([{ m: createMockMessage(complexUpdates) }]);
 
@@ -415,8 +387,8 @@ describe('MessageRepository', () => {
         expect.objectContaining({
           updates: expect.objectContaining({
             metadata: JSON.stringify({ updated: true }),
-            processingMetadata: JSON.stringify({ newField: 'value' })
-          })
+            processingMetadata: JSON.stringify({ newField: 'value' }),
+          }),
         })
       );
     });
@@ -435,10 +407,7 @@ describe('MessageRepository', () => {
       const result = await repository.delete('message-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE m'),
-        { id: 'message-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE m'), { id: 'message-123' });
     });
 
     it('should return false when message not found', async () => {
@@ -479,11 +448,12 @@ describe('MessageRepository', () => {
     it('should include parent messages when requested', async () => {
       const rootMessage = createMockMessage({ parentMessageId: 'parent-123' });
       const parentMessage = createMockMessage({ id: 'parent-123', parentMessageId: undefined });
-      
-      jest.spyOn(repository, 'findById')
+
+      jest
+        .spyOn(repository, 'findById')
         .mockResolvedValueOnce(rootMessage) // Root message
         .mockResolvedValueOnce(parentMessage); // Parent message
-      
+
       mockConnection.executeQuery.mockResolvedValue([]); // No children
 
       const result = await repository.getMessageThread('message-123', true, false);
@@ -496,7 +466,7 @@ describe('MessageRepository', () => {
     it('should include child messages when requested', async () => {
       const rootMessage = createMockMessage({ parentMessageId: undefined });
       const childMessage = createMockMessage({ id: 'child-123', parentMessageId: 'message-123' });
-      
+
       jest.spyOn(repository, 'findById').mockResolvedValue(rootMessage);
       mockConnection.executeQuery.mockResolvedValue([{ m: childMessage }]);
 
@@ -504,12 +474,12 @@ describe('MessageRepository', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe('message-123'); // Root first
-      expect(result[1].id).toBe('child-123');   // Child second
+      expect(result[1].id).toBe('child-123'); // Child second
     });
 
     it('should respect maxDepth parameter', async () => {
       const rootMessage = createMockMessage({ parentMessageId: 'parent-123' });
-      
+
       jest.spyOn(repository, 'findById').mockResolvedValue(rootMessage);
       mockConnection.executeQuery.mockResolvedValue([]);
 
@@ -522,17 +492,14 @@ describe('MessageRepository', () => {
   describe('searchMessages', () => {
     it('should search messages by content', async () => {
       const mockMessages = [createMockMessage({ content: 'search term found' })];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.searchMessages('search term');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.content CONTAINS $query'),
-        { query: 'search term' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.content CONTAINS $query'), {
+        query: 'search term',
+      });
     });
 
     it('should apply all filters', async () => {
@@ -547,7 +514,7 @@ describe('MessageRepository', () => {
         dateFrom: '2024-01-01T00:00:00.000Z',
         dateTo: '2024-01-02T00:00:00.000Z',
         limit: 20,
-        offset: 10
+        offset: 10,
       };
       mockConnection.executeQuery.mockResolvedValue([]);
 
@@ -561,7 +528,7 @@ describe('MessageRepository', () => {
           agentId: 'agent-123',
           role: 'user',
           limit: expect.any(Object),
-          offset: expect.any(Object)
+          offset: expect.any(Object),
         })
       );
     });
@@ -571,27 +538,21 @@ describe('MessageRepository', () => {
 
       await repository.searchMessages('test');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('LIMIT 100'),
-        { query: 'test' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('LIMIT 100'), { query: 'test' });
     });
   });
 
   describe('getConversationMessages', () => {
     it('should return conversation messages with default ordering', async () => {
       const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.getConversationMessages('conversation-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.timestamp ASC'),
-        { conversationId: 'conversation-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp ASC'), {
+        conversationId: 'conversation-123',
+      });
     });
 
     it('should respect custom ordering parameters', async () => {
@@ -599,10 +560,9 @@ describe('MessageRepository', () => {
 
       await repository.getConversationMessages('conversation-123', 'created_at', 'desc');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.createdAt DESC'),
-        { conversationId: 'conversation-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.createdAt DESC'), {
+        conversationId: 'conversation-123',
+      });
     });
   });
 
@@ -616,12 +576,9 @@ describe('MessageRepository', () => {
       expect(result).toEqual({
         processed: 3,
         failed: 0,
-        errors: []
+        errors: [],
       });
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.id IN $messageIds'),
-        { messageIds }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id IN $messageIds'), { messageIds });
     });
 
     it('should handle partial deletion', async () => {
@@ -633,7 +590,7 @@ describe('MessageRepository', () => {
       expect(result).toEqual({
         processed: 2,
         failed: 1,
-        errors: []
+        errors: [],
       });
     });
 
@@ -645,7 +602,7 @@ describe('MessageRepository', () => {
       expect(result).toEqual({
         processed: 0,
         failed: 0,
-        errors: []
+        errors: [],
       });
     });
   });
@@ -658,7 +615,7 @@ describe('MessageRepository', () => {
         messageTypes: ['user_input', 'user_input', 'assistant_response', 'system'],
         importances: ['medium', 'high', 'medium', 'low'],
         avgContentLength: 150.5,
-        avgProcessingTime: 1200.75
+        avgProcessingTime: 1200.75,
       };
       mockConnection.executeQuery.mockResolvedValue([mockStatsResult]);
 
@@ -670,7 +627,7 @@ describe('MessageRepository', () => {
         byType: { user_input: 2, assistant_response: 1, system: 1 },
         byImportance: { medium: 2, high: 1, low: 1 },
         averageContentLength: 150.5,
-        averageProcessingTime: 1200.75
+        averageProcessingTime: 1200.75,
       });
     });
 
@@ -679,16 +636,18 @@ describe('MessageRepository', () => {
         starshipId: 'starship-123',
         agentId: 'agent-123',
         dateFrom: '2024-01-01T00:00:00.000Z',
-        dateTo: '2024-01-02T00:00:00.000Z'
+        dateTo: '2024-01-02T00:00:00.000Z',
       };
-      mockConnection.executeQuery.mockResolvedValue([{
-        total: 5,
-        roles: ['user'],
-        messageTypes: ['user_input'],
-        importances: ['medium'],
-        avgContentLength: 100,
-        avgProcessingTime: null
-      }]);
+      mockConnection.executeQuery.mockResolvedValue([
+        {
+          total: 5,
+          roles: ['user'],
+          messageTypes: ['user_input'],
+          importances: ['medium'],
+          avgContentLength: 100,
+          avgProcessingTime: null,
+        },
+      ]);
 
       const result = await repository.getMessageStats(filters);
 
@@ -709,7 +668,7 @@ describe('MessageRepository', () => {
         byRole: { system: 0, user: 0, assistant: 0 },
         byType: {},
         byImportance: {},
-        averageContentLength: 0
+        averageContentLength: 0,
       });
     });
   });
@@ -719,7 +678,7 @@ describe('MessageRepository', () => {
       const repo = repository as any;
       const message = createMockMessage({
         metadata: { complex: 'data' },
-        processingMetadata: { tokens: 100 }
+        processingMetadata: { tokens: 100 },
       });
 
       const serialized = repo.serializeComplexFields(message);
@@ -734,7 +693,7 @@ describe('MessageRepository', () => {
         id: 'message-123',
         content: 'Test',
         metadata: JSON.stringify({ complex: 'data' }),
-        processingMetadata: JSON.stringify({ tokens: 100 })
+        processingMetadata: JSON.stringify({ tokens: 100 }),
       };
 
       const deserialized = repo.deserializeComplexFields(rawMessage);
@@ -749,7 +708,7 @@ describe('MessageRepository', () => {
         id: 'message-123',
         content: 'Test',
         metadata: null,
-        processingMetadata: undefined
+        processingMetadata: undefined,
       };
 
       const deserialized = repo.deserializeComplexFields(rawMessage);
@@ -765,18 +724,15 @@ describe('MessageRepository', () => {
         id: 'message-123',
         content: 'Test',
         metadata: 'invalid-json{',
-        processingMetadata: '{"incomplete": }'
+        processingMetadata: '{"incomplete": }',
       };
 
       const deserialized = repo.deserializeComplexFields(rawMessage);
 
       expect(deserialized.metadata).toBeUndefined();
       expect(deserialized.processingMetadata).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to deserialize message'),
-        expect.any(Error)
-      );
-      
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to deserialize message'), expect.any(Error));
+
       consoleSpy.mockRestore();
     });
   });
@@ -785,7 +741,8 @@ describe('MessageRepository', () => {
     it('should handle very long messages', async () => {
       const longContent = 'x'.repeat(10000);
       const createInput = createMockCreateInput({ content: longContent });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage({ content: longContent, contentLength: 10000 });
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
@@ -795,7 +752,8 @@ describe('MessageRepository', () => {
     it('should handle special characters in content', async () => {
       const specialContent = 'Message with émojis 🚀 and "quotes" & symbols: <>&';
       const createInput = createMockCreateInput({ content: specialContent });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage({ content: specialContent });
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
@@ -812,9 +770,10 @@ describe('MessageRepository', () => {
         contentHash: 'hash123',
         hasAttachments: true,
         tokenCount: 500,
-        processingTimeMs: 2500
+        processingTimeMs: 2500,
       });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockCreated = createMockMessage(fullMessage);
+      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(fullMessage);
 
@@ -823,18 +782,17 @@ describe('MessageRepository', () => {
         processingStatus: 'processing',
         messageType: 'system_notification',
         importance: 'critical',
-        hasAttachments: true
+        hasAttachments: true,
       });
     });
 
     it('should handle deep message threads', async () => {
-      const deepParentChain = Array.from({ length: 15 }, (_, i) => 
-        createMockMessage({ id: `msg-${i}`, parentMessageId: i > 0 ? `msg-${i-1}` : undefined })
+      const deepParentChain = Array.from({ length: 15 }, (_, i) =>
+        createMockMessage({ id: `msg-${i}`, parentMessageId: i > 0 ? `msg-${i - 1}` : undefined })
       );
-      
-      jest.spyOn(repository, 'findById')
-        .mockImplementation(async (id) => deepParentChain.find(m => m.id === id) || null);
-      
+
+      jest.spyOn(repository, 'findById').mockImplementation(async (id) => deepParentChain.find((m) => m.id === id) || null);
+
       mockConnection.executeQuery.mockResolvedValue([]);
 
       const result = await repository.getMessageThread('msg-14', true, false, 10);

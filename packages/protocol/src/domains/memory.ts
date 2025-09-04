@@ -6,13 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type {
-  MemoryState,
-  AgentMemoryState,
-  AgentIdentity,
-  AgentPurpose,
-  AgentSpace
-} from '@starships/autopilot';
+import type { MemoryState, AgentMemoryState, AgentIdentity, AgentPurpose, AgentSpace } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE MEMORY INTERFACE
@@ -31,11 +25,10 @@ export interface MemoryModel {
 
   // Database-specific computed field
   messageCount: number;
-  
+
   // State container
   state: MemoryState;
 }
-
 
 // ============================================================================
 // MEMORY REQUEST/RESPONSE TYPES
@@ -47,10 +40,10 @@ export interface MemoryModel {
 export interface CreateMemoryRequest {
   // Starship ID for establishing HAS_MEMORY relationship
   starshipId: string;
-  
+
   // Memory state
   state?: MemoryState;
-  
+
   // Initial messages (optional) - deprecated in favor of state
   /** @deprecated Use state.messages instead */
   initialMessages?: Array<{

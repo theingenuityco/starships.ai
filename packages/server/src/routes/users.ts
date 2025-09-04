@@ -1,82 +1,38 @@
-import { Router } from "express";
-import { UserService } from "../services/UserService";
-import type { Request, Response } from "express";
-import { authMiddleware } from "../middleware/auth";
+import { Router } from 'express';
+import { UserService } from '@/services/UserService';
+import type { Request, Response } from 'express';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
 
 const router: Router = Router();
 
-// Validation middleware for user sync requests
-const validateSyncRequest = (req: Request, res: Response, next: any) => {
-  const { kindeId, email } = req.body;
-  
-  if (!kindeId || typeof kindeId !== 'string') {
-    res.status(400).json({ error: 'kindeId is required and must be a string' });
-    return;
-  }
-  
-  if (!email || typeof email !== 'string') {
-    res.status(400).json({ error: 'email is required and must be a string' });
-    return;
-  }
-  
-  next();
-};
-
-// POST /v1/users/sync - Sync Kinde user to local database
-router.post("/sync", validateSyncRequest, async (req: Request, res: Response) => {
-  try {
-    const { kindeId, email, name, avatar } = req.body;
-    
-    const user = await UserService.syncUser({
-      kindeId,
-      email,
-      name,
-      avatar
-    });
-    
-    res.json(user);
-  } catch (err) {
-    console.error('User sync error:', err);
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-// GET /v1/users/:id - Get user by ID
-router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
+// GET /users/:id - Get user by ID (OpenAPI pattern)
+router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
+    // Validate ID format
+    const { isValid, error } = validateUUID(id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
     const user = await UserService.getUserById(id);
-    
+
     if (!user) {
-      res.status(404).json({ error: 'User not found' });
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        id: id,
+      });
       return;
     }
-    
-    res.json(user);
-  } catch (err) {
-    console.error('Get user error:', err);
-    res.status(500).json({ error: (err as Error).message });
+
+    sendSuccess(res, user);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
+    }
   }
 });
 
-// GET /v1/users/kinde/:kindeId - Get user by Kinde ID
-router.get("/kinde/:kindeId", authMiddleware, async (req: Request, res: Response) => {
-  try {
-    const { kindeId } = req.params;
-    
-    const user = await UserService.getUserByKindeId(kindeId);
-    
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    
-    res.json(user);
-  } catch (err) {
-    console.error('Get user by Kinde ID error:', err);
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-export default router; 
+export default router;

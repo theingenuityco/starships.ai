@@ -1,17 +1,17 @@
 /**
  * Agent Service
- * 
+ *
  * Provides business logic APIs for agent management and execution.
- * Orchestrates between database persistence (AgentRepository) and 
+ * Orchestrates between database persistence (AgentRepository) and
  * stateless execution engine (autopilot Agent).
  */
 
-import { AgentRepository, RepositoryFactory } from '@starships/models';
+import { AgentRepository } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { Agent, AgentMemory, createAgentMemory, Blueprint } from '@starships/autopilot';
+import { Agent, AgentMemory, Blueprint } from '@starships/autopilot';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
 import { ValidationError, NotFoundError, InternalServerError } from '@starships/errors';
-import getStore, { type MemoryStore } from '../store';
+import getStore, { type MemoryStore } from '@/store';
 
 export interface AgentOptions {
   includeMemory?: boolean;
@@ -106,14 +106,14 @@ export class AgentService {
    */
   static async createAgent(request: CreateAgentRequest): Promise<AgentModel> {
     const repository = new AgentRepository();
-    
+
     // Provide defaults for core AgentNodeParameters fields
     const agentData = {
       ...request,
       timeout: request.timeout || 30000,
       version: '1.0.0', // Default version for all new agents
     };
-    
+
     return await repository.create(agentData);
   }
 
@@ -178,7 +178,7 @@ export class AgentService {
     if (!agent) {
       return null;
     }
-    
+
     // Return basic analytics from the agent model
     return {
       id: agent.id,
@@ -188,7 +188,7 @@ export class AgentService {
       createdAt: agent.createdAt,
       updatedAt: agent.updatedAt,
       category: agent.category,
-      isPublic: agent.isPublic
+      isPublic: agent.isPublic,
     };
   }
 
@@ -243,7 +243,7 @@ export class AgentService {
    */
   async getAllAgents(options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findAll();
-    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
+    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
@@ -251,7 +251,7 @@ export class AgentService {
    */
   async getAgentsByStarship(starshipId: string, options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findByStarshipId(starshipId);
-    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
+    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
@@ -259,7 +259,7 @@ export class AgentService {
    */
   async getAgentsByUser(userId: string, options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findByAuthor(userId);
-    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
+    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
@@ -300,21 +300,24 @@ export class AgentService {
    */
   async searchAgents(query: string, options: AgentOptions = {}): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.searchAgents(query);
-    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
+    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
   }
 
   /**
    * Get agents with filters as Agent instances
    */
-  async getAgentsWithFilters(filters: {
-    category?: string;
-    tags?: string[];
-    isPublic?: boolean;
-    authorId?: string;
-    starshipClass?: 'scout' | 'cruiser';
-  }, options: AgentOptions = {}): Promise<Agent[]> {
+  async getAgentsWithFilters(
+    filters: {
+      category?: string;
+      tags?: string[];
+      isPublic?: boolean;
+      authorId?: string;
+      starshipClass?: 'scout' | 'cruiser';
+    },
+    options: AgentOptions = {}
+  ): Promise<Agent[]> {
     const dbAgents = await this.agentRepository.findWithFilters(filters);
-    return Promise.all(dbAgents.map(dbAgent => this.createAgentInstance(dbAgent, options)));
+    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
   }
 
   // ============================================================================
@@ -340,7 +343,7 @@ export class AgentService {
     });
 
     // Get agent from database
-    const agentRepo = RepositoryFactory.getAgentRepository();
+    const agentRepo = new AgentRepository();
     const dbAgent = await agentRepo.findById(agentId);
 
     if (!dbAgent) {
@@ -365,20 +368,20 @@ export class AgentService {
           agentId: agentId,
           userId: userId,
           sessionId: sessionId,
-          userMessage: message
+          userMessage: message,
         },
         {
           includeMemory: true,
           userId: userId,
           sessionId: sessionId,
-          loadConversationHistory: true
+          loadConversationHistory: true,
         }
       );
 
       console.log('✅ [AGENT-SERVICE] Chat execution completed successfully:', {
         responseLength: executionResult.response.length,
         executionTime: executionResult.executionTime,
-        usageStats: executionResult.usage
+        usageStats: executionResult.usage,
       });
 
       return {
@@ -387,23 +390,21 @@ export class AgentService {
         agentId: agentId,
         usage: {
           promptTokens: Math.floor(executionResult.usage.total_tokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(executionResult.usage.total_tokens * 0.3) // Estimate completion tokens
-        }
+          completionTokens: Math.floor(executionResult.usage.total_tokens * 0.3), // Estimate completion tokens
+        },
       };
-
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Agent execution failed:', {
         agentId,
         userId,
         error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
+        stack: error instanceof Error ? error.stack : undefined,
       });
 
       // Just throw the error instead of providing fallback response
       throw error;
     }
   }
-
 
   /**
    * Test agent configuration without executing
@@ -414,14 +415,14 @@ export class AgentService {
     warnings: string[];
   }> {
     try {
-      const agentRepo = RepositoryFactory.getAgentRepository();
+      const agentRepo = new AgentRepository();
       const dbAgent = await agentRepo.findById(agentId);
 
       if (!dbAgent) {
         return {
           valid: false,
           errors: [`Agent ${agentId} not found`],
-          warnings: []
+          warnings: [],
         };
       }
 
@@ -430,17 +431,16 @@ export class AgentService {
         return {
           valid: false,
           errors: ['Agent name and model are required'],
-          warnings: []
+          warnings: [],
         };
       }
-      
+
       const warnings: string[] = [];
-      
+
       // Add warnings for potential issues
       if (!dbAgent.blueprint && dbAgent.executionMode === 'workflow') {
         warnings.push('Agent is set to workflow mode but has no blueprint defined');
       }
-      
 
       if (!dbAgent.starshipId) {
         warnings.push('Agent is not assigned to any starship');
@@ -449,14 +449,13 @@ export class AgentService {
       return {
         valid: true,
         errors: [],
-        warnings
+        warnings,
       };
-
     } catch (error) {
       return {
         valid: false,
         errors: [error instanceof Error ? error.message : 'Unknown validation error'],
-        warnings: []
+        warnings: [],
       };
     }
   }
@@ -464,12 +463,9 @@ export class AgentService {
   /**
    * Execute an agent with user input
    */
-  async executeAgent(
-    context: AgentExecutionContext,
-    options: AgentOptions = {}
-  ): Promise<ExecuteAgentResponse> {
+  async executeAgent(context: AgentExecutionContext, options: AgentOptions = {}): Promise<ExecuteAgentResponse> {
     const startTime = Date.now();
-    
+
     try {
       // Get database agent
       const dbAgent = await this.agentRepository.findById(context.agentId);
@@ -488,7 +484,7 @@ export class AgentService {
 
       // Extract response from execution result
       const response = this.extractResponse(execution);
-      
+
       // Calculate usage statistics
       const usage = this.calculateUsage(execution);
 
@@ -503,21 +499,20 @@ export class AgentService {
         response,
         usage,
         executionTime,
-        status: 'success'
+        status: 'success',
       };
-
     } catch (error) {
       const executionTime = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       console.error(`[AGENT-SERVICE] Agent execution failed for ${context.agentId}:`, error);
-      
+
       return {
-        response: "I apologize, but I encountered an error processing your request.",
+        response: 'I apologize, but I encountered an error processing your request.',
         usage: { total_tokens: 0, cost: 0, model_calls: 0 },
         executionTime,
         status: 'error',
-        error: errorMessage
+        error: errorMessage,
       };
     }
   }
@@ -526,12 +521,8 @@ export class AgentService {
    * Test agent execution (dry run without saving to memory)
    */
   async testAgent(agentId: string, testMessage: string): Promise<ExecuteAgentResponse> {
-    return this.executeAgent(
-      { agentId, userMessage: testMessage },
-      { includeMemory: false, loadConversationHistory: false }
-    );
+    return this.executeAgent({ agentId, userMessage: testMessage }, { includeMemory: false, loadConversationHistory: false });
   }
-
 
   // ============================================================================
   // PRIVATE HELPER METHODS
@@ -540,27 +531,27 @@ export class AgentService {
   /**
    * Convert database agent to agent instance
    */
-  private async createAgentInstance(
-    dbAgent: AgentModel,
-    options: AgentOptions
-  ): Promise<Agent> {
-    // Get or create blueprint
-    const blueprint = dbAgent.blueprint || this.createDefaultBlueprint(dbAgent);
+  private async createAgentInstance(dbAgent: AgentModel, options: AgentOptions): Promise<Agent> {
+    // Get or create blueprint - ensure it has proper nodes and edges arrays
+    let blueprint = dbAgent.blueprint;
+    if (!blueprint || !blueprint.nodes || !blueprint.edges) {
+      blueprint = this.createDefaultBlueprint(dbAgent);
+    }
 
     // Create default memory config if missing
     const memoryConfig = dbAgent.memory || {
       identity: {
         name: dbAgent.name as string,
         role: this.getRoleFromCategory(dbAgent.category as string),
-        expertise: dbAgent.tags as string[]
+        expertise: dbAgent.tags as string[],
       },
       purpose: {
         primary: (dbAgent.description as string) || `Assist users as a ${dbAgent.category} agent`,
-        constraints: ['Be helpful and accurate', 'Follow ethical guidelines']
+        constraints: ['Be helpful and accurate', 'Follow ethical guidelines'],
       },
       space: {
-        description: `Professional ${dbAgent.category} assistance environment. Focused on providing accurate and helpful responses.`
-      }
+        description: `Professional ${dbAgent.category} assistance environment. Focused on providing accurate and helpful responses.`,
+      },
     };
 
     // Create autopilot agent parameters
@@ -572,7 +563,7 @@ export class AgentService {
       blueprint: blueprint,
       temperature: dbAgent.temperature as number,
       maxTokens: dbAgent.maxTokens as number,
-      timeout: (dbAgent.timeout as number) || 30000
+      timeout: (dbAgent.timeout as number) || 30000,
     };
 
     return new Agent(agentParams);
@@ -590,7 +581,7 @@ export class AgentService {
     }
   ): Promise<AgentMemory> {
     // Initialize memory with default prompt
-    const memory = createAgentMemory();
+    const memory = new AgentMemory();
     memory.addMessage('system', 'You are a helpful AI assistant.');
 
     // Set structured context from database configuration
@@ -609,12 +600,12 @@ export class AgentService {
       memory.setIdentity({
         name: dbAgent.name as string,
         role: this.getRoleFromCategory(dbAgent.category as string),
-        expertise: dbAgent.tags as string[]
+        expertise: dbAgent.tags as string[],
       });
 
       memory.setPurpose({
         primary: (dbAgent.description as string) || `Assist users as a ${dbAgent.category} agent`,
-        constraints: ['Be helpful and accurate', 'Follow ethical guidelines']
+        constraints: ['Be helpful and accurate', 'Follow ethical guidelines'],
       });
     }
 
@@ -622,7 +613,6 @@ export class AgentService {
 
     return memory;
   }
-
 
   /**
    * Extract response from autopilot agent execution result
@@ -634,7 +624,7 @@ export class AgentService {
 
     // Look for LLM response in execution results
     const results = Array.from(executionResult.executionResults.values()) as any[];
-    
+
     // Find the last successful LLM response
     for (let i = results.length - 1; i >= 0; i--) {
       const result = results[i] as any;
@@ -678,7 +668,7 @@ export class AgentService {
     return {
       total_tokens: totalTokens,
       cost: totalCost,
-      model_calls: results.filter((r: any) => !r.error).length
+      model_calls: results.filter((r: any) => !r.error).length,
     };
   }
 
@@ -693,7 +683,7 @@ export class AgentService {
           type: 'start',
           name: 'Start',
           description: 'Begin conversation',
-          parameters: {}
+          parameters: {},
         },
         {
           ref: 'llm-response',
@@ -705,36 +695,36 @@ export class AgentService {
             prompt: 'Respond to the user based on the conversation context and your system instructions.',
             temperature: dbAgent.temperature || 0.7,
             maxTokens: dbAgent.maxTokens || 2000,
-            timeout: 30000
-          }
+            timeout: 30000,
+          },
         },
         {
           ref: 'end',
           type: 'end',
           name: 'End',
           description: 'Complete conversation',
-          parameters: {}
-        }
+          parameters: {},
+        },
       ],
       edges: [
         {
           ref: 'edge-1',
           from: 'start',
-          to: 'llm-response'
+          to: 'llm-response',
         },
         {
           ref: 'edge-2',
           from: 'llm-response',
-          to: 'end'
-        }
+          to: 'end',
+        },
       ],
       metadata: {
         version: '1.0',
         type: 'simple-chat',
         generated: true,
         agentId: 'id' in dbAgent ? dbAgent.id : 'new-agent',
-        createdAt: new Date().toISOString()
-      }
+        createdAt: new Date().toISOString(),
+      },
     };
   }
 
@@ -755,19 +745,19 @@ export class AgentService {
     }
 
     // Check for start node
-    const hasStartNode = blueprint.nodes.some(node => node.type === 'start');
+    const hasStartNode = blueprint.nodes.some((node) => node.type === 'start');
     if (!hasStartNode) {
       errors.push('Blueprint must have a start node');
     }
 
     // Check for end node
-    const hasEndNode = blueprint.nodes.some(node => node.type === 'end');
+    const hasEndNode = blueprint.nodes.some((node) => node.type === 'end');
     if (!hasEndNode) {
       errors.push('Blueprint must have an end node');
     }
 
     // Validate edge references
-    const nodeRefs = new Set(blueprint.nodes.map(n => n.ref));
+    const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));
     for (const edge of blueprint.edges) {
       if (!nodeRefs.has(edge.from)) {
         errors.push(`Edge references non-existent node: ${edge.from}`);
@@ -779,7 +769,7 @@ export class AgentService {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -792,7 +782,7 @@ export class AgentService {
       coding: 'Software Developer',
       creative: 'Creative Assistant',
       analysis: 'Data Analyst',
-      support: 'Support Specialist'
+      support: 'Support Specialist',
     };
     return roles[category as keyof typeof roles] || 'AI Assistant';
   }

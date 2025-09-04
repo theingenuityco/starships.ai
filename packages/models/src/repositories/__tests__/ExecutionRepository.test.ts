@@ -2,13 +2,8 @@
  * ExecutionRepository Unit Tests
  */
 
-import { ExecutionRepository } from '../ExecutionRepository';
-import type { 
-  ExecutionModel, 
-  CreateExecutionRequest, 
-  UpdateExecutionRequest, 
-  ExecutionStatus 
-} from '../ExecutionRepository';
+import { ExecutionRepository } from '@/repositories/ExecutionRepository';
+import type { ExecutionModel, CreateExecutionRequest, UpdateExecutionRequest, ExecutionStatus } from '../ExecutionRepository';
 import { ValidationError, DatabaseError } from '@starships/errors';
 
 // Mock the database connection and helpers
@@ -18,22 +13,24 @@ jest.mock('../../helpers/database', () => ({
     executeWrite: jest.fn(),
   })),
   convertNeo4jIntsInArray: jest.fn((arr) => arr),
-  convertNeo4jIntsInObject: jest.fn((obj) => obj)
+  convertNeo4jIntsInObject: jest.fn((obj) => obj),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('ExecutionRepository', () => {
   let repository: ExecutionRepository;
   let mockConnection: any;
 
   beforeEach(() => {
-    repository = new ExecutionRepository();
+    // Create fresh mock connection for each test
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    repository = new ExecutionRepository();
+    // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });
 
@@ -51,7 +48,7 @@ describe('ExecutionRepository', () => {
         status: 'pending',
         createdAt: '2024-01-01T00:00:00.000Z',
         executionData: { config: 'test' },
-        result: { output: 'success' }
+        result: { output: 'success' },
       };
 
       const serialized = (repository as any).serializeComplexFields(execution);
@@ -59,7 +56,7 @@ describe('ExecutionRepository', () => {
       expect(serialized).toEqual({
         ...execution,
         executionData: '{"config":"test"}',
-        result: '{"output":"success"}'
+        result: '{"output":"success"}',
       });
     });
 
@@ -70,7 +67,7 @@ describe('ExecutionRepository', () => {
         status: 'pending',
         createdAt: '2024-01-01T00:00:00.000Z',
         executionData: undefined,
-        result: undefined
+        result: undefined,
       };
 
       const serialized = (repository as any).serializeComplexFields(execution);
@@ -88,7 +85,7 @@ describe('ExecutionRepository', () => {
         status: 'pending',
         createdAt: '2024-01-01T00:00:00.000Z',
         executionData: '{"config":"test"}',
-        result: '{"output":"success"}'
+        result: '{"output":"success"}',
       };
 
       const deserialized = (repository as any).deserializeComplexFields(execution);
@@ -96,7 +93,7 @@ describe('ExecutionRepository', () => {
       expect(deserialized).toEqual({
         ...execution,
         executionData: { config: 'test' },
-        result: { output: 'success' }
+        result: { output: 'success' },
       });
     });
 
@@ -104,7 +101,7 @@ describe('ExecutionRepository', () => {
       const execution = {
         id: 'exec-123',
         executionData: 'invalid-json',
-        result: 'also-invalid'
+        result: 'also-invalid',
       };
 
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
@@ -121,7 +118,7 @@ describe('ExecutionRepository', () => {
       const execution = {
         id: 'exec-123',
         executionData: null,
-        result: undefined
+        result: undefined,
       };
 
       const deserialized = (repository as any).deserializeComplexFields(execution);
@@ -134,49 +131,64 @@ describe('ExecutionRepository', () => {
   describe('create', () => {
     const validRequest: CreateExecutionRequest = {
       workflowId: 'workflow-123',
-      executionData: { input: 'test' }
+      executionData: { input: 'test' },
     };
 
     it('should create execution successfully', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-123',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: expect.any(String),
+        executionData: '{"input":"test"}',
+      };
+
+      // Mock the createEntityWithAutoId call to return the execution
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(validRequest);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'CREATE (e:Execution $props) RETURN e',
-        {
+        expect.stringContaining('CREATE (n:Execution)'),
+        expect.objectContaining({
           props: expect.objectContaining({
-            id: expect.any(String),
             workflowId: 'workflow-123',
             status: 'pending',
-            createdAt: expect.any(String),
-            executionData: '{"input":"test"}'
-          })
-        }
+            executionData: '{"input":"test"}',
+          }),
+        })
       );
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('CREATE (w)-[:HAS_EXECUTION]->(e)'),
         expect.objectContaining({
           workflowId: 'workflow-123',
-          executionId: expect.any(String)
+          executionId: 'exec-123',
         })
       );
 
       expect(result).toMatchObject({
-        id: expect.any(String),
+        id: 'exec-123',
         workflowId: 'workflow-123',
         status: 'pending',
-        executionData: { input: 'test' }
       });
     });
 
     it('should create execution without executionData', async () => {
       const minimalRequest: CreateExecutionRequest = {
-        workflowId: 'workflow-123'
+        workflowId: 'workflow-123',
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-123',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+      };
+
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockExecution }]).mockResolvedValueOnce([]);
 
       const result = await repository.create(minimalRequest);
 
@@ -205,22 +217,19 @@ describe('ExecutionRepository', () => {
         status: 'completed',
         createdAt: '2024-01-01T00:00:00.000Z',
         executionData: '{"input":"test"}',
-        result: '{"output":"success"}'
+        result: '{"output":"success"}',
       };
 
       mockConnection.executeQuery.mockResolvedValue([{ e: mockExecution }]);
 
       const result = await repository.findById(executionId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (e:Execution) WHERE e.id = $id RETURN e',
-        { id: executionId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (e:Execution) WHERE e.id = $id RETURN e', { id: executionId });
 
       expect(result).toEqual({
         ...mockExecution,
         executionData: { input: 'test' },
-        result: { output: 'success' }
+        result: { output: 'success' },
       });
     });
 
@@ -237,7 +246,7 @@ describe('ExecutionRepository', () => {
         id: 'exec-123',
         workflowId: 'workflow-123',
         status: 'pending',
-        createdAt: '2024-01-01T00:00:00.000Z'
+        createdAt: '2024-01-01T00:00:00.000Z',
       };
 
       mockConnection.executeQuery.mockResolvedValue([{ e: mockExecution }]);
@@ -264,21 +273,18 @@ describe('ExecutionRepository', () => {
           workflowId,
           status: 'completed',
           createdAt: '2024-01-02T00:00:00.000Z',
-          executionData: '{"test":true}'
+          executionData: '{"test":true}',
         },
         {
           id: 'exec-2',
           workflowId,
           status: 'running',
           createdAt: '2024-01-01T00:00:00.000Z',
-          result: '{"success":true}'
-        }
+          result: '{"success":true}',
+        },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { e: mockExecutions[0] },
-        { e: mockExecutions[1] }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ e: mockExecutions[0] }, { e: mockExecutions[1] }]);
 
       const result = await repository.findByWorkflowId(workflowId);
 
@@ -289,7 +295,7 @@ describe('ExecutionRepository', () => {
 
       expect(result).toEqual([
         { ...mockExecutions[0], executionData: { test: true } },
-        { ...mockExecutions[1], result: { success: true } }
+        { ...mockExecutions[1], result: { success: true } },
       ]);
     });
 
@@ -315,7 +321,7 @@ describe('ExecutionRepository', () => {
       const updates: UpdateExecutionRequest = {
         status: 'completed',
         currentNodeRef: 'final-node',
-        result: { output: 'success' }
+        result: { output: 'success' },
       };
 
       const updatedExecution = {
@@ -323,45 +329,49 @@ describe('ExecutionRepository', () => {
         status: 'completed',
         currentNodeRef: 'final-node',
         result: '{"output":"success"}',
-        endTime: expect.any(String)
+        endTime: expect.any(String),
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ e: updatedExecution }]);
 
       const result = await repository.update(executionId, updates);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
-        {
-          id: executionId,
-          updates: expect.objectContaining({
-            status: 'completed',
-            currentNodeRef: 'final-node',
-            result: { output: 'success' },
-            endTime: expect.any(String) // Should auto-set endTime for terminal status
-          })
-        }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e', {
+        id: executionId,
+        updates: expect.objectContaining({
+          status: 'completed',
+          currentNodeRef: 'final-node',
+          result: { output: 'success' },
+          endTime: expect.any(String), // Should auto-set endTime for terminal status
+        }),
+      });
 
       expect(result).toBeDefined();
     });
 
     it('should auto-set startTime when status changes to running', async () => {
       const updates: UpdateExecutionRequest = {
-        status: 'running'
+        status: 'running',
       };
 
-      mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
+      const mockUpdatedExecution = {
+        id: executionId,
+        status: 'running',
+        startTime: '2024-01-01T10:00:00.000Z',
+      };
+
+      mockConnection.executeWrite.mockResolvedValue([{ e: mockUpdatedExecution }]);
 
       await repository.update(executionId, updates);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.anything(),
+        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
         expect.objectContaining({
+          id: executionId,
           updates: expect.objectContaining({
             status: 'running',
-            startTime: expect.any(String)
-          })
+            startTime: expect.any(String),
+          }),
         })
       );
     });
@@ -370,17 +380,27 @@ describe('ExecutionRepository', () => {
       const terminalStatuses: ExecutionStatus[] = ['completed', 'failed', 'cancelled'];
 
       for (const status of terminalStatuses) {
-        mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
+        // Reset mocks for each iteration
+        mockConnection.executeWrite.mockClear();
+
+        const mockUpdatedExecution = {
+          id: executionId,
+          status,
+          endTime: '2024-01-01T12:00:00.000Z',
+        };
+
+        mockConnection.executeWrite.mockResolvedValue([{ e: mockUpdatedExecution }]);
 
         await repository.update(executionId, { status });
 
         expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          expect.anything(),
+          'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
           expect.objectContaining({
+            id: executionId,
             updates: expect.objectContaining({
               status,
-              endTime: expect.any(String)
-            })
+              endTime: expect.any(String),
+            }),
           })
         );
       }
@@ -390,19 +410,26 @@ describe('ExecutionRepository', () => {
       const customStartTime = '2024-01-01T10:00:00.000Z';
       const updates = {
         status: 'running' as const,
-        startTime: customStartTime
+        startTime: customStartTime,
       };
 
-      mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
+      const mockUpdatedExecution = {
+        id: executionId,
+        status: 'running',
+        startTime: customStartTime,
+      };
+
+      mockConnection.executeWrite.mockResolvedValue([{ e: mockUpdatedExecution }]);
 
       await repository.update(executionId, updates);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.anything(),
+        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
         expect.objectContaining({
+          id: executionId,
           updates: expect.objectContaining({
-            startTime: customStartTime // Should use provided value
-          })
+            startTime: customStartTime, // Should use provided value
+          }),
         })
       );
     });
@@ -461,20 +488,17 @@ describe('ExecutionRepository', () => {
           id: 'exec-1',
           workflowId: 'workflow-1',
           status,
-          createdAt: '2024-01-02T00:00:00.000Z'
+          createdAt: '2024-01-02T00:00:00.000Z',
         },
         {
           id: 'exec-2',
           workflowId: 'workflow-2',
           status,
-          createdAt: '2024-01-01T00:00:00.000Z'
-        }
+          createdAt: '2024-01-01T00:00:00.000Z',
+        },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { e: mockExecutions[0] },
-        { e: mockExecutions[1] }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ e: mockExecutions[0] }, { e: mockExecutions[1] }]);
 
       const result = await repository.findByStatus(status);
 
@@ -498,14 +522,13 @@ describe('ExecutionRepository', () => {
       const statuses: ExecutionStatus[] = ['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'];
 
       for (const status of statuses) {
+        // Clear mocks for each iteration
+        mockConnection.executeQuery.mockClear();
         mockConnection.executeQuery.mockResolvedValue([]);
 
         await repository.findByStatus(status);
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          expect.stringContaining('WHERE e.status = $status'),
-          { status }
-        );
+        expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE e.status = $status'), { status });
       }
     });
   });
@@ -515,14 +538,10 @@ describe('ExecutionRepository', () => {
       const mockExecutions = [
         { id: 'exec-1', status: 'pending', createdAt: '2024-01-03T00:00:00.000Z' },
         { id: 'exec-2', status: 'running', createdAt: '2024-01-02T00:00:00.000Z' },
-        { id: 'exec-3', status: 'paused', createdAt: '2024-01-01T00:00:00.000Z' }
+        { id: 'exec-3', status: 'paused', createdAt: '2024-01-01T00:00:00.000Z' },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { e: mockExecutions[0] },
-        { e: mockExecutions[1] },
-        { e: mockExecutions[2] }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ e: mockExecutions[0] }, { e: mockExecutions[1] }, { e: mockExecutions[2] }]);
 
       const result = await repository.findActiveExecutions();
 
@@ -554,7 +573,8 @@ describe('ExecutionRepository', () => {
       const mockUpdatedExecution = {
         id: executionId,
         status: 'cancelled',
-        error: 'Execution cancelled by user'
+        error: 'Execution cancelled by user',
+        endTime: '2024-01-01T12:00:00.000Z',
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ e: mockUpdatedExecution }]);
@@ -562,17 +582,14 @@ describe('ExecutionRepository', () => {
       const result = await repository.cancelExecution(executionId);
 
       // Should call update method internally
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
-        {
-          id: executionId,
-          updates: expect.objectContaining({
-            status: 'cancelled',
-            error: 'Execution cancelled by user',
-            endTime: expect.any(String)
-          })
-        }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e', {
+        id: executionId,
+        updates: expect.objectContaining({
+          status: 'cancelled',
+          error: 'Execution cancelled by user',
+          endTime: expect.any(String),
+        }),
+      });
 
       expect(result).toBeDefined();
     });
@@ -581,17 +598,26 @@ describe('ExecutionRepository', () => {
       const executionId = 'exec-123';
       const customReason = 'Custom cancellation reason';
 
-      mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
+      const mockUpdatedExecution = {
+        id: executionId,
+        status: 'cancelled',
+        error: customReason,
+        endTime: '2024-01-01T12:00:00.000Z',
+      };
+
+      mockConnection.executeWrite.mockResolvedValue([{ e: mockUpdatedExecution }]);
 
       await repository.cancelExecution(executionId, customReason);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.anything(),
+        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
         expect.objectContaining({
+          id: executionId,
           updates: expect.objectContaining({
             status: 'cancelled',
-            error: customReason
-          })
+            error: customReason,
+            endTime: expect.any(String),
+          }),
         })
       );
     });
@@ -611,7 +637,7 @@ describe('ExecutionRepository', () => {
       mockConnection.executeWrite.mockRejectedValue(error);
 
       const request: CreateExecutionRequest = {
-        workflowId: 'workflow-123'
+        workflowId: 'workflow-123',
       };
 
       await expect(repository.create(request)).rejects.toThrow();
@@ -644,11 +670,21 @@ describe('ExecutionRepository', () => {
       const workflowId = 'workflow-123';
       const createRequest: CreateExecutionRequest = {
         workflowId,
-        executionData: { input: 'test' }
+        executionData: { input: 'test' },
       };
 
-      // Create execution
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-123',
+        workflowId,
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: '{"input":"test"}',
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
       const execution = await repository.create(createRequest);
 
       // Update to running
@@ -657,9 +693,9 @@ describe('ExecutionRepository', () => {
 
       // Update to completed
       mockConnection.executeWrite.mockResolvedValue([{ e: { ...execution, status: 'completed' } }]);
-      await repository.update(execution.id, { 
-        status: 'completed', 
-        result: { output: 'success' } 
+      await repository.update(execution.id, {
+        status: 'completed',
+        result: { output: 'success' },
       });
 
       // Delete execution
@@ -673,20 +709,31 @@ describe('ExecutionRepository', () => {
       const complexExecutionData = {
         inputs: {
           documents: ['doc1.pdf', 'doc2.txt'],
-          settings: { language: 'en', format: 'json' }
+          settings: { language: 'en', format: 'json' },
         },
         workflow: {
           version: '2.0',
-          nodes: ['start', 'process', 'analyze', 'end']
-        }
+          nodes: ['start', 'process', 'analyze', 'end'],
+        },
       };
 
       const createRequest: CreateExecutionRequest = {
         workflowId: 'complex-workflow',
-        executionData: complexExecutionData
+        executionData: complexExecutionData,
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-456',
+        workflowId: 'complex-workflow',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify(complexExecutionData),
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(createRequest);
 
@@ -697,11 +744,15 @@ describe('ExecutionRepository', () => {
       const executionId = 'exec-123';
 
       // Test all status transitions
-      const statusFlow: Array<{ status: ExecutionStatus; shouldHaveStartTime: boolean; shouldHaveEndTime: boolean }> = [
+      const statusFlow: Array<{
+        status: ExecutionStatus;
+        shouldHaveStartTime: boolean;
+        shouldHaveEndTime: boolean;
+      }> = [
         { status: 'pending', shouldHaveStartTime: false, shouldHaveEndTime: false },
         { status: 'running', shouldHaveStartTime: true, shouldHaveEndTime: false },
         { status: 'paused', shouldHaveStartTime: false, shouldHaveEndTime: false },
-        { status: 'completed', shouldHaveStartTime: false, shouldHaveEndTime: true }
+        { status: 'completed', shouldHaveStartTime: false, shouldHaveEndTime: true },
       ];
 
       for (const { status, shouldHaveStartTime, shouldHaveEndTime } of statusFlow) {
@@ -716,7 +767,7 @@ describe('ExecutionRepository', () => {
         expect(mockConnection.executeWrite).toHaveBeenCalledWith(
           expect.anything(),
           expect.objectContaining({
-            updates: expect.objectContaining(expectedUpdates)
+            updates: expect.objectContaining(expectedUpdates),
           })
         );
       }
@@ -727,15 +778,26 @@ describe('ExecutionRepository', () => {
     it('should handle execution with very large execution data', async () => {
       const largeExecutionData = {
         data: 'x'.repeat(100000), // Large string
-        array: Array.from({ length: 1000 }, (_, i) => ({ id: i, value: `item-${i}` }))
+        array: Array.from({ length: 1000 }, (_, i) => ({ id: i, value: `item-${i}` })),
       };
 
       const request: CreateExecutionRequest = {
         workflowId: 'workflow-123',
-        executionData: largeExecutionData
+        executionData: largeExecutionData,
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-789',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify(largeExecutionData),
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(request);
 
@@ -750,10 +812,7 @@ describe('ExecutionRepository', () => {
       mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
 
       // Simulate concurrent updates
-      const promises = [
-        repository.update(executionId, updates1),
-        repository.update(executionId, updates2)
-      ];
+      const promises = [repository.update(executionId, updates1), repository.update(executionId, updates2)];
 
       await Promise.all(promises);
 
@@ -765,7 +824,7 @@ describe('ExecutionRepository', () => {
         id: 'exec-123',
         workflowId: 'workflow-123',
         status: 'completed',
-        result: null
+        result: null,
       };
 
       mockConnection.executeQuery.mockResolvedValue([{ e: mockExecution }]);
@@ -778,7 +837,7 @@ describe('ExecutionRepository', () => {
     it('should handle execution with empty string fields', async () => {
       const updates: UpdateExecutionRequest = {
         currentNodeRef: '',
-        error: ''
+        error: '',
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
@@ -790,8 +849,8 @@ describe('ExecutionRepository', () => {
         expect.objectContaining({
           updates: expect.objectContaining({
             currentNodeRef: '',
-            error: ''
-          })
+            error: '',
+          }),
         })
       );
     });
@@ -800,7 +859,7 @@ describe('ExecutionRepository', () => {
       const errorMessage = 'Error with "quotes" and émojis 🚨 and unicode ñ';
       const updates: UpdateExecutionRequest = {
         status: 'failed',
-        error: errorMessage
+        error: errorMessage,
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
@@ -811,8 +870,8 @@ describe('ExecutionRepository', () => {
         expect.anything(),
         expect.objectContaining({
           updates: expect.objectContaining({
-            error: errorMessage
-          })
+            error: errorMessage,
+          }),
         })
       );
     });
@@ -823,10 +882,10 @@ describe('ExecutionRepository', () => {
       const results = await Promise.all([
         repository.findByWorkflowId('workflow-123'),
         repository.findByStatus('running'),
-        repository.findActiveExecutions()
+        repository.findActiveExecutions(),
       ]);
 
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toEqual([]);
       });
     });
@@ -837,7 +896,7 @@ describe('ExecutionRepository', () => {
         currentNodeRef: undefined,
         executionData: undefined,
         error: undefined,
-        result: undefined
+        result: undefined,
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
@@ -848,7 +907,7 @@ describe('ExecutionRepository', () => {
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          updates: updates
+          updates: updates,
         })
       );
     });
@@ -861,7 +920,7 @@ describe('ExecutionRepository', () => {
 
       const request: CreateExecutionRequest = {
         workflowId: 'workflow-123',
-        executionData: circularData
+        executionData: circularData,
       };
 
       // JSON.stringify should handle this gracefully or throw
@@ -871,7 +930,7 @@ describe('ExecutionRepository', () => {
     it('should handle very deep nested objects', async () => {
       const deepObject: any = {};
       let current = deepObject;
-      
+
       // Create deeply nested object
       for (let i = 0; i < 100; i++) {
         current.nested = { level: i };
@@ -880,10 +939,21 @@ describe('ExecutionRepository', () => {
 
       const request: CreateExecutionRequest = {
         workflowId: 'workflow-123',
-        executionData: { deep: deepObject }
+        executionData: { deep: deepObject },
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-deep',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify({ deep: deepObject }),
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(request);
 
@@ -899,22 +969,33 @@ describe('ExecutionRepository', () => {
         undefined: undefined,
         array: [1, 'two', { three: 3 }],
         object: { nested: { value: 'deep' } },
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
       };
 
       const request: CreateExecutionRequest = {
         workflowId: 'workflow-123',
-        executionData: mixedTypeData
+        executionData: mixedTypeData,
       };
 
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const mockExecution = {
+        id: 'exec-mixed',
+        workflowId: 'workflow-123',
+        status: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        executionData: JSON.stringify(mixedTypeData),
+      };
+
+      // Fix: createEntityWithAutoId expects result[0].n
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockExecution }]) // Create execution
+        .mockResolvedValueOnce([]); // Create relationship
 
       const result = await repository.create(request);
 
       // undefined should be dropped by JSON.stringify
       expect(result.executionData).toEqual({
         ...mixedTypeData,
-        undefined: undefined // This gets preserved in the object but won't be in JSON
+        undefined: undefined, // This gets preserved in the object but won't be in JSON
       });
     });
   });

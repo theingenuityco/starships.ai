@@ -13,7 +13,7 @@ Autopilot provides a powerful workflow execution system:
 ### Features
 
 - **Graph-based execution** - True DAG support with conditional routing
-- **Extensible node system** - Plugin architecture for custom node types  
+- **Extensible node system** - Plugin architecture for custom node types
 - **Interactive workflows** - Built-in user input capabilities
 - **JSONata integration** - Powerful expressions for conditional logic
 - **Event-driven** - Comprehensive lifecycle hooks
@@ -47,7 +47,7 @@ agentMemory.setPurpose({ primary: 'Execute workflow efficiently' });
 const execution = {
   status: 'not_started' as const,
   executionResults: new Map(),
-  agentMemory: agentMemory
+  agentMemory: agentMemory,
 };
 const result = await workflow.execute(execution);
 
@@ -109,30 +109,31 @@ memory.setIdentity({
   name: 'Sarah',
   role: 'Senior Support Agent',
   personality: 'Professional, empathetic, solution-focused',
-  expertise: ['billing', 'technical support', 'account management']
+  expertise: ['billing', 'technical support', 'account management'],
 });
 
 // Set purpose and goals
 memory.setPurpose({
   primary: 'Resolve customer issues efficiently and professionally',
   secondary: ['Build customer satisfaction', 'Identify upsell opportunities'],
-  constraints: ['Never promise what cannot be delivered', 'Escalate complex technical issues']
+  constraints: ['Never promise what cannot be delivered', 'Escalate complex technical issues'],
 });
 
 // Set space (like screenplay background)
 memory.setSpace({
-  description: 'Customer support chat during business hours with customer experiencing billing issue. Mood is professional but friendly. High-volume support period requiring efficient resolution.'
+  description:
+    'Customer support chat during business hours with customer experiencing billing issue. Mood is professional but friendly. High-volume support period requiring efficient resolution.',
 });
 
 // Add conversation history with metadata
 memory.addConversation('user', 'I was charged twice this month!', {
   sentiment: 'frustrated',
-  priority: 'high'
+  priority: 'high',
 });
 
 memory.addConversation('assistant', 'I understand your frustration. Let me check your account right away.', {
   action: 'investigating',
-  empathy_level: 'high'
+  empathy_level: 'high',
 });
 
 // LLM-formatted output includes structured context
@@ -163,6 +164,7 @@ Customer support chat during business hours with customer experiencing billing i
 ### Memory Methods
 
 **Base Memory:**
+
 - `addMessage(role, content)` - Add LLM message
 - `toMessages()` - Get LLM-formatted messages
 - `clear()` - Clear all messages
@@ -172,6 +174,7 @@ Customer support chat during business hours with customer experiencing billing i
 - `clone()` - Clone memory instance
 
 **AgentMemory Additional:**
+
 - `setIdentity(identity)` - Set agent identity
 - `setPurpose(purpose)` - Set agent purpose
 - `setSpace(space)` - Set agent space
@@ -192,7 +195,7 @@ const agent = new Agent({
   name: 'Support Agent',
   model: 'anthropic/claude-3.5-sonnet',
   memory: memory, // Required
-  blueprint: myBlueprint
+  blueprint: myBlueprint,
 });
 
 // Memory automatically flows to LLM nodes with full context
@@ -223,14 +226,15 @@ const agentMemory = new AgentMemory('You are a helpful customer support assistan
 agentMemory.setIdentity({
   name: 'AI Assistant',
   role: 'Customer Support Coordinator',
-  personality: 'Professional, helpful, solution-oriented'
+  personality: 'Professional, helpful, solution-oriented',
 });
 agentMemory.setPurpose({
   primary: 'Provide comprehensive customer support through multi-step workflow',
-  secondary: ['Gather user data', 'Generate personalized responses', 'Process requests efficiently']
+  secondary: ['Gather user data', 'Generate personalized responses', 'Process requests efficiently'],
 });
 agentMemory.setSpace({
-  description: 'Customer support automation system processing multi-step workflow for customer requests. Mood is professional and efficient.'
+  description:
+    'Customer support automation system processing multi-step workflow for customer requests. Mood is professional and efficient.',
 });
 
 // Create workflow with multiple node types - all handlers are automatically available
@@ -240,7 +244,7 @@ const workflow = new Workflow()
     type: 'start',
     name: 'Start',
     description: 'Begin',
-    parameters: {}
+    parameters: {},
   })
   .addNode({
     ref: 'http-call',
@@ -250,10 +254,10 @@ const workflow = new Workflow()
     parameters: {
       url: 'https://api.example.com/users/123',
       method: 'GET',
-      headers: { 'Authorization': 'Bearer ${API_TOKEN}' },
+      headers: { Authorization: 'Bearer ${API_TOKEN}' },
       timeout: 10000,
-      retries: 2
-    }
+      retries: 2,
+    },
   })
   .addNode({
     ref: 'llm-task',
@@ -264,8 +268,8 @@ const workflow = new Workflow()
       model: 'anthropic/claude-3.5-sonnet',
       prompt: 'Generate a helpful response for the user based on their data',
       temperature: 0.7,
-      maxTokens: 500
-    }
+      maxTokens: 500,
+    },
   })
   .addNode({
     ref: 'agent-task',
@@ -277,26 +281,29 @@ const workflow = new Workflow()
       model: 'anthropic/claude-3.5-sonnet',
       memory: (() => {
         const agentTaskMemory = new AgentMemory('You are a helpful customer support agent.');
-        agentTaskMemory.setIdentity({ name: 'Support Agent', role: 'Customer Service Representative' });
+        agentTaskMemory.setIdentity({
+          name: 'Support Agent',
+          role: 'Customer Service Representative',
+        });
         agentTaskMemory.setPurpose({ primary: 'Help customers with their specific requests' });
         return agentTaskMemory;
       })(),
       blueprint: {
         nodes: [
           { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-          { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} }
+          { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} },
         ],
         edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
-        metadata: {}
-      }
-    }
+        metadata: {},
+      },
+    },
   })
   .addNode({
     ref: 'end',
     type: 'end',
     name: 'End',
     description: 'Complete',
-    parameters: {}
+    parameters: {},
   })
   .addEdge('start', 'http-call')
   .addEdge('http-call', 'llm-task')
@@ -307,7 +314,7 @@ const workflow = new Workflow()
 const execution = {
   status: 'not_started' as const,
   executionResults: new Map(),
-  agentMemory: agentMemory
+  agentMemory: agentMemory,
 };
 const result = await workflow.execute(execution);
 ```
@@ -344,6 +351,7 @@ Makes HTTP API calls with comprehensive support for authentication, retries, and
 ```
 
 **Authentication Types:**
+
 - `bearer` - Bearer token authentication
 - `basic` - Basic username/password authentication
 - `api-key` - Custom API key in header
@@ -372,6 +380,7 @@ Integrates with AI models using OpenRouter's unified API, providing access to 20
 **Note**: LLM nodes automatically include system prompts and conversation history from the agent's memory. The `prompt` parameter is added as the final user message.
 
 **Available Models (via OpenRouter):**
+
 - `openai/gpt-4-turbo` - OpenAI GPT-4 Turbo
 - `anthropic/claude-3.5-sonnet` - Anthropic Claude 3.5 Sonnet
 - `google/gemini-pro-1.5` - Google Gemini Pro 1.5
@@ -380,6 +389,7 @@ Integrates with AI models using OpenRouter's unified API, providing access to 20
 - And 200+ more models...
 
 **Key Features:**
+
 - Unified API for all major LLM providers
 - Automatic fallback routing
 - Cost optimization
@@ -436,12 +446,14 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
 ```
 
 **Key Features:**
+
 - **Blueprint Storage**: Store and execute complete workflow definitions
 - **Modular Composition**: Build workflows from reusable sub-workflows
 - **Clean Separation**: Focus on blueprint execution without agent overhead
 - **Validation**: Comprehensive validation of embedded blueprints
 
 **Use Cases:**
+
 - Modular workflow composition
 - Reusable workflow components
 - Clean separation of concerns
@@ -452,17 +464,20 @@ Executes embedded workflow blueprints, enabling modular and reusable workflow co
 ### Workflow System
 
 #### Workflow
+
 ```typescript
 const workflow = new Workflow();
 const execution = {
   status: 'not_started' as const,
-  executionResults: new Map()
+  executionResults: new Map(),
 };
 const result = await workflow.execute(execution);
 ```
 
 #### Engine (Internal)
+
 The engine is created and managed internally by the Workflow class. All supported node handlers are automatically registered:
+
 - start/end - Flow control nodes
 - agent - AI agent with embedded workflow execution
 - conditional - Smart routing with JSONata expressions
@@ -473,6 +488,7 @@ The engine is created and managed internally by the Workflow class. All supporte
 - workflow - Execute embedded workflow blueprints
 
 #### Validator
+
 ```typescript
 const validator = new Validator();
 // or use the workflow's built-in validation
@@ -488,24 +504,25 @@ interface AgentNodeParameters {
   // Core agent identity
   name: string;
   description?: string;
-  
+
   // LLM configuration
   model: string;
   temperature?: number;
   maxTokens?: number;
-  
+
   // Memory system (required)
   memory: AgentMemory;
-  
+
   // Execution parameters
   timeout?: number;
-  
+
   // Embedded workflow execution (required)
   blueprint: Blueprint;
 }
 ```
 
 Example agent node with AgentMemory and embedded workflow:
+
 ```typescript
 import { AgentMemory } from '@starships/autopilot';
 
@@ -578,6 +595,7 @@ memory.addSystemPrompt('Be concise and professional in responses.');
 4. Final output includes both agent information and workflow results
 
 Example execution result:
+
 ```typescript
 {
   nodeRef: 'support-agent',

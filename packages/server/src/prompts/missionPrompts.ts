@@ -45,7 +45,7 @@ export interface WelcomeMessageData {
 
 /**
  * Legacy mission prompt templates - DEPRECATED
- * 
+ *
  * All prompts have been migrated to MissionPromptBuilder.
  * This file can be removed once renderTemplate is no longer used elsewhere.
  */

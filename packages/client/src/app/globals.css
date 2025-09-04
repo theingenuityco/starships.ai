@@ -31,7 +31,7 @@
     --foreground: 0 0% 8%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 8%;
-    --primary: 220 70% 50%;           /* Soothing blue - Theme anchor */
+    --primary: 220 70% 50%; /* Soothing blue - Theme anchor */
     --primary-foreground: 0 0% 98%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 0 0% 8%;
@@ -45,7 +45,7 @@
     --radius: 0.5rem;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    
+
     /* Command Deck Light - Gradient backgrounds */
     --command-bg: linear-gradient(135deg, hsl(220 30% 95%), hsl(220 20% 98%));
     --starship-accent: hsl(220 70% 50%);
@@ -54,11 +54,11 @@
 
   .dark {
     /* Enhanced Dark Theme - Deep Blue-Black Foundation */
-    --background: 220 15% 8%;          /* Deep blue-black base */
+    --background: 220 15% 8%; /* Deep blue-black base */
     --foreground: 0 0% 95%;
     --card: 220 15% 10%;
     --card-foreground: 0 0% 95%;
-    --primary: 220 70% 60%;            /* Brighter blue for dark contrast */
+    --primary: 220 70% 60%; /* Brighter blue for dark contrast */
     --primary-foreground: 220 15% 8%;
     --secondary: 220 15% 15%;
     --secondary-foreground: 0 0% 95%;
@@ -71,7 +71,7 @@
     --ring: 220 70% 60%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    
+
     /* Command Deck Dark - Deep space gradients */
     --command-bg: linear-gradient(135deg, hsl(220 25% 12%), hsl(220 15% 8%));
     --starship-accent: hsl(220 70% 60%);
@@ -146,12 +146,12 @@
   background: hsl(var(--primary) / 0.5);
 }
 
-/* 
- * COMMAND DECK UTILITY CLASSES
- * ============================
+/*
+ * STARSHIP UTILITY CLASSES
+ * =========================
  * Pre-built classes for consistent theming across components
  */
-.command-deck-bg {
+.starship-bg {
   background: var(--command-bg);
   /* Performance: Promote to composite layer for smooth animations */
   will-change: background;
@@ -185,7 +185,7 @@
   --border: 220 15% 20%;
   --input: 220 15% 20%;
   --ring: 220 70% 60%;
-  
+
   /* Ensure text color is applied */
   color: hsl(var(--foreground));
 }
@@ -335,8 +335,8 @@
 
   /* Hide scrollbar for IE, Edge and Firefox */
   .scrollbar-hide {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
   }
 
   /* Animation delay utility for staggered animations */
@@ -388,7 +388,8 @@
 
   /* Performance optimized animations */
   @keyframes float {
-    0%, 100% {
+    0%,
+    100% {
       transform: translateY(0px);
     }
     50% {
@@ -397,12 +398,13 @@
   }
 
   @keyframes pulse-glow {
-    0%, 100% {
-      box-shadow: 0 0 20px rgba(255,255,255,0.1);
+    0%,
+    100% {
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
       transform: scale(1);
     }
     50% {
-      box-shadow: 0 0 30px rgba(255,255,255,0.2);
+      box-shadow: 0 0 30px rgba(255, 255, 255, 0.2);
       transform: scale(1.05);
     }
   }

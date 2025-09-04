@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react';
-import { useStarshipStore } from '@/store/starship-store';
+import { useEffect, useRef } from 'react'
+import { useStarships } from '@/hooks/useStarships'
 
 interface UseStarshipsLoaderOptions {
-  enabled?: boolean;
-  refetchOnWindowFocus?: boolean;
-  refetchOnVisibilityChange?: boolean;
-  refetchInterval?: number;
+  enabled?: boolean
+  refetchOnWindowFocus?: boolean
+  refetchOnVisibilityChange?: boolean
+  refetchInterval?: number
 }
 
 /**
@@ -13,100 +13,94 @@ interface UseStarshipsLoaderOptions {
  * Prevents multiple simultaneous API calls
  */
 export function useStarshipsLoader(options: UseStarshipsLoaderOptions = {}) {
-  const {
-    enabled = true,
-    refetchOnWindowFocus = false,
-    refetchOnVisibilityChange = false,
-    refetchInterval = 0
-  } = options;
+  const { enabled = true, refetchOnWindowFocus = false, refetchOnVisibilityChange = false, refetchInterval = 0 } = options
 
-  const loadUserStarships = useStarshipStore(state => state.loadUserStarships);
-  const starships = useStarshipStore(state => state.starships);
-  const loadingStarships = useStarshipStore(state => state.loadingStarships);
-  
-  const isLoadingRef = useRef(false);
-  const lastFetchRef = useRef<number>(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  const { data: starshipsResponse, isLoading: loadingStarships, refetch } = useStarships()
+  const starships = starshipsResponse?.starships || []
+
+  const isLoadingRef = useRef(false)
+  const lastFetchRef = useRef<number>(0)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   // Debounced load function to prevent rapid successive calls
   const loadStarshipsDebounced = async () => {
-    const now = Date.now();
-    const timeSinceLastFetch = now - lastFetchRef.current;
-    
+    const now = Date.now()
+    const timeSinceLastFetch = now - lastFetchRef.current
+
     // Prevent calls if already loading or if called within 1 second
     if (isLoadingRef.current || timeSinceLastFetch < 1000) {
-      return;
+      return
     }
 
-    isLoadingRef.current = true;
-    lastFetchRef.current = now;
-    
+    isLoadingRef.current = true
+    lastFetchRef.current = now
+
     try {
-      await loadUserStarships();
+      await refetch()
     } finally {
-      isLoadingRef.current = false;
+      isLoadingRef.current = false
     }
-  };
+  }
 
-  // Initial load
+  // Initial load - TanStack Query handles this automatically, but respecting the enabled option
   useEffect(() => {
     if (enabled && !loadingStarships && starships.length === 0) {
-      loadStarshipsDebounced();
+      loadStarshipsDebounced()
     }
-  }, [enabled]); // Only depend on enabled, not on functions or data
+  }, [enabled]) // Only depend on enabled, not on functions or data
 
   // Window focus refetch
   useEffect(() => {
-    if (!refetchOnWindowFocus || !enabled) return;
+    if (!refetchOnWindowFocus || !enabled) return
 
     const handleFocus = () => {
-      const timeSinceLastFetch = Date.now() - lastFetchRef.current;
+      const timeSinceLastFetch = Date.now() - lastFetchRef.current
       // Only refetch if more than 30 seconds have passed
       if (timeSinceLastFetch > 30000) {
-        loadStarshipsDebounced();
+        loadStarshipsDebounced()
       }
-    };
+    }
 
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [refetchOnWindowFocus, enabled]);
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [refetchOnWindowFocus, enabled])
 
   // Visibility change refetch
   useEffect(() => {
-    if (!refetchOnVisibilityChange || !enabled) return;
+    if (!refetchOnVisibilityChange || !enabled) return
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        const timeSinceLastFetch = Date.now() - lastFetchRef.current;
+        const timeSinceLastFetch = Date.now() - lastFetchRef.current
         // Only refetch if more than 30 seconds have passed
         if (timeSinceLastFetch > 30000) {
-          loadStarshipsDebounced();
+          loadStarshipsDebounced()
         }
       }
-    };
+    }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [refetchOnVisibilityChange, enabled]);
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [refetchOnVisibilityChange, enabled])
 
   // Interval refetch
   useEffect(() => {
-    if (!refetchInterval || !enabled) return;
+    if (!refetchInterval || !enabled) return
 
     intervalRef.current = setInterval(() => {
-      loadStarshipsDebounced();
-    }, refetchInterval);
+      loadStarshipsDebounced()
+    }, refetchInterval)
 
     return () => {
       if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+        clearInterval(intervalRef.current)
       }
-    };
-  }, [refetchInterval, enabled]);
+    }
+  }, [refetchInterval, enabled])
 
   return {
     loadStarships: loadStarshipsDebounced,
     isLoading: loadingStarships,
-    starships
-  };
+    starships,
+  }
 }

@@ -78,9 +78,7 @@ async function setupStripe() {
     const existingProducts = await stripe.products.list({ limit: 100, active: true });
 
     for (const [key, config] of Object.entries(PRODUCTS)) {
-      let product = existingProducts.data.find(
-        (p) => p.metadata.plan_type === config.metadata.plan_type
-      );
+      let product = existingProducts.data.find((p) => p.metadata.plan_type === config.metadata.plan_type);
 
       if (product) {
         console.log(`✅ Product already exists: ${product.name} (${product.id})`);
@@ -102,9 +100,7 @@ async function setupStripe() {
       let monthlyPrice = existingPrices.data.find((p) => p.recurring?.interval === 'month');
 
       if (monthlyPrice) {
-        console.log(
-          `  💵 Monthly price exists: $${monthlyPrice.unit_amount! / 100}/month (${monthlyPrice.id})`
-        );
+        console.log(`  💵 Monthly price exists: $${monthlyPrice.unit_amount! / 100}/month (${monthlyPrice.id})`);
       } else {
         console.log(`  📝 Creating monthly price: $${monthlyConfig.amount / 100}/month`);
         monthlyPrice = await stripe.prices.create({
@@ -124,9 +120,7 @@ async function setupStripe() {
       let yearlyPrice = existingPrices.data.find((p) => p.recurring?.interval === 'year');
 
       if (yearlyPrice) {
-        console.log(
-          `  💵 Yearly price exists: $${yearlyPrice.unit_amount! / 100}/year (${yearlyPrice.id})`
-        );
+        console.log(`  💵 Yearly price exists: $${yearlyPrice.unit_amount! / 100}/year (${yearlyPrice.id})`);
       } else {
         console.log(`  📝 Creating yearly price: $${yearlyConfig.amount / 100}/year`);
         yearlyPrice = await stripe.prices.create({

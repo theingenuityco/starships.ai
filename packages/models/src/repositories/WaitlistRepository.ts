@@ -1,5 +1,5 @@
-import { Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import { ValidationError, DatabaseError } from '@starships/errors';
 import { WaitlistEntryModel } from '@starships/protocol';
 
@@ -16,7 +16,7 @@ export class WaitlistRepository extends BaseRepository {
    */
   async checkApproval(email: string): Promise<boolean> {
     const normalizedEmail = this.normalizeEmail(email);
-    
+
     if (!this.isValidEmail(normalizedEmail)) {
       throw new ValidationError(
         'Invalid email format',
@@ -33,10 +33,9 @@ export class WaitlistRepository extends BaseRepository {
         RETURN w IS NOT NULL as isApproved
       `;
 
-      const result = await this.connection.executeQuery<{ isApproved: boolean }>(
-        query,
-        { email: normalizedEmail }
-      );
+      const result = await this.connection.executeQuery<{ isApproved: boolean }>(query, {
+        email: normalizedEmail,
+      });
 
       return result.length > 0 ? result[0].isApproved : false;
     } catch (error) {
@@ -49,17 +48,16 @@ export class WaitlistRepository extends BaseRepository {
    */
   async getByEmail(email: string): Promise<WaitlistEntryModel | null> {
     const normalizedEmail = this.normalizeEmail(email);
-    
+
     try {
       const query = `
         MATCH (w:Waitlist {email: $email})
         RETURN w {.email, .status, .createdAt, .notes} as entry
       `;
 
-      const result = await this.connection.executeQuery<{ entry: WaitlistEntryModel }>(
-        query,
-        { email: normalizedEmail }
-      );
+      const result = await this.connection.executeQuery<{ entry: WaitlistEntryModel }>(query, {
+        email: normalizedEmail,
+      });
 
       return result.length > 0 ? result[0].entry : null;
     } catch (error) {
@@ -70,12 +68,9 @@ export class WaitlistRepository extends BaseRepository {
   /**
    * Add a new approved email to the waitlist
    */
-  async addApprovedEmail(
-    email: string,
-    notes?: string
-  ): Promise<WaitlistEntryModel> {
+  async addApprovedEmail(email: string, notes?: string): Promise<WaitlistEntryModel> {
     const normalizedEmail = this.normalizeEmail(email);
-    
+
     if (!this.isValidEmail(normalizedEmail)) {
       throw new ValidationError(
         'Invalid email format',
@@ -97,13 +92,10 @@ export class WaitlistRepository extends BaseRepository {
         RETURN w {.email, .status, .createdAt, .notes} as entry
       `;
 
-      const result = await this.connection.executeWrite<{ entry: WaitlistEntryModel }>(
-        query,
-        {
-          email: normalizedEmail,
-          notes: notes || null
-        }
-      );
+      const result = await this.connection.executeWrite<{ entry: WaitlistEntryModel }>(query, {
+        email: normalizedEmail,
+        notes: notes || null,
+      });
 
       if (result.length === 0) {
         throw new DatabaseError(
@@ -134,7 +126,7 @@ export class WaitlistRepository extends BaseRepository {
       `;
 
       const result = await this.connection.executeQuery<{ entry: WaitlistEntryModel }>(query);
-      return result.map(r => r.entry);
+      return result.map((r) => r.entry);
     } catch (error) {
       this.handleDatabaseError(error, 'getAllApproved', 'Waitlist');
     }
@@ -188,16 +180,16 @@ export class WaitlistRepository extends BaseRepository {
     const initialEmails = [
       {
         email: 'dewang@theingenuity.co',
-        notes: 'Founder - Primary tester'
+        notes: 'Founder - Primary tester',
       },
       {
         email: 'rudra@theingenuity.co',
-        notes: 'Team member - Alpha tester'
+        notes: 'Team member - Alpha tester',
       },
       {
         email: 'prashant@theingenuity.co',
-        notes: 'Team member - Alpha tester'
-      }
+        notes: 'Team member - Alpha tester',
+      },
     ];
 
     for (const { email, notes } of initialEmails) {

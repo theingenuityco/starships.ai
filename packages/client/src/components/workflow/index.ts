@@ -1,6 +1,6 @@
 /**
  * Workflow Components
- * 
+ *
  * Frontend components for workflow DSL visualization, approval, and management.
  */
 

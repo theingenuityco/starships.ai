@@ -1,15 +1,13 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'motion/react'
+import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
-import { AuthGate } from '@/components/auth/AuthGate'
-import { useStarshipStore } from '@/store/starship-store'
-import { useCommandDeckKeyboard } from '@/hooks/useCommandDeckKeyboard'
 import { useAuth } from '@/hooks/useAuth'
-import { useState, useEffect } from 'react'
-import { Menu } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Menu } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -29,7 +27,7 @@ const pageVariants = {
 }
 
 // const LoadingSpinner = () => (
-//   <div className="flex items-center justify-center h-screen command-deck-bg">
+//   <div className="flex items-center justify-center h-screen bg-background">
 //     <motion.div
 //       className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full"
 //       animate={{ rotate: 360 }}
@@ -40,16 +38,13 @@ const pageVariants = {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
-  const { expandCommandDeck } = useStarshipStore()
   useAuth() // Keep the hook call but don't destructure unused values
   const isDashboard = pathname === '/'
   const isWaitlist = pathname === '/waitlist'
 
-  // Enable keyboard shortcuts only for authenticated users
-  useCommandDeckKeyboard()
-
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
 
   useEffect(() => {
     const checkMobile = () => {
@@ -62,28 +57,22 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [])
 
   if (isDashboard || isWaitlist) {
-    // Landing page and waitlist routes - no CommandDeck, no authentication required
+    // Landing page and waitlist routes - no authentication required
     return (
       <AnimatePresence mode="wait">
-        <motion.div
-          key={pathname}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="h-full w-full"
-        >
+        <motion.div key={pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full">
           {children}
         </motion.div>
       </AnimatePresence>
     )
   }
 
-  // Hide navigation on all fleet-level routes (only show inside starship context)
+  // Hide navigation on all routes except starship routes (only show inside starship context)
   const shouldHideNavigation = !pathname.startsWith('/ship/')
 
   // Regular pages with conditional navigation sidebar
   return (
-    <AuthGate>
+    <JwtAuthGate>
       <div className="h-screen flex relative overflow-hidden">
         {/* Navigation Sidebar with gutter (16px) - conditionally rendered */}
         {!shouldHideNavigation && (
@@ -93,8 +82,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
               className="w-full h-full bg-background/70 backdrop-blur-lg border-r border-border/40 shadow-xl overflow-hidden"
-              onMouseEnter={() => useStarshipStore.getState().setCommandDeckHover(true)}
-              onMouseLeave={() => useStarshipStore.getState().setCommandDeckHover(false)}
             >
               <Navigation mode="sidebar" isMobile={isMobile} />
             </motion.aside>
@@ -106,7 +93,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           <motion.button
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            onClick={expandCommandDeck}
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
             className="fixed top-4 left-4 z-50 p-3 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
             aria-label="Open navigation menu"
           >
@@ -135,6 +122,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           </motion.main>
         </AnimatePresence>
       </div>
-    </AuthGate>
+    </JwtAuthGate>
   )
 }

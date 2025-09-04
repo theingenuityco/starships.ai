@@ -20,15 +20,17 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 ## 🏗️ Architecture
 
 ### Tech Stack
+
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript 5.8+
 - **Styling**: Tailwind CSS + shadcn/ui components
-- **State Management**: Zustand with sophisticated starship store
+- **State Management**: TanStack Query for data operations + Zustand for UI state
 - **Animations**: Framer Motion for smooth transitions
 - **Theme**: next-themes for dark/light mode
-- **Authentication**: Kinde integration
+- **Authentication**: JWT-based authentication
 
 ### Key Features
+
 - ✅ **Clean Navigation Architecture**: Extracted from command-deck spaghetti into dedicated components
 - ✅ **Command Deck**: Mission control dashboard with comprehensive controls
 - ✅ **Responsive Design**: Mobile-first with adaptive layouts
@@ -44,9 +46,7 @@ src/
 │   ├── client-layout.tsx        # Main layout with navigation sidebar
 │   ├── command-deck/page.tsx    # Command Deck dashboard page
 │   ├── crew/page.tsx            # Crew management page
-│   ├── drive/page.tsx           # Starship drive systems page
 │   ├── expeditions/page.tsx     # Expeditions management page
-│   ├── logbook/page.tsx         # Mission logbook page
 │   └── sibil/page.tsx           # AI assistant page
 ├── components/
 │   ├── navigation/              # Clean navigation system
@@ -61,17 +61,18 @@ src/
 │   ├── ui/                      # shadcn/ui components
 │   └── theme-provider.tsx       # Theme system provider
 ├── store/
-│   └── starship-store.ts        # Zustand store (556 lines)
-├── hooks/                       # Custom React hooks
+│   └── starship-ui-store.ts     # Zustand UI state store
+├── hooks/                       # Custom React hooks (including TanStack Query hooks)
 └── lib/                         # Utilities and configurations
 ```
 
 ## 🔧 Development
 
 ### Scripts
+
 ```bash
 pnpm dev          # Start development server
-pnpm build        # Build for production  
+pnpm build        # Build for production
 pnpm start        # Start production server
 pnpm lint         # Run ESLint
 pnpm lint:fix     # Fix ESLint issues
@@ -80,9 +81,10 @@ pnpm type-check   # TypeScript compilation check
 ```
 
 ### Environment Variables
+
 ```env
-# Backend API URL
-NEXT_PUBLIC_API_URL=http://localhost:4000
+# Backend API URL (automatically configured via SERVER_URL)
+SERVER_URL=http://localhost:4000
 ```
 
 ## 🎨 UI Components
@@ -95,6 +97,7 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - **ScrollArea**: Message list scrolling
 
 ### Theme System
+
 - Automatic dark/light mode detection
 - Manual theme toggle in header
 - CSS custom properties for consistent theming
@@ -103,6 +106,7 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 ## 🧭 Navigation Architecture (Recently Cleaned)
 
 ### Before: Spaghetti Architecture
+
 ```
 ❌ src/components/command-deck/
 ├── NavigationBridge.tsx           # Unnecessary wrapper
@@ -112,6 +116,7 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 ```
 
 ### After: Clean Separation
+
 ```
 ✅ src/components/navigation/       # Dedicated navigation folder
 ├── Navigation.tsx                 # Main navigation component
@@ -125,21 +130,30 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 ```
 
 ### Route Structure
-- **Command Deck**: `/command-deck` - Mission control dashboard
-- **Core Systems**: `/crew`, `/drive` - Starship management
-- **Operations**: `/expeditions`, `/logbook`, `/sibil` - Mission operations
 
-## 💾 Data Persistence
+- **Command Deck**: `/command-deck` - Mission control dashboard
+- **Core Systems**: `/crew` - Starship management
+- **Operations**: `/expeditions`, `/sibil` - Mission operations
+
+## 💾 Data Management
+
+### Architecture
+
+- **TanStack Query**: Server state management with optimistic updates, caching, and background refetching
+- **UI State**: Zustand store for client-side UI state (active starship selection, navigation)
+- **Persistence**: localStorage integration for UI preferences
 
 ### Starship Management
-- **Starship Selection**: Multi-starship support with status tracking
-- **Power Management**: Real-time power level monitoring
-- **Expedition Tracking**: Active expedition counting
-- **Insights**: AI-generated insights and recommendations
+
+- **Starship Selection**: Multi-starship support with status tracking via TanStack Query
+- **Real-time Data**: Automatic background refetching and cache invalidation
+- **Optimistic Updates**: Instant UI updates with rollback on errors
+- **Error Handling**: Comprehensive error boundaries and user feedback
 
 ## 🧪 Testing
 
 ### Current Status
+
 - ✅ TypeScript compilation
 - ✅ ESLint configuration
 - 🔄 **TODO**: Unit tests with React Testing Library
@@ -147,10 +161,11 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - 🔄 **TODO**: Accessibility testing
 
 ### Planned Test Coverage
+
 ```bash
 # Future test commands
 pnpm test          # Run unit tests
-pnpm test:e2e      # Run E2E tests  
+pnpm test:e2e      # Run E2E tests
 pnpm test:a11y     # Run accessibility tests
 pnpm test:coverage # Generate coverage report
 ```
@@ -158,12 +173,14 @@ pnpm test:coverage # Generate coverage report
 ## 🚀 Deployment
 
 ### Production Build
+
 ```bash
 pnpm build    # Creates optimized build
 pnpm start    # Starts production server on port 3000
 ```
 
 ### Docker
+
 ```dockerfile
 FROM node:20-alpine
 WORKDIR /app
@@ -176,6 +193,7 @@ CMD ["npm", "start"]
 ```
 
 ### Environment Setup
+
 - **Development**: `http://localhost:4000`
 - **Staging**: `https://staging-api.starships.ai`
 - **Production**: `[API-DOMAIN-URL]`
@@ -185,10 +203,11 @@ CMD ["npm", "start"]
 ### Common Issues
 
 1. **Backend Connection Failed**
+
    ```bash
    # Check environment variable
-   echo $NEXT_PUBLIC_API_URL
-   
+   echo $SERVER_URL
+
    # Verify backend is running
    curl http://localhost:4000/v1/agents
    ```
@@ -200,14 +219,15 @@ CMD ["npm", "start"]
 
 3. **Chat History Lost**
    - Check browser localStorage quota
-   - Verify session ID consistency
    - Check for incognito/private browsing mode
+   - Verify backend session endpoints are accessible
 
 4. **TypeScript Errors**
+
    ```bash
    # Check for compilation issues
    pnpm type-check
-   
+
    # Update dependencies
    pnpm update
    ```
@@ -215,6 +235,7 @@ CMD ["npm", "start"]
 ## 🛣️ Roadmap
 
 ### Phase 3 (Next)
+
 - [ ] **Testing Setup**: Jest + React Testing Library
 - [ ] **Error Boundaries**: Component crash protection
 - [ ] **Accessibility**: ARIA labels, keyboard navigation
@@ -222,6 +243,7 @@ CMD ["npm", "start"]
 - [ ] **PWA**: Service worker, offline support
 
 ### Future Enhancements
+
 - [ ] **Real-time**: WebSocket integration
 - [ ] **Voice**: Speech-to-text input
 - [ ] **Files**: Drag-and-drop file sharing
@@ -244,6 +266,7 @@ CMD ["npm", "start"]
 5. **Testing**: Add tests for new features (TODO)
 
 ### Development Workflow
+
 ```bash
 # 1. Create feature branch
 git checkout -b feature/new-feature
@@ -268,4 +291,4 @@ Part of the Starships.ai project. See main repository for license details.
 
 ---
 
-**Need Help?** Check the troubleshooting section above or refer to the detailed documentation links. 
+**Need Help?** Check the troubleshooting section above or refer to the detailed documentation links.

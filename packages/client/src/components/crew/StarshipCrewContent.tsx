@@ -2,26 +2,17 @@
 
 import { useState, useEffect } from 'react'
 // import { motion, AnimatePresence } from 'motion/react'
-import {
-  Agent,
-  MCPServerConnector,
-  mcpServerAPI,
-  starshipAPI,
-  Starship,
-} from '@/lib/api'
+import { Agent, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
-import { ChatInterface } from '@/components/chat/ChatInterface'
+import { ChatInterface } from '@/components/session/ChatInterface'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  ArrowLeft, Users, Plug, Bot, Loader2, Activity,
-  Shield, Zap, MessageSquare, Info
-} from 'lucide-react'
+import { ArrowLeft, Users, Plug, Bot, Loader2, Activity, Shield, Zap, MessageSquare, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
-import { useStarshipStore } from '@/store/starship-store'
+import { useStarships, useStarshipBySlug } from '@/hooks/useStarships'
 
 interface StarshipCrewContentProps {
   slug: string
@@ -30,11 +21,12 @@ interface StarshipCrewContentProps {
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [starship, setStarship] = useState<Starship | null>(null)
-  const [starshipLoading, setStarshipLoading] = useState(true)
   const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
-  const { starships } = useStarshipStore()
+  const { data: starshipsResponse } = useStarships()
+  const { data: starshipData, isLoading: starshipLoading, error: starshipError } = useStarshipBySlug(slug)
+  const starships = starshipsResponse?.starships || []
+  const starship = starshipData?.starship || null
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
@@ -62,7 +54,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   // State for info button animation
   const [animateInfoButton, setAnimateInfoButton] = useState(false)
-  
+
   // State for tools count
   const [configuredToolsCount, setConfiguredToolsCount] = useState(0)
 
@@ -79,31 +71,21 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const handleTabChange = (value: string) => {
     // Skip connectors tab since it's hidden
     if (value === 'connectors') {
-      return;
+      return
     }
     setCurrentTab(value)
   }
 
-  // Fetch starship data on component mount
+  // Handle starship loading error with toast
   useEffect(() => {
-    const fetchStarship = async () => {
-      try {
-        setStarshipLoading(true)
-        const data = await starshipAPI.getStarshipBySlug(slug)
-        setStarship(data.starship)
-      } catch (error) {
-        console.error('Failed to fetch starship:', error)
-        toast({
-          title: 'Error',
-          description: 'Failed to load starship data',
-          variant: 'destructive',
-        })
-      } finally {
-        setStarshipLoading(false)
-      }
+    if (starshipError) {
+      toast({
+        title: 'Error',
+        description: 'Failed to load starship data',
+        variant: 'destructive',
+      })
     }
-    fetchStarship()
-  }, [slug, toast])
+  }, [starshipError, toast])
 
   // Check if this is the user's first starship and show onboarding
   useEffect(() => {
@@ -158,16 +140,11 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         {/* Background gradient effect - reduced opacity */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/5" />
-        
+
         <div className="relative flex items-center justify-between px-8 py-6 backdrop-blur-sm border-b border-border/40">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all -ml-2 px-2"
-              asChild
-            >
-              <Link href="/fleet">
+            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all -ml-2 px-2" asChild>
+              <Link href="/">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
@@ -182,20 +159,10 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 </div>
                 <div className="flex flex-col">
                   <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-                      Crew Console
-                    </h1>
-                    <button
-                      onClick={handleShowInfo}
-                      className="rounded-full p-0 hover:opacity-80 transition-all relative"
-                      title="Crew Console Guide"
-                    >
-                      <Info className={`h-6 w-6 text-emerald-500 transition-all ${
-                        animateInfoButton ? 'scale-110' : ''
-                      }`} />
-                      {animateInfoButton && (
-                        <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping-slow" />
-                      )}
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Crew Console</h1>
+                    <button onClick={handleShowInfo} className="rounded-full p-0 hover:opacity-80 transition-all relative" title="Crew Console Guide">
+                      <Info className={`h-6 w-6 text-emerald-500 transition-all ${animateInfoButton ? 'scale-110' : ''}`} />
+                      {animateInfoButton && <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping-slow" />}
                     </button>
                   </div>
                   <p className="text-sm text-muted-foreground">Manage your AI agents and connectors</p>
@@ -276,16 +243,11 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
       {/* Enhanced Main Content Layout */}
       <div className="grid grid-cols-[380px_1fr] flex-1 min-h-0">
         {/* Enhanced Left Sidebar */}
-        <div
-          className="border-r border-border/40 bg-gradient-to-br from-card/60 to-card/40 backdrop-blur-sm shadow-lg flex flex-col min-h-0"
-        >
+        <div className="border-r border-border/40 bg-gradient-to-br from-card/60 to-card/40 backdrop-blur-sm shadow-lg flex flex-col min-h-0">
           <div className="p-6 pb-0 flex flex-col h-full min-h-0">
             <Tabs value={currentTab} onValueChange={handleTabChange} className="flex flex-col h-full">
               <TabsList className="grid w-full grid-cols-2 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
-                <TabsTrigger 
-                  value="agents" 
-                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-                >
+                <TabsTrigger value="agents" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all">
                   <Bot className="h-4 w-4" />
                   Agents
                 </TabsTrigger>
@@ -296,8 +258,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                   <Plug className="h-4 w-4" />
                   Connectors
                 </TabsTrigger> */}
-                <TabsTrigger 
-                  value="api-keys" 
+                <TabsTrigger
+                  value="api-keys"
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
                 >
                   <Zap className="h-4 w-4" />
@@ -305,38 +267,30 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent
-                value="agents"
-                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
-              >
+              <TabsContent value="agents" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
                 {/* <AnimatePresence mode="wait"> */}
-                  <div
-                    key="agents-content"
-                    className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar"
-                  >
-                    {starshipLoading ? (
-                      <div className="flex items-center justify-center h-full">
-                        <div
-                          className="text-center"
-                        >
-                          <div className="relative">
-                            <div className="absolute inset-0 bg-primary/5 blur-sm" />
-                            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4 relative" />
-                          </div>
-                          <p className="text-sm text-muted-foreground font-medium">Discovering available agents...</p>
+                <div key="agents-content" className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar">
+                  {starshipLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="relative">
+                          <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4 relative" />
                         </div>
+                        <p className="text-sm text-muted-foreground font-medium">Discovering available agents...</p>
                       </div>
-                    ) : (
-                      <AgentSelector
-                        selectedAgent={selectedAgent}
-                        onAgentSelect={handleAgentSelect}
-                        showCreateButton={true}
-                        showFilters={true}
-                        starshipId={starship?.id}
-                        onAgentsCountChange={setAgentsCount}
-                      />
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <AgentSelector
+                      selectedAgent={selectedAgent}
+                      onAgentSelect={handleAgentSelect}
+                      showCreateButton={true}
+                      showFilters={true}
+                      starshipId={starship?.id}
+                      onAgentsCountChange={setAgentsCount}
+                    />
+                  )}
+                </div>
                 {/* </AnimatePresence> */}
               </TabsContent>
 
@@ -384,19 +338,10 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 </AnimatePresence>
               </TabsContent> */}
 
-              <TabsContent
-                value="api-keys"
-                className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0"
-              >
-                <div
-                  key="api-keys-content"
-                  className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar"
-                >
+              <TabsContent value="api-keys" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
+                <div key="api-keys-content" className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar">
                   {starship?.id ? (
-                    <NativeToolApiKeys 
-                      starshipId={starship.id} 
-                      onConfiguredCountChange={setConfiguredToolsCount}
-                    />
+                    <NativeToolApiKeys starshipId={starship.id} onConfiguredCountChange={setConfiguredToolsCount} />
                   ) : (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">
@@ -412,41 +357,21 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         </div>
 
         {/* Enhanced Right Content Area */}
-        <div
-          className="bg-gradient-to-br from-background via-background to-muted/5 overflow-hidden h-full"
-        >
+        <div className="bg-gradient-to-br from-background via-background to-muted/5 overflow-hidden h-full">
           {selectedAgent ? (
-            <ChatInterface
-              agent={selectedAgent}
-              sessionId={sessionId}
-              onSessionCreated={handleSessionCreated}
-              starshipSlug={slug}
-            />
+            <ChatInterface agent={selectedAgent} sessionId={sessionId} onSessionCreated={handleSessionCreated} starshipSlug={slug} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full">
-              <div
-                className="bg-gradient-to-br from-card via-card/95 to-primary/5 p-10 rounded-2xl text-center max-w-lg shadow-xl border border-primary/20"
-              >
+              <div className="bg-gradient-to-br from-card via-card/95 to-primary/5 p-10 rounded-2xl text-center max-w-lg shadow-xl border border-primary/20">
                 <div className="mb-8">
                   <MessageSquare className="h-16 w-16 text-primary mx-auto" />
                 </div>
-                
-                <h3
-                  className="text-2xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent"
-                >
-                  Ready to Chat
-                </h3>
-                
-                <p
-                  className="text-muted-foreground mb-8 leading-relaxed"
-                >
-                  Select an AI agent from the sidebar to begin your conversation. Each agent has unique capabilities and specializations.
-                </p>
-                
-                <div
-                  className="space-y-4"
-                >
-                  
+
+                <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Ready to Chat</h3>
+
+                <p className="text-muted-foreground mb-8 leading-relaxed">Select an AI agent from the sidebar to begin your conversation. Each agent has unique capabilities and specializations.</p>
+
+                <div className="space-y-4">
                   <div className="bg-gradient-to-r from-primary/10 to-cyan-500/10 rounded-lg p-4 text-sm text-muted-foreground flex items-center justify-center gap-2 border border-border/40">
                     <Shield className="h-4 w-4 text-primary flex-shrink-0" />
                     <span>Your conversations are secure and private</span>
@@ -457,7 +382,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
           )}
         </div>
       </div>
-
     </div>
   )
 }

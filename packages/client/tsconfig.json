@@ -2,28 +2,12 @@
   "extends": "../../tsconfig.nextjs.json",
   "compilerOptions": {
     /* Client-specific overrides if needed */
-    "lib": [
-      "ES2020",
-      "dom",
-      "dom.iterable"
-    ],
+    "lib": ["ES2020", "dom", "dom.iterable"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/__tests__/**/*",
-    ".next"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*", ".next"]
 }

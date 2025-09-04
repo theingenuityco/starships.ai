@@ -18,13 +18,7 @@ export type { Message, MemoryState, MemoryParams } from './Memory';
 
 // Agent memory system
 export { AgentMemory } from './AgentMemory';
-export type {
-  AgentIdentity,
-  AgentPurpose,
-  AgentSpace,
-  AgentMemoryState,
-  AgentMemoryParams
-} from './AgentMemory';
+export type { AgentIdentity, AgentPurpose, AgentSpace, AgentMemoryState, AgentMemoryParams } from './AgentMemory';
 
 // ===== LLM SYSTEM =====
 // Core LLM class for AI model interactions
@@ -47,7 +41,7 @@ export {
   OutputHandler,
   HttpRequestHandler,
   LlmHandler,
-  WorkflowHandler
+  WorkflowHandler,
 } from './nodes/handlers';
 
 // Validation
@@ -61,12 +55,12 @@ export type {
   Edge,
   NodeType,
   NodeParameters,
-  
+
   // Execution types
   Execution,
   NodeResult,
   ExecutionStatus,
-  
+
   // Node parameter types
   AgentNodeParameters,
   ConditionalNodeParameters,
@@ -75,59 +69,13 @@ export type {
   HttpRequestNodeParameters,
   LlmNodeParameters,
   WorkflowNodeParameters,
-  
+
   // Validation types
   ValidationResult,
   ValidationError,
   ValidationWarning,
-  ValidationSuggestion
+  ValidationSuggestion,
 } from './types';
 
 // Configuration
 export { config } from './constants';
-
-// Import classes for convenience functions
-import { Workflow } from './Workflow';
-import { Agent } from './Agent';
-import { LLM } from './LLM';
-import { HttpRequest } from './HttpRequest';
-import { Memory } from './Memory';
-import { AgentMemory } from './AgentMemory';
-import { Validator } from './validation/Validator';
-import { AgentNodeParameters, LlmNodeParameters, HttpRequestNodeParameters } from './types';
-
-// Create default instances for convenience
-const _defaultValidator = new Validator();
-
-// Export configured instances
-export const defaultValidator = _defaultValidator;
-
-// Helper function to create a new workflow with default handlers
-export const createWorkflow = (): Workflow => {
-  return new Workflow();
-};
-
-// Helper function to create a new agent
-export const createAgent = (config: AgentNodeParameters): Agent => {
-  return new Agent(config);
-};
-
-// Helper function to create basic memory
-export const createMemory = (params?: { state?: any; messages?: any[] }): Memory => {
-  return new Memory(params || {});
-};
-
-// Helper function to create agent memory
-export const createAgentMemory = (params?: { state?: any; messages?: any[] }): AgentMemory => {
-  return new AgentMemory(params || {});
-};
-
-// Helper function to create a new LLM
-export const createLLM = (config: LlmNodeParameters): LLM => {
-  return new LLM(config);
-};
-
-// Helper function to create a new HttpRequest
-export const createHttpRequest = (config: HttpRequestNodeParameters): HttpRequest => {
-  return new HttpRequest(config);
-};

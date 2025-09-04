@@ -1,14 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { starshipAPI, Starship } from '@/lib/api'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { useStarships } from '@/hooks/useStarships'
+import { Starship } from '@/lib/api'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, AlertCircle, Rocket } from 'lucide-react'
 
 interface StarshipSelectorProps {
@@ -20,41 +14,20 @@ interface StarshipSelectorProps {
   className?: string
 }
 
-export function StarshipSelector({
-  value,
-  onValueChange,
-  placeholder = 'Select a starship',
-  disabled = false,
-  className,
-}: StarshipSelectorProps) {
-  const [starships, setStarships] = useState<Starship[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const loadStarships = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const data = await starshipAPI.getUserStarshipsList()
-        setStarships(data)
-      } catch (err) {
-        console.error('Failed to load starships:', err)
-        setError('Failed to load starships')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadStarships()
-  }, [])
+export function StarshipSelector({ value, onValueChange, placeholder = 'Select a starship', disabled = false, className }: StarshipSelectorProps) {
+  const { data: starshipsData, isLoading: loading, error } = useStarships()
+  const starships = starshipsData?.starships || []
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     switch (starshipClass) {
-      case 'scout': return '🚀'
-      case 'cruiser': return '🛸'
-      case 'draught': return '🚢'
-      default: return '🚀'
+      case 'scout':
+        return '🚀'
+      case 'cruiser':
+        return '🛸'
+      case 'draught':
+        return '🚢'
+      default:
+        return '🚀'
     }
   }
 
@@ -71,7 +44,7 @@ export function StarshipSelector({
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-destructive/5 border-destructive/20">
         <AlertCircle className="w-4 h-4 text-destructive" />
-        <span className="text-sm text-destructive">{error}</span>
+        <span className="text-sm text-destructive">{error?.message || 'Failed to load starships'}</span>
       </div>
     )
   }
@@ -82,14 +55,11 @@ export function StarshipSelector({
         <Rocket className="w-8 h-8 text-muted-foreground" />
         <div>
           <p className="text-sm font-medium text-muted-foreground">No starships available</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Create a starship first to deploy agents
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">Create a starship first to deploy agents</p>
         </div>
       </div>
     )
   }
-
 
   return (
     <Select value={value} onValueChange={onValueChange} disabled={disabled}>

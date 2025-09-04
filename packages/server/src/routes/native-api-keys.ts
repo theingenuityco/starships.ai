@@ -1,34 +1,43 @@
 import { Router } from 'express';
 import type { Router as ExpressRouter } from 'express';
-import { authMiddleware } from '../middleware/auth';
-import { RepositoryFactory } from '@starships/models';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { StarshipRepository, NativeToolApiKeyRepository } from '@starships/models';
+import type { StandardErrorCode } from '@starships/protocol';
+import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
 
 const router: ExpressRouter = Router();
 
 /**
  * Get all native tool API keys for a starship
  */
-router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req, res) => {
+router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (req, res) => {
   try {
     const { starshipId } = req.params;
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+      return;
+    }
+
+    // Validate starshipId format
+    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
     // Verify user owns this starship
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     const starship = await starshipRepo.findById(starshipId);
 
     if (!starship || starship.ownerId !== userId) {
-      res.status(403).json({ error: 'Access denied' });
+      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
       return;
     }
 
     // Get API keys (returns decrypted keys)
-    const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+    const apiKeyRepo = new NativeToolApiKeyRepository();
     const apiKeys = await apiKeyRepo.getAllApiKeys(starshipId);
 
     // Return keys with masked values for security
@@ -42,87 +51,107 @@ router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req,
       }
     }
 
-    res.json(maskedKeys);
+    sendSuccess(res, maskedKeys);
   } catch (error) {
-    console.error('Error fetching API keys:', error);
-    res.status(500).json({ error: 'Failed to fetch API keys' });
+    if (!handleCommonError(error, res, 'fetching native API keys')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch API keys');
+    }
   }
 });
 
 /**
  * Save or update a native tool API key
  */
-router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req, res) => {
+router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (req, res) => {
   try {
     const { starshipId } = req.params;
     const { toolName, apiKey } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+      return;
+    }
+
+    // Validate starshipId format
+    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
     if (!toolName || !apiKey) {
-      res.status(400).json({ error: 'Tool name and API key are required' });
+      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'Tool name and API key are required', 400, {
+        required_fields: ['toolName', 'apiKey'],
+        provided: { toolName: !!toolName, apiKey: !!apiKey },
+      });
       return;
     }
 
     // Verify user owns this starship
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     const starship = await starshipRepo.findById(starshipId);
 
     if (!starship || starship.ownerId !== userId) {
-      res.status(403).json({ error: 'Access denied' });
+      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
       return;
     }
 
     // Save the API key (it will be encrypted)
-    const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+    const apiKeyRepo = new NativeToolApiKeyRepository();
     await apiKeyRepo.saveApiKey(starshipId, toolName, apiKey);
-    
+
     // Save additional config if provided - commented out since GitHub was removed
     // if (config && Object.keys(config).length > 0) {
     //   await apiKeyRepo.saveToolConfig(starshipId, toolName, config);
     // }
 
-    res.json({ success: true });
+    sendSuccess(res, { message: 'API key saved successfully' }, 201);
   } catch (error) {
-    console.error('Error saving API key:', error);
-    res.status(500).json({ error: 'Failed to save API key' });
+    if (!handleCommonError(error, res, 'saving native API key')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to save API key');
+    }
   }
 });
 
 /**
  * Delete a native tool API key
  */
-router.delete('/starships/:starshipId/native-api-keys/:toolName', authMiddleware, async (req, res) => {
+router.delete('/starships/:starshipId/native-api-keys/:toolName', jwtAuthMiddleware, async (req, res) => {
   try {
     const { starshipId, toolName } = req.params;
     const userId = req.user?.id;
 
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+      return;
+    }
+
+    // Validate starshipId format
+    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
     // Verify user owns this starship
-    const starshipRepo = RepositoryFactory.getStarshipRepository();
+    const starshipRepo = new StarshipRepository();
     const starship = await starshipRepo.findById(starshipId);
 
     if (!starship || starship.ownerId !== userId) {
-      res.status(403).json({ error: 'Access denied' });
+      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
       return;
     }
 
     // Delete the API key
-    const apiKeyRepo = RepositoryFactory.getNativeToolApiKeyRepository();
+    const apiKeyRepo = new NativeToolApiKeyRepository();
     await apiKeyRepo.deleteApiKey(starshipId, toolName);
 
-    res.json({ success: true });
+    sendSuccess(res, { message: 'API key deleted successfully' });
   } catch (error) {
-    console.error('Error deleting API key:', error);
-    res.status(500).json({ error: 'Failed to delete API key' });
+    if (!handleCommonError(error, res, 'deleting native API key')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to delete API key');
+    }
   }
 });
 

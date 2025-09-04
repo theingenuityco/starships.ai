@@ -1,6 +1,6 @@
 /**
  * Base Types
- * 
+ *
  * Core shared types and base interfaces used across the autopilot package
  */
 
@@ -14,16 +14,7 @@ export interface BaseNodeParameters {
 /**
  * Types of workflow nodes
  */
-export type NodeType =
-  | 'agent'
-  | 'conditional'
-  | 'user_prompt'
-  | 'output'
-  | 'start'
-  | 'end'
-  | 'http_request'
-  | 'llm'
-  | 'workflow';
+export type NodeType = 'agent' | 'conditional' | 'user_prompt' | 'output' | 'start' | 'end' | 'http_request' | 'llm' | 'workflow';
 
 /**
  * Base node interface (untyped parameters)

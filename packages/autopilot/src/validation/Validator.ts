@@ -1,10 +1,10 @@
 /**
  * Blueprint Validator
- * 
+ *
  * Validates workflow structure and configuration
  */
 
-import { Blueprint, ValidationResult, ValidationError, Node } from '../types';
+import { Blueprint, ValidationResult, ValidationError, Node } from '@/types';
 
 export class Validator {
   validate(workflow: Blueprint): ValidationResult {
@@ -16,15 +16,15 @@ export class Validator {
         errors.push({
           code: 'MISSING_REQUIRED_FIELD',
           message: 'Blueprint must have nodes',
-          severity: 'error'
+          severity: 'error',
         });
       }
 
       if (!workflow.edges || workflow.edges.length === 0) {
         errors.push({
-          code: 'MISSING_REQUIRED_FIELD', 
+          code: 'MISSING_REQUIRED_FIELD',
           message: 'Blueprint must have edges',
-          severity: 'error'
+          severity: 'error',
         });
       }
 
@@ -33,22 +33,22 @@ export class Validator {
       }
 
       // Check for required node types
-      const hasStart = workflow.nodes.some(node => node.type === 'start');
-      const hasEnd = workflow.nodes.some(node => node.type === 'end');
+      const hasStart = workflow.nodes.some((node) => node.type === 'start');
+      const hasEnd = workflow.nodes.some((node) => node.type === 'end');
 
       if (!hasStart) {
         errors.push({
           code: 'MISSING_START_NODE',
           message: 'Blueprint must have a start node',
-          severity: 'error'
+          severity: 'error',
         });
       }
 
       if (!hasEnd) {
         errors.push({
           code: 'MISSING_END_NODE',
-          message: 'Blueprint must have an end node', 
-          severity: 'error'
+          message: 'Blueprint must have an end node',
+          severity: 'error',
         });
       }
 
@@ -60,53 +60,50 @@ export class Validator {
         valid: errors.length === 0,
         errors,
         warnings: [],
-        suggestions: []
+        suggestions: [],
       };
-
     } catch (error) {
       errors.push({
         code: 'VALIDATION_FAILED',
         message: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        severity: 'error'
+        severity: 'error',
       });
 
       return {
         valid: false,
         errors,
         warnings: [],
-        suggestions: []
+        suggestions: [],
       };
     }
   }
 
   private validateConnectivity(workflow: Blueprint): ValidationError[] {
     const errors: ValidationError[] = [];
-    
+
     // Check for unreachable nodes
-    const startNode = workflow.nodes.find(node => node.type === 'start');
+    const startNode = workflow.nodes.find((node) => node.type === 'start');
     if (!startNode) return errors;
 
     const reachableNodes = this.findReachableNodes(workflow, startNode.ref);
-    const unreachableNodes = workflow.nodes.filter(node =>
-      !reachableNodes.has(node.ref) && node.type !== 'start'
-    );
+    const unreachableNodes = workflow.nodes.filter((node) => !reachableNodes.has(node.ref) && node.type !== 'start');
 
-    unreachableNodes.forEach(node => {
+    unreachableNodes.forEach((node) => {
       errors.push({
         code: 'UNREACHABLE_NODE',
         message: `Node '${node.name}' is not reachable from start node`,
         nodeRef: node.ref,
-        severity: 'error'
+        severity: 'error',
       });
     });
 
     // Check for circular dependencies
     const circularPaths = this.detectCircularDependencies(workflow);
-    circularPaths.forEach(path => {
+    circularPaths.forEach((path) => {
       errors.push({
         code: 'CIRCULAR_DEPENDENCY',
         message: `Circular dependency detected: ${path.join(' -> ')}`,
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -123,9 +120,7 @@ export class Validator {
 
       reachable.add(currentId);
 
-      workflow.edges
-        .filter(edge => edge.from === currentId)
-        .forEach(edge => queue.push(edge.to));
+      workflow.edges.filter((edge) => edge.from === currentId).forEach((edge) => queue.push(edge.to));
     }
 
     return reachable;
@@ -151,7 +146,7 @@ export class Validator {
       visited.add(nodeId);
       recursionStack.add(nodeId);
 
-      const outgoingEdges = workflow.edges.filter(edge => edge.from === nodeId);
+      const outgoingEdges = workflow.edges.filter((edge) => edge.from === nodeId);
       for (const edge of outgoingEdges) {
         dfs(edge.to, path.concat(nodeId));
       }
@@ -159,7 +154,7 @@ export class Validator {
       recursionStack.delete(nodeId);
     };
 
-    workflow.nodes.forEach(node => {
+    workflow.nodes.forEach((node) => {
       if (!visited.has(node.ref)) {
         dfs(node.ref, []);
       }

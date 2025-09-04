@@ -4,7 +4,7 @@
  * Types related to workflow execution runtime state and context
  */
 
-import type { AgentMemory } from '../AgentMemory';
+import type { AgentMemory } from '@/AgentMemory';
 
 /**
  * Workflow execution state
@@ -28,17 +28,10 @@ export interface NodeResult {
   metadata?: Record<string, unknown>;
 }
 
-
 /**
  * Workflow execution status
  */
-export type ExecutionStatus = 
-  | 'not_started'
-  | 'running'
-  | 'paused'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Workflow execution error
@@ -68,4 +61,3 @@ export type WorkflowErrorCode =
   | 'SYSTEM_ERROR'
   | 'VALIDATION_FAILED'
   | 'JSONATA_ERROR';
-  

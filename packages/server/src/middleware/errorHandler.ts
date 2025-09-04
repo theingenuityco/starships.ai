@@ -94,11 +94,7 @@ export function errorHandler(config: ErrorHandlerConfig = {}) {
 
   return (error: any, req: Request, res: Response, next: NextFunction): void => {
     // Use ErrorUtils.normalize from @starships/errors to convert error
-    const standardError = ErrorUtils.normalize(
-      error,
-      req.get('X-Request-ID'),
-      req.path
-    );
+    const standardError = ErrorUtils.normalize(error, req.get('X-Request-ID'), req.path);
 
     // Log server errors
     if (standardError.statusCode >= 500) {
@@ -132,9 +128,7 @@ export function errorHandler(config: ErrorHandlerConfig = {}) {
 /**
  * Async error wrapper for route handlers
  */
-export function asyncHandler<T extends Request, U extends Response>(
-  fn: (req: T, res: U, next: NextFunction) => Promise<any>
-) {
+export function asyncHandler<T extends Request, U extends Response>(fn: (req: T, res: U, next: NextFunction) => Promise<any>) {
   return (req: T, res: U, next: NextFunction): void => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };

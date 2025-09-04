@@ -1,11 +1,11 @@
 /**
  * StartHandler Tests
- * 
+ *
  * Tests for start node handler with simplified types
  */
 
-import { StartHandler } from '../StartHandler';
-import { Node, Execution } from '../../../types';
+import { StartHandler } from '@/nodes/handlers/StartHandler';
+import { Node, Execution } from '@/types';
 
 describe('StartHandler', () => {
   let handler: StartHandler;
@@ -18,7 +18,7 @@ describe('StartHandler', () => {
       type: 'start',
       name: 'Start Node',
       description: 'Starting point of workflow',
-      parameters: {}
+      parameters: {},
     };
     handler = new StartHandler(mockNode);
     mockExecution = global.createMockExecution();
@@ -27,10 +27,10 @@ describe('StartHandler', () => {
   describe('execute', () => {
     it('should execute successfully and store result', async () => {
       const result = await handler.execute(mockExecution);
-      
+
       expect(result.status).toBe('not_started');
       expect(result.executionResults.size).toBe(1);
-      
+
       const nodeResult = result.executionResults.get('start-node');
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('start-node');
@@ -39,11 +39,11 @@ describe('StartHandler', () => {
 
     it('should work with any execution state', async () => {
       const customExecution: Execution = global.createMockExecution({
-        status: 'running'
+        status: 'running',
       });
-      
+
       const result = await handler.execute(customExecution);
-      
+
       expect(result.status).toBe('running');
       const nodeResult = result.executionResults.get('start-node');
       expect(nodeResult?.error).toBeUndefined();
@@ -54,11 +54,11 @@ describe('StartHandler', () => {
       // Add some existing results
       mockExecution.executionResults.set('existing-node', {
         nodeRef: 'existing-node',
-        data: { test: 'data' }
+        data: { test: 'data' },
       });
-      
+
       const result = await handler.execute(mockExecution);
-      
+
       expect(result.executionResults.size).toBe(2);
       expect(result.executionResults.get('existing-node')).toBeDefined();
       expect(result.executionResults.get('start-node')).toBeDefined();
@@ -68,7 +68,7 @@ describe('StartHandler', () => {
       const beforeTime = new Date().getTime();
       const result = await handler.execute(mockExecution);
       const afterTime = new Date().getTime();
-      
+
       const nodeResult = result.executionResults.get('start-node');
       expect(nodeResult).toBeDefined();
     });
@@ -77,7 +77,7 @@ describe('StartHandler', () => {
   describe('validate', () => {
     it('should always return valid result', () => {
       const result = handler.validate();
-      
+
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
       expect(result.warnings).toHaveLength(0);

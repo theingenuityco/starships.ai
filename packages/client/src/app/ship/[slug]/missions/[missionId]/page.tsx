@@ -1,59 +1,59 @@
-'use client';
+'use client'
 
-import { use, useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Target, Clock, Calendar, Send, ChevronDown, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { missionApi } from '@/lib/missionApi';
-import { agentAPI } from '@/lib/api';
-import { useSocket } from '@/providers/socket-provider';
-import SocketClient from '@/lib/socket-client';
-import type { MissionModel, MissionStatus, MissionMessageModel, AgentModel, MissionClarityModel, MissionPhase } from '@starships/protocol';
-import { MISSION_PHASES } from '@starships/protocol';
-import { getMissionPhaseConfig } from '@/types';
-import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent';
-import { ExecutePhaseContent } from '@/components/missions/ExecutePhaseContent';
+import { use, useEffect, useState, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, Target, Clock, Calendar, Send, ChevronDown, ChevronRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { missionApi } from '@/lib/missionApi'
+import { agentAPI } from '@/lib/api'
+import { useSocket } from '@/providers/socket-provider'
+import SocketClient from '@/lib/socket-client'
+import type { MissionModel, MissionStatus, MissionMessageModel, AgentModel, MissionClarityModel, MissionPhase } from '@starships/protocol'
+import { MISSION_PHASES } from '@starships/protocol'
+import { getMissionPhaseConfig } from '@/types'
+import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent'
+import { ExecutePhaseContent } from '@/components/missions/ExecutePhaseContent'
 
 // Extended mission type for client-side usage (includes execution properties)
 interface ClientMissionModel extends MissionModel {
   executionResult?: {
-    success: boolean;
-    summary: string;
-    executedAt: string;
+    success: boolean
+    summary: string
+    executedAt: string
     nodeResults: Array<{
-      nodeId: string;
-      nodeName: string;
-      success: boolean;
-      output?: string;
-      error?: string;
-      timestamp: string;
-    }>;
-  };
+      nodeId: string
+      nodeName: string
+      success: boolean
+      output?: string
+      error?: string
+      timestamp: string
+    }>
+  }
   executionState?: {
-    status: string;
-    totalNodes: number;
-    currentNodeIndex: number;
-    startedAt: string;
-    completedAt?: string;
-    error?: string;
+    status: string
+    totalNodes: number
+    currentNodeIndex: number
+    startedAt: string
+    completedAt?: string
+    error?: string
     nodeResults?: Array<{
-      nodeId: string;
-      nodeName: string;
-      success: boolean;
-      output?: string;
-      error?: string;
-      timestamp: string;
-    }>;
-  };
+      nodeId: string
+      nodeName: string
+      success: boolean
+      output?: string
+      error?: string
+      timestamp: string
+    }>
+  }
 }
 
 interface MissionDetailPageProps {
   params: Promise<{
-    slug: string;
-    missionId: string;
-  }>;
+    slug: string
+    missionId: string
+  }>
 }
 
 const statusColors: Record<MissionStatus, string> = {
@@ -61,40 +61,40 @@ const statusColors: Record<MissionStatus, string> = {
   active: 'bg-blue-100 text-blue-800',
   completed: 'bg-green-100 text-green-800',
   failed: 'bg-red-100 text-red-800',
-  cancelled: 'bg-yellow-100 text-yellow-800'
-};
+  cancelled: 'bg-yellow-100 text-yellow-800',
+}
 
 const statusIcons: Record<MissionStatus, React.ReactNode> = {
   draft: <Clock className="w-4 h-4" />,
   active: <Target className="w-4 h-4" />,
   completed: <Target className="w-4 h-4" />,
   failed: <Target className="w-4 h-4" />,
-  cancelled: <Target className="w-4 h-4" />
-};
+  cancelled: <Target className="w-4 h-4" />,
+}
 
 export default function MissionDetailPage({ params }: MissionDetailPageProps) {
-  const { missionId } = use(params);
-  const router = useRouter();
-  const [mission, setMission] = useState<ClientMissionModel | null>(null);
-  const [agents, setAgents] = useState<AgentModel[]>([]);
-  const [agentsLoading, setAgentsLoading] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
+  const { missionId } = use(params)
+  const router = useRouter()
+  const [mission, setMission] = useState<ClientMissionModel | null>(null)
+  const [agents, setAgents] = useState<AgentModel[]>([])
+  const [agentsLoading, setAgentsLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
   // Clarity state
-  const [clarity, setClarity] = useState<MissionClarityModel | null>(null);
-  const [clarityUpdated, setClarityUpdated] = useState(false);
-  
+  const [clarity, setClarity] = useState<MissionClarityModel | null>(null)
+  const [clarityUpdated, setClarityUpdated] = useState(false)
+
   // Chat state
-  const [messages, setMessages] = useState<MissionMessageModel[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [messages, setMessages] = useState<MissionMessageModel[]>([])
+  const [newMessage, setNewMessage] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // WebSocket state
-  const { isConnected } = useSocket();
-  const socketClient = SocketClient.getInstance();
+  const { isConnected } = useSocket()
+  const socketClient = SocketClient.getInstance()
 
   // Collapsible sections state
   const [collapsedSections, setCollapsedSections] = useState({
@@ -105,63 +105,55 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     plan: false,
     execution: false,
     summary: false,
-    agentResults: false
-  });
+    agentResults: false,
+  })
 
   // Track expanded task outputs
-  const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(new Set());
+  const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(new Set())
 
   const toggleSection = (section: keyof typeof collapsedSections) => {
     setCollapsedSections(prev => ({
       ...prev,
-      [section]: !prev[section]
-    }));
-  };
+      [section]: !prev[section],
+    }))
+  }
 
   const toggleOutputExpansion = (nodeId: string) => {
     setExpandedOutputs(prev => {
-      const newSet = new Set(prev);
+      const newSet = new Set(prev)
       if (newSet.has(nodeId)) {
-        newSet.delete(nodeId);
+        newSet.delete(nodeId)
       } else {
-        newSet.add(nodeId);
+        newSet.add(nodeId)
       }
-      return newSet;
-    });
-  };
+      return newSet
+    })
+  }
 
   // Function to get agent emoji based on name and category (same logic as AgentCard)
   const getAgentEmoji = (agent: AgentModel) => {
     if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
-      return '🎧'; // Headphones emoji
-    } else if (
-      agent.name.toLowerCase().includes('data') ||
-      agent.name.toLowerCase().includes('analyst') ||
-      agent.category === 'analysis'
-    ) {
-      return '📊'; // Bar chart emoji
+      return '🎧' // Headphones emoji
+    } else if (agent.name.toLowerCase().includes('data') || agent.name.toLowerCase().includes('analyst') || agent.category === 'analysis') {
+      return '📊' // Bar chart emoji
     } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
-      return '✏️'; // Pencil emoji
-    } else if (
-      agent.name.toLowerCase().includes('code') ||
-      agent.name.toLowerCase().includes('coding') ||
-      agent.category === 'coding'
-    ) {
-      return '🔍'; // Magnifying glass emoji
+      return '✏️' // Pencil emoji
+    } else if (agent.name.toLowerCase().includes('code') || agent.name.toLowerCase().includes('coding') || agent.category === 'coding') {
+      return '🔍' // Magnifying glass emoji
     } else {
-      return '🤖'; // Robot emoji as default
+      return '🤖' // Robot emoji as default
     }
-  };
+  }
 
   // Local validation function for mission phases
   const isValidMissionPhase = (phase: string): phase is MissionPhase => {
-    return Object.values(MISSION_PHASES).includes(phase as MissionPhase);
-  };
+    return Object.values(MISSION_PHASES).includes(phase as MissionPhase)
+  }
 
   // Function to get current phase information using centralized config
   const getCurrentPhase = (currentPhase: string) => {
     if (isValidMissionPhase(currentPhase)) {
-      return getMissionPhaseConfig(currentPhase);
+      return getMissionPhaseConfig(currentPhase)
     }
     // Fallback for invalid phases
     return {
@@ -173,203 +165,203 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
         border: 'border-gray-200',
         text: 'text-gray-800',
       },
-    };
-  };
+    }
+  }
 
   // Central message handler - single source of truth
   const addMessageToUI = (message: MissionMessageModel) => {
-    setMessages(prev => [...prev, message]);
-  };
+    setMessages(prev => [...prev, message])
+  }
 
   // Handle workflow approval transitions
   const handleWorkflowApproval = (approved: boolean) => {
     if (approved) {
       // Workflow was approved, mission should transition to execute phase
       // This will be handled by the WebSocket event or we can optimistically update
-      setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null);
+      setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null))
     }
     // If rejected, stay in plan phase for regeneration
-  };
+  }
 
   const handleExecutionComplete = () => {
     // Execution completed, mission should transition to converse phase
-    setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null);
-  };
+    setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null))
+  }
 
   // WebSocket setup for mission messages and real-time updates
   useEffect(() => {
-    if (!isConnected || !socketClient) return;
+    if (!isConnected || !socketClient) return
 
     const handleMissionMessage = (data: any) => {
-      console.log('[MISSION] Received WebSocket message:', data);
+      console.log('[MISSION] Received WebSocket message:', data)
       if (data.message && data.missionId === missionId) {
-        addMessageToUI(data.message);
+        addMessageToUI(data.message)
       }
-    };
+    }
 
     const handleClarityUpdate = (data: any) => {
-      console.log('[MISSION] Received clarity update:', data);
+      console.log('[MISSION] Received clarity update:', data)
       if (data.missionId === missionId && data.clarity) {
-        setClarity(data.clarity);
-        setClarityUpdated(true);
+        setClarity(data.clarity)
+        setClarityUpdated(true)
         // Remove the update indicator after 3 seconds
-        setTimeout(() => setClarityUpdated(false), 3000);
+        setTimeout(() => setClarityUpdated(false), 3000)
       }
-    };
+    }
 
     const handlePhaseChange = async (data: any) => {
-      console.log('[MISSION] Received phase change:', data);
+      console.log('[MISSION] Received phase change:', data)
       if (data.missionId === missionId) {
         // Phase changes (especially to CONVERSE) might include new mission data like execution results
         // So we need to refetch the mission to get the complete updated state
         try {
-          const response = await missionApi.getMissionById(missionId);
+          const response = await missionApi.getMissionById(missionId)
           if (response.data) {
-            setMission(response.data.mission);
+            setMission(response.data.mission)
           } else {
             // Fallback to just updating the phase if refetch fails
-            setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: data.newPhase } : null);
+            setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: data.newPhase } : null))
           }
         } catch (error) {
-          console.error('Failed to refetch mission after phase change:', error);
+          console.error('Failed to refetch mission after phase change:', error)
           // Fallback to just updating the phase if refetch fails
-          setMission((prev: ClientMissionModel | null) => prev ? { ...prev, phase: data.newPhase } : null);
+          setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: data.newPhase } : null))
         }
       }
-    };
+    }
 
     const handleStatusChange = (data: any) => {
-      console.log('[MISSION] Received status change:', data);
+      console.log('[MISSION] Received status change:', data)
       if (data.missionId === missionId) {
-        setMission((prev: ClientMissionModel | null) => prev ? { ...prev, status: data.newStatus } : null);
+        setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, status: data.newStatus } : null))
       }
-    };
+    }
 
     // Listen for mission events
-    socketClient.on('mission:message-sent', handleMissionMessage);
-    socketClient.on('mission:clarity-updated', handleClarityUpdate);
-    socketClient.on('mission:phase-changed', handlePhaseChange);
-    socketClient.on('mission:status-changed', handleStatusChange);
+    socketClient.on('mission:message-sent', handleMissionMessage)
+    socketClient.on('mission:clarity-updated', handleClarityUpdate)
+    socketClient.on('mission:phase-changed', handlePhaseChange)
+    socketClient.on('mission:status-changed', handleStatusChange)
 
     // Join mission room for real-time updates
-    socketClient.emit('mission:join-room', missionId);
+    socketClient.emit('mission:join-room', missionId)
 
     return () => {
-      socketClient.off('mission:message-sent', handleMissionMessage);
-      socketClient.off('mission:clarity-updated', handleClarityUpdate);
-      socketClient.off('mission:phase-changed', handlePhaseChange);
-      socketClient.off('mission:status-changed', handleStatusChange);
-      socketClient.emit('mission:leave-room', missionId);
-    };
-  }, [isConnected, missionId, socketClient]);
+      socketClient.off('mission:message-sent', handleMissionMessage)
+      socketClient.off('mission:clarity-updated', handleClarityUpdate)
+      socketClient.off('mission:phase-changed', handlePhaseChange)
+      socketClient.off('mission:status-changed', handleStatusChange)
+      socketClient.emit('mission:leave-room', missionId)
+    }
+  }, [isConnected, missionId, socketClient])
 
   // Fetch agent details
   const loadAgents = async (agentIds: string[]) => {
     try {
-      setAgentsLoading(true);
-      const agentPromises = agentIds.map(agentId => agentAPI.getById(agentId));
-      const agentResults = await Promise.all(agentPromises);
-      setAgents(agentResults);
+      setAgentsLoading(true)
+      const agentPromises = agentIds.map(agentId => agentAPI.getById(agentId))
+      const agentResults = await Promise.all(agentPromises)
+      setAgents(agentResults)
     } catch (error) {
-      console.error('Failed to load agents:', error);
-      setAgents([]);
+      console.error('Failed to load agents:', error)
+      setAgents([])
     } finally {
-      setAgentsLoading(false);
+      setAgentsLoading(false)
     }
-  };
+  }
 
   // Fetch clarity data
   const loadClarity = async () => {
     try {
-      const response = await missionApi.getMissionClarity(missionId);
+      const response = await missionApi.getMissionClarity(missionId)
       if (response.data) {
-        setClarity(response.data);
+        setClarity(response.data)
       } else {
-        setClarity(null);
+        setClarity(null)
       }
     } catch (error) {
-      console.error('Failed to load clarity:', error);
-      setClarity(null);
+      console.error('Failed to load clarity:', error)
+      setClarity(null)
     }
-  };
+  }
 
   useEffect(() => {
     const loadMission = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        const response = await missionApi.getMissionById(missionId);
-        
+        setLoading(true)
+        setError(null)
+        const response = await missionApi.getMissionById(missionId)
+
         if (response.error) {
-          setError(response.error);
+          setError(response.error)
         } else if (response.data) {
-          setMission(response.data.mission);
-          
+          setMission(response.data.mission)
+
           // Load agent details if mission has agents
           if (response.data.mission.agentIds && response.data.mission.agentIds.length > 0) {
-            loadAgents(response.data.mission.agentIds);
+            loadAgents(response.data.mission.agentIds)
           } else {
-            setAgentsLoading(false);
+            setAgentsLoading(false)
           }
-          
+
           // Load chat history - LangGraph will handle greetings automatically
-          const historyResponse = await missionApi.getMessageHistory(missionId);
+          const historyResponse = await missionApi.getMessageHistory(missionId)
           if (historyResponse.data) {
-            setMessages(historyResponse.data.messages);
+            setMessages(historyResponse.data.messages)
           }
 
           // Load clarity data
-          await loadClarity();
+          await loadClarity()
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load mission');
+        setError(err instanceof Error ? err.message : 'Failed to load mission')
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    loadMission();
-  }, [missionId]);
+    loadMission()
+  }, [missionId])
 
   const handleBack = () => {
-    router.back();
-  };
+    router.back()
+  }
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   const focusInput = () => {
-    inputRef.current?.focus();
-  };
+    inputRef.current?.focus()
+  }
 
   useEffect(() => {
-    scrollToBottom();
+    scrollToBottom()
     // Focus input after new messages (slight delay to ensure render)
-    setTimeout(focusInput, 100);
-  }, [messages]);
+    setTimeout(focusInput, 100)
+  }, [messages])
 
   // Focus input on component mount (chat opened)
   useEffect(() => {
-    focusInput();
-  }, []);
+    focusInput()
+  }, [])
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || chatLoading) return;
+    if (!newMessage.trim() || chatLoading) return
 
-    const messageContent = newMessage;
-    setNewMessage('');
-    setChatLoading(true);
+    const messageContent = newMessage
+    setNewMessage('')
+    setChatLoading(true)
 
     try {
-      // WebSocket-first: Server saves messages to DB and emits WebSocket events  
+      // WebSocket-first: Server saves messages to DB and emits WebSocket events
       // WebSocket handler will automatically add both user and orchestrator messages to UI
-      const response = await missionApi.sendMessage(missionId, messageContent);
-      
+      const response = await missionApi.sendMessage(missionId, messageContent)
+
       // HTTP fallback: Only add messages if WebSocket is not connected
       if (!isConnected && response.data) {
-        console.log('[MISSION] WebSocket disconnected, using HTTP fallback for messages');
-        
+        console.log('[MISSION] WebSocket disconnected, using HTTP fallback for messages')
+
         // Add user message
         const userMessage: MissionMessageModel = {
           id: `user-${Date.now()}`,
@@ -377,10 +369,10 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           role: 'user',
           content: messageContent,
           timestamp: new Date().toISOString(),
-          senderName: 'You'
-        };
-        addMessageToUI(userMessage);
-        
+          senderName: 'You',
+        }
+        addMessageToUI(userMessage)
+
         // Add orchestrator response
         const orchestratorMessage: MissionMessageModel = {
           id: `orchestrator-${Date.now()}`,
@@ -388,13 +380,13 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           role: 'orchestrator',
           content: response.data.reply,
           timestamp: new Date().toISOString(),
-          senderName: 'Mission Orchestrator'
-        };
-        addMessageToUI(orchestratorMessage);
+          senderName: 'Mission Orchestrator',
+        }
+        addMessageToUI(orchestratorMessage)
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
-      
+      console.error('Failed to send message:', error)
+
       // On error, always show user message (they typed it)
       const userMessage: MissionMessageModel = {
         id: `user-error-${Date.now()}`,
@@ -402,32 +394,32 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
         role: 'user',
         content: messageContent,
         timestamp: new Date().toISOString(),
-        senderName: 'You'
-      };
-      addMessageToUI(userMessage);
+        senderName: 'You',
+      }
+      addMessageToUI(userMessage)
     } finally {
-      setChatLoading(false);
+      setChatLoading(false)
     }
-  };
+  }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+      e.preventDefault()
+      handleSendMessage()
     }
-  };
+  }
 
   if (loading) {
     return (
-      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+      <div className="h-full bg-background p-8 flex items-center justify-center">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
       </div>
-    );
+    )
   }
 
   if (error || !mission) {
     return (
-      <div className="h-full command-deck-bg p-8 flex items-center justify-center">
+      <div className="h-full bg-background p-8 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 mb-2">⚠️ Error</div>
           <p className="text-muted-foreground mb-4">{error || 'Mission not found'}</p>
@@ -437,11 +429,11 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           </Button>
         </div>
       </div>
-    );
+    )
   }
 
   return (
-    <div className="h-screen command-deck-bg flex flex-col">
+    <div className="h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 flex-shrink-0">
         <div className="flex items-center gap-4">
@@ -452,9 +444,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           <div className="flex items-center gap-3">
             {statusIcons[mission.status as MissionStatus]}
             <h1 className="text-2xl font-bold">{mission.name}</h1>
-            <Badge className={statusColors[mission.status as MissionStatus]}>
-              {mission.status}
-            </Badge>
+            <Badge className={statusColors[mission.status as MissionStatus]}>{mission.status}</Badge>
           </div>
         </div>
       </div>
@@ -470,22 +460,11 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
             <div className="flex flex-col flex-1 p-4 lg:p-6 pt-0 min-h-0">
               {/* Messages */}
               <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 lg:pr-4 min-h-0">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[280px] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-lg ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
+                {messages.map(message => (
+                  <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[280px] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-lg ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                       <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
-                      <p className="text-xs mt-2 opacity-70">
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </p>
+                      <p className="text-xs mt-2 opacity-70">{new Date(message.timestamp).toLocaleTimeString()}</p>
                     </div>
                   </div>
                 ))}
@@ -501,7 +480,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                 )}
                 <div ref={messagesEndRef} />
               </div>
-              
+
               {/* Input */}
               <div className="flex space-x-2 lg:space-x-3 pt-4 border-t flex-shrink-0">
                 <Input
@@ -526,23 +505,17 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           {/* Enhanced Content Sections */}
           <div className="h-full overflow-y-auto p-3 custom-scrollbar">
             <div className="space-y-4 mt-4">
-              
               {/* Current Phase Section */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('progress')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
+                  <button onClick={() => toggleSection('progress')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                     {collapsedSections.progress ? (
                       <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     ) : (
                       <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     )}
                   </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Current Phase
-                  </h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Phase</h4>
                 </div>
                 {!collapsedSections.progress && (
                   <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -551,19 +524,13 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                         <div className="relative flex-shrink-0">
                           <div className={`p-1.5 rounded-md ${getCurrentPhase(mission.phase).color.background} transition-all duration-300`}>
                             <div className="w-3.5 h-3.5 flex items-center justify-center">
-                              <span className={`text-xs ${getCurrentPhase(mission.phase).color.text}`}>
-                                {getCurrentPhase(mission.phase).icon}
-                              </span>
+                              <span className={`text-xs ${getCurrentPhase(mission.phase).color.text}`}>{getCurrentPhase(mission.phase).icon}</span>
                             </div>
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-primary transition-colors leading-tight">
-                            {getCurrentPhase(mission.phase).label}
-                          </span>
-                          <span className="text-xs text-muted-foreground leading-tight">
-                            {getCurrentPhase(mission.phase).description}
-                          </span>
+                          <span className="font-semibold text-sm truncate block text-primary transition-colors leading-tight">{getCurrentPhase(mission.phase).label}</span>
+                          <span className="text-xs text-muted-foreground leading-tight">{getCurrentPhase(mission.phase).description}</span>
                         </div>
                       </div>
                     </div>
@@ -575,19 +542,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {mission.phase === MISSION_PHASES.PLAN && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('plan')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('plan')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.plan ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Execution Workflow
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Execution Workflow</h4>
                   </div>
                   {!collapsedSections.plan && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -603,19 +565,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {mission.phase === MISSION_PHASES.EXECUTE && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('execution')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('execution')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.execution ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Mission Execution
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mission Execution</h4>
                   </div>
                   {!collapsedSections.execution && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -631,34 +588,29 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {(mission.executionResult || mission.executionState?.nodeResults || mission.phase === MISSION_PHASES.CONVERSE) && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('agentResults')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('agentResults')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.agentResults ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Agent Execution Results
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Agent Execution Results</h4>
                     <div className="ml-auto">
-                      <Badge className={
-                        mission.executionResult?.success || 
-                        (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
-                          ? "bg-green-100 text-green-800" 
+                      <Badge
+                        className={
+                          mission.executionResult?.success || (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
+                            ? 'bg-green-100 text-green-800'
+                            : mission.phase === MISSION_PHASES.CONVERSE
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                        }
+                      >
+                        {mission.executionResult?.success || (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
+                          ? '✅ Completed'
                           : mission.phase === MISSION_PHASES.CONVERSE
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                      }>
-                        {mission.executionResult?.success || 
-                         (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
-                          ? "✅ Completed" 
-                          : mission.phase === MISSION_PHASES.CONVERSE
-                            ? "✅ Completed"
-                            : "❌ Failed"}
+                            ? '✅ Completed'
+                            : '❌ Failed'}
                       </Badge>
                     </div>
                   </div>
@@ -666,71 +618,51 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                     <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
                       {/* Agent Task Results */}
                       {(() => {
-                        const nodeResults = mission.executionResult?.nodeResults || mission.executionState?.nodeResults || [];
+                        const nodeResults = mission.executionResult?.nodeResults || mission.executionState?.nodeResults || []
                         return nodeResults.length > 0 ? (
-                        <div className="mx-3 space-y-3">
-                          <div className="text-xs font-medium text-muted-foreground mb-2">
-                            Agent Task Outputs:
-                          </div>
-                          {nodeResults.map((result: any) => (
-                            <div key={result.nodeId} className="p-3 rounded-lg bg-muted/10 border border-muted/30">
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
-                                  <span className="text-xs">
-                                    {result.success ? '✅' : '❌'}
-                                  </span>
-                                  <span className="text-sm font-semibold text-foreground">
-                                    {result.nodeName}
-                                  </span>
-                                  <div className="ml-auto text-xs text-muted-foreground">
-                                    {new Date(result.timestamp).toLocaleTimeString()}
+                          <div className="mx-3 space-y-3">
+                            <div className="text-xs font-medium text-muted-foreground mb-2">Agent Task Outputs:</div>
+                            {nodeResults.map((result: any) => (
+                              <div key={result.nodeId} className="p-3 rounded-lg bg-muted/10 border border-muted/30">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
+                                    <span className="text-xs">{result.success ? '✅' : '❌'}</span>
+                                    <span className="text-sm font-semibold text-foreground">{result.nodeName}</span>
+                                    <div className="ml-auto text-xs text-muted-foreground">{new Date(result.timestamp).toLocaleTimeString()}</div>
                                   </div>
-                                </div>
-                                
-                                {result.output && (
-                                  <div className="text-xs text-muted-foreground">
-                                    <div className={expandedOutputs.has(result.nodeId) ? '' : 'max-h-24 overflow-hidden'}>
-                                      <div className="whitespace-pre-wrap break-words leading-relaxed">
-                                        {expandedOutputs.has(result.nodeId) 
-                                          ? result.output 
-                                          : result.output.length > 300 
-                                            ? result.output.substring(0, 300) + '...' 
-                                            : result.output
-                                        }
+
+                                  {result.output && (
+                                    <div className="text-xs text-muted-foreground">
+                                      <div className={expandedOutputs.has(result.nodeId) ? '' : 'max-h-24 overflow-hidden'}>
+                                        <div className="whitespace-pre-wrap break-words leading-relaxed">
+                                          {expandedOutputs.has(result.nodeId) ? result.output : result.output.length > 300 ? result.output.substring(0, 300) + '...' : result.output}
+                                        </div>
                                       </div>
+                                      {result.output.length > 300 && (
+                                        <button onClick={() => toggleOutputExpansion(result.nodeId)} className="text-blue-600 dark:text-blue-400 hover:underline mt-2 text-xs font-medium">
+                                          {expandedOutputs.has(result.nodeId) ? 'Show less' : 'Show more'}
+                                        </button>
+                                      )}
                                     </div>
-                                    {result.output.length > 300 && (
-                                      <button
-                                        onClick={() => toggleOutputExpansion(result.nodeId)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline mt-2 text-xs font-medium"
-                                      >
-                                        {expandedOutputs.has(result.nodeId) ? 'Show less' : 'Show more'}
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                                
-                                {result.error && (
-                                  <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
-                                    <span className="font-medium">Error:</span> {result.error}
-                                  </div>
-                                )}
+                                  )}
+
+                                  {result.error && (
+                                    <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                                      <span className="font-medium">Error:</span> {result.error}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="mx-3 px-3 py-4 rounded-lg bg-muted/10 border border-dashed border-muted/30">
-                          <div className="text-center">
-                            <div className="text-xs font-medium text-muted-foreground mb-1">
-                              No Agent Results Available
-                            </div>
-                            <p className="text-xs text-muted-foreground/70 leading-relaxed">
-                              Agent execution results will appear here once the workflow completes
-                            </p>
+                            ))}
                           </div>
-                        </div>
-                      );
+                        ) : (
+                          <div className="mx-3 px-3 py-4 rounded-lg bg-muted/10 border border-dashed border-muted/30">
+                            <div className="text-center">
+                              <div className="text-xs font-medium text-muted-foreground mb-1">No Agent Results Available</div>
+                              <p className="text-xs text-muted-foreground/70 leading-relaxed">Agent execution results will appear here once the workflow completes</p>
+                            </div>
+                          </div>
+                        )
                       })()}
                     </div>
                   )}
@@ -743,94 +675,68 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                   {/* Mission Summary Header */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 px-3 group">
-                      <button
-                        onClick={() => toggleSection('summary')}
-                        className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                      >
+                      <button onClick={() => toggleSection('summary')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                         {collapsedSections.summary ? (
                           <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                         ) : (
                           <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                         )}
                       </button>
-                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        Mission Summary
-                      </h4>
+                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mission Summary</h4>
                       <div className="ml-auto">
-                        <Badge className={
-                          mission.executionResult?.success 
-                            ? "bg-green-100 text-green-800" 
+                        <Badge
+                          className={
+                            mission.executionResult?.success
+                              ? 'bg-green-100 text-green-800'
+                              : mission.phase === MISSION_PHASES.CONVERSE
+                                ? 'bg-green-100 text-green-800' // If in converse phase, assume success
+                                : 'bg-red-100 text-red-800'
+                          }
+                        >
+                          {mission.executionResult?.success
+                            ? '✅ Completed'
                             : mission.phase === MISSION_PHASES.CONVERSE
-                              ? "bg-green-100 text-green-800"  // If in converse phase, assume success
-                              : "bg-red-100 text-red-800"
-                        }>
-                          {mission.executionResult?.success 
-                            ? "✅ Completed" 
-                            : mission.phase === MISSION_PHASES.CONVERSE
-                              ? "✅ Completed"  // If in converse phase, assume success
-                              : "❌ Failed"}
+                              ? '✅ Completed' // If in converse phase, assume success
+                              : '❌ Failed'}
                         </Badge>
                       </div>
                     </div>
                     {!collapsedSections.summary && (
                       <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
-                        
                         {/* Execution Results */}
                         {mission.executionResult && (
                           <div className="mx-3 p-3 rounded-lg bg-muted/10 border border-muted/30">
                             <div className="space-y-3">
                               <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
-                                <span className="text-sm font-semibold text-foreground">
-                                  {mission.executionResult.success ? '✅ Execution Completed' : '❌ Execution Failed'}
-                                </span>
-                                <div className="ml-auto text-xs text-muted-foreground">
-                                  {new Date(mission.executionResult.executedAt).toLocaleDateString()}
-                                </div>
+                                <span className="text-sm font-semibold text-foreground">{mission.executionResult.success ? '✅ Execution Completed' : '❌ Execution Failed'}</span>
+                                <div className="ml-auto text-xs text-muted-foreground">{new Date(mission.executionResult.executedAt).toLocaleDateString()}</div>
                               </div>
-                              
-                              <div className="text-xs text-muted-foreground mb-2">
-                                {mission.executionResult.summary}
-                              </div>
-                              
+
+                              <div className="text-xs text-muted-foreground mb-2">{mission.executionResult.summary}</div>
+
                               {/* Task Results */}
                               <div className="space-y-2">
                                 <div className="text-xs font-medium text-muted-foreground">Task Results:</div>
                                 {mission.executionResult.nodeResults.map((result: any) => (
                                   <div key={result.nodeId} className="flex items-start gap-2 p-2 rounded bg-background/50">
-                                    <span className="text-xs mt-0.5">
-                                      {result.success ? '✅' : '❌'}
-                                    </span>
+                                    <span className="text-xs mt-0.5">{result.success ? '✅' : '❌'}</span>
                                     <div className="flex-1 min-w-0">
-                                      <div className="text-xs font-medium text-foreground">
-                                        {result.nodeName}
-                                      </div>
+                                      <div className="text-xs font-medium text-foreground">{result.nodeName}</div>
                                       {result.output && (
                                         <div className="text-xs text-muted-foreground mt-1">
                                           <div className={expandedOutputs.has(result.nodeId) ? '' : 'max-h-16 overflow-hidden'}>
                                             <div className="whitespace-pre-wrap break-words">
-                                              {expandedOutputs.has(result.nodeId) 
-                                                ? result.output 
-                                                : result.output.length > 200 
-                                                  ? result.output.substring(0, 200) + '...' 
-                                                  : result.output
-                                              }
+                                              {expandedOutputs.has(result.nodeId) ? result.output : result.output.length > 200 ? result.output.substring(0, 200) + '...' : result.output}
                                             </div>
                                           </div>
                                           {result.output.length > 200 && (
-                                            <button
-                                              onClick={() => toggleOutputExpansion(result.nodeId)}
-                                              className="text-blue-600 dark:text-blue-400 hover:underline mt-1 text-xs"
-                                            >
+                                            <button onClick={() => toggleOutputExpansion(result.nodeId)} className="text-blue-600 dark:text-blue-400 hover:underline mt-1 text-xs">
                                               {expandedOutputs.has(result.nodeId) ? 'Show less' : 'Show more'}
                                             </button>
                                           )}
                                         </div>
                                       )}
-                                      {result.error && (
-                                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-                                          Error: {result.error}
-                                        </div>
-                                      )}
+                                      {result.error && <div className="text-xs text-red-600 dark:text-red-400 mt-1">Error: {result.error}</div>}
                                     </div>
                                   </div>
                                 ))}
@@ -838,7 +744,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                             </div>
                           </div>
                         )}
-                        
+
                         {/* Workflow Summary */}
                         <div className="mx-3">
                           <WorkflowPhaseContent mission={mission} onWorkflowApproval={handleWorkflowApproval} readonly={true} />
@@ -852,46 +758,31 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {/* Mission Clarity Section */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('clarity')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
+                  <button onClick={() => toggleSection('clarity')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                     {collapsedSections.clarity ? (
                       <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     ) : (
                       <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     )}
                   </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Mission Clarity
-                  </h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mission Clarity</h4>
                   <div className="ml-auto flex items-center gap-1">
                     {clarity ? (
                       <>
-                        <div className={`h-2 w-2 rounded-full transition-all duration-300 ${
-                          clarityUpdated ? 'animate-pulse ring-2 ring-blue-400' : ''
-                        } ${
-                          clarity.overallScore >= 8 ? 'bg-green-500' :
-                          clarity.overallScore >= 6 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`} />
-                        <span className={`text-xs font-medium transition-colors ${
-                          clarityUpdated ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'
-                        }`}>
+                        <div
+                          className={`h-2 w-2 rounded-full transition-all duration-300 ${clarityUpdated ? 'animate-pulse ring-2 ring-blue-400' : ''} ${
+                            clarity.overallScore >= 8 ? 'bg-green-500' : clarity.overallScore >= 6 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                        />
+                        <span className={`text-xs font-medium transition-colors ${clarityUpdated ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
                           {clarity.overallScore.toFixed(1)}/10
                         </span>
-                        {clarityUpdated && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 animate-fade-in">
-                            ✨ Updated
-                          </span>
-                        )}
+                        {clarityUpdated && <span className="text-xs text-blue-600 dark:text-blue-400 animate-fade-in">✨ Updated</span>}
                       </>
                     ) : (
                       <>
                         <div className="h-2 w-2 rounded-full bg-muted-foreground/30 animate-pulse" />
-                        <span className="text-xs font-medium text-muted-foreground/60">
-                          Pending
-                        </span>
+                        <span className="text-xs font-medium text-muted-foreground/60">Pending</span>
                       </>
                     )}
                   </div>
@@ -904,86 +795,93 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                         <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
                           <div className="flex items-center gap-2.5 min-w-0">
                             <div className="relative flex-shrink-0">
-                              <div className={`p-1.5 rounded-md transition-all duration-300 ${
-                                clarity.overallScore >= 8 ? 'bg-green-500/20' :
-                                clarity.overallScore >= 6 ? 'bg-yellow-500/20' :
-                                'bg-red-500/20'
-                              }`}>
+                              <div
+                                className={`p-1.5 rounded-md transition-all duration-300 ${
+                                  clarity.overallScore >= 8 ? 'bg-green-500/20' : clarity.overallScore >= 6 ? 'bg-yellow-500/20' : 'bg-red-500/20'
+                                }`}
+                              >
                                 <div className="w-3.5 h-3.5 flex items-center justify-center">
-                                  <span className={`text-xs font-bold ${
-                                    clarity.overallScore >= 8 ? 'text-green-600 dark:text-green-400' :
-                                    clarity.overallScore >= 6 ? 'text-yellow-600 dark:text-yellow-400' :
-                                    'text-red-600 dark:text-red-400'
-                                  }`}>
+                                  <span
+                                    className={`text-xs font-bold ${
+                                      clarity.overallScore >= 8
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : clarity.overallScore >= 6
+                                          ? 'text-yellow-600 dark:text-yellow-400'
+                                          : 'text-red-600 dark:text-red-400'
+                                    }`}
+                                  >
                                     {clarity.overallScore.toFixed(1)}
                                   </span>
                                 </div>
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="font-semibold text-sm truncate block text-foreground transition-colors leading-tight">
-                                Overall Score
-                              </span>
+                              <span className="font-semibold text-sm truncate block text-foreground transition-colors leading-tight">Overall Score</span>
                               <span className="text-xs text-muted-foreground leading-tight">
-                                Iteration {clarity.iteration} • {
-                                  clarity.overallScore >= 8 ? 'Excellent' :
-                                  clarity.overallScore >= 6 ? 'Good' :
-                                  'Needs Improvement'
-                                }
+                                Iteration {clarity.iteration} • {clarity.overallScore >= 8 ? 'Excellent' : clarity.overallScore >= 6 ? 'Good' : 'Needs Improvement'}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                      {/* 4-Dimension Breakdown */}
-                      {[
-                        { key: 'objectiveClarity', label: 'Objective Clarity', score: clarity.objectiveClarity },
-                        { key: 'successMetrics', label: 'Success Metrics', score: clarity.successMetrics },
-                        { key: 'timelineDefinition', label: 'Timeline Definition', score: clarity.timelineDefinition },
-                        { key: 'scopeBoundaries', label: 'Scope Boundaries', score: clarity.scopeBoundaries }
-                      ].map((dimension) => (
-                        <div key={dimension.key} className="group relative mx-3 px-2 py-1 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="relative flex-shrink-0">
-                              <div className="w-6 h-1.5 bg-muted/30 rounded-full overflow-hidden">
-                                <div 
-                                  className={`h-full transition-all duration-500 ${
-                                    dimension.score >= 8 ? 'bg-green-500' :
-                                    dimension.score >= 6 ? 'bg-yellow-500' :
-                                    'bg-red-500'
+                        {/* 4-Dimension Breakdown */}
+                        {[
+                          {
+                            key: 'objectiveClarity',
+                            label: 'Objective Clarity',
+                            score: clarity.objectiveClarity,
+                          },
+                          {
+                            key: 'successMetrics',
+                            label: 'Success Metrics',
+                            score: clarity.successMetrics,
+                          },
+                          {
+                            key: 'timelineDefinition',
+                            label: 'Timeline Definition',
+                            score: clarity.timelineDefinition,
+                          },
+                          {
+                            key: 'scopeBoundaries',
+                            label: 'Scope Boundaries',
+                            score: clarity.scopeBoundaries,
+                          },
+                        ].map(dimension => (
+                          <div
+                            key={dimension.key}
+                            className="group relative mx-3 px-2 py-1 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="relative flex-shrink-0">
+                                <div className="w-6 h-1.5 bg-muted/30 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full transition-all duration-500 ${dimension.score >= 8 ? 'bg-green-500' : dimension.score >= 6 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                                    style={{ width: `${(dimension.score / 10) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium text-xs truncate block text-muted-foreground group-hover:text-foreground transition-colors leading-tight">{dimension.label}</span>
+                              </div>
+                              <div className="flex-shrink-0">
+                                <span
+                                  className={`text-xs font-medium ${
+                                    dimension.score >= 8 ? 'text-green-600 dark:text-green-400' : dimension.score >= 6 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                                   }`}
-                                  style={{ width: `${(dimension.score / 10) * 100}%` }}
-                                />
+                                >
+                                  {dimension.score}/10
+                                </span>
                               </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <span className="font-medium text-xs truncate block text-muted-foreground group-hover:text-foreground transition-colors leading-tight">
-                                {dimension.label}
-                              </span>
-                            </div>
-                            <div className="flex-shrink-0">
-                              <span className={`text-xs font-medium ${
-                                dimension.score >= 8 ? 'text-green-600 dark:text-green-400' :
-                                dimension.score >= 6 ? 'text-yellow-600 dark:text-yellow-400' :
-                                'text-red-600 dark:text-red-400'
-                              }`}>
-                                {dimension.score}/10
-                              </span>
-                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
 
                         {/* AI Reasoning */}
                         {clarity.reasoning && (
                           <div className="group relative mx-3 px-3 py-2 rounded-lg bg-muted/20 border-l-2 border-blue-500/30 transition-all duration-300">
                             <div className="flex flex-col min-w-0">
-                              <span className="font-medium text-xs text-blue-600 dark:text-blue-400 leading-tight mb-1.5">
-                                Reasoning:
-                              </span>
-                              <blockquote className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-muted/40 pl-2">
-                                &ldquo;{clarity.reasoning}&rdquo;
-                              </blockquote>
+                              <span className="font-medium text-xs text-blue-600 dark:text-blue-400 leading-tight mb-1.5">Reasoning:</span>
+                              <blockquote className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-muted/40 pl-2">&ldquo;{clarity.reasoning}&rdquo;</blockquote>
                             </div>
                           </div>
                         )}
@@ -997,12 +895,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                               <div className="h-3 w-3 rounded-full bg-muted-foreground/30 animate-pulse" />
                             </div>
                           </div>
-                          <span className="text-xs font-medium text-muted-foreground block mb-1">
-                            Clarity Assessment Pending
-                          </span>
-                          <p className="text-xs text-muted-foreground/70 leading-relaxed">
-                            Mission clarity will be evaluated during your conversation with the orchestrator
-                          </p>
+                          <span className="text-xs font-medium text-muted-foreground block mb-1">Clarity Assessment Pending</span>
+                          <p className="text-xs text-muted-foreground/70 leading-relaxed">Mission clarity will be evaluated during your conversation with the orchestrator</p>
                         </div>
                       </div>
                     )}
@@ -1014,19 +908,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {mission.agentIds && mission.agentIds.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('agents')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('agents')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.agents ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Agents ({mission.agentIds.length})
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Agents ({mission.agentIds.length})</h4>
                   </div>
                   {!collapsedSections.agents && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -1037,22 +926,19 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                         </div>
                       ) : (
                         agents.map((agent, index) => (
-                          <div key={agent.id} className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
+                          <div
+                            key={agent.id}
+                            className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm"
+                          >
                             <div className="flex items-center gap-2.5 min-w-0">
                               <div className="relative flex-shrink-0">
                                 <div className="w-9 h-9 rounded-full bg-background border border-border/40 flex items-center justify-center group-hover:border-border/60 transition-all duration-300">
-                                  <span className="text-sm">
-                                    {getAgentEmoji(agent)}
-                                  </span>
+                                  <span className="text-sm">{getAgentEmoji(agent)}</span>
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                                  {agent.name || `Agent ${index + 1}`}
-                                </span>
-                                <span className="text-xs text-muted-foreground truncate block">
-                                  {agent.description || `ID: ${agent.id}`}
-                                </span>
+                                <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">{agent.name || `Agent ${index + 1}`}</span>
+                                <span className="text-xs text-muted-foreground truncate block">{agent.description || `ID: ${agent.id}`}</span>
                               </div>
                             </div>
                           </div>
@@ -1066,19 +952,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {/* Timeline Section */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('timeline')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
+                  <button onClick={() => toggleSection('timeline')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                     {collapsedSections.timeline ? (
                       <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     ) : (
                       <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     )}
                   </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Timeline
-                  </h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Timeline</h4>
                 </div>
                 {!collapsedSections.timeline && (
                   <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -1090,16 +971,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                            Created
-                          </span>
+                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">Created</span>
                           <span className="text-xs text-muted-foreground">
                             {new Date(mission.createdAt).toLocaleDateString()} at {new Date(mission.createdAt).toLocaleTimeString()}
                           </span>
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="group relative mx-3 px-2 py-1.5 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="relative flex-shrink-0">
@@ -1108,9 +987,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                            Updated
-                          </span>
+                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">Updated</span>
                           <span className="text-xs text-muted-foreground">
                             {new Date(mission.updatedAt).toLocaleDateString()} at {new Date(mission.updatedAt).toLocaleTimeString()}
                           </span>
@@ -1125,5 +1002,5 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
         </div>
       </div>
     </div>
-  );
+  )
 }

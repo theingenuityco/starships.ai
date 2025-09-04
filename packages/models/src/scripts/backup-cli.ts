@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 
-import { createConnection } from '../helpers/database';
-import { BackupManager } from './backup-restore';
+import { createConnection } from '@/helpers/database';
+import { BackupManager } from '@/scripts/backup-restore';
 
-/**
- * CLI script for database backup operations
- */
+/** CLI script for database backup operations */
 async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
@@ -125,9 +123,7 @@ Examples:
   const result = await backupManager.restoreFromBackup(backupPath);
   if (result.success) {
     console.log('✅ Restore completed successfully!');
-    console.log(
-      `📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`
-    );
+    console.log(`📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`);
   } else {
     console.error('❌ Restore failed!');
     result.errors.forEach((error) => console.error(`   - ${error}`));

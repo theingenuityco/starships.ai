@@ -1,24 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Eye, EyeOff, ExternalLink, AlertCircle, Loader2, Key } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  ApiKeyRequirement,
-  ApiKeyValidationResult,
-  ConnectorApiKeyState,
-} from '@/types/connector-api-keys'
+import { ApiKeyRequirement, ApiKeyValidationResult, ConnectorApiKeyState } from '@/types/connector-api-keys'
 import { ApiKeyValidator, ServiceType } from '@/lib/api-key-validation'
 import { MCPServerOption } from '@/lib/api'
 
@@ -35,14 +24,7 @@ interface FieldVisibility {
   [key: string]: boolean
 }
 
-export function ApiKeyInputModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  connector,
-  requirements,
-  initialValues = {},
-}: ApiKeyInputModalProps) {
+export function ApiKeyInputModal({ isOpen, onClose, onSubmit, connector, requirements, initialValues = {} }: ApiKeyInputModalProps) {
   // State management
   const [state, setState] = useState<ConnectorApiKeyState>({
     requirements,
@@ -61,12 +43,7 @@ export function ApiKeyInputModal({
 
   // Initialize validation results - only run when requirements change, not on every state update
   useEffect(() => {
-    console.log(
-      '[ApiKeyInputModal] useEffect triggered - requirements:',
-      requirements.length,
-      'serviceType:',
-      serviceType
-    )
+    console.log('[ApiKeyInputModal] useEffect triggered - requirements:', requirements.length, 'serviceType:', serviceType)
     const initialValidationResults: Record<string, ApiKeyValidationResult> = {}
     requirements.forEach(req => {
       const value = state.values[req.envKey] || ''
@@ -77,10 +54,7 @@ export function ApiKeyInputModal({
       })
     })
 
-    console.log(
-      '[ApiKeyInputModal] Setting validation results:',
-      Object.keys(initialValidationResults)
-    )
+    console.log('[ApiKeyInputModal] Setting validation results:', Object.keys(initialValidationResults))
     setState(prev => ({
       ...prev,
       validationResults: initialValidationResults,
@@ -123,11 +97,7 @@ export function ApiKeyInputModal({
 
   // Check if form is valid
   const isFormValid = useCallback(() => {
-    return (
-      requirements.length > 0 &&
-      Object.values(state.validationResults).every(result => result.isValid) &&
-      requirements.filter(req => req.required).every(req => state.values[req.envKey]?.trim())
-    )
+    return requirements.length > 0 && Object.values(state.validationResults).every(result => result.isValid) && requirements.filter(req => req.required).every(req => state.values[req.envKey]?.trim())
   }, [requirements, state.validationResults, state.values])
 
   // Handle form submission
@@ -156,9 +126,7 @@ export function ApiKeyInputModal({
       onClose()
     } catch (error) {
       console.error('Failed to submit API keys:', error)
-      setSubmitError(
-        error instanceof Error ? error.message : 'Failed to save API keys. Please try again.'
-      )
+      setSubmitError(error instanceof Error ? error.message : 'Failed to save API keys. Please try again.')
     } finally {
       setState(prev => ({ ...prev, isSubmitting: false }))
     }
@@ -172,12 +140,7 @@ export function ApiKeyInputModal({
 
   // Reset form when modal opens/closes
   useEffect(() => {
-    console.log(
-      '[ApiKeyInputModal] Modal state changed - isOpen:',
-      isOpen,
-      'initialValues:',
-      Object.keys(initialValues)
-    )
+    console.log('[ApiKeyInputModal] Modal state changed - isOpen:', isOpen, 'initialValues:', Object.keys(initialValues))
     if (isOpen) {
       console.log('[ApiKeyInputModal] Resetting form state')
       setState(prev => ({
@@ -196,8 +159,7 @@ export function ApiKeyInputModal({
 
     // Default help URLs based on service type
     const helpUrls: Record<string, string> = {
-      github:
-        'https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
+      github: 'https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
       slack: 'https://api.slack.com/authentication/token-types',
       notion: 'https://developers.notion.com/docs/create-a-notion-integration',
       brave: 'https://api.search.brave.com/app/documentation/web-search/get-started',
@@ -248,10 +210,7 @@ export function ApiKeyInputModal({
             value={value}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(requirement.envKey, e.target.value)}
             placeholder={requirement.placeholder}
-            className={cn(
-              'pr-10 border border-input',
-              hasError && 'border-red-500 focus:border-red-500 focus:ring-red-500'
-            )}
+            className={cn('pr-10 border border-input', hasError && 'border-red-500 focus:border-red-500 focus:ring-red-500')}
             disabled={state.isSubmitting}
             autoComplete="off"
             spellCheck={false}
@@ -266,11 +225,7 @@ export function ApiKeyInputModal({
               onClick={() => toggleFieldVisibility(requirement.envKey)}
               disabled={state.isSubmitting}
             >
-              {isVisible ? (
-                <EyeOff className="w-4 h-4 text-muted-foreground" />
-              ) : (
-                <Eye className="w-4 h-4 text-muted-foreground" />
-              )}
+              {isVisible ? <EyeOff className="w-4 h-4 text-muted-foreground" /> : <Eye className="w-4 h-4 text-muted-foreground" />}
             </Button>
           )}
         </div>
@@ -282,17 +237,9 @@ export function ApiKeyInputModal({
           </div>
         )}
 
-        {requirement.type === 'file_path' && (
-          <p className="text-xs text-muted-foreground">
-            Enter the full path to the file (e.g., /path/to/file.json)
-          </p>
-        )}
+        {requirement.type === 'file_path' && <p className="text-xs text-muted-foreground">Enter the full path to the file (e.g., /path/to/file.json)</p>}
 
-        {requirement.type === 'directory_path' && (
-          <p className="text-xs text-muted-foreground">
-            Enter the full path to the directory (e.g., /path/to/directory)
-          </p>
-        )}
+        {requirement.type === 'directory_path' && <p className="text-xs text-muted-foreground">Enter the full path to the directory (e.g., /path/to/directory)</p>}
       </div>
     )
   }
@@ -301,12 +248,7 @@ export function ApiKeyInputModal({
     <Dialog
       open={isOpen}
       onOpenChange={open => {
-        console.log(
-          '[ApiKeyInputModal] Dialog onOpenChange called with:',
-          open,
-          'current isOpen:',
-          isOpen
-        )
+        console.log('[ApiKeyInputModal] Dialog onOpenChange called with:', open, 'current isOpen:', isOpen)
         if (!open) {
           handleClose()
         }
@@ -318,16 +260,11 @@ export function ApiKeyInputModal({
             <Key className="w-5 h-5" />
             Configure {connector.name}
           </DialogTitle>
-          <DialogDescription>
-            Enter the required API keys and credentials for {connector.name}. These will be securely
-            stored and used to authenticate with the service.
-          </DialogDescription>
+          <DialogDescription>Enter the required API keys and credentials for {connector.name}. These will be securely stored and used to authenticate with the service.</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {requirements.map(renderInputField)}
-          </div>
+          <div className="space-y-4 max-h-96 overflow-y-auto">{requirements.map(renderInputField)}</div>
 
           {submitError && (
             <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-md">
@@ -337,20 +274,10 @@ export function ApiKeyInputModal({
           )}
 
           <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={state.isSubmitting}
-              className="w-full sm:w-auto"
-            >
+            <Button type="button" variant="outline" onClick={handleClose} disabled={state.isSubmitting} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={!isFormValid() || state.isSubmitting}
-              className="w-full sm:w-auto"
-            >
+            <Button type="submit" disabled={!isFormValid() || state.isSubmitting} className="w-full sm:w-auto">
               {state.isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -2,17 +2,9 @@
  * Tests for error mappings and utilities
  */
 
-import {
-  StandardErrorCode,
-  ERROR_HTTP_STATUS_MAP,
-  ERROR_CATEGORY_MAP,
-  ErrorMappingUtils,
-  getHttpStatusCode,
-  getErrorCategory,
-  isRetryableError,
-  shouldLogError
-} from '../mappings';
-import { ErrorCategory } from '../index';
+import { ERROR_HTTP_STATUS_MAP, ERROR_CATEGORY_MAP, ErrorMappingUtils } from '@/mappings';
+import { ErrorCategory } from '@starships/protocol';
+import type { StandardErrorCode } from '@starships/protocol';
 
 describe('ERROR_HTTP_STATUS_MAP', () => {
   it('should map validation errors to 400', () => {
@@ -229,14 +221,14 @@ describe('ErrorMappingUtils', () => {
   describe('getErrorCodesByCategory', () => {
     it('should return all validation error codes', () => {
       const validationCodes = ErrorMappingUtils.getErrorCodesByCategory(ErrorCategory.VALIDATION);
-      
+
       expect(validationCodes).toContain('VALIDATION_ERROR');
       expect(validationCodes).toContain('INVALID_INPUT');
       expect(validationCodes).toContain('MISSING_REQUIRED_FIELD');
       expect(validationCodes).toContain('INVALID_FORMAT');
       expect(validationCodes).toContain('MESSAGE_INVALID_TYPE');
       expect(validationCodes).toContain('RESULT_VALIDATION_FAILED');
-      
+
       // Should not contain codes from other categories
       expect(validationCodes).not.toContain('AUTHENTICATION_REQUIRED');
       expect(validationCodes).not.toContain('RESOURCE_NOT_FOUND');
@@ -244,12 +236,12 @@ describe('ErrorMappingUtils', () => {
 
     it('should return all authentication error codes', () => {
       const authCodes = ErrorMappingUtils.getErrorCodesByCategory(ErrorCategory.AUTHENTICATION);
-      
+
       expect(authCodes).toContain('AUTHENTICATION_REQUIRED');
       expect(authCodes).toContain('AUTHENTICATION_FAILED');
       expect(authCodes).toContain('TOKEN_EXPIRED');
       expect(authCodes).toContain('TOKEN_INVALID');
-      
+
       // Should not contain codes from other categories
       expect(authCodes).not.toContain('VALIDATION_ERROR');
       expect(authCodes).not.toContain('ACCESS_DENIED');
@@ -257,7 +249,7 @@ describe('ErrorMappingUtils', () => {
 
     it('should return all database error codes', () => {
       const dbCodes = ErrorMappingUtils.getErrorCodesByCategory(ErrorCategory.DATABASE);
-      
+
       expect(dbCodes).toContain('DATABASE_ERROR');
       expect(dbCodes).toContain('DATABASE_CONNECTION_FAILED');
       expect(dbCodes).toContain('DATABASE_QUERY_FAILED');
@@ -276,12 +268,12 @@ describe('ErrorMappingUtils', () => {
   describe('getErrorCodesByStatusCode', () => {
     it('should return all 400 error codes', () => {
       const badRequestCodes = ErrorMappingUtils.getErrorCodesByStatusCode(400);
-      
+
       expect(badRequestCodes).toContain('VALIDATION_ERROR');
       expect(badRequestCodes).toContain('INVALID_INPUT');
       expect(badRequestCodes).toContain('MISSING_REQUIRED_FIELD');
       expect(badRequestCodes).toContain('EXPEDITION_CANNOT_MODIFY');
-      
+
       // Should not contain codes with different status codes
       expect(badRequestCodes).not.toContain('AUTHENTICATION_REQUIRED'); // 401
       expect(badRequestCodes).not.toContain('RESOURCE_NOT_FOUND'); // 404
@@ -289,13 +281,13 @@ describe('ErrorMappingUtils', () => {
 
     it('should return all 404 error codes', () => {
       const notFoundCodes = ErrorMappingUtils.getErrorCodesByStatusCode(404);
-      
+
       expect(notFoundCodes).toContain('RESOURCE_NOT_FOUND');
       expect(notFoundCodes).toContain('EXPEDITION_NOT_FOUND');
       expect(notFoundCodes).toContain('STARSHIP_NOT_FOUND');
       expect(notFoundCodes).toContain('TASK_NOT_FOUND');
       expect(notFoundCodes).toContain('AGENT_NOT_FOUND');
-      
+
       // Should not contain codes with different status codes
       expect(notFoundCodes).not.toContain('VALIDATION_ERROR'); // 400
       expect(notFoundCodes).not.toContain('INTERNAL_SERVER_ERROR'); // 500
@@ -303,12 +295,12 @@ describe('ErrorMappingUtils', () => {
 
     it('should return all 500 error codes', () => {
       const serverErrorCodes = ErrorMappingUtils.getErrorCodesByStatusCode(500);
-      
+
       expect(serverErrorCodes).toContain('INTERNAL_SERVER_ERROR');
       expect(serverErrorCodes).toContain('DATABASE_ERROR');
       expect(serverErrorCodes).toContain('CONFIGURATION_ERROR');
       expect(serverErrorCodes).toContain('EXPEDITION_WORKFLOW_FAILED');
-      
+
       // Should not contain codes with different status codes
       expect(serverErrorCodes).not.toContain('VALIDATION_ERROR'); // 400
       expect(serverErrorCodes).not.toContain('NETWORK_ERROR'); // 502
@@ -318,32 +310,6 @@ describe('ErrorMappingUtils', () => {
       const codes = ErrorMappingUtils.getErrorCodesByStatusCode(418); // I'm a teapot
       expect(codes).toEqual([]);
     });
-  });
-});
-
-describe('Legacy function exports', () => {
-  it('should export getHttpStatusCode function', () => {
-    expect(typeof getHttpStatusCode).toBe('function');
-    expect(getHttpStatusCode('VALIDATION_ERROR')).toBe(400);
-    expect(getHttpStatusCode).toBe(ErrorMappingUtils.getHttpStatusCode);
-  });
-
-  it('should export getErrorCategory function', () => {
-    expect(typeof getErrorCategory).toBe('function');
-    expect(getErrorCategory('VALIDATION_ERROR')).toBe(ErrorCategory.VALIDATION);
-    expect(getErrorCategory).toBe(ErrorMappingUtils.getErrorCategory);
-  });
-
-  it('should export isRetryableError function', () => {
-    expect(typeof isRetryableError).toBe('function');
-    expect(isRetryableError('TIMEOUT_ERROR')).toBe(true);
-    expect(isRetryableError).toBe(ErrorMappingUtils.isRetryableError);
-  });
-
-  it('should export shouldLogError function', () => {
-    expect(typeof shouldLogError).toBe('function');
-    expect(shouldLogError(500)).toBe(true);
-    expect(shouldLogError).toBe(ErrorMappingUtils.shouldLogError);
   });
 });
 
@@ -367,7 +333,7 @@ describe('StandardErrorCode type', () => {
     ];
 
     // Verify each code has both HTTP status and category mappings
-    allErrorCodes.forEach(code => {
+    allErrorCodes.forEach((code) => {
       expect(ERROR_HTTP_STATUS_MAP[code]).toBeDefined();
       expect(typeof ERROR_HTTP_STATUS_MAP[code]).toBe('number');
       expect(ERROR_CATEGORY_MAP[code]).toBeDefined();

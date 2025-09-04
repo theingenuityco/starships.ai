@@ -1,19 +1,9 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
-import type {
-  SocketConnectionState,
-  SessionSocketEvents,
-  EventEmissionOptions,
-  EventEmissionResult,
-} from '@starships/protocol';
+import type { SocketConnectionState, SessionSocketEvents, EventEmissionOptions, EventEmissionResult } from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
-import { UserService } from './UserService';
-import { loadServerEnvironment } from '@starships/env-config';
-
-// Kinde JWKS endpoint for token verification
-const env = loadServerEnvironment();
-const kindeIssuerUrl = env.KINDE_ISSUER_URL;
-const JWKS = createRemoteJWKSet(new URL(`${kindeIssuerUrl}/.well-known/jwks`));
+import { UserService } from '@/services/UserService';
+import { getEnvConfig } from '@starships/env';
 
 // JWT verification function for Socket.IO
 async function verifySocketJWT(token: string) {
@@ -24,19 +14,17 @@ async function verifySocketJWT(token: string) {
       throw new Error(`Invalid JWT format: expected 3 parts, got ${parts.length}`);
     }
 
-    // Decode header and payload for debugging
-    const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    // For our JWT auth system, we'll verify using the same secret as the auth routes
+    const env = getEnvConfig();
+    const jwtSecret = env.JWT_SECRET;
 
-    console.log('[SOCKET.IO] JWT Debug - Header:', header);
-    console.log('[SOCKET.IO] JWT Debug - Issuer:', payload.iss);
-    console.log('[SOCKET.IO] JWT Debug - Expected Issuer:', kindeIssuerUrl);
-    console.log('[SOCKET.IO] JWT Debug - Kid:', header.kid);
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET not configured');
+    }
 
-    // Now verify the token
-    const result = await jwtVerify(token, JWKS, {
-      issuer: kindeIssuerUrl,
-    });
+    // Use our JWT secret for verification
+    const secret = new TextEncoder().encode(jwtSecret);
+    const result = await jwtVerify(token, secret);
 
     return result.payload;
   } catch (error) {
@@ -55,8 +43,7 @@ export class SocketIOService {
   private connections: Map<string, SocketConnectionState> = new Map();
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
   private reconnectionAttempts: Map<string, number> = new Map();
-  private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> =
-    new Map();
+  private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> = new Map();
   private healthCheckInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
 
@@ -117,8 +104,7 @@ export class SocketIOService {
     // Non-blocking authentication middleware
     this.io.use(async (socket, next) => {
       try {
-        const token =
-          socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
+        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
 
         if (!token) {
           return next(new Error('Authentication token required'));
@@ -127,22 +113,16 @@ export class SocketIOService {
         // Verify JWT token - this is the only blocking operation
         const payload = await verifySocketJWT(token);
 
-        // Store Kinde ID immediately for connection
-        socket.data.kindeId = payload.sub as string;
+        // Store user info immediately for connection
+        socket.data.userId = payload.sub as string;
         socket.data.email = payload.email as string;
-        socket.data.name = (payload.given_name as string) || (payload.name as string);
-        socket.data.avatar = payload.picture as string;
+        socket.data.name = payload.name as string;
+        socket.data.avatar = payload.avatar as string;
         socket.data.authenticated = true;
         socket.data.connectedAt = Date.now();
+        socket.data.userResolved = true; // With JWT, user is immediately resolved
 
-        // Set temporary user ID using Kinde ID until database resolution
-        socket.data.userId = `temp:${payload.sub}`;
-        socket.data.userResolved = false;
-        socket.data.userResolutionAttempts = 0;
-
-        console.log(
-          `[SOCKET.IO] JWT verified for Kinde ID: ${payload.sub}, allowing connection with temporary ID`
-        );
+        console.log(`[SOCKET.IO] JWT verified for user ID: ${payload.sub}, connection ready`);
 
         // Allow connection immediately - user resolution happens in background
         next();
@@ -155,45 +135,42 @@ export class SocketIOService {
 
   private setupEventHandlers() {
     this.io.on('connection', (socket) => {
-      const tempUserId = socket.data.userId;
-      const kindeId = socket.data.kindeId;
+      const userId = socket.data.userId;
       const socketId = socket.id;
 
-      console.log(
-        `[SOCKET.IO] Connection established for Kinde ID: ${kindeId}, socket: ${socketId}`
-      );
+      console.log(`[SOCKET.IO] Connection established for user ID: ${userId}, socket: ${socketId}`);
 
-      // Initialize connection state with temporary user ID
+      // Initialize connection state
       this.connections.set(socketId, {
         connected: true,
         authenticated: true,
         roomJoined: false,
-        userId: tempUserId,
+        userId: userId,
         connectionId: socketId,
         lastPing: Date.now(),
       });
 
-      // Track user sockets using temporary ID initially
-      if (!this.userSockets.has(tempUserId)) {
-        this.userSockets.set(tempUserId, new Set());
+      // Track user sockets
+      if (!this.userSockets.has(userId)) {
+        this.userSockets.set(userId, new Set());
       }
-      this.userSockets.get(tempUserId)!.add(socketId);
+      this.userSockets.get(userId)!.add(socketId);
 
-      // Auto-join user to their personal room (using temp ID initially)
-      const userRoom = this.getUserRoom(tempUserId);
+      // Auto-join user to their personal room
+      const userRoom = this.getUserRoom(userId);
       socket.join(userRoom);
       this.updateConnectionState(socketId, { roomJoined: true });
 
-      // Send initial connection confirmation with degraded status
+      // Send initial connection confirmation
       socket.emit('connection-status', {
         status: 'connected',
-        userId: tempUserId,
+        userId: userId,
         connectionId: socketId,
         timestamp: new Date().toISOString(),
       });
 
-      // Start background user resolution
-      this.resolveUserInBackground(socket);
+      // Process any queued events for this user
+      this.processQueuedEvents(userId, socketId);
 
       // Handle ping/pong for connection health
       socket.on('ping', () => {
@@ -218,9 +195,7 @@ export class SocketIOService {
   }
 
   private handleDisconnection(socketId: string, userId: string, reason: string) {
-    console.log(
-      `[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`
-    );
+    console.log(`[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`);
 
     // Clean up connection state
     this.connections.delete(socketId);
@@ -237,11 +212,6 @@ export class SocketIOService {
     // Reset reconnection attempts if clean disconnect
     if (reason === 'client namespace disconnect' || reason === 'server namespace disconnect') {
       this.reconnectionAttempts.delete(userId);
-      // Also clean up for temporary user IDs
-      if (userId.startsWith('temp:')) {
-        const kindeId = userId.replace('temp:', '');
-        this.reconnectionAttempts.delete(kindeId);
-      }
     }
   }
 
@@ -291,9 +261,7 @@ export class SocketIOService {
     if (queuedEvents && queuedEvents.length > 0) {
       const socket = this.io.sockets.sockets.get(socketId);
       if (socket) {
-        console.log(
-          `[SOCKET.IO] Processing ${queuedEvents.length} queued events for user ${userId}`
-        );
+        console.log(`[SOCKET.IO] Processing ${queuedEvents.length} queued events for user ${userId}`);
 
         queuedEvents.forEach(({ event, data }) => {
           socket.emit(event as any, data);
@@ -301,152 +269,6 @@ export class SocketIOService {
 
         this.eventQueue.delete(userId);
       }
-    }
-  }
-
-  /**
-   * Resolve user in background without blocking the connection
-   */
-  private async resolveUserInBackground(socket: any) {
-    const kindeId = socket.data.kindeId;
-    const socketId = socket.id;
-    const tempUserId = socket.data.userId;
-
-    // Prevent multiple resolution attempts for the same socket
-    if (socket.data.userResolutionInProgress) {
-      return;
-    }
-
-    socket.data.userResolutionInProgress = true;
-
-    try {
-      console.log(`[SOCKET.IO] Starting background user resolution for Kinde ID: ${kindeId}`);
-
-      // Attempt to find existing user
-      let user = null;
-      try {
-        user = await UserService.getUserByKindeId(kindeId);
-      } catch (dbError) {
-        console.warn(
-          `[SOCKET.IO] Database error during user lookup for ${kindeId}, will retry later:`,
-          dbError
-        );
-        // Schedule retry
-        setTimeout(() => {
-          if (socket.connected && !socket.data.userResolved) {
-            socket.data.userResolutionInProgress = false;
-            this.resolveUserInBackground(socket);
-          }
-        }, 5000); // Retry in 5 seconds
-        return;
-      }
-
-      // If user not found, attempt to sync
-      if (!user) {
-        console.log(
-          `[SOCKET.IO] User not found for Kinde ID: ${kindeId}, attempting background sync`
-        );
-
-        try {
-          user = await UserService.syncUser({
-            kindeId: kindeId,
-            email: socket.data.email || `user-${kindeId}@unknown.com`,
-            name: socket.data.name,
-            avatar: socket.data.avatar,
-          });
-          console.log(
-            `[SOCKET.IO] User successfully synced in background: ${user.id} (${user.displayName || user.username})`
-          );
-        } catch (syncError) {
-          console.warn(
-            `[SOCKET.IO] Background user sync failed for ${kindeId}, providing degraded service:`,
-            syncError
-          );
-          // Continue with degraded service - don't disconnect
-          socket.data.userResolutionInProgress = false;
-          socket.data.userResolutionAttempts = (socket.data.userResolutionAttempts || 0) + 1;
-
-          // Retry with exponential backoff if not too many attempts
-          if (socket.data.userResolutionAttempts < 5) {
-            const retryDelay = Math.min(
-              30000,
-              1000 * Math.pow(2, socket.data.userResolutionAttempts)
-            );
-            setTimeout(() => {
-              if (socket.connected && !socket.data.userResolved) {
-                socket.data.userResolutionInProgress = false;
-                this.resolveUserInBackground(socket);
-              }
-            }, retryDelay);
-          }
-          return;
-        }
-      }
-
-      // User resolution successful - update socket data and tracking
-      const oldUserId = socket.data.userId;
-      const newUserId = user.id;
-
-      socket.data.userId = newUserId;
-      socket.data.userResolved = true;
-      socket.data.userResolutionInProgress = false;
-
-      // Update connection state
-      this.updateConnectionState(socketId, { userId: newUserId });
-
-      // Update user socket tracking
-      // Remove from old tracking
-      const oldUserSockets = this.userSockets.get(oldUserId);
-      if (oldUserSockets) {
-        oldUserSockets.delete(socketId);
-        if (oldUserSockets.size === 0) {
-          this.userSockets.delete(oldUserId);
-        }
-      }
-
-      // Add to new tracking
-      if (!this.userSockets.has(newUserId)) {
-        this.userSockets.set(newUserId, new Set());
-      }
-      this.userSockets.get(newUserId)!.add(socketId);
-
-      // Update room membership
-      const oldRoom = this.getUserRoom(oldUserId);
-      const newRoom = this.getUserRoom(newUserId);
-
-      if (oldRoom !== newRoom) {
-        socket.leave(oldRoom);
-        socket.join(newRoom);
-      }
-
-      // Process any queued events for the resolved user
-      this.processQueuedEvents(newUserId, socketId);
-
-      // Notify client of successful user resolution using connection-status
-      socket.emit('connection-status', {
-        status: 'connected',
-        userId: newUserId,
-        connectionId: socketId,
-        timestamp: new Date().toISOString(),
-      });
-
-      console.log(
-        `[SOCKET.IO] User resolution completed: ${kindeId} -> ${newUserId} (${user.displayName || user.username})`
-      );
-    } catch (error) {
-      console.error(
-        `[SOCKET.IO] Unexpected error during background user resolution for ${kindeId}:`,
-        error
-      );
-      socket.data.userResolutionInProgress = false;
-
-      // Continue with degraded service - don't disconnect the user
-      socket.emit('connection-status', {
-        status: 'error',
-        userId: tempUserId,
-        connectionId: socketId,
-        timestamp: new Date().toISOString(),
-      });
     }
   }
 
@@ -599,9 +421,7 @@ export class SocketIOService {
 
       if (recipientCount === 0) {
         // Queue the event if no recipients are currently connected
-        console.log(
-          `[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`
-        );
+        console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`);
       }
 
       // Emit to room with timeout
@@ -617,9 +437,7 @@ export class SocketIOService {
 
       await emissionPromise;
 
-      console.log(
-        `[SOCKET.IO] Emitted ${String(event)} to ${recipientCount} recipients in room ${room}`
-      );
+      console.log(`[SOCKET.IO] Emitted ${String(event)} to ${recipientCount} recipients in room ${room}`);
 
       return {
         success: true,
@@ -642,9 +460,7 @@ export class SocketIOService {
         success: false,
         eventType: event as string,
         recipientCount,
-        errors: [
-          { userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' },
-        ],
+        errors: [{ userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' }],
         timestamp: new Date().toISOString(),
       };
     }
@@ -682,10 +498,7 @@ export class SocketIOService {
       totalUsers: this.userSockets.size,
       connectedUsers: this.userSockets.size, // For backward compatibility
       contextRooms: this.userSockets.size, // Migration note: was expeditionRooms, now represents user context rooms
-      queuedEvents: Array.from(this.eventQueue.values()).reduce(
-        (sum, queue) => sum + queue.length,
-        0
-      ),
+      queuedEvents: Array.from(this.eventQueue.values()).reduce((sum, queue) => sum + queue.length, 0),
       averagePingTime: this.getAveragePingTime(),
       healthyConnections: this.getHealthyConnectionsCount(),
       isHealthy: !this.isShuttingDown,
@@ -698,15 +511,11 @@ export class SocketIOService {
       .map((conn) => now - (conn.lastPing || now))
       .filter((time) => time < 60000); // Only consider pings within last minute
 
-    return pingTimes.length > 0
-      ? pingTimes.reduce((sum, time) => sum + time, 0) / pingTimes.length
-      : 0;
+    return pingTimes.length > 0 ? pingTimes.reduce((sum, time) => sum + time, 0) / pingTimes.length : 0;
   }
 
   private getHealthyConnectionsCount(): number {
     const now = Date.now();
-    return Array.from(this.connections.values()).filter(
-      (conn) => conn.connected && now - (conn.lastPing || 0) < 60000
-    ).length;
+    return Array.from(this.connections.values()).filter((conn) => conn.connected && now - (conn.lastPing || 0) < 60000).length;
   }
 }

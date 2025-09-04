@@ -2,8 +2,8 @@
  * LlmHandler Unit Tests
  */
 
-import { LlmHandler } from '../LlmHandler';
-import { Node, Execution, LlmNodeParameters, NodeResult } from '../../../types';
+import { LlmHandler } from '@/nodes/handlers/LlmHandler';
+import { Node, Execution, LlmNodeParameters, NodeResult } from '@/types';
 
 // Type definitions for test data structures
 interface LlmResponseData {
@@ -27,7 +27,7 @@ interface OpenAIResponseBody {
 // Mock LLM class
 jest.mock('../../../LLM');
 
-import { LLM } from '../../../LLM';
+import { LLM } from '@/LLM';
 
 const MockedLLM = LLM as jest.MockedClass<typeof LLM>;
 
@@ -44,8 +44,8 @@ describe('LlmHandler', () => {
       parameters: {
         model: 'anthropic/claude-3.5-sonnet',
         prompt: 'Hello, how are you?',
-        openrouterApiKey: 'test-api-key'
-      } as LlmNodeParameters
+        openrouterApiKey: 'test-api-key',
+      } as LlmNodeParameters,
     };
 
     handler = new LlmHandler(mockNode);
@@ -54,11 +54,11 @@ describe('LlmHandler', () => {
     // Reset mocks
     jest.clearAllMocks();
     MockedLLM.mockClear();
-    
+
     // Setup default mock for validate method
     MockedLLM.prototype.validate = jest.fn().mockReturnValue({
       valid: true,
-      errors: []
+      errors: [],
     });
   });
 
@@ -77,18 +77,20 @@ describe('LlmHandler', () => {
           statusText: 'OK',
           headers: { 'content-type': 'application/json' },
           body: {
-            choices: [{
-              message: {
-                content: 'Hello! I am doing well, thank you for asking.'
-              }
-            }]
+            choices: [
+              {
+                message: {
+                  content: 'Hello! I am doing well, thank you for asking.',
+                },
+              },
+            ],
           },
           url: 'https://openrouter.ai/api/v1/chat/completions',
           llmResponse: 'Hello! I am doing well, thank you for asking.',
-          model: 'anthropic/claude-3.5-sonnet'
-        }
+          model: 'anthropic/claude-3.5-sonnet',
+        },
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       const result = await handler.execute(mockExecution);
@@ -116,8 +118,8 @@ describe('LlmHandler', () => {
           presencePenalty: 0.2,
           timeout: 30000,
           stream: false,
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
 
       const fullHandler = new LlmHandler(fullParamsNode);
@@ -129,18 +131,20 @@ describe('LlmHandler', () => {
           statusText: 'OK',
           headers: { 'content-type': 'application/json' },
           body: {
-            choices: [{
-              message: {
-                content: 'Quantum computing is a revolutionary technology...'
-              }
-            }]
+            choices: [
+              {
+                message: {
+                  content: 'Quantum computing is a revolutionary technology...',
+                },
+              },
+            ],
           },
           url: 'https://openrouter.ai/api/v1/chat/completions',
           llmResponse: 'Quantum computing is a revolutionary technology...',
-          model: 'openai/gpt-4-turbo'
-        }
+          model: 'openai/gpt-4-turbo',
+        },
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       const result = await fullHandler.execute(mockExecution);
@@ -160,8 +164,8 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'What is AI?',
           systemMessage: 'You are an expert AI researcher',
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
 
       const systemHandler = new LlmHandler(systemMessageNode);
@@ -173,18 +177,20 @@ describe('LlmHandler', () => {
           statusText: 'OK',
           headers: { 'content-type': 'application/json' },
           body: {
-            choices: [{
-              message: {
-                content: 'AI stands for Artificial Intelligence...'
-              }
-            }]
+            choices: [
+              {
+                message: {
+                  content: 'AI stands for Artificial Intelligence...',
+                },
+              },
+            ],
           },
           url: 'https://openrouter.ai/api/v1/chat/completions',
           llmResponse: 'AI stands for Artificial Intelligence...',
-          model: 'anthropic/claude-3.5-sonnet'
-        }
+          model: 'anthropic/claude-3.5-sonnet',
+        },
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       const result = await systemHandler.execute(mockExecution);
@@ -204,18 +210,20 @@ describe('LlmHandler', () => {
           statusText: 'OK',
           headers: { 'content-type': 'application/json' },
           body: {
-            choices: [{
-              message: {
-                content: 'Response'
-              }
-            }]
+            choices: [
+              {
+                message: {
+                  content: 'Response',
+                },
+              },
+            ],
           },
           url: 'https://openrouter.ai/api/v1/chat/completions',
           llmResponse: 'Response',
-          model: 'anthropic/claude-3.5-sonnet'
-        }
+          model: 'anthropic/claude-3.5-sonnet',
+        },
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       const result = await handler.execute(mockExecution);
@@ -232,25 +240,25 @@ describe('LlmHandler', () => {
         // OpenAI format
         {
           llmResponse: 'OpenAI response',
-          expected: 'OpenAI response'
+          expected: 'OpenAI response',
         },
         // Different responses
         {
           llmResponse: 'Direct string response',
-          expected: 'Direct string response'
+          expected: 'Direct string response',
         },
         {
           llmResponse: 'Content field response',
-          expected: 'Content field response'
+          expected: 'Content field response',
         },
         {
           llmResponse: 'Text field response',
-          expected: 'Text field response'
+          expected: 'Text field response',
         },
         {
           llmResponse: '{"other":"data"}',
-          expected: '{"other":"data"}'
-        }
+          expected: '{"other":"data"}',
+        },
       ];
 
       for (let i = 0; i < testCases.length; i++) {
@@ -264,10 +272,10 @@ describe('LlmHandler', () => {
             body: {},
             url: 'https://openrouter.ai/api/v1/chat/completions',
             llmResponse: testCase.llmResponse,
-            model: 'anthropic/claude-3.5-sonnet'
-          }
+            model: 'anthropic/claude-3.5-sonnet',
+          },
         };
-        
+
         MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
         const result = await handler.execute(mockExecution);
@@ -281,9 +289,9 @@ describe('LlmHandler', () => {
     it('should handle HTTP request failure', async () => {
       const mockLlmResult = {
         status: 'failed' as const,
-        error: new Error('LLM request failed: HTTP request failed')
+        error: new Error('LLM request failed: HTTP request failed'),
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       const result = await handler.execute(mockExecution);
@@ -297,9 +305,9 @@ describe('LlmHandler', () => {
     it('should handle missing response body', async () => {
       const mockLlmResult = {
         status: 'failed' as const,
-        error: new Error('LLM request failed')
+        error: new Error('LLM request failed'),
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       const result = await handler.execute(mockExecution);
@@ -331,10 +339,10 @@ describe('LlmHandler', () => {
           body: { choices: [{ message: { content: 'Response' } }] },
           url: 'https://openrouter.ai/api/v1/chat/completions',
           llmResponse: 'Response',
-          model: 'anthropic/claude-3.5-sonnet'
-        }
+          model: 'anthropic/claude-3.5-sonnet',
+        },
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       const beforeExecution = Date.now();
@@ -355,11 +363,11 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Hello, how are you?',
           systemMessage: 'You are a helpful assistant',
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
       const handlerWithSystemMessage = new LlmHandler(nodeWithSystemMessage);
-      
+
       const result = handlerWithSystemMessage.validate();
 
       expect(result.valid).toBe(true);
@@ -381,8 +389,8 @@ describe('LlmHandler', () => {
           presencePenalty: 0.2,
           timeout: 30000,
           stream: false,
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
 
       const fullHandler = new LlmHandler(fullParamsNode);
@@ -397,8 +405,8 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           prompt: 'Hello, how are you?',
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
       const handlerWithoutModel = new LlmHandler(nodeWithoutModel);
 
@@ -410,7 +418,7 @@ describe('LlmHandler', () => {
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Model is required',
         nodeRef: 'llm-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -419,8 +427,8 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
       const handlerWithoutPrompt = new LlmHandler(nodeWithoutPrompt);
 
@@ -432,7 +440,7 @@ describe('LlmHandler', () => {
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Prompt is required',
         nodeRef: 'llm-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -443,16 +451,16 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           temperature: 3.0, // Invalid: > 2
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedLLM.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['Temperature must be between 0 and 2']
+        errors: ['Temperature must be between 0 and 2'],
       });
-      
+
       const handlerWithInvalidTemp = new LlmHandler(nodeWithInvalidTemp);
 
       const result = handlerWithInvalidTemp.validate();
@@ -462,7 +470,7 @@ describe('LlmHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'Temperature must be between 0 and 2',
         nodeRef: 'llm-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -473,16 +481,16 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           maxTokens: 0, // Invalid: < 1
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedLLM.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['Max tokens must be greater than 0']
+        errors: ['Max tokens must be greater than 0'],
       });
-      
+
       const handlerWithInvalidTokens = new LlmHandler(nodeWithInvalidTokens);
 
       const result = handlerWithInvalidTokens.validate();
@@ -492,7 +500,7 @@ describe('LlmHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'Max tokens must be greater than 0',
         nodeRef: 'llm-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -503,16 +511,16 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           topP: 1.5, // Invalid: > 1
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedLLM.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['Top P must be between 0 and 1']
+        errors: ['Top P must be between 0 and 1'],
       });
-      
+
       const handlerWithInvalidTopP = new LlmHandler(nodeWithInvalidTopP);
 
       const result = handlerWithInvalidTopP.validate();
@@ -522,7 +530,7 @@ describe('LlmHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'Top P must be between 0 and 1',
         nodeRef: 'llm-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -533,8 +541,8 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           maxTokens: 5000, // High token count
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
       const handlerWithHighTokens = new LlmHandler(nodeWithHighTokens);
 
@@ -544,7 +552,7 @@ describe('LlmHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'LARGE_WORKFLOW_SIZE',
         message: 'High token count may result in expensive API calls',
-        nodeRef: 'llm-node'
+        nodeRef: 'llm-node',
       });
     });
 
@@ -553,7 +561,7 @@ describe('LlmHandler', () => {
       // Since the handler uses LLM class validation internally and we expect a warning,
       // we need to override the LLM validation mock to return a valid result but without warnings
       // The handler itself should add the warning
-      
+
       const result = handler.validate();
 
       expect(result.valid).toBe(true);
@@ -569,8 +577,8 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           timeout: 5000, // Low timeout
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
       const handlerWithLowTimeout = new LlmHandler(nodeWithLowTimeout);
 
@@ -580,7 +588,7 @@ describe('LlmHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'POTENTIAL_TIMEOUT',
         message: 'LLM requests may take longer than the specified timeout',
-        nodeRef: 'llm-node'
+        nodeRef: 'llm-node',
       });
     });
 
@@ -589,8 +597,8 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           temperature: 0.7,
-          openrouterApiKey: 'test-api-key'
-        } as LlmNodeParameters
+          openrouterApiKey: 'test-api-key',
+        } as LlmNodeParameters,
       };
       const handlerWithMissingFields = new LlmHandler(nodeWithMissingFields);
 
@@ -598,8 +606,8 @@ describe('LlmHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors).toHaveLength(2);
-      
-      const errorMessages = result.errors.map(e => e.message);
+
+      const errorMessages = result.errors.map((e) => e.message);
       expect(errorMessages).toContain('Model is required');
       expect(errorMessages).toContain('Prompt is required');
     });
@@ -622,10 +630,10 @@ describe('LlmHandler', () => {
           body: { choices: [{ message: { content: 'Response' } }] },
           url: 'https://openrouter.ai/api/v1/chat/completions',
           llmResponse: 'Response',
-          model: 'anthropic/claude-3.5-sonnet'
-        }
+          model: 'anthropic/claude-3.5-sonnet',
+        },
       };
-      
+
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
       await handler.execute(mockExecution);

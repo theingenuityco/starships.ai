@@ -9,7 +9,7 @@ import type { Agent } from '@/lib/api'
 import { cn, generateId } from '@/lib/utils'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { motion } from 'motion/react'
-import { KeyboardEvent, useRef, useState } from 'react'
+import { KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 interface SessionMessageInputProps {
   selectedAgent?: Agent | null
@@ -31,6 +31,17 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const currentStreamRef = useRef<{ abort: () => void } | null>(null)
   const createSession = useCreateSession()
+
+  // Auto-focus on textarea when component mounts and when agent is selected
+  useEffect(() => {
+    if (textareaRef.current && selectedAgent && !disabled) {
+      // Small delay to ensure the component is fully rendered
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [selectedAgent, disabled])
 
   const handleSubmit = async () => {
     const messageToSend = message.trim()

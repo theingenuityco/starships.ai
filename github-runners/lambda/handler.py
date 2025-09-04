@@ -51,8 +51,15 @@ def lambda_handler(event, context):
 
 def verify_webhook_signature(event):
     """Verify GitHub webhook signature"""
-    signature = event['headers'].get('x-hub-signature-256', '')
+    # Get headers (case-insensitive)
+    headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
+    signature = headers.get('x-hub-signature-256', '')
+    
+    print(f"Headers received: {list(headers.keys())}")
+    print(f"Signature header present: {'x-hub-signature-256' in headers}")
+    
     if not signature:
+        print("No signature header found")
         return False
     
     body = event.get('body', '')
@@ -62,7 +69,13 @@ def verify_webhook_signature(event):
         hashlib.sha256
     ).hexdigest()
     
-    return hmac.compare_digest(signature, expected_signature)
+    print(f"Received signature: {signature[:20]}...")
+    print(f"Expected signature: {expected_signature[:20]}...")
+    
+    result = hmac.compare_digest(signature, expected_signature)
+    print(f"Signature verification result: {result}")
+    
+    return result
 
 def get_github_app_token():
     """Generate JWT token for GitHub App authentication"""

@@ -66,6 +66,9 @@ CREATE CONSTRAINT stripe_event_id_unique IF NOT EXISTS FOR (se:StripeEvent) REQU
 // Waitlist constraints
 CREATE CONSTRAINT waitlist_email_unique IF NOT EXISTS FOR (w:Waitlist) REQUIRE w.email IS UNIQUE;
 
+// HAS_SESSION relationship constraints
+CREATE CONSTRAINT unique_starship_session_relationship IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() REQUIRE (startNode(r).id, endNode(r).id) IS UNIQUE;
+
 // ============================================================================
 // CRITICAL INDEXES
 // ============================================================================

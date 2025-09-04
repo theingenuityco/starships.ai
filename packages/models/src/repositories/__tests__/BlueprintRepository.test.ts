@@ -2,9 +2,9 @@
  * BlueprintRepository Unit Tests
  */
 
-import { BlueprintRepository } from '../BlueprintRepository';
-import { NodeRepository } from '../NodeRepository';
-import { EdgeRepository } from '../EdgeRepository';
+import { BlueprintRepository } from '@/repositories/BlueprintRepository';
+import { NodeRepository } from '@/repositories/NodeRepository';
+import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 
@@ -19,7 +19,7 @@ jest.mock('../../helpers/database', () => ({
 jest.mock('../NodeRepository');
 jest.mock('../EdgeRepository');
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('BlueprintRepository', () => {
   let repository: BlueprintRepository;
@@ -36,7 +36,7 @@ describe('BlueprintRepository', () => {
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
-    
+
     // Now create repository which will use the mocked connection
     repository = new BlueprintRepository();
 
@@ -134,11 +134,7 @@ describe('BlueprintRepository', () => {
       );
 
       expect(mockNodeRepo.createNodes).toHaveBeenCalledWith(expect.any(String), validRequest.nodes);
-      expect(mockEdgeRepo.createEdges).toHaveBeenCalledWith(
-        expect.any(String),
-        validRequest.edges,
-        mockIdMapping
-      );
+      expect(mockEdgeRepo.createEdges).toHaveBeenCalledWith(expect.any(String), validRequest.edges, mockIdMapping);
 
       expect(result).toMatchObject({
         name: 'Test Blueprint',
@@ -154,9 +150,7 @@ describe('BlueprintRepository', () => {
     it('should use default values for optional fields', async () => {
       const minimalRequest: CreateBlueprintRequest = {
         name: 'Minimal Blueprint',
-        nodes: [
-          { type: 'start', name: 'Start', description: 'Start node', parameters: {}, ref: 'start' },
-        ],
+        nodes: [{ type: 'start', name: 'Start', description: 'Start node', parameters: {}, ref: 'start' }],
         edges: [],
       };
 
@@ -260,10 +254,7 @@ describe('BlueprintRepository', () => {
 
       const result = await repository.getBlueprintById(blueprintId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (b:Blueprint {id: $blueprintId})\n        RETURN b',
-        { blueprintId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (b:Blueprint {id: $blueprintId})\n        RETURN b', { blueprintId });
       expect(mockNodeRepo.getNodesByBlueprintId).toHaveBeenCalledWith(blueprintId);
       expect(mockEdgeRepo.getEdgesByBlueprintId).toHaveBeenCalledWith(blueprintId);
 
@@ -299,11 +290,7 @@ describe('BlueprintRepository', () => {
       const result = await repository.getBlueprintById('blueprint-123');
 
       expect(result?.metadata).toEqual({});
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to parse blueprint metadata JSON:',
-        'blueprint-123',
-        expect.any(Error)
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to parse blueprint metadata JSON:', 'blueprint-123', expect.any(Error));
 
       consoleSpy.mockRestore();
     });
@@ -320,18 +307,13 @@ describe('BlueprintRepository', () => {
         { id: 'blueprint-2', name: 'Blueprint 2', metadata: '{}' },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { b: mockBlueprints[0] },
-        { b: mockBlueprints[1] },
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ b: mockBlueprints[0] }, { b: mockBlueprints[1] }]);
       mockNodeRepo.getNodesByBlueprintId.mockResolvedValue([]);
       mockEdgeRepo.getEdgesByBlueprintId.mockResolvedValue([]);
 
       const result = await repository.getAllBlueprints();
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (b:Blueprint)\n        RETURN b\n        ORDER BY b.createdAt DESC'
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (b:Blueprint)\n        RETURN b\n        ORDER BY b.createdAt DESC');
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ ...mockBlueprints[0], metadata: {} });
       expect(result[1]).toMatchObject({ ...mockBlueprints[1], metadata: {} });
@@ -351,10 +333,7 @@ describe('BlueprintRepository', () => {
         { id: 'blueprint-2', name: 'Blueprint 2', metadata: '{"valid": true}' },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { b: mockBlueprints[0] },
-        { b: mockBlueprints[1] },
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ b: mockBlueprints[0] }, { b: mockBlueprints[1] }]);
       mockNodeRepo.getNodesByBlueprintId.mockResolvedValue([]);
       mockEdgeRepo.getEdgesByBlueprintId.mockResolvedValue([]);
 
@@ -433,25 +412,19 @@ describe('BlueprintRepository', () => {
     });
 
     it('should throw ValidationError for missing blueprintId', async () => {
-      await expect(repository.updateBlueprint('', { name: 'Test' })).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.updateBlueprint('', { name: 'Test' })).rejects.toThrow(ValidationError);
     });
 
     it('should handle not found scenario', async () => {
       mockConnection.executeWrite.mockResolvedValue([]);
 
-      await expect(repository.updateBlueprint(blueprintId, { name: 'Test' })).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.updateBlueprint(blueprintId, { name: 'Test' })).rejects.toThrow(NotFoundError);
     });
 
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.updateBlueprint(blueprintId, { name: 'Test' })).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.updateBlueprint(blueprintId, { name: 'Test' })).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -494,10 +467,7 @@ describe('BlueprintRepository', () => {
 
       expect(mockNodeRepo.deleteNodesByBlueprintId).toHaveBeenCalledWith(blueprintId);
       expect(mockEdgeRepo.deleteEdgesByBlueprintId).toHaveBeenCalledWith(blueprintId);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (b:Blueprint {id: $blueprintId})\n        DELETE b',
-        { blueprintId }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (b:Blueprint {id: $blueprintId})\n        DELETE b', { blueprintId });
     });
 
     it('should validate required blueprintId parameter', async () => {
@@ -526,10 +496,7 @@ describe('BlueprintRepository', () => {
         { id: 'blueprint-2', name: 'Blueprint 2', category, metadata: '{}' },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { b: mockBlueprints[0] },
-        { b: mockBlueprints[1] },
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ b: mockBlueprints[0] }, { b: mockBlueprints[1] }]);
       mockNodeRepo.getNodesByBlueprintId.mockResolvedValue([]);
       mockEdgeRepo.getEdgesByBlueprintId.mockResolvedValue([]);
 
@@ -556,9 +523,7 @@ describe('BlueprintRepository', () => {
     });
 
     it('should handle metadata parsing errors', async () => {
-      const mockBlueprints = [
-        { id: 'blueprint-1', name: 'Blueprint 1', category: 'test', metadata: 'invalid-json' },
-      ];
+      const mockBlueprints = [{ id: 'blueprint-1', name: 'Blueprint 1', category: 'test', metadata: 'invalid-json' }];
 
       mockConnection.executeQuery.mockResolvedValue([{ b: mockBlueprints[0] }]);
       mockNodeRepo.getNodesByBlueprintId.mockResolvedValue([]);
@@ -616,9 +581,7 @@ describe('BlueprintRepository', () => {
     it('should handle complete blueprint lifecycle', async () => {
       const createRequest: CreateBlueprintRequest = {
         name: 'Lifecycle Blueprint',
-        nodes: [
-          { type: 'start', name: 'Start', description: 'Start node', parameters: {}, ref: 'start' },
-        ],
+        nodes: [{ type: 'start', name: 'Start', description: 'Start node', parameters: {}, ref: 'start' }],
         edges: [],
       };
 
@@ -722,15 +685,8 @@ describe('BlueprintRepository', () => {
       const result = await repository.createBlueprint(complexRequest);
 
       expect(result.metadata).toEqual(complexRequest.metadata);
-      expect(mockNodeRepo.createNodes).toHaveBeenCalledWith(
-        expect.any(String),
-        complexRequest.nodes
-      );
-      expect(mockEdgeRepo.createEdges).toHaveBeenCalledWith(
-        expect.any(String),
-        complexRequest.edges,
-        expect.any(Map)
-      );
+      expect(mockNodeRepo.createNodes).toHaveBeenCalledWith(expect.any(String), complexRequest.nodes);
+      expect(mockEdgeRepo.createEdges).toHaveBeenCalledWith(expect.any(String), complexRequest.edges, expect.any(Map));
     });
   });
 

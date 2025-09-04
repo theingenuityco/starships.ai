@@ -1,9 +1,5 @@
-import {
-  ApiKeyRequirement,
-  ApiKeyValidationResult,
-  ConnectorApiKeyState,
-} from '../types/connector-api-keys'
-import { MCPServerOption } from './api'
+import { ApiKeyRequirement, ApiKeyValidationResult, ConnectorApiKeyState } from '@/types/connector-api-keys'
+import { MCPServerOption } from '@/lib/api'
 
 /**
  * ConnectorApiKeyManager - Core utility for detecting and managing API key requirements
@@ -268,17 +264,7 @@ export class ConnectorApiKeyManager {
    */
   private static isSensitiveKey(envKey: string): boolean {
     const key = envKey.toUpperCase()
-    const sensitivePatterns = [
-      'API_KEY',
-      'TOKEN',
-      'SECRET',
-      'PASSWORD',
-      'PRIVATE_KEY',
-      'CLIENT_SECRET',
-      'AUTH',
-      'BEARER',
-      'ACCESS_TOKEN',
-    ]
+    const sensitivePatterns = ['API_KEY', 'TOKEN', 'SECRET', 'PASSWORD', 'PRIVATE_KEY', 'CLIENT_SECRET', 'AUTH', 'BEARER', 'ACCESS_TOKEN']
 
     return sensitivePatterns.some(pattern => key.includes(pattern))
   }
@@ -286,10 +272,7 @@ export class ConnectorApiKeyManager {
   /**
    * Validate an API key value against its requirement
    */
-  public static validateApiKey(
-    requirement: ApiKeyRequirement,
-    value: string
-  ): ApiKeyValidationResult {
+  public static validateApiKey(requirement: ApiKeyRequirement, value: string): ApiKeyValidationResult {
     if (!value || value.trim() === '') {
       if (requirement.required) {
         return {
@@ -360,10 +343,7 @@ export class ConnectorApiKeyManager {
    * Merge user-provided values with environment variables
    * Environment variables take precedence over user input
    */
-  public static mergeWithEnvironment(
-    userValues: Record<string, string>,
-    requirements: ApiKeyRequirement[]
-  ): Record<string, string> {
+  public static mergeWithEnvironment(userValues: Record<string, string>, requirements: ApiKeyRequirement[]): Record<string, string> {
     const merged: Record<string, string> = { ...userValues }
 
     for (const requirement of requirements) {

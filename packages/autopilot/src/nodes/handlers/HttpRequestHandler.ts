@@ -5,15 +5,9 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
-import {
-  Execution,
-  ValidationResult,
-  HttpRequestNodeParameters,
-  ValidationError,
-  ValidationWarning,
-} from '../../types';
-import { HttpRequest } from '../../HttpRequest';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '@/types';
+import { HttpRequest } from '@/HttpRequest';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
@@ -37,17 +31,11 @@ export class HttpRequestHandler extends BaseHandler {
       } else {
         // HTTP request execution failed
         const errorMessage = httpResult.error?.message || 'HTTP request failed';
-        return this.createErrorResult(
-          execution,
-          `HTTP ${params.method} request to ${params.url} failed: ${errorMessage}`
-        );
+        return this.createErrorResult(execution, `HTTP ${params.method} request to ${params.url} failed: ${errorMessage}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(
-        execution,
-        `HTTP ${params.method} request to ${params.url} execution failed: ${errorMessage}`
-      );
+      return this.createErrorResult(execution, `HTTP ${params.method} request to ${params.url} execution failed: ${errorMessage}`);
     }
   }
 
@@ -84,21 +72,11 @@ export class HttpRequestHandler extends BaseHandler {
 
     // Warnings for common issues
     if (params.timeout && params.timeout < 1000) {
-      warnings.push(
-        this.createValidationWarning(
-          'POTENTIAL_TIMEOUT',
-          'Timeout is very low, this may cause frequent failures'
-        )
-      );
+      warnings.push(this.createValidationWarning('POTENTIAL_TIMEOUT', 'Timeout is very low, this may cause frequent failures'));
     }
 
     if (params.retries && params.retries > 5) {
-      warnings.push(
-        this.createValidationWarning(
-          'POTENTIAL_TIMEOUT',
-          'High retry count may cause long execution times'
-        )
-      );
+      warnings.push(this.createValidationWarning('POTENTIAL_TIMEOUT', 'High retry count may cause long execution times'));
     }
 
     return {

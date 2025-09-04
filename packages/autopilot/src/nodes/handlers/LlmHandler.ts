@@ -5,15 +5,9 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
-import {
-  Execution,
-  ValidationResult,
-  LlmNodeParameters,
-  ValidationError,
-  ValidationWarning,
-} from '../../types';
-import { LLM } from '../../LLM';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult, LlmNodeParameters, ValidationError, ValidationWarning } from '@/types';
+import { LLM } from '@/LLM';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
@@ -37,17 +31,11 @@ export class LlmHandler extends BaseHandler {
       } else {
         // LLM execution failed
         const errorMessage = llmResult.error?.message || 'LLM execution failed';
-        return this.createErrorResult(
-          execution,
-          `LLM ${params.model} execution failed: ${errorMessage}`
-        );
+        return this.createErrorResult(execution, `LLM ${params.model} execution failed: ${errorMessage}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(
-        execution,
-        `LLM ${params.model} execution failed: ${errorMessage}`
-      );
+      return this.createErrorResult(execution, `LLM ${params.model} execution failed: ${errorMessage}`);
     }
   }
 
@@ -84,21 +72,11 @@ export class LlmHandler extends BaseHandler {
 
     // Warnings for common issues
     if (params.maxTokens && params.maxTokens > 4000) {
-      warnings.push(
-        this.createValidationWarning(
-          'LARGE_WORKFLOW_SIZE',
-          'High token count may result in expensive API calls'
-        )
-      );
+      warnings.push(this.createValidationWarning('LARGE_WORKFLOW_SIZE', 'High token count may result in expensive API calls'));
     }
 
     if (params.timeout && params.timeout < 10000) {
-      warnings.push(
-        this.createValidationWarning(
-          'POTENTIAL_TIMEOUT',
-          'LLM requests may take longer than the specified timeout'
-        )
-      );
+      warnings.push(this.createValidationWarning('POTENTIAL_TIMEOUT', 'LLM requests may take longer than the specified timeout'));
     }
 
     return {

@@ -5,15 +5,11 @@
  * following BaseRepository patterns and Neo4j relationship patterns.
  */
 
-import { BaseRepository } from './BaseRepository';
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { NodeRepository } from './NodeRepository';
-import { EdgeRepository } from './EdgeRepository';
-import type {
-  BlueprintModel,
-  CreateBlueprintRequest,
-  UpdateBlueprintRequest,
-} from '@starships/protocol';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { NodeRepository } from '@/repositories/NodeRepository';
+import { EdgeRepository } from '@/repositories/EdgeRepository';
+import type { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 
 export class BlueprintRepository extends BaseRepository {
   private connection: Neo4jConnection;
@@ -72,11 +68,7 @@ export class BlueprintRepository extends BaseRepository {
           metadata: JSON.stringify(request.metadata || {}),
         };
 
-        const blueprint = await this.createEntityWithAutoId<any>(
-          'Blueprint',
-          blueprintData,
-          this.connection
-        );
+        const blueprint = await this.createEntityWithAutoId<any>('Blueprint', blueprintData, this.connection);
 
         // Create nodes using NodeRepository
         const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprint.id, request.nodes);
@@ -110,10 +102,9 @@ export class BlueprintRepository extends BaseRepository {
         const connection = this.connection;
 
         // Get blueprint metadata
-        const blueprintResult = await connection.executeQuery<{ b: any }>(
-          'MATCH (b:Blueprint {id: $blueprintId})\n        RETURN b',
-          { blueprintId }
-        );
+        const blueprintResult = await connection.executeQuery<{ b: any }>('MATCH (b:Blueprint {id: $blueprintId})\n        RETURN b', {
+          blueprintId,
+        });
 
         if (!blueprintResult || blueprintResult.length === 0) return null;
 
@@ -197,10 +188,7 @@ export class BlueprintRepository extends BaseRepository {
     );
   }
 
-  async updateBlueprint(
-    blueprintId: string,
-    updates: UpdateBlueprintRequest
-  ): Promise<BlueprintModel | null> {
+  async updateBlueprint(blueprintId: string, updates: UpdateBlueprintRequest): Promise<BlueprintModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         this.validateRequired({ blueprintId }, ['blueprintId'], 'updateBlueprint');

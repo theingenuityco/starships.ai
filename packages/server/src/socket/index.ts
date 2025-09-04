@@ -1,7 +1,7 @@
-import { SocketIOService } from '../services/SocketIOService';
-import { MissionEventService } from '../services/MissionEventService';
-import { setupAgentHandlers } from './agentHandlers';
-import { setupMissionHandlers } from './missionHandlers';
+import { SocketIOService } from '@/services/SocketIOService';
+import { MissionEventService } from '@/services/MissionEventService';
+import { setupAgentHandlers } from '@/socket/agentHandlers';
+import { setupMissionHandlers } from '@/socket/missionHandlers';
 import type { Server as HTTPServer } from 'http';
 
 export function initializeSocketIO(httpServer: HTTPServer) {

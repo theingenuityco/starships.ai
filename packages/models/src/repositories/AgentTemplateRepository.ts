@@ -1,8 +1,8 @@
 import type { AgentTemplateModel, AgentModel } from '@starships/protocol';
-import { Neo4jConnection, getConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 import { AgentMemoryState } from '@starships/autopilot';
 
 export class AgentTemplateRepository extends BaseRepository {
@@ -17,11 +17,7 @@ export class AgentTemplateRepository extends BaseRepository {
    * Helper to safely get value or default, handling empty objects from Neo4j
    */
   private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    if (
-      value === null ||
-      value === undefined ||
-      (typeof value === 'object' && Object.keys(value as any).length === 0)
-    ) {
+    if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
       return defaultValue;
     }
     return value as T;
@@ -95,10 +91,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
     return this.executeWithErrorHandling(
       async () => {
-        console.log(
-          '[Repository] Inside executeWithErrorHandling - Creating template:',
-          entity.name
-        );
+        console.log('[Repository] Inside executeWithErrorHandling - Creating template:', entity.name);
         console.log('[Repository] Entity memory type:', typeof entity.memory);
         console.log('[Repository] Entity blueprint type:', typeof entity.blueprint);
 
@@ -140,11 +133,7 @@ export class AgentTemplateRepository extends BaseRepository {
           blueprintIsString: typeof templateData.blueprint === 'string',
         });
 
-        const created = await this.createEntityWithAutoId<any>(
-          'AgentTemplate',
-          templateData,
-          this.connection
-        );
+        const created = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
 
         console.log('[Repository] Created successfully, deserializing...');
 
@@ -156,10 +145,7 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
-  async update(
-    id: string,
-    updates: Partial<AgentTemplateModel>
-  ): Promise<AgentTemplateModel | null> {
+  async update(id: string, updates: Partial<AgentTemplateModel>): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         this.validateRequired({ id }, ['id'], 'update');
@@ -168,13 +154,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const serializedUpdates = this.serializeTemplate(updates);
 
         const updateFields = Object.keys(serializedUpdates)
-          .filter(
-            (key) =>
-              key !== 'id' &&
-              key !== 'createdAt' &&
-              serializedUpdates[key] !== undefined &&
-              serializedUpdates[key] !== null
-          )
+          .filter((key) => key !== 'id' && key !== 'createdAt' && serializedUpdates[key] !== undefined && serializedUpdates[key] !== null)
           .map((key) => `t.${key} = $updates.${key}`)
           .join(', ');
 
@@ -424,12 +404,7 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
-  async createAgentFromTemplate(
-    templateId: string,
-    agentName: string,
-    authorId: string,
-    starshipId: string
-  ): Promise<AgentModel> {
+  async createAgentFromTemplate(templateId: string, agentName: string, authorId: string, starshipId: string): Promise<AgentModel> {
     // First get the template
     const template = await this.findById(templateId);
     if (!template) {
@@ -526,8 +501,7 @@ export class AgentTemplateRepository extends BaseRepository {
               description: 'Process user input and respond',
               parameters: {
                 model: agent.model,
-                prompt:
-                  'Respond helpfully to the user based on the conversation context and your system instructions.',
+                prompt: 'Respond helpfully to the user based on the conversation context and your system instructions.',
                 temperature: agent.temperature || 0.7,
                 maxTokens: agent.maxTokens || 2000,
               },
@@ -559,18 +533,11 @@ export class AgentTemplateRepository extends BaseRepository {
             personality: 'Professional and helpful',
           },
           purpose: {
-            primary: String(
-              this.getSafeValue(agent.description, 'Assist users with their requests')
-            ),
-            constraints: [
-              'Be helpful and accurate',
-              'Follow ethical guidelines',
-              'Respect user privacy',
-            ],
+            primary: String(this.getSafeValue(agent.description, 'Assist users with their requests')),
+            constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy'],
           },
           space: {
-            description:
-              'Professional assistance environment focused on providing accurate and helpful responses.',
+            description: 'Professional assistance environment focused on providing accurate and helpful responses.',
           },
         };
 
@@ -597,11 +564,7 @@ export class AgentTemplateRepository extends BaseRepository {
           previewPrompts: [],
         };
 
-        const rawCreated = await this.createEntityWithAutoId<any>(
-          'AgentTemplate',
-          templateData,
-          this.connection
-        );
+        const rawCreated = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
         const created = this.deserializeTemplate(convertNeo4jIntsInObject(rawCreated));
 
         // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists

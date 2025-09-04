@@ -6,16 +6,14 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { jwtVerify } from 'jose';
-import { UserService } from '../services/UserService';
+import { UserService } from '@/services/UserService';
 import { getEnvConfig } from '@starships/env';
-import { sendError } from '../utils/responseHelpers';
+import { sendError } from '@/utils/responseHelpers';
 
 const env = getEnvConfig();
 
 // JWT configuration
-const JWT_SECRET = new TextEncoder().encode(
-  env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production'
-);
+const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');
 const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
 
@@ -23,18 +21,12 @@ const JWT_AUDIENCE = 'starships-users';
  * JWT Authentication middleware that validates JWT tokens
  * and resolves the user from the database
  */
-export const jwtAuthMiddleware = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log(
-        `[JWT-AUTH] Missing or invalid Authorization header for ${req.method} ${req.path}`
-      );
+      console.log(`[JWT-AUTH] Missing or invalid Authorization header for ${req.method} ${req.path}`);
       sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing or invalid Authorization header', 401);
       return;
     }
@@ -48,9 +40,7 @@ export const jwtAuthMiddleware = async (
       return;
     }
 
-    console.log(
-      `[JWT-AUTH] Validating token for request to ${req.method} ${req.path} - token length: ${token.length}`
-    );
+    console.log(`[JWT-AUTH] Validating token for request to ${req.method} ${req.path} - token length: ${token.length}`);
 
     // Verify JWT token
     const { payload } = await jwtVerify(token, JWT_SECRET, {
@@ -65,9 +55,7 @@ export const jwtAuthMiddleware = async (
     try {
       console.log(`[JWT-AUTH] Attempting database lookup for user ID: ${payload.sub}`);
       user = await UserService.getUserById(payload.sub as string);
-      console.log(
-        `[JWT-AUTH] Database lookup completed for user ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`
-      );
+      console.log(`[JWT-AUTH] Database lookup completed for user ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`);
     } catch (dbError: any) {
       console.error(`[JWT-AUTH] Database error when looking up user: ${payload.sub}`);
       console.error(`[JWT-AUTH] Error message: ${dbError?.message}`);
@@ -105,11 +93,7 @@ export const jwtAuthMiddleware = async (
 /**
  * Optional JWT middleware - allows unauthenticated requests but attaches user if token is provided
  */
-export const optionalJwtAuth = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> => {
+export const optionalJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

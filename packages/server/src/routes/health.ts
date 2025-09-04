@@ -7,15 +7,10 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import {
-  getConnection,
-  StarshipRepository,
-  UserRepository,
-  AgentRepository,
-} from '@starships/models';
+import { getConnection, StarshipRepository, UserRepository, AgentRepository } from '@starships/models';
 import { logger } from '@starships/models';
 import { ErrorUtils } from '@starships/errors';
-import { sendSuccess, sendError, handleCommonError } from '../utils/responseHelpers';
+import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
 
 const router: Router = Router();
 
@@ -139,8 +134,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     });
 
     // Set appropriate HTTP status code and send response
-    const statusCode =
-      healthCheck.status === 'healthy' ? 200 : healthCheck.status === 'degraded' ? 200 : 503;
+    const statusCode = healthCheck.status === 'healthy' ? 200 : healthCheck.status === 'degraded' ? 200 : 503;
 
     sendSuccess(res, healthCheck, statusCode);
   } catch (error) {
@@ -307,8 +301,7 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
       },
     });
 
-    const statusCode =
-      healthCheck.status === 'healthy' ? 200 : healthCheck.status === 'degraded' ? 200 : 503;
+    const statusCode = healthCheck.status === 'healthy' ? 200 : healthCheck.status === 'degraded' ? 200 : 503;
 
     sendSuccess(res, healthCheck, statusCode);
   } catch (error) {
@@ -347,12 +340,7 @@ router.get('/health/ready', async (req: Request, res: Response): Promise<void> =
     });
 
     if (!handleCommonError(error, res, 'readiness check')) {
-      sendError(
-        res,
-        'SERVICE_UNAVAILABLE',
-        error instanceof Error ? error.message : 'System not ready',
-        503
-      );
+      sendError(res, 'SERVICE_UNAVAILABLE', error instanceof Error ? error.message : 'System not ready', 503);
     }
   }
 });

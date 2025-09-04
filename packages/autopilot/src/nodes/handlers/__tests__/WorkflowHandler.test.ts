@@ -2,9 +2,9 @@
  * WorkflowHandler Unit Tests
  */
 
-import { WorkflowHandler } from '../WorkflowHandler';
-import { Workflow } from '../../../Workflow';
-import { Node, Execution, WorkflowNodeParameters, Blueprint, NodeResult } from '../../../types';
+import { WorkflowHandler } from '@/nodes/handlers/WorkflowHandler';
+import { Workflow } from '@/Workflow';
+import { Node, Execution, WorkflowNodeParameters, Blueprint, NodeResult } from '@/types';
 
 // Mock Workflow class
 jest.mock('../../../Workflow');
@@ -409,8 +409,7 @@ describe('WorkflowHandler', () => {
       expect(result.valid).toBe(true);
       expect(result.warnings).toContainEqual({
         code: 'POTENTIAL_TIMEOUT',
-        message:
-          'Workflow timeout is less than 1 second, which may be too short for complex workflows',
+        message: 'Workflow timeout is less than 1 second, which may be too short for complex workflows',
         nodeRef: 'workflow-node',
       });
     });

@@ -3,9 +3,9 @@
  * Automatically adds approved emails to the waitlist on server startup
  */
 
-import { getConnection } from '../helpers/database';
-import { WaitlistRepository } from '../repositories/WaitlistRepository';
-import { logger } from '../helpers/logging';
+import { getConnection } from '@/helpers/database';
+import { WaitlistRepository } from '@/repositories/WaitlistRepository';
+import { logger } from '@/helpers/logging';
 
 // List of approved emails - add new testers here
 const APPROVED_EMAILS = [
@@ -55,15 +55,11 @@ export async function seedWaitlist(): Promise<void> {
         }
       } catch (error) {
         errorCount++;
-        logger.warn(
-          `Waitlist: Error processing ${email}: ${error instanceof Error ? error.message : 'Unknown error'}`
-        );
+        logger.warn(`Waitlist: Error processing ${email}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
 
-    logger.info(
-      `✅ Waitlist seeding completed: ${addedCount} new, ${existingCount} existing, ${errorCount} errors`
-    );
+    logger.info(`✅ Waitlist seeding completed: ${addedCount} new, ${existingCount} existing, ${errorCount} errors`);
 
     // Log current approved count
     try {
@@ -75,9 +71,7 @@ export async function seedWaitlist(): Promise<void> {
       });
     }
   } catch (error) {
-    logger.error(
-      `Failed to seed waitlist: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
+    logger.error(`Failed to seed waitlist: ${error instanceof Error ? error.message : 'Unknown error'}`);
     if (error instanceof Error) {
       logger.error('Waitlist seeding error details', {
         stack: error.stack || 'No stack trace available',

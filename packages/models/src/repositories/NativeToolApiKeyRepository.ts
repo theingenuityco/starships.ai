@@ -1,5 +1,5 @@
-import { getConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { getConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import crypto from 'crypto';
 
 export class NativeToolApiKeyRepository extends BaseRepository {
@@ -52,11 +52,7 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    * Save or update an API key for a starship and tool
    */
   async saveApiKey(starshipId: string, toolName: string, apiKey: string): Promise<void> {
-    this.validateRequired(
-      { starshipId, toolName, apiKey },
-      ['starshipId', 'toolName', 'apiKey'],
-      'saveApiKey'
-    );
+    this.validateRequired({ starshipId, toolName, apiKey }, ['starshipId', 'toolName', 'apiKey'], 'saveApiKey');
 
     return this.executeWithErrorHandling(
       async () => {

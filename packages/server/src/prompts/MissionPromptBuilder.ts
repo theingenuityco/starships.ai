@@ -5,7 +5,7 @@
  * eliminating the need for separate phase-specific interfaces or complex template management.
  */
 
-import type { MissionChatState } from '../services/MissionOrchestratorAgent';
+import type { MissionChatState } from '@/services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 // Note: LLMChatPrompt type needs to be defined based on the actual interface needed
 // For now, creating a local interface until the proper type is available
@@ -214,9 +214,7 @@ export class MissionPromptBuilder {
    * Builds prompt specifically for clarity questions (bypasses phase-based routing)
    */
   buildClarityQuestionPrompt(isFirstIteration: boolean): string {
-    const instruction = isFirstIteration
-      ? SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_FIRST
-      : SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_SUBSEQUENT;
+    const instruction = isFirstIteration ? SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_FIRST : SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_SUBSEQUENT;
     return this.buildCompletePrompt(instruction);
   }
 
@@ -224,9 +222,7 @@ export class MissionPromptBuilder {
    * Builds prompt specifically for clarity completion (bypasses phase-based routing)
    */
   buildClarityCompletionPrompt(isFirstIteration: boolean): string {
-    const instruction = isFirstIteration
-      ? SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_FIRST
-      : SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_SUBSEQUENT;
+    const instruction = isFirstIteration ? SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_FIRST : SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_SUBSEQUENT;
     return this.buildCompletePrompt(instruction);
   }
 
@@ -234,10 +230,7 @@ export class MissionPromptBuilder {
    * Build workflow generation prompt
    */
   buildWorkflowGenerationPrompt(agents: AgentModel[]): LLMChatPrompt {
-    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION.replace(
-      '{agentList}',
-      this.buildAgentListSection(agents)
-    )
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION.replace('{agentList}', this.buildAgentListSection(agents))
       .replace('{missionContext}', this.buildMissionSection())
       .replace('{clarityData}', this.buildClaritySection());
 
@@ -255,10 +248,7 @@ export class MissionPromptBuilder {
    * Build workflow presentation prompt
    */
   buildWorkflowPresentationPrompt(blueprint: BlueprintModel): LLMChatPrompt {
-    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION.replace(
-      '{planData}',
-      this.buildWorkflowDataSection(blueprint)
-    );
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION.replace('{planData}', this.buildWorkflowDataSection(blueprint));
 
     return {
       messages: [
@@ -275,10 +265,10 @@ export class MissionPromptBuilder {
    */
   buildWorkflowApprovalIntentPrompt(userMessage: string): LLMChatPrompt {
     const missionContext = this.buildMissionSection();
-    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_APPROVAL_INTENT.replace(
-      '{userMessage}',
-      userMessage
-    ).replace('{missionContext}', missionContext);
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_APPROVAL_INTENT.replace('{userMessage}', userMessage).replace(
+      '{missionContext}',
+      missionContext
+    );
 
     return {
       messages: [
@@ -308,12 +298,7 @@ export class MissionPromptBuilder {
    * Universal context - mission basics that appear in all prompts
    */
   private buildUniversalContext(): string {
-    return [
-      this.buildIdentitySection(),
-      this.buildMissionSection(),
-      this.buildStatusSection(),
-      this.buildConversationSection(),
-    ]
+    return [this.buildIdentitySection(), this.buildMissionSection(), this.buildStatusSection(), this.buildConversationSection()]
       .filter(Boolean)
       .join('\n');
   }
@@ -350,10 +335,7 @@ WELCOME PHASE: First interaction with user for this mission.`;
    * Analysis phase context - clarity data and conversation history
    */
   private buildAnalysisPhaseContext(): string {
-    return [
-      `ANALYSIS PHASE: Assessing mission clarity through iterative questioning.`,
-      this.buildClaritySection(),
-    ]
+    return [`ANALYSIS PHASE: Assessing mission clarity through iterative questioning.`, this.buildClaritySection()]
       .filter(Boolean)
       .join('\n\n');
   }
@@ -454,19 +436,11 @@ MISSION CLARITY ASSESSMENT:
     const agentNodes = blueprint.nodes?.filter((n: any) => n.type === 'agent') || [];
     const approvalStatus = metadata?.mission.approvalStatus || 'pending';
     const workflowStatus =
-      approvalStatus === 'approved'
-        ? '✅ APPROVED & EXECUTED'
-        : approvalStatus === 'rejected'
-          ? '❌ REJECTED'
-          : '⏳ PENDING APPROVAL';
+      approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' : approvalStatus === 'rejected' ? '❌ REJECTED' : '⏳ PENDING APPROVAL';
 
-    const taskList = agentNodes
-      .map((node: any, index: number) => `├─ Task ${index + 1}: ${node.name}`)
-      .join('\n');
+    const taskList = agentNodes.map((node: any, index: number) => `├─ Task ${index + 1}: ${node.name}`).join('\n');
 
-    const createdDate = blueprint.createdAt
-      ? new Date(blueprint.createdAt).toLocaleDateString()
-      : 'Unknown';
+    const createdDate = blueprint.createdAt ? new Date(blueprint.createdAt).toLocaleDateString() : 'Unknown';
 
     return `
 MISSION WORKFLOW:
@@ -487,9 +461,7 @@ ${taskList}
     const taskResults = executionResult.nodeResults
       .map((result: any) => {
         const icon = result.success ? '✅' : '❌';
-        const output = result.output
-          ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}`
-          : '';
+        const output = result.output ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}` : '';
         return `├─ ${icon} ${result.nodeName}${output}`;
       })
       .join('\n');
@@ -576,11 +548,7 @@ ${taskResults}
   private encapsulateMessage(content: string): string {
     // Check if message is complex (contains newlines, special chars, or is long)
     const isComplex =
-      content.includes('\n') ||
-      content.includes('```') ||
-      content.includes('---') ||
-      content.length > 100 ||
-      /[{}<>]/.test(content);
+      content.includes('\n') || content.includes('```') || content.includes('---') || content.length > 100 || /[{}<>]/.test(content);
 
     if (isComplex) {
       return `---\n${content}\n---`;

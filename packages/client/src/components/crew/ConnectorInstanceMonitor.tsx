@@ -2,12 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { MCPServerConnector } from '@/lib/api'
-import {
-  ConnectorHealthMetrics,
-  ConnectorStatusHistoryEntry,
-  monitoringService,
-  connectorMonitoring,
-} from '@/lib/connector-monitoring'
+import { ConnectorHealthMetrics, ConnectorStatusHistoryEntry, monitoringService, connectorMonitoring } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,25 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Clock,
-  Activity,
-  Wifi,
-  WifiOff,
-  Zap,
-  TrendingUp,
-  AlertCircle,
-  RefreshCw,
-  Eye,
-  EyeOff,
-  BarChart3,
-  Lightbulb,
-  Key,
-  Minus,
-} from 'lucide-react'
+import { AlertTriangle, CheckCircle, XCircle, Clock, Activity, Wifi, WifiOff, Zap, TrendingUp, AlertCircle, RefreshCw, Eye, EyeOff, BarChart3, Lightbulb, Key, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConnectorInstanceMonitorProps {
@@ -53,14 +30,7 @@ interface ConnectorMonitorCardProps {
 }
 
 // Individual connector monitoring card
-function ConnectorMonitorCard({
-  connector,
-  healthMetrics,
-  apiKeyStatus,
-  onToggleDetails,
-  showDetails,
-  statusHistory,
-}: ConnectorMonitorCardProps) {
+function ConnectorMonitorCard({ connector, healthMetrics, apiKeyStatus, onToggleDetails, showDetails, statusHistory }: ConnectorMonitorCardProps) {
   const getStatusIcon = () => {
     switch (connector.status) {
       case 'active':
@@ -147,14 +117,7 @@ function ConnectorMonitorCard({
                 <TooltipTrigger asChild>
                   <div className="flex items-center gap-1">
                     {getHealthIcon()}
-                    <span
-                      className={cn(
-                        'text-xs font-medium',
-                        connectorMonitoring.getHealthStatusColor()
-                      )}
-                    >
-                      {healthMetrics.healthStatus}
-                    </span>
+                    <span className={cn('text-xs font-medium', connectorMonitoring.getHealthStatusColor())}>{healthMetrics.healthStatus}</span>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -162,12 +125,7 @@ function ConnectorMonitorCard({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onToggleDetails(connector.id)}
-              className="h-6 w-6 p-0"
-            >
+            <Button variant="ghost" size="sm" onClick={() => onToggleDetails(connector.id)} className="h-6 w-6 p-0">
               {showDetails ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
             </Button>
           </div>
@@ -182,10 +140,7 @@ function ConnectorMonitorCard({
               <Wifi className="w-3 h-3 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Status</span>
             </div>
-            <Badge
-              variant={connector.status === 'active' ? 'default' : 'secondary'}
-              className="text-xs"
-            >
+            <Badge variant={connector.status === 'active' ? 'default' : 'secondary'} className="text-xs">
               {connector.status}
             </Badge>
           </div>
@@ -194,11 +149,7 @@ function ConnectorMonitorCard({
               {getPerformanceIcon()}
               <span className="text-xs text-muted-foreground">Performance</span>
             </div>
-            <span
-              className={cn('text-xs font-medium', connectorMonitoring.getPerformanceLevelColor())}
-            >
-              {healthMetrics.performanceLevel}
-            </span>
+            <span className={cn('text-xs font-medium', connectorMonitoring.getPerformanceLevelColor())}>{healthMetrics.performanceLevel}</span>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1">
@@ -209,36 +160,18 @@ function ConnectorMonitorCard({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Badge
-                    variant={
-                      apiKeyStatus.status === 'configured'
-                        ? 'default'
-                        : apiKeyStatus.status === 'missing'
-                          ? 'secondary'
-                          : apiKeyStatus.status === 'invalid'
-                            ? 'destructive'
-                            : 'outline'
-                    }
+                    variant={apiKeyStatus.status === 'configured' ? 'default' : apiKeyStatus.status === 'missing' ? 'secondary' : apiKeyStatus.status === 'invalid' ? 'destructive' : 'outline'}
                     className={cn(
                       'text-xs cursor-help',
-                      apiKeyStatus.status === 'configured' &&
-                        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-                      apiKeyStatus.status === 'missing' &&
-                        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                      apiKeyStatus.status === 'configured' && 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                      apiKeyStatus.status === 'missing' && 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                     )}
                   >
-                    {apiKeyStatus.status === 'not_required'
-                      ? 'N/A'
-                      : apiKeyStatus.status === 'configured'
-                        ? 'Configured'
-                        : apiKeyStatus.status === 'missing'
-                          ? 'Missing'
-                          : 'Invalid'}
+                    {apiKeyStatus.status === 'not_required' ? 'N/A' : apiKeyStatus.status === 'configured' ? 'Configured' : apiKeyStatus.status === 'missing' ? 'Missing' : 'Invalid'}
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <div className="text-xs whitespace-pre-line max-w-xs">
-                    {ConnectorApiKeyStatus.getTooltipContent(apiKeyStatus)}
-                  </div>
+                  <div className="text-xs whitespace-pre-line max-w-xs">{ConnectorApiKeyStatus.getTooltipContent(apiKeyStatus)}</div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -273,9 +206,7 @@ function ConnectorMonitorCard({
               <AlertCircle className="w-3 h-3 text-red-500" />
               <span className="text-xs text-red-600 font-medium">Error</span>
             </div>
-            <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded border">
-              {connector.errorMessage}
-            </p>
+            <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded border">{connector.errorMessage}</p>
           </div>
         )}
 
@@ -307,9 +238,7 @@ function ConnectorMonitorCard({
                   {healthMetrics.lastUsed && (
                     <div>
                       <span className="text-muted-foreground">Last Used</span>
-                      <p className="font-mono">
-                        {new Date(healthMetrics.lastUsed).toLocaleString()}
-                      </p>
+                      <p className="font-mono">{new Date(healthMetrics.lastUsed).toLocaleString()}</p>
                     </div>
                   )}
                   <div>
@@ -337,19 +266,11 @@ function ConnectorMonitorCard({
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium">Configuration Status</span>
                       <Badge
-                        variant={
-                          apiKeyStatus.status === 'configured'
-                            ? 'default'
-                            : apiKeyStatus.status === 'missing'
-                              ? 'secondary'
-                              : 'destructive'
-                        }
+                        variant={apiKeyStatus.status === 'configured' ? 'default' : apiKeyStatus.status === 'missing' ? 'secondary' : 'destructive'}
                         className={cn(
                           'text-xs',
-                          apiKeyStatus.status === 'configured' &&
-                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-                          apiKeyStatus.status === 'missing' &&
-                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                          apiKeyStatus.status === 'configured' && 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                          apiKeyStatus.status === 'missing' && 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                         )}
                       >
                         {ConnectorApiKeyStatus.getStatusMessage(apiKeyStatus)}
@@ -362,23 +283,12 @@ function ConnectorMonitorCard({
                         {apiKeyStatus.requirements.map(req => {
                           const isConfigured = apiKeyStatus.maskedValues[req.envKey]
                           return (
-                            <div
-                              key={req.envKey}
-                              className="flex items-center justify-between text-xs"
-                            >
+                            <div key={req.envKey} className="flex items-center justify-between text-xs">
                               <div className="flex items-center gap-2">
-                                {isConfigured ? (
-                                  <CheckCircle className="w-3 h-3 text-green-500" />
-                                ) : (
-                                  <XCircle className="w-3 h-3 text-red-500" />
-                                )}
+                                {isConfigured ? <CheckCircle className="w-3 h-3 text-green-500" /> : <XCircle className="w-3 h-3 text-red-500" />}
                                 <span>{req.displayName}</span>
                               </div>
-                              {isConfigured && (
-                                <span className="font-mono text-muted-foreground">
-                                  {apiKeyStatus.maskedValues[req.envKey]}
-                                </span>
-                              )}
+                              {isConfigured && <span className="font-mono text-muted-foreground">{apiKeyStatus.maskedValues[req.envKey]}</span>}
                             </div>
                           )
                         })}
@@ -389,13 +299,9 @@ function ConnectorMonitorCard({
                       <div className="p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
                         <div className="flex items-center gap-1 mb-1">
                           <AlertTriangle className="w-3 h-3 text-green-600" />
-                          <span className="text-xs font-medium text-green-800 dark:text-green-300">
-                            Missing Keys
-                          </span>
+                          <span className="text-xs font-medium text-green-800 dark:text-green-300">Missing Keys</span>
                         </div>
-                        <div className="text-xs text-green-700 dark:text-green-400">
-                          Configure the missing API keys to enable full functionality
-                        </div>
+                        <div className="text-xs text-green-700 dark:text-green-400">Configure the missing API keys to enable full functionality</div>
                       </div>
                     )}
                   </div>
@@ -406,10 +312,7 @@ function ConnectorMonitorCard({
                 {recentHistory.length > 0 ? (
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {recentHistory.map((entry, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between text-xs p-1 rounded bg-muted/30"
-                      >
+                      <div key={index} className="flex items-center justify-between text-xs p-1 rounded bg-muted/30">
                         <div className="flex items-center gap-2">
                           <div
                             className={cn(
@@ -422,16 +325,12 @@ function ConnectorMonitorCard({
                           />
                           <span>{entry.status}</span>
                         </div>
-                        <span className="text-muted-foreground font-mono">
-                          {new Date(entry.timestamp).toLocaleTimeString()}
-                        </span>
+                        <span className="text-muted-foreground font-mono">{new Date(entry.timestamp).toLocaleTimeString()}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center py-4">
-                    No history available
-                  </p>
+                  <p className="text-xs text-muted-foreground text-center py-4">No history available</p>
                 )}
               </TabsContent>
 
@@ -460,17 +359,10 @@ function ConnectorMonitorCard({
   )
 }
 
-export function ConnectorInstanceMonitor({
-  connectorInstances,
-  className,
-  autoRefresh = true,
-  refreshInterval = 30000,
-}: ConnectorInstanceMonitorProps) {
+export function ConnectorInstanceMonitor({ connectorInstances, className, autoRefresh = true, refreshInterval = 30000 }: ConnectorInstanceMonitorProps) {
   const [healthMetrics, setHealthMetrics] = useState<Map<string, ConnectorHealthMetrics>>(new Map())
   const [apiKeyStatus, setApiKeyStatus] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
-  const [statusHistory, setStatusHistory] = useState<Map<string, ConnectorStatusHistoryEntry[]>>(
-    new Map()
-  )
+  const [statusHistory, setStatusHistory] = useState<Map<string, ConnectorStatusHistoryEntry[]>>(new Map())
   const [expandedConnectors, setExpandedConnectors] = useState<Set<string>>(new Set())
   const [isRefreshing, setIsRefreshing] = useState(false)
 
@@ -600,9 +492,7 @@ export function ConnectorInstanceMonitor({
         <CardContent className="flex flex-col items-center justify-center py-8">
           <WifiOff className="w-12 h-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">No Connectors</h3>
-          <p className="text-sm text-muted-foreground text-center">
-            No connector instances are currently configured for this starship.
-          </p>
+          <p className="text-sm text-muted-foreground text-center">No connector instances are currently configured for this starship.</p>
         </CardContent>
       </Card>
     )
@@ -624,13 +514,7 @@ export function ConnectorInstanceMonitor({
                 {overallMetrics.total !== 1 ? 's' : ''}
               </CardDescription>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="flex items-center gap-2"
-            >
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2">
               <RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />
               Refresh
             </Button>

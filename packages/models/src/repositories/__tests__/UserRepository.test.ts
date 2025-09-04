@@ -2,7 +2,7 @@
  * UserRepository Unit Tests
  */
 
-import { UserRepository } from '../UserRepository';
+import { UserRepository } from '@/repositories/UserRepository';
 import { ValidationError, NotFoundError } from '@starships/errors';
 import { UserModel } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('UserRepository', () => {
   let repository: UserRepository;
@@ -47,9 +47,7 @@ describe('UserRepository', () => {
 
       const result = await repository.findAll();
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (u:User) RETURN u ORDER BY u.createdAt DESC'
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
       expect(result).toEqual(mockUsers);
     });
 
@@ -75,10 +73,7 @@ describe('UserRepository', () => {
 
       const result = await repository.findById('user-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (u:User) WHERE u.id = $id RETURN u',
-        { id: 'user-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.id = $id RETURN u', { id: 'user-123' });
       expect(result).toEqual(mockUser);
     });
 
@@ -98,10 +93,9 @@ describe('UserRepository', () => {
 
       const result = await repository.findByEmail('test@example.com');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (u:User) WHERE u.email = $email RETURN u',
-        { email: 'test@example.com' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.email = $email RETURN u', {
+        email: 'test@example.com',
+      });
       expect(result).toEqual(mockUser);
     });
 
@@ -121,10 +115,9 @@ describe('UserRepository', () => {
 
       const result = await repository.findByUsername('testuser');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (u:User) WHERE u.username = $username RETURN u',
-        { username: 'testuser' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.username = $username RETURN u', {
+        username: 'testuser',
+      });
       expect(result).toEqual(mockUser);
     });
   });
@@ -242,9 +235,7 @@ describe('UserRepository', () => {
     it('should throw NotFoundError when user does not exist', async () => {
       mockConnection.executeWrite.mockResolvedValue([]);
 
-      await expect(repository.update('non-existent', { displayName: 'New Name' })).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.update('non-existent', { displayName: 'New Name' })).rejects.toThrow(NotFoundError);
     });
 
     it('should filter out protected fields from updates', async () => {
@@ -319,20 +310,16 @@ describe('UserRepository', () => {
 
       await repository.updateStripeCustomerId('user-123', 'cus_123');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (user:User {id: $userId})'),
-        { userId: 'user-123', stripeCustomerId: 'cus_123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('MATCH (user:User {id: $userId})'), {
+        userId: 'user-123',
+        stripeCustomerId: 'cus_123',
+      });
     });
 
     it('should validate required parameters', async () => {
-      await expect(repository.updateStripeCustomerId('', 'cus_123')).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.updateStripeCustomerId('', 'cus_123')).rejects.toThrow(ValidationError);
 
-      await expect(repository.updateStripeCustomerId('user-123', '')).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.updateStripeCustomerId('user-123', '')).rejects.toThrow(ValidationError);
     });
   });
 
@@ -415,10 +402,7 @@ describe('UserRepository', () => {
       const success = await repository.delete(userId);
 
       expect(success).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE'),
-        { id: userId }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE'), { id: userId });
     });
   });
 });

@@ -1,17 +1,11 @@
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 
 /**
  * Execution status types
  */
-export type ExecutionStatus =
-  | 'pending'
-  | 'running'
-  | 'paused'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+export type ExecutionStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Execution model for database operations
@@ -103,11 +97,7 @@ export class ExecutionRepository extends BaseRepository {
 
         const executionForStorage = this.serializeComplexFields(executionData as ExecutionModel);
 
-        const execution = await this.createEntityWithAutoId<ExecutionModel>(
-          'Execution',
-          executionForStorage,
-          this.connection
-        );
+        const execution = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionForStorage, this.connection);
 
         // Create relationship with workflow
         await connection.executeWrite(
@@ -128,15 +118,10 @@ export class ExecutionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ e: ExecutionModel }>(
-          'MATCH (e:Execution) WHERE e.id = $id RETURN e',
-          { id }
-        );
+        const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) WHERE e.id = $id RETURN e', { id });
 
         const execution = result[0]?.e || null;
-        return execution
-          ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution))
-          : null;
+        return execution ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution)) : null;
       },
       'findById',
       'Execution',
@@ -153,9 +138,7 @@ export class ExecutionRepository extends BaseRepository {
           { workflowId }
         );
 
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.e))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.e)));
       },
       'findByWorkflowId',
       'Execution'
@@ -170,16 +153,11 @@ export class ExecutionRepository extends BaseRepository {
 
         // Handle status transitions
         const updateProps: any = { ...updates };
-        if (
-          updates.status === 'running' &&
-          !Object.prototype.hasOwnProperty.call(updates, 'startTime')
-        ) {
+        if (updates.status === 'running' && !Object.prototype.hasOwnProperty.call(updates, 'startTime')) {
           updateProps.startTime = now;
         }
         if (
-          (updates.status === 'completed' ||
-            updates.status === 'failed' ||
-            updates.status === 'cancelled') &&
+          (updates.status === 'completed' || updates.status === 'failed' || updates.status === 'cancelled') &&
           !Object.prototype.hasOwnProperty.call(updates, 'endTime')
         ) {
           updateProps.endTime = now;
@@ -191,9 +169,7 @@ export class ExecutionRepository extends BaseRepository {
         );
 
         const execution = result[0]?.e || null;
-        return execution
-          ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution))
-          : null;
+        return execution ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution)) : null;
       },
       'update',
       'Execution',
@@ -226,9 +202,7 @@ export class ExecutionRepository extends BaseRepository {
           { status }
         );
 
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.e))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.e)));
       },
       'findByStatus',
       'Execution'
@@ -243,9 +217,7 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
         );
 
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.e))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.e)));
       },
       'findActiveExecutions',
       'Execution'

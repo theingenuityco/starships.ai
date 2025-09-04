@@ -1,5 +1,5 @@
 import { StarshipRepository } from '@starships/models';
-import { getRandomStarshipName } from '../utils/starshipNames';
+import { getRandomStarshipName } from '@/utils/starshipNames';
 
 /**
  * Service for managing starship operations
@@ -15,9 +15,7 @@ export class StarshipService {
       // Generate a random name for the starship
       const starshipName = getRandomStarshipName();
 
-      console.log(
-        `[STARSHIP-SERVICE] Creating default starship "${starshipName}" for user: ${userId}`
-      );
+      console.log(`[STARSHIP-SERVICE] Creating default starship "${starshipName}" for user: ${userId}`);
 
       // Create the starship with scout class (free tier)
       const starship = await starshipRepo.create({

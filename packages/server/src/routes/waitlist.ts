@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { WaitlistRepository, getConnection } from '@starships/models';
-import { WaitlistService } from '../services/WaitlistService';
-import { logger } from '../utils/logger';
-import { asyncHandler } from '../middleware/errorHandler';
-import { sendSuccess, sendError, handleCommonError } from '../utils/responseHelpers';
+import { WaitlistService } from '@/services/WaitlistService';
+import { logger } from '@/utils/logger';
+import { asyncHandler } from '@/middleware/errorHandler';
+import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
 
 const router: Router = Router();
 
@@ -56,12 +56,7 @@ router.post(
         logger.error('Failed to initialize waitlist service:', {
           error: error instanceof Error ? error.message : 'Unknown error',
         });
-        sendError(
-          res,
-          'SERVICE_UNAVAILABLE',
-          'Service temporarily unavailable. Please try again.',
-          503
-        );
+        sendError(res, 'SERVICE_UNAVAILABLE', 'Service temporarily unavailable. Please try again.', 503);
         return;
       }
 
@@ -84,11 +79,7 @@ router.post(
       });
 
       if (!handleCommonError(error, res, 'checking waitlist approval')) {
-        sendError(
-          res,
-          'INTERNAL_SERVER_ERROR',
-          'Service temporarily unavailable. Please try again.'
-        );
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Service temporarily unavailable. Please try again.');
       }
     }
   })

@@ -2,7 +2,7 @@
  * Common database mocking helper for repository tests
  */
 
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 export function createDatabaseMock() {
   const mockConnection = {

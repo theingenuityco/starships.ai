@@ -1,12 +1,9 @@
 import * as dotenv from 'dotenv';
 import dotenvExpand from 'dotenv-expand';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
-import { EnvironmentConfig } from './types';
+import { EnvironmentConfig } from '@/types';
 
 // Load environment variables from the root .env file
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const rootEnvPath = path.resolve(__dirname, '../../../.env');
 
 // Only run dotenv config on server-side to prevent browser TTY errors
@@ -46,13 +43,11 @@ export function getEnvConfig(): EnvironmentConfig {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
 
     // Default Model Configuration
-    DEFAULT_LLM_PROVIDER:
-      (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || 'openai',
+    DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || 'openai',
     DEFAULT_CHAT_MODEL: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
 
     // JWT Authentication Configuration
-    JWT_SECRET:
-      process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-at-least-32-characters-long',
+    JWT_SECRET: process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-at-least-32-characters-long',
 
     // Stripe Configuration
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
@@ -69,4 +64,3 @@ export function getEnvConfig(): EnvironmentConfig {
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
   };
 }
-

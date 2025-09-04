@@ -2,33 +2,12 @@
 
 import React from 'react'
 import type { AgentModel } from '@starships/protocol'
-import {
-  Bot,
-  Edit,
-  Trash2,
-  EyeOff,
-  Star,
-  TestTube,
-  BarChart3,
-  Code,
-  Lightbulb,
-  BarChart2,
-  HeartPulse,
-  MoreVertical,
-  Sparkles,
-  Brain,
-} from 'lucide-react'
+import { Bot, Edit, Trash2, EyeOff, Star, TestTube, BarChart3, Code, Lightbulb, BarChart2, HeartPulse, MoreVertical, Sparkles, Brain } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 
 interface AgentCardProps {
   agent: AgentModel
@@ -41,28 +20,14 @@ interface AgentCardProps {
   showActions?: boolean
 }
 
-export function AgentCard({
-  agent,
-  isSelected,
-  onClick,
-  onEdit,
-  onDelete,
-  onTest,
-  onAnalytics,
-  showActions = false,
-}: AgentCardProps) {
+export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest, onAnalytics, showActions = false }: AgentCardProps) {
   const getCategoryColor = (category: AgentModel['category']) => {
     const colors = {
-      general:
-        'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
-      coding:
-        'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
-      creative:
-        'bg-gradient-to-r from-purple-500/10 to-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30',
-      analysis:
-        'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
-      support:
-        'bg-gradient-to-r from-orange-500/10 to-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30',
+      general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
+      coding: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
+      creative: 'bg-gradient-to-r from-purple-500/10 to-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30',
+      analysis: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
+      support: 'bg-gradient-to-r from-orange-500/10 to-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30',
     }
     return colors[category] || colors.general
   }
@@ -96,19 +61,11 @@ export function AgentCard({
     // Determine emoji-like icon based on agent name or category
     if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
       return '🎧' // Headphones emoji
-    } else if (
-      agent.name.toLowerCase().includes('data') ||
-      agent.name.toLowerCase().includes('analyst') ||
-      agent.category === 'analysis'
-    ) {
+    } else if (agent.name.toLowerCase().includes('data') || agent.name.toLowerCase().includes('analyst') || agent.category === 'analysis') {
       return '📊' // Bar chart emoji
     } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
       return '✏️' // Pencil emoji
-    } else if (
-      agent.name.toLowerCase().includes('code') ||
-      agent.name.toLowerCase().includes('coding') ||
-      agent.category === 'coding'
-    ) {
+    } else if (agent.name.toLowerCase().includes('code') || agent.name.toLowerCase().includes('coding') || agent.category === 'coding') {
       return '🔍' // Magnifying glass emoji
     } else {
       return '🤖' // Robot emoji as default
@@ -133,17 +90,11 @@ export function AgentCard({
             {/* Left Column: Enhanced Avatar */}
             <div className="flex flex-col items-center space-y-2">
               <div className="relative">
-                <div
-                  className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`}
-                />
+                <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
                 <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
                   <AvatarFallback
                     className={`
-                  ${
-                    isSelected
-                      ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground'
-                      : `${getAvatarBackgroundColor(agent.category)} text-foreground`
-                  }
+                  ${isSelected ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' : `${getAvatarBackgroundColor(agent.category)} text-foreground`}
                 `}
                   >
                     <span className="text-base">{getAgentAvatarContent(agent)}</span>
@@ -177,17 +128,13 @@ export function AgentCard({
                 {(agent as any).rating && (
                   <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-1 rounded-md">
                     <Star className="w-3.5 h-3.5 text-yellow-500 fill-current" />
-                    <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">
-                      {((agent as any).rating as number).toFixed(1)}
-                    </span>
+                    <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">{((agent as any).rating as number).toFixed(1)}</span>
                   </div>
                 )}
               </div>
 
               <div className="flex items-center gap-2 mb-2">
-                <Badge
-                  className={`text-xs ${getCategoryColor(agent.category)} flex items-center border font-semibold`}
-                >
+                <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center border font-semibold`}>
                   {getCategoryIcon(agent.category)}
                   {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
                 </Badge>
@@ -197,37 +144,24 @@ export function AgentCard({
                 </div>
               </div>
 
-              {agent.description && (
-                <p className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed group-hover:text-foreground/80 transition-colors">
-                  {agent.description}
-                </p>
-              )}
+              {agent.description && <p className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed group-hover:text-foreground/80 transition-colors">{agent.description}</p>}
 
               {/* Enhanced Tags display */}
-              {(agent as any).tags &&
-                Array.isArray((agent as any).tags) &&
-                (agent as any).tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {((agent as any).tags as string[]).slice(0, 3).map((tag: string) => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-muted/30 border-muted-foreground/20 hover:bg-muted/50 transition-colors"
-                      >
-                        <Sparkles className="w-2.5 h-2.5 mr-1" />
-                        {tag.charAt(0).toUpperCase() + tag.slice(1)}
-                      </Badge>
-                    ))}
-                    {((agent as any).tags as string[]).length > 3 && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-primary/10 border-primary/30 text-primary font-semibold"
-                      >
-                        +{((agent as any).tags as string[]).length - 3} more
-                      </Badge>
-                    )}
-                  </div>
-                )}
+              {(agent as any).tags && Array.isArray((agent as any).tags) && (agent as any).tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {((agent as any).tags as string[]).slice(0, 3).map((tag: string) => (
+                    <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-muted/30 border-muted-foreground/20 hover:bg-muted/50 transition-colors">
+                      <Sparkles className="w-2.5 h-2.5 mr-1" />
+                      {tag.charAt(0).toUpperCase() + tag.slice(1)}
+                    </Badge>
+                  ))}
+                  {((agent as any).tags as string[]).length > 3 && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded-full bg-primary/10 border-primary/30 text-primary font-semibold">
+                      +{((agent as any).tags as string[]).length - 3} more
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Right Column: Action menu */}
@@ -246,11 +180,7 @@ export function AgentCard({
                       <span className="sr-only">Open agent actions menu</span>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-48 bg-background/95 backdrop-blur-sm border border-border/50 shadow-lg"
-                    onClick={e => e.stopPropagation()}
-                  >
+                  <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur-sm border border-border/50 shadow-lg" onClick={e => e.stopPropagation()}>
                     {onAnalytics && (
                       <DropdownMenuItem
                         onClick={e => {

@@ -3,40 +3,14 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import { useRouter } from 'next/navigation'
-import {
-  Target,
-  Plus,
-  Edit,
-  Trash2,
-  Play,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
-  SortAsc,
-  SortDesc,
-  Users,
-} from 'lucide-react'
+import { Target, Plus, Edit, Trash2, Play, CheckCircle, XCircle, Clock, AlertCircle, SortAsc, SortDesc, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/useToast'
@@ -65,14 +39,7 @@ type DeployedAgent = {
   allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[]
   requiredPermissions?: string[]
 }
-import type {
-  MissionModel,
-  MissionStatus,
-  CreateMissionRequest,
-  UpdateMissionRequest,
-  MissionFilters,
-  MissionSort,
-} from '@starships/protocol'
+import type { MissionModel, MissionStatus, CreateMissionRequest, UpdateMissionRequest, MissionFilters, MissionSort } from '@starships/protocol'
 
 interface MissionListProps {
   starshipId?: string
@@ -96,11 +63,7 @@ const statusColors: Record<MissionStatus, string> = {
   cancelled: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
 }
 
-export function MissionList({
-  starshipId,
-  starshipSlug,
-  showCreateButton = true,
-}: MissionListProps) {
+export function MissionList({ starshipId, starshipSlug, showCreateButton = true }: MissionListProps) {
   const [missions, setMissions] = useState<MissionModel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -118,9 +81,7 @@ export function MissionList({
     setError(null)
 
     try {
-      const response = starshipId
-        ? await missionApi.getMissionsByStarshipId(starshipId, filters, sort)
-        : await missionApi.getAllMissions(filters, sort)
+      const response = starshipId ? await missionApi.getMissionsByStarshipId(starshipId, filters, sort) : await missionApi.getAllMissions(filters, sort)
 
       if (response.error) {
         setError(response.error)
@@ -139,11 +100,7 @@ export function MissionList({
   }, [starshipId, filters, sort])
 
   // Filter missions by search term
-  const filteredMissions = missions.filter(
-    mission =>
-      mission.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mission.description.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredMissions = missions.filter(mission => mission.name.toLowerCase().includes(searchTerm.toLowerCase()) || mission.description.toLowerCase().includes(searchTerm.toLowerCase()))
 
   // Create mission
   const handleCreateMission = async (data: CreateMissionRequest) => {
@@ -268,11 +225,7 @@ export function MissionList({
               </Button>
             </DialogTrigger>
             <DialogContent>
-              <CreateMissionForm
-                starshipId={starshipId}
-                onSubmit={handleCreateMission}
-                onCancel={() => setShowCreateModal(false)}
-              />
+              <CreateMissionForm starshipId={starshipId} onSubmit={handleCreateMission} onCancel={() => setShowCreateModal(false)} />
             </DialogContent>
           </Dialog>
         )}
@@ -281,11 +234,7 @@ export function MissionList({
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
-          <Input
-            placeholder="Search missions..."
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-          />
+          <Input placeholder="Search missions..." value={searchTerm} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)} />
         </div>
 
         <Select
@@ -320,29 +269,17 @@ export function MissionList({
             })
           }
         >
-          {sort.direction === 'asc' ? (
-            <SortAsc className="w-4 h-4" />
-          ) : (
-            <SortDesc className="w-4 h-4" />
-          )}
+          {sort.direction === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
         </Button>
       </div>
 
       {/* Mission List */}
       <AnimatePresence>
         {filteredMissions.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center p-8 border-2 border-dashed border-muted rounded-lg"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center p-8 border-2 border-dashed border-muted rounded-lg">
             <Target className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">No missions found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm
-                ? 'No missions match your search criteria.'
-                : 'Create your first mission to get started.'}
-            </p>
+            <p className="text-muted-foreground mb-4">{searchTerm ? 'No missions match your search criteria.' : 'Create your first mission to get started.'}</p>
             {showCreateButton && starshipId && !searchTerm && (
               <Button onClick={() => setShowCreateModal(true)}>
                 <Plus className="w-4 h-4 mr-2" />
@@ -353,21 +290,8 @@ export function MissionList({
         ) : (
           <div className="grid gap-4">
             {filteredMissions.map(mission => (
-              <motion.div
-                key={mission.id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.2 }}
-              >
-                <MissionCard
-                  mission={mission}
-                  onEdit={setEditingMission}
-                  onDelete={handleDeleteMission}
-                  onStatusChange={handleStatusChange}
-                  onClick={handleMissionClick}
-                />
+              <motion.div key={mission.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.2 }}>
+                <MissionCard mission={mission} onEdit={setEditingMission} onDelete={handleDeleteMission} onStatusChange={handleStatusChange} onClick={handleMissionClick} />
               </motion.div>
             ))}
           </div>
@@ -377,13 +301,7 @@ export function MissionList({
       {/* Edit Mission Modal */}
       <Dialog open={!!editingMission} onOpenChange={() => setEditingMission(null)}>
         <DialogContent>
-          {editingMission && (
-            <EditMissionForm
-              mission={editingMission}
-              onSubmit={updates => handleUpdateMission(editingMission.id, updates)}
-              onCancel={() => setEditingMission(null)}
-            />
-          )}
+          {editingMission && <EditMissionForm mission={editingMission} onSubmit={updates => handleUpdateMission(editingMission.id, updates)} onCancel={() => setEditingMission(null)} />}
         </DialogContent>
       </Dialog>
     </div>
@@ -405,10 +323,7 @@ function MissionCard({
   onClick: (mission: MissionModel) => void
 }) {
   return (
-    <Card
-      className="hover:shadow-md transition-shadow cursor-pointer"
-      onClick={() => onClick(mission)}
-    >
+    <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onClick(mission)}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -417,12 +332,8 @@ function MissionCard({
               {mission.name}
             </CardTitle>
             <div className="flex items-center gap-2 mt-2">
-              <Badge className={statusColors[mission.status as MissionStatus]}>
-                {mission.status}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                Created {new Date(mission.createdAt).toLocaleDateString()}
-              </span>
+              <Badge className={statusColors[mission.status as MissionStatus]}>{mission.status}</Badge>
+              <span className="text-sm text-muted-foreground">Created {new Date(mission.createdAt).toLocaleDateString()}</span>
             </div>
           </div>
           <div className="flex gap-1">
@@ -527,15 +438,7 @@ function MissionCard({
 }
 
 // Create Mission Form Component
-function CreateMissionForm({
-  starshipId,
-  onSubmit,
-  onCancel,
-}: {
-  starshipId: string
-  onSubmit: (data: CreateMissionRequest) => void
-  onCancel: () => void
-}) {
+function CreateMissionForm({ starshipId, onSubmit, onCancel }: { starshipId: string; onSubmit: (data: CreateMissionRequest) => void; onCancel: () => void }) {
   const [formData, setFormData] = useState<CreateMissionRequest>({
     starshipId,
     name: '',
@@ -544,11 +447,7 @@ function CreateMissionForm({
   })
 
   // Use TanStack Query hook for agents
-  const {
-    data: agentsData,
-    isLoading: loadingAgents,
-    error: agentsError,
-  } = useStarshipAgents(starshipId)
+  const { data: agentsData, isLoading: loadingAgents, error: agentsError } = useStarshipAgents(starshipId)
   const agents =
     agentsData?.deployedAgents?.map((agent: any) => ({
       ...agent,
@@ -580,15 +479,7 @@ function CreateMissionForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <Label htmlFor="name">Mission Name</Label>
-          <Input
-            id="name"
-            value={formData.name}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setFormData({ ...formData, name: e.target.value })
-            }
-            placeholder="Enter mission name"
-            required
-          />
+          <Input id="name" value={formData.name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter mission name" required />
         </div>
 
         <div>
@@ -596,9 +487,7 @@ function CreateMissionForm({
           <Textarea
             id="description"
             value={formData.description}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-              setFormData({ ...formData, description: e.target.value })
-            }
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Describe the mission objectives and details"
             rows={3}
             required
@@ -611,9 +500,7 @@ function CreateMissionForm({
             <Users className="w-4 h-4" />
             Assign Agents
           </Label>
-          <p className="text-sm text-muted-foreground mb-3">
-            Select at least one agent to assign to this mission
-          </p>
+          <p className="text-sm text-muted-foreground mb-3">Select at least one agent to assign to this mission</p>
 
           {loadingAgents ? (
             <div className="flex items-center justify-center py-4">
@@ -621,35 +508,22 @@ function CreateMissionForm({
               <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
             </div>
           ) : agentsError ? (
-            <div className="text-sm text-red-500 py-2">
-              {agentsError?.message || 'Failed to load agents'}
-            </div>
+            <div className="text-sm text-red-500 py-2">{agentsError?.message || 'Failed to load agents'}</div>
           ) : agents.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-2">
-              No agents available. Deploy agents to your starship first.
-            </div>
+            <div className="text-sm text-muted-foreground py-2">No agents available. Deploy agents to your starship first.</div>
           ) : (
             <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-3">
               {agents.map(agent => (
                 <div key={agent.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`agent-${agent.id}`}
-                    checked={formData.agentIds.includes(agent.id)}
-                    onCheckedChange={checked => handleAgentToggle(agent.id, checked as boolean)}
-                  />
-                  <label
-                    htmlFor={`agent-${agent.id}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
-                  >
+                  <Checkbox id={`agent-${agent.id}`} checked={formData.agentIds.includes(agent.id)} onCheckedChange={checked => handleAgentToggle(agent.id, checked as boolean)} />
+                  <label htmlFor={`agent-${agent.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1">
                     <div className="flex items-center justify-between">
                       <span>{agent.name}</span>
                       <Badge variant="secondary" className="text-xs">
                         {agent.category}
                       </Badge>
                     </div>
-                    {agent.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{agent.description}</p>
-                    )}
+                    {agent.description && <p className="text-xs text-muted-foreground mt-1">{agent.description}</p>}
                   </label>
                 </div>
               ))}
@@ -667,14 +541,7 @@ function CreateMissionForm({
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button
-            type="submit"
-            disabled={
-              !formData.name.trim() ||
-              !formData.description.trim() ||
-              formData.agentIds.length === 0
-            }
-          >
+          <Button type="submit" disabled={!formData.name.trim() || !formData.description.trim() || formData.agentIds.length === 0}>
             Create Mission
           </Button>
         </DialogFooter>
@@ -684,15 +551,7 @@ function CreateMissionForm({
 }
 
 // Edit Mission Form Component
-function EditMissionForm({
-  mission,
-  onSubmit,
-  onCancel,
-}: {
-  mission: MissionModel
-  onSubmit: (updates: UpdateMissionRequest) => void
-  onCancel: () => void
-}) {
+function EditMissionForm({ mission, onSubmit, onCancel }: { mission: MissionModel; onSubmit: (updates: UpdateMissionRequest) => void; onCancel: () => void }) {
   const [formData, setFormData] = useState<UpdateMissionRequest>({
     name: mission.name,
     description: mission.description,
@@ -701,11 +560,7 @@ function EditMissionForm({
   })
 
   // Use TanStack Query hook for agents
-  const {
-    data: agentsData,
-    isLoading: loadingAgents,
-    error: agentsError,
-  } = useStarshipAgents(mission.starshipId)
+  const { data: agentsData, isLoading: loadingAgents, error: agentsError } = useStarshipAgents(mission.starshipId)
   const agents =
     agentsData?.deployedAgents?.map((agent: any) => ({
       ...agent,
@@ -722,9 +577,7 @@ function EditMissionForm({
   const handleAgentToggle = (agentId: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      agentIds: checked
-        ? [...(prev.agentIds || []), agentId]
-        : (prev.agentIds || []).filter(id => id !== agentId),
+      agentIds: checked ? [...(prev.agentIds || []), agentId] : (prev.agentIds || []).filter(id => id !== agentId),
     }))
   }
 
@@ -740,9 +593,7 @@ function EditMissionForm({
           <Input
             id="edit-name"
             value={formData.name || ''}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setFormData({ ...formData, name: e.target.value })
-            }
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
             placeholder="Enter mission name"
           />
         </div>
@@ -752,9 +603,7 @@ function EditMissionForm({
           <Textarea
             id="edit-description"
             value={formData.description || ''}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-              setFormData({ ...formData, description: e.target.value })
-            }
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Describe the mission objectives and details"
             rows={3}
           />
@@ -773,33 +622,22 @@ function EditMissionForm({
               <span className="ml-2 text-sm text-muted-foreground">Loading agents...</span>
             </div>
           ) : agentsError ? (
-            <div className="text-sm text-red-500 py-2">
-              {agentsError?.message || 'Failed to load agents'}
-            </div>
+            <div className="text-sm text-red-500 py-2">{agentsError?.message || 'Failed to load agents'}</div>
           ) : agents.length === 0 ? (
             <div className="text-sm text-muted-foreground py-2">No agents available.</div>
           ) : (
             <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-3">
               {agents.map(agent => (
                 <div key={agent.id} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`edit-agent-${agent.id}`}
-                    checked={(formData.agentIds || []).includes(agent.id)}
-                    onCheckedChange={checked => handleAgentToggle(agent.id, checked as boolean)}
-                  />
-                  <label
-                    htmlFor={`edit-agent-${agent.id}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
-                  >
+                  <Checkbox id={`edit-agent-${agent.id}`} checked={(formData.agentIds || []).includes(agent.id)} onCheckedChange={checked => handleAgentToggle(agent.id, checked as boolean)} />
+                  <label htmlFor={`edit-agent-${agent.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1">
                     <div className="flex items-center justify-between">
                       <span>{agent.name}</span>
                       <Badge variant="secondary" className="text-xs">
                         {agent.category}
                       </Badge>
                     </div>
-                    {agent.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{agent.description}</p>
-                    )}
+                    {agent.description && <p className="text-xs text-muted-foreground mt-1">{agent.description}</p>}
                   </label>
                 </div>
               ))}
@@ -816,10 +654,7 @@ function EditMissionForm({
 
         <div>
           <Label htmlFor="edit-status">Status</Label>
-          <Select
-            value={formData.status}
-            onValueChange={(value: MissionStatus) => setFormData({ ...formData, status: value })}
-          >
+          <Select value={formData.status} onValueChange={(value: MissionStatus) => setFormData({ ...formData, status: value })}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>

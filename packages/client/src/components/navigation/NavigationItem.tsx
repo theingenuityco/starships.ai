@@ -11,13 +11,7 @@ interface NavigationItemProps {
   compact?: boolean
 }
 
-export function NavigationItem({
-  href,
-  label,
-  icon: Icon,
-  isActive,
-  compact = false,
-}: NavigationItemProps) {
+export function NavigationItem({ href, label, icon: Icon, isActive, compact = false }: NavigationItemProps) {
   return (
     <Link href={href}>
       <motion.div
@@ -31,23 +25,13 @@ export function NavigationItem({
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="relative flex-shrink-0">
-            <div
-              className={`p-1.5 rounded-md transition-all duration-300 ${
-                isActive ? 'bg-primary/20' : 'bg-muted/30 group-hover:bg-muted/50'
-              }`}
-            >
-              <Icon
-                className={`w-3.5 h-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`}
-              />
+            <div className={`p-1.5 rounded-md transition-all duration-300 ${isActive ? 'bg-primary/20' : 'bg-muted/30 group-hover:bg-muted/50'}`}>
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
             </div>
             {/* Status indicators removed for cleaner look */}
           </div>
           <div className="flex-1 min-w-0">
-            <span
-              className={`font-semibold ${compact ? 'text-sm' : 'text-sm'} truncate block ${
-                isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'
-              } transition-colors`}
-            >
+            <span className={`font-semibold ${compact ? 'text-sm' : 'text-sm'} truncate block ${isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`}>
               {label}
             </span>
           </div>

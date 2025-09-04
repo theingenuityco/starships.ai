@@ -2,8 +2,8 @@
  * PromptHandler Unit Tests
  */
 
-import { PromptHandler } from '../PromptHandler';
-import { Node, Execution, UserPromptNodeParameters, UserPromptChoice } from '../../../types';
+import { PromptHandler } from '@/nodes/handlers/PromptHandler';
+import { Node, Execution, UserPromptNodeParameters, UserPromptChoice } from '@/types';
 
 describe('PromptHandler', () => {
   let handler: PromptHandler;
@@ -58,10 +58,7 @@ describe('PromptHandler', () => {
 
       // Verify console.log was called with correct parameters
       expect(consoleSpy).toHaveBeenCalledWith('User prompt: Please select an option:');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Choices:',
-        (mockNode.parameters as UserPromptNodeParameters).choices
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Choices:', (mockNode.parameters as UserPromptNodeParameters).choices);
 
       consoleSpy.mockRestore();
     });

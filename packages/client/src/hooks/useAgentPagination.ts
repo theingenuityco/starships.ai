@@ -22,9 +22,7 @@ interface UseAgentPaginationResult {
 /**
  * Hook for paginated agent loading with lazy loading support
  */
-export function useAgentPagination(
-  options: UseAgentPaginationOptions = {}
-): UseAgentPaginationResult {
+export function useAgentPagination(options: UseAgentPaginationOptions = {}): UseAgentPaginationResult {
   const { pageSize = 20, category, authorId, searchQuery, isPublic } = options
 
   const [agents, setAgents] = useState<Agent[]>([])
@@ -124,12 +122,7 @@ export function useAgentPagination(
 /**
  * Hook for infinite scroll behavior
  */
-export function useInfiniteScroll(
-  loadMore: () => void,
-  hasMore: boolean,
-  loading: boolean,
-  threshold: number = 100
-) {
+export function useInfiniteScroll(loadMore: () => void, hasMore: boolean, loading: boolean, threshold: number = 100) {
   useEffect(() => {
     const handleScroll = () => {
       if (loading || !hasMore) return

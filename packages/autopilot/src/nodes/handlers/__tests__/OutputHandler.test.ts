@@ -2,8 +2,8 @@
  * OutputHandler Unit Tests
  */
 
-import { OutputHandler } from '../OutputHandler';
-import { Node, Execution, OutputNodeParameters, NodeResult } from '../../../types';
+import { OutputHandler } from '@/nodes/handlers/OutputHandler';
+import { Node, Execution, OutputNodeParameters, NodeResult } from '@/types';
 
 describe('OutputHandler', () => {
   let handler: OutputHandler;
@@ -150,15 +150,7 @@ describe('OutputHandler', () => {
     });
 
     it('should handle all supported formats', async () => {
-      const formats: Array<OutputNodeParameters['format']> = [
-        'text',
-        'markdown',
-        'json',
-        'html',
-        'xml',
-        'pdf',
-        'csv',
-      ];
+      const formats: Array<OutputNodeParameters['format']> = ['text', 'markdown', 'json', 'html', 'xml', 'pdf', 'csv'];
 
       for (const format of formats) {
         const paramsWithFormat = {
@@ -431,15 +423,7 @@ describe('OutputHandler', () => {
     });
 
     it('should validate with different output formats', () => {
-      const formats: Array<OutputNodeParameters['format']> = [
-        'text',
-        'markdown',
-        'json',
-        'html',
-        'xml',
-        'pdf',
-        'csv',
-      ];
+      const formats: Array<OutputNodeParameters['format']> = ['text', 'markdown', 'json', 'html', 'xml', 'pdf', 'csv'];
 
       for (const format of formats) {
         const paramsWithFormat = {

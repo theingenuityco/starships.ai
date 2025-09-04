@@ -1,6 +1,6 @@
 import { SessionModel } from '@starships/protocol';
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 
 export class SessionRepository extends BaseRepository {
   private connection: Neo4jConnection;
@@ -14,9 +14,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        const result = await connection.executeQuery<{ s: SessionModel }>(
-          'MATCH (s:Session) RETURN s ORDER BY s.last_activity_at DESC'
-        );
+        const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) RETURN s ORDER BY s.last_activity_at DESC');
         return result.map((record) => this.mapToSession(record.s));
       },
       'findAll',
@@ -28,10 +26,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ s: any }>(
-          'MATCH (s:Session) WHERE s.id = $id RETURN s',
-          { id }
-        );
+        const result = await connection.executeQuery<{ s: any }>('MATCH (s:Session) WHERE s.id = $id RETURN s', { id });
         return result.length > 0 ? this.mapToSession(result[0].s) : null;
       },
       'findById',
@@ -40,10 +35,7 @@ export class SessionRepository extends BaseRepository {
     );
   }
 
-  async create(
-    entity: Omit<SessionModel, 'id' | 'createdAt' | 'updatedAt'>,
-    starshipId?: string
-  ): Promise<SessionModel> {
+  async create(entity: Omit<SessionModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<SessionModel> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
@@ -58,11 +50,7 @@ export class SessionRepository extends BaseRepository {
           metadata: entity.metadata ? JSON.stringify(entity.metadata) : null,
         };
 
-        const result = await this.createEntityWithAutoId<any>(
-          'Session',
-          sessionData,
-          this.connection
-        );
+        const result = await this.createEntityWithAutoId<any>('Session', sessionData, this.connection);
 
         // Create relationship with starship if starshipId is provided
         if (starshipId) {
@@ -162,10 +150,10 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.last_activity_at = $timestamp',
-          { id, timestamp: new Date().toISOString() }
-        );
+        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.last_activity_at = $timestamp', {
+          id,
+          timestamp: new Date().toISOString(),
+        });
       },
       'updateActivity',
       'Session',
@@ -207,10 +195,11 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
-          { id, status: 'completed', timestamp: new Date().toISOString() }
-        );
+        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp', {
+          id,
+          status: 'completed',
+          timestamp: new Date().toISOString(),
+        });
       },
       'markAsCompleted',
       'Session',
@@ -222,10 +211,11 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
-          { id, status: 'archived', timestamp: new Date().toISOString() }
-        );
+        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp', {
+          id,
+          status: 'archived',
+          timestamp: new Date().toISOString(),
+        });
       },
       'archiveSession',
       'Session',
@@ -255,9 +245,7 @@ export class SessionRepository extends BaseRepository {
   /**
    * Get the starship associated with a session using Neo4j relationships
    */
-  async getSessionStarship(
-    sessionId: string
-  ): Promise<{ id: string; name: string; slug: string } | null> {
+  async getSessionStarship(sessionId: string): Promise<{ id: string; name: string; slug: string } | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;

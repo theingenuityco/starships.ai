@@ -1,9 +1,13 @@
 {
   "extends": "../../tsconfig.nodejs.json",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM"],
+    "lib": ["ES2020", "DOM"],
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist"]

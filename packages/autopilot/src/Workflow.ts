@@ -5,8 +5,8 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from './types';
-import { Engine } from './engine/Engine';
+import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '@/types';
+import { Engine } from '@/engine/Engine';
 import { v4 as uuidv4 } from 'uuid';
 
 export class Workflow {
@@ -78,14 +78,10 @@ export class Workflow {
    */
   removeNode(nodeRef: string): Workflow {
     // Remove the node
-    this.params.blueprint.nodes = this.params.blueprint.nodes.filter(
-      (node) => node.ref !== nodeRef
-    );
+    this.params.blueprint.nodes = this.params.blueprint.nodes.filter((node) => node.ref !== nodeRef);
 
     // Remove associated edges
-    this.params.blueprint.edges = this.params.blueprint.edges.filter(
-      (edge) => edge.from !== nodeRef && edge.to !== nodeRef
-    );
+    this.params.blueprint.edges = this.params.blueprint.edges.filter((edge) => edge.from !== nodeRef && edge.to !== nodeRef);
 
     return this;
   }
@@ -94,9 +90,7 @@ export class Workflow {
    * Builder method: Remove an edge
    */
   removeEdge(edgeRef: string): Workflow {
-    this.params.blueprint.edges = this.params.blueprint.edges.filter(
-      (edge) => edge.ref !== edgeRef
-    );
+    this.params.blueprint.edges = this.params.blueprint.edges.filter((edge) => edge.ref !== edgeRef);
     return this;
   }
 
@@ -155,18 +149,14 @@ export class Workflow {
     }
 
     // Check that all node types have handlers (delegate to engine)
-    const unsupportedNodes = this.params.blueprint.nodes.filter(
-      (node) => !this.engine.hasHandler(node.type)
-    );
+    const unsupportedNodes = this.params.blueprint.nodes.filter((node) => !this.engine.hasHandler(node.type));
     if (unsupportedNodes.length > 0) {
       errors.push(`Unsupported node types: ${unsupportedNodes.map((n) => n.type).join(', ')}`);
     }
 
     // Check edge references
     const nodeRefs = new Set(this.params.blueprint.nodes.map((n) => n.ref));
-    const invalidEdges = this.params.blueprint.edges.filter(
-      (edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
-    );
+    const invalidEdges = this.params.blueprint.edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
     if (invalidEdges.length > 0) {
       errors.push(`Invalid edge references found: ${invalidEdges.length} edges`);
     }

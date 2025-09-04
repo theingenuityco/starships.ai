@@ -2,7 +2,7 @@
  * Configuration Constants Unit Tests
  */
 
-import { config, ConfigKey } from '../index';
+import { config, ConfigKey } from '@/constants/index';
 
 describe('Configuration Constants', () => {
   describe('config object', () => {

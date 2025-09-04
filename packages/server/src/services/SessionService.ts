@@ -63,14 +63,9 @@ export class SessionService {
     try {
       const sessionRepo = new SessionRepository();
       await sessionRepo.incrementMessageCount(sessionId, increment);
-      console.log(
-        `[SESSION-SERVICE] Incremented message count for session: ${sessionId} by ${increment}`
-      );
+      console.log(`[SESSION-SERVICE] Incremented message count for session: ${sessionId} by ${increment}`);
     } catch (error) {
-      console.error(
-        `[SESSION-SERVICE] Failed to increment message count for session ${sessionId}:`,
-        error
-      );
+      console.error(`[SESSION-SERVICE] Failed to increment message count for session ${sessionId}:`, error);
       throw new Error(`Failed to increment message count: ${error}`);
     }
   }
@@ -82,14 +77,9 @@ export class SessionService {
     try {
       const sessionRepo = new SessionRepository();
       await sessionRepo.updateTokenCount(sessionId, tokens);
-      console.log(
-        `[SESSION-SERVICE] Updated token count for session: ${sessionId} with ${tokens} tokens`
-      );
+      console.log(`[SESSION-SERVICE] Updated token count for session: ${sessionId} with ${tokens} tokens`);
     } catch (error) {
-      console.error(
-        `[SESSION-SERVICE] Failed to update token count for session ${sessionId}:`,
-        error
-      );
+      console.error(`[SESSION-SERVICE] Failed to update token count for session ${sessionId}:`, error);
       throw new Error(`Failed to update token count: ${error}`);
     }
   }

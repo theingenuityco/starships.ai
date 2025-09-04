@@ -2,13 +2,8 @@
  * ExecutionRepository Unit Tests
  */
 
-import { ExecutionRepository } from '../ExecutionRepository';
-import type {
-  ExecutionModel,
-  CreateExecutionRequest,
-  UpdateExecutionRequest,
-  ExecutionStatus,
-} from '../ExecutionRepository';
+import { ExecutionRepository } from '@/repositories/ExecutionRepository';
+import type { ExecutionModel, CreateExecutionRequest, UpdateExecutionRequest, ExecutionStatus } from '../ExecutionRepository';
 import { ValidationError, DatabaseError } from '@starships/errors';
 
 // Mock the database connection and helpers
@@ -21,7 +16,7 @@ jest.mock('../../helpers/database', () => ({
   convertNeo4jIntsInObject: jest.fn((obj) => obj),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('ExecutionRepository', () => {
   let repository: ExecutionRepository;
@@ -114,10 +109,7 @@ describe('ExecutionRepository', () => {
       const deserialized = (repository as any).deserializeComplexFields(execution);
 
       expect(deserialized).toEqual(execution); // Should return original on parse error
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to deserialize execution fields:',
-        expect.any(Error)
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to deserialize execution fields:', expect.any(Error));
 
       consoleSpy.mockRestore();
     });
@@ -196,9 +188,7 @@ describe('ExecutionRepository', () => {
         createdAt: '2024-01-01T00:00:00.000Z',
       };
 
-      mockConnection.executeWrite
-        .mockResolvedValueOnce([{ n: mockExecution }])
-        .mockResolvedValueOnce([]);
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockExecution }]).mockResolvedValueOnce([]);
 
       const result = await repository.create(minimalRequest);
 
@@ -234,10 +224,7 @@ describe('ExecutionRepository', () => {
 
       const result = await repository.findById(executionId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (e:Execution) WHERE e.id = $id RETURN e',
-        { id: executionId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (e:Execution) WHERE e.id = $id RETURN e', { id: executionId });
 
       expect(result).toEqual({
         ...mockExecution,
@@ -297,10 +284,7 @@ describe('ExecutionRepository', () => {
         },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { e: mockExecutions[0] },
-        { e: mockExecutions[1] },
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ e: mockExecutions[0] }, { e: mockExecutions[1] }]);
 
       const result = await repository.findByWorkflowId(workflowId);
 
@@ -352,18 +336,15 @@ describe('ExecutionRepository', () => {
 
       const result = await repository.update(executionId, updates);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
-        {
-          id: executionId,
-          updates: expect.objectContaining({
-            status: 'completed',
-            currentNodeRef: 'final-node',
-            result: { output: 'success' },
-            endTime: expect.any(String), // Should auto-set endTime for terminal status
-          }),
-        }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e', {
+        id: executionId,
+        updates: expect.objectContaining({
+          status: 'completed',
+          currentNodeRef: 'final-node',
+          result: { output: 'success' },
+          endTime: expect.any(String), // Should auto-set endTime for terminal status
+        }),
+      });
 
       expect(result).toBeDefined();
     });
@@ -464,9 +445,7 @@ describe('ExecutionRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.update(executionId, { status: 'completed' })).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.update(executionId, { status: 'completed' })).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -519,10 +498,7 @@ describe('ExecutionRepository', () => {
         },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { e: mockExecutions[0] },
-        { e: mockExecutions[1] },
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ e: mockExecutions[0] }, { e: mockExecutions[1] }]);
 
       const result = await repository.findByStatus(status);
 
@@ -543,14 +519,7 @@ describe('ExecutionRepository', () => {
     });
 
     it('should handle all valid execution statuses', async () => {
-      const statuses: ExecutionStatus[] = [
-        'pending',
-        'running',
-        'paused',
-        'completed',
-        'failed',
-        'cancelled',
-      ];
+      const statuses: ExecutionStatus[] = ['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'];
 
       for (const status of statuses) {
         // Clear mocks for each iteration
@@ -559,10 +528,7 @@ describe('ExecutionRepository', () => {
 
         await repository.findByStatus(status);
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          expect.stringContaining('WHERE e.status = $status'),
-          { status }
-        );
+        expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE e.status = $status'), { status });
       }
     });
   });
@@ -575,11 +541,7 @@ describe('ExecutionRepository', () => {
         { id: 'exec-3', status: 'paused', createdAt: '2024-01-01T00:00:00.000Z' },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { e: mockExecutions[0] },
-        { e: mockExecutions[1] },
-        { e: mockExecutions[2] },
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ e: mockExecutions[0] }, { e: mockExecutions[1] }, { e: mockExecutions[2] }]);
 
       const result = await repository.findActiveExecutions();
 
@@ -620,17 +582,14 @@ describe('ExecutionRepository', () => {
       const result = await repository.cancelExecution(executionId);
 
       // Should call update method internally
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
-        {
-          id: executionId,
-          updates: expect.objectContaining({
-            status: 'cancelled',
-            error: 'Execution cancelled by user',
-            endTime: expect.any(String),
-          }),
-        }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e', {
+        id: executionId,
+        updates: expect.objectContaining({
+          status: 'cancelled',
+          error: 'Execution cancelled by user',
+          endTime: expect.any(String),
+        }),
+      });
 
       expect(result).toBeDefined();
     });
@@ -853,10 +812,7 @@ describe('ExecutionRepository', () => {
       mockConnection.executeWrite.mockResolvedValue([{ e: {} }]);
 
       // Simulate concurrent updates
-      const promises = [
-        repository.update(executionId, updates1),
-        repository.update(executionId, updates2),
-      ];
+      const promises = [repository.update(executionId, updates1), repository.update(executionId, updates2)];
 
       await Promise.all(promises);
 

@@ -31,15 +31,10 @@ class ThreadStateManager {
       await fs.writeFile(filePath, JSON.stringify(state, null, 2));
 
       // Upload as artifact
-      const uploadResponse = await this.artifactClient.uploadArtifact(
-        this.artifactName,
-        [filePath],
-        tempDir,
-        {
-          continueOnError: false,
-          retentionDays: 90,
-        }
-      );
+      const uploadResponse = await this.artifactClient.uploadArtifact(this.artifactName, [filePath], tempDir, {
+        continueOnError: false,
+        retentionDays: 90,
+      });
 
       console.log(`State saved for PR #${prNumber}: ${threadId}`);
       return uploadResponse;
@@ -80,10 +75,7 @@ class ThreadStateManager {
     try {
       // Download artifact
       const tempDir = process.env.RUNNER_TEMP || '/tmp';
-      const downloadResponse = await this.artifactClient.downloadArtifact(
-        this.artifactName,
-        tempDir
-      );
+      const downloadResponse = await this.artifactClient.downloadArtifact(this.artifactName, tempDir);
 
       if (downloadResponse.downloadPath) {
         const filePath = path.join(downloadResponse.downloadPath, this.stateFile);
@@ -241,9 +233,7 @@ Thread ID: \`${threadId}\`
         issue_number: prNumber,
       });
 
-      const threadComment = comments.find((comment) =>
-        comment.body.includes('<!-- discord-thread-id -->')
-      );
+      const threadComment = comments.find((comment) => comment.body.includes('<!-- discord-thread-id -->'));
 
       if (threadComment) {
         const threadIdMatch = threadComment.body.match(/Discord Thread ID: (\d+)/);

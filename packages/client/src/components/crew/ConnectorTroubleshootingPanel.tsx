@@ -2,11 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { MCPServerConnector } from '@/lib/api'
-import {
-  ConnectorHealthMetrics,
-  monitoringService,
-  ConnectorError,
-} from '@/lib/connector-monitoring'
+import { ConnectorHealthMetrics, monitoringService, ConnectorError } from '@/lib/connector-monitoring'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,10 +21,7 @@ interface ErrorLogEntry {
   timestamp: string
 }
 
-export function ConnectorTroubleshootingPanel({
-  connectorInstances,
-  className,
-}: ConnectorTroubleshootingPanelProps) {
+export function ConnectorTroubleshootingPanel({ connectorInstances, className }: ConnectorTroubleshootingPanelProps) {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([])
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set())
   const [healthMetrics, setHealthMetrics] = useState<Map<string, ConnectorHealthMetrics>>(new Map())
@@ -103,10 +96,7 @@ export function ConnectorTroubleshootingPanel({
   // Get connectors that need attention
   const connectorsNeedingAttention = connectorInstances.filter(connector => {
     const metrics = healthMetrics.get(connector.id)
-    return (
-      connector.status === 'error' ||
-      (metrics && (metrics.healthStatus === 'critical' || metrics.healthStatus === 'warning'))
-    )
+    return connector.status === 'error' || (metrics && (metrics.healthStatus === 'critical' || metrics.healthStatus === 'warning'))
   })
 
   if (connectorsNeedingAttention.length === 0) {
@@ -154,24 +144,12 @@ export function ConnectorTroubleshootingPanel({
                         <div className="flex items-center gap-2">
                           {getTypeIcon(log.error.type)}
                           <span className="text-sm font-medium">{log.connectorName}</span>
-                          <Badge
-                            variant="outline"
-                            className={cn('text-xs', getSeverityColor(log.error.severity))}
-                          >
+                          <Badge variant="outline" className={cn('text-xs', getSeverityColor(log.error.severity))}>
                             {log.error.severity}
                           </Badge>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleErrorExpansion(errorId)}
-                          className="h-6 w-6 p-0"
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="w-3 h-3" />
-                          ) : (
-                            <ChevronDown className="w-3 h-3" />
-                          )}
+                        <Button variant="ghost" size="sm" onClick={() => toggleErrorExpansion(errorId)} className="h-6 w-6 p-0">
+                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                         </Button>
                       </div>
 
@@ -185,10 +163,7 @@ export function ConnectorTroubleshootingPanel({
                           </h5>
                           <ul className="space-y-1">
                             {log.error.troubleshootingHints.slice(0, 3).map((hint, hintIndex) => (
-                              <li
-                                key={hintIndex}
-                                className="text-xs text-muted-foreground flex items-start gap-2"
-                              >
+                              <li key={hintIndex} className="text-xs text-muted-foreground flex items-start gap-2">
                                 <span className="text-yellow-500 mt-0.5">•</span>
                                 <span>{hint}</span>
                               </li>
@@ -222,9 +197,7 @@ export function ConnectorTroubleshootingPanel({
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 text-yellow-500" />
-                          <span className="text-sm font-medium">
-                            {connector.template?.name || connector.templateId}
-                          </span>
+                          <span className="text-sm font-medium">{connector.template?.name || connector.templateId}</span>
                           <Badge variant="secondary" className="text-xs">
                             {metrics.healthStatus}
                           </Badge>
@@ -233,10 +206,7 @@ export function ConnectorTroubleshootingPanel({
 
                       <div className="space-y-1">
                         {metrics.troubleshootingHints.slice(0, 2).map((hint, index) => (
-                          <p
-                            key={index}
-                            className="text-xs text-muted-foreground flex items-start gap-2"
-                          >
+                          <p key={index} className="text-xs text-muted-foreground flex items-start gap-2">
                             <Lightbulb className="w-3 h-3 text-yellow-500 mt-0.5 flex-shrink-0" />
                             <span>{hint}</span>
                           </p>

@@ -2,13 +2,13 @@
  * HttpRequestHandler Unit Tests
  */
 
-import { HttpRequestHandler } from '../HttpRequestHandler';
-import { Node, Execution, HttpRequestNodeParameters } from '../../../types';
+import { HttpRequestHandler } from '@/nodes/handlers/HttpRequestHandler';
+import { Node, Execution, HttpRequestNodeParameters } from '@/types';
 
 // Mock HttpRequest class
 jest.mock('../../../HttpRequest');
 
-import { HttpRequest } from '../../../HttpRequest';
+import { HttpRequest } from '@/HttpRequest';
 
 const MockedHttpRequest = HttpRequest as jest.MockedClass<typeof HttpRequest>;
 
@@ -62,9 +62,7 @@ describe('HttpRequestHandler', () => {
 
       const nodeResult = result.executionResults.get('http-request-node');
       expect(nodeResult).toBeDefined();
-      expect(nodeResult?.error).toBe(
-        'HTTP GET request to https://api.example.com/data failed: HTTP request failed: Network Error'
-      );
+      expect(nodeResult?.error).toBe('HTTP GET request to https://api.example.com/data failed: HTTP request failed: Network Error');
       expect(nodeResult?.nodeRef).toBe('http-request-node');
     });
 
@@ -190,9 +188,7 @@ describe('HttpRequestHandler', () => {
       // Mock validation to return the expected error
       MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: [
-          'Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
-        ],
+        errors: ['Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS'],
       });
 
       const handlerWithInvalidMethod = new HttpRequestHandler(nodeWithInvalidMethod);
@@ -202,8 +198,7 @@ describe('HttpRequestHandler', () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
         code: 'VALIDATION_FAILED',
-        message:
-          'Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
+        message: 'Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
         nodeRef: 'http-request-node',
         severity: 'error',
       });

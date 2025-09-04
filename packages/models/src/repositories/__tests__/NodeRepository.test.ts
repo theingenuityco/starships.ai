@@ -2,7 +2,7 @@
  * NodeRepository Unit Tests
  */
 
-import { NodeRepository } from '../NodeRepository';
+import { NodeRepository } from '@/repositories/NodeRepository';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { NodeModel } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('NodeRepository', () => {
   let repository: NodeRepository;
@@ -75,10 +75,7 @@ describe('NodeRepository', () => {
       const result = await repository.createNode(blueprintId, validNodeData);
 
       // Verify blueprint check
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
-        { blueprintId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id', { blueprintId });
 
       // Verify node creation (createEntityWithAutoId)
       expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
@@ -227,29 +224,21 @@ describe('NodeRepository', () => {
     it('should throw ValidationError for missing required fields', async () => {
       await expect(repository.createNode('', validNodeData)).rejects.toThrow(ValidationError);
 
-      await expect(repository.createNode('blueprint-123', { name: 'Test' } as any)).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.createNode('blueprint-123', { name: 'Test' } as any)).rejects.toThrow(ValidationError);
 
-      await expect(
-        repository.createNode('blueprint-123', { type: 'start' } as any)
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.createNode('blueprint-123', { type: 'start' } as any)).rejects.toThrow(ValidationError);
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Blueprint not found
 
-      await expect(repository.createNode('non-existent', validNodeData)).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.createNode('non-existent', validNodeData)).rejects.toThrow(NotFoundError);
     });
 
     it('should handle database errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database connection failed'));
 
-      await expect(repository.createNode('blueprint-123', validNodeData)).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.createNode('blueprint-123', validNodeData)).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -389,9 +378,7 @@ describe('NodeRepository', () => {
     });
 
     it('should throw ValidationError for invalid nodes array', async () => {
-      await expect(repository.createNodes('blueprint-123', 'invalid' as any)).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.createNodes('blueprint-123', 'invalid' as any)).rejects.toThrow(ValidationError);
     });
 
     it('should throw ValidationError for missing blueprintId', async () => {
@@ -401,9 +388,7 @@ describe('NodeRepository', () => {
     it('should throw NotFoundError when blueprint does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Blueprint not found
 
-      await expect(repository.createNodes('non-existent', validNodesData)).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.createNodes('non-existent', validNodesData)).rejects.toThrow(NotFoundError);
     });
 
     it('should handle complex nested parameters', async () => {
@@ -546,11 +531,7 @@ describe('NodeRepository', () => {
       const result = await repository.getNodesByBlueprintId('blueprint-123');
 
       expect(result[0].parameters).toEqual({});
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to parse node parameters JSON:',
-        'node-1',
-        expect.any(Error)
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to parse node parameters JSON:', 'node-1', expect.any(Error));
 
       consoleSpy.mockRestore();
     });
@@ -576,10 +557,7 @@ describe('NodeRepository', () => {
 
       const result = await repository.getNodeById(nodeId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (n:Node {id: $nodeId}) RETURN n',
-        { nodeId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (n:Node {id: $nodeId}) RETURN n', { nodeId });
 
       expect(result).toEqual({
         id: nodeId,
@@ -614,11 +592,7 @@ describe('NodeRepository', () => {
       const result = await repository.getNodeById('node-123');
 
       expect(result?.parameters).toEqual({});
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to parse node parameters JSON:',
-        'node-123',
-        expect.any(Error)
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to parse node parameters JSON:', 'node-123', expect.any(Error));
 
       consoleSpy.mockRestore();
     });
@@ -668,10 +642,7 @@ describe('NodeRepository', () => {
 
       const result = await repository.updateNode(nodeId, updates);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (n:Node {id: $nodeId}) RETURN n',
-        { nodeId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (n:Node {id: $nodeId}) RETURN n', { nodeId });
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('SET n.name = $name'),
@@ -742,9 +713,7 @@ describe('NodeRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([{ n: { id: nodeId } }]);
       mockConnection.executeWrite.mockResolvedValue([]); // Update failed
 
-      await expect(repository.updateNode(nodeId, { name: 'Test' })).rejects.toThrow(
-        'Database operation failed'
-      );
+      await expect(repository.updateNode(nodeId, { name: 'Test' })).rejects.toThrow('Database operation failed');
     });
 
     it('should serialize complex parameters correctly', async () => {
@@ -792,15 +761,9 @@ describe('NodeRepository', () => {
 
       const result = await repository.deleteNode(nodeId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (n:Node {id: $nodeId}) RETURN n',
-        { nodeId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (n:Node {id: $nodeId}) RETURN n', { nodeId });
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (n:Node {id: $nodeId}) DETACH DELETE n',
-        { nodeId }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (n:Node {id: $nodeId}) DETACH DELETE n', { nodeId });
 
       expect(result).toBe(true);
     });
@@ -831,10 +794,7 @@ describe('NodeRepository', () => {
 
       await repository.deleteNodesByBlueprintId(blueprintId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
-        { blueprintId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id', { blueprintId });
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(n:Node)'),
@@ -845,9 +805,7 @@ describe('NodeRepository', () => {
     it('should throw NotFoundError when blueprint does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Blueprint not found
 
-      await expect(repository.deleteNodesByBlueprintId('non-existent')).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.deleteNodesByBlueprintId('non-existent')).rejects.toThrow(NotFoundError);
     });
 
     it('should validate required blueprintId parameter', async () => {
@@ -857,9 +815,7 @@ describe('NodeRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.deleteNodesByBlueprintId('blueprint-123')).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.deleteNodesByBlueprintId('blueprint-123')).rejects.toThrow(DatabaseError);
     });
   });
 

@@ -19,15 +19,10 @@ export function useAgents(starshipId?: string): UseAgentsReturn {
         setLoading(true)
         setError(null)
 
-        console.log(
-          '[AGENTS] Loading agents',
-          starshipId ? `for starship: ${starshipId}` : '(all agents)'
-        )
+        console.log('[AGENTS] Loading agents', starshipId ? `for starship: ${starshipId}` : '(all agents)')
 
         // Use the proper agentAPI which handles authentication
-        const loadedAgents = starshipId
-          ? await agentAPI.getByStarshipId(starshipId)
-          : await agentAPI.getAll()
+        const loadedAgents = starshipId ? await agentAPI.getByStarshipId(starshipId) : await agentAPI.getAll()
 
         console.log('[AGENTS] Loaded agents:', loadedAgents.length)
         setAgents(loadedAgents)

@@ -2,18 +2,19 @@
   "name": "@starships/env",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "rm -f tsconfig.tsbuildinfo && tsc",
+    "build": "rm -f tsconfig.tsbuildinfo && tsc && tsc-alias -p tsconfig.json",
     "type-check": "tsc --noEmit",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.10",
+    "tsc-alias": "^1.8.16",
     "typescript": "^5.8.3"
   },
   "dependencies": {

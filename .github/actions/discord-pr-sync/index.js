@@ -22,9 +22,7 @@ async function run() {
     const prDetails = extractPRDetails(context);
     if (!prDetails) {
       // This is expected for events not related to PRs (e.g., pushes to main, standalone workflows)
-      console.log(
-        `Event ${eventName}/${payload.action || 'unknown'} is not related to a pull request - skipping`
-      );
+      console.log(`Event ${eventName}/${payload.action || 'unknown'} is not related to a pull request - skipping`);
       core.setOutput('action-taken', 'skipped - not a PR event');
       return;
     }
@@ -33,12 +31,7 @@ async function run() {
     console.log(`Processing ${eventName} event for PR #${prNumber} (action: ${action})`);
 
     // Skip updates for closed PRs unless it's the closing event itself
-    if (
-      payload.pull_request &&
-      payload.pull_request.state === 'closed' &&
-      action !== 'closed' &&
-      action !== 'reopened'
-    ) {
+    if (payload.pull_request && payload.pull_request.state === 'closed' && action !== 'closed' && action !== 'reopened') {
       console.log(`Skipping update for closed PR #${prNumber} (action: ${action})`);
       core.setOutput('action-taken', 'skipped - PR is closed');
       return;
@@ -57,8 +50,7 @@ async function run() {
     const stateManager = new ThreadStateManager();
 
     // Determine if we need to create or update
-    const shouldCreate =
-      eventName === 'pull_request' && (action === 'opened' || action === 'reopened');
+    const shouldCreate = eventName === 'pull_request' && (action === 'opened' || action === 'reopened');
 
     console.log(`Event type: ${eventName}, Action: ${action}, Should create: ${shouldCreate}`);
 
@@ -81,14 +73,7 @@ async function run() {
       core.setOutput('action-taken', result.created ? 'created' : 'reactivated');
     } else {
       // Update existing thread
-      const result = await updateThread(
-        discord,
-        stateManager,
-        prNumber,
-        eventName,
-        action,
-        context
-      );
+      const result = await updateThread(discord, stateManager, prNumber, eventName, action, context);
 
       if (result) {
         core.setOutput('thread-id', result.threadId);
@@ -244,9 +229,7 @@ async function createOrReactivateThread(
   // Get PR reviewers from context and invite them
   if (context.payload.pull_request) {
     const reviewers = context.payload.pull_request.requested_reviewers || [];
-    const discordIds = reviewers
-      .map((reviewer) => githubDiscordMap[reviewer.login])
-      .filter((id) => id);
+    const discordIds = reviewers.map((reviewer) => githubDiscordMap[reviewer.login]).filter((id) => id);
 
     if (discordIds.length > 0) {
       console.log(`Inviting ${discordIds.length} reviewers`);
@@ -277,11 +260,7 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
       }
 
       // Don't create threads for workflow/check events - they should only update existing threads
-      if (
-        eventName === 'workflow_run' ||
-        eventName === 'check_run' ||
-        eventName === 'check_suite'
-      ) {
+      if (eventName === 'workflow_run' || eventName === 'check_run' || eventName === 'check_suite') {
         console.log(`Skipping ${eventName} for PR #${prNumber} - no existing thread to update`);
         return null;
       }
@@ -304,12 +283,7 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
         }
 
         // Create the thread
-        const result = await discord.createPrivateThread(
-          prNumber,
-          pr.title,
-          pr.user.login,
-          pr.html_url
-        );
+        const result = await discord.createPrivateThread(prNumber, pr.title, pr.user.login, pr.html_url);
 
         // Save thread ID to state
         await stateManager.saveThreadId(prNumber, result.threadId, result.threadUrl);
@@ -372,10 +346,7 @@ async function updateThread(discord, stateManager, prNumber, eventName, action, 
     // Archive thread if PR is closed
     if (eventName === 'pull_request' && action === 'closed') {
       try {
-        await discord.archiveThread(
-          threadData.threadId,
-          context.payload.pull_request.merged ? 'PR merged' : 'PR closed'
-        );
+        await discord.archiveThread(threadData.threadId, context.payload.pull_request.merged ? 'PR merged' : 'PR closed');
         console.log(`Archived thread for closed PR #${prNumber}`);
       } catch (error) {
         console.error(`Failed to archive thread: ${error.message}`);
@@ -463,9 +434,7 @@ function createPullRequestEmbed(action, payload) {
     // Get the latest commit info
     const headCommit = pr.head;
     const latestCommitSha = headCommit?.sha || payload.after;
-    const commitMessage = payload.pull_request?.head?.repo?.pushed_at
-      ? `Latest: ${headCommit?.ref || 'unknown'}`
-      : 'New commits pushed';
+    const commitMessage = payload.pull_request?.head?.repo?.pushed_at ? `Latest: ${headCommit?.ref || 'unknown'}` : 'New commits pushed';
 
     embed.description = commitMessage;
     embed.url = pr.html_url; // Link to PR

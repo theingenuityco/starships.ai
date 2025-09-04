@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
     /* Base compilation target and module system for Node.js/libraries */
-    "target": "ES2022",
-    "module": "ESNext",
-    "lib": ["ES2022"],
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
 
     /* Module resolution */
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
 

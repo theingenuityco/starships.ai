@@ -98,13 +98,7 @@ export function getMissionPhaseConfig(phase: MissionPhase): MissionPhaseConfig {
  * Get all valid mission phases in order (UI utility)
  */
 export function getMissionPhasesInOrder(): MissionPhase[] {
-  return [
-    MISSION_PHASES.WELCOME,
-    MISSION_PHASES.ANALYSIS,
-    MISSION_PHASES.PLAN,
-    MISSION_PHASES.EXECUTE,
-    MISSION_PHASES.CONVERSE,
-  ]
+  return [MISSION_PHASES.WELCOME, MISSION_PHASES.ANALYSIS, MISSION_PHASES.PLAN, MISSION_PHASES.EXECUTE, MISSION_PHASES.CONVERSE]
 }
 
 /**

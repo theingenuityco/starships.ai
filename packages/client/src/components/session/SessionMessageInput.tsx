@@ -10,7 +10,7 @@ import { generateId } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateSession } from '@/hooks/useSessions'
 import type { Agent } from '@/lib/api'
-import type { ChatMode } from './ChatModeSelector'
+import type { ChatMode } from '@/components/session/ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
 
 interface SessionMessageInputProps {
@@ -240,20 +240,14 @@ export function SessionMessageInput({
   }
 
   return (
-    <motion.div
-      className="relative"
-      initial={{ opacity: 0, y: minimal ? 10 : 20 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
+    <motion.div className="relative" initial={{ opacity: 0, y: minimal ? 10 : 20 }} animate={{ opacity: 1, y: 0 }}>
       {/* Input Container */}
       <div
         className={cn(
           'relative transition-all',
           minimal ? 'rounded-xl border border-border/30' : 'rounded-2xl border border-border/40',
           'bg-card/50 backdrop-blur-sm',
-          minimal
-            ? 'shadow-sm focus-within:ring-1 focus-within:ring-primary/15'
-            : 'shadow-lg focus-within:ring-2 focus-within:ring-primary/20',
+          minimal ? 'shadow-sm focus-within:ring-1 focus-within:ring-primary/15' : 'shadow-lg focus-within:ring-2 focus-within:ring-primary/20',
           'focus-within:border-primary/40',
           disabled && 'opacity-50'
         )}
@@ -292,12 +286,7 @@ export function SessionMessageInput({
               {/* Right Side - Action Buttons */}
               <div className="flex items-center gap-2">
                 {/* File Attachment */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground"
-                  disabled={disabled}
-                >
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled}>
                   <Paperclip className="h-4 w-4" />
                 </Button>
 
@@ -306,12 +295,7 @@ export function SessionMessageInput({
                   variant="ghost"
                   size="icon"
                   onClick={handleVoiceToggle}
-                  className={cn(
-                    'h-8 w-8 rounded-full shrink-0 transition-colors',
-                    isRecording
-                      ? 'text-red-500 hover:text-red-600 bg-red-500/10'
-                      : 'text-muted-foreground hover:text-foreground'
-                  )}
+                  className={cn('h-8 w-8 rounded-full shrink-0 transition-colors', isRecording ? 'text-red-500 hover:text-red-600 bg-red-500/10' : 'text-muted-foreground hover:text-foreground')}
                   disabled={disabled}
                 >
                   {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
@@ -330,9 +314,7 @@ export function SessionMessageInput({
                     size="icon"
                     className={cn(
                       'h-8 w-8 rounded-full shrink-0 transition-all',
-                      canSend
-                        ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
-                        : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                     )}
                   >
                     {sending ? (
@@ -354,9 +336,7 @@ export function SessionMessageInput({
 
       {/* Mode Indicator - Only show in non-minimal mode */}
       {!minimal && mode === 'agent' && selectedAgent && (
-        <div className="absolute -top-3 left-4 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">
-          Chatting with {selectedAgent.name}
-        </div>
+        <div className="absolute -top-3 left-4 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">Chatting with {selectedAgent.name}</div>
       )}
     </motion.div>
   )

@@ -1,5 +1,5 @@
 import { WaitlistRepository } from '@starships/models';
-import { logger } from '../utils/logger';
+import { logger } from '@/utils/logger';
 
 export interface WaitlistCheckResult {
   isApproved: boolean;
@@ -50,8 +50,7 @@ export class WaitlistService {
 
       return {
         isApproved: false,
-        message:
-          "Thanks for your interest in Starships.ai! We're currently in private alpha. We'll notify you as soon as we're ready.",
+        message: "Thanks for your interest in Starships.ai! We're currently in private alpha. We'll notify you as soon as we're ready.",
       };
     } catch (error) {
       logger.error('WaitlistService: Error checking approval', {
@@ -99,11 +98,7 @@ export class WaitlistService {
   /**
    * Add a new approved email (admin use)
    */
-  async addApprovedEmail(
-    email: string,
-    addedBy: string = 'admin',
-    notes?: string
-  ): Promise<boolean> {
+  async addApprovedEmail(email: string, addedBy: string = 'admin', notes?: string): Promise<boolean> {
     try {
       const normalizedEmail = this.normalizeEmail(email);
 

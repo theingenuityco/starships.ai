@@ -14,19 +14,7 @@ const StarfieldBackground = lazy(() =>
     default: module.StarfieldBackground,
   }))
 )
-import {
-  Sparkles,
-  Rocket,
-  Brain,
-  Compass,
-  Users,
-  User,
-  Book,
-  ChevronDown,
-  Star,
-  Lightbulb,
-  Minus,
-} from 'lucide-react'
+import { Sparkles, Rocket, Brain, Compass, Users, User, Book, ChevronDown, Star, Lightbulb, Minus } from 'lucide-react'
 
 // System component cards
 const SystemCard = memo(
@@ -56,16 +44,10 @@ const SystemCard = memo(
         <div className="grid md:grid-cols-2 gap-8 items-center">
           <div>
             <div className="flex items-center space-x-3 mb-4">
-              <div
-                className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}
-              >
-                <Icon
-                  className={`w-7 h-7 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`}
-                />
+              <div className={`p-3 rounded-lg ${accent ? 'bg-primary/20' : 'bg-white/10'} group-hover:scale-110 transition-transform duration-300 backdrop-blur-sm`}>
+                <Icon className={`w-7 h-7 ${accent ? 'text-primary' : 'text-white/70'} group-hover:text-primary transition-colors`} />
               </div>
-              <h3 className="font-semibold text-xl group-hover:text-primary transition-colors">
-                {title}
-              </h3>
+              <h3 className="font-semibold text-xl group-hover:text-primary transition-colors">{title}</h3>
             </div>
             <p className="text-muted-foreground leading-relaxed">{description}</p>
           </div>
@@ -79,45 +61,27 @@ const SystemCard = memo(
 SystemCard.displayName = 'SystemCard'
 
 // Starship class showcase
-const StarshipClass = memo(
-  ({
-    name,
-    description,
-    features,
-    highlight = false,
-  }: {
-    name: string
-    description: string
-    features: string[]
-    highlight?: boolean
-  }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-50px' }}
-      transition={{ duration: 0.3 }}
-      className="group"
+const StarshipClass = memo(({ name, description, features, highlight = false }: { name: string; description: string; features: string[]; highlight?: boolean }) => (
+  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-50px' }} transition={{ duration: 0.3 }} className="group">
+    <Card
+      className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 hover:bg-white/10 ${highlight ? 'ring-2 ring-primary bg-primary/10 scale-105' : 'hover:ring-1 hover:ring-primary/50'}`}
     >
-      <Card
-        className={`p-6 h-full bg-white/5 backdrop-blur-md border-white/10 transition-all duration-300 hover:shadow-2xl hover:shadow-primary/20 hover:bg-white/10 ${highlight ? 'ring-2 ring-primary bg-primary/10 scale-105' : 'hover:ring-1 hover:ring-primary/50'}`}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold">{name}</h3>
-          {highlight && <Badge className="bg-primary/10 text-primary">Recommended</Badge>}
-        </div>
-        <p className="text-muted-foreground mb-4 leading-relaxed">{description}</p>
-        <ul className="space-y-2">
-          {features.map((feature, i) => (
-            <li key={i} className="flex items-center space-x-2 text-sm">
-              <Star className="w-4 h-4 text-primary" />
-              <span>{feature}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </motion.div>
-  )
-)
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-bold">{name}</h3>
+        {highlight && <Badge className="bg-primary/10 text-primary">Recommended</Badge>}
+      </div>
+      <p className="text-muted-foreground mb-4 leading-relaxed">{description}</p>
+      <ul className="space-y-2">
+        {features.map((feature, i) => (
+          <li key={i} className="flex items-center space-x-2 text-sm">
+            <Star className="w-4 h-4 text-primary" />
+            <span>{feature}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  </motion.div>
+))
 
 StarshipClass.displayName = 'StarshipClass'
 
@@ -176,18 +140,11 @@ export default function HomePage() {
             {/* Right side buttons */}
             <div className="flex gap-4">
               {!isAuthenticated && (
-                <LoginButton
-                  size="default"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full"
-                >
+                <LoginButton size="default" className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-full">
                   Login
                 </LoginButton>
               )}
-              <Button
-                variant="outline"
-                size="default"
-                className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
-              >
+              <Button variant="outline" size="default" className="px-6 py-2 rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10">
                 <Book className="w-4 h-4 mr-2" />
                 View Documentation
               </Button>
@@ -212,12 +169,7 @@ export default function HomePage() {
           >
             <div className="flex items-center justify-center gap-8">
               {/* Rocket Logo on the left */}
-              <motion.div
-                initial={{ scale: 0, x: -50 }}
-                animate={{ scale: 1, x: 0 }}
-                transition={{ delay: 0.5, duration: 0.8, type: 'spring', stiffness: 80 }}
-                className="relative flex-shrink-0"
-              >
+              <motion.div initial={{ scale: 0, x: -50 }} animate={{ scale: 1, x: 0 }} transition={{ delay: 0.5, duration: 0.8, type: 'spring', stiffness: 80 }} className="relative flex-shrink-0">
                 <motion.svg
                   xmlns="http://www.w3.org/2000/svg"
                   width="120"
@@ -277,70 +229,20 @@ export default function HomePage() {
                     animate={{ pathLength: 1 }}
                     transition={{ duration: 0.4, delay: 0.6 }}
                   />
-                  <motion.path
-                    d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.3, delay: 0.7 }}
-                  />
-                  <motion.path
-                    d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.3, delay: 0.8 }}
-                  />
-                  <motion.circle
-                    cx="14.5"
-                    cy="9"
-                    r="1.5"
-                    fill="none"
-                    strokeLinecap="butt"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1.2 }}
-                    transition={{ duration: 0.2, delay: 0.9 }}
-                  />
+                  <motion.path d="M8 13H3s.55-3.03 2-4c1.62-1.08 5 0 5 0" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3, delay: 0.7 }} />
+                  <motion.path d="M11 16v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.3, delay: 0.8 }} />
+                  <motion.circle cx="14.5" cy="9" r="1.5" fill="none" strokeLinecap="butt" initial={{ pathLength: 0 }} animate={{ pathLength: 1.2 }} transition={{ duration: 0.2, delay: 0.9 }} />
                   {/* Three parallel flame lines representing thrust with varied lengths */}
-                  <motion.line
-                    x1="6"
-                    y1="15"
-                    x2="2.5"
-                    y2="18.5"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.2, delay: 1.0 }}
-                  />
-                  <motion.line
-                    x1="7.5"
-                    y1="16.5"
-                    x2="5.4"
-                    y2="18.6"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.2, delay: 1.1 }}
-                  />
-                  <motion.line
-                    x1="9"
-                    y1="18"
-                    x2="7.6"
-                    y2="19.4"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 0.2, delay: 1.2 }}
-                  />
+                  <motion.line x1="6" y1="15" x2="2.5" y2="18.5" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.2, delay: 1.0 }} />
+                  <motion.line x1="7.5" y1="16.5" x2="5.4" y2="18.6" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.2, delay: 1.1 }} />
+                  <motion.line x1="9" y1="18" x2="7.6" y2="19.4" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.2, delay: 1.2 }} />
                 </motion.svg>
               </motion.div>
 
               {/* Title and Tagline on the right */}
               <div className="flex flex-col items-center">
-                <motion.h1
-                  initial={{ opacity: 0, x: 50 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.8, duration: 1, type: 'spring' }}
-                  className="text-5xl md:text-7xl font-bold mb-3"
-                >
-                  <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">
-                    Starships.ai
-                  </span>
+                <motion.h1 initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8, duration: 1, type: 'spring' }} className="text-5xl md:text-7xl font-bold mb-3">
+                  <span className="bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent bg-300% animate-gradient">Starships.ai</span>
                 </motion.h1>
 
                 <motion.div
@@ -372,11 +274,7 @@ export default function HomePage() {
                 >
                   <span className="relative z-10">
                     <Rocket className="w-5 h-5 mr-2 inline" />
-                    {isAuthenticated
-                      ? hasExistingStarships
-                        ? 'Enter Command Deck'
-                        : 'Launch Your Starship'
-                      : 'Begin Your Journey'}
+                    {isAuthenticated ? (hasExistingStarships ? 'Enter Command Deck' : 'Launch Your Starship') : 'Begin Your Journey'}
                   </span>
                   <motion.div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
@@ -389,23 +287,14 @@ export default function HomePage() {
 
               {/* Login Button - Only for unauthenticated users */}
               {!isAuthenticated && (
-                <LoginButton
-                  size="lg"
-                  variant="outline"
-                  className="px-8 py-4 text-lg rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10"
-                >
+                <LoginButton size="lg" variant="outline" className="px-8 py-4 text-lg rounded-full backdrop-blur-sm border-white/20 text-white hover:bg-white/10">
                   Sign In
                 </LoginButton>
               )}
             </motion.div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 2, duration: 1 }}
-            className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2, duration: 1 }} className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
             <div className="flex flex-col items-center space-y-1">
               {[0, 1, 2].map(index => (
                 <motion.div
@@ -481,8 +370,7 @@ export default function HomePage() {
                 }}
                 viewport={{ once: false, margin: '-10%' }}
               >
-                Your idea becomes a plan. Your plan becomes focused missions. Your missions become
-                reality.
+                Your idea becomes a plan. Your plan becomes focused missions. Your missions become reality.
               </motion.p>
             </motion.div>
 
@@ -506,9 +394,7 @@ export default function HomePage() {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold mb-2">You</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      You arrive with an idea, a concept of what could be. The journey begins here.
-                    </p>
+                    <p className="text-muted-foreground leading-relaxed">You arrive with an idea, a concept of what could be. The journey begins here.</p>
                   </div>
                 </div>
               </motion.div>
@@ -598,20 +484,14 @@ export default function HomePage() {
                         </motion.div>
                         <motion.div
                           animate={{
-                            opacity: [
-                              0.1, 0.1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 1, 1, 0.1, 1, 0.1,
-                              1, 0.1,
-                            ],
+                            opacity: [0.1, 0.1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 0.1, 1, 1, 1, 0.1, 1, 0.1, 1, 0.1],
                           }}
                           transition={{
                             duration: 9,
                             repeat: Infinity,
                             ease: 'linear',
                             delay: 3,
-                            times: [
-                              0, 0.38, 0.39, 0.4, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46, 0.47, 0.48,
-                              0.7, 0.9, 0.91, 0.92, 0.93, 0.94, 1,
-                            ],
+                            times: [0, 0.38, 0.39, 0.4, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46, 0.47, 0.48, 0.7, 0.9, 0.91, 0.92, 0.93, 0.94, 1],
                           }}
                         >
                           <Lightbulb className="w-8 h-8 text-white/60" />
@@ -890,8 +770,7 @@ export default function HomePage() {
                 }}
                 viewport={{ once: false, margin: '-10%' }}
               >
-                Each class shapes your strategy and scale. Start small or go big—your goals
-                determine the path.
+                Each class shapes your strategy and scale. Start small or go big—your goals determine the path.
               </motion.p>
             </motion.div>
 
@@ -910,12 +789,7 @@ export default function HomePage() {
                 <StarshipClass
                   name="Scout Class"
                   description="Perfect for focused exploration and individual missions. Efficient and nimble."
-                  features={[
-                    '3 Crew Members',
-                    '1 Concurrent Expedition',
-                    'Minimal Burn Rate',
-                    'Quick Deployment',
-                  ]}
+                  features={['3 Crew Members', '1 Concurrent Expedition', 'Minimal Burn Rate', 'Quick Deployment']}
                 />
               </motion.div>
               <motion.div
@@ -932,12 +806,7 @@ export default function HomePage() {
                 <StarshipClass
                   name="Cruiser Class"
                   description="Balanced power and capability. Ideal for ambitious projects and sustained operations."
-                  features={[
-                    '6-8 Crew Members',
-                    'Up to 3 Expeditions',
-                    'Moderate Burn Rate',
-                    'Advanced Coordination',
-                  ]}
+                  features={['6-8 Crew Members', 'Up to 3 Expeditions', 'Moderate Burn Rate', 'Advanced Coordination']}
                   highlight
                 />
               </motion.div>
@@ -955,12 +824,7 @@ export default function HomePage() {
                 <StarshipClass
                   name="Dreadnought Class"
                   description="Maximum capability for complex, multi-faceted projects. Built for large-scale operations."
-                  features={[
-                    '12+ Crew Members',
-                    'Unlimited Expeditions',
-                    'High Burn Rate',
-                    'Epic Scale Missions',
-                  ]}
+                  features={['12+ Crew Members', 'Unlimited Expeditions', 'High Burn Rate', 'Epic Scale Missions']}
                 />
               </motion.div>
             </div>
@@ -968,23 +832,15 @@ export default function HomePage() {
         </section>
 
         {/* Single overlay covering Ready to Launch and Footer sections */}
-        <div
-          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent backdrop-blur-md z-0"
-          style={{ height: '85vh' }}
-        />
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent backdrop-blur-md z-0" style={{ height: '85vh' }} />
 
         {/* CTA Section */}
         <section className="py-72 px-4 relative">
           <div className="relative z-10 max-w-4xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 1.2 }}
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 1.2 }}>
               <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Launch?</h2>
               <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-                Your journey awaits. Build your Starship, assemble your Crew, and embark on the
-                journey that transforms intention into reality.
+                Your journey awaits. Build your Starship, assemble your Crew, and embark on the journey that transforms intention into reality.
               </p>
               {isAuthenticated ? (
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -1036,17 +892,10 @@ export default function HomePage() {
           <div className="max-w-6xl mx-auto relative z-10">
             <div className="flex flex-col md:flex-row justify-between items-center">
               <div className="mb-6 md:mb-0 text-center md:text-left">
-                <p className="text-muted-foreground mb-2">
-                  © 2025 Starships.ai - Where Ideas meet Intelligence
-                </p>
+                <p className="text-muted-foreground mb-2">© 2025 Starships.ai - Where Ideas meet Intelligence</p>
                 <p className="text-muted-foreground text-sm">
                   🪐 Manifested by{' '}
-                  <a
-                    href="https://theingenuity.co"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-primary transition-colors underline"
-                  >
+                  <a href="https://theingenuity.co" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline">
                     The Ingenuity Co
                   </a>
                 </p>
@@ -1056,11 +905,7 @@ export default function HomePage() {
                   <Book className="w-4 h-4 mr-2" />
                   Documentation
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}
-                >
+                <Button variant="ghost" size="sm" onClick={() => window.open('https://discord.gg/HjAXxpsV', '_blank')}>
                   <Users className="w-4 h-4 mr-2" />
                   Discord
                 </Button>

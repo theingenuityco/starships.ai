@@ -1,4 +1,4 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 /**
  * Database Performance Monitoring and Query Optimization
@@ -77,13 +77,7 @@ export class PerformanceMonitor {
   /**
    * Record query execution metrics
    */
-  recordQuery(
-    queryType: string,
-    executionTime: number,
-    parameters?: any,
-    resultCount?: number,
-    indexesUsed?: string[]
-  ): void {
+  recordQuery(queryType: string, executionTime: number, parameters?: any, resultCount?: number, indexesUsed?: string[]): void {
     const metric: QueryMetrics = {
       queryId: `${queryType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       queryType,
@@ -162,20 +156,13 @@ export class PerformanceMonitor {
 
     // Calculate summary statistics
     const totalQueries = recentMetrics.length;
-    const averageExecutionTime =
-      totalQueries > 0
-        ? recentMetrics.reduce((sum, m) => sum + m.executionTime, 0) / totalQueries
-        : 0;
+    const averageExecutionTime = totalQueries > 0 ? recentMetrics.reduce((sum, m) => sum + m.executionTime, 0) / totalQueries : 0;
 
-    const slowQueries = recentMetrics.filter(
-      (m) => m.executionTime > this.SLOW_QUERY_THRESHOLD
-    ).length;
+    const slowQueries = recentMetrics.filter((m) => m.executionTime > this.SLOW_QUERY_THRESHOLD).length;
     const fastQueries = totalQueries - slowQueries;
 
     // Get slowest queries
-    const slowestQueries = recentMetrics
-      .sort((a, b) => b.executionTime - a.executionTime)
-      .slice(0, 10);
+    const slowestQueries = recentMetrics.sort((a, b) => b.executionTime - a.executionTime).slice(0, 10);
 
     // Analyze index usage
     const indexUsage = await this.analyzeIndexUsage();
@@ -222,9 +209,7 @@ export class PerformanceMonitor {
 
       return indexes.map((index) => {
         // Calculate usage from recent queries
-        const usageCount = this.queryMetrics.filter((m) =>
-          m.indexesUsed?.includes(index.name)
-        ).length;
+        const usageCount = this.queryMetrics.filter((m) => m.indexesUsed?.includes(index.name)).length;
 
         let effectiveness: 'high' | 'medium' | 'low' | 'unused' = 'unused';
         if (usageCount > 100) effectiveness = 'high';
@@ -248,18 +233,13 @@ export class PerformanceMonitor {
   /**
    * Generate optimization recommendations
    */
-  private generateRecommendations(
-    metrics: QueryMetrics[],
-    indexUsage: IndexUsageStats[]
-  ): string[] {
+  private generateRecommendations(metrics: QueryMetrics[], indexUsage: IndexUsageStats[]): string[] {
     const recommendations: string[] = [];
 
     // Analyze slow queries
     const slowQueries = metrics.filter((m) => m.executionTime > this.SLOW_QUERY_THRESHOLD);
     if (slowQueries.length > metrics.length * 0.1) {
-      recommendations.push(
-        '🐌 High percentage of slow queries detected. Consider query optimization.'
-      );
+      recommendations.push('🐌 High percentage of slow queries detected. Consider query optimization.');
     }
 
     // Analyze query patterns
@@ -279,37 +259,28 @@ export class PerformanceMonitor {
     // Analyze index usage
     const unusedIndexes = indexUsage.filter((i) => i.effectiveness === 'unused');
     if (unusedIndexes.length > 0) {
-      recommendations.push(
-        `🗂️ ${unusedIndexes.length} indexes are unused and could be dropped to save space.`
-      );
+      recommendations.push(`🗂️ ${unusedIndexes.length} indexes are unused and could be dropped to save space.`);
     }
 
     const lowEffectivenessIndexes = indexUsage.filter((i) => i.effectiveness === 'low');
     if (lowEffectivenessIndexes.length > 0) {
-      recommendations.push(
-        `📊 ${lowEffectivenessIndexes.length} indexes have low effectiveness. Review their necessity.`
-      );
+      recommendations.push(`📊 ${lowEffectivenessIndexes.length} indexes have low effectiveness. Review their necessity.`);
     }
 
     // Memory and performance recommendations
     if (metrics.length > 1000) {
       const avgTime = metrics.reduce((sum, m) => sum + m.executionTime, 0) / metrics.length;
       if (avgTime > 500) {
-        recommendations.push(
-          '⚡ Average query time is high. Consider connection pooling and query optimization.'
-        );
+        recommendations.push('⚡ Average query time is high. Consider connection pooling and query optimization.');
       }
     }
 
     // Workflow-specific recommendations
     const workflowQueries = metrics.filter((m) => m.queryType.includes('workflow'));
     if (workflowQueries.length > 0) {
-      const avgWorkflowTime =
-        workflowQueries.reduce((sum, m) => sum + m.executionTime, 0) / workflowQueries.length;
+      const avgWorkflowTime = workflowQueries.reduce((sum, m) => sum + m.executionTime, 0) / workflowQueries.length;
       if (avgWorkflowTime > 200) {
-        recommendations.push(
-          '🚀 Workflow queries are slower than optimal. Consider optimizing workflow-specific queries.'
-        );
+        recommendations.push('🚀 Workflow queries are slower than optimal. Consider optimizing workflow-specific queries.');
       }
     }
 
@@ -323,16 +294,11 @@ export class PerformanceMonitor {
   /**
    * Generate performance alerts
    */
-  private generateAlerts(
-    metrics: QueryMetrics[],
-    indexUsage: IndexUsageStats[]
-  ): PerformanceAlert[] {
+  private generateAlerts(metrics: QueryMetrics[], indexUsage: IndexUsageStats[]): PerformanceAlert[] {
     const alerts: PerformanceAlert[] = [];
 
     // Critical slow queries
-    const criticalSlowQueries = metrics.filter(
-      (m) => m.executionTime > this.VERY_SLOW_QUERY_THRESHOLD
-    );
+    const criticalSlowQueries = metrics.filter((m) => m.executionTime > this.VERY_SLOW_QUERY_THRESHOLD);
     if (criticalSlowQueries.length > 0) {
       alerts.push({
         severity: 'critical',
@@ -518,9 +484,7 @@ export class PerformanceMonitor {
       );
 
       for (const cache of cacheNodes) {
-        const relatedQueries = this.queryMetrics.filter((m) =>
-          m.queryType.includes(cache.type.replace('_', ''))
-        );
+        const relatedQueries = this.queryMetrics.filter((m) => m.queryType.includes(cache.type.replace('_', '')));
 
         // Adjust TTL based on query frequency
         let newTTL = 300000; // 5 minutes default

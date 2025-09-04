@@ -20,9 +20,7 @@ export function DebugMissionList() {
       if (response.error) {
         setResult(`Error: ${response.error}`)
       } else {
-        setResult(
-          `Success: Found ${response.data?.missions.length || 0} missions\n${JSON.stringify(response.data, null, 2)}`
-        )
+        setResult(`Success: Found ${response.data?.missions.length || 0} missions\n${JSON.stringify(response.data, null, 2)}`)
       }
     } catch (err) {
       console.error('Exception:', err)

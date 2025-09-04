@@ -161,15 +161,7 @@ export function useRegister() {
   const router = useRouter()
 
   return useMutation({
-    mutationFn: async ({
-      email,
-      password,
-      name,
-    }: {
-      email: string
-      password: string
-      name?: string
-    }) => {
+    mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
       const response = await fetch('/api/v1/auth/register', {
         method: 'POST',
         headers: {
@@ -303,11 +295,7 @@ export function useAuth() {
 
   // Register function
   const register = useCallback(
-    async (
-      email: string,
-      password: string,
-      name?: string
-    ): Promise<{ success: boolean; error?: string }> => {
+    async (email: string, password: string, name?: string): Promise<{ success: boolean; error?: string }> => {
       try {
         await registerMutation.mutateAsync({ email, password, name })
         return { success: true }
@@ -324,10 +312,8 @@ export function useAuth() {
   }, [logoutMutation])
 
   const isAuthenticated = !!user
-  const authError =
-    error?.message || loginMutation.error?.message || registerMutation.error?.message || null
-  const authLoading =
-    isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending
+  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || null
+  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending
 
   return {
     // Auth state

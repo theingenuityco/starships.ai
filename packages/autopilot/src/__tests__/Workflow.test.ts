@@ -2,8 +2,8 @@
  * Workflow Unit Tests
  */
 
-import { Workflow } from '../Workflow';
-import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '../types';
+import { Workflow } from '@/Workflow';
+import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '@/types';
 
 describe('Workflow', () => {
   let mockExecution: Execution;
@@ -35,9 +35,7 @@ describe('Workflow', () => {
 
     it('should create workflow from parameters with blueprint', () => {
       const mockBlueprint: Blueprint = {
-        nodes: [
-          { ref: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        ],
+        nodes: [{ ref: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} }],
         edges: [{ ref: 'edge1', from: 'node1', to: 'node2' }],
         metadata: { version: '1.0' },
       };
@@ -58,9 +56,7 @@ describe('Workflow', () => {
 
     it('should create a copy of the blueprint to avoid mutations', () => {
       const originalBlueprint: Blueprint = {
-        nodes: [
-          { ref: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        ],
+        nodes: [{ ref: 'node1', type: 'start', name: 'Start', description: 'Start node', parameters: {} }],
         edges: [],
         metadata: {},
       };

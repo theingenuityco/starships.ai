@@ -12,7 +12,7 @@
     "type-check": "turbo run type-check",
     "test": "turbo run test",
     "build": "turbo run build",
-    "start": "pnpm --filter @starships/server start",
+    "start": "turbo run start",
     "deploy:staging": "cd deploy && npm run deploy:staging",
     "deploy:production": "cd deploy && npm run deploy:production",
     "deploy:staging:dry-run": "cd deploy && npm run deploy:staging:dry-run",

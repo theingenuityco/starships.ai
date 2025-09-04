@@ -6,25 +6,13 @@ import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import { useRouter } from 'next/navigation'
-import { Suspense, useEffect } from 'react'
+import { Suspense } from 'react'
 
 export default function LoginPage() {
   const router = useRouter()
   const { isAuthenticated, isLoading } = useAuth()
 
-  // Handle redirect after successful login
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      const redirectUrl = localStorage.getItem('starships_redirect_after_login')
-      if (redirectUrl && redirectUrl !== '/') {
-        localStorage.removeItem('starships_redirect_after_login')
-        router.push(redirectUrl)
-      } else {
-        // Default redirect to home page
-        router.push('/')
-      }
-    }
-  }, [isAuthenticated, isLoading, router])
+  // Redirect is handled by useJwtAuth hook - no need for additional redirect logic here
 
   // Show loading state while checking authentication
   if (isLoading) {

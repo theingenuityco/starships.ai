@@ -308,6 +308,7 @@ pnpm dev          # Start all services in development
 pnpm build        # Build all packages
 pnpm type-check   # TypeScript compilation check
 pnpm lint         # ESLint code quality check
+pnpm format       # Prettier code formatting (client package)
 pnpm test         # Run test suites (autopilot package)
 
 # Deployment
@@ -369,11 +370,13 @@ pnpm deploy:production  # Deploy to production environment
 4. Start development: `pnpm dev`
 5. Run type checks: `pnpm type-check`
 6. Lint code: `pnpm lint`
+7. Format code: `pnpm format` (in client package)
 
 ### Code Standards
 
 - **TypeScript**: Strict mode enabled across all packages
-- **ESLint**: Consistent code quality and formatting
+- **ESLint**: Consistent code quality with Prettier integration
+- **Prettier**: Automated code formatting with consistent style
 - **Conventional Commits**: Clear commit message format
 - **Package Isolation**: Clean dependency boundaries
 - **Testing**: Unit tests for critical business logic

@@ -11,7 +11,7 @@ import {
   Node as WorkflowNode,
   ValidationErrorCode,
   ValidationWarningCode,
-} from '../types';
+} from '@/types';
 
 /**
  * Base interface for workflow node handlers

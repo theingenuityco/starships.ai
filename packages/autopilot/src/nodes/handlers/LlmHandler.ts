@@ -5,15 +5,15 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
+import { BaseHandler } from '@/nodes/Handler';
 import {
   Execution,
   ValidationResult,
   LlmNodeParameters,
   ValidationError,
   ValidationWarning,
-} from '../../types';
-import { LLM } from '../../LLM';
+} from '@/types';
+import { LLM } from '@/LLM';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';

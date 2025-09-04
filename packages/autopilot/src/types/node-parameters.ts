@@ -6,7 +6,7 @@
  */
 
 import type { BaseNodeParameters, BaseBlueprint } from './base';
-import type { AgentMemoryState } from '../AgentMemory';
+import type { AgentMemoryState } from '@/AgentMemory';
 
 /**
  * Agent-specific node parameters

@@ -5,8 +5,8 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { Blueprint, Execution, Node as WorkflowNode, NodeResult } from '../types';
-import { Handler, HandlerConstructor } from '../nodes/Handler';
+import { Blueprint, Execution, Node as WorkflowNode, NodeResult } from '@/types';
+import { Handler, HandlerConstructor } from '@/nodes/Handler';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {

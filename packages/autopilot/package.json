@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc-alias -p tsconfig.json",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
@@ -23,15 +23,16 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "uuid": "^9.0.0",
+    "axios": "^1.11.0",
     "jsonata": "^2.0.3",
-    "axios": "^1.11.0"
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
-    "@types/uuid": "^9.0.0",
     "@types/jest": "^30.0.0",
+    "@types/uuid": "^9.0.0",
     "jest": "^30.1.1",
     "ts-jest": "^29.4.1",
+    "tsc-alias": "^1.8.16",
     "typescript": "^5.0.0"
   },
   "peerDependencies": {

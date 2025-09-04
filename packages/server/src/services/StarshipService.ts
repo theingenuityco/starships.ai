@@ -1,5 +1,5 @@
 import { StarshipRepository } from '@starships/models';
-import { getRandomStarshipName } from '../utils/starshipNames';
+import { getRandomStarshipName } from '@/utils/starshipNames';
 
 /**
  * Service for managing starship operations

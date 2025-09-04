@@ -4,7 +4,7 @@
  */
 
 import { Server } from 'socket.io';
-import { Logger } from '../utils/logger';
+import { Logger } from '@/utils/logger';
 import type {
   MissionModel,
   MissionClarityModel,

@@ -6,8 +6,8 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import { LlmNodeParameters, HttpRequestNodeParameters, Execution } from './types';
-import { HttpRequest } from './HttpRequest';
+import { LlmNodeParameters, HttpRequestNodeParameters, Execution } from '@/types';
+import { HttpRequest } from '@/HttpRequest';
 
 export class LLM {
   private params: LlmNodeParameters;

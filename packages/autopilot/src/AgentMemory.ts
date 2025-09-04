@@ -5,7 +5,7 @@
  * Built on top of the base Memory class for LLM message management
  */
 
-import { Memory, Message, MemoryState, MemoryParams } from './Memory';
+import { Memory, Message, MemoryState, MemoryParams } from '@/Memory';
 
 /**
  * Agent identity information

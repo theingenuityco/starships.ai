@@ -7,7 +7,7 @@
 
 import type { CreateWorkflowRequest, AgentModel } from '@starships/protocol';
 import type { Blueprint } from '@starships/autopilot';
-import { Logger } from '../utils/logger';
+import { Logger } from '@/utils/logger';
 
 export class WorkflowParsingService {
   private static logger = Logger.getInstance();

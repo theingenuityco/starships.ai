@@ -10,17 +10,17 @@ import { Handler, HandlerConstructor } from '@/nodes/Handler';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
-  start: () => import('../nodes/handlers/StartHandler').then((m) => m.StartHandler),
-  end: () => import('../nodes/handlers/EndHandler').then((m) => m.EndHandler),
-  agent: () => import('../nodes/handlers/AgentHandler').then((m) => m.AgentHandler),
+  start: () => import('@/nodes/handlers/StartHandler').then((m) => m.StartHandler),
+  end: () => import('@/nodes/handlers/EndHandler').then((m) => m.EndHandler),
+  agent: () => import('@/nodes/handlers/AgentHandler').then((m) => m.AgentHandler),
   conditional: () =>
-    import('../nodes/handlers/ConditionalHandler').then((m) => m.ConditionalHandler),
-  user_prompt: () => import('../nodes/handlers/PromptHandler').then((m) => m.PromptHandler),
-  output: () => import('../nodes/handlers/OutputHandler').then((m) => m.OutputHandler),
+    import('@/nodes/handlers/ConditionalHandler').then((m) => m.ConditionalHandler),
+  user_prompt: () => import('@/nodes/handlers/PromptHandler').then((m) => m.PromptHandler),
+  output: () => import('@/nodes/handlers/OutputHandler').then((m) => m.OutputHandler),
   http_request: () =>
-    import('../nodes/handlers/HttpRequestHandler').then((m) => m.HttpRequestHandler),
-  llm: () => import('../nodes/handlers/LlmHandler').then((m) => m.LlmHandler),
-  workflow: () => import('../nodes/handlers/WorkflowHandler').then((m) => m.WorkflowHandler),
+    import('@/nodes/handlers/HttpRequestHandler').then((m) => m.HttpRequestHandler),
+  llm: () => import('@/nodes/handlers/LlmHandler').then((m) => m.LlmHandler),
+  workflow: () => import('@/nodes/handlers/WorkflowHandler').then((m) => m.WorkflowHandler),
 };
 
 /**

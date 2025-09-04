@@ -26,7 +26,22 @@
     "composite": true,
 
     /* Node.js types by default */
-    "types": ["node"]
+    "types": ["node"],
+
+    /* Path mappings for cross-package imports */
+    "baseUrl": ".",
+    "paths": {
+      "@starships/protocol/*": ["./packages/protocol/src/*"],
+      "@starships/protocol": ["./packages/protocol/src/index.ts"],
+      "@starships/env/*": ["./packages/env/src/*"],
+      "@starships/env": ["./packages/env/src/index.ts"],
+      "@starships/models/*": ["./packages/models/src/*"],
+      "@starships/models": ["./packages/models/src/index.ts"],
+      "@starships/autopilot/*": ["./packages/autopilot/src/*"],
+      "@starships/autopilot": ["./packages/autopilot/src/index.ts"],
+      "@starships/errors/*": ["./packages/errors/src/*"],
+      "@starships/errors": ["./packages/errors/src/index.ts"]
+    }
   },
   "exclude": ["node_modules", "dist", "build", ".next"]
 }

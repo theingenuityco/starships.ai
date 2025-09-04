@@ -324,6 +324,38 @@ pnpm deploy:production  # Deploy to production environment
 - **API Testing**: Comprehensive endpoint testing
 - **Integration**: Socket.IO event testing
 
+### VSCode Debugging
+
+Simple and efficient debug configurations for development:
+
+#### Debug Configurations
+
+- **Next.js Client** - Debug the Next.js frontend with browser integration
+- **Express Server** - Debug the Express.js backend with hot reloading
+- **Full Stack** - Launch client and server simultaneously
+- **Attach Process** - Attach to any running Node.js process
+
+#### Quick Start Debugging
+
+1. **Full Stack Development**:
+   - Press `F5` and choose **"Full Stack"**
+   - Debugs frontend and backend with breakpoints
+
+2. **Individual Services**:
+   - Choose **"Next.js Client"** for frontend-only debugging
+   - Choose **"Express Server"** for backend-only debugging
+
+3. **Auto-Attach from Terminal**:
+   - Run `pnpm dev` in terminal - debugger auto-attaches
+   - Or choose **"Attach Process"** to pick a running process
+
+#### Debug Tips
+
+- **Auto-Attach**: VSCode automatically detects and attaches to dev processes
+- **Breakpoints**: Works seamlessly in `.ts` and `.tsx` files
+- **Hot Reload**: Server restarts automatically maintain debug sessions
+- **Source Maps**: Full TypeScript debugging support with accurate line numbers
+
 ---
 
 ## 🚧 Project Roadmap

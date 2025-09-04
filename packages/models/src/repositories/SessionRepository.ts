@@ -41,10 +41,12 @@ export class SessionRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<SessionModel, 'id' | 'createdAt' | 'updatedAt'>
+    entity: Omit<SessionModel, 'id' | 'createdAt' | 'updatedAt'>,
+    starshipId?: string
   ): Promise<SessionModel> {
     return this.executeWithErrorHandling(
       async () => {
+        const connection = this.connection;
         const now = new Date().toISOString();
 
         const sessionData = {
@@ -61,6 +63,19 @@ export class SessionRepository extends BaseRepository {
           sessionData,
           this.connection
         );
+
+        // Create relationship with starship if starshipId is provided
+        if (starshipId) {
+          await connection.executeWrite(
+            `MATCH (s:Starship {id: $starshipId}), (session:SessionModel {id: $sessionId})
+             CREATE (s)-[:HAS_SESSION {createdAt: $timestamp}]->(session)`,
+            {
+              starshipId,
+              sessionId: result.id,
+              timestamp: now,
+            }
+          );
+        }
 
         return this.mapToSession(result);
       },
@@ -215,6 +230,92 @@ export class SessionRepository extends BaseRepository {
       'archiveSession',
       'Session',
       id
+    );
+  }
+
+  /**
+   * Find all sessions for a specific starship using Neo4j relationships
+   */
+  async findByStarship(starshipId: string): Promise<SessionModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const result = await connection.executeQuery<{ s: any }>(
+          `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:SessionModel)
+           RETURN s ORDER BY s.last_activity_at DESC`,
+          { starshipId }
+        );
+        return result.map((record) => this.mapToSession(record.s));
+      },
+      'findByStarship',
+      'Session'
+    );
+  }
+
+  /**
+   * Get the starship associated with a session using Neo4j relationships
+   */
+  async getSessionStarship(
+    sessionId: string
+  ): Promise<{ id: string; name: string; slug: string } | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const result = await connection.executeQuery<{ starship: any }>(
+          `MATCH (starship:Starship)-[:HAS_SESSION]->(s:SessionModel {id: $sessionId})
+           RETURN starship`,
+          { sessionId }
+        );
+        return result.length > 0
+          ? {
+              id: result[0].starship.id,
+              name: result[0].starship.name,
+              slug: result[0].starship.slug,
+            }
+          : null;
+      },
+      'getSessionStarship',
+      'Session'
+    );
+  }
+
+  /**
+   * Create relationship between existing session and starship
+   */
+  async linkToStarship(sessionId: string, starshipId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (session:SessionModel {id: $sessionId})
+           CREATE (s)-[:HAS_SESSION {createdAt: $timestamp}]->(session)`,
+          {
+            starshipId,
+            sessionId,
+            timestamp: new Date().toISOString(),
+          }
+        );
+      },
+      'linkToStarship',
+      'Session'
+    );
+  }
+
+  /**
+   * Remove relationship between session and starship
+   */
+  async unlinkFromStarship(sessionId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        await connection.executeWrite(
+          `MATCH (s:Starship)-[r:HAS_SESSION]->(session:SessionModel {id: $sessionId})
+           DELETE r`,
+          { sessionId }
+        );
+      },
+      'unlinkFromStarship',
+      'Session'
     );
   }
 

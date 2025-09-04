@@ -1,23 +1,18 @@
 'use client'
 
-import { useState, useRef, KeyboardEvent } from 'react'
-import { Send, Paperclip, Mic, StopCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { motion } from 'motion/react'
-import { cn } from '@/lib/utils'
-import { agentSocketAPI } from '@/lib/agent-socket-api'
-import { generateId } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateSession } from '@/hooks/useSessions'
-import type { Agent } from '@/lib/api'
-import type { ChatMode } from '@/components/session/ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
+import { agentSocketAPI } from '@/lib/agent-socket-api'
+import type { Agent } from '@/lib/api'
+import { cn, generateId } from '@/lib/utils'
+import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
+import { motion } from 'motion/react'
+import { KeyboardEvent, useRef, useState } from 'react'
 
 interface SessionMessageInputProps {
-  mode: ChatMode
   selectedAgent?: Agent | null
-  provider?: 'openai' | 'anthropic'
-  model?: string
   starshipId?: string
   sessionId?: string | null
   onSessionStart?: (sessionId: string) => void
@@ -28,20 +23,7 @@ interface SessionMessageInputProps {
   children?: React.ReactNode // For footer content
 }
 
-export function SessionMessageInput({
-  mode,
-  selectedAgent,
-  provider = 'openai',
-  model = 'gpt-4',
-  starshipId,
-  sessionId,
-  onSessionStart,
-  onMessageSent,
-  onMessageReceived,
-  disabled = false,
-  minimal = false,
-  children,
-}: SessionMessageInputProps) {
+export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSessionStart, onMessageSent, onMessageReceived, disabled = false, minimal = false, children }: SessionMessageInputProps) {
   const { userId } = useAuth()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -54,9 +36,9 @@ export function SessionMessageInput({
     const messageToSend = message.trim()
     if (!messageToSend || sending || disabled) return
 
-    // Validation for agent mode
-    if (mode === 'agent' && !selectedAgent) {
-      console.error('No agent selected for agent mode')
+    // Validation for agent
+    if (!selectedAgent) {
+      console.error('No agent selected')
       return
     }
 
@@ -134,9 +116,9 @@ export function SessionMessageInput({
   const handleSuggestionSubmit = async (suggestionText: string) => {
     if (!suggestionText || sending || disabled) return
 
-    // Validation for agent mode
-    if (mode === 'agent' && !selectedAgent) {
-      console.error('No agent selected for agent mode')
+    // Validation for agent
+    if (!selectedAgent) {
+      console.error('No agent selected')
       return
     }
 
@@ -225,13 +207,10 @@ export function SessionMessageInput({
   }
 
   const getPlaceholder = () => {
-    if (mode === 'agent') {
-      return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
-    }
-    return minimal ? 'Ask anything...' : 'Ask anything...'
+    return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
   }
 
-  const canSend = message.trim() && !disabled && !sending && mode === 'agent' && selectedAgent
+  const canSend = message.trim() && !disabled && !sending && selectedAgent
 
   // Expose handleSuggestionSubmit for parent component
   const inputRef = useRef({ handleSuggestionSubmit })
@@ -334,10 +313,8 @@ export function SessionMessageInput({
         )}
       </div>
 
-      {/* Mode Indicator - Only show in non-minimal mode */}
-      {!minimal && mode === 'agent' && selectedAgent && (
-        <div className="absolute -top-3 left-4 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">Chatting with {selectedAgent.name}</div>
-      )}
+      {/* Agent Indicator - Only show in non-minimal mode */}
+      {!minimal && selectedAgent && <div className="absolute -top-3 left-4 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">Chatting with {selectedAgent.name}</div>}
     </motion.div>
   )
 }

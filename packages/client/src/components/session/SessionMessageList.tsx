@@ -1,15 +1,13 @@
 'use client'
 
-import { useEffect } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
-import { MessageList } from '@/components/session/MessageList'
 import { MessageBubble } from '@/components/session/MessageBubble'
-import type { Message } from '@/lib/agent-socket-api'
-import type { ChatMode } from '@/components/session/ChatModeSelector'
+import { MessageList } from '@/components/session/MessageList'
 import { useSessionMessages, type Message as SessionMessage } from '@/hooks/useSessions'
+import type { Message } from '@/lib/agent-socket-api'
+import { AnimatePresence, motion } from 'motion/react'
+import { useEffect } from 'react'
 
 interface SessionMessageListProps {
-  mode: ChatMode
   sessionId: string | null
   starshipId?: string
   onMessageAdded?: (message: SessionMessage) => void
@@ -18,7 +16,7 @@ interface SessionMessageListProps {
 // Union type for session messages
 type SessionMessageType = Message
 
-export function SessionMessageList({ mode, sessionId, starshipId, onMessageAdded }: SessionMessageListProps) {
+export function SessionMessageList({ sessionId, starshipId, onMessageAdded }: SessionMessageListProps) {
   // Use TanStack Query to fetch messages
   const { data: messageData, isLoading: loading, error: queryError } = useSessionMessages(sessionId || '', !!sessionId)
 
@@ -67,23 +65,19 @@ export function SessionMessageList({ mode, sessionId, starshipId, onMessageAdded
   }
 
   if (!sessionId) {
-    return <EmptyState mode={mode} />
+    return <EmptyState />
   }
 
   return (
     <AnimatePresence mode="wait">
-      <motion.div key={`${mode}-${sessionId}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full">
+      <motion.div key={sessionId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full">
         <MessageList messages={sessionMessages} loading={loading} error={error} MessageComponent={getMessageComponent() as any} />
       </motion.div>
     </AnimatePresence>
   )
 }
 
-interface EmptyStateProps {
-  mode: ChatMode
-}
-
-function EmptyState({ mode }: EmptyStateProps) {
+function EmptyState() {
   const content = {
     title: 'Connect with your Agent',
     subtitle: 'Select an agent and start a conversation to boost your productivity',

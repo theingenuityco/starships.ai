@@ -108,16 +108,6 @@ resource "aws_iam_role_policy" "github_runner" {
       {
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
-        ]
-        Resource = "arn:aws:logs:*:*:*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
           "cloudwatch:PutMetricData",
           "ec2:DescribeVolumes",
           "ec2:DescribeTags"
@@ -169,15 +159,6 @@ resource "aws_iam_role_policy" "lambda" {
       {
         Effect = "Allow"
         Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ]
-        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
           "ec2:RunInstances",
           "ec2:CreateTags",
           "ec2:DescribeInstances",
@@ -219,17 +200,7 @@ resource "aws_iam_role_policy" "lambda" {
   })
 }
 
-# CloudWatch Log Group for Lambda
-resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/github-runner-webhook"
-  retention_in_days = 7
-
-  tags = {
-    Name        = "github-runner-lambda-logs"
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  }
-}
+# CloudWatch Log Group removed for cost optimization
 
 # Package Lambda function
 data "archive_file" "lambda_zip" {
@@ -263,8 +234,7 @@ resource "aws_lambda_function" "webhook" {
   }
 
   depends_on = [
-    aws_iam_role_policy.lambda,
-    aws_cloudwatch_log_group.lambda
+    aws_iam_role_policy.lambda
   ]
 
   tags = {

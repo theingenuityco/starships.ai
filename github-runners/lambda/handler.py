@@ -40,14 +40,11 @@ def lambda_handler(event, context):
     # Get headers (case-insensitive)
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
     github_event = headers.get('x-github-event', '')
-    print(f"GitHub event type: {github_event}")
-    print(f"All headers: {list(headers.keys())}")
     
     if github_event != 'workflow_job':
         return {'statusCode': 200, 'body': json.dumps('Not a workflow_job event')}
     
     action = body.get('action')
-    print(f"Workflow job action: {action}")
     
     if action == 'queued':
         return handle_job_queued(body)
@@ -62,11 +59,8 @@ def verify_webhook_signature(event):
     headers = {k.lower(): v for k, v in event.get('headers', {}).items()}
     signature = headers.get('x-hub-signature-256', '')
     
-    print(f"Headers received: {list(headers.keys())}")
-    print(f"Signature header present: {'x-hub-signature-256' in headers}")
     
     if not signature:
-        print("No signature header found")
         return False
     
     body = event.get('body', '')
@@ -76,11 +70,7 @@ def verify_webhook_signature(event):
         hashlib.sha256
     ).hexdigest()
     
-    print(f"Received signature: {signature[:20]}...")
-    print(f"Expected signature: {expected_signature[:20]}...")
-    
     result = hmac.compare_digest(signature, expected_signature)
-    print(f"Signature verification result: {result}")
     
     return result
 
@@ -145,10 +135,8 @@ def handle_job_queued(body):
     
     # Check if job requires self-hosted runner
     labels = workflow_job.get('labels', [])
-    print(f"Job labels: {labels}")
     
     if 'self-hosted' not in labels:
-        print("Not a self-hosted job, skipping")
         return {'statusCode': 200, 'body': json.dumps('Not a self-hosted job')}
     
     repo_url = repository.get('html_url')
@@ -165,7 +153,6 @@ def handle_job_queued(body):
         # Launch EC2 instance
         instance_id = launch_ec2_instance(user_data_script, job_id, run_id, repo_url)
         
-        print(f"Launched instance {instance_id} for job {job_id}")
         
         return {
             'statusCode': 200,
@@ -190,7 +177,6 @@ def handle_job_completed(body):
     workflow_job = body.get('workflow_job', {})
     job_id = workflow_job.get('id')
     
-    print(f"Job {job_id} completed")
     
     return {'statusCode': 200, 'body': json.dumps('Job completed')}
 
@@ -200,50 +186,11 @@ def create_user_data_script(repo_url, registration_token, labels, job_id):
     labels_str = ','.join(labels)
     
     script = f"""#!/bin/bash
-set -x  # Enable debug output
-
-# Logging to file
-LOG_FILE="/var/log/runner-setup.log"
-exec > >(tee -a $LOG_FILE)
-exec 2>&1
-
-# Install CloudWatch agent for logging
-echo "Installing CloudWatch agent..."
-wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-dpkg -i -E ./amazon-cloudwatch-agent.deb || true
-
-# Configure CloudWatch agent
-cat <<'EOT' > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
-{{
-  "logs": {{
-    "logs_collected": {{
-      "files": {{
-        "collect_list": [
-          {{
-            "file_path": "/var/log/runner-setup.log",
-            "log_group_name": "/aws/ec2/github-runner",
-            "log_stream_name": "{{{{instance_id}}}}-setup"
-          }},
-          {{
-            "file_path": "/var/log/runner.log",
-            "log_group_name": "/aws/ec2/github-runner",
-            "log_stream_name": "{{{{instance_id}}}}-runner"
-          }}
-        ]
-      }}
-    }}
-  }}
-}}
-EOT
-
-# Start CloudWatch agent
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json || true
+set -e  # Exit on error
 
 echo "=== Starting GitHub Runner Setup ==="
-echo "Date: $(date)"
 echo "Repository: {repo_url}"
 echo "Runner name: {runner_name}"
-echo "Labels: {labels_str}"
 
 # Update system
 echo "Updating system packages..."
@@ -269,14 +216,13 @@ echo "Installing runner dependencies..."
 
 # Configure runner
 echo "Configuring runner..."
-echo "Token length: ${{#registration_token}}"
 sudo -u runner ./config.sh --url {repo_url} \
     --token {registration_token} \
     --name {runner_name} \
     --labels {labels_str} \
     --ephemeral \
     --unattended \
-    --replace
+    --replace 2>/dev/null
 
 # Install Node.js for workflows
 echo "Installing Node.js 22..."
@@ -284,34 +230,13 @@ curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 npm install -g pnpm
 
-# Start runner
+# Start runner and wait for completion
 echo "Starting runner..."
 cd /home/runner
-sudo -u runner nohup ./run.sh > /var/log/runner.log 2>&1 &
+sudo -u runner ./run.sh
 
-# Give runner time to start
-sleep 15
-
-# Check if runner is running
-if pgrep -f "Runner.Listener" > /dev/null; then
-    echo "Runner started successfully!"
-    RUNNER_PID=$(pgrep -f "Runner.Listener")
-    echo "Runner PID: $RUNNER_PID"
-    
-    # Monitor runner
-    while kill -0 $RUNNER_PID 2>/dev/null; do
-        sleep 10
-    done
-    
-    echo "Runner process completed"
-else
-    echo "ERROR: Runner failed to start!"
-    echo "Config logs:"
-    cat /home/runner/_diag/*.log 2>/dev/null || echo "No logs found"
-fi
-
-echo "Shutting down in 10 seconds..."
-sleep 10
+# Runner completed, shutdown
+echo "Job completed, shutting down..."
 shutdown -h now
 """
     

@@ -76,6 +76,9 @@ CREATE INDEX agent_starship_id IF NOT EXISTS FOR (a:Agent) ON (a.starshipId);
 CREATE INDEX mission_starship_id IF NOT EXISTS FOR (m:MissionModel) ON (m.starshipId);
 CREATE INDEX message_starship_id IF NOT EXISTS FOR (msg:Message) ON (msg.starshipId);
 
+// Session relationship indexes for performance
+CREATE INDEX session_starship_relationship IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() ON (r.createdAt);
+
 // Status and filtering
 CREATE INDEX starship_status IF NOT EXISTS FOR (s:Starship) ON (s.status);
 CREATE INDEX mission_status IF NOT EXISTS FOR (m:MissionModel) ON (m.status);

@@ -92,7 +92,7 @@ export function useJwtAuth() {
       const data = await response.json();
 
       if (response.ok && data.data) {
-        const { user, token, firstStarship } = data.data;
+        const { user, token, starship } = data.data;
         setStoredToken(token);
         setState({
           user,
@@ -102,10 +102,10 @@ export function useJwtAuth() {
         });
         console.log('[JWT-AUTH] User logged in:', user.email);
         
-        // Redirect to first starship's session if available
-        if (firstStarship) {
-          console.log('[JWT-AUTH] Redirecting to starship session:', firstStarship.slug);
-          router.push(`/ship/${firstStarship.slug}/session`);
+        // Redirect to starship's session if available
+        if (starship) {
+          console.log('[JWT-AUTH] Redirecting to starship session:', starship.slug);
+          router.push(`/ship/${starship.slug}/session`);
         }
         
         return { success: true };
@@ -146,7 +146,7 @@ export function useJwtAuth() {
       const data = await response.json();
 
       if (response.ok && data.data) {
-        const { user, token, defaultStarship } = data.data;
+        const { user, token, starship } = data.data;
         setStoredToken(token);
         setState({
           user,
@@ -156,10 +156,10 @@ export function useJwtAuth() {
         });
         console.log('[JWT-AUTH] User registered:', user.email);
         
-        // Redirect to newly created default starship's session if available
-        if (defaultStarship) {
-          console.log('[JWT-AUTH] Redirecting to new starship session:', defaultStarship.slug);
-          router.push(`/ship/${defaultStarship.slug}/session`);
+        // Redirect to starship's session if available
+        if (starship) {
+          console.log('[JWT-AUTH] Redirecting to starship session:', starship.slug);
+          router.push(`/ship/${starship.slug}/session`);
         }
         
         return { success: true };

@@ -1,8 +1,5 @@
 import type { NextConfig } from 'next'
-import { getServerConfig } from '@starships/env-config'
-
-// Load client configuration for public variables
-const s = getServerConfig()
+import { getEnvConfig } from '@starships/env'
 
 const nextConfig: NextConfig = {
   eslint: {
@@ -18,13 +15,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   async rewrites() {
-    console.log(s)
-    console.log(process.env)
     return [
       {
         // rewrite /api/* requests to backend /api/* endpoints
         source: '/api/:path*',
-        destination: `${s.SERVER_URL}/api/:path*`,
+        destination: `${getEnvConfig().SERVER_URL}/api/:path*`,
       },
     ]
   },

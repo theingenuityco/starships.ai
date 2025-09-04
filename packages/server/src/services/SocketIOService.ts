@@ -8,7 +8,7 @@ import type {
 } from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from './UserService';
-import { loadServerEnvironment } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 // JWT verification function for Socket.IO
 async function verifySocketJWT(token: string) {
@@ -20,7 +20,7 @@ async function verifySocketJWT(token: string) {
     }
 
     // For our JWT auth system, we'll verify using the same secret as the auth routes
-    const env = loadServerEnvironment();
+    const env = getEnvConfig();
     const jwtSecret = env.JWT_SECRET;
     
     if (!jwtSecret) {

@@ -7,10 +7,10 @@
 import { Request, Response, NextFunction } from 'express';
 import { jwtVerify } from 'jose';
 import { UserService } from '../services/UserService';
-import { loadServerEnvironment } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 import { sendError } from '../utils/responseHelpers';
 
-const env = loadServerEnvironment();
+const env = getEnvConfig();
 
 // JWT configuration
 const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');

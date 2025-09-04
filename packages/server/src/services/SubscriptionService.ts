@@ -1,10 +1,10 @@
 import Stripe from 'stripe';
 import { UserRepository, StarshipRepository } from '@starships/models';
-import { loadServerEnvironment } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 export class SubscriptionService {
   private stripe: Stripe;
-  private env = loadServerEnvironment();
+  private env = getEnvConfig();
 
   constructor(
     private userRepository: UserRepository,
@@ -192,9 +192,9 @@ export class SubscriptionService {
     }
 
     const customerId = await this.getOrCreateCustomer(userId);
-    const baseUrl = this.env.NODE_ENV === 'production' 
+    const baseUrl = this.env.NODE_ENV === 'production'
       ? 'https://app.starships.ai' // TODO: Set your production domain
-      : `http://localhost:${this.env.PORT}`;
+      : `http://localhost:${this.env.SERVER_PORT}`;
 
     const session = await this.stripe.billingPortal.sessions.create({
       customer: customerId,

@@ -11,7 +11,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { UserService } from '../services/UserService';
 import { StarshipService } from '../services/StarshipService';
 import { StarshipRepository } from '@starships/models';
-import { loadServerEnvironment } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 import {
   sendSuccess,
   sendError,
@@ -19,7 +19,7 @@ import {
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
-const env = loadServerEnvironment();
+const env = getEnvConfig();
 
 // JWT configuration
 const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');

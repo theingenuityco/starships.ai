@@ -1,10 +1,10 @@
-import { getServerConfig, ServerEnvironmentConfig } from '@starships/env-config';
+import { getEnvConfig, EnvironmentConfig } from '@starships/env';
 
 /**
  * Validated environment configuration
  * Re-exported for backward compatibility
  */
-export const env: ServerEnvironmentConfig = getServerConfig();
+export const env: EnvironmentConfig = getEnvConfig();
 
 // Legacy export for backward compatibility
-export interface EnvironmentConfig extends ServerEnvironmentConfig {} 
+export interface ServerEnvironmentConfig extends EnvironmentConfig {}

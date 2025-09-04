@@ -131,9 +131,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.7
         version: 1.2.7(@types/react-dom@19.1.6(@types/react@19.1.8))(@types/react@19.1.8)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@starships/env-config':
+      '@starships/env':
         specifier: workspace:*
-        version: link:../env-config
+        version: link:../env
       '@starships/errors':
         specifier: workspace:*
         version: link:../errors
@@ -401,9 +401,9 @@ importers:
       '@starships/autopilot':
         specifier: workspace:*
         version: link:../autopilot
-      '@starships/env-config':
+      '@starships/env':
         specifier: workspace:*
-        version: link:../env-config
+        version: link:../env
       '@starships/errors':
         specifier: workspace:*
         version: link:../errors

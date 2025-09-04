@@ -40,12 +40,12 @@
       "outputs": []
     },
     "@starships/client#lint": {
-      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
     "@starships/server#lint": {
-      "dependsOn": ["@starships/env-config#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -59,7 +59,7 @@
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
-    "@starships/env-config#type-check": {
+    "@starships/env#type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
@@ -69,12 +69,12 @@
       "outputs": []
     },
     "@starships/server#type-check": {
-      "dependsOn": ["@starships/env-config#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
     "@starships/client#type-check": {
-      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },

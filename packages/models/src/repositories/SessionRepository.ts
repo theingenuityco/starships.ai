@@ -15,7 +15,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = getConnection();
         const result = await connection.executeQuery<{ s: SessionModel }>(
-          'MATCH (s:SessionModel) RETURN s ORDER BY s.last_activity_at DESC'
+          'MATCH (s:Session) RETURN s ORDER BY s.last_activity_at DESC'
         );
         return result.map((record) => this.mapToSession(record.s));
       },
@@ -29,7 +29,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         const result = await connection.executeQuery<{ s: any }>(
-          'MATCH (s:SessionModel) WHERE s.id = $id RETURN s',
+          'MATCH (s:Session) WHERE s.id = $id RETURN s',
           { id }
         );
         return result.length > 0 ? this.mapToSession(result[0].s) : null;
@@ -59,7 +59,7 @@ export class SessionRepository extends BaseRepository {
         };
 
         const result = await this.createEntityWithAutoId<any>(
-          'SessionModel',
+          'Session',
           sessionData,
           this.connection
         );
@@ -67,7 +67,7 @@ export class SessionRepository extends BaseRepository {
         // Create relationship with starship if starshipId is provided
         if (starshipId) {
           await connection.executeWrite(
-            `MATCH (s:Starship {id: $starshipId}), (session:SessionModel {id: $sessionId})
+            `MATCH (s:Starship {id: $starshipId}), (session:Session {id: $sessionId})
              CREATE (s)-[:HAS_SESSION {createdAt: $timestamp}]->(session)`,
             {
               starshipId,
@@ -123,7 +123,7 @@ export class SessionRepository extends BaseRepository {
         params.updatedAt = new Date().toISOString();
 
         const result = await connection.executeWrite<{ s: any }>(
-          `MATCH (s:SessionModel) WHERE s.id = $id
+          `MATCH (s:Session) WHERE s.id = $id
          SET ${setFields.join(', ')}
          RETURN s`,
           params
@@ -146,7 +146,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (s:SessionModel) WHERE s.id = $id DETACH DELETE s RETURN count(s) as deletedCount',
+          'MATCH (s:Session) WHERE s.id = $id DETACH DELETE s RETURN count(s) as deletedCount',
           { id }
         );
 
@@ -163,7 +163,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:SessionModel) WHERE s.id = $id SET s.last_activity_at = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.last_activity_at = $timestamp',
           { id, timestamp: new Date().toISOString() }
         );
       },
@@ -178,7 +178,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:SessionModel) WHERE s.id = $id SET s.message_count = s.message_count + $increment, s.last_activity_at = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.message_count = s.message_count + $increment, s.last_activity_at = $timestamp',
           { id, increment, timestamp: new Date().toISOString() }
         );
       },
@@ -193,7 +193,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:SessionModel) WHERE s.id = $id SET s.total_tokens = s.total_tokens + $tokens, s.last_activity_at = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.total_tokens = s.total_tokens + $tokens, s.last_activity_at = $timestamp',
           { id, tokens, timestamp: new Date().toISOString() }
         );
       },
@@ -208,7 +208,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:SessionModel) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
           { id, status: 'completed', timestamp: new Date().toISOString() }
         );
       },
@@ -223,7 +223,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:SessionModel) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp',
           { id, status: 'archived', timestamp: new Date().toISOString() }
         );
       },
@@ -241,7 +241,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         const result = await connection.executeQuery<{ s: any }>(
-          `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:SessionModel)
+          `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
            RETURN s ORDER BY s.last_activity_at DESC`,
           { starshipId }
         );
@@ -262,7 +262,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         const result = await connection.executeQuery<{ starship: any }>(
-          `MATCH (starship:Starship)-[:HAS_SESSION]->(s:SessionModel {id: $sessionId})
+          `MATCH (starship:Starship)-[:HAS_SESSION]->(s:Session {id: $sessionId})
            RETURN starship`,
           { sessionId }
         );
@@ -287,7 +287,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          `MATCH (s:Starship {id: $starshipId}), (session:SessionModel {id: $sessionId})
+          `MATCH (s:Starship {id: $starshipId}), (session:Session {id: $sessionId})
            CREATE (s)-[:HAS_SESSION {createdAt: $timestamp}]->(session)`,
           {
             starshipId,
@@ -309,7 +309,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          `MATCH (s:Starship)-[r:HAS_SESSION]->(session:SessionModel {id: $sessionId})
+          `MATCH (s:Starship)-[r:HAS_SESSION]->(session:Session {id: $sessionId})
            DELETE r`,
           { sessionId }
         );

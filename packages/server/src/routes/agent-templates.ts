@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { StarshipRepository, AgentRepository } from '@starships/models';
-import { authMiddleware } from '../middleware/auth';
+import { jwtAuthMiddleware } from '../middleware/jwt-auth';
 import { Request, Response } from 'express';
 import { getConnection } from '@starships/models';
 import { AgentTemplateService } from '../services/AgentTemplateService';
@@ -27,7 +27,7 @@ function getAgentTemplateService(): AgentTemplateService | null {
 }
 
 // GET /agent-templates - Get all templates (OpenAPI pattern)
-router.get('/agent-templates', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/agent-templates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const templateService = getAgentTemplateService();
     if (!templateService) {
@@ -60,7 +60,7 @@ router.get('/agent-templates', authMiddleware, async (req: Request, res: Respons
 });
 
 // GET /agent-templates/:id - Get template by ID (OpenAPI pattern)
-router.get('/agent-templates/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/agent-templates/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -97,7 +97,7 @@ router.get('/agent-templates/:id', authMiddleware, async (req: Request, res: Res
 });
 
 // POST /agent-templates/:templateId/agents - Create agent from template (OpenAPI pattern)
-router.post('/agent-templates/:templateId/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { templateId } = req.params;
     const { agentName, starshipId } = req.body;
@@ -233,7 +233,7 @@ router.post('/agent-templates/:templateId/agents', authMiddleware, async (req: R
 });
 
 // POST /agent-templates/from-agents/:agentId - Convert a public agent to a template (OpenAPI pattern)
-router.post('/agent-templates/from-agents/:agentId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     console.log('[TEMPLATE] Convert agent to template request received:', req.params);
     const { agentId } = req.params;

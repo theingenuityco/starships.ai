@@ -15,7 +15,7 @@ import type {
   MissionSort,
   SendMissionMessageRequest
 } from '@starships/protocol';
-import { authMiddleware } from '../middleware/auth';
+import { jwtAuthMiddleware } from '../middleware/jwt-auth';
 import type { StandardErrorCode } from '@starships/protocol';
 import {
   sendSuccess,
@@ -29,7 +29,7 @@ import {
 const router: Router = Router();
 
 // Apply authentication to all mission routes
-router.use(authMiddleware);
+router.use(jwtAuthMiddleware);
 
 /**
  * Safely extract error message from unknown error

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { jwtAuthMiddleware } from '../middleware/jwt-auth';
 import {
   sendSuccess,
   sendError,
@@ -12,7 +12,7 @@ import getStore from '../store';
 const router: Router = Router();
 
 // POST /memory/reset - Clear memory for agent and user (OpenAPI pattern)
-router.post('/memory/reset', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/memory/reset', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     const { agentId } = req.body;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Router as ExpressRouter } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { jwtAuthMiddleware } from '../middleware/jwt-auth';
 import { StarshipRepository, NativeToolApiKeyRepository } from '@starships/models';
 import type { StandardErrorCode } from '@starships/protocol';
 import {
@@ -15,7 +15,7 @@ const router: ExpressRouter = Router();
 /**
  * Get all native tool API keys for a starship
  */
-router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req, res) => {
+router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (req, res) => {
   try {
     const { starshipId } = req.params;
     const userId = req.user?.id;
@@ -67,7 +67,7 @@ router.get('/starships/:starshipId/native-api-keys', authMiddleware, async (req,
 /**
  * Save or update a native tool API key
  */
-router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req, res) => {
+router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (req, res) => {
   try {
     const { starshipId } = req.params;
     const { toolName, apiKey } = req.body;
@@ -122,7 +122,7 @@ router.post('/starships/:starshipId/native-api-keys', authMiddleware, async (req
 /**
  * Delete a native tool API key
  */
-router.delete('/starships/:starshipId/native-api-keys/:toolName', authMiddleware, async (req, res) => {
+router.delete('/starships/:starshipId/native-api-keys/:toolName', jwtAuthMiddleware, async (req, res) => {
   try {
     const { starshipId, toolName } = req.params;
     const userId = req.user?.id;

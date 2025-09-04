@@ -1,7 +1,6 @@
 {
   "name": "@starships/errors",
   "version": "1.0.0",
-  "type": "module",
   "description": "Comprehensive error handling system for Starships.ai",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

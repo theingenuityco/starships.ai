@@ -154,7 +154,7 @@ describe('SessionRepository', () => {
         messageCount: 0,
       });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (n:SessionModel)'),
+        expect.stringContaining('CREATE (n:Session)'),
         expect.objectContaining({
           props: expect.objectContaining({
             message_count: 0,

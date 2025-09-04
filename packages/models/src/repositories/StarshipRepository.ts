@@ -598,7 +598,7 @@ export class StarshipRepository extends BaseRepository {
 
     const connection = this.connection;
     const result = await connection.executeQuery<{ s: any }>(
-      `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:SessionModel)
+      `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
        RETURN s ORDER BY s.last_activity_at DESC`,
       { starshipId }
     );
@@ -618,7 +618,7 @@ export class StarshipRepository extends BaseRepository {
 
     const connection = this.connection;
     const result = await connection.executeQuery<{ count: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[:HAS_SESSION]->(session:SessionModel)
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_SESSION]->(session:Session)
        RETURN count(session) as count`,
       { starshipId }
     );
@@ -638,7 +638,7 @@ export class StarshipRepository extends BaseRepository {
 
     const connection = this.connection;
     const result = await connection.executeQuery<{ s: any }>(
-      `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:SessionModel)
+      `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
        WHERE s.status = 'active'
        RETURN s ORDER BY s.last_activity_at DESC`,
       { starshipId }
@@ -663,7 +663,7 @@ export class StarshipRepository extends BaseRepository {
 
     const connection = this.connection;
     const result = await connection.executeWrite<{ deletedCount: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[r:HAS_SESSION]->(session:SessionModel {id: $sessionId})
+      `MATCH (s:Starship {id: $starshipId})-[r:HAS_SESSION]->(session:Session {id: $sessionId})
        DELETE r
        RETURN count(r) as deletedCount`,
       { starshipId, sessionId }

@@ -16,18 +16,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
+      - name: Configure pnpm
         run: |
-          # Check if pnpm is already installed
-          if ! command -v pnpm &> /dev/null; then
-            echo "Installing pnpm..."
-            mkdir -p ~/.local/bin
-            curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o ~/.local/bin/pnpm
-            chmod +x ~/.local/bin/pnpm
-            export PATH="$HOME/.local/bin:$PATH"
-          fi
           pnpm --version
-          # Configure pnpm to use the official npm registry
           pnpm config set registry https://registry.npmjs.org
 
       - name: Setup Node.js

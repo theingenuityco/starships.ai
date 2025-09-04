@@ -9,11 +9,25 @@ module.exports = {
   // Simple workspace package resolution - one line handles all!
   moduleNameMapper: {
     '^@starships/(.+)$': '<rootDir>/../$1/src',
+    '^@/(.*)$': '<rootDir>/src/$1',
   },
   
   transformIgnorePatterns: [
     'node_modules/(?!(@starships)/)',
   ],
+  
+  // Configure ts-jest to handle TypeScript compilation with path mappings
+  globals: {
+    'ts-jest': {
+      isolatedModules: true,
+      tsconfig: {
+        paths: {
+          '@/*': ['src/*'],
+          '@starships/*': ['../*/src'],
+        },
+      },
+    },
+  },
   
   testTimeout: 10000,
   clearMocks: true,

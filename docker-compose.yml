@@ -57,7 +57,7 @@ services:
       STRIPE_PRICE_DRAUGHT_YEARLY: ${STRIPE_PRICE_DRAUGHT_YEARLY}
 
       # Analytics
-      NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
+      GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID}
 
     volumes:
       # Application data

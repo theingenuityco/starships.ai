@@ -68,7 +68,7 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 
 ### Analytics
 
-- `NEXT_PUBLIC_GA_MEASUREMENT_ID` (string, optional) - Google Analytics measurement ID
+- `GA_MEASUREMENT_ID` (string, optional) - Google Analytics measurement ID
 
 ## Development
 

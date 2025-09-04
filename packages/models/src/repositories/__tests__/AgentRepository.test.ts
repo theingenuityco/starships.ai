@@ -31,7 +31,6 @@ describe('AgentRepository', () => {
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     repository = new AgentRepository();
-
     // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });

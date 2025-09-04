@@ -182,7 +182,7 @@ describe('WorkflowRepository', () => {
         mockConnection.executeQuery.mockResolvedValue(mockWorkflows.map((w) => ({ w })));
 
         const result = await repository.findAll();
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC'
         );
@@ -338,9 +338,9 @@ describe('WorkflowRepository', () => {
         };
         const updates = { name: 'Updated Workflow' };
         mockConnection.executeWrite.mockResolvedValue([{ w: mockWorkflow }]);
-
+  
         const result = await repository.update('workflow-1', updates);
-
+  
         expect(mockConnection.executeWrite).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.id = $id SET w += $updates RETURN w',
           {
@@ -535,7 +535,7 @@ describe('WorkflowRepository', () => {
         mockConnection.executeQuery.mockResolvedValue(mockWorkflows.map((w) => ({ w })));
 
         const result = await repository.findUndeployedWorkflows();
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.starshipId IS NULL OR w.starshipId = "" RETURN w ORDER BY w.createdAt DESC',
           {}
@@ -561,7 +561,7 @@ describe('WorkflowRepository', () => {
         mockConnection.executeQuery.mockResolvedValue(mockWorkflows.map((w) => ({ w })));
 
         const result = await repository.findByAuthor('author-123');
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
           { authorId: 'author-123' }
@@ -585,7 +585,7 @@ describe('WorkflowRepository', () => {
         mockConnection.executeQuery.mockResolvedValue(mockWorkflows.map((w) => ({ w })));
 
         const result = await repository.findByCategory('automation');
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
           { category: 'automation' }
@@ -608,7 +608,7 @@ describe('WorkflowRepository', () => {
         mockConnection.executeQuery.mockResolvedValue(mockWorkflows.map((w) => ({ w })));
 
         const result = await repository.findByTags(['automation', 'test']);
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
           { tags: ['automation', 'test'] }
@@ -632,7 +632,7 @@ describe('WorkflowRepository', () => {
         mockConnection.executeQuery.mockResolvedValue(mockWorkflows.map((w) => ({ w })));
 
         const result = await repository.findPublic(10, 5);
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (w:Workflow) WHERE w.isPublic = true RETURN w ORDER BY w.usageCount DESC, w.rating DESC SKIP $offset LIMIT $limit',
           {
@@ -670,9 +670,9 @@ describe('WorkflowRepository', () => {
         mockConnection.executeQuery.mockResolvedValue(
           mockWorkflows.map((w) => ({ w, score: 0.95 }))
         );
-
+  
         const result = await repository.searchWorkflows('test query');
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'CALL db.index.fulltext.queryNodes("workflowSearch", $query) YIELD node as w, score RETURN w, score ORDER BY score DESC LIMIT 20',
           { query: 'test query' }
@@ -702,9 +702,9 @@ describe('WorkflowRepository', () => {
           tags: ['test'],
           starshipClass: 'scout' as const,
         };
-
+  
         const result = await repository.findWithFilters(filters);
-
+  
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           expect.stringContaining('WHERE 1=1'),
           expect.objectContaining({

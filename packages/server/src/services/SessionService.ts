@@ -12,7 +12,6 @@ export class SessionService {
   static async createSession(data: { metadata?: Record<string, unknown> }): Promise<SessionModel> {
     try {
       const sessionRepo = new SessionRepository();
-
       const session = await sessionRepo.create({
         lastActivityAt: new Date().toISOString(),
         messageCount: 0,

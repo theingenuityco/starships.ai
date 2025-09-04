@@ -302,7 +302,6 @@ export class StarshipRepository extends BaseRepository {
 
   async updateStatus(starshipId: string, status: StarshipModel['status']): Promise<boolean> {
     const connection = this.connection;
-
     // Database constraints will validate the status values
     const result = await connection.executeWrite<{ count: number }>(
       `MATCH (s:Starship) WHERE s.id = $starshipId
@@ -501,7 +500,6 @@ export class StarshipRepository extends BaseRepository {
   /** Clean up abandoned pending starships */
   async cleanupAbandonedStarship(starshipId: string): Promise<void> {
     const connection = this.connection;
-
     // Delete the starship
     await connection.executeWrite(
       `MATCH (s:Starship {id: $starshipId})

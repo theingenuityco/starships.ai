@@ -89,7 +89,6 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     try {
       const repoStart = Date.now();
       const starshipRepo = new StarshipRepository();
-
       // Test basic repository functionality
       await starshipRepo.findAll();
 

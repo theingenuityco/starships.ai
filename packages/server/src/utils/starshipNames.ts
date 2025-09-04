@@ -15,7 +15,6 @@ const STARSHIP_NAMES = [
   'Horizon',
   'Aurora',
   'Meridian',
-
   // Celestial Bodies
   'Andromeda',
   'Cassiopeia',
@@ -27,7 +26,6 @@ const STARSHIP_NAMES = [
   'Nebula',
   'Pulsar',
   'Quasar',
-
   // Mythological/Epic Names
   'Phoenix',
   'Titan',
@@ -39,7 +37,6 @@ const STARSHIP_NAMES = [
   'Excalibur',
   'Valkyrie',
   'Serenity',
-
   // Science/Tech Names
   'Quantum',
   'Vector',
@@ -51,7 +48,6 @@ const STARSHIP_NAMES = [
   'Synthesis',
   'Axiom',
   'Theorem',
-
   // Nature/Elements
   'Tempest',
   'Thunder',
@@ -63,7 +59,6 @@ const STARSHIP_NAMES = [
   'Solar',
   'Lunar',
   'Stellar',
-
   // Abstract Concepts
   'Infinity',
   'Eternity',
@@ -75,7 +70,6 @@ const STARSHIP_NAMES = [
   'Liberty',
   'Justice',
   'Triumph',
-
   // Sci-Fi Inspired
   'Stardust',
   'Starlight',
@@ -87,7 +81,6 @@ const STARSHIP_NAMES = [
   'Starhawk',
   'Starseeker',
   'Starwalker',
-
   // Direction/Motion
   'Ascendant',
   'Transcendent',
@@ -99,7 +92,6 @@ const STARSHIP_NAMES = [
   'Sovereign',
   'Supreme',
   'Ultimate',
-
   // Unique Names
   'Harbinger',
   'Sentinel',
@@ -111,7 +103,6 @@ const STARSHIP_NAMES = [
   'Fearless',
   'Relentless',
   'Unstoppable',
-
   // More Creative Names
   'Dreamcatcher',
   'Wishmaker',

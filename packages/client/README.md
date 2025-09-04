@@ -144,7 +144,6 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - **Persistence**: localStorage integration for UI preferences
 
 ### Starship Management
-
 - **Starship Selection**: Multi-starship support with status tracking via TanStack Query
 - **Real-time Data**: Automatic background refetching and cache invalidation
 - **Optimistic Updates**: Instant UI updates with rollback on errors

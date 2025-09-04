@@ -290,7 +290,6 @@ export class MissionService {
     recentMissions: MissionModel[];
   }> {
     const missionRepo = new MissionRepository();
-
     const allMissions = await missionRepo.getMissionModelsByStarshipId(starshipId);
     const missions = allMissions.missions;
 
@@ -373,7 +372,6 @@ export class MissionService {
    */
   static async getWorkflowByMissionId(missionId: string): Promise<any | null> {
     const missionRepo = new MissionRepository();
-
     // Verify mission exists first
     try {
       await missionRepo.getMissionById(missionId);

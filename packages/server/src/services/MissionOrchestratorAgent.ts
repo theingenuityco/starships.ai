@@ -660,7 +660,6 @@ export class MissionOrchestratorAgent {
       const stateWithClarity = { ...state, clarity: currentClarity || undefined };
       const clarityRequest = await this.assessMissionClarity(stateWithClarity, iteration);
       clarityRequest.missionId = state.missionId;
-
       const clarityRepo = new MissionClarityRepository();
       const updatedClarity = await clarityRepo.upsertByMissionId(state.missionId, clarityRequest);
 

@@ -160,7 +160,6 @@ export class MessageService {
   }> {
     // Generate conversation ID using timestamp + random suffix for uniqueness
     const conversationId = `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
     console.log('💬 [MESSAGE-SERVICE] Starting conversation:', {
       conversationId,
       starshipId: context.starshipId,

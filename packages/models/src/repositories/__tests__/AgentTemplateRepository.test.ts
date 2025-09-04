@@ -206,7 +206,6 @@ describe('AgentTemplateRepository', () => {
     it('should create template successfully', async () => {
       const createInput = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
-
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
@@ -248,7 +247,6 @@ describe('AgentTemplateRepository', () => {
         description: 'Basic template',
       };
       const mockCreatedRaw = createMockRawTemplate(minimalInput);
-
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
@@ -261,7 +259,6 @@ describe('AgentTemplateRepository', () => {
     it('should serialize complex objects', async () => {
       const inputWithComplexObjects = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
-
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 

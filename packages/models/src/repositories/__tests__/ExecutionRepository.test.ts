@@ -35,7 +35,6 @@ describe('ExecutionRepository', () => {
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     repository = new ExecutionRepository();
-
     // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });

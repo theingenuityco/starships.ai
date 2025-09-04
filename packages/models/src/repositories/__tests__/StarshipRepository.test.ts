@@ -28,7 +28,6 @@ describe('StarshipRepository', () => {
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     repository = new StarshipRepository();
-
     // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });

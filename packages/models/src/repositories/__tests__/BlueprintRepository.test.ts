@@ -30,13 +30,15 @@ describe('BlueprintRepository', () => {
   beforeEach(() => {
     // Clear all mocks before each test
     jest.clearAllMocks();
-
     // Set up mock connection BEFORE creating repository
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    
+    // Now create repository which will use the mocked connection
+    repository = new BlueprintRepository();
 
     // Now create repository which will use the mocked connection
     repository = new BlueprintRepository();

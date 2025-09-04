@@ -192,7 +192,6 @@ export class ErrorContextUtils {
     if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
       return `req_${globalThis.crypto.randomUUID()}`;
     }
-
     // Fallback for environments without crypto.randomUUID
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
@@ -211,12 +210,10 @@ export class ErrorContextUtils {
     const enhanced = new Error(error.message);
     enhanced.name = error.name;
     enhanced.stack = options?.preserveStack ? error.stack : enhanced.stack;
-
     // Add original error as cause if supported (modern Error API)
     if ('cause' in Error.prototype || 'cause' in enhanced) {
       (enhanced as any).cause = error;
     }
-
     // Add context as non-enumerable property
     Object.defineProperty(enhanced, 'context', {
       value: context,

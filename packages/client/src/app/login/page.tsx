@@ -12,7 +12,7 @@ export default function LoginPage() {
   const router = useRouter()
   const { isAuthenticated, isLoading } = useAuth()
 
-  // Redirect is handled by useJwtAuth hook - no need for additional redirect logic here
+  // Redirect is handled by useAuth hook - no need for additional redirect logic here
 
   // Show loading state while checking authentication
   if (isLoading) {

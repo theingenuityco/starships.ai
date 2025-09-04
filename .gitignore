@@ -73,3 +73,11 @@ terraform.tfvars
 # GitHub Runner configuration
 .env.github-runner
 github-app-config.env
+
+# Lambda build artifacts
+github-runners/lambda/lambda_function.zip
+github-runners/lambda/package/
+github-runners/lambda/layer.zip
+github-runners/lambda/python/
+github-runners/terraform/lambda_function.zip
+github-runners/terraform/layer.zip

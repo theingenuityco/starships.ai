@@ -103,15 +103,15 @@ jobs:
     environment: ci
     env:
       # Core Configuration
-      NODE_ENV: ${{ env.NODE_ENV }}
-      SERVER_PORT: ${{ env.SERVER_PORT }}
-      CLIENT_PORT: ${{ env.CLIENT_PORT }}
-      LOG_LEVEL: ${{ env.LOG_LEVEL }}
+      NODE_ENV: ${{ vars.NODE_ENV }}
+      SERVER_PORT: ${{ vars.SERVER_PORT }}
+      CLIENT_PORT: ${{ vars.CLIENT_PORT }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
 
       # URLs
-      PUBLIC_URL: ${{ env.PUBLIC_URL }}
-      CLIENT_URL: ${{ env.CLIENT_URL }}
-      SERVER_URL: ${{ env.SERVER_URL }}
+      PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+      CLIENT_URL: ${{ vars.CLIENT_URL }}
+      SERVER_URL: ${{ vars.SERVER_URL }}
 
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -123,8 +123,8 @@ jobs:
       NEO4J_DATABASE: ${{ secrets.NEO4J_DATABASE }}
 
       # LLM Providers (optional for build)
-      DEFAULT_LLM_PROVIDER: ${{ env.DEFAULT_LLM_PROVIDER }}
-      DEFAULT_CHAT_MODEL: ${{ env.DEFAULT_CHAT_MODEL }}
+      DEFAULT_LLM_PROVIDER: ${{ vars.DEFAULT_LLM_PROVIDER }}
+      DEFAULT_CHAT_MODEL: ${{ vars.DEFAULT_CHAT_MODEL }}
 
       # Stripe Configuration
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
@@ -132,7 +132,7 @@ jobs:
       STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
 
       # Analytics (optional for CI)
-      GA_MEASUREMENT_ID: ${{ env.GA_MEASUREMENT_ID }}
+      GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

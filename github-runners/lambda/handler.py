@@ -37,10 +37,14 @@ def lambda_handler(event, context):
         return {'statusCode': 400, 'body': json.dumps('Invalid JSON')}
     
     # Process workflow_job events
-    if event['headers'].get('x-github-event', '') != 'workflow_job':
+    github_event = event['headers'].get('x-github-event', '')
+    print(f"GitHub event type: {github_event}")
+    
+    if github_event != 'workflow_job':
         return {'statusCode': 200, 'body': json.dumps('Not a workflow_job event')}
     
     action = body.get('action')
+    print(f"Workflow job action: {action}")
     
     if action == 'queued':
         return handle_job_queued(body)
@@ -138,7 +142,10 @@ def handle_job_queued(body):
     
     # Check if job requires self-hosted runner
     labels = workflow_job.get('labels', [])
+    print(f"Job labels: {labels}")
+    
     if 'self-hosted' not in labels:
+        print("Not a self-hosted job, skipping")
         return {'statusCode': 200, 'body': json.dumps('Not a self-hosted job')}
     
     repo_url = repository.get('html_url')

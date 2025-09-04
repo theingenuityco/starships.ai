@@ -17,7 +17,6 @@ router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
       sendError(res, error.code, error.message, 400, error.details);
       return;
     }
-
     const user = await UserService.getUserById(id);
 
     if (!user) {

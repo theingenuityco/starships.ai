@@ -69,7 +69,6 @@ export default function StarshipSessionPage() {
           onSessionSelect={setCurrentSessionId}
         />
       </div>
-
       {/* Main Session Interface */}
       <div className="flex-1 min-w-0">
         <SessionInterface

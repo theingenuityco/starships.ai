@@ -67,7 +67,6 @@ export function SessionMessageInput({
 
     try {
       setSending(true)
-
       // Create session if one doesn't exist
       let currentSessionId = sessionId
       if (!currentSessionId) {
@@ -148,7 +147,6 @@ export function SessionMessageInput({
 
     try {
       setSending(true)
-
       // Create session if one doesn't exist
       let currentSessionId = sessionId
       if (!currentSessionId) {

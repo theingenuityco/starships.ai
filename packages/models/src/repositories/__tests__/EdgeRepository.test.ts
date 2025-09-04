@@ -28,7 +28,6 @@ describe('EdgeRepository', () => {
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     repository = new EdgeRepository();
-
     // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });
@@ -49,13 +48,11 @@ describe('EdgeRepository', () => {
     it('should create edge successfully', async () => {
       const blueprintId = 'blueprint-123';
       const mockEdgeId = 'edge-456';
-
       // Mock blueprint exists
       mockConnection.executeQuery
         .mockResolvedValueOnce([{ id: blueprintId }]) // Blueprint check
         .mockResolvedValueOnce([{ fromId: 'node-1', toId: 'node-2' }]) // Nodes check
         .mockResolvedValueOnce([{ edgeId: mockEdgeId, ref: 'test-edge' }]); // Edge ID retrieval
-
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.createEdge(blueprintId, validEdgeData);
@@ -168,7 +165,6 @@ describe('EdgeRepository', () => {
         .mockResolvedValueOnce([{ edgeId: 'edge-1', ref: 'start-process' }]) // First edge ID retrieval
         .mockResolvedValueOnce([{ fromId: 'node-2', toId: 'node-3' }]) // Second edge nodes check
         .mockResolvedValueOnce([{ edgeId: 'edge-2', ref: 'process-end' }]); // Second edge ID retrieval
-
       mockConnection.executeWrite.mockResolvedValue([]);
 
       const result = await repository.createEdges(blueprintId, validEdgesData, idMapping);

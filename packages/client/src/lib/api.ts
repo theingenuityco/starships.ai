@@ -295,6 +295,7 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   }
 }
 
+
 // API functions with caching
 export const agentAPI = {
   getAll: async (): Promise<Agent[]> => {

@@ -76,7 +76,6 @@ describe('MissionClarityRepository', () => {
     it('should create new mission clarity successfully', async () => {
       const request = createMockClarityRequest();
       const mockCreated = createMockClarity();
-
       // Mock mission existence check
       mockConnection.executeQuery.mockResolvedValueOnce([{ id: 'mission-123' }]);
       // Mock getByMissionId returning null (no existing clarity)
@@ -103,7 +102,6 @@ describe('MissionClarityRepository', () => {
         scopeBoundaries: 4,
       });
       const mockCreated = createMockClarity({ overallScore: 7 });
-
       // Mock mission existence check
       mockConnection.executeQuery.mockResolvedValueOnce([{ id: 'mission-123' }]);
       // Mock getByMissionId returning null (no existing clarity)
@@ -560,7 +558,6 @@ describe('MissionClarityRepository', () => {
         scopeBoundaries: 10,
       });
       const mockCreated = createMockClarity({ overallScore: 5 });
-
       // Mock mission existence check
       mockConnection.executeQuery.mockResolvedValueOnce([{ id: 'mission-123' }]);
       // Mock getByMissionId returning null (no existing clarity)
@@ -579,7 +576,6 @@ describe('MissionClarityRepository', () => {
       const longReasoning = 'Very detailed reasoning: ' + 'x'.repeat(1000);
       const request = createMockClarityRequest({ reasoning: longReasoning });
       const mockCreated = createMockClarity({ reasoning: longReasoning });
-
       // Mock mission existence check
       mockConnection.executeQuery.mockResolvedValueOnce([{ id: 'mission-123' }]);
       // Mock getByMissionId returning null (no existing clarity)

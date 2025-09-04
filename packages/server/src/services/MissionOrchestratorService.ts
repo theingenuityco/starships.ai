@@ -170,7 +170,6 @@ export class MissionOrchestratorService {
     try {
       const missionRepo = new MissionRepository();
       const missionMessageRepo = new MissionMessageRepository();
-
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
 
@@ -211,7 +210,6 @@ export class MissionOrchestratorService {
     try {
       const missionRepo = new MissionRepository();
       const missionMessageRepo = new MissionMessageRepository();
-
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
 
@@ -249,7 +247,6 @@ export class MissionOrchestratorService {
     try {
       const missionRepo = new MissionRepository();
       const missionMessageRepo = new MissionMessageRepository();
-
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
 
@@ -292,7 +289,6 @@ export class MissionOrchestratorService {
     try {
       const missionRepo = new MissionRepository();
       const missionMessageRepo = new MissionMessageRepository();
-
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
 

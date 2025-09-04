@@ -384,7 +384,6 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
         });
         return;
       }
-
       if (starship.ownerId !== userId) {
         sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
         return;

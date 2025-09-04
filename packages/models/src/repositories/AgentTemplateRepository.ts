@@ -465,7 +465,6 @@ export class AgentTemplateRepository extends BaseRepository {
 
     // Create agent with auto-generated ID
     const rawAgent = await this.createEntityWithAutoId<any>('Agent', agentData, this.connection);
-
     // Create relationship with starship
     try {
       await this.connection.executeWrite(
@@ -476,7 +475,6 @@ export class AgentTemplateRepository extends BaseRepository {
     } catch (error) {
       console.warn('Failed to create Agent-Starship relationship:', error);
     }
-
     // Deserialize for return (assuming Agent has similar structure)
     const createdAgent = {
       ...convertNeo4jIntsInObject(rawAgent),

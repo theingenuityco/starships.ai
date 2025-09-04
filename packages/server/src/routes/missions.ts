@@ -364,7 +364,6 @@ router.post('/missions/:id/messages', async (req: Request, res: Response): Promi
       const errorCode = (error as any).code;
       let statusCode = 500;
       let mappedErrorCode: StandardErrorCode = 'INTERNAL_SERVER_ERROR';
-
       // Map error codes to appropriate HTTP status codes
       if (errorCode === 'MISSION_MESSAGE_INVALID') {
         statusCode = 400;

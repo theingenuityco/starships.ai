@@ -491,7 +491,6 @@ describe('MissionMessageRepository', () => {
       });
 
       mockConnection.executeQuery.mockResolvedValue([{ id: missionId }]);
-
       // Mock createEntityWithAutoId format for each message save
       mockConnection.executeWrite
         .mockResolvedValueOnce([{ n: createMockMessage({ role: 'user' }) }]) // user message creation
@@ -642,7 +641,6 @@ describe('MissionMessageRepository', () => {
 
       // Mock all database operations to handle concurrent calls
       mockConnection.executeQuery.mockResolvedValue([{ id: missionId }]); // Always return mission exists
-
       // Mock createEntityWithAutoId format for all concurrent operations
       // Each message needs: createEntityWithAutoId + user relationship + mission relationship = 3 calls each
       mockConnection.executeWrite.mockResolvedValue([{ n: createMockMessage() }]); // Always return success

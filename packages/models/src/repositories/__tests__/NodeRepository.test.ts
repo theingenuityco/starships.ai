@@ -23,14 +23,12 @@ describe('NodeRepository', () => {
   beforeEach(() => {
     // Clear all mocks to ensure clean state
     jest.clearAllMocks();
-
     // Create fresh mock connection for each test BEFORE creating repository
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
-
     // Now create repository which will use the mocked connection
     repository = new NodeRepository();
   });
@@ -1048,7 +1046,6 @@ describe('NodeRepository', () => {
       // Mock delete all nodes - blueprint check + delete
       mockConnection.executeQuery.mockResolvedValue([{ id: blueprintId }]);
       mockConnection.executeWrite.mockResolvedValue([]);
-
       await repository.deleteNodesByBlueprintId(blueprintId);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledTimes(7); // 6 for creates (3 nodes + 3 relationships) + 1 bulk delete

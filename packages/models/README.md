@@ -49,7 +49,6 @@ const starships = await starshipRepo.findAll();
 - **Missions**: Task execution contexts with phases and messaging
 
 ### Direct Repository Usage
-
 Direct repository instantiation for clean and simple data access:
 
 ```typescript

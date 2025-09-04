@@ -16,7 +16,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { StarshipSelector } from './StarshipSelector'
+import { StarshipSelector } from '@/components/agents/StarshipSelector'
 import {
   X,
   Plus,

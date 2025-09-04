@@ -10,7 +10,7 @@ import { generateId } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateSession } from '@/hooks/useSessions'
 import type { Agent } from '@/lib/api'
-import type { ChatMode } from './ChatModeSelector'
+import type { ChatMode } from '@/components/session/ChatModeSelector'
 import type { Message } from '@/lib/agent-socket-api'
 
 interface SessionMessageInputProps {

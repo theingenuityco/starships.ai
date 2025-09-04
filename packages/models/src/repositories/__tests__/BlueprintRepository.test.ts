@@ -2,9 +2,9 @@
  * BlueprintRepository Unit Tests
  */
 
-import { BlueprintRepository } from '../BlueprintRepository';
-import { NodeRepository } from '../NodeRepository';
-import { EdgeRepository } from '../EdgeRepository';
+import { BlueprintRepository } from '@/repositories/BlueprintRepository';
+import { NodeRepository } from '@/repositories/NodeRepository';
+import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 
@@ -19,7 +19,7 @@ jest.mock('../../helpers/database', () => ({
 jest.mock('../NodeRepository');
 jest.mock('../EdgeRepository');
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('BlueprintRepository', () => {
   let repository: BlueprintRepository;

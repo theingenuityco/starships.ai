@@ -2,7 +2,7 @@
  * ExecutionRepository Unit Tests
  */
 
-import { ExecutionRepository } from '../ExecutionRepository';
+import { ExecutionRepository } from '@/repositories/ExecutionRepository';
 import type {
   ExecutionModel,
   CreateExecutionRequest,
@@ -21,7 +21,7 @@ jest.mock('../../helpers/database', () => ({
   convertNeo4jIntsInObject: jest.fn((obj) => obj),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('ExecutionRepository', () => {
   let repository: ExecutionRepository;

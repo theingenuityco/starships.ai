@@ -2,8 +2,8 @@
  * AgentRepository Unit Tests
  */
 
-import { AgentRepository } from '../AgentRepository';
-import { getConnection } from '../../helpers/database';
+import { AgentRepository } from '@/repositories/AgentRepository';
+import { getConnection } from '@/helpers/database';
 import { ValidationError, NotFoundError, DatabaseError, ConflictError } from '@starships/errors';
 import type { AgentModel } from '@starships/protocol';
 

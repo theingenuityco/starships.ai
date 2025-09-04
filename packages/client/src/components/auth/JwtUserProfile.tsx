@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAuth } from '@/hooks/useAuth'
 import { User } from 'lucide-react'
 import React, { useState } from 'react'
-import { JwtLogoutButton } from './JwtLogoutButton'
+import { JwtLogoutButton } from '@/components/auth/JwtLogoutButton'
 
 interface JwtUserProfileProps {
   mode?: 'collapsed' | 'expanded'

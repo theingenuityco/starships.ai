@@ -2,7 +2,7 @@
  * UserRepository Unit Tests
  */
 
-import { UserRepository } from '../UserRepository';
+import { UserRepository } from '@/repositories/UserRepository';
 import { ValidationError, NotFoundError } from '@starships/errors';
 import { UserModel } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('UserRepository', () => {
   let repository: UserRepository;

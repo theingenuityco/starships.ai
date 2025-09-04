@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { MCPServerConnector, MCPServerOption } from '@/lib/api'
-import { ConnectorStatusDashboard } from './ConnectorStatusDashboard'
-import { ConnectorInstanceMonitor } from './ConnectorInstanceMonitor'
-import { ConnectorPerformanceMetrics } from './ConnectorPerformanceMetrics'
+import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
+import { ConnectorInstanceMonitor } from '@/components/crew/ConnectorInstanceMonitor'
+import { ConnectorPerformanceMetrics } from '@/components/crew/ConnectorPerformanceMetrics'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'

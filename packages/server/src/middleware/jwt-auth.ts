@@ -6,9 +6,9 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { jwtVerify } from 'jose';
-import { UserService } from '../services/UserService';
+import { UserService } from '@/services/UserService';
 import { getEnvConfig } from '@starships/env';
-import { sendError } from '../utils/responseHelpers';
+import { sendError } from '@/utils/responseHelpers';
 
 const env = getEnvConfig();
 

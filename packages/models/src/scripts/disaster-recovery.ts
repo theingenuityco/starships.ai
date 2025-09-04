@@ -1,5 +1,5 @@
-import { BackupManager } from './backup-restore';
-import { getConnection } from '../helpers/database';
+import { BackupManager } from '@/scripts/backup-restore';
+import { getConnection } from '@/helpers/database';
 import * as fs from 'fs';
 import * as path from 'path';
 

@@ -1,7 +1,7 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 import type { WorkflowModel } from '@starships/protocol';
-import { BaseRepository } from './BaseRepository';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 import { Blueprint } from '@starships/autopilot';
 
 /**

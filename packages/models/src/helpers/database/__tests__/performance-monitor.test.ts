@@ -2,8 +2,8 @@
  * PerformanceMonitor Unit Tests
  */
 
-import { performanceMonitor } from '../performance-monitor';
-import type { QueryMetrics } from '../performance-monitor';
+import { performanceMonitor } from '@/helpers/database/performance-monitor';
+import type { QueryMetrics } from '@/helpers/database/performance-monitor';
 
 describe('PerformanceMonitor', () => {
   beforeEach(() => {

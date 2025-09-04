@@ -9,8 +9,8 @@ import {
   AgentRepository,
   MissionClarityRepository,
 } from '@starships/models';
-import { MissionOrchestratorService } from './MissionOrchestratorService';
-import { MissionEventService } from './MissionEventService';
+import { MissionOrchestratorService } from '@/services/MissionOrchestratorService';
+import { MissionEventService } from '@/services/MissionEventService';
 import type {
   MissionModel,
   CreateMissionRequest,

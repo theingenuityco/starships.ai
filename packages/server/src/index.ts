@@ -7,7 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
-import { initializeSocketIO } from './socket';
+import { initializeSocketIO } from '@/socket';
 import {
   AgentRepository,
   UserRepository,
@@ -20,23 +20,23 @@ import { migrationRunner, seedWaitlist } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 
 // Route imports
-import authRoutes from './routes/auth';
-import agentRoutes from './routes/agents';
-import sessionRoutes from './routes/sessions';
-import memoryRoutes from './routes/memory';
-import userRoutes from './routes/users';
-import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
-import agentTemplateRoutes from './routes/agent-templates';
-// import expeditionRoutes from './routes/expeditions';
-import missionRoutes from './routes/missions';
-import nativeApiKeysRoutes from './routes/native-api-keys';
-import waitlistRoutes from './routes/waitlist';
-import { AgentTemplateService } from './services/AgentTemplateService';
-import webhookRoutes, { initializeWebhookRoutes } from './routes/webhooks';
+import authRoutes from '@/routes/auth';
+import agentRoutes from '@/routes/agents';
+import sessionRoutes from '@/routes/sessions';
+import memoryRoutes from '@/routes/memory';
+import userRoutes from '@/routes/users';
+import starshipRoutes, { initializeStarshipRoutes } from '@/routes/starships';
+import agentTemplateRoutes from '@/routes/agent-templates';
+// import expeditionRoutes from '@/routes/expeditions';
+import missionRoutes from '@/routes/missions';
+import nativeApiKeysRoutes from '@/routes/native-api-keys';
+import waitlistRoutes from '@/routes/waitlist';
+import { AgentTemplateService } from '@/services/AgentTemplateService';
+import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
 
 // Import new error handling and health check routes
-import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware/errorHandler';
-import healthRoutes from './routes/health';
+import { requestIdMiddleware, errorHandler, notFoundHandler } from '@/middleware/errorHandler';
+import healthRoutes from '@/routes/health';
 
 // Load server configuration
 const config = getEnvConfig();

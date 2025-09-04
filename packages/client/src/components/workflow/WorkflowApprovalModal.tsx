@@ -24,7 +24,7 @@ import {
   Eye,
   MessageSquare,
 } from 'lucide-react'
-import { WorkflowVisualization } from './WorkflowVisualization'
+import { WorkflowVisualization } from '@/components/workflow/WorkflowVisualization'
 import type { WorkflowModel } from '@starships/protocol'
 
 // Client-side workflow type for compatibility

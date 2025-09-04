@@ -1,7 +1,7 @@
 import type { AgentModel } from '@starships/protocol';
 import { StarshipModel } from '@starships/protocol';
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 
 export class StarshipRepository extends BaseRepository {
   private connection: Neo4jConnection;

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { migrationRunner } from './migration-runner';
-import { schemaValidator } from './schema-validator';
-import { performanceMonitor } from './performance-monitor';
+import { migrationRunner } from '@/scripts/migration-runner';
+import { schemaValidator } from '@/scripts/schema-validator';
+import { performanceMonitor } from '@/scripts/performance-monitor';
 
 /**
  * Database CLI Tool

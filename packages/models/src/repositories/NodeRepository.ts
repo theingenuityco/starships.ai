@@ -1,5 +1,5 @@
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import type { NodeModel } from '@starships/protocol';
 
 export class NodeRepository extends BaseRepository {

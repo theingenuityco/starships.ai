@@ -1,5 +1,5 @@
-import { generateId } from './utils'
-import SocketClient from './socket-client'
+import { generateId } from '@/lib/utils'
+import SocketClient from '@/lib/socket-client'
 import type {
   SessionRequest,
   SessionStreamChunk,

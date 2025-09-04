@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { Users, Command, Target, MessageSquare } from 'lucide-react'
 import { UserProfile } from '@/components/auth/UserProfile'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { NavigationSection } from './NavigationSection'
+import { NavigationSection } from '@/components/navigation/NavigationSection'
 
 interface NavigationProps {
   mode?: 'sidebar' | 'module'

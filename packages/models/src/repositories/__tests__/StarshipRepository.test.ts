@@ -2,7 +2,7 @@
  * StarshipRepository Unit Tests
  */
 
-import { StarshipRepository } from '../StarshipRepository';
+import { StarshipRepository } from '@/repositories/StarshipRepository';
 import { ValidationError, NotFoundError } from '@starships/errors';
 import { StarshipModel } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('StarshipRepository', () => {
   let repository: StarshipRepository;

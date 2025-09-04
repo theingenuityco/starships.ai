@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { Message } from '@/lib/agent-socket-api'
-import { MessageBubble } from './MessageBubble'
+import { MessageBubble } from '@/components/session/MessageBubble'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { CHAT_TEXT, LOADING_TEXT } from '@/constants/text'

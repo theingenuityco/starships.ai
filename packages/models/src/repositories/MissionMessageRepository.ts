@@ -1,7 +1,7 @@
-import { getConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { getConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 import { MissionMessageModel, MissionMessageRole } from '@starships/protocol';
 
 export class MissionMessageRepository extends BaseRepository {

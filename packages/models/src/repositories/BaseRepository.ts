@@ -12,7 +12,7 @@ import {
   ErrorLayer,
 } from '@starships/errors';
 import type { RepositoryErrorContext } from '@starships/errors';
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 /**
  * Base repository with standardized error handling and validation

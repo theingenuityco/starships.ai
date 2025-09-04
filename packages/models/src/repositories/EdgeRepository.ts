@@ -1,5 +1,5 @@
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import type { EdgeModel } from '@starships/protocol';
 
 export class EdgeRepository extends BaseRepository {

@@ -1,4 +1,4 @@
-import { ApiKeyRequirement, ApiKeyValidationResult } from '../types/connector-api-keys'
+import { ApiKeyRequirement, ApiKeyValidationResult } from '@/types/connector-api-keys'
 
 export type ServiceType = 'openai' | 'anthropic' | 'google' | 'azure' | 'aws' | 'generic'
 

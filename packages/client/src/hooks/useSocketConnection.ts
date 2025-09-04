@@ -5,7 +5,7 @@ import type {
   SocketConnectionState,
 } from '@starships/protocol'
 import { useCallback, useEffect, useState } from 'react'
-import { useAuth } from './useAuth'
+import { useAuth } from '@/hooks/useAuth'
 
 interface UseSocketConnectionReturn {
   isConnected: boolean

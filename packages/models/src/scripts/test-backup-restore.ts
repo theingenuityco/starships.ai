@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { createConnection } from '../helpers/database';
-import { BackupManager } from './backup-restore';
-import { DisasterRecoveryManager, DisasterScenario } from './disaster-recovery';
+import { createConnection } from '@/helpers/database';
+import { BackupManager } from '@/scripts/backup-restore';
+import { DisasterRecoveryManager, DisasterScenario } from '@/scripts/disaster-recovery';
 import * as fs from 'fs';
 
 /**

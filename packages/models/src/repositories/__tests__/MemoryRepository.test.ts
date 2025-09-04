@@ -2,8 +2,8 @@
  * MemoryRepository Unit Tests
  */
 
-import { MemoryRepository } from '../MemoryRepository';
-import { Neo4jConnection, getConnection } from '../../helpers/database';
+import { MemoryRepository } from '@/repositories/MemoryRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { DatabaseError, ConflictError } from '@starships/errors';
 import type { MemoryModel } from '@starships/protocol';
 

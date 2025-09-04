@@ -10,9 +10,9 @@ rm -rf package lambda_function.zip
 # Create package directory
 mkdir -p package
 
-# Install dependencies
+# Install dependencies (skip binary wheels for cryptography issues)
 echo "📦 Installing Python dependencies..."
-pip install --target ./package --platform manylinux2014_x86_64 --only-binary :all: -r requirements.txt --quiet
+pip install --target ./package -r requirements.txt --quiet
 
 # Copy Lambda function files
 echo "📄 Copying Lambda functions..."

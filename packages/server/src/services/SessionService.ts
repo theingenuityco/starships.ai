@@ -1,5 +1,5 @@
 import { SessionRepository } from '@starships/models';
-import { SessionModel, SessionSourceType } from '@starships/protocol';
+import { SessionModel } from '@starships/protocol';
 
 /**
  * Service for managing chat sessions
@@ -9,21 +9,11 @@ export class SessionService {
   /**
    * Create a new session
    */
-  static async createSession(data: {
-    source: SessionSourceType;
-    userId: string;
-    agentId?: string;
-    starshipId?: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<SessionModel> {
+  static async createSession(data: { metadata?: Record<string, unknown> }): Promise<SessionModel> {
     try {
       const sessionRepo = new SessionRepository();
 
       const session = await sessionRepo.create({
-        source: data.source,
-        userId: data.userId,
-        agentId: data.agentId,
-        starshipId: data.starshipId,
         lastActivityAt: new Date().toISOString(),
         messageCount: 0,
         totalTokens: 0,
@@ -31,7 +21,7 @@ export class SessionService {
         metadata: data.metadata,
       });
 
-      console.log(`[SESSION-SERVICE] Created new session: ${session.id} for user: ${data.userId}`);
+      console.log(`[SESSION-SERVICE] Created new session: ${session.id}`);
       return session;
     } catch (error) {
       console.error('[SESSION-SERVICE] Failed to create session:', error);
@@ -50,58 +40,6 @@ export class SessionService {
     } catch (error) {
       console.error(`[SESSION-SERVICE] Failed to get session ${id}:`, error);
       throw new Error(`Failed to get session: ${error}`);
-    }
-  }
-
-  /**
-   * Get sessions for a user
-   */
-  static async getUserSessions(userId: string): Promise<SessionModel[]> {
-    try {
-      const sessionRepo = new SessionRepository();
-      return await sessionRepo.findByUserId(userId);
-    } catch (error) {
-      console.error(`[SESSION-SERVICE] Failed to get sessions for user ${userId}:`, error);
-      throw new Error(`Failed to get user sessions: ${error}`);
-    }
-  }
-
-  /**
-   * Get active sessions for a user
-   */
-  static async getActiveUserSessions(userId: string): Promise<SessionModel[]> {
-    try {
-      const sessionRepo = new SessionRepository();
-      return await sessionRepo.findActiveByUser(userId);
-    } catch (error) {
-      console.error(`[SESSION-SERVICE] Failed to get active sessions for user ${userId}:`, error);
-      throw new Error(`Failed to get active user sessions: ${error}`);
-    }
-  }
-
-  /**
-   * Get sessions for a starship
-   */
-  static async getStarshipSessions(starshipId: string): Promise<SessionModel[]> {
-    try {
-      const sessionRepo = new SessionRepository();
-      return await sessionRepo.findByStarshipId(starshipId);
-    } catch (error) {
-      console.error(`[SESSION-SERVICE] Failed to get sessions for starship ${starshipId}:`, error);
-      throw new Error(`Failed to get starship sessions: ${error}`);
-    }
-  }
-
-  /**
-   * Get sessions for an agent
-   */
-  static async getAgentSessions(agentId: string): Promise<SessionModel[]> {
-    try {
-      const sessionRepo = new SessionRepository();
-      return await sessionRepo.findByAgentId(agentId);
-    } catch (error) {
-      console.error(`[SESSION-SERVICE] Failed to get sessions for agent ${agentId}:`, error);
-      throw new Error(`Failed to get agent sessions: ${error}`);
     }
   }
 

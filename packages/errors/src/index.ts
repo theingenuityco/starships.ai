@@ -92,16 +92,18 @@ export abstract class BaseError extends Error {
       path: this.path,
       details: this.details,
       stack: this.stack,
-      context: this.context ? {
-        layer: this.context.layer,
-        component: this.context.component,
-        operation: this.context.operation,
-        resource: this.context.resource,
-        resourceId: this.context.resourceId,
-        userId: this.context.userId,
-        timestamp: this.context.timestamp.toISOString(),
-        metadata: this.context.metadata
-      } : undefined,
+      context: this.context
+        ? {
+            layer: this.context.layer,
+            component: this.context.component,
+            operation: this.context.operation,
+            resource: this.context.resource,
+            resourceId: this.context.resourceId,
+            userId: this.context.userId,
+            timestamp: this.context.timestamp.toISOString(),
+            metadata: this.context.metadata,
+          }
+        : undefined,
     };
   }
 }
@@ -120,7 +122,16 @@ export class ValidationError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(message, 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION, details, requestId, path, context);
+    super(
+      message,
+      'VALIDATION_ERROR',
+      400,
+      ErrorCategory.VALIDATION,
+      details,
+      requestId,
+      path,
+      context
+    );
     this.field = field;
   }
 
@@ -148,7 +159,16 @@ export class NotFoundError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(message, 'RESOURCE_NOT_FOUND', 404, ErrorCategory.NOT_FOUND, details, requestId, path, context);
+    super(
+      message,
+      'RESOURCE_NOT_FOUND',
+      404,
+      ErrorCategory.NOT_FOUND,
+      details,
+      requestId,
+      path,
+      context
+    );
     this.entityType = entityType;
     this.entityId = entityId;
   }
@@ -242,7 +262,16 @@ export class ConflictError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(message, 'RESOURCE_CONFLICT', 409, ErrorCategory.CONFLICT, details, requestId, path, context);
+    super(
+      message,
+      'RESOURCE_CONFLICT',
+      409,
+      ErrorCategory.CONFLICT,
+      details,
+      requestId,
+      path,
+      context
+    );
     this.conflictType = conflictType;
   }
 
@@ -273,7 +302,16 @@ export class DatabaseError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(message, 'DATABASE_ERROR', 500, ErrorCategory.DATABASE, details, requestId, path, context);
+    super(
+      message,
+      'DATABASE_ERROR',
+      500,
+      ErrorCategory.DATABASE,
+      details,
+      requestId,
+      path,
+      context
+    );
     this.operation = operation;
     this.query = query;
   }
@@ -335,7 +373,16 @@ export class InternalServerError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path, context);
+    super(
+      message,
+      'INTERNAL_SERVER_ERROR',
+      500,
+      ErrorCategory.INTERNAL,
+      details,
+      requestId,
+      path,
+      context
+    );
   }
 }
 
@@ -521,7 +568,11 @@ export class ErrorUtils {
     }
 
     // Handle network/HTTP errors
-    if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' || error?.code === 'ETIMEDOUT') {
+    if (
+      error?.code === 'ECONNREFUSED' ||
+      error?.code === 'ENOTFOUND' ||
+      error?.code === 'ETIMEDOUT'
+    ) {
       return new NetworkError(
         error.message || 'Network operation failed',
         'external_service',

@@ -1,4 +1,4 @@
-import neo4j, { Driver, Session, auth, ManagedTransaction, isInt, int } from 'neo4j-driver';
+import neo4j, { Driver, ManagedTransaction, Session, auth, int, isInt } from 'neo4j-driver';
 
 export interface Neo4jConfig {
   uri: string;
@@ -26,12 +26,13 @@ export class Neo4jConnection {
         this.config.uri,
         auth.basic(this.config.username, this.config.password),
         {
+          disableLosslessIntegers: true,
           connectionTimeout: 5000, // 5 second timeout
           maxConnectionLifetime: 30000, // 30 second max lifetime
           maxConnectionPoolSize: 100,
           connectionAcquisitionTimeout: 10000, // 10 second acquisition timeout
           encrypted: false, // Disable encryption for local development
-          trust: 'TRUST_ALL_CERTIFICATES' // Trust all certificates for local development
+          trust: 'TRUST_ALL_CERTIFICATES', // Trust all certificates for local development
         }
       );
 
@@ -78,7 +79,7 @@ export class Neo4jConnection {
     try {
       // Convert any Map objects to plain objects for Neo4j compatibility
       const sanitizedParameters = this.sanitizeParameters(parameters);
-      
+
       const result = await session.executeRead((tx: ManagedTransaction) =>
         tx.run(cypher, sanitizedParameters)
       );
@@ -109,7 +110,7 @@ export class Neo4jConnection {
     try {
       // Convert any Map objects to plain objects for Neo4j compatibility
       const sanitizedParameters = this.sanitizeParameters(parameters);
-      
+
       const result = await session.executeWrite((tx: ManagedTransaction) =>
         tx.run(cypher, sanitizedParameters)
       );
@@ -143,14 +144,13 @@ export class Neo4jConnection {
         'CREATE CONSTRAINT llm_id_unique IF NOT EXISTS FOR (l:LLM) REQUIRE l.id IS UNIQUE',
         'CREATE CONSTRAINT llm_name_unique IF NOT EXISTS FOR (l:LLM) REQUIRE l.name IS UNIQUE',
         'CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE',
-        'CREATE CONSTRAINT user_kinde_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.kindeId IS UNIQUE',
         'CREATE CONSTRAINT starship_id_unique IF NOT EXISTS FOR (s:Starship) REQUIRE s.id IS UNIQUE',
         'CREATE CONSTRAINT starship_slug_owner_unique IF NOT EXISTS FOR (s:Starship) REQUIRE (s.slug, s.ownerId) IS UNIQUE',
         'CREATE CONSTRAINT vision_id_unique IF NOT EXISTS FOR (v:Vision) REQUIRE v.id IS UNIQUE',
         // 'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',
         // 'CREATE CONSTRAINT concept_id_unique IF NOT EXISTS FOR (concept:Concept) REQUIRE concept.id IS UNIQUE',
         // 'CREATE CONSTRAINT meta_anchor_id_unique IF NOT EXISTS FOR (m:MetaAnchor) REQUIRE m.id IS UNIQUE',
-        
+
         // Mission system constraints
         'CREATE CONSTRAINT mission_id_unique IF NOT EXISTS FOR (m:Mission) REQUIRE m.id IS UNIQUE',
         'CREATE CONSTRAINT mission_clarity_id_unique IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE mc.id IS UNIQUE',
@@ -175,14 +175,13 @@ export class Neo4jConnection {
         // 'CREATE INDEX concept_category_index IF NOT EXISTS FOR (concept:Concept) ON (concept.category)',
         // 'CREATE INDEX meta_anchor_codex_index IF NOT EXISTS FOR (m:MetaAnchor) ON (m.codexId)',
         'CREATE INDEX vision_starship_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId)',
-        
-        
+
         // Mission system indexes
         'CREATE INDEX mission_starship_index IF NOT EXISTS FOR (m:Mission) ON (m.starshipId)',
         'CREATE INDEX mission_status_index IF NOT EXISTS FOR (m:Mission) ON (m.status)',
         'CREATE INDEX mission_phase_index IF NOT EXISTS FOR (m:Mission) ON (m.phase)',
         'CREATE INDEX mission_created_by_index IF NOT EXISTS FOR (m:Mission) ON (m.createdBy)',
-        
+
         'CREATE INDEX mission_clarity_mission_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.missionId)',
         'CREATE INDEX mission_clarity_score_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.overallScore)',
         'CREATE INDEX mission_clarity_iteration_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.iteration)',
@@ -203,7 +202,10 @@ export class Neo4jConnection {
   private sanitizeParameters(params: any, depth: number = 0): any {
     // Prevent infinite recursion
     if (depth > 10) {
-      console.warn('[Neo4j] Maximum sanitization depth reached, returning value as-is:', typeof params);
+      console.warn(
+        '[Neo4j] Maximum sanitization depth reached, returning value as-is:',
+        typeof params
+      );
       return params;
     }
     if (params === null || params === undefined) {
@@ -226,7 +228,7 @@ export class Neo4jConnection {
 
     // Handle arrays
     if (Array.isArray(params)) {
-      return params.map(item => this.sanitizeParameters(item, depth + 1));
+      return params.map((item) => this.sanitizeParameters(item, depth + 1));
     }
 
     // Handle plain objects (but not Neo4j objects like Node, Relationship, etc.)

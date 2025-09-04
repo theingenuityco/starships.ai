@@ -4,7 +4,14 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { NodeResult, Execution, ValidationResult, Node as WorkflowNode, ValidationErrorCode, ValidationWarningCode } from '../types';
+import {
+  NodeResult,
+  Execution,
+  ValidationResult,
+  Node as WorkflowNode,
+  ValidationErrorCode,
+  ValidationWarningCode,
+} from '../types';
 
 /**
  * Base interface for workflow node handlers
@@ -13,13 +20,13 @@ import { NodeResult, Execution, ValidationResult, Node as WorkflowNode, Validati
 export interface Handler {
   /** The node type this handler manages */
   readonly type: string;
-  
+
   /** Execute with parameters already injected via constructor */
   execute(execution: Execution): Promise<Execution>;
-  
+
   /** Validate the handler's configuration */
   validate(): ValidationResult;
-  
+
   /** Get icon for UI representation */
   getIcon(): string;
 }
@@ -47,9 +54,9 @@ export abstract class BaseHandler implements Handler {
   protected createSuccessResult(execution: Execution, data: any): Execution {
     const result: NodeResult = {
       nodeRef: this.node.ref,
-      data
+      data,
     };
-    
+
     execution.executionResults.set(this.node.ref, result);
     return execution;
   }
@@ -60,9 +67,9 @@ export abstract class BaseHandler implements Handler {
   protected createErrorResult(execution: Execution, error: string): Execution {
     const result: NodeResult = {
       nodeRef: this.node.ref,
-      error
+      error,
     };
-    
+
     execution.executionResults.set(this.node.ref, result);
     return execution;
   }
@@ -75,7 +82,7 @@ export abstract class BaseHandler implements Handler {
       code,
       message,
       nodeRef: this.node.ref,
-      severity: 'error' as const
+      severity: 'error' as const,
     };
   }
 

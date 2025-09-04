@@ -119,9 +119,7 @@ export function ConnectorPerformanceMetrics({
             </div>
             <div className="flex items-center gap-2">
               <Progress value={overallMetrics.averageSuccessRate} className="flex-1 h-2" />
-              <span className="text-sm font-mono">
-                {connectorMonitoring.formatSuccessRate()}
-              </span>
+              <span className="text-sm font-mono">{connectorMonitoring.formatSuccessRate()}</span>
             </div>
           </div>
 
@@ -130,9 +128,7 @@ export function ConnectorPerformanceMetrics({
               <Clock className="w-3 h-3 text-blue-500" />
               <span className="text-xs text-muted-foreground">Avg Response</span>
             </div>
-            <div className="text-sm font-mono">
-              {connectorMonitoring.formatResponseTime()}
-            </div>
+            <div className="text-sm font-mono">{connectorMonitoring.formatResponseTime()}</div>
           </div>
 
           <div className="space-y-2">
@@ -237,9 +233,7 @@ export function ConnectorPerformanceMetrics({
                       {metrics.lastResponseTime && (
                         <div className="flex items-center gap-1">
                           <Zap className="w-3 h-3 text-muted-foreground" />
-                          <span>
-                            {connectorMonitoring.formatResponseTime()}
-                          </span>
+                          <span>{connectorMonitoring.formatResponseTime()}</span>
                         </div>
                       )}
                     </div>

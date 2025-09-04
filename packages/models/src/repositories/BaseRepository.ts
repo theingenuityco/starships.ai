@@ -9,9 +9,10 @@ import {
   ConflictError,
   ValidationError,
   ErrorContextUtils,
-  ErrorLayer
+  ErrorLayer,
 } from '@starships/errors';
 import type { RepositoryErrorContext } from '@starships/errors';
+import { getConnection } from '../helpers/database';
 
 /**
  * Base repository with standardized error handling and validation
@@ -34,8 +35,8 @@ export abstract class BaseRepository {
       resourceId,
       metadata: {
         component: 'repository',
-        ...additionalMetadata
-      }
+        ...additionalMetadata,
+      },
     });
   }
 
@@ -61,7 +62,7 @@ export abstract class BaseRepository {
     resourceId?: string
   ): never {
     const context = this.createContext(operation, resource, resourceId, {
-      originalError: error.message || error.toString()
+      originalError: error.message || error.toString(),
     });
 
     // Handle specific database error types
@@ -134,13 +135,9 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleNotFound(
-    resource: string,
-    resourceId?: string,
-    operation?: string
-  ): never {
+  protected handleNotFound(resource: string, resourceId?: string, operation?: string): never {
     const context = this.createContext(operation || 'find', resource, resourceId);
-    
+
     throw new NotFoundError(
       `${resource} ${resourceId ? `with ID ${resourceId}` : ''} not found`,
       resource,
@@ -166,10 +163,10 @@ export abstract class BaseRepository {
     operation?: string
   ): never {
     const context = this.createContext(operation || 'validate', undefined, undefined, {
-      fieldErrors
+      fieldErrors,
     });
-    
-    const message = fieldErrors.map(e => `${e.field}: ${e.message}`).join(', ');
+
+    const message = fieldErrors.map((e) => `${e.field}: ${e.message}`).join(', ');
     throw new ValidationError(
       message,
       fieldErrors[0]?.field,
@@ -198,9 +195,9 @@ export abstract class BaseRepository {
     resourceId?: string
   ): never {
     const context = this.createContext(operation || 'create', resource, resourceId, {
-      conflictReason
+      conflictReason,
     });
-    
+
     throw new ConflictError(
       conflictReason,
       'resource_conflict',
@@ -296,14 +293,14 @@ export abstract class BaseRepository {
       'foreign key',
       'check constraint',
       'not null',
-      'primary key'
+      'primary key',
     ];
 
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();
 
-    return constraintPatterns.some(pattern => 
-      errorMessage.includes(pattern) || errorCode.includes(pattern)
+    return constraintPatterns.some(
+      (pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern)
     );
   }
 
@@ -319,14 +316,14 @@ export abstract class BaseRepository {
       'econnrefused',
       'enotfound',
       'network',
-      'timeout'
+      'timeout',
     ];
 
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();
 
-    return connectionPatterns.some(pattern => 
-      errorMessage.includes(pattern) || errorCode.includes(pattern)
+    return connectionPatterns.some(
+      (pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern)
     );
   }
 
@@ -336,18 +333,13 @@ export abstract class BaseRepository {
   private isTimeoutError(error: any): boolean {
     if (!error) return false;
 
-    const timeoutPatterns = [
-      'timeout',
-      'etimedout',
-      'time out',
-      'timed out'
-    ];
+    const timeoutPatterns = ['timeout', 'etimedout', 'time out', 'timed out'];
 
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();
 
-    return timeoutPatterns.some(pattern => 
-      errorMessage.includes(pattern) || errorCode.includes(pattern)
+    return timeoutPatterns.some(
+      (pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern)
     );
   }
 
@@ -362,12 +354,12 @@ export abstract class BaseRepository {
       'invalid query',
       'query failed',
       'sql error',
-      'cypher error'
+      'cypher error',
     ];
 
     const errorMessage = (error.message || '').toLowerCase();
 
-    return queryPatterns.some(pattern => errorMessage.includes(pattern));
+    return queryPatterns.some((pattern) => errorMessage.includes(pattern));
   }
 
   // ============================================================================
@@ -377,11 +369,7 @@ export abstract class BaseRepository {
   /**
    * Validate required fields
    */
-  protected validateRequired(
-    data: any,
-    requiredFields: string[],
-    operation?: string
-  ): void {
+  protected validateRequired(data: any, requiredFields: string[], operation?: string): void {
     const errors: Array<{ field: string; message: string; value?: any }> = [];
 
     for (const field of requiredFields) {
@@ -389,7 +377,7 @@ export abstract class BaseRepository {
         errors.push({
           field,
           message: `${field} is required`,
-          value: data[field]
+          value: data[field],
         });
       }
     }
@@ -402,11 +390,7 @@ export abstract class BaseRepository {
   /**
    * Validate field types
    */
-  protected validateTypes(
-    data: any,
-    fieldTypes: Record<string, string>,
-    operation?: string
-  ): void {
+  protected validateTypes(data: any, fieldTypes: Record<string, string>, operation?: string): void {
     const errors: Array<{ field: string; message: string; value?: any }> = [];
 
     for (const [field, expectedType] of Object.entries(fieldTypes)) {
@@ -414,7 +398,7 @@ export abstract class BaseRepository {
         errors.push({
           field,
           message: `${field} must be of type ${expectedType}`,
-          value: data[field]
+          value: data[field],
         });
       }
     }
@@ -441,14 +425,14 @@ export abstract class BaseRepository {
           errors.push({
             field,
             message: `${field} must be at least ${constraints.min} characters long`,
-            value: value.length
+            value: value.length,
           });
         }
         if (constraints.max !== undefined && value.length > constraints.max) {
           errors.push({
             field,
             message: `${field} must be no more than ${constraints.max} characters long`,
-            value: value.length
+            value: value.length,
           });
         }
       }
@@ -475,7 +459,7 @@ export abstract class BaseRepository {
         errors.push({
           field,
           message: `${field} must be one of: ${allowedValues.join(', ')}`,
-          value
+          value,
         });
       }
     }
@@ -506,17 +490,16 @@ export abstract class BaseRepository {
     let conn = connection;
     if (!conn) {
       try {
-        const dbModule = await import('../helpers/database');
-        conn = dbModule.getConnection();
+        conn = getConnection();
       } catch (error) {
         // Fallback for testing scenarios where import might fail
         throw new Error('Database connection not available');
       }
     }
-    
+
     // Remove any existing 'id' from properties - Neo4j will generate it
     const { id, ...propsWithoutId } = properties;
-    
+
     const result = await conn.executeWrite(
       `CREATE (n:${nodeLabel})
        SET n.id = randomUUID(),
@@ -524,11 +507,11 @@ export abstract class BaseRepository {
        RETURN n`,
       { props: propsWithoutId }
     );
-    
+
     if (!result || result.length === 0) {
       throw new Error(`Failed to create ${nodeLabel}`);
     }
-    
+
     return result[0].n;
   }
 
@@ -551,25 +534,27 @@ export abstract class BaseRepository {
     connection?: any
   ): Promise<T> {
     // Use provided connection or get from module - this helps with testing
-    const conn = connection || (await import('../helpers/database').then(m => m.getConnection()));
-    
+    const conn = connection || getConnection();
+
     // Remove ID from all property sets - Neo4j will generate it
     const { id: _, ...matchProps } = matchProperties;
     const { id: __, ...createProps } = createProperties;
     const { id: ___, ...updateProps } = updateProperties;
 
-    let cypher = `MERGE (n:${nodeLabel} {${Object.keys(matchProps).map(key => `${key}: $match.${key}`).join(', ')}})`;
-    
+    let cypher = `MERGE (n:${nodeLabel} {${Object.keys(matchProps)
+      .map((key) => `${key}: $match.${key}`)
+      .join(', ')}})`;
+
     if (Object.keys(createProps).length > 0) {
       cypher += `\nON CREATE SET n.id = randomUUID(), n += $create`;
     } else {
       cypher += `\nON CREATE SET n.id = randomUUID()`;
     }
-    
+
     if (Object.keys(updateProps).length > 0) {
       cypher += `\nON MATCH SET n += $update`;
     }
-    
+
     cypher += `\nRETURN n`;
 
     const parameters: Record<string, any> = { match: matchProps };
@@ -593,7 +578,7 @@ export abstract class BaseRepository {
    */
   protected log(level: 'debug' | 'info' | 'warn' | 'error', message: string, context?: any): void {
     const logMessage = `[${this.serviceName.toUpperCase()}] ${message}`;
-    
+
     switch (level) {
       case 'debug':
         console.debug(logMessage, context);
@@ -621,9 +606,9 @@ export abstract class BaseRepository {
     resourceId?: string
   ): never {
     const context = this.createContext(operation || 'unknown', resource, resourceId, {
-      businessLogicCode: code
+      businessLogicCode: code,
     });
-    
+
     throw new DatabaseError(
       message,
       operation || 'unknown',

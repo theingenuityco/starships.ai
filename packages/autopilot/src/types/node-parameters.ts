@@ -16,18 +16,18 @@ export interface AgentNodeParameters extends BaseNodeParameters {
   // Core agent identity
   name: string;
   description?: string;
-  
+
   // LLM configuration
   model: string;
   temperature?: number;
   maxTokens?: number;
-  
+
   // Execution parameters
   timeout?: number;
-  
+
   // Memory system (required)
   memory: AgentMemoryState;
-  
+
   // Blueprint execution
   blueprint: BaseBlueprint;
 }
@@ -76,14 +76,7 @@ export interface UserPromptChoice {
 /**
  * Output formats for workflow results
  */
-export type OutputFormat =
-  | 'text'
-  | 'markdown'
-  | 'json'
-  | 'html'
-  | 'xml'
-  | 'pdf'
-  | 'csv';
+export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf' | 'csv';
 
 /**
  * HTTP request node parameters for making HTTP calls
@@ -102,14 +95,7 @@ export interface HttpRequestNodeParameters extends BaseNodeParameters {
 /**
  * HTTP methods supported by the HTTP request node
  */
-export type HttpMethod =
-  | 'GET'
-  | 'POST'
-  | 'PUT'
-  | 'DELETE'
-  | 'PATCH'
-  | 'HEAD'
-  | 'OPTIONS';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
 /**
  * HTTP authentication configuration

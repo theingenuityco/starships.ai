@@ -1,20 +1,19 @@
 'use client'
 
 import { useAuth } from '@/hooks/useAuth'
-import { LoginButton } from './LoginButton'
-import { motion } from 'motion/react'
 import { Rocket, Stars, Zap } from 'lucide-react'
+import { motion } from 'motion/react'
+import { LoginForm } from './LoginForm'
 
-interface AuthGateProps {
+interface JwtAuthGateProps {
   children: React.ReactNode
 }
 
 /**
- * Authentication gate component
+ * JWT Authentication gate component
  * Shows login UI for unauthenticated users, or renders children for authenticated users
- * Integrates with the existing space-themed design
  */
-export function AuthGate({ children }: AuthGateProps) {
+export function JwtAuthGate({ children }: JwtAuthGateProps) {
   const { isAuthenticated, isLoading } = useAuth()
 
   // Show loading state while checking authentication
@@ -63,11 +62,11 @@ export function AuthGate({ children }: AuthGateProps) {
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Welcome to Starships.ai</h1>
             <p className="text-muted-foreground">
-              Please sign in to access your crew console and manage your AI agents.
+              Please sign in to access your mission control and manage your AI agents.
             </p>
           </div>
 
-          <LoginButton />
+          <LoginForm />
         </motion.div>
       </div>
     )

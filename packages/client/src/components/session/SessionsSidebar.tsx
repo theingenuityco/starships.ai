@@ -1,10 +1,10 @@
 'use client'
 
-import { motion } from 'motion/react'
-import { MessageSquare, Bot, Clock, ChevronRight } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipSessions } from '@/hooks/useSessions'
-import type { SessionModel, SessionSourceType } from '@starships/protocol'
+import type { SessionModel } from '@starships/protocol'
+import { ChevronRight, Clock, MessageSquare } from 'lucide-react'
+import { motion } from 'motion/react'
 
 interface SessionsSidebarProps {
   starshipId: string
@@ -13,20 +13,19 @@ interface SessionsSidebarProps {
   className?: string
 }
 
-
 export function SessionsSidebar({
   starshipId,
   currentSessionId,
   onSessionSelect,
-  className = ""
+  className = '',
 }: SessionsSidebarProps) {
   const { isAuthenticated } = useAuth()
-  
+
   // Use TanStack Query to fetch sessions
   const {
     data: sessionData,
     isLoading: loading,
-    error: queryError
+    error: queryError,
   } = useStarshipSessions(starshipId, !!isAuthenticated)
 
   const sessions = sessionData?.sessions || []
@@ -36,26 +35,18 @@ export function SessionsSidebar({
     const date = new Date(timestamp)
     const now = new Date()
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-    
+
     if (diffInMinutes < 1) return 'Just now'
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`
     return date.toLocaleDateString()
   }
 
-  const getSessionIcon = (source: SessionSourceType) => {
-    switch (source) {
-      case 'agent':
-        return <Bot className="w-4 h-4" />
-      default:
-        return <MessageSquare className="w-4 h-4" />
-    }
+  const getSessionIcon = () => {
+    return <MessageSquare className="w-4 h-4" />
   }
 
   const getSessionTitle = (session: SessionModel) => {
-    if (session.source === 'agent') {
-      return session.agentId ? `Agent Chat` : 'Agent Session'
-    }
     return 'Chat Session'
   }
 
@@ -104,18 +95,14 @@ export function SessionsSidebar({
                 whileTap={{ scale: 0.99 }}
                 onClick={() => onSessionSelect?.(session.id)}
                 className={`w-full text-left p-3 rounded-lg transition-colors duration-200 hover:bg-muted/30 group ${
-                  currentSessionId === session.id 
-                    ? 'bg-muted/40 border border-border/50' 
+                  currentSessionId === session.id
+                    ? 'bg-muted/40 border border-border/50'
                     : 'border border-transparent'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-start gap-2 min-w-0 flex-1">
-                    <div className={`mt-0.5 shrink-0 ${
-                      session.source === 'agent' ? 'text-blue-500' : 'text-primary'
-                    }`}>
-                      {getSessionIcon(session.source)}
-                    </div>
+                    <div className="mt-0.5 shrink-0 text-primary">{getSessionIcon()}</div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-foreground truncate">
                         {getSessionTitle(session)}
@@ -130,16 +117,12 @@ export function SessionsSidebar({
                     <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
                   )}
                 </div>
-                
+
                 {/* Session metadata */}
                 <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <div className="capitalize">
-                    {session.source} mode
-                  </div>
+                  <div>Messages: {session.messageCount}</div>
                   {session.totalTokens && session.totalTokens > 0 && (
-                    <div>
-                      {session.totalTokens.toLocaleString()} tokens
-                    </div>
+                    <div>{session.totalTokens.toLocaleString()} tokens</div>
                   )}
                 </div>
               </motion.button>

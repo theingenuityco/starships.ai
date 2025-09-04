@@ -13,13 +13,13 @@
  */
 export interface UserModel {
   id: string;
-  kindeId?: string;
   username: string;
   email?: string;
   displayName?: string;
   avatar?: string;
+  password?: string; // For local authentication
   createdAt: string;
-  
+
   // Stripe integration
   stripeCustomerId?: string;
 }
@@ -32,11 +32,11 @@ export interface UserModel {
  * Request to create a new user
  */
 export interface CreateUserRequest {
-  kindeId?: string;
   username: string;
   email?: string;
   displayName?: string;
   avatar?: string;
+  password?: string;
   stripeCustomerId?: string;
 }
 
@@ -74,7 +74,6 @@ export interface UserListResponse {
  * Filters for querying users
  */
 export interface UserFilters {
-  kindeId?: string;
   username?: string;
   email?: string;
 }

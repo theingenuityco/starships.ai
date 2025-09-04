@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     /* Next.js recommended target and libs */
-    "target": "ES2020",
-    "lib": ["ES2020", "dom", "dom.iterable"],
-    
+    "target": "ES2022",
+    "lib": ["ES2022", "dom", "dom.iterable"],
+
     /* Frontend module system */
     "module": "esnext",
     "moduleResolution": "bundler",
-    
+
     /* Next.js specific settings */
     "allowJs": true,
     "skipLibCheck": true,
@@ -18,39 +18,29 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "downlevelIteration": true,
-    
+
     /* React/JSX support */
     "jsx": "preserve",
-    
+
     /* Performance */
     "incremental": true,
-    
+
     /* Next.js plugin */
     "plugins": [
       {
         "name": "next"
       }
     ],
-    
+
     /* Default path mapping for Next.js */
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
-    
+
     /* Frontend types */
     "types": ["node", "react", "react-dom"]
   },
-  "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "**/*.test.ts", 
-    "**/*.test.tsx",
-    "**/__tests__/**/*"
-  ]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.test.tsx", "**/__tests__/**/*"]
 }

@@ -83,7 +83,6 @@ export class AgentMemory extends Memory {
     this.state.space = space;
   }
 
-
   /**
    * Add conversation entry with metadata (legacy compatibility)
    * @deprecated Use addMessage instead
@@ -95,7 +94,6 @@ export class AgentMemory extends Memory {
   ): void {
     this.addMessage(role, content, metadata);
   }
-
 
   /**
    * Get message history
@@ -138,7 +136,7 @@ export class AgentMemory extends Memory {
    */
   toMessages(): Message[] {
     const messages: Message[] = [];
-    
+
     // Add structured system context if available
     const systemContext = this.buildSystemContext();
     if (systemContext) {
@@ -146,16 +144,16 @@ export class AgentMemory extends Memory {
         id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         role: 'system',
-        content: systemContext
+        content: systemContext,
       });
     }
 
     // Add all other messages (excluding system messages we'll replace)
-    const nonSystemMessages = super.getMessages().filter(msg => msg.role !== 'system');
+    const nonSystemMessages = super.getMessages().filter((msg) => msg.role !== 'system');
     messages.push(...nonSystemMessages);
 
     // Add any remaining system messages that aren't part of structured context
-    const remainingSystemMessages = super.getMessages().filter(msg => msg.role === 'system');
+    const remainingSystemMessages = super.getMessages().filter((msg) => msg.role === 'system');
     messages.push(...remainingSystemMessages);
 
     return messages;
@@ -172,11 +170,12 @@ export class AgentMemory extends Memory {
       const identityParts: string[] = [];
       if (this.state.identity.name) identityParts.push(`Name: ${this.state.identity.name}`);
       if (this.state.identity.role) identityParts.push(`Role: ${this.state.identity.role}`);
-      if (this.state.identity.personality) identityParts.push(`Personality: ${this.state.identity.personality}`);
+      if (this.state.identity.personality)
+        identityParts.push(`Personality: ${this.state.identity.personality}`);
       if (this.state.identity.expertise && this.state.identity.expertise.length > 0) {
         identityParts.push(`Expertise: ${this.state.identity.expertise.join(', ')}`);
       }
-      
+
       if (identityParts.length > 0) {
         parts.push(`<identity>\n${identityParts.join('\n')}\n</identity>`);
       }
@@ -192,7 +191,7 @@ export class AgentMemory extends Memory {
       if (this.state.purpose.constraints && this.state.purpose.constraints.length > 0) {
         purposeParts.push(`Constraints: ${this.state.purpose.constraints.join(', ')}`);
       }
-      
+
       parts.push(`<purpose>\n${purposeParts.join('\n')}\n</purpose>`);
     }
 
@@ -204,15 +203,14 @@ export class AgentMemory extends Memory {
     return parts.length > 0 ? parts.join('\n\n') : '';
   }
 
-
   /**
    * Clear message history only
    */
   clearMessages(): void {
     // Remove conversation messages but keep system messages
-    const systemMessages = super.getMessageEntries().filter(msg => msg.role === 'system');
+    const systemMessages = super.getMessageEntries().filter((msg) => msg.role === 'system');
     super.clear();
-    systemMessages.forEach(msg => super.addMessage(msg.role, msg.content, msg.metadata));
+    systemMessages.forEach((msg) => super.addMessage(msg.role, msg.content, msg.metadata));
   }
 
   /**
@@ -239,9 +237,9 @@ export class AgentMemory extends Memory {
   clone(): AgentMemory {
     const cloned = new AgentMemory();
     // Copy message entries with metadata
-    super.getMessageEntries().forEach(msg =>
-      cloned.addMessage(msg.role, msg.content, msg.metadata)
-    );
+    super
+      .getMessageEntries()
+      .forEach((msg) => cloned.addMessage(msg.role, msg.content, msg.metadata));
     // Copy agent-specific data
     cloned.state.identity = this.state.identity ? { ...this.state.identity } : undefined;
     cloned.state.purpose = this.state.purpose ? { ...this.state.purpose } : undefined;
@@ -272,7 +270,7 @@ export class AgentMemory extends Memory {
       messageEntries: super.getMessageEntries().length,
       hasIdentity: !!this.state.identity,
       hasPurpose: !!this.state.purpose,
-      hasSpace: !!this.state.space
+      hasSpace: !!this.state.space,
     };
   }
 }

@@ -25,8 +25,8 @@ describe('HttpRequestHandler', () => {
       description: 'HTTP request for testing',
       parameters: {
         url: 'https://api.example.com/data',
-        method: 'GET'
-      } as HttpRequestNodeParameters
+        method: 'GET',
+      } as HttpRequestNodeParameters,
     };
 
     handler = new HttpRequestHandler(mockNode);
@@ -35,11 +35,11 @@ describe('HttpRequestHandler', () => {
     // Reset mocks
     jest.clearAllMocks();
     MockedHttpRequest.mockClear();
-    
+
     // Setup default mock for validate method
     MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
       valid: true,
-      errors: []
+      errors: [],
     });
   });
 
@@ -53,16 +53,18 @@ describe('HttpRequestHandler', () => {
     it('should handle execution errors gracefully', async () => {
       const mockExecuteResult = {
         status: 'failed' as const,
-        error: new Error('HTTP request failed: Network Error')
+        error: new Error('HTTP request failed: Network Error'),
       };
-      
+
       MockedHttpRequest.prototype.execute = jest.fn().mockResolvedValue(mockExecuteResult);
 
       const result = await handler.execute(mockExecution);
 
       const nodeResult = result.executionResults.get('http-request-node');
       expect(nodeResult).toBeDefined();
-      expect(nodeResult?.error).toBe('HTTP GET request to https://api.example.com/data failed: HTTP request failed: Network Error');
+      expect(nodeResult?.error).toBe(
+        'HTTP GET request to https://api.example.com/data failed: HTTP request failed: Network Error'
+      );
       expect(nodeResult?.nodeRef).toBe('http-request-node');
     });
 
@@ -74,10 +76,10 @@ describe('HttpRequestHandler', () => {
           statusText: 'OK',
           headers: { 'content-type': 'application/json' },
           body: { message: 'success' },
-          url: 'https://api.example.com/data'
-        }
+          url: 'https://api.example.com/data',
+        },
       };
-      
+
       MockedHttpRequest.prototype.execute = jest.fn().mockResolvedValue(mockExecuteResult);
 
       const result = await handler.execute(mockExecution);
@@ -92,7 +94,7 @@ describe('HttpRequestHandler', () => {
         headers: { 'content-type': 'application/json' },
         body: { message: 'success' },
         url: 'https://api.example.com/data',
-        output: 'HTTP GET request to https://api.example.com/data completed successfully'
+        output: 'HTTP GET request to https://api.example.com/data completed successfully',
       });
     });
   });
@@ -110,8 +112,8 @@ describe('HttpRequestHandler', () => {
       const nodeWithoutURL: Node = {
         ...mockNode,
         parameters: {
-          method: 'GET'
-        } as HttpRequestNodeParameters
+          method: 'GET',
+        } as HttpRequestNodeParameters,
       };
       const handlerWithoutURL = new HttpRequestHandler(nodeWithoutURL);
 
@@ -123,7 +125,7 @@ describe('HttpRequestHandler', () => {
         code: 'MISSING_REQUIRED_FIELD',
         message: 'URL is required',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -131,8 +133,8 @@ describe('HttpRequestHandler', () => {
       const nodeWithoutMethod: Node = {
         ...mockNode,
         parameters: {
-          url: 'https://api.example.com/data'
-        } as HttpRequestNodeParameters
+          url: 'https://api.example.com/data',
+        } as HttpRequestNodeParameters,
       };
       const handlerWithoutMethod = new HttpRequestHandler(nodeWithoutMethod);
 
@@ -144,7 +146,7 @@ describe('HttpRequestHandler', () => {
         code: 'MISSING_REQUIRED_FIELD',
         message: 'HTTP method is required',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -153,16 +155,16 @@ describe('HttpRequestHandler', () => {
         ...mockNode,
         parameters: {
           url: 'not-a-valid-url',
-          method: 'GET'
-        } as HttpRequestNodeParameters
+          method: 'GET',
+        } as HttpRequestNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['URL format is invalid']
+        errors: ['URL format is invalid'],
       });
-      
+
       const handlerWithInvalidURL = new HttpRequestHandler(nodeWithInvalidURL);
 
       const result = handlerWithInvalidURL.validate();
@@ -172,7 +174,7 @@ describe('HttpRequestHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'URL format is invalid',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -181,16 +183,18 @@ describe('HttpRequestHandler', () => {
         ...mockNode,
         parameters: {
           url: 'https://api.example.com/data',
-          method: 'INVALID' as any
-        } as HttpRequestNodeParameters
+          method: 'INVALID' as any,
+        } as HttpRequestNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS']
+        errors: [
+          'Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
+        ],
       });
-      
+
       const handlerWithInvalidMethod = new HttpRequestHandler(nodeWithInvalidMethod);
 
       const result = handlerWithInvalidMethod.validate();
@@ -198,9 +202,10 @@ describe('HttpRequestHandler', () => {
       expect(result.valid).toBe(false);
       expect(result.errors).toContainEqual({
         code: 'VALIDATION_FAILED',
-        message: 'Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
+        message:
+          'Invalid HTTP method. Must be one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -211,17 +216,17 @@ describe('HttpRequestHandler', () => {
           url: 'https://api.example.com/data',
           method: 'GET',
           authentication: {
-            type: 'bearer'
-          }
-        } as HttpRequestNodeParameters
+            type: 'bearer',
+          },
+        } as HttpRequestNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['Bearer token is required for bearer authentication']
+        errors: ['Bearer token is required for bearer authentication'],
       });
-      
+
       const handlerWithIncompleteAuth = new HttpRequestHandler(nodeWithIncompleteAuth);
 
       const result = handlerWithIncompleteAuth.validate();
@@ -231,7 +236,7 @@ describe('HttpRequestHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'Bearer token is required for bearer authentication',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -243,18 +248,18 @@ describe('HttpRequestHandler', () => {
           method: 'GET',
           authentication: {
             type: 'basic',
-            username: 'user'
+            username: 'user',
             // missing password
-          }
-        } as HttpRequestNodeParameters
+          },
+        } as HttpRequestNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['Username and password are required for basic authentication']
+        errors: ['Username and password are required for basic authentication'],
       });
-      
+
       const handlerWithIncompleteAuth = new HttpRequestHandler(nodeWithIncompleteAuth);
 
       const result = handlerWithIncompleteAuth.validate();
@@ -264,7 +269,7 @@ describe('HttpRequestHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'Username and password are required for basic authentication',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -276,18 +281,18 @@ describe('HttpRequestHandler', () => {
           method: 'GET',
           authentication: {
             type: 'api-key',
-            apiKey: 'key'
+            apiKey: 'key',
             // missing headerName
-          }
-        } as HttpRequestNodeParameters
+          },
+        } as HttpRequestNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['API key and header name are required for API key authentication']
+        errors: ['API key and header name are required for API key authentication'],
       });
-      
+
       const handlerWithIncompleteAuth = new HttpRequestHandler(nodeWithIncompleteAuth);
 
       const result = handlerWithIncompleteAuth.validate();
@@ -297,7 +302,7 @@ describe('HttpRequestHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'API key and header name are required for API key authentication',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -307,16 +312,16 @@ describe('HttpRequestHandler', () => {
         parameters: {
           url: 'https://api.example.com/data',
           method: 'GET',
-          timeout: 500
-        } as HttpRequestNodeParameters
+          timeout: 500,
+        } as HttpRequestNodeParameters,
       };
-      
+
       // Mock validation to return the expected error
       MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
         valid: false,
-        errors: ['Timeout should be at least 1000ms']
+        errors: ['Timeout should be at least 1000ms'],
       });
-      
+
       const handlerWithLowTimeout = new HttpRequestHandler(nodeWithLowTimeout);
 
       const result = handlerWithLowTimeout.validate();
@@ -326,7 +331,7 @@ describe('HttpRequestHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'Timeout should be at least 1000ms',
         nodeRef: 'http-request-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -336,8 +341,8 @@ describe('HttpRequestHandler', () => {
         parameters: {
           url: 'https://api.example.com/data',
           method: 'GET',
-          retries: 10
-        } as HttpRequestNodeParameters
+          retries: 10,
+        } as HttpRequestNodeParameters,
       };
       const handlerWithHighRetries = new HttpRequestHandler(nodeWithHighRetries);
 
@@ -347,7 +352,7 @@ describe('HttpRequestHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'POTENTIAL_TIMEOUT',
         message: 'High retry count may cause long execution times',
-        nodeRef: 'http-request-node'
+        nodeRef: 'http-request-node',
       });
     });
   });

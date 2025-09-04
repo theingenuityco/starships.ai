@@ -3,13 +3,8 @@
  * Provides retry mechanisms and user guidance using unified error system
  */
 
-import {
-  BaseError,
-  ErrorContextUtils,
-  ErrorLayer,
-  type ErrorContext
-} from '@starships/errors';
-import { ErrorCategory } from '@starships/protocol';
+import { BaseError, ErrorContextUtils, ErrorLayer, type ErrorContext } from '@starships/errors'
+import { ErrorCategory } from '@starships/protocol'
 
 export interface ErrorRecoveryOptions {
   maxRetries?: number
@@ -141,7 +136,11 @@ export class ErrorRecoveryManager {
       return ErrorCategory.AUTHENTICATION
     }
 
-    if (message.includes('forbidden') || message.includes('permission') || message.includes('access denied')) {
+    if (
+      message.includes('forbidden') ||
+      message.includes('permission') ||
+      message.includes('access denied')
+    ) {
       return ErrorCategory.AUTHORIZATION
     }
 
@@ -357,8 +356,7 @@ export class ErrorRecoveryManager {
         'Your login session may have expired. Refreshing the page should resolve this.',
       [ErrorCategory.AUTHORIZATION]:
         'Contact your system administrator if you believe you should have access to this feature.',
-      [ErrorCategory.NOT_FOUND]:
-        'The resource you are looking for may have been moved or deleted.',
+      [ErrorCategory.NOT_FOUND]: 'The resource you are looking for may have been moved or deleted.',
       [ErrorCategory.CONFLICT]:
         'Another user may have modified this resource. Please refresh and try again.',
       [ErrorCategory.DATABASE]:
@@ -367,7 +365,8 @@ export class ErrorRecoveryManager {
         'You have exceeded the rate limit. Please wait a few moments before trying again.',
       [ErrorCategory.SERVICE_UNAVAILABLE]:
         'Our servers are experiencing temporary issues. Please wait a moment and try again.',
-      [ErrorCategory.INTERNAL]: 'This is usually a temporary issue. Trying again often resolves the problem.',
+      [ErrorCategory.INTERNAL]:
+        'This is usually a temporary issue. Trying again often resolves the problem.',
     }
 
     return guidance[category] || guidance[ErrorCategory.INTERNAL]

@@ -27,8 +27,8 @@ export default function Error({
           onClick={() => {
             // Clear cache and reload
             if ('caches' in window) {
-              caches.keys().then((names) => {
-                names.forEach((name) => {
+              caches.keys().then(names => {
+                names.forEach(name => {
                   caches.delete(name)
                 })
               })

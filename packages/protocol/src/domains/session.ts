@@ -160,10 +160,6 @@ export interface SessionStreamChunk {
  */
 export interface SessionModel {
   id: string;
-  source: SessionSourceType;
-  agentId?: string;
-  userId?: string;
-  starshipId?: string;
   createdAt: string;
   updatedAt?: string;
   lastActivityAt: string;

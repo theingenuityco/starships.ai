@@ -1,7 +1,6 @@
 import axios, { AxiosResponse } from 'axios'
 import type { ApiResponse } from '@starships/protocol'
 
-import { getApiBaseUrl } from './env'
 import {
   apiCache,
   CACHE_KEYS,
@@ -10,10 +9,7 @@ import {
 } from './cache'
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 
-const API_BASE_URL = getApiBaseUrl()
-
 const api = axios.create({
-  baseURL: API_BASE_URL,
   timeout: 120000, // Increased to 120s (2 minutes) for long-running operations
   headers: {
     'Content-Type': 'application/json',
@@ -203,7 +199,7 @@ export type {
   StarshipListResponse,
   StarshipDetailsResponse,
   CreateStarshipRequest,
-  Session
+  Session,
 }
 
 // For compatibility, alias the types
@@ -218,7 +214,6 @@ export interface MCPServerOption {
   args: string[] // Command arguments array
   env?: string // Environment variables as JSON string (optional)
 }
-
 
 // NEW: MCP Server Connector Instance interface (matching backend model)
 export interface MCPServerConnector {
@@ -252,7 +247,6 @@ export interface Message {
 // User Interface (from backend)
 export interface SyncedUser {
   id: string
-  kindeId?: string
   username: string
   email?: string
   displayName?: string
@@ -262,7 +256,6 @@ export interface SyncedUser {
 
 // Export Starship type for backward compatibility
 export type Starship = StarshipResponse['starship']
-
 
 // Backend request/response types (snake_case)
 interface ChatBackendRequest {
@@ -314,8 +307,8 @@ export const agentAPI = {
     }
 
     console.log('[API] Fetching all agents from server')
-    const data = await api.get('/api/v1/agents').then((res) => {
-      const agents = extractResponseData<Agent[]>(res);
+    const data = await api.get('/api/v1/agents').then(res => {
+      const agents = extractResponseData<Agent[]>(res)
       console.log('[API] Received agents from server:', agents.length)
       return agents
     })
@@ -333,7 +326,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/starships/${starshipId}/agents`)
-      .then((res) => extractResponseData<Agent[]>(res))
+      .then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -345,7 +338,7 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api.get(`/api/v1/agents/${id}`).then((res) => extractResponseData<Agent>(res))
+    const data = await api.get(`/api/v1/agents/${id}`).then(res => extractResponseData<Agent>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -353,8 +346,8 @@ export const agentAPI = {
   // CRUD methods with cache invalidation
   create: async (agent: CreateAgentRequest): Promise<Agent> => {
     console.log('[API] Creating new agent:', agent.name)
-    const data = await api.post('/api/v1/agents', agent).then((res) => {
-      const agent = extractResponseData<Agent>(res);
+    const data = await api.post('/api/v1/agents', agent).then(res => {
+      const agent = extractResponseData<Agent>(res)
       console.log('[API] Agent created successfully:', agent.id, 'authorId:', agent.authorId)
       return agent
     })
@@ -366,7 +359,7 @@ export const agentAPI = {
   update: async (id: string, updates: UpdateAgentRequest): Promise<Agent> => {
     const data = await api
       .put(`/api/v1/agents/${id}`, updates)
-      .then((res) => extractResponseData<Agent>(res))
+      .then(res => extractResponseData<Agent>(res))
     invalidateAgentCaches(id)
     return data
   },
@@ -386,7 +379,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/agents?category=${category}`)
-      .then((res) => extractResponseData<Agent[]>(res))
+      .then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -400,7 +393,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/users/${authorId}/agents`)
-      .then((res) => extractResponseData<Agent[]>(res))
+      .then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -414,7 +407,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/agents/public?limit=${limit}&offset=${offset}`)
-      .then((res) => extractResponseData<Agent[]>(res))
+      .then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -428,7 +421,7 @@ export const agentAPI = {
 
     const data = await api
       .get(`/api/v1/agents/search?q=${encodeURIComponent(query)}`)
-      .then((res) => extractResponseData<Agent[]>(res))
+      .then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
     return data
   },
@@ -437,7 +430,7 @@ export const agentAPI = {
   getAnalytics: async (id: string): Promise<any> => {
     const data = await api
       .get(`/api/v1/agents/${id}/analytics`)
-      .then((res) => extractResponseData<any>(res))
+      .then(res => extractResponseData<any>(res))
     return data
   },
 }
@@ -453,7 +446,7 @@ export const templateAPI = {
 
     const data = await api
       .get('/api/v1/agent-templates')
-      .then((res) => extractResponseData<AgentTemplate[]>(res))
+      .then(res => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -467,7 +460,7 @@ export const templateAPI = {
 
     const data = await api
       .get(`/api/v1/agent-templates/${id}`)
-      .then((res) => extractResponseData<AgentTemplate>(res))
+      .then(res => extractResponseData<AgentTemplate>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -481,7 +474,7 @@ export const templateAPI = {
 
     const data = await api
       .get(`/api/v1/agent-templates?category=${category}`)
-      .then((res) => extractResponseData<AgentTemplate[]>(res))
+      .then(res => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -495,7 +488,7 @@ export const templateAPI = {
 
     const data = await api
       .get(`/api/v1/agent-templates?authorId=${authorId}`)
-      .then((res) => extractResponseData<AgentTemplate[]>(res))
+      .then(res => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -513,7 +506,7 @@ export const templateAPI = {
 
       const data = await api
         .post(`/api/v1/agent-templates/${templateId}/agents`, requestBody)
-        .then((res) => extractResponseData<Agent>(res))
+        .then(res => extractResponseData<Agent>(res))
 
       // Invalidate agent caches since we've created a new agent
       invalidateAgentCaches()
@@ -532,13 +525,11 @@ export const templateAPI = {
   convertAgentToTemplate: async (agentId: string): Promise<AgentTemplate> => {
     try {
       console.log('[API] Converting agent to template:', agentId)
-      const data = await api
-        .post(`/api/v1/agent-templates/from-agents/${agentId}`)
-        .then((res) => {
-          const template = extractResponseData<AgentTemplate>(res);
-          console.log('[API] Agent converted to template successfully:', template.id)
-          return template
-        })
+      const data = await api.post(`/api/v1/agent-templates/from-agents/${agentId}`).then(res => {
+        const template = extractResponseData<AgentTemplate>(res)
+        console.log('[API] Agent converted to template successfully:', template.id)
+        return template
+      })
 
       // Invalidate both agent and template caches
       invalidateAgentCaches()
@@ -556,8 +547,6 @@ export const templateAPI = {
 
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility
-
-
 
 // MCP Server API response types
 interface MCPServersResponse {
@@ -595,19 +584,28 @@ export const mcpServerAPI = {
 
   // Connect MCP server to starship - DEPRECATED
   connectToStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
-    console.warn('[API] MCP Server connection functionality has been removed:', { starshipId, mcpServerId })
+    console.warn('[API] MCP Server connection functionality has been removed:', {
+      starshipId,
+      mcpServerId,
+    })
     // No-op for compatibility
   },
 
   // Disconnect MCP server from starship - DEPRECATED
   disconnectFromStarship: async (starshipId: string, mcpServerId: string): Promise<void> => {
-    console.warn('[API] MCP Server disconnection functionality has been removed:', { starshipId, mcpServerId })
+    console.warn('[API] MCP Server disconnection functionality has been removed:', {
+      starshipId,
+      mcpServerId,
+    })
     // No-op for compatibility
   },
 
   // Get connector instances - DEPRECATED
   getConnectorInstances: async (starshipId: string): Promise<MCPServerConnector[]> => {
-    console.warn('[API] MCP Connector instances functionality has been removed for starship:', starshipId)
+    console.warn(
+      '[API] MCP Connector instances functionality has been removed for starship:',
+      starshipId
+    )
     return []
   },
 
@@ -617,13 +615,19 @@ export const mcpServerAPI = {
     templateId: string,
     env?: string
   ): Promise<MCPServerConnector> => {
-    console.warn('[API] MCP Connector instance creation has been removed:', { starshipId, templateId })
+    console.warn('[API] MCP Connector instance creation has been removed:', {
+      starshipId,
+      templateId,
+    })
     throw new Error('MCP functionality has been removed')
   },
 
   // Remove connector instance - DEPRECATED
   removeConnectorInstance: async (starshipId: string, connectorId: string): Promise<void> => {
-    console.warn('[API] MCP Connector instance removal has been removed:', { starshipId, connectorId })
+    console.warn('[API] MCP Connector instance removal has been removed:', {
+      starshipId,
+      connectorId,
+    })
     // No-op for compatibility
   },
 
@@ -633,7 +637,10 @@ export const mcpServerAPI = {
     connectorId: string,
     config: ConnectorInstanceConfig
   ): Promise<MCPServerConnector> => {
-    console.warn('[API] MCP Connector configuration update has been removed:', { starshipId, connectorId })
+    console.warn('[API] MCP Connector configuration update has been removed:', {
+      starshipId,
+      connectorId,
+    })
     throw new Error('MCP functionality has been removed')
   },
 
@@ -643,7 +650,11 @@ export const mcpServerAPI = {
     connectorId: string,
     templateId: string
   ): Promise<MCPServerConnector> => {
-    console.warn('[API] MCP Configuration template application has been removed:', { starshipId, connectorId, templateId })
+    console.warn('[API] MCP Configuration template application has been removed:', {
+      starshipId,
+      connectorId,
+      templateId,
+    })
     throw new Error('MCP functionality has been removed')
   },
 
@@ -657,17 +668,23 @@ export const mcpServerAPI = {
     version: number
     lastModified: string
   }> => {
-    console.warn('[API] MCP Connector configuration retrieval has been removed:', { starshipId, connectorId })
+    console.warn('[API] MCP Connector configuration retrieval has been removed:', {
+      starshipId,
+      connectorId,
+    })
     throw new Error('MCP functionality has been removed')
   },
 
   // Get configuration history - DEPRECATED
   getConnectorConfigHistory: async (
     starshipId: string,
-    connectorId: string,
+    connectorId: string
     // Removed unused parameter
   ): Promise<any[]> => {
-    console.warn('[API] MCP Configuration history retrieval has been removed:', { starshipId, connectorId })
+    console.warn('[API] MCP Configuration history retrieval has been removed:', {
+      starshipId,
+      connectorId,
+    })
     return []
   },
 
@@ -675,34 +692,22 @@ export const mcpServerAPI = {
   rollbackConnectorConfig: async (
     starshipId: string,
     connectorId: string,
-    historyId: string,
+    historyId: string
     // Removed unused parameter
   ): Promise<void> => {
-    console.warn('[API] MCP Configuration rollback has been removed:', { starshipId, connectorId, historyId })
+    console.warn('[API] MCP Configuration rollback has been removed:', {
+      starshipId,
+      connectorId,
+      historyId,
+    })
     // No-op for compatibility
   },
 }
 
-
 export const userAPI = {
-  // Sync Kinde user to backend database
-  syncUser: async (userData: {
-    kindeId: string
-    email: string
-    name?: string
-    avatar?: string
-  }): Promise<SyncedUser> => {
-    const response = await api.post('/api/v1/users/sync', userData)
-    return extractResponseData<SyncedUser>(response)
-  },
-
   // Get user by ID
   getById: (id: string): Promise<SyncedUser> =>
-    api.get(`/api/v1/users/${id}`).then((res) => extractResponseData<SyncedUser>(res)),
-
-  // Get user by Kinde ID
-  getByKindeId: (kindeId: string): Promise<SyncedUser> =>
-    api.get(`/api/v1/users/kinde/${kindeId}`).then((res) => extractResponseData<SyncedUser>(res)),
+    api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
 }
 
 // Memory API
@@ -714,7 +719,6 @@ export const memoryAPI = {
   },
 }
 
-
 // Utility function for generating client-side IDs
 function generateId(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)
@@ -724,29 +728,31 @@ function generateId(): string {
 export const starshipAPI = {
   // Get starship by slug
   getStarshipBySlug: async (slug: string): Promise<{ starship: Starship }> => {
-    const response = await api.get(`/api/v1/starships/${slug}`);
-    const data = extractResponseData<{ starship: Starship; agents: any[]; availableSlots: number }>(response);
-    return { starship: data.starship };
+    const response = await api.get(`/api/v1/starships/${slug}`)
+    const data = extractResponseData<{ starship: Starship; agents: any[]; availableSlots: number }>(
+      response
+    )
+    return { starship: data.starship }
   },
 
   // Get user's starships list
   getUserStarshipsList: async (): Promise<Starship[]> => {
-    const response = await api.get('/api/v1/starships');
-    const data = extractResponseData<Starship[]>(response);
-    return data;
+    const response = await api.get('/api/v1/starships')
+    const data = extractResponseData<Starship[]>(response)
+    return data
   },
 
   // Create billing portal session
   createBillingPortal: async (starshipId: string): Promise<{ url: string }> => {
-    const response = await api.post(`/api/v1/starships/${starshipId}/billing-portal`);
-    return response.data;
+    const response = await api.post(`/api/v1/starships/${starshipId}/billing-portal`)
+    return response.data
   },
 
   // Retry payment for starship
   retryPayment: async (starshipId: string): Promise<{ checkoutUrl: string; message: string }> => {
-    const response = await api.post(`/api/v1/starships/${starshipId}/retry-payment`);
-    return response.data;
-  }
-};
+    const response = await api.post(`/api/v1/starships/${starshipId}/retry-payment`)
+    return response.data
+  },
+}
 
 export default api

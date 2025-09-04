@@ -435,9 +435,7 @@ export class ConnectorApiKeyManager {
   /**
    * Get environment variables string for the connector instance
    */
-  public static buildEnvironmentString(
-    template: MCPServerOption
-  ): string {
+  public static buildEnvironmentString(template: MCPServerOption): string {
     try {
       // Start with existing environment variables
       const envVars = template.env ? this.parseEnvironmentVariables(template.env) : {}

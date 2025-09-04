@@ -2,7 +2,6 @@
 // MAIN PROTOCOL EXPORTS
 // ============================================================================
 
-
 // Export domain types (database domains)
 export * from './domains/agent';
 export * from './domains/agent-template';
@@ -23,4 +22,3 @@ export * from './domains/starship';
 // Export API contracts
 export * from './contracts/api-response';
 export * from './contracts/errors';
-

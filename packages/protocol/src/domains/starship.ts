@@ -41,12 +41,12 @@ export interface StarshipModel {
   status: StarshipStatus;
   createdAt: string;
   updatedAt: string;
-  
+
   // Stripe integration
-  subscriptionId?: string;     // Stripe subscription ID
-  plan?: StarshipClass;  // Separate from class for billing
-  billingPeriod?: BillingPeriod;  // Billing period
-  stripeCustomerId?: string;  // Links to Stripe Customer for portal access
+  subscriptionId?: string; // Stripe subscription ID
+  plan?: StarshipClass; // Separate from class for billing
+  billingPeriod?: BillingPeriod; // Billing period
+  stripeCustomerId?: string; // Links to Stripe Customer for portal access
 }
 
 // ============================================================================
@@ -95,7 +95,7 @@ export interface StarshipAgentsResponse {
     timeout?: number;
     memory?: Record<string, unknown>; // AgentMemoryConfig - keeping flexible for now
     blueprint?: Record<string, unknown>; // BaseBlueprint - keeping flexible for now
-    
+
     // Database-specific fields
     id: string;
     createdAt: string;

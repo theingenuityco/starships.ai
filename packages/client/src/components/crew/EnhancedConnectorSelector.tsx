@@ -120,9 +120,7 @@ export function EnhancedConnectorSelector({
     return availableConnectors.map(connector => {
       const instance = connectorInstanceMap.get(connector.id)
       const status = instance ? instance.status : 'disconnected'
-      const healthMetrics = instance
-        ? monitoringService.createHealthMetrics()
-        : null
+      const healthMetrics = instance ? monitoringService.createHealthMetrics() : null
       const apiKeyStatus = apiKeyStatusMap.get(connector.id)
       const isConnecting = connectingIds.has(connector.id)
 
@@ -532,7 +530,9 @@ export function EnhancedConnectorSelector({
                   <Input
                     placeholder="Search connectors..."
                     value={searchQuery}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setSearchQuery(e.target.value)
+                    }
                     className="pl-10"
                     disabled={disabled}
                   />

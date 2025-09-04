@@ -17,15 +17,15 @@ import {
   WaitlistRepository,
 } from '@starships/models';
 import { migrationRunner, seedWaitlist } from '@starships/models';
-import { getServerConfig } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 // Route imports
+import authRoutes from './routes/auth';
 import agentRoutes from './routes/agents';
 import sessionRoutes from './routes/sessions';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
-import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';
 import missionRoutes from './routes/missions';
@@ -39,7 +39,7 @@ import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware
 import healthRoutes from './routes/health';
 
 // Load server configuration
-const config = getServerConfig();
+const config = getEnvConfig();
 
 /**
  * Validate URL format
@@ -53,7 +53,7 @@ function validateUrlFormat(url: string, name: string) {
 }
 
 const app: express.Application = express();
-const PORT = config.PORT || 3001;
+const PORT = config.SERVER_PORT || 3001;
 
 // Validate URL formats
 validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
@@ -83,7 +83,6 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-
 // ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
 // Initialize starship routes with dependencies
 initializeStarshipRoutes({
@@ -96,7 +95,6 @@ initializeStarshipRoutes({
 initializeWebhookRoutes({
   starshipRepository,
 });
-
 
 // Public pricing endpoint - must be before auth-protected routes
 app.get('/api/v1/starships/pricing', async (req, res) => {
@@ -112,6 +110,7 @@ app.get('/api/v1/starships/pricing', async (req, res) => {
 });
 
 // API Routes
+app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix
@@ -122,19 +121,20 @@ app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', missionRoutes); // Updated to OpenAPI standard with v1 prefix
 // app.use('/api', expeditionRoutes);
-app.use('/api', redeployRoutes);
 app.use('/api', nativeApiKeysRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);
 
 // Add centralized error handling middleware (must be last)
-app.use(errorHandler({
-  includeStackTrace: config.NODE_ENV === 'development',
-  environment: config.NODE_ENV,
-  service: 'starships-api',
-  ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
-}));
+app.use(
+  errorHandler({
+    includeStackTrace: config.NODE_ENV === 'development',
+    environment: config.NODE_ENV,
+    service: 'starships-api',
+    ...(process.env.npm_package_version && { version: process.env.npm_package_version }),
+  })
+);
 
 // Create HTTP server and initialize Socket.IO
 const httpServer = createServer(app);
@@ -176,7 +176,6 @@ httpServer.listen(PORT, async () => {
         error
       );
     }
-
 
     // Initialize Waitlist (seeds approved emails)
     try {

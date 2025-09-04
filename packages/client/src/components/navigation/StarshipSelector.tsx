@@ -1,86 +1,92 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { usePathname } from 'next/navigation';
-import { ChevronDown, Plus, Rocket } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react'
+import { usePathname } from 'next/navigation'
+import { ChevronDown, Plus, Rocket } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { useStarships, useCreateStarship } from '@/hooks/useStarships';
-import { useStarshipUIStore } from '@/store/starship-ui-store';
-import { cn } from '@/lib/utils';
+} from '@/components/ui/dropdown-menu'
+import { Badge } from '@/components/ui/badge'
+import { useStarships, useCreateStarship } from '@/hooks/useStarships'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
+import { cn } from '@/lib/utils'
 
 interface StarshipSelectorProps {
-  className?: string;
+  className?: string
 }
 
 export function StarshipSelector({ className }: StarshipSelectorProps) {
-  const pathname = usePathname();
-  
+  const pathname = usePathname()
+
   // Use new hooks
-  const { data: starshipsData, isLoading, error } = useStarships();
-  const { activeStarshipId, setActiveStarship } = useStarshipUIStore();
-  const createStarshipMutation = useCreateStarship();
+  const { data: starshipsData, isLoading, error } = useStarships()
+  const { activeStarshipId, setActiveStarship } = useStarshipUIStore()
+  const createStarshipMutation = useCreateStarship()
 
   // Extract starships from response
-  const starships = starshipsData?.starships || [];
-  
+  const starships = starshipsData?.starships || []
+
   // Don't show StarshipSelector when inside individual starship routes
   if (pathname.startsWith('/ship/')) {
-    return null;
+    return null
   }
 
-  const activeStarship = starships.find((s: any) => s.id === activeStarshipId);
+  const activeStarship = starships.find((s: any) => s.id === activeStarshipId)
 
   const handleCreateStarship = async (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     try {
       const result = await createStarshipMutation.mutateAsync({
         name: `${starshipClass.charAt(0).toUpperCase() + starshipClass.slice(1)} Starship`,
-        class: starshipClass
-      });
-      
+        class: starshipClass,
+      })
+
       // Set the newly created starship as active
       if (result.starship) {
-        setActiveStarship(result.starship.id);
+        setActiveStarship(result.starship.id)
       }
     } catch (error) {
       // Error handling is already done in the mutation
-      console.error('Failed to create starship:', error);
+      console.error('Failed to create starship:', error)
     }
-  };
+  }
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
-    return starshipClass === 'scout' ? '🚀' : starshipClass === 'cruiser' ? '🛸' : '🚢';
-  };
+    return starshipClass === 'scout' ? '🚀' : starshipClass === 'cruiser' ? '🛸' : '🚢'
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500/20 text-green-400 border-green-500/30';
-      case 'docked': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'maintenance': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'active':
+        return 'bg-green-500/20 text-green-400 border-green-500/30'
+      case 'docked':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+      case 'maintenance':
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+      default:
+        return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
     }
-  };
+  }
 
   if (isLoading && starships.length === 0) {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
+      <div className={cn('flex items-center gap-2', className)}>
         <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
         <span className="text-sm text-white/60">Loading starships...</span>
       </div>
-    );
+    )
   }
 
   if (error) {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
-        <span className="text-sm text-red-400">Error: {error?.message || 'Failed to load starships'}</span>
+      <div className={cn('flex items-center gap-2', className)}>
+        <span className="text-sm text-red-400">
+          Error: {error?.message || 'Failed to load starships'}
+        </span>
         <Button
           variant="outline"
           size="sm"
@@ -90,11 +96,11 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
           Retry
         </Button>
       </div>
-    );
+    )
   }
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn('flex items-center gap-2', className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -109,7 +115,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="outline"
-                      className={cn("text-xs", getStatusColor(activeStarship.status))}
+                      className={cn('text-xs', getStatusColor(activeStarship.status))}
                     >
                       {activeStarship.status}
                     </Badge>
@@ -138,8 +144,8 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
                   key={starship.id}
                   onClick={() => setActiveStarship(starship.id)}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-white/5 focus:bg-white/5",
-                    activeStarshipId === starship.id && "bg-white/10"
+                    'flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-white/5 focus:bg-white/5',
+                    activeStarshipId === starship.id && 'bg-white/10'
                   )}
                 >
                   <span className="text-lg">{getStarshipIcon(starship.class)}</span>
@@ -151,7 +157,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
                     <div className="flex items-center gap-2 mt-1">
                       <Badge
                         variant="outline"
-                        className={cn("text-xs", getStatusColor(starship.status))}
+                        className={cn('text-xs', getStatusColor(starship.status))}
                       >
                         {starship.status}
                       </Badge>
@@ -196,5 +202,5 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
         <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
       )}
     </div>
-  );
+  )
 }

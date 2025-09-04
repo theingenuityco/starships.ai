@@ -10,7 +10,7 @@ import type {
   CreateMissionRequest,
   UpdateMissionRequest,
   MissionFilters,
-  MissionSort
+  MissionSort,
 } from '@starships/protocol';
 
 // Mock the database connection
@@ -47,8 +47,8 @@ describe('MissionRepository', () => {
     describe('validateMissionStatus', () => {
       it('should validate correct mission status', () => {
         const validStatuses = ['draft', 'active', 'completed', 'failed', 'cancelled'];
-        
-        validStatuses.forEach(status => {
+
+        validStatuses.forEach((status) => {
           expect(() => repository['validateMissionStatus'](status)).not.toThrow();
         });
       });
@@ -71,7 +71,7 @@ describe('MissionRepository', () => {
           approvalStatus: 'approved',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          createdBy: 'user-123'
+          createdBy: 'user-123',
         };
 
         const result = repository['parseMissionFromRecord'](record);
@@ -89,7 +89,7 @@ describe('MissionRepository', () => {
           phase: 'execution',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          createdBy: 'user-123'
+          createdBy: 'user-123',
         };
 
         const result = repository['parseMissionFromRecord'](record);
@@ -105,7 +105,7 @@ describe('MissionRepository', () => {
       starshipId: 'starship-123',
       name: 'Test Mission',
       description: 'Test Description',
-      agentIds: ['agent-1', 'agent-2']
+      agentIds: ['agent-1', 'agent-2'],
     };
 
     it('should create mission successfully', async () => {
@@ -119,9 +119,9 @@ describe('MissionRepository', () => {
         agentIds: ['agent-1', 'agent-2'],
         createdBy: 'user-123',
         createdAt: expect.any(String),
-        updatedAt: expect.any(String)
+        updatedAt: expect.any(String),
       };
-      
+
       mockConnection.executeQuery.mockResolvedValue([{ id: 'starship-123' }]); // Starship exists
       mockConnection.executeWrite.mockResolvedValue([{ n: createdMission }]); // createEntityWithAutoId format
 
@@ -137,55 +137,61 @@ describe('MissionRepository', () => {
     it('should validate required fields', async () => {
       const invalidRequest = { ...validRequest, starshipId: undefined } as any;
 
-      await expect(repository.createMission(invalidRequest, 'user-123'))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should validate userId', async () => {
-      await expect(repository.createMission(validRequest, ''))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.createMission(validRequest, '')).rejects.toThrow(ValidationError);
     });
 
     it('should validate field types', async () => {
       const invalidRequest = { ...validRequest, name: 123 } as any;
 
-      await expect(repository.createMission(invalidRequest, 'user-123'))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should validate string lengths', async () => {
       const invalidRequest = { ...validRequest, name: '' };
 
-      await expect(repository.createMission(invalidRequest, 'user-123'))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should validate agentIds is array', async () => {
       const invalidRequest = { ...validRequest, agentIds: 'not-array' } as any;
 
-      await expect(repository.createMission(invalidRequest, 'user-123'))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should require at least one agent', async () => {
       const invalidRequest = { ...validRequest, agentIds: [] };
 
-      await expect(repository.createMission(invalidRequest, 'user-123'))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should check starship exists', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Starship doesn't exist
 
-      await expect(repository.createMission(validRequest, 'user-123'))
-        .rejects.toThrow(NotFoundError);
+      await expect(repository.createMission(validRequest, 'user-123')).rejects.toThrow(
+        NotFoundError
+      );
     });
 
     it('should handle database errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.createMission(validRequest, 'user-123'))
-        .rejects.toThrow(DatabaseError);
+      await expect(repository.createMission(validRequest, 'user-123')).rejects.toThrow(
+        DatabaseError
+      );
     });
   });
 
@@ -201,7 +207,7 @@ describe('MissionRepository', () => {
         agentIds: ['agent-1'],
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        createdBy: 'user-123'
+        createdBy: 'user-123',
       };
       mockConnection.executeQuery.mockResolvedValue([{ m: mockMission }]);
 
@@ -211,10 +217,12 @@ describe('MissionRepository', () => {
         'MATCH (m:MissionModel {id: $id}) RETURN m',
         { id: 'mission-123' }
       );
-      expect(result).toEqual(expect.objectContaining({
-        id: 'mission-123',
-        name: 'Test Mission'
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'mission-123',
+          name: 'Test Mission',
+        })
+      );
     });
 
     it('should validate id parameter', async () => {
@@ -241,19 +249,19 @@ describe('MissionRepository', () => {
         starshipId: 'starship-123',
         name: 'Mission 1',
         status: 'active',
-        createdBy: 'user-123'
+        createdBy: 'user-123',
       },
       {
         id: 'mission-2',
         starshipId: 'starship-123',
         name: 'Mission 2',
         status: 'completed',
-        createdBy: 'user-456'
-      }
+        createdBy: 'user-456',
+      },
     ];
 
     it('should return missions by starship id', async () => {
-      mockConnection.executeQuery.mockResolvedValue(mockMissions.map(m => ({ m })));
+      mockConnection.executeQuery.mockResolvedValue(mockMissions.map((m) => ({ m })));
 
       const result = await repository.getMissionModelsByStarshipId('starship-123');
 
@@ -266,7 +274,7 @@ describe('MissionRepository', () => {
     });
 
     it('should filter by status', async () => {
-      mockConnection.executeQuery.mockResolvedValue([mockMissions[0]].map(m => ({ m })));
+      mockConnection.executeQuery.mockResolvedValue([mockMissions[0]].map((m) => ({ m })));
 
       const filters: MissionFilters = { status: ['active'] };
       const result = await repository.getMissionModelsByStarshipId('starship-123', filters);
@@ -274,14 +282,14 @@ describe('MissionRepository', () => {
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('m.status IN $statusList'),
         expect.objectContaining({
-          statusList: ['active']
+          statusList: ['active'],
         })
       );
       expect(result.missions).toHaveLength(1);
     });
 
     it('should filter by createdBy', async () => {
-      mockConnection.executeQuery.mockResolvedValue([mockMissions[0]].map(m => ({ m })));
+      mockConnection.executeQuery.mockResolvedValue([mockMissions[0]].map((m) => ({ m })));
 
       const filters: MissionFilters = { createdBy: 'user-123' };
       const result = await repository.getMissionModelsByStarshipId('starship-123', filters);
@@ -289,13 +297,13 @@ describe('MissionRepository', () => {
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('m.createdBy = $createdBy'),
         expect.objectContaining({
-          createdBy: 'user-123'
+          createdBy: 'user-123',
         })
       );
     });
 
     it('should apply custom sorting', async () => {
-      mockConnection.executeQuery.mockResolvedValue(mockMissions.map(m => ({ m })));
+      mockConnection.executeQuery.mockResolvedValue(mockMissions.map((m) => ({ m })));
 
       const sort: MissionSort = { field: 'name', direction: 'asc' };
       await repository.getMissionModelsByStarshipId('starship-123', undefined, sort);
@@ -323,11 +331,11 @@ describe('MissionRepository', () => {
   describe('getAllMissions', () => {
     const mockMissions = [
       { id: 'mission-1', name: 'Mission 1', status: 'active' },
-      { id: 'mission-2', name: 'Mission 2', status: 'completed' }
+      { id: 'mission-2', name: 'Mission 2', status: 'completed' },
     ];
 
     it('should return all missions without filters', async () => {
-      mockConnection.executeQuery.mockResolvedValue(mockMissions.map(m => ({ m })));
+      mockConnection.executeQuery.mockResolvedValue(mockMissions.map((m) => ({ m })));
 
       const result = await repository.getAllMissions();
 
@@ -339,28 +347,30 @@ describe('MissionRepository', () => {
     });
 
     it('should apply filters', async () => {
-      mockConnection.executeQuery.mockResolvedValue([mockMissions[0]].map(m => ({ m })));
+      mockConnection.executeQuery.mockResolvedValue([mockMissions[0]].map((m) => ({ m })));
 
       const filters: MissionFilters = {
         starshipId: 'starship-123',
         status: ['active'],
-        createdBy: 'user-123'
+        createdBy: 'user-123',
       };
 
       await repository.getAllMissions(filters);
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.starshipId = $starshipId AND m.status IN $statusList AND m.createdBy = $createdBy'),
+        expect.stringContaining(
+          'WHERE m.starshipId = $starshipId AND m.status IN $statusList AND m.createdBy = $createdBy'
+        ),
         expect.objectContaining({
           starshipId: 'starship-123',
           statusList: ['active'],
-          createdBy: 'user-123'
+          createdBy: 'user-123',
         })
       );
     });
 
     it('should apply sorting', async () => {
-      mockConnection.executeQuery.mockResolvedValue(mockMissions.map(m => ({ m })));
+      mockConnection.executeQuery.mockResolvedValue(mockMissions.map((m) => ({ m })));
 
       const sort: MissionSort = { field: 'updatedAt', direction: 'desc' };
       await repository.getAllMissions(undefined, sort);
@@ -382,7 +392,7 @@ describe('MissionRepository', () => {
     const mockMission = {
       id: 'mission-123',
       name: 'Updated Mission',
-      status: 'active'
+      status: 'active',
     };
 
     it('should update mission successfully', async () => {
@@ -391,7 +401,7 @@ describe('MissionRepository', () => {
 
       const updates: UpdateMissionRequest = {
         name: 'Updated Mission',
-        status: 'active'
+        status: 'active',
       };
 
       const result = await repository.updateMission('mission-123', updates);
@@ -406,12 +416,14 @@ describe('MissionRepository', () => {
           id: 'mission-123',
           name: 'Updated Mission',
           status: 'active',
-          updatedAt: expect.any(String)
+          updatedAt: expect.any(String),
         })
       );
-      expect(result).toEqual(expect.objectContaining({
-        name: 'Updated Mission'
-      }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          name: 'Updated Mission',
+        })
+      );
     });
 
     it('should validate id parameter', async () => {
@@ -425,15 +437,17 @@ describe('MissionRepository', () => {
     it('should validate mission status', async () => {
       const updates = { status: 'invalid-status' } as any;
 
-      await expect(repository.updateMission('mission-123', updates))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should validate string lengths', async () => {
       const updates = { name: '' };
 
-      await expect(repository.updateMission('mission-123', updates))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should check mission exists', async () => {
@@ -441,8 +455,9 @@ describe('MissionRepository', () => {
 
       const updates = { name: 'Updated' };
 
-      await expect(repository.updateMission('non-existent', updates))
-        .rejects.toThrow(NotFoundError);
+      await expect(repository.updateMission('non-existent', updates)).rejects.toThrow(
+        NotFoundError
+      );
     });
 
     it('should update all possible fields', async () => {
@@ -455,7 +470,7 @@ describe('MissionRepository', () => {
         status: 'completed',
         phase: 'welcome',
         agentIds: ['agent-1', 'agent-2'],
-        approvalStatus: 'approved'
+        approvalStatus: 'approved',
       };
 
       await repository.updateMission('mission-123', updates);
@@ -468,7 +483,7 @@ describe('MissionRepository', () => {
           status: 'completed',
           phase: 'welcome',
           agentIds: ['agent-1', 'agent-2'],
-          approvalStatus: 'approved'
+          approvalStatus: 'approved',
         })
       );
     });
@@ -478,8 +493,9 @@ describe('MissionRepository', () => {
 
       const updates = { agentIds: 'not-array' } as any;
 
-      await expect(repository.updateMission('mission-123', updates))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should handle update failure', async () => {
@@ -488,8 +504,7 @@ describe('MissionRepository', () => {
 
       const updates = { name: 'Updated' };
 
-      await expect(repository.updateMission('mission-123', updates))
-        .rejects.toThrow(DatabaseError);
+      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -517,8 +532,7 @@ describe('MissionRepository', () => {
     it('should check mission exists before deletion', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Mission doesn't exist
 
-      await expect(repository.deleteMissionModel('non-existent'))
-        .rejects.toThrow(NotFoundError);
+      await expect(repository.deleteMissionModel('non-existent')).rejects.toThrow(NotFoundError);
     });
 
     it('should handle database errors', async () => {

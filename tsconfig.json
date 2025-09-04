@@ -2,7 +2,7 @@
   "files": [],
   "references": [
     { "path": "./packages/protocol" },
-    { "path": "./packages/env-config" },
+    { "path": "./packages/env" },
     { "path": "./packages/models" },
     { "path": "./packages/autopilot" },
     { "path": "./packages/server" },

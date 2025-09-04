@@ -16,7 +16,7 @@ export class HttpRequest {
     this.params = {
       ...params,
       headers: { ...params.headers },
-      authentication: params.authentication ? { ...params.authentication } : undefined
+      authentication: params.authentication ? { ...params.authentication } : undefined,
     };
   }
 
@@ -75,7 +75,7 @@ export class HttpRequest {
         url: this.params.url,
         headers: {
           'Content-Type': 'application/json',
-          ...this.params.headers
+          ...this.params.headers,
         },
         timeout: this.params.timeout || 30000,
         maxRedirects: this.params.followRedirects !== false ? 5 : 0,
@@ -103,16 +103,15 @@ export class HttpRequest {
           break; // Success, exit retry loop
         } catch (error) {
           lastError = error as AxiosError;
-          
+
           // Don't retry on certain errors
-          if (axios.isCancel(error) ||
-              (error as AxiosError).code === 'ECONNABORTED') {
+          if (axios.isCancel(error) || (error as AxiosError).code === 'ECONNABORTED') {
             break;
           }
-          
+
           // Wait before retry (exponential backoff)
           if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+            await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
           }
         }
       }
@@ -125,22 +124,22 @@ export class HttpRequest {
             statusText: response.statusText,
             headers: response.headers,
             body: response.data,
-            url: response.config.url
-          }
+            url: response.config.url,
+          },
         };
       } else {
         // If we get here, all retries failed
         const errorMessage = lastError?.message || 'HTTP request failed';
         return {
           status: 'failed',
-          error: new Error(`HTTP request failed: ${errorMessage}`)
+          error: new Error(`HTTP request failed: ${errorMessage}`),
         };
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
         status: 'failed',
-        error: new Error(`HTTP request execution failed: ${errorMessage}`)
+        error: new Error(`HTTP request execution failed: ${errorMessage}`),
       };
     }
   }
@@ -148,7 +147,10 @@ export class HttpRequest {
   /**
    * Add authentication to request configuration
    */
-  private addAuthentication(config: AxiosRequestConfig, auth: HttpRequestNodeParameters['authentication']) {
+  private addAuthentication(
+    config: AxiosRequestConfig,
+    auth: HttpRequestNodeParameters['authentication']
+  ) {
     if (!auth || !config.headers) return;
 
     switch (auth.type) {
@@ -161,7 +163,7 @@ export class HttpRequest {
         if (auth.username && auth.password) {
           config.auth = {
             username: auth.username,
-            password: auth.password
+            password: auth.password,
           };
         }
         break;
@@ -237,7 +239,7 @@ export class HttpRequest {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -248,7 +250,7 @@ export class HttpRequest {
     const clonedParams: HttpRequestNodeParameters = {
       ...this.params,
       headers: this.params.headers ? { ...this.params.headers } : undefined,
-      authentication: this.params.authentication ? { ...this.params.authentication } : undefined
+      authentication: this.params.authentication ? { ...this.params.authentication } : undefined,
     };
 
     return new HttpRequest(clonedParams);
@@ -264,10 +266,10 @@ export class HttpRequest {
       // Merge headers if both exist
       headers: {
         ...this.params.headers,
-        ...updates.headers
+        ...updates.headers,
       },
       // Use new authentication if provided, otherwise keep existing
-      authentication: updates.authentication || this.params.authentication
+      authentication: updates.authentication || this.params.authentication,
     };
 
     return new HttpRequest(updatedParams);

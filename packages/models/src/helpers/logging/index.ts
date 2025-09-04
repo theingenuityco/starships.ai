@@ -89,9 +89,9 @@ export class Logger {
 
   private constructor(config?: LoggerConfig) {
     this.logLevel = this.parseLogLevel(config?.logLevel ?? process.env.LOG_LEVEL ?? 'info');
-    this.enableConsole = config?.enableConsole ?? (process.env.LOG_CONSOLE !== 'false');
-    this.enableFile = config?.enableFile ?? (process.env.LOG_FILE === 'true');
-    this.enableMetrics = config?.enableMetrics ?? (process.env.LOG_METRICS === 'true');
+    this.enableConsole = config?.enableConsole ?? process.env.LOG_CONSOLE !== 'false';
+    this.enableFile = config?.enableFile ?? process.env.LOG_FILE === 'true';
+    this.enableMetrics = config?.enableMetrics ?? process.env.LOG_METRICS === 'true';
   }
 
   /** Get singleton logger instance */
@@ -382,7 +382,7 @@ class HealthMonitorClass {
     const startTime = Date.now();
 
     let timeoutHandle: NodeJS.Timeout | undefined;
-    
+
     try {
       const timeoutPromise = new Promise<boolean>((_, reject) => {
         timeoutHandle = setTimeout(() => reject(new Error('Health check timeout')), timeout);

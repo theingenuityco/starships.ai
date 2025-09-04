@@ -19,13 +19,13 @@ export class NativeToolApiKeyRepository extends BaseRepository {
   private encrypt(text: string): string {
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(this.algorithm, this.secretKey, iv);
-    
+
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     // Cast to any to access getAuthTag method
     const authTag = (cipher as any).getAuthTag();
-    
+
     return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
   }
 
@@ -37,14 +37,14 @@ export class NativeToolApiKeyRepository extends BaseRepository {
     const iv = Buffer.from(parts[0], 'hex');
     const authTag = Buffer.from(parts[1], 'hex');
     const encrypted = parts[2];
-    
+
     const decipher = crypto.createDecipheriv(this.algorithm, this.secretKey, iv);
     // Cast to any to access setAuthTag method
     (decipher as any).setAuthTag(authTag);
-    
+
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     return decrypted;
   }
 
@@ -52,23 +52,32 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    * Save or update an API key for a starship and tool
    */
   async saveApiKey(starshipId: string, toolName: string, apiKey: string): Promise<void> {
-    this.validateRequired({ starshipId, toolName, apiKey }, ['starshipId', 'toolName', 'apiKey'], 'saveApiKey');
-    
-    return this.executeWithErrorHandling(async () => {
-      const encryptedApiKey = this.encrypt(apiKey);
-      const connection = getConnection();
-      
-      await connection.executeWrite(
-        `
+    this.validateRequired(
+      { starshipId, toolName, apiKey },
+      ['starshipId', 'toolName', 'apiKey'],
+      'saveApiKey'
+    );
+
+    return this.executeWithErrorHandling(
+      async () => {
+        const encryptedApiKey = this.encrypt(apiKey);
+        const connection = getConnection();
+
+        await connection.executeWrite(
+          `
         MERGE (k:NativeToolApiKey {starshipId: $starshipId, toolName: $toolName})
         SET k.encryptedApiKey = $encryptedApiKey,
             k.updatedAt = datetime(),
             k.id = CASE WHEN k.id IS NULL THEN randomUUID() ELSE k.id END,
             k.createdAt = CASE WHEN k.createdAt IS NULL THEN datetime() ELSE k.createdAt END
         `,
-        { starshipId, toolName, encryptedApiKey }
-      );
-    }, 'saveApiKey', 'NativeToolApiKey', `${starshipId}:${toolName}`);
+          { starshipId, toolName, encryptedApiKey }
+        );
+      },
+      'saveApiKey',
+      'NativeToolApiKey',
+      `${starshipId}:${toolName}`
+    );
   }
 
   /**
@@ -76,24 +85,29 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    */
   async getApiKey(starshipId: string, toolName: string): Promise<string | null> {
     this.validateRequired({ starshipId, toolName }, ['starshipId', 'toolName'], 'getApiKey');
-    
-    return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ encryptedApiKey: string }>(
-        `
+
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = getConnection();
+        const result = await connection.executeQuery<{ encryptedApiKey: string }>(
+          `
         MATCH (k:NativeToolApiKey {starshipId: $starshipId, toolName: $toolName})
         RETURN k.encryptedApiKey as encryptedApiKey
         `,
-        { starshipId, toolName }
-      );
+          { starshipId, toolName }
+        );
 
-      if (result.length === 0) {
-        return null;
-      }
+        if (result.length === 0) {
+          return null;
+        }
 
-      const encryptedApiKey = result[0].encryptedApiKey;
-      return this.decrypt(encryptedApiKey);
-    }, 'getApiKey', 'NativeToolApiKey', `${starshipId}:${toolName}`);
+        const encryptedApiKey = result[0].encryptedApiKey;
+        return this.decrypt(encryptedApiKey);
+      },
+      'getApiKey',
+      'NativeToolApiKey',
+      `${starshipId}:${toolName}`
+    );
   }
 
   /**
@@ -101,29 +115,34 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    */
   async getAllApiKeys(starshipId: string): Promise<Record<string, string>> {
     this.validateRequired({ starshipId }, ['starshipId'], 'getAllApiKeys');
-    
-    return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ toolName: string; encryptedApiKey: string }>(
-        `
+
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = getConnection();
+        const result = await connection.executeQuery<{ toolName: string; encryptedApiKey: string }>(
+          `
         MATCH (k:NativeToolApiKey {starshipId: $starshipId})
         RETURN k.toolName as toolName, k.encryptedApiKey as encryptedApiKey
         `,
-        { starshipId }
-      );
+          { starshipId }
+        );
 
-      const apiKeys: Record<string, string> = {};
-      
-      for (const record of result) {
-        const toolName = record.toolName;
-        const encryptedApiKey = record.encryptedApiKey;
-        if (encryptedApiKey) {
-          apiKeys[toolName] = this.decrypt(encryptedApiKey);
+        const apiKeys: Record<string, string> = {};
+
+        for (const record of result) {
+          const toolName = record.toolName;
+          const encryptedApiKey = record.encryptedApiKey;
+          if (encryptedApiKey) {
+            apiKeys[toolName] = this.decrypt(encryptedApiKey);
+          }
         }
-      }
-      
-      return apiKeys;
-    }, 'getAllApiKeys', 'NativeToolApiKey', starshipId);
+
+        return apiKeys;
+      },
+      'getAllApiKeys',
+      'NativeToolApiKey',
+      starshipId
+    );
   }
 
   /**
@@ -131,17 +150,22 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    */
   async deleteApiKey(starshipId: string, toolName: string): Promise<void> {
     this.validateRequired({ starshipId, toolName }, ['starshipId', 'toolName'], 'deleteApiKey');
-    
-    return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
-      await connection.executeWrite(
-        `
+
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = getConnection();
+        await connection.executeWrite(
+          `
         MATCH (k:NativeToolApiKey {starshipId: $starshipId, toolName: $toolName})
         DELETE k
         `,
-        { starshipId, toolName }
-      );
-    }, 'deleteApiKey', 'NativeToolApiKey', `${starshipId}:${toolName}`);
+          { starshipId, toolName }
+        );
+      },
+      'deleteApiKey',
+      'NativeToolApiKey',
+      `${starshipId}:${toolName}`
+    );
   }
 
   /**
@@ -149,19 +173,24 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    */
   async hasApiKey(starshipId: string, toolName: string): Promise<boolean> {
     this.validateRequired({ starshipId, toolName }, ['starshipId', 'toolName'], 'hasApiKey');
-    
-    return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ hasKey: boolean }>(
-        `
+
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = getConnection();
+        const result = await connection.executeQuery<{ hasKey: boolean }>(
+          `
         MATCH (k:NativeToolApiKey {starshipId: $starshipId, toolName: $toolName})
         RETURN count(k) > 0 as hasKey
         `,
-        { starshipId, toolName }
-      );
+          { starshipId, toolName }
+        );
 
-      return result[0]?.hasKey || false;
-    }, 'hasApiKey', 'NativeToolApiKey', `${starshipId}:${toolName}`);
+        return result[0]?.hasKey || false;
+      },
+      'hasApiKey',
+      'NativeToolApiKey',
+      `${starshipId}:${toolName}`
+    );
   }
 }
 

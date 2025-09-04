@@ -1,6 +1,6 @@
 /**
  * Start Node Handler
- * 
+ *
  * Handles workflow start nodes - always succeeds immediately
  * Uses lazy loading with BaseHandler
  */
@@ -13,7 +13,7 @@ export class StartHandler extends BaseHandler {
 
   async execute(execution: Execution) {
     return this.createSuccessResult(execution, {
-      message: 'Workflow started'
+      message: 'Workflow started',
     });
   }
 
@@ -22,7 +22,7 @@ export class StartHandler extends BaseHandler {
       valid: true,
       errors: [],
       warnings: [],
-      suggestions: []
+      suggestions: [],
     };
   }
 

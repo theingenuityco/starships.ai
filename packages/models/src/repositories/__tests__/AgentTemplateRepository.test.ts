@@ -10,7 +10,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-template-id')
+  v4: jest.fn(() => 'test-template-id'),
 }));
 
 describe('AgentTemplateRepository', () => {
@@ -19,7 +19,7 @@ describe('AgentTemplateRepository', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     mockConnection = {
       connect: jest.fn().mockResolvedValue(undefined),
       disconnect: jest.fn().mockResolvedValue(undefined),
@@ -29,9 +29,9 @@ describe('AgentTemplateRepository', () => {
       initializeSchema: jest.fn().mockResolvedValue(undefined),
       driver: null,
       config: {},
-      sanitizeParameters: jest.fn((params) => params)
+      sanitizeParameters: jest.fn((params) => params),
     } as any;
-    
+
     repository = new AgentTemplateRepository(mockConnection);
   });
 
@@ -54,16 +54,16 @@ describe('AgentTemplateRepository', () => {
     memory: {
       identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
       purpose: { primary: 'assist users', constraints: [] },
-      space: { description: 'helpful environment' }
+      space: { description: 'helpful environment' },
     },
     blueprint: {
       nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} }],
       edges: [],
-      metadata: {}
+      metadata: {},
     },
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
-    ...overrides
+    ...overrides,
   });
 
   // Helper to create mock template as it would be stored in Neo4j (serialized)
@@ -93,14 +93,14 @@ describe('AgentTemplateRepository', () => {
     memory: {
       identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
       purpose: { primary: 'assist users', constraints: [] },
-      space: { description: 'helpful environment' }
+      space: { description: 'helpful environment' },
     },
     blueprint: {
       nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} }],
       edges: [],
-      metadata: {}
+      metadata: {},
     },
-    ...overrides
+    ...overrides,
   });
 
   describe('constructor', () => {
@@ -117,24 +117,27 @@ describe('AgentTemplateRepository', () => {
 
   describe('findAll', () => {
     it('should return all agent templates', async () => {
-      const mockRawTemplates = [createMockRawTemplate(), createMockRawTemplate({ id: 'template-456' })];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockRawTemplates.map(t => ({ t }))
-      );
+      const mockRawTemplates = [
+        createMockRawTemplate(),
+        createMockRawTemplate({ id: 'template-456' }),
+      ];
+      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(expect.objectContaining({
-        id: 'template-123',
-        name: 'Test Template',
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          id: 'template-123',
+          name: 'Test Template',
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (t:AgentTemplate)')
       );
@@ -162,16 +165,18 @@ describe('AgentTemplateRepository', () => {
 
       const result = await repository.findById('template-123');
 
-      expect(result).toEqual(expect.objectContaining({
-        id: 'template-123',
-        name: 'Test Template',
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'template-123',
+          name: 'Test Template',
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'),
         { id: 'template-123' }
@@ -201,7 +206,6 @@ describe('AgentTemplateRepository', () => {
     it('should create template successfully', async () => {
       const createInput = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
-      
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
@@ -211,11 +215,11 @@ describe('AgentTemplateRepository', () => {
         name: 'Test Template',
         description: 'A test agent template',
         memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
+          identity: expect.objectContaining({ name: 'Assistant' }),
         }),
         blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
-        })
+          nodes: expect.any(Array),
+        }),
       });
       // The actual query uses CREATE (n:AgentTemplate) with randomUUID(), not CREATE (t:AgentTemplate $template)
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
@@ -225,8 +229,8 @@ describe('AgentTemplateRepository', () => {
             name: 'Test Template',
             description: 'A test agent template',
             memory: expect.any(String), // Should be serialized
-            blueprint: expect.any(String) // Should be serialized
-          })
+            blueprint: expect.any(String), // Should be serialized
+          }),
         })
       );
     });
@@ -240,10 +244,9 @@ describe('AgentTemplateRepository', () => {
     it('should handle missing optional fields', async () => {
       const minimalInput = {
         name: 'Minimal Template',
-        description: 'Basic template'
+        description: 'Basic template',
       };
       const mockCreatedRaw = createMockRawTemplate(minimalInput);
-      
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
@@ -256,7 +259,6 @@ describe('AgentTemplateRepository', () => {
     it('should serialize complex objects', async () => {
       const inputWithComplexObjects = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
-      
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreatedRaw }]);
 
@@ -267,8 +269,8 @@ describe('AgentTemplateRepository', () => {
         expect.objectContaining({
           props: expect.objectContaining({
             memory: expect.any(String),
-            blueprint: expect.any(String)
-          })
+            blueprint: expect.any(String),
+          }),
         })
       );
     });
@@ -285,7 +287,7 @@ describe('AgentTemplateRepository', () => {
     it('should update template successfully', async () => {
       const updates = { name: 'Updated Template', rating: 5 };
       const mockUpdatedRaw = createMockRawTemplate(updates);
-      
+
       mockConnection.executeWrite.mockResolvedValue([{ t: mockUpdatedRaw }]);
 
       const result = await repository.update('template-123', updates);
@@ -295,7 +297,7 @@ describe('AgentTemplateRepository', () => {
         expect.stringContaining('SET'),
         expect.objectContaining({
           id: 'template-123',
-          updates: expect.objectContaining(updates)
+          updates: expect.objectContaining(updates),
         })
       );
     });
@@ -310,23 +312,25 @@ describe('AgentTemplateRepository', () => {
 
     it('should handle empty updates by calling findById', async () => {
       const mockRawTemplate = createMockRawTemplate();
-      
+
       // Mock the database call that will be made by findById when no updates are provided
       mockConnection.executeQuery.mockResolvedValue([{ t: mockRawTemplate }]);
 
       const result = await repository.update('template-123', {});
 
-      expect(result).toEqual(expect.objectContaining({
-        id: 'template-123',
-        name: 'Test Template',
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'template-123',
+          name: 'Test Template',
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
-      
+      );
+
       // Verify executeQuery was called (indicating findById path was taken)
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'),
@@ -341,26 +345,28 @@ describe('AgentTemplateRepository', () => {
     it('should serialize complex objects in updates', async () => {
       const complexUpdates = {
         memory: { identity: { name: 'Updated' } },
-        blueprint: { nodes: [], edges: [] }
+        blueprint: { nodes: [], edges: [] },
       };
       const mockUpdatedRaw = createMockRawTemplate(complexUpdates);
-      
+
       mockConnection.executeWrite.mockResolvedValue([{ t: mockUpdatedRaw }]);
 
       const result = await repository.update('template-123', complexUpdates);
 
-      expect(result).toEqual(expect.objectContaining({
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Updated' })
+      expect(result).toEqual(
+        expect.objectContaining({
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Updated' }),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           updates: expect.objectContaining({
             memory: expect.any(String),
-            blueprint: expect.any(String)
-          })
+            blueprint: expect.any(String),
+          }),
         })
       );
     });
@@ -394,22 +400,25 @@ describe('AgentTemplateRepository', () => {
 
   describe('findByAuthor', () => {
     it('should return templates by author', async () => {
-      const mockRawTemplates = [createMockRawTemplate(), createMockRawTemplate({ id: 'template-456' })];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockRawTemplates.map(t => ({ t }))
-      );
+      const mockRawTemplates = [
+        createMockRawTemplate(),
+        createMockRawTemplate({ id: 'template-456' }),
+      ];
+      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.findByAuthor('user-123');
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(expect.objectContaining({
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (t:AgentTemplate {authorId: $authorId})'),
         { authorId: 'user-123' }
@@ -424,21 +433,21 @@ describe('AgentTemplateRepository', () => {
   describe('findByCategory', () => {
     it('should return public templates by category', async () => {
       const mockRawTemplates = [createMockRawTemplate({ category: 'general' })];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockRawTemplates.map(t => ({ t }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.findByCategory('general');
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(expect.objectContaining({
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('WHERE t.isPublic = true'),
         { category: 'general' }
@@ -453,21 +462,21 @@ describe('AgentTemplateRepository', () => {
   describe('findByTags', () => {
     it('should return templates matching tags', async () => {
       const mockRawTemplates = [createMockRawTemplate({ tags: ['ai', 'assistant'] })];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockRawTemplates.map(t => ({ t }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.findByTags(['ai', 'assistant']);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(expect.objectContaining({
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('ANY(tag IN $tags WHERE tag IN t.tags)'),
         { tags: ['ai', 'assistant'] }
@@ -487,26 +496,26 @@ describe('AgentTemplateRepository', () => {
   describe('findPublic', () => {
     it('should return public templates with default pagination', async () => {
       const mockRawTemplates = [createMockRawTemplate()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockRawTemplates.map(t => ({ t }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.findPublic();
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(expect.objectContaining({
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (t:AgentTemplate {isPublic: true})'),
         expect.objectContaining({
           limit: expect.any(Object), // Neo4j int
-          offset: expect.any(Object)  // Neo4j int
+          offset: expect.any(Object), // Neo4j int
         })
       );
     });
@@ -520,7 +529,7 @@ describe('AgentTemplateRepository', () => {
         expect.stringContaining('SKIP $offset'),
         expect.objectContaining({
           limit: expect.any(Object),
-          offset: expect.any(Object)
+          offset: expect.any(Object),
         })
       );
     });
@@ -538,21 +547,21 @@ describe('AgentTemplateRepository', () => {
   describe('searchTemplates', () => {
     it('should search templates by query', async () => {
       const mockRawTemplates = [createMockRawTemplate()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockRawTemplates.map(t => ({ t }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.searchTemplates('assistant');
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(expect.objectContaining({
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: 'Assistant' })
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
         })
-      }));
+      );
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('toLower(t.name) CONTAINS toLower($query)'),
         { query: 'assistant' }
@@ -579,7 +588,7 @@ describe('AgentTemplateRepository', () => {
         expect.stringContaining('SET t.usageCount = t.usageCount + 1'),
         expect.objectContaining({
           id: 'template-123',
-          now: expect.any(String)
+          now: expect.any(String),
         })
       );
     });
@@ -600,7 +609,7 @@ describe('AgentTemplateRepository', () => {
         expect.objectContaining({
           id: 'template-123',
           rating: 4.5,
-          now: expect.any(String)
+          now: expect.any(String),
         })
       );
     });
@@ -609,7 +618,9 @@ describe('AgentTemplateRepository', () => {
       await expect(repository.updateRating('', 4.5)).rejects.toThrow(ValidationError);
       await expect(repository.updateRating('template-123', 6)).rejects.toThrow(ValidationError);
       await expect(repository.updateRating('template-123', -1)).rejects.toThrow(ValidationError);
-      await expect(repository.updateRating('template-123', 'invalid' as any)).rejects.toThrow(ValidationError);
+      await expect(repository.updateRating('template-123', 'invalid' as any)).rejects.toThrow(
+        ValidationError
+      );
     });
   });
 
@@ -622,13 +633,14 @@ describe('AgentTemplateRepository', () => {
         starshipId: 'starship-123',
         templateId: 'template-123',
         memory: JSON.stringify(mockTemplate.memory),
-        blueprint: JSON.stringify(mockTemplate.blueprint)
+        blueprint: JSON.stringify(mockTemplate.blueprint),
       };
 
       jest.spyOn(repository, 'findById').mockResolvedValue(mockTemplate);
       jest.spyOn(repository, 'incrementUsageCount').mockResolvedValue();
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].a
-      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockAgent }])
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: mockAgent }])
         .mockResolvedValueOnce([]); // For the relationship creation
 
       const result = await repository.createAgentFromTemplate(
@@ -640,7 +652,7 @@ describe('AgentTemplateRepository', () => {
 
       expect(result).toMatchObject({
         name: 'Test Agent',
-        starshipId: 'starship-123'
+        starshipId: 'starship-123',
       });
       expect(repository.incrementUsageCount).toHaveBeenCalledWith('template-123');
     });
@@ -663,7 +675,7 @@ describe('AgentTemplateRepository', () => {
         model: 'gpt-4',
         temperature: 0.7,
         maxTokens: 2000,
-        category: 'general'
+        category: 'general',
       };
       const mockRawTemplate = createMockRawTemplate();
 
@@ -677,11 +689,11 @@ describe('AgentTemplateRepository', () => {
       expect(result).toMatchObject({
         name: expect.stringContaining('Template'),
         memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: expect.any(String) })
+          identity: expect.objectContaining({ name: expect.any(String) }),
         }),
         blueprint: expect.objectContaining({
-          nodes: expect.any(Array)
-        })
+          nodes: expect.any(Array),
+        }),
       });
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('WHERE a.isPublic = true'),
@@ -705,7 +717,7 @@ describe('AgentTemplateRepository', () => {
   describe('private helper methods', () => {
     it('should safely get values with defaults', () => {
       const repo = repository as any;
-      
+
       expect(repo.getSafeValue(null, 'default')).toBe('default');
       expect(repo.getSafeValue(undefined, 'default')).toBe('default');
       expect(repo.getSafeValue({}, 'default')).toBe('default');
@@ -717,7 +729,7 @@ describe('AgentTemplateRepository', () => {
       const template = {
         name: 'Test',
         memory: { test: 'data' },
-        blueprint: { nodes: [] }
+        blueprint: { nodes: [] },
       };
 
       const serialized = repo.serializeTemplate(template);
@@ -725,7 +737,7 @@ describe('AgentTemplateRepository', () => {
       expect(serialized).toEqual({
         name: 'Test',
         memory: JSON.stringify({ test: 'data' }),
-        blueprint: JSON.stringify({ nodes: [] })
+        blueprint: JSON.stringify({ nodes: [] }),
       });
     });
 
@@ -734,7 +746,7 @@ describe('AgentTemplateRepository', () => {
       const rawTemplate = {
         name: 'Test',
         memory: JSON.stringify({ test: 'data' }),
-        blueprint: JSON.stringify({ nodes: [] })
+        blueprint: JSON.stringify({ nodes: [] }),
       };
 
       const deserialized = repo.deserializeTemplate(rawTemplate);
@@ -742,7 +754,7 @@ describe('AgentTemplateRepository', () => {
       expect(deserialized).toEqual({
         name: 'Test',
         memory: { test: 'data' },
-        blueprint: { nodes: [] }
+        blueprint: { nodes: [] },
       });
     });
 
@@ -751,7 +763,7 @@ describe('AgentTemplateRepository', () => {
       const rawTemplate = {
         name: 'Test',
         memory: null,
-        blueprint: undefined
+        blueprint: undefined,
       };
 
       const deserialized = repo.deserializeTemplate(rawTemplate);
@@ -759,7 +771,7 @@ describe('AgentTemplateRepository', () => {
       expect(deserialized).toEqual({
         name: 'Test',
         memory: undefined,
-        blueprint: undefined
+        blueprint: undefined,
       });
     });
   });

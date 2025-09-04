@@ -2,10 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { MCPServerConnector } from '@/lib/api'
-import {
-  ConnectorHealthMetrics,
-  monitoringService,
-} from '@/lib/connector-monitoring'
+import { ConnectorHealthMetrics, monitoringService } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'

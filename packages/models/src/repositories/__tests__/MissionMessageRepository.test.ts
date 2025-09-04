@@ -10,7 +10,7 @@ import type { MissionMessageModel, MissionMessageRole } from '@starships/protoco
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-message-id')
+  v4: jest.fn(() => 'test-message-id'),
 }));
 
 describe('MissionMessageRepository', () => {
@@ -32,7 +32,9 @@ describe('MissionMessageRepository', () => {
     jest.clearAllMocks();
   });
 
-  const createMockMessage = (overrides: Partial<MissionMessageModel> = {}): MissionMessageModel => ({
+  const createMockMessage = (
+    overrides: Partial<MissionMessageModel> = {}
+  ): MissionMessageModel => ({
     id: 'message-123',
     missionId: 'mission-123',
     role: 'user',
@@ -40,7 +42,7 @@ describe('MissionMessageRepository', () => {
     timestamp: '2024-01-01T00:00:00.000Z',
     userId: 'user-123',
     senderName: 'Test User',
-    ...overrides
+    ...overrides,
   });
 
   const createMockMessageInput = (overrides: any = {}) => ({
@@ -50,7 +52,7 @@ describe('MissionMessageRepository', () => {
     timestamp: '2024-01-01T00:00:00.000Z',
     userId: 'user-123',
     senderName: 'Test User',
-    ...overrides
+    ...overrides,
   });
 
   describe('constructor', () => {
@@ -63,7 +65,7 @@ describe('MissionMessageRepository', () => {
     it('should save user message with user relationship', async () => {
       const messageInput = createMockMessageInput();
       const mockCreated = createMockMessage();
-      
+
       // Mock mission exists check
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       // Mock createEntityWithAutoId format and relationships
@@ -76,7 +78,7 @@ describe('MissionMessageRepository', () => {
 
       expect(result).toMatchObject({
         role: 'user',
-        content: 'Test message content'
+        content: 'Test message content',
       });
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (m:Mission {id: $missionId})'),
@@ -87,10 +89,10 @@ describe('MissionMessageRepository', () => {
     it('should save system/orchestrator message without user relationship', async () => {
       const systemMessage = createMockMessageInput({
         role: 'system',
-        userId: undefined
+        userId: undefined,
       });
       const mockCreated = createMockMessage({ role: 'system' });
-      
+
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       // Mock createEntityWithAutoId format and mission relationship (no user relationship for system messages)
       mockConnection.executeWrite
@@ -120,7 +122,7 @@ describe('MissionMessageRepository', () => {
         { ...createMockMessageInput(), missionId: 123 },
         { ...createMockMessageInput(), role: 123 },
         { ...createMockMessageInput(), content: 123 },
-        { ...createMockMessageInput(), timestamp: 123 }
+        { ...createMockMessageInput(), timestamp: 123 },
       ];
 
       for (const invalidType of invalidTypes) {
@@ -136,18 +138,21 @@ describe('MissionMessageRepository', () => {
 
     it('should validate string lengths', async () => {
       // Content too short
-      await expect(repository.saveMessage(createMockMessageInput({ content: '' })))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.saveMessage(createMockMessageInput({ content: '' }))).rejects.toThrow(
+        ValidationError
+      );
 
       // Content too long
       const longContent = 'x'.repeat(10001);
-      await expect(repository.saveMessage(createMockMessageInput({ content: longContent })))
-        .rejects.toThrow(ValidationError);
+      await expect(
+        repository.saveMessage(createMockMessageInput({ content: longContent }))
+      ).rejects.toThrow(ValidationError);
 
       // SenderName too long
       const longSenderName = 'x'.repeat(201);
-      await expect(repository.saveMessage(createMockMessageInput({ senderName: longSenderName })))
-        .rejects.toThrow(ValidationError);
+      await expect(
+        repository.saveMessage(createMockMessageInput({ senderName: longSenderName }))
+      ).rejects.toThrow(ValidationError);
     });
 
     it('should throw NotFoundError when mission does not exist', async () => {
@@ -170,19 +175,16 @@ describe('MissionMessageRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite.mockResolvedValue([]); // No results
 
-      await expect(repository.saveMessage(messageInput)).rejects.toThrow('Database operation failed');
+      await expect(repository.saveMessage(messageInput)).rejects.toThrow(
+        'Database operation failed'
+      );
     });
   });
 
   describe('getMessagesByMission', () => {
     it('should return messages for mission without pagination', async () => {
-      const mockMessages = [
-        createMockMessage({ id: 'msg-1' }),
-        createMockMessage({ id: 'msg-2' })
-      ];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(msg => ({ msg }))
-      );
+      const mockMessages = [createMockMessage({ id: 'msg-1' }), createMockMessage({ id: 'msg-2' })];
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((msg) => ({ msg })));
 
       const result = await repository.getMessagesByMission('mission-123');
 
@@ -195,9 +197,7 @@ describe('MissionMessageRepository', () => {
 
     it('should return messages with pagination', async () => {
       const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMessages.map(msg => ({ msg }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((msg) => ({ msg })));
 
       const result = await repository.getMessagesByMission('mission-123', 10, 5);
 
@@ -207,7 +207,7 @@ describe('MissionMessageRepository', () => {
         expect.objectContaining({
           missionId: 'mission-123',
           limit: expect.any(Object), // Neo4j int
-          offset: expect.any(Object)  // Neo4j int
+          offset: expect.any(Object), // Neo4j int
         })
       );
     });
@@ -268,7 +268,7 @@ describe('MissionMessageRepository', () => {
   describe('getMessagesByMissionWithPagination', () => {
     it('should return paginated messages with metadata', async () => {
       const mockMessages = [createMockMessage()];
-      
+
       jest.spyOn(repository, 'getMessageCount').mockResolvedValue(25);
       jest.spyOn(repository, 'getMessagesByMission').mockResolvedValue(mockMessages);
 
@@ -279,7 +279,7 @@ describe('MissionMessageRepository', () => {
         total: 25,
         page: 2,
         pageSize: 10,
-        totalPages: 3
+        totalPages: 3,
       });
       expect(repository.getMessagesByMission).toHaveBeenCalledWith('mission-123', 10, 10); // offset = (2-1) * 10
     });
@@ -296,19 +296,23 @@ describe('MissionMessageRepository', () => {
     });
 
     it('should validate pagination parameters', async () => {
-      await expect(repository.getMessagesByMissionWithPagination('mission-123', 0))
-        .rejects.toThrow(ValidationError);
-      
-      await expect(repository.getMessagesByMissionWithPagination('mission-123', 1, 0))
-        .rejects.toThrow(ValidationError);
-      
-      await expect(repository.getMessagesByMissionWithPagination('mission-123', 1, 201))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.getMessagesByMissionWithPagination('mission-123', 0)).rejects.toThrow(
+        ValidationError
+      );
+
+      await expect(
+        repository.getMessagesByMissionWithPagination('mission-123', 1, 0)
+      ).rejects.toThrow(ValidationError);
+
+      await expect(
+        repository.getMessagesByMissionWithPagination('mission-123', 1, 201)
+      ).rejects.toThrow(ValidationError);
     });
 
     it('should validate missionId parameter', async () => {
-      await expect(repository.getMessagesByMissionWithPagination(''))
-        .rejects.toThrow(ValidationError);
+      await expect(repository.getMessagesByMissionWithPagination('')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should calculate total pages correctly', async () => {
@@ -343,8 +347,9 @@ describe('MissionMessageRepository', () => {
     it('should throw NotFoundError when mission does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Mission not found
 
-      await expect(repository.deleteMessagesByMission('non-existent'))
-        .rejects.toThrow(NotFoundError);
+      await expect(repository.deleteMessagesByMission('non-existent')).rejects.toThrow(
+        NotFoundError
+      );
     });
 
     it('should validate missionId parameter', async () => {
@@ -354,14 +359,16 @@ describe('MissionMessageRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.deleteMessagesByMission('mission-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.deleteMessagesByMission('mission-123')).rejects.toThrow(
+        DatabaseError
+      );
     });
   });
 
   describe('deleteMessage', () => {
     it('should delete individual message successfully', async () => {
       const mockMessage = createMockMessage();
-      
+
       // Mock message exists check
       mockConnection.executeQuery.mockResolvedValue([{ msg: mockMessage }]);
       // Mock deletion
@@ -433,11 +440,11 @@ describe('MissionMessageRepository', () => {
   describe('role validation', () => {
     it('should accept valid roles', async () => {
       const validRoles: MissionMessageRole[] = ['user', 'orchestrator', 'system'];
-      
+
       for (const role of validRoles) {
         const messageInput = createMockMessageInput({ role });
         const mockCreated = createMockMessage({ role });
-        
+
         mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
         // Mock createEntityWithAutoId format - need to account for user vs non-user messages
         if (role === 'user') {
@@ -469,14 +476,21 @@ describe('MissionMessageRepository', () => {
   describe('integration scenarios', () => {
     it('should handle complete message workflow', async () => {
       const missionId = 'mission-123';
-      
+
       // Save multiple messages
       const userMessage = createMockMessageInput({ role: 'user', content: 'User question' });
-      const systemMessage = createMockMessageInput({ role: 'system', content: 'System response', userId: undefined });
-      const orchestratorMessage = createMockMessageInput({ role: 'orchestrator', content: 'Orchestrator note', userId: undefined });
+      const systemMessage = createMockMessageInput({
+        role: 'system',
+        content: 'System response',
+        userId: undefined,
+      });
+      const orchestratorMessage = createMockMessageInput({
+        role: 'orchestrator',
+        content: 'Orchestrator note',
+        userId: undefined,
+      });
 
       mockConnection.executeQuery.mockResolvedValue([{ id: missionId }]);
-      
       // Mock createEntityWithAutoId format for each message save
       mockConnection.executeWrite
         .mockResolvedValueOnce([{ n: createMockMessage({ role: 'user' }) }]) // user message creation
@@ -495,11 +509,9 @@ describe('MissionMessageRepository', () => {
       const mockAllMessages = [
         createMockMessage({ role: 'user' }),
         createMockMessage({ role: 'system' }),
-        createMockMessage({ role: 'orchestrator' })
+        createMockMessage({ role: 'orchestrator' }),
       ];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockAllMessages.map(msg => ({ msg }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockAllMessages.map((msg) => ({ msg })));
 
       const messages = await repository.getMessagesByMission(missionId);
       expect(messages).toHaveLength(3);
@@ -568,9 +580,9 @@ describe('MissionMessageRepository', () => {
     it('should handle messages with minimal content', async () => {
       const minimalMessage = createMockMessageInput({
         content: 'x', // Minimum valid length
-        senderName: 'A' // Minimum valid length
+        senderName: 'A', // Minimum valid length
       });
-      
+
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite
         .mockResolvedValueOnce([{ n: createMockMessage(minimalMessage) }]) // createEntityWithAutoId result
@@ -584,7 +596,7 @@ describe('MissionMessageRepository', () => {
     it('should handle messages with maximum allowed content', async () => {
       const maxContent = 'x'.repeat(10000);
       const maxMessage = createMockMessageInput({ content: maxContent });
-      
+
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite
         .mockResolvedValueOnce([{ n: createMockMessage({ content: maxContent }) }]) // createEntityWithAutoId result
@@ -598,7 +610,7 @@ describe('MissionMessageRepository', () => {
     it('should handle messages with special characters', async () => {
       const specialContent = 'Message with émojis 🚀 and "quotes" & symbols: <>&\n\t';
       const specialMessage = createMockMessageInput({ content: specialContent });
-      
+
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite
         .mockResolvedValueOnce([{ n: createMockMessage({ content: specialContent }) }]) // createEntityWithAutoId result
@@ -624,18 +636,17 @@ describe('MissionMessageRepository', () => {
       const messageInputs = [
         createMockMessageInput({ content: 'Message 1' }),
         createMockMessageInput({ content: 'Message 2' }),
-        createMockMessageInput({ content: 'Message 3' })
+        createMockMessageInput({ content: 'Message 3' }),
       ];
 
       // Mock all database operations to handle concurrent calls
       mockConnection.executeQuery.mockResolvedValue([{ id: missionId }]); // Always return mission exists
-      
       // Mock createEntityWithAutoId format for all concurrent operations
       // Each message needs: createEntityWithAutoId + user relationship + mission relationship = 3 calls each
       mockConnection.executeWrite.mockResolvedValue([{ n: createMockMessage() }]); // Always return success
 
       // Simulate concurrent saves
-      const promises = messageInputs.map(input => repository.saveMessage(input));
+      const promises = messageInputs.map((input) => repository.saveMessage(input));
       const results = await Promise.all(promises);
 
       expect(results).toHaveLength(3);

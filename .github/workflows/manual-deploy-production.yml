@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     # Extra safety: Only run on workflow_dispatch
     if: github.event_name == 'workflow_dispatch'
-    environment: 
+    environment:
       name: prod
       url: https://starships.ai
     steps:
@@ -51,7 +51,7 @@ jobs:
           VERSION="${{ github.event.inputs.version }}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 Preparing to deploy version: $VERSION to production"
-          
+
           # Store deployment metadata
           echo "deployment_id=${{ github.run_id }}-${{ github.run_number }}" >> $GITHUB_OUTPUT
           echo "deployment_timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
@@ -61,12 +61,12 @@ jobs:
         run: |
           IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
           IMAGE_TO_DEPLOY="ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }}"
-          
+
           echo "🔍 Verifying image: ${IMAGE_TO_DEPLOY}"
-          
+
           # Login to GitHub Container Registry
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          
+
           # Try to pull the image to verify it exists
           if docker pull "${IMAGE_TO_DEPLOY}"; then
             echo "✅ Image verified and available: ${IMAGE_TO_DEPLOY}"
@@ -96,14 +96,14 @@ jobs:
         id: dev_check
         run: |
           echo "🔍 Checking if version ${{ steps.version.outputs.version }} is running in dev environment..."
-          
+
           # Switch to dev context
           kubectl config use-context do-nyc1-starships-dev
-          
+
           # Get current dev deployment image
           DEV_IMAGE=$(kubectl get deployment starships-app -n starships-dev \
             -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "not-found")
-          
+
           if [[ "$DEV_IMAGE" == *":${{ steps.version.outputs.version }}" ]]; then
             echo "✅ Version ${{ steps.version.outputs.version }} is currently running in dev"
             
@@ -128,25 +128,25 @@ jobs:
       - name: Backup current production state
         run: |
           echo "💾 Creating backup of current production deployment..."
-          
+
           # Switch to prod context
           kubectl config use-context do-nyc1-starships-prod
-          
+
           # Create backup directory
           mkdir -p backups
           BACKUP_FILE="backups/prod-backup-${{ steps.version.outputs.deployment_id }}.yaml"
-          
+
           # Get current deployment state
           kubectl get deployment starships-app -n starships-prod -o yaml > "$BACKUP_FILE" 2>/dev/null || echo "No existing deployment to backup"
-          
+
           # Get current image version for reference
           CURRENT_IMAGE=$(kubectl get deployment starships-app -n starships-prod \
             -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "none")
           echo "Current production image: $CURRENT_IMAGE"
-          
+
           # Store rollback information
           echo "ROLLBACK_IMAGE=$CURRENT_IMAGE" >> $GITHUB_ENV
-          
+
           # Upload backup as artifact
           if [ -f "$BACKUP_FILE" ]; then
             echo "✅ Backup created: $BACKUP_FILE"
@@ -161,18 +161,17 @@ jobs:
           name: deployment-backup-${{ steps.version.outputs.deployment_id }}
           path: backups/
           retention-days: 30
-          
+
       - name: Create namespace if not exists
         run: |
           kubectl create namespace starships-prod --dry-run=client -o yaml | kubectl apply -f -
-          
+
       - name: Create/Update Secrets
         run: |
           # Delete and recreate secrets
           kubectl delete secret starships-secrets -n starships-prod --ignore-not-found=true
-          kubectl delete secret kinde-auth-secret -n starships-prod --ignore-not-found=true
           kubectl delete secret ghcr-pull-secret -n starships-prod --ignore-not-found=true
-          
+
           # Create API secrets
           kubectl create secret generic starships-secrets \
             --from-literal=OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
@@ -184,67 +183,56 @@ jobs:
             --from-literal=NEO4J_USERNAME="${{ secrets.NEO4J_USERNAME }}" \
             --from-literal=NEO4J_PASSWORD="${{ secrets.NEO4J_PASSWORD }}" \
             --from-literal=NEO4J_DATABASE="${{ secrets.NEO4J_DATABASE }}" \
+            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
             --from-literal=SERVER_URL="${{ vars.SERVER_URL }}" \
-            --from-literal=ENABLE_AUTH_TESTING_BACKDOOR="${{ vars.ENABLE_AUTH_TESTING_BACKDOOR }}" \
-            --from-literal=KINDE_SITE_URL="${{ vars.KINDE_SITE_URL }}" \
-            --from-literal=KINDE_POST_LOGIN_REDIRECT_URL="${{ vars.KINDE_POST_LOGIN_REDIRECT_URL }}" \
-            --from-literal=KINDE_POST_LOGOUT_REDIRECT_URL="${{ vars.KINDE_POST_LOGOUT_REDIRECT_URL }}" \
-            --from-literal=KINDE_DEBUG_MODE="${{ vars.KINDE_DEBUG_MODE }}" \
             --from-literal=CLIENT_URL="${{ vars.CLIENT_URL }}" \
-            --from-literal=PORT="${{ vars.PORT }}" \
+            --from-literal=PUBLIC_URL="${{ vars.PUBLIC_URL }}" \
+            --from-literal=SERVER_PORT="${{ vars.SERVER_PORT }}" \
+            --from-literal=CLIENT_PORT="${{ vars.CLIENT_PORT }}" \
             --from-literal=LOG_LEVEL="${{ vars.LOG_LEVEL }}" \
             --from-literal=DEFAULT_LLM_PROVIDER="${{ vars.DEFAULT_LLM_PROVIDER }}" \
             --from-literal=DEFAULT_CHAT_MODEL="${{ vars.DEFAULT_CHAT_MODEL }}" \
-            --from-literal=DEFAULT_EMBEDDING_MODEL="${{ vars.DEFAULT_EMBEDDING_MODEL }}" \
-            --from-literal=SSE_CLIENT_TIMEOUT="${{ vars.SSE_CLIENT_TIMEOUT }}" \
-            --from-literal=SSE_HEARTBEAT_INTERVAL="${{ vars.SSE_HEARTBEAT_INTERVAL }}" \
             --from-literal=STRIPE_PRICE_CRUISER_MONTHLY="${{ vars.STRIPE_PRICE_CRUISER_MONTHLY }}" \
             --from-literal=STRIPE_PRICE_CRUISER_YEARLY="${{ vars.STRIPE_PRICE_CRUISER_YEARLY }}" \
             --from-literal=STRIPE_PRICE_DRAUGHT_MONTHLY="${{ vars.STRIPE_PRICE_DRAUGHT_MONTHLY }}" \
             --from-literal=STRIPE_PRICE_DRAUGHT_YEARLY="${{ vars.STRIPE_PRICE_DRAUGHT_YEARLY }}" \
+            --from-literal=GA_MEASUREMENT_ID="${{ vars.GA_MEASUREMENT_ID }}" \
             -n starships-prod
-          
-          # Create Kinde secrets
-          kubectl create secret generic kinde-auth-secret \
-            --from-literal=KINDE_CLIENT_ID="${{ secrets.KINDE_CLIENT_ID }}" \
-            --from-literal=KINDE_CLIENT_SECRET="${{ secrets.KINDE_CLIENT_SECRET }}" \
-            --from-literal=KINDE_ISSUER_URL="${{ vars.KINDE_ISSUER_URL }}" \
-            -n starships-prod
-          
+
           # Create GHCR pull secret using persistent PAT
           kubectl create secret docker-registry ghcr-pull-secret \
             --docker-server=ghcr.io \
             --docker-username=${{ github.repository_owner }} \
             --docker-password="${{ secrets.GHCR_PULL_TOKEN || secrets.GITHUB_TOKEN }}" \
             -n starships-prod
-          
+
           echo "✅ Secrets updated successfully"
 
       - name: Validate Kubernetes Manifests
         run: |
           echo "🔍 Validating Kubernetes manifests..."
-          
+
           # Dry-run validation to catch syntax errors before deployment
           kubectl apply --dry-run=client -f k8s/prod/00-namespace.yaml
           kubectl apply --dry-run=client -f k8s/prod/02-pvc.yaml
           kubectl apply --dry-run=client -f k8s/prod/03-deployment.yaml
           kubectl apply --dry-run=client -f k8s/prod/04-service.yaml
           kubectl apply --dry-run=client -f k8s/prod/05-ingress.yaml
-          
+
           echo "✅ All manifests validated successfully"
 
       - name: Deploy to Production with Tracking
         id: deployment
         run: |
           echo "🚀 Starting production deployment..."
-          
+
           # Apply manifests
           kubectl apply -f k8s/prod/00-namespace.yaml
           kubectl apply -f k8s/prod/02-pvc.yaml
           kubectl apply -f k8s/prod/03-deployment.yaml
           kubectl apply -f k8s/prod/04-service.yaml
           kubectl apply -f k8s/prod/05-ingress.yaml
-          
+
           # Add deployment annotations for tracking
           kubectl annotate deployment starships-app \
             kubernetes.io/change-cause="Deployment v${{ steps.version.outputs.version }} by ${{ github.actor }} via GitHub Actions" \
@@ -255,15 +243,15 @@ jobs:
             deployment.starships.ai/github-run-id="${{ github.run_id }}" \
             deployment.starships.ai/dev-verified="${{ steps.dev_check.outputs.dev_verified }}" \
             -n starships-prod --overwrite
-          
+
           # Update deployment with new image
           IMAGE_NAME_LOWER=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')
           kubectl set image deployment/starships-app \
             starships=ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }} \
             -n starships-prod
-          
+
           echo "✅ Deployment initiated with image: ghcr.io/${IMAGE_NAME_LOWER}:${{ steps.version.outputs.version }}"
-          
+
           # Wait for rollout with timeout
           echo "⏳ Waiting for rollout to complete (timeout: 10 minutes)..."
           if kubectl rollout status deployment/starships-app -n starships-prod --timeout=600s; then
@@ -279,11 +267,11 @@ jobs:
         id: health_check
         run: |
           echo "🏥 Starting comprehensive health checks..."
-          
+
           # Check pod status
           echo "📊 Pod Status:"
           kubectl get pods -n starships-prod -l app=starships-ai
-          
+
           # Wait for pods to be ready
           echo "⏳ Waiting for pods to be ready..."
           if ! kubectl wait --for=condition=ready pod -l app=starships-ai -n starships-prod --timeout=300s; then
@@ -291,20 +279,20 @@ jobs:
             echo "health_status=failed" >> $GITHUB_OUTPUT
             exit 1
           fi
-          
+
           # Verify endpoints
           echo "🔗 Endpoints:"
           kubectl get endpoints -n starships-prod
-          
+
           # Get ingress IP
           INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
           echo "Load Balancer IP: $INGRESS_IP"
-          
+
           # Perform health checks with retries
           MAX_RETRIES=10
           RETRY_DELAY=30
           SUCCESS=false
-          
+
           for i in $(seq 1 $MAX_RETRIES); do
             echo "Health check attempt $i/$MAX_RETRIES..."
             
@@ -317,7 +305,7 @@ jobs:
               sleep $RETRY_DELAY
             fi
           done
-          
+
           if [ "$SUCCESS" = true ]; then
             echo "✅ All health checks passed successfully"
             echo "health_status=success" >> $GITHUB_OUTPUT
@@ -336,19 +324,19 @@ jobs:
         if: success()
         run: |
           echo "📈 Collecting deployment metrics..."
-          
+
           # Get resource usage
           echo "Resource Usage:"
           kubectl top pods -n starships-prod -l app=starships-ai || echo "Metrics not available yet"
-          
+
           # Check replica status
           echo "Replica Status:"
           kubectl get deployment starships-app -n starships-prod -o wide
-          
+
           # Get recent events
           echo "Recent Events:"
           kubectl get events -n starships-prod --sort-by='.lastTimestamp' | tail -10
-          
+
           # Response time test
           INGRESS_IP=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
           echo "Response Time Test:"
@@ -361,7 +349,7 @@ jobs:
         run: |
           echo "## 🚀 Production Deployment Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Deployment Status
           echo "### 📊 Deployment Status" >> $GITHUB_STEP_SUMMARY
           if [ "${{ job.status }}" == "success" ]; then
@@ -370,7 +358,7 @@ jobs:
             echo "❌ **Overall Status:** Production deployment failed" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Deployment Details
           echo "### 📦 Deployment Details" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
@@ -382,22 +370,22 @@ jobs:
           echo "| **GitHub Run** | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
           echo "| **Image** | \`ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Pre-deployment Checks
           echo "### ✅ Pre-deployment Validation" >> $GITHUB_STEP_SUMMARY
           echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Image Verification** | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ steps.dev_check.outputs.dev_verified }}" == "true" ]]; then
             echo "| **Dev Environment** | ✅ Version verified in dev |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| **Dev Environment** | ⚠️ Version not in dev (override) |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "| **Backup Created** | ✅ Artifact saved |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Deployment Results
           echo "### 🎯 Deployment Results" >> $GITHUB_STEP_SUMMARY
           if [[ "${{ steps.deployment.outputs.deployment_status }}" == "success" ]]; then
@@ -405,7 +393,7 @@ jobs:
           else
             echo "❌ **Rollout:** Failed or timed out" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [[ "${{ steps.health_check.outputs.health_status }}" == "success" ]]; then
             echo "✅ **Health Checks:** All passed" >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ steps.health_check.outputs.health_status }}" == "failed" ]]; then
@@ -414,7 +402,7 @@ jobs:
             echo "⏭️ **Health Checks:** Skipped" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Access Information
           echo "### 🌐 Access Information" >> $GITHUB_STEP_SUMMARY
           echo "- **Production URL:** https://starships.ai" >> $GITHUB_STEP_SUMMARY
@@ -422,7 +410,7 @@ jobs:
           echo "- **Cluster:** starships-prod" >> $GITHUB_STEP_SUMMARY
           echo "- **Namespace:** starships-prod" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Rollback Information
           echo "### 🔄 Rollback Information" >> $GITHUB_STEP_SUMMARY
           if [ -n "${{ env.ROLLBACK_IMAGE }}" ] && [ "${{ env.ROLLBACK_IMAGE }}" != "none" ]; then
@@ -434,14 +422,14 @@ jobs:
           echo "kubectl rollout undo deployment/starships-app -n starships-prod" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           # Next Steps
           echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
           echo "1. ✅ Monitor application metrics and logs" >> $GITHUB_STEP_SUMMARY
           echo "2. 📊 Check performance metrics in monitoring dashboard" >> $GITHUB_STEP_SUMMARY
           echo "3. 🔍 Verify user-facing functionality" >> $GITHUB_STEP_SUMMARY
           echo "4. 📧 Notify stakeholders of deployment status" >> $GITHUB_STEP_SUMMARY
-          
+
           # Deployment History
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📜 Deployment History" >> $GITHUB_STEP_SUMMARY

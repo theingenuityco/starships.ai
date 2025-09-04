@@ -1,9 +1,10 @@
-import { MemoryRepository, MessageRepository } from '@starships/models';
-import type { Request, Response } from 'express';
-import { Router } from 'express';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { SessionService } from '@/services/SessionService';
+import getStore from '@/store';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
+import { AgentRepository, MemoryRepository, MessageRepository } from '@starships/models';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
 
 const router: Router = Router();
 
@@ -92,7 +93,8 @@ router.post('/sessions/:sessionId/messages', jwtAuthMiddleware, async (req: Requ
 
     // Track agent usage after successful chat
     try {
-      await AgentService.trackUsage(chatRequest.agentId!);
+      const agentRepository = new AgentRepository();
+      await agentRepository.incrementUsageCount(chatRequest.agentId!);
       console.log(`[ANALYTICS] Tracked usage for agent: ${chatRequest.agentId}`);
     } catch (trackingError) {
       // Don't fail the chat request if usage tracking fails
@@ -135,9 +137,8 @@ router.delete('/sessions/:sessionId/memory', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
-    // Import AgentService dynamically to avoid circular dependencies
-    const { AgentService } = await import('../services/AgentService');
-    const store = AgentService.getMemoryStore();
+    // Clear session memory
+    const store = getStore();
     await store.clear(sessionId);
 
     sendSuccess(res, { message: 'Session memory cleared successfully' }, 200);

@@ -5,7 +5,7 @@
  * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-import type { BaseNodeParameters, BaseBlueprint } from './base';
+import type { BaseNodeParameters, BaseBlueprint } from '@/types/base';
 import type { AgentMemoryState } from '@/AgentMemory';
 
 /**

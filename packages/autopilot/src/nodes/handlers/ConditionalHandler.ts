@@ -5,7 +5,7 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
+import { BaseHandler } from '@/nodes/Handler';
 import {
   Execution,
   NodeResult,
@@ -13,7 +13,7 @@ import {
   ConditionalNodeParameters,
   ValidationError,
   ValidationWarning,
-} from '../../types';
+} from '@/types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {

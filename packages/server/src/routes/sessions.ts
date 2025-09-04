@@ -1,8 +1,8 @@
 import { MemoryRepository, MessageRepository } from '@starships/models';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { jwtAuthMiddleware } from '../middleware/jwt-auth';
-import { SessionService } from '../services/SessionService';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { SessionService } from '@/services/SessionService';
 import {
   createPaginationMeta,
   handleCommonError,
@@ -10,7 +10,7 @@ import {
   sendSuccess,
   validatePagination,
   validateUUID,
-} from '../utils/responseHelpers';
+} from '@/utils/responseHelpers';
 
 const router: Router = Router();
 

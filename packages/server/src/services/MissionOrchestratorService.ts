@@ -6,10 +6,10 @@
  */
 
 import { MissionOrchestratorAgent, type MissionChatState } from './MissionOrchestratorAgent';
-import { SYSTEM_INSTRUCTIONS } from '../prompts/MissionPromptBuilder';
+import { SYSTEM_INSTRUCTIONS } from '@/prompts/MissionPromptBuilder';
 import { MissionService } from './MissionService';
 import { MissionRepository, MissionMessageRepository } from '@starships/models';
-import { Logger } from '../utils/logger';
+import { Logger } from '@/utils/logger';
 import { SocketIOService } from './SocketIOService';
 import { ValidationError, InternalServerError } from '@starships/errors';
 import type { MissionMessageModel, MissionChatResponse, MissionPhase } from '@starships/protocol';

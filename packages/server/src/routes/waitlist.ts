@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { WaitlistRepository, getConnection } from '@starships/models';
-import { WaitlistService } from '../services/WaitlistService';
-import { logger } from '../utils/logger';
-import { asyncHandler } from '../middleware/errorHandler';
-import { sendSuccess, sendError, handleCommonError } from '../utils/responseHelpers';
+import { WaitlistService } from '@/services/WaitlistService';
+import { logger } from '@/utils/logger';
+import { asyncHandler } from '@/middleware/errorHandler';
+import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
 
 const router: Router = Router();
 

@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import type { Router as ExpressRouter } from 'express';
-import { jwtAuthMiddleware } from '../middleware/jwt-auth';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipRepository, NativeToolApiKeyRepository } from '@starships/models';
 import type { StandardErrorCode } from '@starships/protocol';
-import { sendSuccess, sendError, handleCommonError, validateUUID } from '../utils/responseHelpers';
+import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
 
 const router: ExpressRouter = Router();
 

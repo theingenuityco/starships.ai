@@ -4,10 +4,10 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { MissionOrchestratorService } from '../services/MissionOrchestratorService';
-import { MissionService } from '../services/MissionService';
-import { WorkflowService } from '../services/WorkflowService';
-import { AgentService } from '../services/AgentService';
+import { MissionOrchestratorService } from '@/services/MissionOrchestratorService';
+import { MissionService } from '@/services/MissionService';
+import { WorkflowService } from '@/services/WorkflowService';
+import { AgentService } from '@/services/AgentService';
 import type {
   CreateMissionRequest,
   UpdateMissionRequest,
@@ -15,7 +15,7 @@ import type {
   MissionSort,
   SendMissionMessageRequest,
 } from '@starships/protocol';
-import { jwtAuthMiddleware } from '../middleware/jwt-auth';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import type { StandardErrorCode } from '@starships/protocol';
 import {
   sendSuccess,
@@ -24,7 +24,7 @@ import {
   validateUUID,
   validatePagination,
   createPaginationMeta,
-} from '../utils/responseHelpers';
+} from '@/utils/responseHelpers';
 
 const router: Router = Router();
 

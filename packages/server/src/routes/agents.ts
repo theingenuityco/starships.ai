@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AgentService } from '../services/AgentService';
+import { AgentService } from '@/services/AgentService';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { jwtAuthMiddleware } from '../middleware/jwt-auth';

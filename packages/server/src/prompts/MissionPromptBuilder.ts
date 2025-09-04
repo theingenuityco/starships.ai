@@ -5,7 +5,7 @@
  * eliminating the need for separate phase-specific interfaces or complex template management.
  */
 
-import type { MissionChatState } from '../services/MissionOrchestratorAgent';
+import type { MissionChatState } from '@/services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 // Note: LLMChatPrompt type needs to be defined based on the actual interface needed
 // For now, creating a local interface until the proper type is available

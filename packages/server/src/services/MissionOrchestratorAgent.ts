@@ -11,11 +11,11 @@ import {
   StarshipRepository,
   MissionClarityRepository,
 } from '@starships/models';
-import { Logger } from '../utils/logger';
+import { Logger } from '@/utils/logger';
 import { MissionEventService } from './MissionEventService';
 import { MissionService } from './MissionService';
 import { WorkflowParsingService } from './WorkflowParsingService';
-import { MissionPromptBuilder } from '../prompts/MissionPromptBuilder';
+import { MissionPromptBuilder } from '@/prompts/MissionPromptBuilder';
 import { MISSION_PHASES } from '@starships/protocol';
 import { Workflow, AgentMemory, LLM } from '@starships/autopilot';
 import type { LlmNodeParameters } from '@starships/autopilot';

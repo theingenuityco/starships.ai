@@ -4,7 +4,7 @@
 
 import { Server } from 'socket.io';
 import type { Socket } from 'socket.io';
-import { Logger } from '../utils/logger';
+import { Logger } from '@/utils/logger';
 
 const logger = Logger.getInstance();
 

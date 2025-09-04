@@ -2,8 +2,8 @@
  * PromptHandler Unit Tests
  */
 
-import { PromptHandler } from '../PromptHandler';
-import { Node, Execution, UserPromptNodeParameters, UserPromptChoice } from '../../../types';
+import { PromptHandler } from '@/nodes/handlers/PromptHandler';
+import { Node, Execution, UserPromptNodeParameters, UserPromptChoice } from '@/types';
 
 describe('PromptHandler', () => {
   let handler: PromptHandler;

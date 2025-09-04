@@ -5,7 +5,7 @@
  * Uses BaseHandler pattern and focuses purely on workflow execution
  */
 
-import { BaseHandler } from '../Handler';
+import { BaseHandler } from '@/nodes/Handler';
 import {
   Execution,
   ValidationResult,
@@ -13,8 +13,8 @@ import {
   Node as WorkflowNode,
   ValidationError,
   ValidationWarning,
-} from '../../types';
-import { Workflow } from '../../Workflow';
+} from '@/types';
+import { Workflow } from '@/Workflow';
 
 export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';

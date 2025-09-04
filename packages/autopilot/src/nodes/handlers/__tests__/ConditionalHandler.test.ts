@@ -4,8 +4,8 @@
  * Tests for conditional node handler with simplified types
  */
 
-import { ConditionalHandler } from '../ConditionalHandler';
-import { Node, Execution, ConditionalNodeParameters, NodeResult } from '../../../types';
+import { ConditionalHandler } from '@/nodes/handlers/ConditionalHandler';
+import { Node, Execution, ConditionalNodeParameters, NodeResult } from '@/types';
 
 describe('ConditionalHandler', () => {
   let handler: ConditionalHandler;

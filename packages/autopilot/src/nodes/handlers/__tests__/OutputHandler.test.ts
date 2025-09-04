@@ -2,8 +2,8 @@
  * OutputHandler Unit Tests
  */
 
-import { OutputHandler } from '../OutputHandler';
-import { Node, Execution, OutputNodeParameters, NodeResult } from '../../../types';
+import { OutputHandler } from '@/nodes/handlers/OutputHandler';
+import { Node, Execution, OutputNodeParameters, NodeResult } from '@/types';
 
 describe('OutputHandler', () => {
   let handler: OutputHandler;

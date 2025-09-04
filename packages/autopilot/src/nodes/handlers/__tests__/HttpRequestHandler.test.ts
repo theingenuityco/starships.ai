@@ -2,13 +2,13 @@
  * HttpRequestHandler Unit Tests
  */
 
-import { HttpRequestHandler } from '../HttpRequestHandler';
-import { Node, Execution, HttpRequestNodeParameters } from '../../../types';
+import { HttpRequestHandler } from '@/nodes/handlers/HttpRequestHandler';
+import { Node, Execution, HttpRequestNodeParameters } from '@/types';
 
 // Mock HttpRequest class
 jest.mock('../../../HttpRequest');
 
-import { HttpRequest } from '../../../HttpRequest';
+import { HttpRequest } from '@/HttpRequest';
 
 const MockedHttpRequest = HttpRequest as jest.MockedClass<typeof HttpRequest>;
 

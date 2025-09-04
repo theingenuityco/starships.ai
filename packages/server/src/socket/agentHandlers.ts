@@ -1,5 +1,5 @@
 import { AgentService } from '@/services/AgentService';
-import { SessionService } from '@/services/SessionService';
+import { createSessionService } from '@/services/SessionService';
 import { SocketIOService } from '@/services/SocketIOService';
 import getStore from '@/store';
 import { AgentRepository, MessageRepository } from '@starships/models';
@@ -7,6 +7,7 @@ import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@star
 import type { Socket, Server as SocketIOServer } from 'socket.io';
 
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
+  const sessionService = createSessionService();
   const isSessionActive = (session: any): boolean => {
     const lastActivity = new Date(session.last_activity_at);
     const now = new Date();
@@ -94,7 +95,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
 
         // Validate provided session exists
         try {
-          const existingSession = await SessionService.getSessionById(request.sessionId);
+          const existingSession = await sessionService.getSessionById(request.sessionId);
 
           // Check if session exists
           if (!existingSession) {
@@ -102,7 +103,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           }
 
           sessionId = request.sessionId;
-          await SessionService.updateSessionActivity(sessionId);
+          await sessionService.updateSessionActivity(sessionId);
           console.log(`✅ [AGENT SESSION] Using existing session: ${sessionId}`);
         } catch (error) {
           console.error(`❌ [AGENT SESSION] Session validation failed for ${request.sessionId}:`, error);

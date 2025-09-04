@@ -4,15 +4,15 @@
  * JWT-based authentication system for user registration, login, and token management
  */
 
-import { Router } from 'express';
-import type { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
-import { SignJWT, jwtVerify } from 'jose';
-import { UserService } from '@/services/UserService';
 import { StarshipService } from '@/services/StarshipService';
-import { StarshipRepository } from '@starships/models';
+import { UserService } from '@/services/UserService';
+import { handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { getEnvConfig } from '@starships/env';
-import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
+import { StarshipRepository } from '@starships/models';
+import bcrypt from 'bcrypt';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
+import { SignJWT, jwtVerify } from 'jose';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -62,9 +62,25 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
 
     // Create default starship for the new user
     let defaultStarship;
+    let defaultAgent;
     try {
       defaultStarship = await StarshipService.createDefaultStarship(user.id);
       console.log(`[AUTH] Created default starship for user: ${user.id}`);
+
+      // Create default agent from "General Assistant" template
+      if (defaultStarship) {
+        try {
+          defaultAgent = await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
+          if (defaultAgent) {
+            console.log(`[AUTH] Created default agent for user: ${user.id}`);
+          } else {
+            console.log(`[AUTH] No default agent created for user: ${user.id}`);
+          }
+        } catch (agentError) {
+          console.error(`[AUTH] Failed to create default agent for user ${user.id}:`, agentError);
+          // Continue even if agent creation fails
+        }
+      }
     } catch (error) {
       console.error(`[AUTH] Failed to create default starship for user ${user.id}:`, error);
       // Continue with registration even if starship creation fails
@@ -100,6 +116,13 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
               id: defaultStarship.id,
               slug: defaultStarship.slug,
               name: defaultStarship.name,
+            }
+          : null,
+        agent: defaultAgent
+          ? {
+              id: defaultAgent.id,
+              name: defaultAgent.name,
+              description: defaultAgent.description,
             }
           : null,
       },

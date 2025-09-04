@@ -12,6 +12,7 @@ import {
   ErrorLayer,
 } from '@starships/errors';
 import type { RepositoryErrorContext } from '@starships/errors';
+import { getConnection } from '../helpers/database';
 
 /**
  * Base repository with standardized error handling and validation
@@ -489,8 +490,7 @@ export abstract class BaseRepository {
     let conn = connection;
     if (!conn) {
       try {
-        const dbModule = await import('../helpers/database');
-        conn = dbModule.getConnection();
+        conn = getConnection();
       } catch (error) {
         // Fallback for testing scenarios where import might fail
         throw new Error('Database connection not available');
@@ -534,7 +534,7 @@ export abstract class BaseRepository {
     connection?: any
   ): Promise<T> {
     // Use provided connection or get from module - this helps with testing
-    const conn = connection || (await import('../helpers/database').then((m) => m.getConnection()));
+    const conn = connection || getConnection();
 
     // Remove ID from all property sets - Neo4j will generate it
     const { id: _, ...matchProps } = matchProperties;

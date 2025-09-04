@@ -2,11 +2,11 @@
   "compilerOptions": {
     /* Base compilation target and module system for Node.js/libraries */
     "target": "ES2022",
-    "module": "NodeNext",
+    "module": "ESNext",
     "lib": ["ES2022"],
 
     /* Module resolution */
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
 

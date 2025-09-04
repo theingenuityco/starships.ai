@@ -202,9 +202,42 @@ def create_user_data_script(repo_url, registration_token, labels, job_id):
     script = f"""#!/bin/bash
 set -x  # Enable debug output
 
-# Logging to CloudWatch and file
-exec > >(tee /var/log/runner-setup.log | logger -t runner-setup)
+# Logging to file
+LOG_FILE="/var/log/runner-setup.log"
+exec > >(tee -a $LOG_FILE)
 exec 2>&1
+
+# Install CloudWatch agent for logging
+echo "Installing CloudWatch agent..."
+wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+dpkg -i -E ./amazon-cloudwatch-agent.deb || true
+
+# Configure CloudWatch agent
+cat <<'EOT' > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+{{
+  "logs": {{
+    "logs_collected": {{
+      "files": {{
+        "collect_list": [
+          {{
+            "file_path": "/var/log/runner-setup.log",
+            "log_group_name": "/aws/ec2/github-runner",
+            "log_stream_name": "{{{{instance_id}}}}-setup"
+          }},
+          {{
+            "file_path": "/var/log/runner.log",
+            "log_group_name": "/aws/ec2/github-runner",
+            "log_stream_name": "{{{{instance_id}}}}-runner"
+          }}
+        ]
+      }}
+    }}
+  }}
+}}
+EOT
+
+# Start CloudWatch agent
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json || true
 
 echo "=== Starting GitHub Runner Setup ==="
 echo "Date: $(date)"

@@ -104,6 +104,25 @@ resource "aws_iam_role_policy" "github_runner" {
             "ec2:InstanceProfile" = aws_iam_instance_profile.github_runner.arn
           }
         }
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData",
+          "ec2:DescribeVolumes",
+          "ec2:DescribeTags"
+        ]
+        Resource = "*"
       }
     ]
   })

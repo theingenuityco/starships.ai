@@ -1,8 +1,7 @@
-import { AgentTemplateModel, AgentModel } from '@starships/protocol';
-import { AgentTemplateRepository } from '@starships/models';
-import { Neo4jConnection } from '@starships/models';
-import { Blueprint, AgentMemoryState } from '@starships/autopilot';
+import { AgentMemoryState, Blueprint } from '@starships/autopilot';
 import { ValidationError } from '@starships/errors';
+import { AgentTemplateRepository, Neo4jConnection } from '@starships/models';
+import { AgentModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
@@ -215,6 +214,80 @@ export class AgentTemplateService {
   }
 
   /**
+   * Create workflow blueprint for starship navigator
+   */
+  private createStarshipNavigatorBlueprint(): Blueprint {
+    return {
+      nodes: [
+        {
+          ref: 'start',
+          type: 'start',
+          name: 'Start',
+          description: 'Begin starship navigation assistance',
+          parameters: {},
+        },
+        {
+          ref: 'assess-needs',
+          type: 'llm',
+          name: 'Assess Captain Needs',
+          description: 'Understand what the captain needs help with',
+          parameters: {
+            model: 'anthropic/claude-3.5-sonnet',
+            prompt:
+              'As an experienced starship navigator, assess what the captain needs help with regarding their starship operations, setup, or journey.',
+            temperature: 0.3,
+            maxTokens: 800,
+          },
+        },
+        {
+          ref: 'provide-guidance',
+          type: 'llm',
+          name: 'Provide Navigation Guidance',
+          description: 'Offer expert starship guidance and next steps',
+          parameters: {
+            model: 'anthropic/claude-3.5-sonnet',
+            prompt:
+              'Provide clear, actionable guidance on starship operations, crew management, or system configuration. Include specific next steps.',
+            temperature: 0.4,
+            maxTokens: 1200,
+          },
+        },
+        {
+          ref: 'offer-assistance',
+          type: 'llm',
+          name: 'Offer Further Assistance',
+          description: 'Suggest additional ways to help the captain',
+          parameters: {
+            model: 'anthropic/claude-3.5-sonnet',
+            prompt: 'Suggest additional resources, features, or assistance that might help the captain with their starship journey.',
+            temperature: 0.5,
+            maxTokens: 1000,
+          },
+        },
+        {
+          ref: 'end',
+          type: 'end',
+          name: 'End',
+          description: 'Complete navigation assistance',
+          parameters: {},
+        },
+      ],
+      edges: [
+        { ref: 'edge-1', from: 'start', to: 'assess-needs' },
+        { ref: 'edge-2', from: 'assess-needs', to: 'provide-guidance' },
+        { ref: 'edge-3', from: 'provide-guidance', to: 'offer-assistance' },
+        { ref: 'edge-4', from: 'offer-assistance', to: 'end' },
+      ],
+      metadata: {
+        version: '1.0',
+        type: 'starship-navigator-workflow',
+        complexity: 'intermediate',
+        focus: ['assessment', 'guidance', 'assistance'],
+      },
+    };
+  }
+
+  /**
    * Create workflow blueprint for creative writing
    */
   private createCreativeWritingBlueprint(): Blueprint {
@@ -282,6 +355,38 @@ export class AgentTemplateService {
         type: 'creative-workflow',
         complexity: 'intermediate',
         stages: ['ideation', 'planning', 'creation'],
+      },
+    };
+  }
+
+  /**
+   * Create specialized memory configuration for Sibyl
+   */
+  private createSibylMemoryConfig(): AgentMemoryState {
+    return {
+      identity: {
+        name: 'Sibyl',
+        role: 'Starship Navigator and First Officer',
+        personality: 'Knowledgeable, welcoming, and expert at guiding new captains through their starship journey',
+        expertise: ['starship operations', 'crew management', 'mission planning', 'system configuration', 'onboarding guidance'],
+      },
+      purpose: {
+        primary: 'Guide new captains through starship setup, operations, and help them get started on their journey',
+        secondary: [
+          'Explain starship features',
+          'Help configure agents and crew',
+          'Assist with mission planning',
+          'Provide operational guidance',
+        ],
+        constraints: [
+          'Prioritize safety and best practices',
+          'Ensure smooth onboarding experience',
+          'Maintain professional starship protocols',
+        ],
+      },
+      space: {
+        description:
+          'The starship bridge where experienced navigation officer Sibyl helps new captains learn the ropes and get their vessels operational.',
       },
     };
   }
@@ -476,6 +581,29 @@ export class AgentTemplateService {
         ),
         executionMode: 'simple',
         timeout: 30000,
+      },
+      {
+        name: 'Sibyl',
+        description:
+          'Your expert starship navigator and first officer who helps new captains get started, configure their crew, and begin their journey.',
+        category: 'general',
+        tags: ['starship', 'navigator', 'onboarding', 'guide', 'first-officer', 'autopilot'],
+        model: 'anthropic/claude-3.5-sonnet',
+        temperature: 0.5,
+        maxTokens: 2000,
+        authorId: 'system',
+        isPublic: true,
+        rating: 4.6,
+        icon: '🧙‍♀️',
+        previewPrompts: [
+          'Help me set up my new starship',
+          'How do I configure my first AI agents?',
+          'What should I do first as a new captain?',
+        ],
+        blueprint: this.createStarshipNavigatorBlueprint(),
+        memory: this.createSibylMemoryConfig(),
+        executionMode: 'workflow',
+        timeout: 45000,
       },
     ];
 

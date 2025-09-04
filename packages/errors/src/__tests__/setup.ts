@@ -28,60 +28,35 @@ global.console = {
 };
 
 // Global test utilities for creating mock errors
-(global as any).createMockValidationError = (message = 'Validation failed', field = 'testField') =>
-  new ValidationError(message, field);
+(global as any).createMockValidationError = (message = 'Validation failed', field = 'testField') => new ValidationError(message, field);
 
 (global as any).createMockNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') =>
   new NotFoundError(`${entityType} not found`, entityType, entityId);
 
-(global as any).createMockAuthenticationError = (message = 'Authentication required') =>
-  new AuthenticationError(message);
+(global as any).createMockAuthenticationError = (message = 'Authentication required') => new AuthenticationError(message);
 
-(global as any).createMockAuthorizationError = (
-  message = 'Access denied',
-  requiredPermission = 'read',
-  userRole = 'user'
-) => new AuthorizationError(message, requiredPermission, userRole);
+(global as any).createMockAuthorizationError = (message = 'Access denied', requiredPermission = 'read', userRole = 'user') =>
+  new AuthorizationError(message, requiredPermission, userRole);
 
-(global as any).createMockConflictError = (
-  message = 'Resource conflict',
-  conflictType = 'duplicate'
-) => new ConflictError(message, conflictType);
+(global as any).createMockConflictError = (message = 'Resource conflict', conflictType = 'duplicate') =>
+  new ConflictError(message, conflictType);
 
-(global as any).createMockDatabaseError = (
-  message = 'Database operation failed',
-  operation = 'query',
-  query = 'SELECT * FROM test'
-) => new DatabaseError(message, operation, query);
+(global as any).createMockDatabaseError = (message = 'Database operation failed', operation = 'query', query = 'SELECT * FROM test') =>
+  new DatabaseError(message, operation, query);
 
-(global as any).createMockNetworkError = (
-  message = 'Network operation failed',
-  service = 'TestService',
-  endpoint = '/api/test'
-) => new NetworkError(message, service, endpoint);
+(global as any).createMockNetworkError = (message = 'Network operation failed', service = 'TestService', endpoint = '/api/test') =>
+  new NetworkError(message, service, endpoint);
 
-(global as any).createMockInternalServerError = (message = 'Internal server error') =>
-  new InternalServerError(message);
+(global as any).createMockInternalServerError = (message = 'Internal server error') => new InternalServerError(message);
 
-(global as any).createMockRateLimitError = (
-  message = 'Rate limit exceeded',
-  limit = 100,
-  retryAfter = 60,
-  remainingAttempts = 0
-) => new RateLimitError(message, limit, retryAfter, remainingAttempts);
+(global as any).createMockRateLimitError = (message = 'Rate limit exceeded', limit = 100, retryAfter = 60, remainingAttempts = 0) =>
+  new RateLimitError(message, limit, retryAfter, remainingAttempts);
 
-(global as any).createMockServiceUnavailableError = (
-  message = 'Service unavailable',
-  service = 'TestService',
-  retryAfter = 120
-) => new ServiceUnavailableError(message, service, retryAfter);
+(global as any).createMockServiceUnavailableError = (message = 'Service unavailable', service = 'TestService', retryAfter = 120) =>
+  new ServiceUnavailableError(message, service, retryAfter);
 
 // Mock error with minimal required properties for testing normalization
-(global as any).createMockGenericError = (
-  name = 'GenericError',
-  message = 'Something went wrong',
-  status?: number
-) => {
+(global as any).createMockGenericError = (name = 'GenericError', message = 'Something went wrong', status?: number) => {
   const error = new Error(message);
   error.name = name;
   if (status !== undefined) {
@@ -91,10 +66,7 @@ global.console = {
 };
 
 // Mock database-like error
-(global as any).createMockDatabaseLikeError = (
-  code = 'ER_SOME_ERROR',
-  message = 'Database constraint violation'
-) => {
+(global as any).createMockDatabaseLikeError = (code = 'ER_SOME_ERROR', message = 'Database constraint violation') => {
   const error = new Error(message);
   (error as any).code = code;
   error.name = 'DatabaseError';
@@ -102,10 +74,7 @@ global.console = {
 };
 
 // Mock network-like error
-(global as any).createMockNetworkLikeError = (
-  code = 'ECONNREFUSED',
-  message = 'Connection refused'
-) => {
+(global as any).createMockNetworkLikeError = (code = 'ECONNREFUSED', message = 'Connection refused') => {
   const error = new Error(message);
   (error as any).code = code;
   return error;

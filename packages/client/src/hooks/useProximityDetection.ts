@@ -56,26 +56,19 @@ export function useProximityDetection(options: ProximityOptions = {}) {
   }, [])
 
   // Determine proximity state based on distance - stable callback
-  const getProximityState = useCallback(
-    (distance: number, isDirectlyHovering: boolean): ProximityState => {
-      const {
-        engageThreshold: currentEngageThreshold,
-        nearThreshold: currentNearThreshold,
-        mode: currentMode,
-      } = optionsRef.current
+  const getProximityState = useCallback((distance: number, isDirectlyHovering: boolean): ProximityState => {
+    const { engageThreshold: currentEngageThreshold, nearThreshold: currentNearThreshold, mode: currentMode } = optionsRef.current
 
-      if (currentMode === 'element' && (isDirectlyHovering || distance <= currentEngageThreshold)) {
-        return 'engaged'
-      } else if (distance <= currentEngageThreshold) {
-        return 'engaged'
-      } else if (distance <= currentNearThreshold) {
-        return 'near'
-      } else {
-        return 'far'
-      }
-    },
-    []
-  )
+    if (currentMode === 'element' && (isDirectlyHovering || distance <= currentEngageThreshold)) {
+      return 'engaged'
+    } else if (distance <= currentEngageThreshold) {
+      return 'engaged'
+    } else if (distance <= currentNearThreshold) {
+      return 'near'
+    } else {
+      return 'far'
+    }
+  }, [])
 
   // Debounced state update - stable callback
   const updateProximityState = useCallback((newState: ProximityState) => {

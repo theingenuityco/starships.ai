@@ -4,8 +4,8 @@
  * Tests for conditional node handler with simplified types
  */
 
-import { ConditionalHandler } from '../ConditionalHandler';
-import { Node, Execution, ConditionalNodeParameters, NodeResult } from '../../../types';
+import { ConditionalHandler } from '@/nodes/handlers/ConditionalHandler';
+import { Node, Execution, ConditionalNodeParameters, NodeResult } from '@/types';
 
 describe('ConditionalHandler', () => {
   let handler: ConditionalHandler;
@@ -73,9 +73,7 @@ describe('ConditionalHandler', () => {
     it('should handle missing source node', async () => {
       mockExecution.executionResults.clear();
 
-      await expect(handler.execute(mockExecution)).rejects.toThrow(
-        'Source node source-node not found in execution results'
-      );
+      await expect(handler.execute(mockExecution)).rejects.toThrow('Source node source-node not found in execution results');
     });
 
     it('should handle JSONata evaluation errors', async () => {
@@ -165,9 +163,7 @@ describe('ConditionalHandler', () => {
       const result = invalidHandler.validate();
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((error) => error.message.includes('At least one condition'))).toBe(
-        true
-      );
+      expect(result.errors.some((error) => error.message.includes('At least one condition'))).toBe(true);
     });
 
     it('should validate JSONata expressions', () => {
@@ -185,9 +181,7 @@ describe('ConditionalHandler', () => {
       const result = invalidHandler.validate();
 
       expect(result.valid).toBe(false);
-      expect(
-        result.errors.some((error) => error.message.includes('Invalid JSONata expression'))
-      ).toBe(true);
+      expect(result.errors.some((error) => error.message.includes('Invalid JSONata expression'))).toBe(true);
     });
   });
 

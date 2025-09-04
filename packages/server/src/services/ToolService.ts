@@ -83,9 +83,7 @@ export class ToolService {
 
       if (this.enableLogging) {
         const toolNames = tools.map((t) => t.name).join(', ');
-        console.log(
-          `[TOOL-SERVICE] Created ${tools.length} tools for starship ${this.starshipId}: ${toolNames}`
-        );
+        console.log(`[TOOL-SERVICE] Created ${tools.length} tools for starship ${this.starshipId}: ${toolNames}`);
       }
 
       return tools;
@@ -112,11 +110,7 @@ export class ToolService {
   /**
    * Execute a tool by name
    */
-  async executeTool(
-    tools: AgentTool[],
-    toolName: string,
-    args: Record<string, unknown>
-  ): Promise<string> {
+  async executeTool(tools: AgentTool[], toolName: string, args: Record<string, unknown>): Promise<string> {
     const tool = tools.find((t) => t.name === toolName);
     if (!tool) {
       throw new Error(`Tool not found: ${toolName}`);
@@ -139,8 +133,7 @@ export class ToolService {
   private async createBraveSearchTool(apiKey: string): Promise<AgentTool> {
     return {
       name: 'brave_web_search',
-      description:
-        'Search the web using Brave Search API. Useful for finding current information, news, facts, and general web content.',
+      description: 'Search the web using Brave Search API. Useful for finding current information, news, facts, and general web content.',
       parameters: {
         type: 'object',
         properties: {
@@ -288,8 +281,7 @@ export class ToolService {
   private async createTavilySearchTool(apiKey: string): Promise<AgentTool> {
     return {
       name: 'tavily_search',
-      description:
-        'Advanced AI-powered search using Tavily API. Better for research and finding comprehensive information.',
+      description: 'Advanced AI-powered search using Tavily API. Better for research and finding comprehensive information.',
       parameters: {
         type: 'object',
         properties: {
@@ -321,10 +313,7 @@ export class ToolService {
 
           if (response.data.results && response.data.results.length > 0) {
             const results = response.data.results
-              .map(
-                (result: any) =>
-                  `**${result.title}**\n${result.content || result.raw_content}\n${result.url}`
-              )
+              .map((result: any) => `**${result.title}**\n${result.content || result.raw_content}\n${result.url}`)
               .join('\n\n');
             return `Search results for "${args.query}":\n\n${results}`;
           } else {

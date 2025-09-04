@@ -1,12 +1,6 @@
-import { generateId } from './utils'
-import SocketClient from './socket-client'
-import type {
-  SessionRequest,
-  SessionStreamChunk,
-  SessionError,
-  SessionResponse,
-  ChatTypingData,
-} from '@starships/protocol'
+import { generateId } from '@/lib/utils'
+import SocketClient from '@/lib/socket-client'
+import type { SessionRequest, SessionStreamChunk, SessionError, SessionResponse, ChatTypingData } from '@starships/protocol'
 
 export interface Message {
   id: string
@@ -66,12 +60,7 @@ export const agentSocketAPI = {
     }
 
     const handleStreamChunk = (chunk: SessionStreamChunk) => {
-      if (
-        chunk.streamId === streamId &&
-        chunk.agentId === agentId &&
-        chunk.source === 'agent' &&
-        !isAborted
-      ) {
+      if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content
           callbacks.onChunk(chunk, accumulatedContent)
@@ -84,13 +73,7 @@ export const agentSocketAPI = {
     }
 
     const handleStreamComplete = (chunk: SessionStreamChunk) => {
-      if (
-        chunk.streamId === streamId &&
-        chunk.agentId === agentId &&
-        chunk.source === 'agent' &&
-        chunk.type === 'complete' &&
-        !isAborted
-      ) {
+      if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && chunk.type === 'complete' && !isAborted) {
         // Extract sessionId from server's metadata or fallback to provided sessionId
         const serverSessionId = chunk.metadata?.sessionId as string
         const finalSessionId = serverSessionId || request.sessionId || 'unknown'

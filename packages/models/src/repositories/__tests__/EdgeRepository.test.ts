@@ -2,7 +2,7 @@
  * EdgeRepository Unit Tests
  */
 
-import { EdgeRepository } from '../EdgeRepository';
+import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { EdgeModel } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('EdgeRepository', () => {
   let repository: EdgeRepository;
@@ -57,15 +57,10 @@ describe('EdgeRepository', () => {
 
       const result = await repository.createEdge(blueprintId, validEdgeData);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
-        { blueprintId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id', { blueprintId });
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(from:Node {id: $fromId})'
-        ),
+        expect.stringContaining('MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(from:Node {id: $fromId})'),
         { blueprintId, fromId: 'node-1', toId: 'node-2' }
       );
 
@@ -108,21 +103,15 @@ describe('EdgeRepository', () => {
     it('should throw ValidationError for missing required parameters', async () => {
       await expect(repository.createEdge('', validEdgeData)).rejects.toThrow(ValidationError);
 
-      await expect(
-        repository.createEdge('blueprint-123', { from: '', to: 'node-2' } as any)
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.createEdge('blueprint-123', { from: '', to: 'node-2' } as any)).rejects.toThrow(ValidationError);
 
-      await expect(
-        repository.createEdge('blueprint-123', { from: 'node-1', to: '' } as any)
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.createEdge('blueprint-123', { from: 'node-1', to: '' } as any)).rejects.toThrow(ValidationError);
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Blueprint not found
 
-      await expect(repository.createEdge('non-existent', validEdgeData)).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.createEdge('non-existent', validEdgeData)).rejects.toThrow(NotFoundError);
     });
 
     it('should throw ValidationError when nodes do not exist', async () => {
@@ -130,17 +119,13 @@ describe('EdgeRepository', () => {
         .mockResolvedValueOnce([{ id: 'blueprint-123' }]) // Blueprint exists
         .mockResolvedValueOnce([]); // Nodes don't exist
 
-      await expect(repository.createEdge('blueprint-123', validEdgeData)).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.createEdge('blueprint-123', validEdgeData)).rejects.toThrow(ValidationError);
     });
 
     it('should handle database errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database connection failed'));
 
-      await expect(repository.createEdge('blueprint-123', validEdgeData)).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.createEdge('blueprint-123', validEdgeData)).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -225,17 +210,13 @@ describe('EdgeRepository', () => {
     });
 
     it('should throw ValidationError for invalid edges array', async () => {
-      await expect(repository.createEdges('blueprint-123', 'invalid' as any)).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.createEdges('blueprint-123', 'invalid' as any)).rejects.toThrow(ValidationError);
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]);
 
-      await expect(repository.createEdges('non-existent', validEdgesData)).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.createEdges('non-existent', validEdgesData)).rejects.toThrow(NotFoundError);
     });
 
     it('should validate required blueprintId parameter', async () => {
@@ -399,10 +380,7 @@ describe('EdgeRepository', () => {
 
       const result = await repository.updateEdge(edgeId, updates);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() DELETE r',
-        { edgeId }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() DELETE r', { edgeId });
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('CREATE (from)-[:FLOWS_TO {id: $edgeId, ref: $ref}]->(to)'),
@@ -433,10 +411,10 @@ describe('EdgeRepository', () => {
 
       const result = await repository.updateEdge(edgeId, updates);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() SET r.ref = $ref',
-        { edgeId, ref: 'new-ref-only' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() SET r.ref = $ref', {
+        edgeId,
+        ref: 'new-ref-only',
+      });
 
       expect(result?.ref).toBe('new-ref-only');
     });
@@ -485,9 +463,7 @@ describe('EdgeRepository', () => {
     it('should throw NotFoundError when edge does not exist', async () => {
       jest.spyOn(repository, 'getEdgeById').mockResolvedValue(null);
 
-      await expect(repository.updateEdge(edgeId, { ref: 'new-ref' })).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.updateEdge(edgeId, { ref: 'new-ref' })).rejects.toThrow(NotFoundError);
     });
   });
 
@@ -500,15 +476,9 @@ describe('EdgeRepository', () => {
 
       const result = await repository.deleteEdge(edgeId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() RETURN r.id as edgeId',
-        { edgeId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() RETURN r.id as edgeId', { edgeId });
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() DELETE r',
-        { edgeId }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() DELETE r', { edgeId });
 
       expect(result).toBe(true);
     });
@@ -539,10 +509,7 @@ describe('EdgeRepository', () => {
 
       await repository.deleteEdgesByBlueprintId(blueprintId);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
-        { blueprintId }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id', { blueprintId });
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(from:Node)'),
@@ -553,9 +520,7 @@ describe('EdgeRepository', () => {
     it('should throw NotFoundError when blueprint does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Blueprint not found
 
-      await expect(repository.deleteEdgesByBlueprintId('non-existent')).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.deleteEdgesByBlueprintId('non-existent')).rejects.toThrow(NotFoundError);
     });
 
     it('should validate required blueprintId parameter', async () => {
@@ -778,10 +743,10 @@ describe('EdgeRepository', () => {
 
       await repository.updateEdge('edge-123', updates);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET r.ref = $ref'),
-        { edgeId: 'edge-123', ref: null }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('SET r.ref = $ref'), {
+        edgeId: 'edge-123',
+        ref: null,
+      });
     });
 
     it('should handle very long ref values', async () => {

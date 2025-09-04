@@ -5,7 +5,7 @@
  * Built on top of the base Memory class for LLM message management
  */
 
-import { Memory, Message, MemoryState, MemoryParams } from './Memory';
+import { Memory, Message, MemoryState, MemoryParams } from '@/Memory';
 
 /**
  * Agent identity information
@@ -87,11 +87,7 @@ export class AgentMemory extends Memory {
    * Add conversation entry with metadata (legacy compatibility)
    * @deprecated Use addMessage instead
    */
-  addConversation(
-    role: 'user' | 'assistant' | 'system',
-    content: string,
-    metadata?: Record<string, unknown>
-  ): void {
+  addConversation(role: 'user' | 'assistant' | 'system', content: string, metadata?: Record<string, unknown>): void {
     this.addMessage(role, content, metadata);
   }
 
@@ -170,8 +166,7 @@ export class AgentMemory extends Memory {
       const identityParts: string[] = [];
       if (this.state.identity.name) identityParts.push(`Name: ${this.state.identity.name}`);
       if (this.state.identity.role) identityParts.push(`Role: ${this.state.identity.role}`);
-      if (this.state.identity.personality)
-        identityParts.push(`Personality: ${this.state.identity.personality}`);
+      if (this.state.identity.personality) identityParts.push(`Personality: ${this.state.identity.personality}`);
       if (this.state.identity.expertise && this.state.identity.expertise.length > 0) {
         identityParts.push(`Expertise: ${this.state.identity.expertise.join(', ')}`);
       }
@@ -237,9 +232,7 @@ export class AgentMemory extends Memory {
   clone(): AgentMemory {
     const cloned = new AgentMemory();
     // Copy message entries with metadata
-    super
-      .getMessageEntries()
-      .forEach((msg) => cloned.addMessage(msg.role, msg.content, msg.metadata));
+    super.getMessageEntries().forEach((msg) => cloned.addMessage(msg.role, msg.content, msg.metadata));
     // Copy agent-specific data
     cloned.state.identity = this.state.identity ? { ...this.state.identity } : undefined;
     cloned.state.purpose = this.state.purpose ? { ...this.state.purpose } : undefined;

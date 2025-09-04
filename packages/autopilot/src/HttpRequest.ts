@@ -6,7 +6,7 @@
  */
 
 import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
-import { HttpRequestNodeParameters } from './types';
+import { HttpRequestNodeParameters } from '@/types';
 
 export class HttpRequest {
   private params: HttpRequestNodeParameters;
@@ -147,10 +147,7 @@ export class HttpRequest {
   /**
    * Add authentication to request configuration
    */
-  private addAuthentication(
-    config: AxiosRequestConfig,
-    auth: HttpRequestNodeParameters['authentication']
-  ) {
+  private addAuthentication(config: AxiosRequestConfig, auth: HttpRequestNodeParameters['authentication']) {
     if (!auth || !config.headers) return;
 
     switch (auth.type) {

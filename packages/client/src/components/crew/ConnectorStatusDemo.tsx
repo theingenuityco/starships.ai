@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { MCPServerConnector, MCPServerOption } from '@/lib/api'
-import { ConnectorStatusDashboard } from './ConnectorStatusDashboard'
-import { ConnectorInstanceMonitor } from './ConnectorInstanceMonitor'
-import { ConnectorPerformanceMetrics } from './ConnectorPerformanceMetrics'
+import { ConnectorStatusDashboard } from '@/components/crew/ConnectorStatusDashboard'
+import { ConnectorInstanceMonitor } from '@/components/crew/ConnectorInstanceMonitor'
+import { ConnectorPerformanceMetrics } from '@/components/crew/ConnectorPerformanceMetrics'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -35,12 +35,7 @@ const mockTemplates: MCPServerOption[] = [
   },
 ]
 
-const createMockConnector = (
-  template: MCPServerOption,
-  status: MCPServerConnector['status'],
-  hasApiKeys: boolean = false,
-  errorMessage?: string
-): MCPServerConnector => ({
+const createMockConnector = (template: MCPServerOption, status: MCPServerConnector['status'], hasApiKeys: boolean = false, errorMessage?: string): MCPServerConnector => ({
   id: `conn-${template.id}`,
   templateId: template.id,
   starshipId: 'demo-ship',
@@ -49,8 +44,7 @@ const createMockConnector = (
   connectedAt: new Date(Date.now() - Math.random() * 86400000).toISOString(),
   createdAt: new Date(Date.now() - Math.random() * 86400000).toISOString(),
   updatedAt: new Date().toISOString(),
-  lastUsed:
-    status === 'active' ? new Date(Date.now() - Math.random() * 3600000).toISOString() : undefined,
+  lastUsed: status === 'active' ? new Date(Date.now() - Math.random() * 3600000).toISOString() : undefined,
   template,
   env: hasApiKeys
     ? template.env?.replace(/\$\{([^}]+)\}/g, (_, key) => {
@@ -70,11 +64,7 @@ export function ConnectorStatusDemo() {
   const getConnectorInstances = (): MCPServerConnector[] => {
     switch (scenario) {
       case 'configured':
-        return [
-          createMockConnector(mockTemplates[0], 'active', true),
-          createMockConnector(mockTemplates[1], 'active', true),
-          createMockConnector(mockTemplates[2], 'active', false),
-        ]
+        return [createMockConnector(mockTemplates[0], 'active', true), createMockConnector(mockTemplates[1], 'active', true), createMockConnector(mockTemplates[2], 'active', false)]
       case 'missing':
         return [
           createMockConnector(mockTemplates[0], 'error', false, 'Missing required API keys'),
@@ -107,31 +97,17 @@ export function ConnectorStatusDemo() {
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground mb-3">
-                This demo shows the enhanced connector status displays with API key configuration
-                information. Switch between different scenarios to see how the status indicators
-                change.
+                This demo shows the enhanced connector status displays with API key configuration information. Switch between different scenarios to see how the status indicators change.
               </p>
 
               <div className="flex gap-2">
-                <Button
-                  variant={scenario === 'configured' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScenario('configured')}
-                >
+                <Button variant={scenario === 'configured' ? 'default' : 'outline'} size="sm" onClick={() => setScenario('configured')}>
                   All Configured
                 </Button>
-                <Button
-                  variant={scenario === 'missing' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScenario('missing')}
-                >
+                <Button variant={scenario === 'missing' ? 'default' : 'outline'} size="sm" onClick={() => setScenario('missing')}>
                   Missing Keys
                 </Button>
-                <Button
-                  variant={scenario === 'mixed' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setScenario('mixed')}
-                >
+                <Button variant={scenario === 'mixed' ? 'default' : 'outline'} size="sm" onClick={() => setScenario('mixed')}>
                   Mixed Status
                 </Button>
               </div>

@@ -4,14 +4,7 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import {
-  NodeResult,
-  Execution,
-  ValidationResult,
-  Node as WorkflowNode,
-  ValidationErrorCode,
-  ValidationWarningCode,
-} from '../types';
+import { NodeResult, Execution, ValidationResult, Node as WorkflowNode, ValidationErrorCode, ValidationWarningCode } from '@/types';
 
 /**
  * Base interface for workflow node handlers

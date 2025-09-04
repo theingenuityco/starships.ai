@@ -13,12 +13,7 @@ interface ChatModeSelectorProps {
   compact?: boolean
 }
 
-export function ChatModeSelector({
-  mode,
-  onModeChange,
-  disabled = false,
-  compact = false,
-}: ChatModeSelectorProps) {
+export function ChatModeSelector({ mode, onModeChange, disabled = false, compact = false }: ChatModeSelectorProps) {
   const modes = [
     {
       id: 'agent' as const,
@@ -29,12 +24,7 @@ export function ChatModeSelector({
   ] as const
 
   return (
-    <div
-      className={cn(
-        'flex items-center bg-muted/20 rounded-xl border border-border/40',
-        compact ? 'p-0.5' : 'p-1'
-      )}
-    >
+    <div className={cn('flex items-center bg-muted/20 rounded-xl border border-border/40', compact ? 'p-0.5' : 'p-1')}>
       {modes.map(modeOption => {
         const Icon = modeOption.icon
         const isActive = mode === modeOption.id
@@ -48,9 +38,7 @@ export function ChatModeSelector({
               'relative flex items-center rounded-lg font-medium transition-colors',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               compact ? 'gap-1.5 px-2.5 py-1.5 text-xs' : 'gap-2 px-4 py-2 text-sm',
-              isActive
-                ? 'text-primary bg-background shadow-sm border border-border/40'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+              isActive ? 'text-primary bg-background shadow-sm border border-border/40' : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
             )}
             whileHover={!disabled ? { scale: 1.02 } : undefined}
             whileTap={!disabled ? { scale: 0.98 } : undefined}
@@ -68,13 +56,7 @@ export function ChatModeSelector({
               />
             )}
 
-            <Icon
-              className={cn(
-                'relative z-10',
-                compact ? 'h-3 w-3' : 'h-4 w-4',
-                isActive ? 'text-primary' : 'text-muted-foreground'
-              )}
-            />
+            <Icon className={cn('relative z-10', compact ? 'h-3 w-3' : 'h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
             <span className="relative z-10">{modeOption.label}</span>
           </motion.button>
         )

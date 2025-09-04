@@ -2,8 +2,8 @@
  * MissionMessageRepository Unit Tests
  */
 
-import { MissionMessageRepository } from '../MissionMessageRepository';
-import { Neo4jConnection, getConnection } from '../../helpers/database';
+import { MissionMessageRepository } from '@/repositories/MissionMessageRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '@starships/errors';
 import type { MissionMessageModel, MissionMessageRole } from '@starships/protocol';
 
@@ -32,9 +32,7 @@ describe('MissionMessageRepository', () => {
     jest.clearAllMocks();
   });
 
-  const createMockMessage = (
-    overrides: Partial<MissionMessageModel> = {}
-  ): MissionMessageModel => ({
+  const createMockMessage = (overrides: Partial<MissionMessageModel> = {}): MissionMessageModel => ({
     id: 'message-123',
     missionId: 'mission-123',
     role: 'user',
@@ -80,10 +78,9 @@ describe('MissionMessageRepository', () => {
         role: 'user',
         content: 'Test message content',
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (m:Mission {id: $missionId})'),
-        { missionId: 'mission-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (m:Mission {id: $missionId})'), {
+        missionId: 'mission-123',
+      });
     });
 
     it('should save system/orchestrator message without user relationship', async () => {
@@ -138,21 +135,15 @@ describe('MissionMessageRepository', () => {
 
     it('should validate string lengths', async () => {
       // Content too short
-      await expect(repository.saveMessage(createMockMessageInput({ content: '' }))).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.saveMessage(createMockMessageInput({ content: '' }))).rejects.toThrow(ValidationError);
 
       // Content too long
       const longContent = 'x'.repeat(10001);
-      await expect(
-        repository.saveMessage(createMockMessageInput({ content: longContent }))
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.saveMessage(createMockMessageInput({ content: longContent }))).rejects.toThrow(ValidationError);
 
       // SenderName too long
       const longSenderName = 'x'.repeat(201);
-      await expect(
-        repository.saveMessage(createMockMessageInput({ senderName: longSenderName }))
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.saveMessage(createMockMessageInput({ senderName: longSenderName }))).rejects.toThrow(ValidationError);
     });
 
     it('should throw NotFoundError when mission does not exist', async () => {
@@ -175,9 +166,7 @@ describe('MissionMessageRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite.mockResolvedValue([]); // No results
 
-      await expect(repository.saveMessage(messageInput)).rejects.toThrow(
-        'Database operation failed'
-      );
+      await expect(repository.saveMessage(messageInput)).rejects.toThrow('Database operation failed');
     });
   });
 
@@ -189,10 +178,9 @@ describe('MissionMessageRepository', () => {
       const result = await repository.getMessagesByMission('mission-123');
 
       expect(result).toHaveLength(2);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY msg.timestamp ASC'),
-        { missionId: 'mission-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY msg.timestamp ASC'), {
+        missionId: 'mission-123',
+      });
     });
 
     it('should return messages with pagination', async () => {
@@ -240,10 +228,9 @@ describe('MissionMessageRepository', () => {
       const result = await repository.getMessageCount('mission-123');
 
       expect(result).toBe(15);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('count(msg) as count'),
-        { missionId: 'mission-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('count(msg) as count'), {
+        missionId: 'mission-123',
+      });
     });
 
     it('should return 0 when no messages found', async () => {
@@ -296,23 +283,15 @@ describe('MissionMessageRepository', () => {
     });
 
     it('should validate pagination parameters', async () => {
-      await expect(repository.getMessagesByMissionWithPagination('mission-123', 0)).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.getMessagesByMissionWithPagination('mission-123', 0)).rejects.toThrow(ValidationError);
 
-      await expect(
-        repository.getMessagesByMissionWithPagination('mission-123', 1, 0)
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.getMessagesByMissionWithPagination('mission-123', 1, 0)).rejects.toThrow(ValidationError);
 
-      await expect(
-        repository.getMessagesByMissionWithPagination('mission-123', 1, 201)
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.getMessagesByMissionWithPagination('mission-123', 1, 201)).rejects.toThrow(ValidationError);
     });
 
     it('should validate missionId parameter', async () => {
-      await expect(repository.getMessagesByMissionWithPagination('')).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.getMessagesByMissionWithPagination('')).rejects.toThrow(ValidationError);
     });
 
     it('should calculate total pages correctly', async () => {
@@ -334,22 +313,16 @@ describe('MissionMessageRepository', () => {
 
       await repository.deleteMessagesByMission('mission-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (m:Mission {id: $missionId})'),
-        { missionId: 'mission-123' }
-      );
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE msg'),
-        { missionId: 'mission-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (m:Mission {id: $missionId})'), {
+        missionId: 'mission-123',
+      });
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE msg'), { missionId: 'mission-123' });
     });
 
     it('should throw NotFoundError when mission does not exist', async () => {
       mockConnection.executeQuery.mockResolvedValue([]); // Mission not found
 
-      await expect(repository.deleteMessagesByMission('non-existent')).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.deleteMessagesByMission('non-existent')).rejects.toThrow(NotFoundError);
     });
 
     it('should validate missionId parameter', async () => {
@@ -359,9 +332,7 @@ describe('MissionMessageRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.deleteMessagesByMission('mission-123')).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.deleteMessagesByMission('mission-123')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -381,10 +352,7 @@ describe('MissionMessageRepository', () => {
         expect.stringContaining('MATCH (msg:MissionMessageModel {id: $messageId})'),
         { messageId: 'message-123' }
       );
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE msg'),
-        { messageId: 'message-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE msg'), { messageId: 'message-123' });
     });
 
     it('should throw NotFoundError when message does not exist', async () => {
@@ -526,10 +494,7 @@ describe('MissionMessageRepository', () => {
       mockConnection.executeWrite.mockResolvedValue([]);
       await repository.deleteMessagesByMission(missionId);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE msg'),
-        { missionId }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE msg'), { missionId });
     });
 
     it('should handle pagination edge cases', async () => {

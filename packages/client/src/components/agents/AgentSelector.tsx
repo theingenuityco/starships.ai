@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Agent, agentAPI } from '@/lib/api'
-import { AgentCard } from './AgentCard'
-import { AgentForm } from './AgentForm'
-import { AgentTester } from './AgentTester'
-import { AgentAnalytics } from './AgentAnalytics'
-import { AgentTemplateSelector } from './AgentTemplateSelector'
+import { AgentCard } from '@/components/agents/AgentCard'
+import { AgentForm } from '@/components/agents/AgentForm'
+import { AgentTester } from '@/components/agents/AgentTester'
+import { AgentAnalytics } from '@/components/agents/AgentAnalytics'
+import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Loader2, Plus, Sparkles, Bot } from 'lucide-react'
@@ -26,14 +26,7 @@ interface FilterState {
   searchQuery: string
 }
 
-export function AgentSelector({
-  selectedAgent,
-  onAgentSelect,
-  showCreateButton = true,
-  showFilters = true,
-  starshipId,
-  onAgentsCountChange,
-}: AgentSelectorProps) {
+export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton = true, showFilters = true, starshipId, onAgentsCountChange }: AgentSelectorProps) {
   const [agents, setAgents] = useState<Agent[]>([])
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
@@ -104,9 +97,7 @@ export function AgentSelector({
 
       // If starshipId is provided, fetch agents for that specific starship
       // Otherwise, fetch all agents (for backward compatibility)
-      const fetchedAgents = starshipId
-        ? await agentAPI.getByStarshipId(starshipId)
-        : await agentAPI.getAll()
+      const fetchedAgents = starshipId ? await agentAPI.getByStarshipId(starshipId) : await agentAPI.getAll()
       setAgents(fetchedAgents)
       setError(null)
     } catch (err) {
@@ -128,11 +119,7 @@ export function AgentSelector({
     // Search filter
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        agent =>
-          agent.name.toLowerCase().includes(query) ||
-          agent.description?.toLowerCase().includes(query)
-      )
+      filtered = filtered.filter(agent => agent.name.toLowerCase().includes(query) || agent.description?.toLowerCase().includes(query))
     }
 
     setFilteredAgents(filtered)
@@ -217,12 +204,7 @@ export function AgentSelector({
       <div className="p-6">
         <div className="text-center">
           <div className="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg
-              className="w-6 h-6 text-destructive"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-6 h-6 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -250,9 +232,7 @@ export function AgentSelector({
           </span>
           <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
-            <p className="text-sm text-muted-foreground">
-              Manage your starship&apos;s AI crew members
-            </p>
+            <p className="text-sm text-muted-foreground">Manage your starship&apos;s AI crew members</p>
           </div>
         </div>
         {showCreateButton && (
@@ -274,12 +254,7 @@ export function AgentSelector({
                 </Button>
               }
             />
-            <Button
-              onClick={handleCreateAgent}
-              size="sm"
-              variant="outline"
-              className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80"
-            >
+            <Button onClick={handleCreateAgent} size="sm" variant="outline" className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80">
               <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>Create Agent</span>
             </Button>
@@ -293,9 +268,7 @@ export function AgentSelector({
           <div className="space-y-3">
             <div className="flex items-center gap-2 px-1">
               <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
-              <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
-                ACTIVE AGENTS
-              </h4>
+              <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">ACTIVE AGENTS</h4>
               <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
             </div>
 
@@ -330,12 +303,7 @@ export function AgentSelector({
       {filteredAgents.length === 0 ? (
         <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
           <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-8 h-8 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -344,11 +312,7 @@ export function AgentSelector({
               />
             </svg>
           </div>
-          <p className="text-base text-muted-foreground mb-3">
-            {filters.searchQuery || filters.category
-              ? 'No agents match your filters'
-              : AGENT_TEXT.NO_AGENTS_AVAILABLE}
-          </p>
+          <p className="text-base text-muted-foreground mb-3">{filters.searchQuery || filters.category ? 'No agents match your filters' : AGENT_TEXT.NO_AGENTS_AVAILABLE}</p>
         </div>
       ) : (
         <div className="space-y-3 mt-4">
@@ -374,31 +338,19 @@ export function AgentSelector({
           <DialogHeader>
             <DialogTitle>{editingAgent ? 'Edit Agent' : 'Create New Agent'}</DialogTitle>
           </DialogHeader>
-          <AgentForm
-            agent={editingAgent || undefined}
-            onSave={handleFormSave}
-            onCancel={handleFormCancel}
-          />
+          <AgentForm agent={editingAgent || undefined} onSave={handleFormSave} onCancel={handleFormCancel} />
         </DialogContent>
       </Dialog>
 
       {/* Agent Tester Dialog */}
       <Dialog open={showTester} onOpenChange={setShowTester}>
-        <DialogContent className="max-w-7xl max-h-[95vh] p-0">
-          {testingAgent && <AgentTester agent={testingAgent} onClose={handleTestClose} />}
-        </DialogContent>
+        <DialogContent className="max-w-7xl max-h-[95vh] p-0">{testingAgent && <AgentTester agent={testingAgent} onClose={handleTestClose} />}</DialogContent>
       </Dialog>
 
       {/* Agent Analytics Dialog */}
       <Dialog open={showAnalytics} onOpenChange={setShowAnalytics}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          {analyticsAgent && (
-            <AgentAnalytics
-              agentId={analyticsAgent.id}
-              agentName={analyticsAgent.name}
-              onClose={handleAnalyticsClose}
-            />
-          )}
+          {analyticsAgent && <AgentAnalytics agentId={analyticsAgent.id} agentName={analyticsAgent.name} onClose={handleAnalyticsClose} />}
         </DialogContent>
       </Dialog>
     </div>

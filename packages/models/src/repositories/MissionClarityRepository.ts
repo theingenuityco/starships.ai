@@ -5,13 +5,9 @@
  * Uses MERGE pattern for upsert operations following existing repository patterns.
  */
 
-import { BaseRepository } from './BaseRepository';
-import { getConnection } from '../helpers/database';
-import {
-  MissionClarityModel,
-  CreateMissionClarityRequest,
-  UpdateMissionClarityRequest,
-} from '@starships/protocol';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { getConnection } from '@/helpers/database';
+import { MissionClarityModel, CreateMissionClarityRequest, UpdateMissionClarityRequest } from '@starships/protocol';
 
 export class MissionClarityRepository extends BaseRepository {
   constructor() {
@@ -22,34 +18,18 @@ export class MissionClarityRepository extends BaseRepository {
    * Create or update mission clarity (single clarity per mission)
    * Uses MERGE pattern to handle both create and update scenarios
    */
-  async upsertByMissionId(
-    missionId: string,
-    request: CreateMissionClarityRequest
-  ): Promise<MissionClarityModel> {
+  async upsertByMissionId(missionId: string, request: CreateMissionClarityRequest): Promise<MissionClarityModel> {
     return this.executeWithErrorHandling(
       async () => {
         // Validate required fields
         this.validateRequired(
           request,
-          [
-            'missionId',
-            'objectiveClarity',
-            'successMetrics',
-            'timelineDefinition',
-            'scopeBoundaries',
-            'reasoning',
-            'iteration',
-          ],
+          ['missionId', 'objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'reasoning', 'iteration'],
           'upsert'
         );
 
         // Validate score ranges (0-10)
-        const scoreFields = [
-          'objectiveClarity',
-          'successMetrics',
-          'timelineDefinition',
-          'scopeBoundaries',
-        ];
+        const scoreFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries'];
         for (const field of scoreFields) {
           const score = request[field as keyof CreateMissionClarityRequest] as number;
           if (typeof score !== 'number' || score < 0 || score > 10) {
@@ -67,21 +47,15 @@ export class MissionClarityRepository extends BaseRepository {
         }
 
         // Calculate overall score as average of 4 dimensions
-        const overallScore =
-          (request.objectiveClarity +
-            request.successMetrics +
-            request.timelineDefinition +
-            request.scopeBoundaries) /
-          4;
+        const overallScore = (request.objectiveClarity + request.successMetrics + request.timelineDefinition + request.scopeBoundaries) / 4;
 
         const now = new Date().toISOString();
         const connection = getConnection();
 
         // Check if mission exists
-        const missionCheck = await connection.executeQuery<{ id: string }>(
-          'MATCH (m:Mission {id: $missionId}) RETURN m.id as id',
-          { missionId }
-        );
+        const missionCheck = await connection.executeQuery<{ id: string }>('MATCH (m:Mission {id: $missionId}) RETURN m.id as id', {
+          missionId,
+        });
 
         if (!missionCheck || missionCheck.length === 0) {
           this.handleNotFound('Mission', missionId, 'upsert');
@@ -108,10 +82,7 @@ export class MissionClarityRepository extends BaseRepository {
             updatedAt: now,
           };
 
-          const clarity = await this.createEntityWithAutoId<MissionClarityModel>(
-            'MissionClarityModel',
-            clarityData
-          );
+          const clarity = await this.createEntityWithAutoId<MissionClarityModel>('MissionClarityModel', clarityData);
 
           // Create relationship with mission
           await connection.executeWrite(
@@ -171,10 +142,7 @@ export class MissionClarityRepository extends BaseRepository {
   /**
    * Update existing mission clarity
    */
-  async updateByMissionId(
-    missionId: string,
-    request: UpdateMissionClarityRequest
-  ): Promise<MissionClarityModel> {
+  async updateByMissionId(missionId: string, request: UpdateMissionClarityRequest): Promise<MissionClarityModel> {
     return this.executeWithErrorHandling(
       async () => {
         if (!missionId) {
@@ -198,12 +166,7 @@ export class MissionClarityRepository extends BaseRepository {
         };
 
         // Add score fields with validation
-        const scoreFields = [
-          'objectiveClarity',
-          'successMetrics',
-          'timelineDefinition',
-          'scopeBoundaries',
-        ];
+        const scoreFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries'];
         const providedScores: number[] = [];
 
         for (const field of scoreFields) {

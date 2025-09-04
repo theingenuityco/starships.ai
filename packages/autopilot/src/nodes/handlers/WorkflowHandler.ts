@@ -5,16 +5,9 @@
  * Uses BaseHandler pattern and focuses purely on workflow execution
  */
 
-import { BaseHandler } from '../Handler';
-import {
-  Execution,
-  ValidationResult,
-  WorkflowNodeParameters,
-  Node as WorkflowNode,
-  ValidationError,
-  ValidationWarning,
-} from '../../types';
-import { Workflow } from '../../Workflow';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '@/types';
+import { Workflow } from '@/Workflow';
 
 export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';
@@ -63,21 +56,14 @@ export class WorkflowHandler extends BaseHandler {
     } else {
       // Validate blueprint structure
       if (!params.blueprint.nodes || params.blueprint.nodes.length === 0) {
-        errors.push(
-          this.createValidationError(
-            'VALIDATION_FAILED',
-            'Blueprint must contain at least one node'
-          )
-        );
+        errors.push(this.createValidationError('VALIDATION_FAILED', 'Blueprint must contain at least one node'));
       }
 
       // Check for start node
       if (params.blueprint.nodes) {
         const hasStartNode = params.blueprint.nodes.some((n) => n.type === 'start');
         if (!hasStartNode) {
-          errors.push(
-            this.createValidationError('MISSING_START_NODE', 'Blueprint must have a start node')
-          );
+          errors.push(this.createValidationError('MISSING_START_NODE', 'Blueprint must have a start node'));
         }
       }
 
@@ -87,10 +73,7 @@ export class WorkflowHandler extends BaseHandler {
         for (const edge of params.blueprint.edges) {
           if (!nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)) {
             errors.push(
-              this.createValidationError(
-                'INVALID_EDGE_CONNECTION',
-                `Invalid edge reference in blueprint: ${edge.from} -> ${edge.to}`
-              )
+              this.createValidationError('INVALID_EDGE_CONNECTION', `Invalid edge reference in blueprint: ${edge.from} -> ${edge.to}`)
             );
           }
         }

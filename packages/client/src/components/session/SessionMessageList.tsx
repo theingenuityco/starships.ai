@@ -2,10 +2,10 @@
 
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { MessageList } from './MessageList'
-import { MessageBubble } from './MessageBubble'
+import { MessageList } from '@/components/session/MessageList'
+import { MessageBubble } from '@/components/session/MessageBubble'
 import type { Message } from '@/lib/agent-socket-api'
-import type { ChatMode } from './ChatModeSelector'
+import type { ChatMode } from '@/components/session/ChatModeSelector'
 import { useSessionMessages, type Message as SessionMessage } from '@/hooks/useSessions'
 
 interface SessionMessageListProps {
@@ -18,18 +18,9 @@ interface SessionMessageListProps {
 // Union type for session messages
 type SessionMessageType = Message
 
-export function SessionMessageList({
-  mode,
-  sessionId,
-  starshipId,
-  onMessageAdded,
-}: SessionMessageListProps) {
+export function SessionMessageList({ mode, sessionId, starshipId, onMessageAdded }: SessionMessageListProps) {
   // Use TanStack Query to fetch messages
-  const {
-    data: messageData,
-    isLoading: loading,
-    error: queryError,
-  } = useSessionMessages(sessionId || '', !!sessionId)
+  const { data: messageData, isLoading: loading, error: queryError } = useSessionMessages(sessionId || '', !!sessionId)
 
   const messages = messageData?.messages || []
 
@@ -81,19 +72,8 @@ export function SessionMessageList({
 
   return (
     <AnimatePresence mode="wait">
-      <motion.div
-        key={`${mode}-${sessionId}`}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="h-full"
-      >
-        <MessageList
-          messages={sessionMessages}
-          loading={loading}
-          error={error}
-          MessageComponent={getMessageComponent() as any}
-        />
+      <motion.div key={`${mode}-${sessionId}`} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full">
+        <MessageList messages={sessionMessages} loading={loading} error={error} MessageComponent={getMessageComponent() as any} />
       </motion.div>
     </AnimatePresence>
   )
@@ -107,21 +87,12 @@ function EmptyState({ mode }: EmptyStateProps) {
   const content = {
     title: 'Connect with your Agent',
     subtitle: 'Select an agent and start a conversation to boost your productivity',
-    suggestions: [
-      'Help me plan my project timeline',
-      'Analyze this data for insights',
-      'Write code for my application',
-      'Research industry trends',
-    ],
+    suggestions: ['Help me plan my project timeline', 'Analyze this data for insights', 'Write code for my application', 'Research industry trends'],
   }
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="max-w-md mx-auto space-y-6"
-      >
+      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md mx-auto space-y-6">
         {/* Title */}
         <div className="space-y-2">
           <h3 className="text-2xl font-semibold text-foreground">{content.title}</h3>

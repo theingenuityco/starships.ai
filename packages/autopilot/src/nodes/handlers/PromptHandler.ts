@@ -4,14 +4,8 @@
  * User prompt handler using BaseHandler pattern - will need UI integration
  */
 
-import { BaseHandler } from '../Handler';
-import {
-  Execution,
-  ValidationResult,
-  UserPromptNodeParameters,
-  Node as WorkflowNode,
-  ValidationError,
-} from '../../types';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult, UserPromptNodeParameters, Node as WorkflowNode, ValidationError } from '@/types';
 
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
@@ -39,9 +33,7 @@ export class PromptHandler extends BaseHandler {
     }
 
     if (!params.choices || params.choices.length === 0) {
-      errors.push(
-        this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one choice is required')
-      );
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one choice is required'));
     }
 
     return {

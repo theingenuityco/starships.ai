@@ -4,23 +4,12 @@
 
 import type { Response } from 'express';
 import { BaseError, ErrorUtils } from '@starships/errors';
-import type {
-  ApiResponse,
-  ApiErrorResponse,
-  ApiResponseMeta,
-  PaginationMeta,
-  StandardErrorCode,
-} from '@starships/protocol';
+import type { ApiResponse, ApiErrorResponse, ApiResponseMeta, PaginationMeta, StandardErrorCode } from '@starships/protocol';
 
 /**
  * Send standardized success response
  */
-export function sendSuccess<T>(
-  res: Response,
-  data: T,
-  statusCode: number = 200,
-  meta?: ApiResponseMeta
-): void {
+export function sendSuccess<T>(res: Response, data: T, statusCode: number = 200, meta?: ApiResponseMeta): void {
   const response: ApiResponse<T> = { data };
   if (meta) {
     response.meta = meta;

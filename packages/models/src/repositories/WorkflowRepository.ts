@@ -1,7 +1,7 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 import type { WorkflowModel } from '@starships/protocol';
-import { BaseRepository } from './BaseRepository';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 import { Blueprint } from '@starships/autopilot';
 
 /**
@@ -16,11 +16,7 @@ export class WorkflowRepository extends BaseRepository {
    * Safe value getter with null/undefined/empty object handling
    */
   private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    if (
-      value === null ||
-      value === undefined ||
-      (typeof value === 'object' && Object.keys(value as any).length === 0)
-    ) {
+    if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
       return defaultValue;
     }
     return value as T;
@@ -59,12 +55,8 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC'
-        );
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.w))
-        );
+        const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC');
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
       },
       'findAll',
       'Workflow'
@@ -75,10 +67,7 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) WHERE w.id = $id RETURN w',
-          { id }
-        );
+        const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) WHERE w.id = $id RETURN w', { id });
         const workflow = result[0]?.w || null;
         return workflow ? convertNeo4jIntsInObject(workflow) : null;
       },
@@ -145,10 +134,7 @@ export class WorkflowRepository extends BaseRepository {
     // Update Neo4j relationship for backward compatibility
     try {
       // Remove existing DEPLOYED_ON relationships
-      await connection.executeWrite(
-        'MATCH (w:Workflow {id: $workflowId})-[r:DEPLOYED_ON]->() DELETE r',
-        { workflowId }
-      );
+      await connection.executeWrite('MATCH (w:Workflow {id: $workflowId})-[r:DEPLOYED_ON]->() DELETE r', { workflowId });
 
       // Create new DEPLOYED_ON relationship
       await connection.executeWrite(
@@ -173,9 +159,7 @@ export class WorkflowRepository extends BaseRepository {
     return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
-  async create(
-    entity: Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
-  ): Promise<WorkflowModel> {
+  async create(entity: Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<WorkflowModel> {
     return this.executeWithErrorHandling(
       async () => {
         this.validateRequired(entity, ['name', 'authorId'], 'create');
@@ -215,14 +199,9 @@ export class WorkflowRepository extends BaseRepository {
           allowedStarshipClasses: entity.allowedStarshipClasses as string[] | undefined,
         };
 
-        const workflowForStorage = this.serializeComplexFields(
-          workflowData as unknown as WorkflowModel
-        );
+        const workflowForStorage = this.serializeComplexFields(workflowData as unknown as WorkflowModel);
 
-        const workflow = await this.createEntityWithAutoId<WorkflowModel>(
-          'Workflow',
-          workflowForStorage
-        );
+        const workflow = await this.createEntityWithAutoId<WorkflowModel>('Workflow', workflowForStorage);
 
         // For backward compatibility, also create Neo4j relationship during transition
         if (workflow.starshipId) {
@@ -336,18 +315,19 @@ export class WorkflowRepository extends BaseRepository {
 
   async incrementUsageCount(id: string): Promise<void> {
     const connection = getConnection();
-    await connection.executeWrite(
-      'MATCH (w:Workflow) WHERE w.id = $id SET w.usageCount = w.usageCount + 1, w.updatedAt = $timestamp',
-      { id, timestamp: new Date().toISOString() }
-    );
+    await connection.executeWrite('MATCH (w:Workflow) WHERE w.id = $id SET w.usageCount = w.usageCount + 1, w.updatedAt = $timestamp', {
+      id,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   async updateRating(id: string, rating: number): Promise<void> {
     const connection = getConnection();
-    await connection.executeWrite(
-      'MATCH (w:Workflow) WHERE w.id = $id SET w.rating = $rating, w.updatedAt = $timestamp',
-      { id, rating, timestamp: new Date().toISOString() }
-    );
+    await connection.executeWrite('MATCH (w:Workflow) WHERE w.id = $id SET w.rating = $rating, w.updatedAt = $timestamp', {
+      id,
+      rating,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   async findWithFilters(filters: {

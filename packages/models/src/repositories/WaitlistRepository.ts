@@ -1,5 +1,5 @@
-import { Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import { ValidationError, DatabaseError } from '@starships/errors';
 import { WaitlistEntryModel } from '@starships/protocol';
 

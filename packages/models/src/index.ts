@@ -23,13 +23,7 @@ export { MessageRepository } from './repositories/MessageRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
 
 // Logging and monitoring
-export {
-  Logger,
-  PerformanceMonitor,
-  HealthMonitor,
-  RequestContext,
-  logger,
-} from './helpers/logging';
+export { Logger, PerformanceMonitor, HealthMonitor, RequestContext, logger } from './helpers/logging';
 
 export type { LogLevel, LogContext, PerformanceMetrics, HealthStatus } from './helpers/logging';
 

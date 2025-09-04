@@ -5,12 +5,12 @@
  * for real-time mission coordination.
  */
 
-import { MissionOrchestratorAgent, type MissionChatState } from './MissionOrchestratorAgent';
-import { SYSTEM_INSTRUCTIONS } from '../prompts/MissionPromptBuilder';
-import { MissionService } from './MissionService';
+import { MissionOrchestratorAgent, type MissionChatState } from '@/services/MissionOrchestratorAgent';
+import { SYSTEM_INSTRUCTIONS } from '@/prompts/MissionPromptBuilder';
+import { MissionService } from '@/services/MissionService';
 import { MissionRepository, MissionMessageRepository } from '@starships/models';
-import { Logger } from '../utils/logger';
-import { SocketIOService } from './SocketIOService';
+import { Logger } from '@/utils/logger';
+import { SocketIOService } from '@/services/SocketIOService';
 import { ValidationError, InternalServerError } from '@starships/errors';
 import type { MissionMessageModel, MissionChatResponse, MissionPhase } from '@starships/protocol';
 
@@ -53,9 +53,7 @@ export class MissionOrchestratorService {
   /**
    * Get singleton instance
    */
-  static getInstance(
-    config?: Partial<MissionOrchestratorServiceConfig>
-  ): MissionOrchestratorService {
+  static getInstance(config?: Partial<MissionOrchestratorServiceConfig>): MissionOrchestratorService {
     if (!MissionOrchestratorService.instance) {
       MissionOrchestratorService.instance = new MissionOrchestratorService(config);
     }
@@ -97,10 +95,7 @@ export class MissionOrchestratorService {
       message,
       {
         onMessageGenerated: async (aiMessage: any) => {
-          const savedMessage = await this.saveOrchestratorMessage(
-            missionId,
-            aiMessage.content as string
-          );
+          const savedMessage = await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
           this.emitMessageEvent(missionId, savedMessage);
         },
 
@@ -120,11 +115,7 @@ export class MissionOrchestratorService {
   /**
    * Handle user message and generate AI response
    */
-  async handleUserMessage(
-    missionId: string,
-    userId: string,
-    message: string
-  ): Promise<MissionChatResponse> {
+  async handleUserMessage(missionId: string, userId: string, message: string): Promise<MissionChatResponse> {
     try {
       const aiResponse = await this.handleMessage(missionId, message, { userId });
       return { reply: aiResponse };
@@ -173,11 +164,7 @@ export class MissionOrchestratorService {
       // Check if mission exists first
       await missionRepo.getMissionById(missionId);
 
-      const result = await missionMessageRepo.getMessagesByMissionWithPagination(
-        missionId,
-        page || 1,
-        pageSize || 50
-      );
+      const result = await missionMessageRepo.getMessagesByMissionWithPagination(missionId, page || 1, pageSize || 50);
 
       this.logger.info('Retrieved message history successfully', {
         ...context,
@@ -239,11 +226,7 @@ export class MissionOrchestratorService {
   /**
    * Save user message to database
    */
-  private async saveUserMessage(
-    missionId: string,
-    userId: string,
-    content: string
-  ): Promise<MissionMessageModel> {
+  private async saveUserMessage(missionId: string, userId: string, content: string): Promise<MissionMessageModel> {
     try {
       const missionRepo = new MissionRepository();
       const missionMessageRepo = new MissionMessageRepository();
@@ -282,10 +265,7 @@ export class MissionOrchestratorService {
   /**
    * Save orchestrator message to database
    */
-  private async saveOrchestratorMessage(
-    missionId: string,
-    content: string
-  ): Promise<MissionMessageModel> {
+  private async saveOrchestratorMessage(missionId: string, content: string): Promise<MissionMessageModel> {
     try {
       const missionRepo = new MissionRepository();
       const missionMessageRepo = new MissionMessageRepository();
@@ -358,10 +338,7 @@ export class MissionOrchestratorService {
   /**
    * Sync activePhase changes to database
    */
-  private async syncActivePhase(
-    missionId: string,
-    state: Partial<MissionChatState>
-  ): Promise<void> {
+  private async syncActivePhase(missionId: string, state: Partial<MissionChatState>): Promise<void> {
     if (state.activePhase && state.metadata?.mission?.phase !== state.activePhase) {
       try {
         await MissionService.updateMission(missionId, { phase: state.activePhase });

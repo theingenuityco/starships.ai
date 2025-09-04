@@ -4,8 +4,8 @@
  * Output formatting handler using BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
-import { Execution, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult, OutputNodeParameters, ValidationError } from '@/types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
@@ -41,9 +41,7 @@ export class OutputHandler extends BaseHandler {
     }
 
     if (!params.sources || params.sources.length === 0) {
-      errors.push(
-        this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one source node is required')
-      );
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one source node is required'));
     }
 
     return {

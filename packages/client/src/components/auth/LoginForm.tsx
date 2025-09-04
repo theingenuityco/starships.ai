@@ -2,14 +2,7 @@
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -82,12 +75,7 @@ export function LoginForm() {
   }
 
   return (
-    <motion.div
-      className="w-full max-w-md"
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: 0.3, duration: 0.4 }}
-    >
+    <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
       <Card>
         <CardHeader className="text-center">
           <CardTitle>Access Mission Control</CardTitle>
@@ -195,9 +183,7 @@ export function LoginForm() {
                       id="register-password"
                       type={showPassword ? 'text' : 'password'}
                       value={registerData.password}
-                      onChange={e =>
-                        setRegisterData(prev => ({ ...prev, password: e.target.value }))
-                      }
+                      onChange={e => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
                       placeholder="Create a strong password"
                       disabled={isLoading}
                       required
@@ -223,9 +209,7 @@ export function LoginForm() {
                       id="register-confirm-password"
                       type={showConfirmPassword ? 'text' : 'password'}
                       value={registerData.confirmPassword}
-                      onChange={e =>
-                        setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))
-                      }
+                      onChange={e => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                       placeholder="Confirm your password"
                       disabled={isLoading}
                       required
@@ -238,11 +222,7 @@ export function LoginForm() {
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       disabled={isLoading}
                     >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -269,10 +249,7 @@ export function LoginForm() {
         </CardContent>
 
         <CardFooter className="text-center">
-          <p className="text-xs text-muted-foreground">
-            By signing {activeTab === 'login' ? 'in' : 'up'}, you agree to our Terms of Service and
-            Privacy Policy
-          </p>
+          <p className="text-xs text-muted-foreground">By signing {activeTab === 'login' ? 'in' : 'up'}, you agree to our Terms of Service and Privacy Policy</p>
         </CardFooter>
       </Card>
     </motion.div>

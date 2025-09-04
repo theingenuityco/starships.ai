@@ -2,14 +2,8 @@
  * BaseRepository Unit Tests
  */
 
-import { BaseRepository } from '../BaseRepository';
-import {
-  BaseError,
-  ValidationError,
-  NotFoundError,
-  ConflictError,
-  DatabaseError,
-} from '@starships/errors';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { BaseError, ValidationError, NotFoundError, ConflictError, DatabaseError } from '@starships/errors';
 
 // Test implementation of BaseRepository
 class TestRepository extends BaseRepository {
@@ -22,12 +16,7 @@ class TestRepository extends BaseRepository {
     return this.createContext(operation, resource, resourceId);
   }
 
-  public testHandleDatabaseError(
-    error: any,
-    operation: string,
-    resource?: string,
-    resourceId?: string
-  ) {
+  public testHandleDatabaseError(error: any, operation: string, resource?: string, resourceId?: string) {
     return this.handleDatabaseError(error, operation, resource, resourceId);
   }
 
@@ -35,37 +24,19 @@ class TestRepository extends BaseRepository {
     return this.handleNotFound(resource, resourceId, operation);
   }
 
-  public testHandleValidationError(
-    fieldErrors: Array<{ field: string; message: string; value?: any }>,
-    operation?: string
-  ) {
+  public testHandleValidationError(fieldErrors: Array<{ field: string; message: string; value?: any }>, operation?: string) {
     return this.handleValidationError(fieldErrors, operation);
   }
 
-  public testHandleConflict(
-    resource: string,
-    conflictReason: string,
-    operation?: string,
-    resourceId?: string
-  ) {
+  public testHandleConflict(resource: string, conflictReason: string, operation?: string, resourceId?: string) {
     return this.handleConflict(resource, conflictReason, operation, resourceId);
   }
 
-  public async testExecuteWithErrorHandling<T>(
-    operation: () => Promise<T>,
-    operationName: string,
-    resource?: string,
-    resourceId?: string
-  ) {
+  public async testExecuteWithErrorHandling<T>(operation: () => Promise<T>, operationName: string, resource?: string, resourceId?: string) {
     return this.executeWithErrorHandling(operation, operationName, resource, resourceId);
   }
 
-  public testExecuteWithErrorHandlingSync<T>(
-    operation: () => T,
-    operationName: string,
-    resource?: string,
-    resourceId?: string
-  ) {
+  public testExecuteWithErrorHandlingSync<T>(operation: () => T, operationName: string, resource?: string, resourceId?: string) {
     return this.executeWithErrorHandlingSync(operation, operationName, resource, resourceId);
   }
 
@@ -77,29 +48,15 @@ class TestRepository extends BaseRepository {
     return this.validateTypes(data, fieldTypes, operation);
   }
 
-  public testValidateStringLengths(
-    data: any,
-    lengthConstraints: Record<string, { min?: number; max?: number }>,
-    operation?: string
-  ) {
+  public testValidateStringLengths(data: any, lengthConstraints: Record<string, { min?: number; max?: number }>, operation?: string) {
     return this.validateStringLengths(data, lengthConstraints, operation);
   }
 
-  public testValidateEnums(
-    data: any,
-    enumConstraints: Record<string, string[]>,
-    operation?: string
-  ) {
+  public testValidateEnums(data: any, enumConstraints: Record<string, string[]>, operation?: string) {
     return this.validateEnums(data, enumConstraints, operation);
   }
 
-  public testCreateBusinessLogicError(
-    code: string,
-    message: string,
-    operation?: string,
-    resource?: string,
-    resourceId?: string
-  ) {
+  public testCreateBusinessLogicError(code: string, message: string, operation?: string, resource?: string, resourceId?: string) {
     return this.createBusinessLogicError(code, message, operation, resource, resourceId);
   }
 }
@@ -292,9 +249,7 @@ describe('BaseRepository', () => {
         throw new ValidationError('Test validation error');
       };
 
-      await expect(repository.testExecuteWithErrorHandling(operation, 'test')).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.testExecuteWithErrorHandling(operation, 'test')).rejects.toThrow(ValidationError);
     });
 
     it('should handle generic error', async () => {
@@ -302,9 +257,7 @@ describe('BaseRepository', () => {
         throw new Error('Generic error');
       };
 
-      await expect(
-        repository.testExecuteWithErrorHandling(operation, 'test', 'User', 'user-123')
-      ).rejects.toThrow(DatabaseError);
+      await expect(repository.testExecuteWithErrorHandling(operation, 'test', 'User', 'user-123')).rejects.toThrow(DatabaseError);
     });
   });
 

@@ -4,8 +4,8 @@
  * Tests for workflow execution engine with simplified types
  */
 
-import { Engine } from '../Engine';
-import { Blueprint, Execution, NodeResult } from '../../types';
+import { Engine } from '@/engine/Engine';
+import { Blueprint, Execution, NodeResult } from '@/types';
 
 describe('Engine', () => {
   let engine: Engine;
@@ -93,9 +93,7 @@ describe('Engine', () => {
         parameters: {},
       };
 
-      await expect(engine.createHandler(unsupportedNode)).rejects.toThrow(
-        'No handler available for node type: unsupported_type'
-      );
+      await expect(engine.createHandler(unsupportedNode)).rejects.toThrow('No handler available for node type: unsupported_type');
     });
   });
 

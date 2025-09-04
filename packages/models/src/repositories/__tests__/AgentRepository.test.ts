@@ -2,8 +2,8 @@
  * AgentRepository Unit Tests
  */
 
-import { AgentRepository } from '../AgentRepository';
-import { getConnection } from '../../helpers/database';
+import { AgentRepository } from '@/repositories/AgentRepository';
+import { getConnection } from '@/helpers/database';
 import { ValidationError, NotFoundError, DatabaseError, ConflictError } from '@starships/errors';
 import type { AgentModel } from '@starships/protocol';
 
@@ -188,9 +188,7 @@ describe('AgentRepository', () => {
 
         const result = await repository.findAll();
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          'MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC'
-        );
+        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
         expect(result).toEqual(mockAgents);
       });
 
@@ -216,10 +214,7 @@ describe('AgentRepository', () => {
 
         const result = await repository.findById('agent-1');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          'MATCH (a:Agent) WHERE a.id = $id RETURN a',
-          { id: 'agent-1' }
-        );
+        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id: 'agent-1' });
         expect(result).toEqual(mockAgent);
       });
 
@@ -353,16 +348,13 @@ describe('AgentRepository', () => {
 
         const result = await repository.update('agent-1', updates);
 
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          'MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a',
-          {
-            id: 'agent-1',
-            updates: expect.objectContaining({
-              ...updates,
-              updatedAt: expect.any(String),
-            }),
-          }
-        );
+        expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a', {
+          id: 'agent-1',
+          updates: expect.objectContaining({
+            ...updates,
+            updatedAt: expect.any(String),
+          }),
+        });
         expect(result).toEqual(mockAgent);
       });
 
@@ -377,9 +369,7 @@ describe('AgentRepository', () => {
       it('should handle database errors', async () => {
         mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-        await expect(repository.update('agent-1', { name: 'Updated' })).rejects.toThrow(
-          DatabaseError
-        );
+        await expect(repository.update('agent-1', { name: 'Updated' })).rejects.toThrow(DatabaseError);
       });
     });
 
@@ -468,10 +458,9 @@ describe('AgentRepository', () => {
 
         await repository.updateStarshipId('agent-123', 'starship-456');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          'MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count',
-          { starshipId: 'starship-456' }
-        );
+        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count', {
+          starshipId: 'starship-456',
+        });
         expect(mockConnection.executeWrite).toHaveBeenCalledWith(
           expect.stringContaining('SET a.starshipId = $starshipId'),
           expect.objectContaining({
@@ -484,18 +473,14 @@ describe('AgentRepository', () => {
       it('should throw error when starship not found', async () => {
         mockConnection.executeQuery.mockResolvedValue([{ count: 0 }]); // Starship doesn't exist
 
-        await expect(repository.updateStarshipId('agent-123', 'non-existent')).rejects.toThrow(
-          NotFoundError
-        );
+        await expect(repository.updateStarshipId('agent-123', 'non-existent')).rejects.toThrow(NotFoundError);
       });
 
       it('should throw error when agent not found', async () => {
         mockConnection.executeQuery.mockResolvedValue([{ count: 1 }]); // Starship exists
         mockConnection.executeWrite.mockResolvedValue([{ count: 0 }]); // Agent doesn't exist
 
-        await expect(repository.updateStarshipId('non-existent', 'starship-456')).rejects.toThrow(
-          NotFoundError
-        );
+        await expect(repository.updateStarshipId('non-existent', 'starship-456')).rejects.toThrow(NotFoundError);
       });
     });
 
@@ -538,10 +523,9 @@ describe('AgentRepository', () => {
 
         const result = await repository.findByCategory('general');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          'MATCH (a:Agent) WHERE a.category = $category RETURN a ORDER BY a.name',
-          { category: 'general' }
-        );
+        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) WHERE a.category = $category RETURN a ORDER BY a.name', {
+          category: 'general',
+        });
         expect(result).toEqual(mockAgents);
       });
     });
@@ -641,10 +625,7 @@ describe('AgentRepository', () => {
 
         const result = await repository.findWithFilters({});
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          'MATCH (a:Agent) WHERE 1=1 RETURN a ORDER BY a.updatedAt DESC',
-          {}
-        );
+        expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) WHERE 1=1 RETURN a ORDER BY a.updatedAt DESC', {});
         expect(result).toEqual([]);
       });
     });

@@ -11,11 +11,7 @@ interface AuthContextValue {
   isLoading: boolean
   error: string | null
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
-  register: (
-    email: string,
-    password: string,
-    name?: string
-  ) => Promise<{ success: boolean; error?: string }>
+  register: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>
   logout: () => Promise<void>
   getToken: () => string | null
   userId?: string

@@ -15,12 +15,7 @@ interface JwtLogoutButtonProps {
 /**
  * JWT-based logout button
  */
-export function JwtLogoutButton({
-  variant = 'ghost',
-  size = 'default',
-  className,
-  children,
-}: JwtLogoutButtonProps) {
+export function JwtLogoutButton({ variant = 'ghost', size = 'default', className, children }: JwtLogoutButtonProps) {
   const { logout, isLoading } = useAuth()
 
   const handleLogout = async () => {
@@ -28,13 +23,7 @@ export function JwtLogoutButton({
   }
 
   return (
-    <Button
-      variant={variant}
-      size={size}
-      className={cn('flex items-center gap-2', className)}
-      onClick={handleLogout}
-      disabled={isLoading}
-    >
+    <Button variant={variant} size={size} className={cn('flex items-center gap-2', className)} onClick={handleLogout} disabled={isLoading}>
       <LogOut className="h-4 w-4" />
       {children || 'Sign Out'}
     </Button>

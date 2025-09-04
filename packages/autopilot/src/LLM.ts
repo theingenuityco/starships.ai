@@ -6,8 +6,8 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import { LlmNodeParameters, HttpRequestNodeParameters, Execution } from './types';
-import { HttpRequest } from './HttpRequest';
+import { LlmNodeParameters, HttpRequestNodeParameters, Execution } from '@/types';
+import { HttpRequest } from '@/HttpRequest';
 
 export class LLM {
   private params: LlmNodeParameters;
@@ -50,9 +50,7 @@ export class LLM {
   /**
    * Execute the LLM request (delegates to HttpRequest)
    */
-  async execute(
-    execution?: Execution
-  ): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+  async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
     try {
       console.log(`Executing LLM: ${this.params.model}`);
 
@@ -193,10 +191,7 @@ export class LLM {
     }
 
     // LLM-specific parameter range validation
-    if (
-      this.params.temperature !== undefined &&
-      (this.params.temperature < 0 || this.params.temperature > 2)
-    ) {
+    if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
       errors.push('Temperature must be between 0 and 2');
     }
 
@@ -208,17 +203,11 @@ export class LLM {
       errors.push('Top P must be between 0 and 1');
     }
 
-    if (
-      this.params.frequencyPenalty !== undefined &&
-      (this.params.frequencyPenalty < -2 || this.params.frequencyPenalty > 2)
-    ) {
+    if (this.params.frequencyPenalty !== undefined && (this.params.frequencyPenalty < -2 || this.params.frequencyPenalty > 2)) {
       errors.push('Frequency penalty must be between -2 and 2');
     }
 
-    if (
-      this.params.presencePenalty !== undefined &&
-      (this.params.presencePenalty < -2 || this.params.presencePenalty > 2)
-    ) {
+    if (this.params.presencePenalty !== undefined && (this.params.presencePenalty < -2 || this.params.presencePenalty > 2)) {
       errors.push('Presence penalty must be between -2 and 2');
     }
 

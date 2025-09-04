@@ -18,13 +18,7 @@ export type { Message, MemoryState, MemoryParams } from './Memory';
 
 // Agent memory system
 export { AgentMemory } from './AgentMemory';
-export type {
-  AgentIdentity,
-  AgentPurpose,
-  AgentSpace,
-  AgentMemoryState,
-  AgentMemoryParams,
-} from './AgentMemory';
+export type { AgentIdentity, AgentPurpose, AgentSpace, AgentMemoryState, AgentMemoryParams } from './AgentMemory';
 
 // ===== LLM SYSTEM =====
 // Core LLM class for AI model interactions

@@ -2,8 +2,8 @@
  * LlmHandler Unit Tests
  */
 
-import { LlmHandler } from '../LlmHandler';
-import { Node, Execution, LlmNodeParameters, NodeResult } from '../../../types';
+import { LlmHandler } from '@/nodes/handlers/LlmHandler';
+import { Node, Execution, LlmNodeParameters, NodeResult } from '@/types';
 
 // Type definitions for test data structures
 interface LlmResponseData {
@@ -27,7 +27,7 @@ interface OpenAIResponseBody {
 // Mock LLM class
 jest.mock('../../../LLM');
 
-import { LLM } from '../../../LLM';
+import { LLM } from '@/LLM';
 
 const MockedLLM = LLM as jest.MockedClass<typeof LLM>;
 
@@ -298,9 +298,7 @@ describe('LlmHandler', () => {
 
       const nodeResult = result.executionResults.get('llm-node');
       expect(nodeResult).toBeDefined();
-      expect(nodeResult?.error).toBe(
-        'LLM anthropic/claude-3.5-sonnet execution failed: LLM request failed: HTTP request failed'
-      );
+      expect(nodeResult?.error).toBe('LLM anthropic/claude-3.5-sonnet execution failed: LLM request failed: HTTP request failed');
       expect(nodeResult?.nodeRef).toBe('llm-node');
     });
 
@@ -316,9 +314,7 @@ describe('LlmHandler', () => {
 
       const nodeResult = result.executionResults.get('llm-node');
       expect(nodeResult).toBeDefined();
-      expect(nodeResult?.error).toBe(
-        'LLM anthropic/claude-3.5-sonnet execution failed: LLM request failed'
-      );
+      expect(nodeResult?.error).toBe('LLM anthropic/claude-3.5-sonnet execution failed: LLM request failed');
       expect(nodeResult?.nodeRef).toBe('llm-node');
     });
 
@@ -329,9 +325,7 @@ describe('LlmHandler', () => {
 
       const nodeResult = result.executionResults.get('llm-node');
       expect(nodeResult).toBeDefined();
-      expect(nodeResult?.error).toBe(
-        'LLM anthropic/claude-3.5-sonnet execution failed: Network error'
-      );
+      expect(nodeResult?.error).toBe('LLM anthropic/claude-3.5-sonnet execution failed: Network error');
       expect(nodeResult?.nodeRef).toBe('llm-node');
     });
 

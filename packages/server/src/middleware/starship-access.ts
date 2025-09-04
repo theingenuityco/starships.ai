@@ -8,17 +8,11 @@ export interface StarshipRequest extends Request {
 // ⚠️ UPDATED: Use dependency injection pattern
 let starshipRepository: StarshipRepository;
 
-export function initializeStarshipAccessMiddleware(deps: {
-  starshipRepository: StarshipRepository;
-}) {
+export function initializeStarshipAccessMiddleware(deps: { starshipRepository: StarshipRepository }) {
   starshipRepository = deps.starshipRepository;
 }
 
-export async function checkStarshipAccess(
-  req: StarshipRequest,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+export async function checkStarshipAccess(req: StarshipRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const starshipId = req.params.starshipId || req.params.id;
     const userId = req.user?.id;

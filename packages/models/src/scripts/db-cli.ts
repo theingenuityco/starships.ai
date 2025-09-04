@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { migrationRunner } from './migration-runner';
-import { schemaValidator } from './schema-validator';
-import { performanceMonitor } from './performance-monitor';
+import { migrationRunner } from '@/scripts/migration-runner';
+import { schemaValidator } from '@/scripts/schema-validator';
+import { performanceMonitor } from '@/scripts/performance-monitor';
 
 /**
  * Database CLI Tool
@@ -125,10 +125,7 @@ class DatabaseCLI {
           break;
       }
     } catch (error) {
-      this.log(
-        `Command failed: ${error instanceof Error ? error.message : String(error)}`,
-        'error'
-      );
+      this.log(`Command failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
       process.exit(1);
     }
   }
@@ -167,9 +164,7 @@ class DatabaseCLI {
     const result = await migrationRunner.runMigration(migrationId);
 
     if (result.success) {
-      spinner.succeed(
-        `Migration ${migrationId} completed successfully in ${result.executionTime}ms`
-      );
+      spinner.succeed(`Migration ${migrationId} completed successfully in ${result.executionTime}ms`);
 
       if (result.warnings && result.warnings.length > 0) {
         console.log('\n⚠️  Warnings:');
@@ -216,9 +211,7 @@ class DatabaseCLI {
     const result = await migrationRunner.rollbackMigration(migrationId);
 
     if (result.success) {
-      spinner.succeed(
-        `Migration ${migrationId} rolled back successfully in ${result.executionTime}ms`
-      );
+      spinner.succeed(`Migration ${migrationId} rolled back successfully in ${result.executionTime}ms`);
     } else {
       spinner.fail(`Rollback failed for ${migrationId}`);
 
@@ -234,10 +227,7 @@ class DatabaseCLI {
   private async showMigrationStatus(): Promise<void> {
     const spinner = this.spinner('Checking migration status');
 
-    const [applied, pending] = await Promise.all([
-      migrationRunner.getAppliedMigrations(),
-      migrationRunner.getPendingMigrations(),
-    ]);
+    const [applied, pending] = await Promise.all([migrationRunner.getAppliedMigrations(), migrationRunner.getPendingMigrations()]);
 
     spinner.stop();
 
@@ -284,18 +274,11 @@ class DatabaseCLI {
       const validation = await schemaValidator.validateSchema();
 
       if (validation.overallStatus === 'passed') {
-        spinner.succeed(
-          `Schema validation passed (${validation.passedTests}/${validation.totalTests} tests)`
-        );
+        spinner.succeed(`Schema validation passed (${validation.passedTests}/${validation.totalTests} tests)`);
       } else if (validation.overallStatus === 'warnings') {
-        this.log(
-          `Schema validation completed with warnings (${validation.warningTests} warnings)`,
-          'warning'
-        );
+        this.log(`Schema validation completed with warnings (${validation.warningTests} warnings)`, 'warning');
       } else {
-        spinner.fail(
-          `Schema validation failed (${validation.failedTests} errors, ${validation.warningTests} warnings)`
-        );
+        spinner.fail(`Schema validation failed (${validation.failedTests} errors, ${validation.warningTests} warnings)`);
       }
 
       // Show summary
@@ -388,8 +371,7 @@ class DatabaseCLI {
     if (report.alerts.length > 0) {
       console.log('\n⚠️  Alerts:');
       report.alerts.forEach((alert) => {
-        const icon =
-          alert.severity === 'critical' ? '🚨' : alert.severity === 'warning' ? '⚠️' : 'ℹ️';
+        const icon = alert.severity === 'critical' ? '🚨' : alert.severity === 'warning' ? '⚠️' : 'ℹ️';
         console.log(`  ${icon} ${alert.message}`);
       });
     }
@@ -498,10 +480,7 @@ class DatabaseCLI {
         validation.recommendations.forEach((rec) => console.log(`  ${rec}`));
       }
     } catch (error) {
-      this.log(
-        `Optimization failed: ${error instanceof Error ? error.message : String(error)}`,
-        'error'
-      );
+      this.log(`Optimization failed: ${error instanceof Error ? error.message : String(error)}`, 'error');
       process.exit(1);
     }
   }

@@ -2,13 +2,7 @@
  * Neo4j Database Connection Unit Tests
  */
 
-import {
-  Neo4jConnection,
-  createConnection,
-  getConnection,
-  resetConnection,
-  Neo4jConfig,
-} from '../connection';
+import { Neo4jConnection, createConnection, getConnection, resetConnection, Neo4jConfig } from '../connection';
 import neo4j, { Driver, Session, ManagedTransaction, Integer } from 'neo4j-driver';
 
 // Mock neo4j-driver
@@ -168,9 +162,7 @@ describe('Neo4jConnection', () => {
     });
 
     it('should throw error when driver not connected', () => {
-      expect(() => connection.getSession()).toThrow(
-        'Neo4j driver is not connected. Call connect() first.'
-      );
+      expect(() => connection.getSession()).toThrow('Neo4j driver is not connected. Call connect() first.');
     });
   });
 
@@ -313,9 +305,7 @@ describe('Neo4jConnection', () => {
       const writeError = new Error('Write failed');
       mockSession.executeWrite.mockRejectedValue(writeError);
 
-      await expect(connection.executeWrite('CREATE (u:User) RETURN u')).rejects.toThrow(
-        'Write failed'
-      );
+      await expect(connection.executeWrite('CREATE (u:User) RETURN u')).rejects.toThrow('Write failed');
 
       expect(mockSession.close).toHaveBeenCalled();
     });
@@ -333,23 +323,13 @@ describe('Neo4jConnection', () => {
       await connection.initializeSchema();
 
       // Should create constraints
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE CONSTRAINT agent_id_unique')
-      );
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE CONSTRAINT user_id_unique')
-      );
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE CONSTRAINT starship_id_unique')
-      );
+      expect(mockSession.run).toHaveBeenCalledWith(expect.stringContaining('CREATE CONSTRAINT agent_id_unique'));
+      expect(mockSession.run).toHaveBeenCalledWith(expect.stringContaining('CREATE CONSTRAINT user_id_unique'));
+      expect(mockSession.run).toHaveBeenCalledWith(expect.stringContaining('CREATE CONSTRAINT starship_id_unique'));
 
       // Should create indexes
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE INDEX agent_name_index')
-      );
-      expect(mockSession.run).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE INDEX user_email_index')
-      );
+      expect(mockSession.run).toHaveBeenCalledWith(expect.stringContaining('CREATE INDEX agent_name_index'));
+      expect(mockSession.run).toHaveBeenCalledWith(expect.stringContaining('CREATE INDEX user_email_index'));
 
       expect(mockSession.close).toHaveBeenCalled();
     });
@@ -454,10 +434,7 @@ describe('Neo4jConnection', () => {
 
       const result = sanitizeMethod(circular, 11); // Exceed max depth
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[Neo4j] Maximum sanitization depth reached, returning value as-is:',
-        'object'
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('[Neo4j] Maximum sanitization depth reached, returning value as-is:', 'object');
 
       consoleSpy.mockRestore();
     });
@@ -523,9 +500,7 @@ describe('Connection Factory Functions', () => {
       // Reset the connection instance to simulate no connection
       resetConnection();
 
-      expect(() => getConnection()).toThrow(
-        'Neo4j connection not initialized. Call createConnection() first.'
-      );
+      expect(() => getConnection()).toThrow('Neo4j connection not initialized. Call createConnection() first.');
     });
   });
 });

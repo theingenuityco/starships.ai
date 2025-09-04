@@ -14,13 +14,7 @@ class PerformanceMonitor {
   private maxMetrics = 1000; // Keep last 1000 metrics
 
   /** Record database query performance */
-  recordQuery(
-    operation: string,
-    duration: number,
-    parameters?: any,
-    resultCount: number = 0,
-    tags?: string[]
-  ): void {
+  recordQuery(operation: string, duration: number, parameters?: any, resultCount: number = 0, tags?: string[]): void {
     const metric: QueryMetrics = {
       operation,
       duration,

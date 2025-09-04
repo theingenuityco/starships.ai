@@ -2,14 +2,10 @@
  * MissionClarityRepository Unit Tests
  */
 
-import { MissionClarityRepository } from '../MissionClarityRepository';
-import { Neo4jConnection, getConnection } from '../../helpers/database';
+import { MissionClarityRepository } from '@/repositories/MissionClarityRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '@starships/errors';
-import type {
-  MissionClarityModel,
-  CreateMissionClarityRequest,
-  UpdateMissionClarityRequest,
-} from '@starships/protocol';
+import type { MissionClarityModel, CreateMissionClarityRequest, UpdateMissionClarityRequest } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
@@ -36,9 +32,7 @@ describe('MissionClarityRepository', () => {
     jest.clearAllMocks();
   });
 
-  const createMockClarityRequest = (
-    overrides: Partial<CreateMissionClarityRequest> = {}
-  ): CreateMissionClarityRequest => ({
+  const createMockClarityRequest = (overrides: Partial<CreateMissionClarityRequest> = {}): CreateMissionClarityRequest => ({
     missionId: 'mission-123',
     objectiveClarity: 8,
     successMetrics: 7,
@@ -49,9 +43,7 @@ describe('MissionClarityRepository', () => {
     ...overrides,
   });
 
-  const createMockClarity = (
-    overrides: Partial<MissionClarityModel> = {}
-  ): MissionClarityModel => ({
+  const createMockClarity = (overrides: Partial<MissionClarityModel> = {}): MissionClarityModel => ({
     id: 'clarity-123',
     missionId: 'mission-123',
     objectiveClarity: 8,
@@ -127,9 +119,7 @@ describe('MissionClarityRepository', () => {
     it('should validate required fields', async () => {
       const invalidRequest = { missionId: 'mission-123' }; // Missing required scores
 
-      await expect(
-        repository.upsertByMissionId('mission-123', invalidRequest as any)
-      ).rejects.toThrow(ValidationError);
+      await expect(repository.upsertByMissionId('mission-123', invalidRequest as any)).rejects.toThrow(ValidationError);
     });
 
     it('should validate score ranges', async () => {
@@ -142,9 +132,7 @@ describe('MissionClarityRepository', () => {
 
       for (const invalidScore of invalidScores) {
         const request = createMockClarityRequest(invalidScore as any);
-        await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(
-          ValidationError
-        );
+        await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(ValidationError);
       }
     });
 
@@ -153,9 +141,7 @@ describe('MissionClarityRepository', () => {
       // Mock mission check returning empty (mission not found)
       mockConnection.executeQuery.mockResolvedValueOnce([]);
 
-      await expect(repository.upsertByMissionId('non-existent', request)).rejects.toThrow(
-        NotFoundError
-      );
+      await expect(repository.upsertByMissionId('non-existent', request)).rejects.toThrow(NotFoundError);
     });
 
     it('should handle database errors', async () => {
@@ -167,9 +153,7 @@ describe('MissionClarityRepository', () => {
       // Mock createEntityWithAutoId failing
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -182,9 +166,7 @@ describe('MissionClarityRepository', () => {
 
       expect(result).toEqual(mockClarity);
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarityModel)'
-        ),
+        expect.stringContaining('MATCH (m:Mission {id: $missionId})-[:HAS_CLARITY]->(mc:MissionClarityModel)'),
         { missionId: 'mission-123' }
       );
     });
@@ -261,25 +243,17 @@ describe('MissionClarityRepository', () => {
     });
 
     it('should validate score ranges in updates', async () => {
-      const invalidUpdates = [
-        { objectiveClarity: -1 },
-        { successMetrics: 11 },
-        { timelineDefinition: 'invalid' },
-      ];
+      const invalidUpdates = [{ objectiveClarity: -1 }, { successMetrics: 11 }, { timelineDefinition: 'invalid' }];
 
       for (const invalidUpdate of invalidUpdates) {
-        await expect(
-          repository.updateByMissionId('mission-123', invalidUpdate as any)
-        ).rejects.toThrow(ValidationError);
+        await expect(repository.updateByMissionId('mission-123', invalidUpdate as any)).rejects.toThrow(ValidationError);
       }
     });
 
     it('should throw NotFoundError when clarity does not exist for update', async () => {
       jest.spyOn(repository, 'getByMissionId').mockResolvedValue(null);
 
-      await expect(
-        repository.updateByMissionId('mission-123', { objectiveClarity: 9 })
-      ).rejects.toThrow(NotFoundError);
+      await expect(repository.updateByMissionId('mission-123', { objectiveClarity: 9 })).rejects.toThrow(NotFoundError);
     });
 
     it('should throw NotFoundError when update query returns no results', async () => {
@@ -287,9 +261,7 @@ describe('MissionClarityRepository', () => {
       jest.spyOn(repository, 'getByMissionId').mockResolvedValue(currentClarity);
       mockConnection.executeWrite.mockResolvedValue([]); // No results
 
-      await expect(
-        repository.updateByMissionId('mission-123', { reasoning: 'Updated' })
-      ).rejects.toThrow(NotFoundError);
+      await expect(repository.updateByMissionId('mission-123', { reasoning: 'Updated' })).rejects.toThrow(NotFoundError);
     });
 
     it('should handle updates with only non-score fields', async () => {
@@ -318,10 +290,7 @@ describe('MissionClarityRepository', () => {
       const result = await repository.deleteByMissionId('mission-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE mc'),
-        { missionId: 'mission-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DELETE mc'), { missionId: 'mission-123' });
     });
 
     it('should return false when clarity not found', async () => {
@@ -354,19 +323,14 @@ describe('MissionClarityRepository', () => {
 
   describe('getAll', () => {
     it('should return all mission clarities', async () => {
-      const mockClarities = [
-        createMockClarity({ id: 'clarity-1' }),
-        createMockClarity({ id: 'clarity-2' }),
-      ];
+      const mockClarities = [createMockClarity({ id: 'clarity-1' }), createMockClarity({ id: 'clarity-2' })];
       mockConnection.executeQuery.mockResolvedValue(mockClarities.map((mc) => ({ mc })));
 
       const result = await repository.getAll();
 
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ id: 'clarity-1' });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY mc.createdAt DESC')
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY mc.createdAt DESC'));
     });
 
     it('should return empty array when no clarities found', async () => {
@@ -386,19 +350,14 @@ describe('MissionClarityRepository', () => {
 
   describe('getByScoreRange', () => {
     it('should return clarities within score range', async () => {
-      const mockClarities = [
-        createMockClarity({ overallScore: 8.5 }),
-        createMockClarity({ overallScore: 7.0 }),
-      ];
+      const mockClarities = [createMockClarity({ overallScore: 8.5 }), createMockClarity({ overallScore: 7.0 })];
       mockConnection.executeQuery.mockResolvedValue(mockClarities.map((mc) => ({ mc })));
 
       const result = await repository.getByScoreRange(7, 9);
 
       expect(result).toHaveLength(2);
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'WHERE mc.overallScore >= $minScore AND mc.overallScore <= $maxScore'
-        ),
+        expect.stringContaining('WHERE mc.overallScore >= $minScore AND mc.overallScore <= $maxScore'),
         { minScore: 7, maxScore: 9 }
       );
     });
@@ -507,9 +466,7 @@ describe('MissionClarityRepository', () => {
       expect(lowScores).toHaveLength(1);
 
       // All clarities
-      mockConnection.executeQuery.mockResolvedValue(
-        [...highScoreClarities, ...lowScoreClarities].map((mc) => ({ mc }))
-      );
+      mockConnection.executeQuery.mockResolvedValue([...highScoreClarities, ...lowScoreClarities].map((mc) => ({ mc })));
       const all = await repository.getAll();
       expect(all).toHaveLength(2);
     });
@@ -525,9 +482,7 @@ describe('MissionClarityRepository', () => {
       // Mock createEntityWithAutoId failing with constraint violation
       mockConnection.executeWrite.mockRejectedValue(new Error('constraint violation'));
 
-      await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(
-        ConflictError
-      );
+      await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(ConflictError);
     });
 
     it('should handle connection timeouts', async () => {

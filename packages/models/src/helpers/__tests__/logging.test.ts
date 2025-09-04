@@ -153,10 +153,7 @@ describe('Logging and Monitoring System', () => {
 
       testLogger.fatal('Fatal error');
 
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('FATAL'),
-        expect.any(String)
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('FATAL'), expect.any(String));
     });
 
     it('should log performance metrics', () => {
@@ -269,10 +266,7 @@ describe('Logging and Monitoring System', () => {
 
       // Duration should be >= 0 (sometimes high-resolution timers can return 0 for very fast operations)
       expect(duration).toBeGreaterThanOrEqual(0);
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Performance: test_operation'),
-        expect.any(Object)
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Performance: test_operation'), expect.any(Object));
     });
 
     it('should handle missing timer gracefully', () => {
@@ -288,10 +282,7 @@ describe('Logging and Monitoring System', () => {
       expect(duration).toBe(0);
       // The warn method should be called, and it goes to console.log
       // The logger outputs a formatted message string and empty context object
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Performance timer not found for operation: non-existent-op'),
-        ''
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Performance timer not found for operation: non-existent-op'), '');
     });
 
     it('should measure async operations successfully', async () => {
@@ -321,9 +312,7 @@ describe('Logging and Monitoring System', () => {
         throw new ValidationError('Test error');
       };
 
-      await expect(PerformanceMonitor.measure('failing_async', failingOperation)).rejects.toThrow(
-        'Test error'
-      );
+      await expect(PerformanceMonitor.measure('failing_async', failingOperation)).rejects.toThrow('Test error');
 
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining('Performance: failing_async'),
@@ -360,9 +349,7 @@ describe('Logging and Monitoring System', () => {
         throw new Error('Sync error');
       };
 
-      expect(() => PerformanceMonitor.measureSync('failing_sync', failingOperation)).toThrow(
-        'Sync error'
-      );
+      expect(() => PerformanceMonitor.measureSync('failing_sync', failingOperation)).toThrow('Sync error');
 
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining('Performance: failing_sync'),
@@ -387,10 +374,7 @@ describe('Logging and Monitoring System', () => {
       expect(status.responseTime).toBeDefined();
       expect(status.timestamp).toBeDefined();
 
-      expect(console.log).toHaveBeenCalledWith(
-        expect.stringContaining('Health Check: test-service is healthy'),
-        expect.any(Object)
-      );
+      expect(console.log).toHaveBeenCalledWith(expect.stringContaining('Health Check: test-service is healthy'), expect.any(Object));
     });
 
     it('should check unhealthy service', async () => {

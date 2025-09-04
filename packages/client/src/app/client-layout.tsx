@@ -60,13 +60,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     // Landing page and waitlist routes - no authentication required
     return (
       <AnimatePresence mode="wait">
-        <motion.div
-          key={pathname}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="h-full w-full"
-        >
+        <motion.div key={pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full">
           {children}
         </motion.div>
       </AnimatePresence>

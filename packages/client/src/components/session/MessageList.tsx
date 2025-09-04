@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { Message } from '@/lib/agent-socket-api'
-import { MessageBubble } from './MessageBubble'
+import { MessageBubble } from '@/components/session/MessageBubble'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { CHAT_TEXT, LOADING_TEXT } from '@/constants/text'
@@ -14,12 +14,7 @@ interface MessageListProps<T = Message> {
   MessageComponent?: React.ComponentType<{ message: T }>
 }
 
-export function MessageList<T = Message>({
-  messages,
-  loading,
-  error,
-  MessageComponent = MessageBubble as React.ComponentType<{ message: T }>,
-}: MessageListProps<T>) {
+export function MessageList<T = Message>({ messages, loading, error, MessageComponent = MessageBubble as React.ComponentType<{ message: T }> }: MessageListProps<T>) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when new messages arrive
@@ -29,10 +24,7 @@ export function MessageList<T = Message>({
     const scrollToBottom = () => {
       if (messagesEndRef.current) {
         // Use instant scroll for code blocks to prevent bouncing
-        const hasCodeBlock = messages.some(
-          msg =>
-            typeof (msg as Message).content === 'string' && (msg as Message).content.includes('```')
-        )
+        const hasCodeBlock = messages.some(msg => typeof (msg as Message).content === 'string' && (msg as Message).content.includes('```'))
 
         messagesEndRef.current.scrollIntoView({
           behavior: hasCodeBlock ? 'auto' : 'smooth',
@@ -75,12 +67,7 @@ export function MessageList<T = Message>({
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center">
           <div className="w-16 h-16 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-zinc-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-8 h-8 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -104,13 +91,7 @@ export function MessageList<T = Message>({
           const isMessageBubble = MessageComponent === MessageBubble
           const streamingProp = isMessageBubble ? { streaming: (message as Message).streaming } : {}
 
-          return (
-            <MessageComponent
-              key={(message as Message).id}
-              message={message}
-              {...(streamingProp as Record<string, unknown>)}
-            />
-          )
+          return <MessageComponent key={(message as Message).id} message={message} {...(streamingProp as Record<string, unknown>)} />
         })}
         <div ref={messagesEndRef} />
       </div>

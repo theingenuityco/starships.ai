@@ -5,11 +5,11 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Users, Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
-import { SessionMessageInput } from './SessionMessageInput'
-import { SessionMessageList } from './SessionMessageList'
-import { ChatModeSelector } from './ChatModeSelector'
-import { AgentSelector } from './AgentSelector'
-import { ProviderSelector } from './ProviderSelector'
+import { SessionMessageInput } from '@/components/session/SessionMessageInput'
+import { SessionMessageList } from '@/components/session/SessionMessageList'
+import { ChatModeSelector } from '@/components/session/ChatModeSelector'
+import { AgentSelector } from '@/components/session/AgentSelector'
+import { ProviderSelector } from '@/components/session/ProviderSelector'
 import type { Agent } from '@/lib/api'
 import type { Message } from '@/lib/agent-socket-api'
 export type ChatMode = 'agent'
@@ -21,12 +21,7 @@ interface SessionInterfaceProps {
   onSessionChange?: (sessionId: string | null) => void
 }
 
-export function SessionInterface({
-  defaultMode = 'agent',
-  starshipId,
-  sessionId: externalSessionId,
-  onSessionChange,
-}: SessionInterfaceProps) {
+export function SessionInterface({ defaultMode = 'agent', starshipId, sessionId: externalSessionId, onSessionChange }: SessionInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected } = useSocketConnection()
 
@@ -66,11 +61,7 @@ export function SessionInterface({
   if (isLoading) {
     return (
       <div className="flex flex-col h-screen items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-4"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <Sparkles className="w-8 h-8 text-primary animate-pulse" />
           </div>
@@ -84,11 +75,7 @@ export function SessionInterface({
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col h-screen items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-4"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-4">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
             <Users className="w-8 h-8 text-muted-foreground" />
           </div>
@@ -126,18 +113,8 @@ export function SessionInterface({
       {/* Messages Area - Only shown when there are messages */}
       <AnimatePresence>
         {hasMessages && currentSessionId && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="flex-1 min-h-0 overflow-hidden"
-          >
-            <SessionMessageList
-              mode={chatMode}
-              sessionId={currentSessionId}
-              starshipId={starshipId}
-              key={`${chatMode}-${currentSessionId}-${refreshMessages}`}
-            />
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0 overflow-hidden">
+            <SessionMessageList mode={chatMode} sessionId={currentSessionId} starshipId={starshipId} key={`${chatMode}-${currentSessionId}-${refreshMessages}`} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -163,12 +140,7 @@ export function SessionInterface({
             {/* Welcome Section - Only shown when no messages */}
             <AnimatePresence>
               {!hasMessages && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20, transition: { duration: 0.3 } }}
-                  className="text-center mb-8"
-                >
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20, transition: { duration: 0.3 } }} className="text-center mb-8">
                   <motion.h1
                     className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent"
                     initial={{ opacity: 0, y: 10 }}
@@ -177,15 +149,8 @@ export function SessionInterface({
                   >
                     {chatMode === 'agent' ? 'Meet Agent Mode' : 'Meet AI Mode'}
                   </motion.h1>
-                  <motion.p
-                    className="text-muted-foreground text-lg font-light"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                  >
-                    {chatMode === 'agent'
-                      ? 'Connect with specialized agents for focused assistance'
-                      : 'Ask detailed questions for better responses'}
+                  <motion.p className="text-muted-foreground text-lg font-light" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+                    {chatMode === 'agent' ? 'Connect with specialized agents for focused assistance' : 'Ask detailed questions for better responses'}
                   </motion.p>
                 </motion.div>
               )}
@@ -218,44 +183,16 @@ export function SessionInterface({
                 minimal={hasMessages}
               >
                 {/* Footer Content - Selectors */}
-                <ChatModeSelector
-                  mode={chatMode}
-                  onModeChange={setChatMode}
-                  disabled={!isConnected}
-                  compact={true}
-                />
+                <ChatModeSelector mode={chatMode} onModeChange={setChatMode} disabled={!isConnected} compact={true} />
 
                 <AnimatePresence mode="wait">
                   {chatMode === 'agent' ? (
-                    <motion.div
-                      key="agent-selector"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <AgentSelector
-                        selectedAgent={selectedAgent}
-                        onAgentChange={setSelectedAgent}
-                        starshipId={starshipId}
-                        compact={true}
-                      />
+                    <motion.div key="agent-selector" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2 }}>
+                      <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
                     </motion.div>
                   ) : (
-                    <motion.div
-                      key="provider-selector"
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <ProviderSelector
-                        provider={provider}
-                        model={model}
-                        onProviderChange={setProvider}
-                        onModelChange={setModel}
-                        compact={true}
-                      />
+                    <motion.div key="provider-selector" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2 }}>
+                      <ProviderSelector provider={provider} model={model} onProviderChange={setProvider} onModelChange={setModel} compact={true} />
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -320,8 +257,4 @@ export function SessionInterface({
 }
 
 // Suggestion examples
-const AGENT_SUGGESTIONS = [
-  'Help me plan a project timeline with milestones',
-  'Analyze this data set and find patterns',
-  'Write code for a responsive navigation component',
-]
+const AGENT_SUGGESTIONS = ['Help me plan a project timeline with milestones', 'Analyze this data set and find patterns', 'Write code for a responsive navigation component']

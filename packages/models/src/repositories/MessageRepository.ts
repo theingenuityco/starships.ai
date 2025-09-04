@@ -1,8 +1,8 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 import type { MessageModel } from '@starships/protocol';
-import { BaseRepository } from './BaseRepository';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 
 /**
  * Neo4j-based message repository
@@ -19,9 +19,7 @@ export class MessageRepository extends BaseRepository {
     return {
       ...message,
       metadata: message.metadata ? JSON.stringify(message.metadata) : null,
-      processingMetadata: message.processingMetadata
-        ? JSON.stringify(message.processingMetadata)
-        : null,
+      processingMetadata: message.processingMetadata ? JSON.stringify(message.processingMetadata) : null,
     };
   }
 
@@ -33,9 +31,7 @@ export class MessageRepository extends BaseRepository {
       return {
         ...message,
         metadata: message.metadata ? JSON.parse(message.metadata) : undefined,
-        processingMetadata: message.processingMetadata
-          ? JSON.parse(message.processingMetadata)
-          : undefined,
+        processingMetadata: message.processingMetadata ? JSON.parse(message.processingMetadata) : undefined,
       };
     } catch (error) {
       console.warn(`Failed to deserialize message ${message.id} complex fields:`, error);
@@ -51,12 +47,8 @@ export class MessageRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        const result = await connection.executeQuery<{ m: MessageModel }>(
-          'MATCH (m:Message) RETURN m ORDER BY m.timestamp DESC'
-        );
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) RETURN m ORDER BY m.timestamp DESC');
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'findAll',
       'Message'
@@ -67,10 +59,7 @@ export class MessageRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        const result = await connection.executeQuery<{ m: MessageModel }>(
-          'MATCH (m:Message) WHERE m.id = $id RETURN m',
-          { id }
-        );
+        const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id RETURN m', { id });
         const message = result[0]?.m || null;
         return message ? convertNeo4jIntsInObject(this.deserializeComplexFields(message)) : null;
       },
@@ -88,9 +77,7 @@ export class MessageRepository extends BaseRepository {
           'MATCH (m:Message) WHERE m.starshipId = $starshipId RETURN m ORDER BY m.timestamp DESC',
           { starshipId }
         );
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'findByStarshipId',
       'Message'
@@ -105,9 +92,7 @@ export class MessageRepository extends BaseRepository {
           'MATCH (m:Message) WHERE m.agentId = $agentId RETURN m ORDER BY m.timestamp DESC',
           { agentId }
         );
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'findByAgentId',
       'Message'
@@ -122,25 +107,18 @@ export class MessageRepository extends BaseRepository {
           'MATCH (m:Message) WHERE m.memoryId = $memoryId RETURN m ORDER BY m.timestamp ASC',
           { memoryId }
         );
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'findByMemoryId',
       'Message'
     );
   }
 
-  async findByConversationId(
-    conversationId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<MessageModel[]> {
+  async findByConversationId(conversationId: string, limit?: number, offset?: number): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        let cypher =
-          'MATCH (m:Message) WHERE m.conversationId = $conversationId RETURN m ORDER BY m.timestamp ASC';
+        let cypher = 'MATCH (m:Message) WHERE m.conversationId = $conversationId RETURN m ORDER BY m.timestamp ASC';
         const params: any = { conversationId };
 
         if (limit) {
@@ -150,19 +128,14 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'findByConversationId',
       'Message'
     );
   }
 
-  async findByRole(
-    role: 'system' | 'user' | 'assistant',
-    starshipId?: string
-  ): Promise<MessageModel[]> {
+  async findByRole(role: 'system' | 'user' | 'assistant', starshipId?: string): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
@@ -177,18 +150,14 @@ export class MessageRepository extends BaseRepository {
         cypher += ' RETURN m ORDER BY m.timestamp DESC';
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'findByRole',
       'Message'
     );
   }
 
-  async create(
-    entity: Omit<MessageModel, 'id' | 'createdAt' | 'updatedAt' | 'contentLength'>
-  ): Promise<MessageModel> {
+  async create(entity: Omit<MessageModel, 'id' | 'createdAt' | 'updatedAt' | 'contentLength'>): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
         // Validate required fields
@@ -227,10 +196,7 @@ export class MessageRepository extends BaseRepository {
 
         const messageForStorage = this.serializeComplexFields(messageData as MessageModel);
 
-        const message = await this.createEntityWithAutoId<MessageModel>(
-          'Message',
-          messageForStorage
-        );
+        const message = await this.createEntityWithAutoId<MessageModel>('Message', messageForStorage);
 
         return convertNeo4jIntsInObject(message);
       },
@@ -256,10 +222,10 @@ export class MessageRepository extends BaseRepository {
         // Serialize complex fields in updates
         const serializedUpdates = this.serializeComplexFields(updateProps as any);
 
-        const result = await connection.executeWrite<{ m: MessageModel }>(
-          'MATCH (m:Message) WHERE m.id = $id SET m += $updates RETURN m',
-          { id, updates: serializedUpdates }
-        );
+        const result = await connection.executeWrite<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id SET m += $updates RETURN m', {
+          id,
+          updates: serializedUpdates,
+        });
 
         const message = result[0]?.m || null;
         return message ? convertNeo4jIntsInObject(this.deserializeComplexFields(message)) : null;
@@ -287,12 +253,7 @@ export class MessageRepository extends BaseRepository {
     );
   }
 
-  async getMessageThread(
-    messageId: string,
-    includeParents = true,
-    includeChildren = true,
-    maxDepth = 10
-  ): Promise<MessageModel[]> {
+  async getMessageThread(messageId: string, includeParents = true, includeChildren = true, maxDepth = 10): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const thread: MessageModel[] = [];
@@ -339,12 +300,7 @@ export class MessageRepository extends BaseRepository {
 
     const parents = [parent];
     if (parent.parentMessageId) {
-      const grandParents = await this.getParentMessages(
-        parent.parentMessageId,
-        maxDepth,
-        currentDepth + 1,
-        visited
-      );
+      const grandParents = await this.getParentMessages(parent.parentMessageId, maxDepth, currentDepth + 1, visited);
       parents.unshift(...grandParents);
     }
 
@@ -380,12 +336,7 @@ export class MessageRepository extends BaseRepository {
       allChildren.push(child);
 
       // Recursively get grandchildren
-      const grandChildren = await this.getChildMessages(
-        child.id,
-        maxDepth,
-        currentDepth + 1,
-        visited
-      );
+      const grandChildren = await this.getChildMessages(child.id, maxDepth, currentDepth + 1, visited);
 
       // Add grandchildren, avoiding duplicates
       for (const grandChild of grandChildren) {
@@ -478,9 +429,7 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'searchMessages',
       'Message'
@@ -504,18 +453,14 @@ export class MessageRepository extends BaseRepository {
           { conversationId }
         );
 
-        return convertNeo4jIntsInArray(
-          result.map((record) => this.deserializeComplexFields(record.m))
-        );
+        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
       'getConversationMessages',
       'Message'
     );
   }
 
-  async bulkDelete(
-    messageIds: string[]
-  ): Promise<{
+  async bulkDelete(messageIds: string[]): Promise<{
     processed: number;
     failed: number;
     errors: Array<{ messageId: string; error: string }>;
@@ -541,12 +486,7 @@ export class MessageRepository extends BaseRepository {
     );
   }
 
-  async getMessageStats(filters?: {
-    starshipId?: string;
-    agentId?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  }): Promise<{
+  async getMessageStats(filters?: { starshipId?: string; agentId?: string; dateFrom?: string; dateTo?: string }): Promise<{
     total: number;
     byRole: { system: number; user: number; assistant: number };
     byType: Record<string, number>;
@@ -639,9 +579,7 @@ export class MessageRepository extends BaseRepository {
           byType,
           byImportance,
           averageContentLength: Number(record.avgContentLength) || 0,
-          averageProcessingTime: record.avgProcessingTime
-            ? Number(record.avgProcessingTime)
-            : undefined,
+          averageProcessingTime: record.avgProcessingTime ? Number(record.avgProcessingTime) : undefined,
         };
       },
       'getMessageStats',

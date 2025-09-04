@@ -3,10 +3,10 @@
 import React from 'react'
 import { Loader2, CheckCircle, AlertCircle, Key } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card'
-import { Badge } from './badge'
-import { Progress } from './progress'
-import { Skeleton } from './skeleton'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Skeleton } from '@/components/ui/skeleton'
 
 export interface LoadingStateProps {
   className?: string
@@ -21,12 +21,7 @@ export interface LoadingStateProps {
 /**
  * Generic loading spinner component
  */
-export function LoadingSpinner({
-  className,
-  size = 'md',
-  message,
-  showIcon = true,
-}: LoadingStateProps) {
+export function LoadingSpinner({ className, size = 'md', message, showIcon = true }: LoadingStateProps) {
   const sizeClasses = {
     sm: 'h-4 w-4',
     md: 'h-6 w-6',
@@ -36,17 +31,7 @@ export function LoadingSpinner({
   return (
     <div className={cn('flex items-center gap-2', className)}>
       {showIcon && <Loader2 className={cn('animate-spin text-primary', sizeClasses[size])} />}
-      {message && (
-        <span
-          className={cn(
-            'text-muted-foreground',
-            size === 'sm' && 'text-sm',
-            size === 'lg' && 'text-lg'
-          )}
-        >
-          {message}
-        </span>
-      )}
+      {message && <span className={cn('text-muted-foreground', size === 'sm' && 'text-sm', size === 'lg' && 'text-lg')}>{message}</span>}
     </div>
   )
 }
@@ -54,12 +39,7 @@ export function LoadingSpinner({
 /**
  * Loading state with progress bar
  */
-export function LoadingProgress({
-  className,
-  message,
-  description,
-  progress = 0,
-}: LoadingStateProps) {
+export function LoadingProgress({ className, message, description, progress = 0 }: LoadingStateProps) {
   return (
     <div className={cn('space-y-3', className)}>
       <div className="flex items-center gap-2">
@@ -107,13 +87,7 @@ export function ApiKeyFormSkeleton({ className }: { className?: string }) {
 /**
  * Skeleton loading for connector list
  */
-export function ConnectorListSkeleton({
-  count = 3,
-  className,
-}: {
-  count?: number
-  className?: string
-}) {
+export function ConnectorListSkeleton({ count = 3, className }: { count?: number; className?: string }) {
   return (
     <div className={cn('space-y-3', className)}>
       {Array.from({ length: count }).map((_, i) => (
@@ -137,13 +111,7 @@ export function ConnectorListSkeleton({
 /**
  * Loading state for API key validation
  */
-export function ApiKeyValidationLoading({
-  keyName,
-  className,
-}: {
-  keyName: string
-  className?: string
-}) {
+export function ApiKeyValidationLoading({ keyName, className }: { keyName: string; className?: string }) {
   return (
     <div className={cn('flex items-center gap-2 text-sm text-muted-foreground', className)}>
       <Loader2 className="h-3 w-3 animate-spin" />
@@ -162,12 +130,7 @@ export interface ConnectionStatusProps {
   showLabel?: boolean
 }
 
-export function ConnectionStatus({
-  status,
-  message,
-  className,
-  showLabel = true,
-}: ConnectionStatusProps) {
+export function ConnectionStatus({ status, message, className, showLabel = true }: ConnectionStatusProps) {
   const statusConfig = {
     connecting: {
       icon: <Loader2 className="h-4 w-4 animate-spin text-blue-500" />,
@@ -258,9 +221,7 @@ export function MultiStepLoading({ steps, currentStep, className }: MultiStepLoa
               {isLoading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
               {isCompleted && <CheckCircle className="h-4 w-4 text-green-500" />}
               {isError && <AlertCircle className="h-4 w-4 text-red-500" />}
-              {step.status === 'pending' && (
-                <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
-              )}
+              {step.status === 'pending' && <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
             </div>
 
             <div className="flex-1 min-w-0">
@@ -275,24 +236,11 @@ export function MultiStepLoading({ steps, currentStep, className }: MultiStepLoa
               >
                 {step.label}
               </div>
-              {step.description && (
-                <div className="text-xs text-muted-foreground mt-1">{step.description}</div>
-              )}
+              {step.description && <div className="text-xs text-muted-foreground mt-1">{step.description}</div>}
             </div>
 
             <div className="flex-shrink-0">
-              <Badge
-                variant={
-                  isCompleted
-                    ? 'default'
-                    : isError
-                      ? 'destructive'
-                      : isLoading
-                        ? 'secondary'
-                        : 'outline'
-                }
-                className="text-xs"
-              >
+              <Badge variant={isCompleted ? 'default' : isError ? 'destructive' : isLoading ? 'secondary' : 'outline'} className="text-xs">
                 {isCompleted ? 'Done' : isError ? 'Failed' : isLoading ? 'Loading' : 'Pending'}
               </Badge>
             </div>
@@ -315,14 +263,7 @@ export interface LoadingOverlayProps {
   className?: string
 }
 
-export function LoadingOverlay({
-  isLoading,
-  message = 'Loading...',
-  description,
-  progress,
-  children,
-  className,
-}: LoadingOverlayProps) {
+export function LoadingOverlay({ isLoading, message = 'Loading...', description, progress, children, className }: LoadingOverlayProps) {
   return (
     <div className={cn('relative', className)}>
       {children}
@@ -342,9 +283,7 @@ export function LoadingOverlay({
               <CardContent>
                 <div className="space-y-2">
                   <Progress value={progress} className="h-2" />
-                  <div className="text-center text-xs text-muted-foreground">
-                    {Math.round(progress)}% complete
-                  </div>
+                  <div className="text-center text-xs text-muted-foreground">{Math.round(progress)}% complete</div>
                 </div>
               </CardContent>
             )}
@@ -358,15 +297,7 @@ export function LoadingOverlay({
 /**
  * Inline loading state for buttons and small components
  */
-export function InlineLoading({
-  message,
-  size = 'sm',
-  className,
-}: {
-  message?: string
-  size?: 'xs' | 'sm' | 'md'
-  className?: string
-}) {
+export function InlineLoading({ message, size = 'sm', className }: { message?: string; size?: 'xs' | 'sm' | 'md'; className?: string }) {
   const sizeClasses = {
     xs: 'h-3 w-3',
     sm: 'h-4 w-4',
@@ -382,9 +313,7 @@ export function InlineLoading({
   return (
     <div className={cn('flex items-center gap-2', className)}>
       <Loader2 className={cn('animate-spin text-muted-foreground', sizeClasses[size])} />
-      {message && (
-        <span className={cn('text-muted-foreground', textSizeClasses[size])}>{message}</span>
-      )}
+      {message && <span className={cn('text-muted-foreground', textSizeClasses[size])}>{message}</span>}
     </div>
   )
 }

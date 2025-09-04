@@ -54,10 +54,7 @@ export function ToastComponent({ toast }: ToastProps) {
         {toast.action && <div className="mt-2">{toast.action}</div>}
       </div>
 
-      <button
-        onClick={() => dismiss(toast.id)}
-        className="flex-shrink-0 rounded-md p-1 hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-2"
-      >
+      <button onClick={() => dismiss(toast.id)} className="flex-shrink-0 rounded-md p-1 hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-2">
         <X className="h-4 w-4" />
       </button>
     </div>

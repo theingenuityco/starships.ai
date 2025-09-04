@@ -81,19 +81,10 @@ export class UserRepository extends BaseRepository {
           'User',
           { email: entity.email },
           {
-            username: entity.username,
-            email: entity.email,
-            displayName: entity.displayName,
-            avatar: entity.avatar,
-            password: entity.password,
-            createdAt: createdAt,
+            ...entity,
+            createdAt,
           },
-          {
-            displayName: entity.displayName || undefined,
-            avatar: entity.avatar || undefined,
-            username: entity.username || undefined,
-            password: entity.password || undefined,
-          }
+          entity
         );
         return user;
       },

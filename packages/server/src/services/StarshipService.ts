@@ -43,21 +43,21 @@ export class StarshipService {
 
       console.log(`[STARSHIP-SERVICE] Creating default agent for user: ${userId}, starship: ${starshipId}`);
 
-      // Find the "General Assistant" template to use as the default
-      const templates = await templateService.searchTemplates('General Assistant');
-      const defaultTemplate = templates.find((t) => t.name === 'General Assistant' && t.authorId === 'system');
+      // Find the "Sibyl" template to use as the default starship navigator
+      const templates = await templateService.searchTemplates('Sibyl');
+      const defaultTemplate = templates.find((t) => t.name === 'Sibyl' && t.authorId === 'system');
 
       if (!defaultTemplate) {
-        console.error('[STARSHIP-SERVICE] Default agent template not found - skipping agent creation');
+        console.error('[STARSHIP-SERVICE] Sibyl agent template not found - skipping agent creation');
         return null;
       }
 
       console.log(`[STARSHIP-SERVICE] Found default template: ${defaultTemplate.name} (${defaultTemplate.id})`);
 
-      // Create agent from template with a default name
+      // Create agent from template with Sibyl as the default navigator
       const defaultAgent = await templateService.createAgentFromTemplate(
         defaultTemplate.id,
-        'My Assistant', // Default agent name
+        'Sibyl', // Default agent name - the starship navigator
         userId,
         starshipId
       );

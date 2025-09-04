@@ -22,8 +22,7 @@ export interface Message {
  * Memory state configuration for base Memory class
  * Pure state container - messages are handled separately by Memory class
  */
-export interface MemoryState extends Record<string, any> {
-}
+export interface MemoryState extends Record<string, any> {}
 
 /**
  * Memory constructor parameters
@@ -45,10 +44,10 @@ export class Memory {
 
   constructor(params: MemoryParams = {}) {
     this.state = params.state || {};
-    
+
     // Initialize messages if provided
     if (params.messages && params.messages.length > 0) {
-      params.messages.forEach(message => {
+      params.messages.forEach((message) => {
         this.addMessage(message.role, message.content, message.metadata);
       });
     }
@@ -57,14 +56,18 @@ export class Memory {
   /**
    * Add message to memory
    */
-  addMessage(role: 'system' | 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
+  addMessage(
+    role: 'system' | 'user' | 'assistant',
+    content: string,
+    metadata?: Record<string, unknown>
+  ): void {
     if (content && content.trim()) {
       const message: Message = {
         id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         role,
         content: content.trim(),
-        metadata
+        metadata,
       };
       this.messages.push(message);
     }
@@ -109,7 +112,7 @@ export class Memory {
    * Get messages by role
    */
   getMessagesByRole(role: 'system' | 'user' | 'assistant'): Message[] {
-    return this.messages.filter(msg => msg.role === role);
+    return this.messages.filter((msg) => msg.role === role);
   }
 
   /**
@@ -124,7 +127,7 @@ export class Memory {
    */
   clone(): Memory {
     const cloned = new Memory();
-    cloned.messages = this.messages.map(msg => ({ ...msg }));
+    cloned.messages = this.messages.map((msg) => ({ ...msg }));
     return cloned;
   }
 
@@ -133,7 +136,7 @@ export class Memory {
    */
   getStats(): { total: number; system: number; user: number; assistant: number } {
     const stats = { total: 0, system: 0, user: 0, assistant: 0 };
-    this.messages.forEach(msg => {
+    this.messages.forEach((msg) => {
       stats.total++;
       stats[msg.role]++;
     });

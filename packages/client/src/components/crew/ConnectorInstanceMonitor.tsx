@@ -195,10 +195,7 @@ function ConnectorMonitorCard({
               <span className="text-xs text-muted-foreground">Performance</span>
             </div>
             <span
-              className={cn(
-                'text-xs font-medium',
-                connectorMonitoring.getPerformanceLevelColor()
-              )}
+              className={cn('text-xs font-medium', connectorMonitoring.getPerformanceLevelColor())}
             >
               {healthMetrics.performanceLevel}
             </span>
@@ -252,25 +249,19 @@ function ConnectorMonitorCard({
         <div className="space-y-2 mb-4">
           <div className="flex justify-between items-center">
             <span className="text-xs text-muted-foreground">Uptime</span>
-            <span className="text-xs font-mono">
-              {connectorMonitoring.formatUptime()}
-            </span>
+            <span className="text-xs font-mono">{connectorMonitoring.formatUptime()}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-xs text-muted-foreground">Success Rate</span>
             <div className="flex items-center gap-2">
               <Progress value={healthMetrics.successRate} className="w-12 h-1" />
-              <span className="text-xs font-mono">
-                {connectorMonitoring.formatSuccessRate()}
-              </span>
+              <span className="text-xs font-mono">{connectorMonitoring.formatSuccessRate()}</span>
             </div>
           </div>
           {healthMetrics.lastResponseTime && (
             <div className="flex justify-between items-center">
               <span className="text-xs text-muted-foreground">Response Time</span>
-              <span className="text-xs font-mono">
-                {connectorMonitoring.formatResponseTime()}
-              </span>
+              <span className="text-xs font-mono">{connectorMonitoring.formatResponseTime()}</span>
             </div>
           )}
         </div>

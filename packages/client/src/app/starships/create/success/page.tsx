@@ -1,31 +1,31 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { CheckCircle, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
+'use client'
+import { useEffect, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { CheckCircle, Loader2 } from 'lucide-react'
+import { motion } from 'motion/react'
 
 export default function CheckoutSuccess() {
-  const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking');
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const sessionId = searchParams.get('session_id');
+  const [status, setStatus] = useState<'checking' | 'success' | 'error'>('checking')
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const sessionId = searchParams.get('session_id')
 
   useEffect(() => {
     if (!sessionId) {
-      setStatus('error');
-      return;
+      setStatus('error')
+      return
     }
 
     // Simple delay then redirect - webhook handles starship creation
     const timer = setTimeout(() => {
-      setStatus('success');
-      setTimeout(() => router.push('/'), 3000);
-    }, 2000);
+      setStatus('success')
+      setTimeout(() => router.push('/'), 3000)
+    }, 2000)
 
-    return () => clearTimeout(timer);
-  }, [sessionId, router]);
+    return () => clearTimeout(timer)
+  }, [sessionId, router])
 
   if (status === 'checking') {
     return (
@@ -38,7 +38,7 @@ export default function CheckoutSuccess() {
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   if (status === 'success') {
@@ -60,7 +60,7 @@ export default function CheckoutSuccess() {
           </CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   return (
@@ -68,14 +68,10 @@ export default function CheckoutSuccess() {
       <Card className="max-w-md mx-auto">
         <CardContent className="p-8 text-center space-y-4">
           <h1 className="text-xl font-semibold">Something went wrong</h1>
-          <p className="text-muted-foreground">
-            Please check your starships or contact support.
-          </p>
-          <Button onClick={() => router.push('/')}>
-            Go to Home
-          </Button>
+          <p className="text-muted-foreground">Please check your starships or contact support.</p>
+          <Button onClick={() => router.push('/')}>Go to Home</Button>
         </CardContent>
       </Card>
     </div>
-  );
+  )
 }

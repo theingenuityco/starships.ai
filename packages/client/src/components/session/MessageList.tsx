@@ -18,7 +18,7 @@ export function MessageList<T = Message>({
   messages,
   loading,
   error,
-  MessageComponent = MessageBubble as React.ComponentType<{ message: T }>
+  MessageComponent = MessageBubble as React.ComponentType<{ message: T }>,
 }: MessageListProps<T>) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -29,20 +29,20 @@ export function MessageList<T = Message>({
     const scrollToBottom = () => {
       if (messagesEndRef.current) {
         // Use instant scroll for code blocks to prevent bouncing
-        const hasCodeBlock = messages.some(msg =>
-          typeof (msg as Message).content === 'string' &&
-          (msg as Message).content.includes('```')
-        );
-        
+        const hasCodeBlock = messages.some(
+          msg =>
+            typeof (msg as Message).content === 'string' && (msg as Message).content.includes('```')
+        )
+
         messagesEndRef.current.scrollIntoView({
           behavior: hasCodeBlock ? 'auto' : 'smooth',
-          block: 'end'
-        });
+          block: 'end',
+        })
       }
-    };
-    
-    requestAnimationFrame(scrollToBottom);
-  }, [messages]);
+    }
+
+    requestAnimationFrame(scrollToBottom)
+  }, [messages])
 
   if (error) {
     return (
@@ -90,9 +90,7 @@ export function MessageList<T = Message>({
             </svg>
           </div>
           <h3 className="font-medium text-white mb-1">{CHAT_TEXT.START_CONVERSATION_TITLE}</h3>
-          <p className="text-sm text-zinc-400">
-            {CHAT_TEXT.START_CONVERSATION_MESSAGE}
-          </p>
+          <p className="text-sm text-zinc-400">{CHAT_TEXT.START_CONVERSATION_MESSAGE}</p>
         </div>
       </div>
     )
@@ -101,18 +99,18 @@ export function MessageList<T = Message>({
   return (
     <ScrollArea className="h-full">
       <div className="p-4">
-        {messages.map((message) => {
+        {messages.map(message => {
           // Check if MessageComponent is MessageBubble and pass streaming prop
-          const isMessageBubble = MessageComponent === MessageBubble;
-          const streamingProp = isMessageBubble ? { streaming: (message as Message).streaming } : {};
-          
+          const isMessageBubble = MessageComponent === MessageBubble
+          const streamingProp = isMessageBubble ? { streaming: (message as Message).streaming } : {}
+
           return (
             <MessageComponent
               key={(message as Message).id}
               message={message}
               {...(streamingProp as Record<string, unknown>)}
             />
-          );
+          )
         })}
         <div ref={messagesEndRef} />
       </div>

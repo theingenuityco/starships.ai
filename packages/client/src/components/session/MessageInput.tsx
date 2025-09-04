@@ -23,7 +23,7 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
       setSending(true)
       await onSendMessage(trimmedMessage)
       setMessage('')
-      
+
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
@@ -44,7 +44,7 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value)
-    
+
     // Auto-resize textarea
     const textarea = e.target
     textarea.style.height = 'auto'
@@ -70,7 +70,7 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
           rows={1}
         />
       </div>
-      
+
       <Button
         onClick={handleSubmit}
         disabled={!message.trim() || disabled || sending}

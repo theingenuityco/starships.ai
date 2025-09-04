@@ -19,7 +19,7 @@ export interface UserModel {
   avatar?: string;
   password?: string; // For local authentication
   createdAt: string;
-  
+
   // Stripe integration
   stripeCustomerId?: string;
 }

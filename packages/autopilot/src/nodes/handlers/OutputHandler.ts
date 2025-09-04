@@ -1,6 +1,6 @@
 /**
  * Output Node Handler
- * 
+ *
  * Output formatting handler using BaseHandler pattern
  */
 
@@ -24,11 +24,11 @@ export class OutputHandler extends BaseHandler {
     // TODO: Implement template rendering (Mustache/Handlebars)
     // For now, return simple formatted output
     const output = `# ${params.title || 'Workflow Output'}\n\n${JSON.stringify(sourceData, null, 2)}`;
-    
+
     return this.createSuccessResult(execution, {
       output,
       format: params.format,
-      sourceData
+      sourceData,
     });
   }
 
@@ -37,24 +37,20 @@ export class OutputHandler extends BaseHandler {
     const params = this.node.parameters as OutputNodeParameters;
 
     if (!params.template) {
-      errors.push(this.createValidationError(
-        'MISSING_REQUIRED_FIELD',
-        'Template is required'
-      ));
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Template is required'));
     }
 
     if (!params.sources || params.sources.length === 0) {
-      errors.push(this.createValidationError(
-        'MISSING_REQUIRED_FIELD',
-        'At least one source node is required'
-      ));
+      errors.push(
+        this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one source node is required')
+      );
     }
 
     return {
       valid: errors.length === 0,
       errors,
       warnings: [],
-      suggestions: []
+      suggestions: [],
     };
   }
 

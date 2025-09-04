@@ -27,6 +27,7 @@ A GitHub Action that automatically syncs pull request activities to Discord thre
 ### 2. Bot Permissions
 
 The bot needs these permissions (permission integer: `360777252928`):
+
 - View Channels
 - Send Messages
 - Create Private Threads
@@ -40,6 +41,7 @@ The bot needs these permissions (permission integer: `360777252928`):
 ### 3. Invite Bot to Server
 
 Generate an invite link:
+
 ```
 https://discord.com/api/oauth2/authorize?client_id=YOUR_BOT_CLIENT_ID&permissions=360777252928&scope=bot
 ```
@@ -52,19 +54,20 @@ Replace `YOUR_BOT_CLIENT_ID` with your bot's client ID from the Discord Develope
 
 In your repository settings, add these secrets:
 
-| Secret | Description | How to Get |
-|--------|-------------|------------|
-| `DISCORD_BOT_TOKEN` | Discord bot token | Discord Developer Portal → Bot → Token |
-| `DISCORD_GUILD_ID` | Discord server ID | Right-click server → Copy Server ID* |
-| `DISCORD_CHANNEL_ID` | Channel for threads | Right-click channel → Copy Channel ID* |
-| `AUTO_INVITE_ROLE_ID` | (Optional) Role to auto-invite | Right-click role → Copy Role ID* |
-| `DISCORD_USER_MAP` | (Optional) GitHub to Discord user mapping | See format below |
+| Secret                | Description                               | How to Get                              |
+| --------------------- | ----------------------------------------- | --------------------------------------- |
+| `DISCORD_BOT_TOKEN`   | Discord bot token                         | Discord Developer Portal → Bot → Token  |
+| `DISCORD_GUILD_ID`    | Discord server ID                         | Right-click server → Copy Server ID\*   |
+| `DISCORD_CHANNEL_ID`  | Channel for threads                       | Right-click channel → Copy Channel ID\* |
+| `AUTO_INVITE_ROLE_ID` | (Optional) Role to auto-invite            | Right-click role → Copy Role ID\*       |
+| `DISCORD_USER_MAP`    | (Optional) GitHub to Discord user mapping | See format below                        |
 
-*Enable Developer Mode in Discord Settings → Advanced → Developer Mode
+\*Enable Developer Mode in Discord Settings → Advanced → Developer Mode
 
 ### 2. User Mapping Format
 
 For `DISCORD_USER_MAP`, use this JSON format:
+
 ```json
 {
   "github-username": "discord-user-id",
@@ -81,10 +84,26 @@ name: Discord PR Sync
 
 on:
   pull_request:
-    types: [opened, closed, reopened, edited, assigned, unassigned, 
-            labeled, unlabeled, synchronize, converted_to_draft, 
-            ready_for_review, locked, unlocked, review_requested, 
-            review_request_removed, auto_merge_enabled, auto_merge_disabled]
+    types:
+      [
+        opened,
+        closed,
+        reopened,
+        edited,
+        assigned,
+        unassigned,
+        labeled,
+        unlabeled,
+        synchronize,
+        converted_to_draft,
+        ready_for_review,
+        locked,
+        unlocked,
+        review_requested,
+        review_request_removed,
+        auto_merge_enabled,
+        auto_merge_disabled,
+      ]
   pull_request_review:
     types: [submitted, edited, dismissed]
   pull_request_review_comment:
@@ -92,7 +111,7 @@ on:
   issue_comment:
     types: [created, edited, deleted]
   workflow_run:
-    workflows: ["*"]
+    workflows: ['*']
     types: [requested, in_progress, completed]
   check_run:
     types: [created, rerequested, completed]
@@ -144,12 +163,15 @@ jobs:
 Once configured, the action runs automatically on PR events:
 
 ### Thread Creation
+
 - When a PR is opened, a private Discord thread is created
 - Thread name format: `🔒 PR #123: Title`
 - Initial message includes PR details and status
 
 ### Thread Updates
+
 The thread receives updates for:
+
 - 💬 **Comments**: New, edited, or deleted comments
 - ✅ **Reviews**: Approved, changes requested, or commented
 - 📦 **Commits**: New commits pushed
@@ -159,7 +181,9 @@ The thread receives updates for:
 - 🎉 **Merge/Close**: PR merged or closed
 
 ### Status Indicators
+
 Thread names update with status emojis:
+
 - 🔵 Open
 - ⚪ Draft
 - ✅ Approved
@@ -169,42 +193,48 @@ Thread names update with status emojis:
 
 ## Action Inputs
 
-| Input | Required | Description |
-|-------|----------|-------------|
-| `discord-token` | Yes | Discord bot token |
-| `guild-id` | Yes | Discord server ID |
-| `channel-id` | Yes | Channel for thread creation |
-| `auto-invite-role-id` | No | Role ID to auto-invite to threads |
-| `github-discord-map` | No | JSON mapping of GitHub to Discord users |
+| Input                 | Required | Description                             |
+| --------------------- | -------- | --------------------------------------- |
+| `discord-token`       | Yes      | Discord bot token                       |
+| `guild-id`            | Yes      | Discord server ID                       |
+| `channel-id`          | Yes      | Channel for thread creation             |
+| `auto-invite-role-id` | No       | Role ID to auto-invite to threads       |
+| `github-discord-map`  | No       | JSON mapping of GitHub to Discord users |
 
 ## Action Outputs
 
-| Output | Description |
-|--------|-------------|
-| `thread-id` | Discord thread ID |
-| `thread-url` | Direct URL to Discord thread |
+| Output         | Description                                         |
+| -------------- | --------------------------------------------------- |
+| `thread-id`    | Discord thread ID                                   |
+| `thread-url`   | Direct URL to Discord thread                        |
 | `action-taken` | What action was performed (created/updated/skipped) |
 
 ## Troubleshooting
 
 ### Bot Not Found Error
+
 ```
 Error: Unknown Guild
 ```
+
 **Solution**: Bot is not in the Discord server. Use the invite link to add it.
 
 ### Permission Errors
+
 ```
 Missing permissions in channel
 ```
+
 **Solution**: Ensure bot role has all required permissions in the target channel.
 
 ### Thread Not Created
+
 - Check bot has "Create Private Threads" permission
 - Verify channel is a text channel (not voice/category)
 - Check GitHub secrets are correctly set
 
 ### Updates Not Appearing
+
 - Verify workflow is running in Actions tab
 - Check thread exists for the PR
 - Ensure bot token is valid
@@ -275,6 +305,7 @@ MIT License - See LICENSE file for details
 ## Support
 
 For issues or questions:
+
 1. Check this README
 2. Review workflow logs in GitHub Actions
 3. Check Discord bot permissions
@@ -283,6 +314,7 @@ For issues or questions:
 ## Changelog
 
 ### v1.0.0
+
 - Initial release
 - Full PR lifecycle support
 - Comprehensive event handling

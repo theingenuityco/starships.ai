@@ -1,43 +1,43 @@
-'use client';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { AlertTriangle, XCircle } from 'lucide-react';
-import { starshipAPI } from '@/lib/api';
+'use client'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle, XCircle } from 'lucide-react'
+import { starshipAPI } from '@/lib/api'
 
 interface PaymentStatusBannerProps {
   starship: {
-    id: string;
-    name: string;
-    status: 'active' | 'restricted' | 'disabled' | 'pending_payment';
-    plan: 'scout' | 'cruiser' | 'draught';
-  };
+    id: string
+    name: string
+    status: 'active' | 'restricted' | 'disabled' | 'pending_payment'
+    plan: 'scout' | 'cruiser' | 'draught'
+  }
 }
 
 export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
   const handleManageSubscription = async () => {
     try {
-      const response = await starshipAPI.createBillingPortal(starship.id);
+      const response = await starshipAPI.createBillingPortal(starship.id)
       if (response.url) {
-        window.location.href = response.url;
+        window.location.href = response.url
       }
     } catch (error) {
-      console.error('Failed to open billing portal:', error);
+      console.error('Failed to open billing portal:', error)
     }
-  };
+  }
 
   const handleRetryPayment = async () => {
     try {
-      const response = await starshipAPI.retryPayment(starship.id);
+      const response = await starshipAPI.retryPayment(starship.id)
       if (response.checkoutUrl) {
-        window.location.href = response.checkoutUrl;
+        window.location.href = response.checkoutUrl
       }
     } catch (error) {
-      console.error('Failed to retry payment:', error);
+      console.error('Failed to retry payment:', error)
     }
-  };
+  }
 
   if (starship.status === 'active' || starship.plan === 'scout') {
-    return null;
+    return null
   }
 
   if (starship.status === 'pending_payment') {
@@ -57,7 +57,7 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
   if (starship.status === 'restricted') {
@@ -77,7 +77,7 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
   if (starship.status === 'disabled') {
@@ -88,9 +88,7 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
             <div className="flex items-center space-x-3">
               <XCircle className="h-5 w-5 text-red-600" />
               <div>
-                <span className="text-sm text-red-800">
-                  Subscription ended for {starship.name}
-                </span>
+                <span className="text-sm text-red-800">Subscription ended for {starship.name}</span>
                 <p className="text-xs text-red-600 mt-1">
                   Create a new starship to start a new subscription
                 </p>
@@ -100,8 +98,8 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
           </div>
         </CardContent>
       </Card>
-    );
+    )
   }
 
-  return null;
+  return null
 }

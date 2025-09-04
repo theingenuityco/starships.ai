@@ -22,10 +22,10 @@ export class Agent {
       // Ensure blueprint has a deep copy to avoid mutations
       blueprint: {
         ...params.blueprint,
-        nodes: (params.blueprint.nodes || []).map(node => ({ ...node })),
-        edges: (params.blueprint.edges || []).map(edge => ({ ...edge })),
-        metadata: { ...params.blueprint.metadata }
-      }
+        nodes: (params.blueprint.nodes || []).map((node) => ({ ...node })),
+        edges: (params.blueprint.edges || []).map((edge) => ({ ...edge })),
+        metadata: { ...params.blueprint.metadata },
+      },
     };
 
     // Create AgentMemory instance from config
@@ -59,10 +59,13 @@ export class Agent {
   /**
    * Add content to agent memory
    */
-  addToMemory(role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
+  addToMemory(
+    role: 'user' | 'assistant',
+    content: string,
+    metadata?: Record<string, unknown>
+  ): void {
     this.memory.addConversation(role, content, metadata);
   }
-
 
   /**
    * Get agent description
@@ -115,7 +118,7 @@ export class Agent {
       status: 'not_started',
       executionResults: new Map(),
       agentMemory: this.memory,
-      ...initialExecution
+      ...initialExecution,
     };
     return this.engine.execute(this.params.blueprint, executionWithMemory);
   }
@@ -148,26 +151,30 @@ export class Agent {
     } else {
       const nodes = this.params.blueprint.nodes || [];
       const edges = this.params.blueprint.edges || [];
-      
+
       // Check for start node
-      const hasStartNode = nodes.some(node => node.type === 'start');
+      const hasStartNode = nodes.some((node) => node.type === 'start');
       if (!hasStartNode) {
         errors.push('Agent blueprint must have a start node');
       }
 
       // Check that all node types have handlers (delegate to engine)
-      const unsupportedNodes = nodes.filter(node => !this.engine.hasHandler(node.type));
+      const unsupportedNodes = nodes.filter((node) => !this.engine.hasHandler(node.type));
       if (unsupportedNodes.length > 0) {
-        errors.push(`Unsupported node types in agent blueprint: ${unsupportedNodes.map(n => n.type).join(', ')}`);
+        errors.push(
+          `Unsupported node types in agent blueprint: ${unsupportedNodes.map((n) => n.type).join(', ')}`
+        );
       }
 
       // Check edge references
-      const nodeRefs = new Set(nodes.map(n => n.ref));
+      const nodeRefs = new Set(nodes.map((n) => n.ref));
       const invalidEdges = edges.filter(
-        edge => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
+        (edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
       );
       if (invalidEdges.length > 0) {
-        errors.push(`Invalid edge references found in agent blueprint: ${invalidEdges.length} edges`);
+        errors.push(
+          `Invalid edge references found in agent blueprint: ${invalidEdges.length} edges`
+        );
       }
     }
 
@@ -177,7 +184,10 @@ export class Agent {
     }
 
     // Validate temperature if provided
-    if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
+    if (
+      this.params.temperature !== undefined &&
+      (this.params.temperature < 0 || this.params.temperature > 2)
+    ) {
       errors.push('Agent temperature should be between 0 and 2');
     }
 
@@ -188,7 +198,7 @@ export class Agent {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -201,7 +211,7 @@ export class Agent {
       identity: this.memory.getIdentity(),
       purpose: this.memory.getPurpose(),
       space: this.memory.getSpace(),
-      messages: this.memory.getMessageHistory()
+      messages: this.memory.getMessageHistory(),
     };
 
     const clonedParams: AgentNodeParameters = {
@@ -209,9 +219,9 @@ export class Agent {
       memory: memoryState,
       blueprint: {
         ...this.params.blueprint,
-        nodes: (this.params.blueprint.nodes || []).map(node => ({ ...node })),
-        edges: (this.params.blueprint.edges || []).map(edge => ({ ...edge }))
-      }
+        nodes: (this.params.blueprint.nodes || []).map((node) => ({ ...node })),
+        edges: (this.params.blueprint.edges || []).map((edge) => ({ ...edge })),
+      },
     };
 
     return new Agent(clonedParams);
@@ -226,7 +236,7 @@ export class Agent {
       identity: this.memory.getIdentity(),
       purpose: this.memory.getPurpose(),
       space: this.memory.getSpace(),
-      messages: this.memory.getMessageHistory()
+      messages: this.memory.getMessageHistory(),
     };
 
     const updatedParams = {
@@ -235,7 +245,7 @@ export class Agent {
       // Use provided memory state or current memory state
       memory: updates.memory || currentMemoryState,
       // Preserve blueprint if not being updated
-      blueprint: updates.blueprint || this.params.blueprint
+      blueprint: updates.blueprint || this.params.blueprint,
     };
 
     return new Agent(updatedParams);

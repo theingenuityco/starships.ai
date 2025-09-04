@@ -1,27 +1,33 @@
-import { generateId } from './utils';
-import SocketClient from './socket-client';
-import type { SessionRequest, SessionStreamChunk, SessionError, SessionResponse, ChatTypingData } from '@starships/protocol';
+import { generateId } from './utils'
+import SocketClient from './socket-client'
+import type {
+  SessionRequest,
+  SessionStreamChunk,
+  SessionError,
+  SessionResponse,
+  ChatTypingData,
+} from '@starships/protocol'
 
 export interface Message {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: string;
-  sessionId: string;
-  agentId?: string;
-  sending?: boolean;
-  streaming?: boolean;
-  streamId?: string;
+  id: string
+  content: string
+  role: 'user' | 'assistant'
+  timestamp: string
+  sessionId: string
+  agentId?: string
+  sending?: boolean
+  streaming?: boolean
+  streamId?: string
   usage?: {
-    promptTokens: number;
-    completionTokens: number;
-  };
+    promptTokens: number
+    completionTokens: number
+  }
 }
 
 export interface AgentRequest {
-  agentId: string;
-  message: string;
-  sessionId?: string;
+  agentId: string
+  message: string
+  sessionId?: string
 }
 
 export const agentSocketAPI = {
@@ -29,24 +35,24 @@ export const agentSocketAPI = {
     agentId: string,
     request: { sessionId?: string; message: string },
     callbacks: {
-      onChunk: (chunk: SessionStreamChunk, accumulatedContent: string) => void;
-      onComplete: (message: Message) => void;
-      onError: (error: string) => void;
-      onTypingStart?: () => void;
-      onTypingStop?: () => void;
+      onChunk: (chunk: SessionStreamChunk, accumulatedContent: string) => void
+      onComplete: (message: Message) => void
+      onError: (error: string) => void
+      onTypingStart?: () => void
+      onTypingStop?: () => void
     }
   ): { abort: () => void } => {
-    const socketClient = SocketClient.getInstance();
-    const socket = socketClient.getSocket();
-    
+    const socketClient = SocketClient.getInstance()
+    const socket = socketClient.getSocket()
+
     if (!socket || !socketClient.isConnected()) {
-      callbacks.onError('Socket.IO connection required - please check your connection');
-      return { abort: () => {} };
+      callbacks.onError('Socket.IO connection required - please check your connection')
+      return { abort: () => {} }
     }
 
-    const streamId = generateId();
-    let accumulatedContent = '';
-    let isAborted = false;
+    const streamId = generateId()
+    let accumulatedContent = ''
+    let isAborted = false
 
     const socketRequest: SessionRequest = {
       source: 'agent',
@@ -56,29 +62,39 @@ export const agentSocketAPI = {
       streamId: streamId,
       userId: 'client-user', // Overridden by server auth
       typewriterEnabled: true,
-      typingSpeed: 75
-    };
-
+      typingSpeed: 75,
+    }
 
     const handleStreamChunk = (chunk: SessionStreamChunk) => {
-      if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && !isAborted) {
+      if (
+        chunk.streamId === streamId &&
+        chunk.agentId === agentId &&
+        chunk.source === 'agent' &&
+        !isAborted
+      ) {
         if (chunk.typewriter?.type === 'character') {
-          accumulatedContent += chunk.typewriter.content;
-          callbacks.onChunk(chunk, accumulatedContent);
+          accumulatedContent += chunk.typewriter.content
+          callbacks.onChunk(chunk, accumulatedContent)
         } else if (chunk.content) {
           // Handle non-typewriter content
-          accumulatedContent += chunk.content;
-          callbacks.onChunk(chunk, accumulatedContent);
+          accumulatedContent += chunk.content
+          callbacks.onChunk(chunk, accumulatedContent)
         }
       }
-    };
+    }
 
     const handleStreamComplete = (chunk: SessionStreamChunk) => {
-      if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && chunk.type === 'complete' && !isAborted) {
+      if (
+        chunk.streamId === streamId &&
+        chunk.agentId === agentId &&
+        chunk.source === 'agent' &&
+        chunk.type === 'complete' &&
+        !isAborted
+      ) {
         // Extract sessionId from server's metadata or fallback to provided sessionId
-        const serverSessionId = chunk.metadata?.sessionId as string;
-        const finalSessionId = serverSessionId || request.sessionId || 'unknown';
-        
+        const serverSessionId = chunk.metadata?.sessionId as string
+        const finalSessionId = serverSessionId || request.sessionId || 'unknown'
+
         const finalMessage: Message = {
           id: generateId(),
           content: chunk.content,
@@ -87,72 +103,72 @@ export const agentSocketAPI = {
           sessionId: finalSessionId, // Use server-provided sessionId
           agentId: chunk.agentId,
           streaming: false,
-          usage: undefined // Usage not available in stream chunks
-        };
-        callbacks.onComplete(finalMessage);
-        cleanup();
+          usage: undefined, // Usage not available in stream chunks
+        }
+        callbacks.onComplete(finalMessage)
+        cleanup()
       }
-    };
+    }
 
     const handleStreamError = (error: SessionError) => {
       if (error.streamId === streamId && error.agentId === agentId && !isAborted) {
-        callbacks.onError(error.message);
-        cleanup();
+        callbacks.onError(error.message)
+        cleanup()
       }
-    };
+    }
 
     const handleTypingStart = (data: ChatTypingData) => {
       if (data.isTyping) {
-        callbacks.onTypingStart?.();
+        callbacks.onTypingStart?.()
       }
-    };
+    }
 
     const handleTypingStop = (data: ChatTypingData) => {
       if (!data.isTyping) {
-        callbacks.onTypingStop?.();
+        callbacks.onTypingStop?.()
       }
-    };
+    }
 
     const cleanup = () => {
-      socket.off('session:stream-chunk', handleStreamChunk);
-      socket.off('session:stream-complete', handleStreamComplete);
-      socket.off('session:stream-error', handleStreamError);
-      socket.off('session:typing-start', handleTypingStart);
-      socket.off('session:typing-stop', handleTypingStop);
-    };
+      socket.off('session:stream-chunk', handleStreamChunk)
+      socket.off('session:stream-complete', handleStreamComplete)
+      socket.off('session:stream-error', handleStreamError)
+      socket.off('session:typing-start', handleTypingStart)
+      socket.off('session:typing-stop', handleTypingStop)
+    }
 
     // Set up event listeners
-    socket.on('session:stream-chunk', handleStreamChunk);
-    socket.on('session:stream-complete', handleStreamComplete);
-    socket.on('session:stream-error', handleStreamError);
-    socket.on('session:typing-start', handleTypingStart);
-    socket.on('session:typing-stop', handleTypingStop);
+    socket.on('session:stream-chunk', handleStreamChunk)
+    socket.on('session:stream-complete', handleStreamComplete)
+    socket.on('session:stream-error', handleStreamError)
+    socket.on('session:typing-start', handleTypingStart)
+    socket.on('session:typing-stop', handleTypingStop)
 
     // Join agent room for this session
-    socketClient.joinAgentRoom(agentId, 'current-user'); // Will be overridden by server auth
+    socketClient.joinAgentRoom(agentId, 'current-user') // Will be overridden by server auth
 
     // Start the stream
-    socket.emit('session:start-stream', socketRequest);
+    socket.emit('session:start-stream', socketRequest)
 
     return {
       abort: () => {
-        isAborted = true;
-        socket.emit('session:stop-stream', streamId);
-        socketClient.leaveAgentRoom(agentId, 'current-user');
-        cleanup();
-      }
-    };
+        isAborted = true
+        socket.emit('session:stop-stream', streamId)
+        socketClient.leaveAgentRoom(agentId, 'current-user')
+        cleanup()
+      },
+    }
   },
 
   // Utility method to join agent room
   joinAgentRoom: (agentId: string, userId: string) => {
-    const socketClient = SocketClient.getInstance();
-    socketClient.joinAgentRoom(agentId, userId);
+    const socketClient = SocketClient.getInstance()
+    socketClient.joinAgentRoom(agentId, userId)
   },
 
   // Utility method to leave agent room
   leaveAgentRoom: (agentId: string, userId: string) => {
-    const socketClient = SocketClient.getInstance();
-    socketClient.leaveAgentRoom(agentId, userId);
-  }
-};
+    const socketClient = SocketClient.getInstance()
+    socketClient.leaveAgentRoom(agentId, userId)
+  },
+}

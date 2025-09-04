@@ -3,7 +3,12 @@
  * Business logic layer for mission operations
  */
 
-import { MissionRepository, StarshipRepository, AgentRepository, MissionClarityRepository } from '@starships/models';
+import {
+  MissionRepository,
+  StarshipRepository,
+  AgentRepository,
+  MissionClarityRepository,
+} from '@starships/models';
 import { MissionOrchestratorService } from './MissionOrchestratorService';
 import { MissionEventService } from './MissionEventService';
 import type {
@@ -15,15 +20,11 @@ import type {
   MissionListResponse,
   MissionStatus,
   MissionPhase,
-  MissionClarityModel
+  MissionClarityModel,
 } from '@starships/protocol';
-import {
-  ValidationError,
-  NotFoundError,
-} from '@starships/errors';
+import { ValidationError, NotFoundError } from '@starships/errors';
 
 export class MissionService {
-  
   /**
    * Create a new mission
    */
@@ -89,16 +90,16 @@ export class MissionService {
     try {
       const missionOrchestratorService = MissionOrchestratorService.getInstance();
       console.log('📡 MissionOrchestratorService obtained:', !!missionOrchestratorService);
-      
+
       // Fire and forget - start mission orchestration
-      missionOrchestratorService.startMission(mission.id)
+      missionOrchestratorService
+        .startMission(mission.id)
         .then(() => {
           console.log('✅ Mission orchestration started successfully for mission:', mission.id);
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('❌ Failed to start mission orchestration:', error);
         });
-      
     } catch (error) {
       console.error('❌ Failed to start mission orchestration:', error);
       // Silent fail - mission orchestration can be started later
@@ -153,10 +154,7 @@ export class MissionService {
   /**
    * Update a mission
    */
-  static async updateMission(
-    id: string,
-    updates: UpdateMissionRequest
-  ): Promise<MissionModel> {
+  static async updateMission(id: string, updates: UpdateMissionRequest): Promise<MissionModel> {
     const missionRepo = new MissionRepository();
     const agentRepo = new AgentRepository();
     const missionEventService = MissionEventService.getInstance();
@@ -201,8 +199,7 @@ export class MissionService {
 
       const duplicateName = existingMissions.missions.find(
         (mission: MissionModel) =>
-          mission.id !== id &&
-          mission.name.toLowerCase() === updates.name!.toLowerCase()
+          mission.id !== id && mission.name.toLowerCase() === updates.name!.toLowerCase()
       );
 
       if (duplicateName) {
@@ -238,10 +235,7 @@ export class MissionService {
 
     // Business rule: Don't allow deletion of active missions
     if (existingMission.status === 'active') {
-      throw new ValidationError(
-        'Cannot delete an active mission. Cancel it first.',
-        'status'
-      );
+      throw new ValidationError('Cannot delete an active mission. Cancel it first.', 'status');
     }
 
     // TODO: Add authorization check if userId is provided
@@ -296,7 +290,7 @@ export class MissionService {
     recentMissions: MissionModel[];
   }> {
     const missionRepo = new MissionRepository();
-    
+
     const allMissions = await missionRepo.getMissionModelsByStarshipId(starshipId);
     const missions = allMissions.missions;
 
@@ -306,7 +300,7 @@ export class MissionService {
       active: 0,
       completed: 0,
       failed: 0,
-      cancelled: 0
+      cancelled: 0,
     };
 
     missions.forEach((mission: MissionModel) => {
@@ -315,13 +309,16 @@ export class MissionService {
 
     // Get recent missions (last 5)
     const recentMissions = missions
-      .sort((a: MissionModel, b: MissionModel) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .sort(
+        (a: MissionModel, b: MissionModel) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
       .slice(0, 5);
 
     return {
       total: missions.length,
       byStatus,
-      recentMissions
+      recentMissions,
     };
   }
 
@@ -337,11 +334,11 @@ export class MissionService {
       active: ['completed', 'failed', 'cancelled'],
       completed: [], // No transitions from completed
       failed: ['active'], // Can restart a failed mission
-      cancelled: ['draft'] // Can reopen a cancelled mission
+      cancelled: ['draft'], // Can reopen a cancelled mission
     };
 
     const allowedTransitions = validTransitions[currentStatus];
-    
+
     if (!allowedTransitions.includes(newStatus)) {
       throw new ValidationError(
         `Cannot transition mission from "${currentStatus}" to "${newStatus}". Valid transitions: ${allowedTransitions.join(', ')}`,
@@ -376,7 +373,7 @@ export class MissionService {
    */
   static async getWorkflowByMissionId(missionId: string): Promise<any | null> {
     const missionRepo = new MissionRepository();
-    
+
     // Verify mission exists first
     try {
       await missionRepo.getMissionById(missionId);
@@ -395,21 +392,24 @@ export class MissionService {
   /**
    * Update workflow approval status for a mission - temporary implementation
    */
-  static async updateWorkflowApproval(missionId: string, approvalData: {
-    approvalStatus: 'pending' | 'approved' | 'rejected';
-    rejectionReason?: string;
-  }): Promise<any | null> {
+  static async updateWorkflowApproval(
+    missionId: string,
+    approvalData: {
+      approvalStatus: 'pending' | 'approved' | 'rejected';
+      rejectionReason?: string;
+    }
+  ): Promise<any | null> {
     const missionRepo = new MissionRepository();
-    
+
     // Verify mission exists first
     try {
       const mission = await missionRepo.getMissionById(missionId);
-      
+
       // Update mission's approval status
       const updatedMission = await missionRepo.updateMission(missionId, {
-        approvalStatus: approvalData.approvalStatus as any
+        approvalStatus: approvalData.approvalStatus as any,
       });
-      
+
       return updatedMission;
     } catch (error) {
       if (error instanceof NotFoundError) {

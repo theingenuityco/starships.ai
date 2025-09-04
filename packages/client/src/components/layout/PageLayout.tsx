@@ -1,17 +1,17 @@
-'use client';
+'use client'
 
-import { motion } from 'motion/react';
-import { JwtAuthGate } from '@/components/auth/JwtAuthGate';
-import { cn } from '@/lib/utils';
+import { motion } from 'motion/react'
+import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
+import { cn } from '@/lib/utils'
 
 interface PageLayoutProps {
-  children: React.ReactNode;
-  title?: string;
-  description?: string;
-  showHeader?: boolean;
-  className?: string;
-  requireAuth?: boolean;
-  headerActions?: React.ReactNode;
+  children: React.ReactNode
+  title?: string
+  description?: string
+  showHeader?: boolean
+  className?: string
+  requireAuth?: boolean
+  headerActions?: React.ReactNode
 }
 
 export function PageLayout({
@@ -21,10 +21,10 @@ export function PageLayout({
   showHeader = false,
   className,
   requireAuth = true,
-  headerActions
+  headerActions,
 }: PageLayoutProps) {
   const content = (
-    <div className={cn("h-full w-full", className)}>
+    <div className={cn('h-full w-full', className)}>
       {showHeader && (title || description) && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -38,35 +38,27 @@ export function PageLayout({
                   {title}
                 </h1>
               )}
-              {description && (
-                <p className="text-gray-600 mt-2">
-                  {description}
-                </p>
-              )}
+              {description && <p className="text-gray-600 mt-2">{description}</p>}
             </div>
-            {headerActions && (
-              <div className="flex-shrink-0">
-                {headerActions}
-              </div>
-            )}
+            {headerActions && <div className="flex-shrink-0">{headerActions}</div>}
           </div>
         </motion.div>
       )}
-      
-      <div className={cn(
-        "container mx-auto px-4 py-8",
-        showHeader && (title || description) 
-          ? "h-[calc(100%-140px)]" 
-          : "h-full"
-      )}>
+
+      <div
+        className={cn(
+          'container mx-auto px-4 py-8',
+          showHeader && (title || description) ? 'h-[calc(100%-140px)]' : 'h-full'
+        )}
+      >
         {children}
       </div>
     </div>
-  );
+  )
 
   if (requireAuth) {
-    return <JwtAuthGate>{content}</JwtAuthGate>;
+    return <JwtAuthGate>{content}</JwtAuthGate>
   }
 
-  return content;
+  return content
 }

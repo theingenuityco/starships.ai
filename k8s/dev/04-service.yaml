@@ -12,22 +12,22 @@ spec:
     app: starships-ai
     environment: dev
   ports:
-  - port: 3000
-    targetPort: 3000
-    protocol: TCP
-    name: frontend
-  - port: 3001
-    targetPort: 3001
-    protocol: TCP
-    name: backend
-  - port: 7474
-    targetPort: 7474
-    protocol: TCP
-    name: neo4j-http
-  - port: 7687
-    targetPort: 7687
-    protocol: TCP
-    name: neo4j-bolt
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: frontend
+    - port: 3001
+      targetPort: 3001
+      protocol: TCP
+      name: backend
+    - port: 7474
+      targetPort: 7474
+      protocol: TCP
+      name: neo4j-http
+    - port: 7687
+      targetPort: 7687
+      protocol: TCP
+      name: neo4j-bolt
   sessionAffinity: ClientIP
   sessionAffinityConfig:
     clientIP:

@@ -45,7 +45,7 @@ export interface WelcomeMessageData {
 
 /**
  * Legacy mission prompt templates - DEPRECATED
- * 
+ *
  * All prompts have been migrated to MissionPromptBuilder.
  * This file can be removed once renderTemplate is no longer used elsewhere.
  */
@@ -55,6 +55,9 @@ export interface WelcomeMessageData {
  */
 import { template } from 'lodash';
 
-export const renderTemplate = <T extends Record<string, any>>(templateStr: string, data: T): string => {
+export const renderTemplate = <T extends Record<string, any>>(
+  templateStr: string,
+  data: T
+): string => {
   return template(templateStr)(data);
 };

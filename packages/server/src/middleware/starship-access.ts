@@ -42,15 +42,15 @@ export async function checkStarshipAccess(
 
     // Check subscription status
     if (starship.status === 'disabled') {
-      res.status(403).json({ 
-        error: 'Subscription ended. Please reactivate to continue.' 
+      res.status(403).json({
+        error: 'Subscription ended. Please reactivate to continue.',
       });
       return;
     }
 
     if (starship.status === 'restricted') {
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-        res.status(402).json({ 
+        res.status(402).json({
           error: 'Payment required. Please update your payment method.',
           billingPortalUrl: `/api/${starshipId}/billing-portal`,
         });
@@ -60,7 +60,6 @@ export async function checkStarshipAccess(
 
     req.starship = starship;
     next();
-
   } catch (error) {
     console.error('Access check error:', error);
     res.status(500).json({ error: 'Failed to verify access' });

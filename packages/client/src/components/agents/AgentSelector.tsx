@@ -67,7 +67,7 @@ export function AgentSelector({
   useEffect(() => {
     applyFilters()
   }, [agents, filters])
-  
+
   // Notify parent of agents count change
   useEffect(() => {
     if (onAgentsCountChange) {
@@ -250,7 +250,9 @@ export function AgentSelector({
           </span>
           <div className="flex-1 min-w-0 space-y-1">
             <h3 className="text-xl font-bold text-foreground">{AGENT_TEXT.SECTION_TITLE}</h3>
-            <p className="text-sm text-muted-foreground">Manage your starship&apos;s AI crew members</p>
+            <p className="text-sm text-muted-foreground">
+              Manage your starship&apos;s AI crew members
+            </p>
           </div>
         </div>
         {showCreateButton && (
@@ -300,7 +302,7 @@ export function AgentSelector({
             {/* Search and Filters Side by Side - COMMENTED OUT FOR NOW */}
             {/* <div className="flex flex-col lg:flex-row gap-4">
               {/* Search Input */}
-              {/* <div className="flex-1 relative">
+            {/* <div className="flex-1 relative">
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground z-10">
                   <Search className="w-4 h-4" />
                 </div>
@@ -312,8 +314,8 @@ export function AgentSelector({
                 />
               </div> */}
 
-              {/* Filters */}
-              {/* <div className="lg:flex-shrink-0">
+            {/* Filters */}
+            {/* <div className="lg:flex-shrink-0">
                 <AgentFilters
                   filters={filters}
                   onFiltersChange={setFilters}

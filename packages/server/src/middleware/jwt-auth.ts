@@ -13,7 +13,9 @@ import { sendError } from '../utils/responseHelpers';
 const env = getEnvConfig();
 
 // JWT configuration
-const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');
+const JWT_SECRET = new TextEncoder().encode(
+  env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production'
+);
 const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
 
@@ -30,7 +32,9 @@ export const jwtAuthMiddleware = async (
     // Extract token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log(`[JWT-AUTH] Missing or invalid Authorization header for ${req.method} ${req.path}`);
+      console.log(
+        `[JWT-AUTH] Missing or invalid Authorization header for ${req.method} ${req.path}`
+      );
       sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing or invalid Authorization header', 401);
       return;
     }
@@ -107,7 +111,7 @@ export const optionalJwtAuth = async (
   next: NextFunction
 ): Promise<void> => {
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     // No token provided, continue without user
     next();

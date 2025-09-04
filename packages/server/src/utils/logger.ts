@@ -8,7 +8,7 @@ export enum LogLevel {
   INFO = 1,
   WARN = 2,
   ERROR = 3,
-  CRITICAL = 4
+  CRITICAL = 4,
 }
 
 export interface LogContext {
@@ -76,12 +76,14 @@ export class Logger {
       level,
       message,
       context: context ? { ...context } : undefined,
-      error: error ? {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      } as any : undefined,
-      stack: error?.stack
+      error: error
+        ? ({
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          } as any)
+        : undefined,
+      stack: error?.stack,
     };
 
     this.logBuffer.push(logEntry);
@@ -122,9 +124,7 @@ export class Logger {
   }
 
   public getErrorLogs(count: number = 50): LogEntry[] {
-    return this.logBuffer
-      .filter(entry => entry.level >= LogLevel.ERROR)
-      .slice(-count);
+    return this.logBuffer.filter((entry) => entry.level >= LogLevel.ERROR).slice(-count);
   }
 
   public clearBuffer(): void {

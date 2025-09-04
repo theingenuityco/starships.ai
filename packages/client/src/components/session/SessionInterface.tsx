@@ -25,17 +25,17 @@ export function SessionInterface({
   defaultMode = 'agent',
   starshipId,
   sessionId: externalSessionId,
-  onSessionChange
+  onSessionChange,
 }: SessionInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected } = useSocketConnection()
-  
+
   // Chat mode state
   const [chatMode, setChatMode] = useState<ChatMode>(defaultMode)
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
   const [provider, setProvider] = useState<'openai' | 'anthropic'>('openai')
   const [model, setModel] = useState<string>('gpt-4')
-  
+
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [refreshMessages, setRefreshMessages] = useState(0)
@@ -149,14 +149,14 @@ export function SessionInterface({
           className="flex-1 flex flex-col"
           animate={{
             justifyContent: hasMessages ? 'flex-end' : 'center',
-            alignItems: 'center'
+            alignItems: 'center',
           }}
           transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
         >
           <motion.div
             className="w-full max-w-2xl mx-auto px-6"
             animate={{
-              paddingBottom: hasMessages ? '2rem' : '0'
+              paddingBottom: hasMessages ? '2rem' : '0',
             }}
             transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
           >
@@ -185,8 +185,7 @@ export function SessionInterface({
                   >
                     {chatMode === 'agent'
                       ? 'Connect with specialized agents for focused assistance'
-                      : 'Ask detailed questions for better responses'
-                    }
+                      : 'Ask detailed questions for better responses'}
                   </motion.p>
                 </motion.div>
               )}
@@ -196,10 +195,10 @@ export function SessionInterface({
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ 
+              transition={{
                 delay: hasMessages ? 0 : 0.35,
                 duration: 0.5,
-                ease: [0.4, 0, 0.2, 1]
+                ease: [0.4, 0, 0.2, 1],
               }}
               className="relative"
             >
@@ -225,7 +224,7 @@ export function SessionInterface({
                   disabled={!isConnected}
                   compact={true}
                 />
-                
+
                 <AnimatePresence mode="wait">
                   {chatMode === 'agent' ? (
                     <motion.div
@@ -278,13 +277,13 @@ export function SessionInterface({
                       key={suggestion}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ 
-                        delay: 0.5 + (index * 0.1),
-                        duration: 0.3
+                      transition={{
+                        delay: 0.5 + index * 0.1,
+                        duration: 0.3,
                       }}
-                      whileHover={{ 
+                      whileHover={{
                         scale: 1.01,
-                        backgroundColor: 'hsl(var(--muted) / 0.6)'
+                        backgroundColor: 'hsl(var(--muted) / 0.6)',
                       }}
                       whileTap={{ scale: 0.99 }}
                       className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group"
@@ -322,7 +321,7 @@ export function SessionInterface({
 
 // Suggestion examples
 const AGENT_SUGGESTIONS = [
-  "Help me plan a project timeline with milestones",
-  "Analyze this data set and find patterns",  
-  "Write code for a responsive navigation component"
+  'Help me plan a project timeline with milestones',
+  'Analyze this data set and find patterns',
+  'Write code for a responsive navigation component',
 ]

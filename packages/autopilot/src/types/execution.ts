@@ -28,11 +28,10 @@ export interface NodeResult {
   metadata?: Record<string, unknown>;
 }
 
-
 /**
  * Workflow execution status
  */
-export type ExecutionStatus = 
+export type ExecutionStatus =
   | 'not_started'
   | 'running'
   | 'paused'
@@ -68,4 +67,3 @@ export type WorkflowErrorCode =
   | 'SYSTEM_ERROR'
   | 'VALIDATION_FAILED'
   | 'JSONATA_ERROR';
-  

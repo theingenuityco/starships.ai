@@ -29,29 +29,34 @@ console.log(config.NEO4J_URI); // string
 The `getEnvConfig()` function returns an `EnvironmentConfig` object with all environment variables properly typed, including:
 
 ### Server Configuration
+
 - `SERVER_PORT` (number) - Server port, defaults to 4000
 - `CLIENT_PORT` (number) - Client port, defaults to 3000
 - `NODE_ENV` (string) - Environment, defaults to 'development'
 - `LOG_LEVEL` (string) - Log level, defaults to 'info'
 
 ### URLs
+
 - `PUBLIC_URL` (string) - Public URL, defaults to 'http://localhost:3000'
 - `CLIENT_URL` (string) - Frontend URL, defaults to 'http://localhost:3000'
 - `SERVER_URL` (string) - Backend URL, defaults to 'http://localhost:4000'
 
 ### Database Configuration
+
 - `NEO4J_URI` (string) - Neo4j connection URI, defaults to 'bolt://localhost:7687'
 - `NEO4J_USERNAME` (string) - Neo4j username, defaults to 'neo4j'
 - `NEO4J_PASSWORD` (string) - Neo4j password, defaults to 'password'
 - `NEO4J_DATABASE` (string) - Neo4j database name, defaults to 'neo4j'
 
 ### LLM Provider Configuration
+
 - `OPENAI_API_KEY` (string, optional) - OpenAI API key
 - `ANTHROPIC_API_KEY` (string, optional) - Anthropic API key
 - `DEFAULT_LLM_PROVIDER` ('openai' | 'anthropic' | '') - Default provider, defaults to 'openai'
 - `DEFAULT_CHAT_MODEL` (string) - Default model name, defaults to 'gpt-4o'
 
 ### Authentication & Payments
+
 - `JWT_SECRET` (string) - JWT signing secret
 - `STRIPE_SECRET_KEY` (string) - Stripe secret key
 - `STRIPE_PUBLISHABLE_KEY` (string) - Stripe publishable key
@@ -62,6 +67,7 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 - `STRIPE_PRICE_DRAUGHT_YEARLY` (string, optional) - Stripe price ID for draught yearly plan
 
 ### Analytics
+
 - `NEXT_PUBLIC_GA_MEASUREMENT_ID` (string, optional) - Google Analytics measurement ID
 
 ## Development

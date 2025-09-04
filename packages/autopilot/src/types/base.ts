@@ -1,6 +1,6 @@
 /**
  * Base Types
- * 
+ *
  * Core shared types and base interfaces used across the autopilot package
  */
 

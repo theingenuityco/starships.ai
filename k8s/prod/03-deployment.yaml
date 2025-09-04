@@ -24,8 +24,8 @@ spec:
         app: starships-ai
         environment: production
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "3000"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '3000'
     spec:
       # Security Context - Temporarily disabled due to supervisor permission issues
       # TODO: Fix Docker image to work with non-root user
@@ -34,128 +34,127 @@ spec:
       #   runAsGroup: 1000
       #   fsGroup: 1000
       #   runAsNonRoot: true
-      
+
       imagePullSecrets:
-      - name: ghcr-pull-secret
-      
+        - name: ghcr-pull-secret
+
       containers:
-      - name: starships
-        image: "PLACEHOLDER_IMAGE:latest"  # Updated by CI/CD via kubectl set image
-        imagePullPolicy: Always
-        
-        ports:
-        - containerPort: 3000
-          name: frontend
-          protocol: TCP
-        - containerPort: 4000
-          name: backend
-          protocol: TCP
-        - containerPort: 7474
-          name: neo4j-http
-          protocol: TCP
-        - containerPort: 7687
-          name: neo4j-bolt
-          protocol: TCP
-        
-        # Production Environment Variables
-        env:
-        # Core Settings
-        - name: NODE_ENV
-          value: "production"
-        - name: SKIP_BUILD
-          value: "true"
-        - name: SKIP_INSTALL
-          value: "true"
-        
-        # URLs (from secrets for flexibility)
-        - name: CLIENT_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: CLIENT_URL
-        # Runtime server configuration (not NEXT_PUBLIC!)
-        - name: SERVER_URL
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: SERVER_URL
-        - name: ENABLE_AUTH_TESTING_BACKDOOR
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: ENABLE_AUTH_TESTING_BACKDOOR
-        
-        # Neo4j Configuration (with auth enabled)
-        - name: NEO4J_URI
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: NEO4J_URI
-        - name: NEO4J_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: NEO4J_USERNAME
-        - name: NEO4J_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: NEO4J_PASSWORD
-        - name: NEO4J_DATABASE
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: NEO4J_DATABASE
-        
-        # API Keys from Secrets
-        - name: OPENAI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: OPENAI_API_KEY
-        - name: ANTHROPIC_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: ANTHROPIC_API_KEY
-        - name: STRIPE_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: STRIPE_SECRET_KEY
-        - name: STRIPE_WEBHOOK_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: STRIPE_WEBHOOK_SECRET
-        - name: STRIPE_PUBLISHABLE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: starships-secrets
-              key: STRIPE_PUBLISHABLE_KEY
-        
-        # Resource Limits
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "2Gi"
-            cpu: "1000m"
-        
-        
-        # Volume Mounts
-        volumeMounts:
-        - name: neo4j-data
-          mountPath: /var/lib/neo4j/data
-        - name: app-sessions
-          mountPath: /app/data/sessions
-        
+        - name: starships
+          image: 'PLACEHOLDER_IMAGE:latest' # Updated by CI/CD via kubectl set image
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 3000
+              name: frontend
+              protocol: TCP
+            - containerPort: 4000
+              name: backend
+              protocol: TCP
+            - containerPort: 7474
+              name: neo4j-http
+              protocol: TCP
+            - containerPort: 7687
+              name: neo4j-bolt
+              protocol: TCP
+
+          # Production Environment Variables
+          env:
+            # Core Settings
+            - name: NODE_ENV
+              value: 'production'
+            - name: SKIP_BUILD
+              value: 'true'
+            - name: SKIP_INSTALL
+              value: 'true'
+
+            # URLs (from secrets for flexibility)
+            - name: CLIENT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: CLIENT_URL
+            # Runtime server configuration (not NEXT_PUBLIC!)
+            - name: SERVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SERVER_URL
+            - name: ENABLE_AUTH_TESTING_BACKDOOR
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ENABLE_AUTH_TESTING_BACKDOOR
+
+            # Neo4j Configuration (with auth enabled)
+            - name: NEO4J_URI
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: NEO4J_URI
+            - name: NEO4J_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: NEO4J_USERNAME
+            - name: NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: NEO4J_PASSWORD
+            - name: NEO4J_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: NEO4J_DATABASE
+
+            # API Keys from Secrets
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: OPENAI_API_KEY
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ANTHROPIC_API_KEY
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_SECRET_KEY
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_WEBHOOK_SECRET
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_PUBLISHABLE_KEY
+
+          # Resource Limits
+          resources:
+            requests:
+              memory: '512Mi'
+              cpu: '250m'
+            limits:
+              memory: '2Gi'
+              cpu: '1000m'
+
+          # Volume Mounts
+          volumeMounts:
+            - name: neo4j-data
+              mountPath: /var/lib/neo4j/data
+            - name: app-sessions
+              mountPath: /app/data/sessions
+
       # Volumes
       volumes:
-      - name: neo4j-data
-        persistentVolumeClaim:
-          claimName: neo4j-data-pvc
-      - name: app-sessions
-        persistentVolumeClaim:
-          claimName: sessions-pvc
+        - name: neo4j-data
+          persistentVolumeClaim:
+            claimName: neo4j-data-pvc
+        - name: app-sessions
+          persistentVolumeClaim:
+            claimName: sessions-pvc

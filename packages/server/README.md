@@ -82,6 +82,7 @@ src/
 ### Mission Orchestration
 
 #### Create Mission
+
 ```http
 POST /missions
 Authorization: Bearer <token>
@@ -96,6 +97,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "id": "mission-456",
@@ -108,6 +110,7 @@ Content-Type: application/json
 ```
 
 #### Mission Chat with Orchestrator
+
 ```http
 POST /missions/:id/chat
 Authorization: Bearer <token>
@@ -120,6 +123,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "message": {
@@ -134,13 +138,14 @@ Content-Type: application/json
 ### Multi-Agent Expeditions
 
 #### Start Expedition
+
 ```http
 POST /starships/:starshipId/expeditions
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "title": "Competitive Analysis", 
+  "title": "Competitive Analysis",
   "objective": "Analyze top 10 AI productivity tools and create comparison report",
   "selectedAgents": ["research-agent", "analysis-agent"],
   "approvalRequired": true
@@ -148,6 +153,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "expeditionId": "exp-123",
@@ -164,6 +170,7 @@ Content-Type: application/json
 ### Enhanced Starship Management
 
 #### Create Starship
+
 ```http
 POST /starships
 Authorization: Bearer <token>
@@ -176,6 +183,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "starship": {
@@ -194,6 +202,7 @@ Content-Type: application/json
 ```
 
 #### Update Starship
+
 ```http
 PUT /starships/:id
 Authorization: Bearer <token>
@@ -207,6 +216,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "starship": {
@@ -222,12 +232,14 @@ Content-Type: application/json
 ### Agent Marketplace
 
 #### List Agents with Filtering
+
 ```http
 GET /agents?category=research&tags=analysis&public=true&page=1&limit=10
 Authorization: Bearer <token>
 ```
 
 **Response:**
+
 ```json
 {
   "agents": [
@@ -254,12 +266,14 @@ Authorization: Bearer <token>
 ```
 
 #### Agent Analytics
+
 ```http
 GET /agents/:id/analytics
 Authorization: Bearer <token>
 ```
 
 **Response:**
+
 ```json
 {
   "usage": {
@@ -277,6 +291,7 @@ Authorization: Bearer <token>
 ```
 
 #### Create Agent
+
 ```http
 POST /agents
 Authorization: Bearer <token>
@@ -293,6 +308,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "id": "agent-456",
@@ -309,6 +325,7 @@ Content-Type: application/json
 ```
 
 #### Update Agent Starship Assignment
+
 ```http
 PUT /agents/:id/starship
 Authorization: Bearer <token>
@@ -320,6 +337,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "message": "Agent starship assignment updated successfully",
@@ -332,12 +350,14 @@ Content-Type: application/json
 ```
 
 #### Get Agents by Starship
+
 ```http
 GET /agents/by-starship/:starshipId
 Authorization: Bearer <token>
 ```
 
 **Response:**
+
 ```json
 [
   {
@@ -352,11 +372,13 @@ Authorization: Bearer <token>
 ### Memory Endpoints
 
 #### Clear Memory
+
 ```http
 DELETE /v1/memory/:sessionKey
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -365,11 +387,13 @@ DELETE /v1/memory/:sessionKey
 ```
 
 #### Reset All Memory
+
 ```http
 POST /v1/memory/reset
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -380,12 +404,14 @@ POST /v1/memory/reset
 ### MCP Tool Integration
 
 #### List MCP Server Templates
+
 ```http
 GET /mcp-servers
 Authorization: Bearer <token>
 ```
 
 **Response:**
+
 ```json
 [
   {
@@ -402,6 +428,7 @@ Authorization: Bearer <token>
 ```
 
 #### Manage Native Tool API Keys
+
 ```http
 PUT /starships/:starshipId/native-api-keys
 Authorization: Bearer <token>
@@ -416,6 +443,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "message": "API keys updated successfully",
@@ -429,6 +457,7 @@ Content-Type: application/json
 ### Real-Time Communication
 
 **Socket.IO Events:**
+
 - `expedition:progress` - Real-time expedition updates
 - `mission:message` - Mission chat messages
 - `agent:activity` - Agent status and activity
@@ -437,6 +466,7 @@ Content-Type: application/json
 ### Stripe Billing Integration
 
 #### Stripe Webhook
+
 ```http
 POST /webhooks/stripe
 Stripe-Signature: <webhook-signature>
@@ -454,6 +484,7 @@ Content-Type: application/json
 ```
 
 **Features:**
+
 - Idempotency protection for webhook events
 - Automatic subscription status updates
 - Payment failure handling and retries
@@ -462,11 +493,13 @@ Content-Type: application/json
 ### Comprehensive Health Monitoring
 
 #### Detailed Health Check
+
 ```http
 GET /health/detailed
 ```
 
 **Response:**
+
 ```json
 {
   "status": "healthy",
@@ -476,7 +509,7 @@ GET /health/detailed
       "latency": 12
     },
     "socketio": {
-      "status": "healthy", 
+      "status": "healthy",
       "connectedClients": 45
     },
     "stripe": {
@@ -496,7 +529,6 @@ GET /health/detailed
 }
 ```
 
-
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -507,7 +539,7 @@ PORT=4000
 NODE_ENV=production
 CORS_ORIGIN=http://localhost:3000
 
-# Database Configuration  
+# Database Configuration
 NEO4J_URI=[NEO4J-LOCAL-URL]
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=password
@@ -573,6 +605,7 @@ interface ServerConfig {
 ## 🛡️ Middleware
 
 ### Core Middleware
+
 ```typescript
 import express from 'express';
 import cors from 'cors';
@@ -584,12 +617,14 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.CORS_ORIGIN,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 // Security headers
 app.use((req, res, next) => {
@@ -601,6 +636,7 @@ app.use((req, res, next) => {
 ```
 
 ### Request Validation
+
 ```typescript
 import { body, validationResult } from 'express-validator';
 
@@ -611,43 +647,44 @@ export const validateChatRequest = [
   body('message').isString().notEmpty(),
   body('channel_id').optional().isString(),
   body('stream').optional().isBoolean(),
-  
+
   (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
         error: 'Validation failed',
-        details: errors.array()
+        details: errors.array(),
       });
     }
     next();
-  }
+  },
 ];
 ```
 
 ### Error Handling
+
 ```typescript
 // Global error handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('Server error:', err);
-  
+
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       error: 'Validation failed',
-      message: err.message
+      message: err.message,
     });
   }
-  
+
   if (err.name === 'UnauthorizedError') {
     return res.status(401).json({
       error: 'Unauthorized',
-      message: 'Invalid or missing authentication'
+      message: 'Invalid or missing authentication',
     });
   }
-  
+
   res.status(500).json({
     error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong',
   });
 });
 ```
@@ -655,13 +692,14 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 ## 🔄 Request/Response Flow
 
 ### Chat Processing Flow
+
 ```mermaid
 sequenceDiagram
     participant Client
     participant Server
     participant AgentEngine
     participant Database
-    
+
     Client->>Server: POST /v1/chat
     Server->>Server: Validate request
     Server->>Database: Get agent config
@@ -672,12 +710,13 @@ sequenceDiagram
 ```
 
 ### Error Handling Flow
+
 ```mermaid
 sequenceDiagram
     participant Client
     participant Server
     participant Service
-    
+
     Client->>Server: API Request
     Server->>Service: Process request
     Service-->>Server: Throws error
@@ -688,6 +727,7 @@ sequenceDiagram
 ## 🧪 Testing
 
 ### Test Structure
+
 ```
 tests/
 ├── setup.ts                 # Test configuration
@@ -703,6 +743,7 @@ tests/
 ```
 
 ### Running Tests
+
 ```bash
 # Run all tests
 pnpm test
@@ -718,6 +759,7 @@ pnpm test --watch
 ```
 
 ### Test Examples
+
 ```typescript
 import request from 'supertest';
 import { app } from '../src/index';
@@ -729,23 +771,23 @@ describe('Chat Endpoints', () => {
       .send({
         agent_id: 'test-agent',
         user_id: 'test-user',
-        message: 'Hello'
+        message: 'Hello',
       })
       .expect(200);
-      
+
     expect(response.body).toHaveProperty('reply');
     expect(response.body.reply).toBeDefined();
   });
-  
+
   it('should validate required fields', async () => {
     const response = await request(app)
       .post('/v1/chat')
       .send({
-        agent_id: 'test-agent'
+        agent_id: 'test-agent',
         // Missing user_id and message
       })
       .expect(400);
-      
+
     expect(response.body).toHaveProperty('error', 'Validation failed');
   });
 });
@@ -754,6 +796,7 @@ describe('Chat Endpoints', () => {
 ## 🐳 Docker Deployment
 
 ### Dockerfile
+
 ```dockerfile
 FROM node:20-alpine
 
@@ -785,6 +828,7 @@ CMD ["pnpm", "start"]
 ```
 
 ### Docker Compose
+
 ```yaml
 version: '3.8'
 
@@ -792,7 +836,7 @@ services:
   server:
     build: .
     ports:
-      - "4000:4000"
+      - '4000:4000'
     environment:
       - NODE_ENV=production
       - NEO4J_URI=bolt://neo4j:7687
@@ -801,12 +845,12 @@ services:
     depends_on:
       - neo4j
     restart: unless-stopped
-    
+
   neo4j:
     image: neo4j:5.15
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - '7474:7474'
+      - '7687:7687'
     environment:
       - NEO4J_AUTH=neo4j/password
       - NEO4J_PLUGINS=["apoc"]
@@ -823,6 +867,7 @@ volumes:
 ## 🚀 Performance
 
 ### Optimization Features
+
 - **Connection Pooling**: Database connection management
 - **Request Compression**: Gzip compression for responses
 - **Caching**: In-memory caching for frequently accessed data
@@ -830,6 +875,7 @@ volumes:
 - **Health Monitoring**: Performance metrics and monitoring
 
 ### Performance Metrics
+
 ```typescript
 interface PerformanceMetrics {
   requestsPerSecond: number;
@@ -841,6 +887,7 @@ interface PerformanceMetrics {
 ```
 
 ### Monitoring Endpoints
+
 ```http
 GET /metrics         # Prometheus metrics
 GET /health          # Health status
@@ -852,24 +899,27 @@ GET /health/detailed # Detailed health information
 ### Common Issues
 
 1. **Server won't start**
+
    ```bash
    # Check port availability
    lsof -i :4000
-   
+
    # Check environment variables
    printenv | grep -E "(PORT|NEO4J|OPENAI|ANTHROPIC)"
    ```
 
 2. **Database connection issues**
+
    ```bash
    # Test Neo4j connection
    cypher-shell -u neo4j -p password
-   
+
    # Check database logs
    docker logs neo4j-container
    ```
 
 3. **API key errors**
+
    ```bash
    # Verify API keys
    curl -H "Authorization: Bearer $OPENAI_API_KEY" \
@@ -877,15 +927,17 @@ GET /health/detailed # Detailed health information
    ```
 
 4. **Memory leaks**
+
    ```bash
    # Monitor memory usage
    docker stats server-container
-   
+
    # Check Node.js heap
    node --inspect src/index.js
    ```
 
 ### Debug Mode
+
 ```bash
 # Enable debug logging
 DEBUG=starships:* pnpm dev
@@ -897,6 +949,7 @@ node --inspect-brk dist/index.js
 ## 📚 Dependencies
 
 ### Core Dependencies
+
 - **express**: Web framework for Node.js with Socket.IO integration
 - **socket.io**: Real-time bidirectional communication
 - **stripe**: Payment processing and subscription management
@@ -907,6 +960,7 @@ node --inspect-brk dist/index.js
 - **@starships/core**: MCP HTTP bridge services
 
 ### Development Dependencies
+
 - **jest**: Testing framework
 - **supertest**: HTTP testing utilities
 - **@types/express**: TypeScript definitions
@@ -914,4 +968,4 @@ node --inspect-brk dist/index.js
 
 ## 📄 License
 
-Private package - Part of the Starships AI platform. 
+Private package - Part of the Starships AI platform.

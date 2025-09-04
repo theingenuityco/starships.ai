@@ -374,7 +374,7 @@ export function ConnectorSelector({
             </p>
           </div>
         </div>
-        
+
         {/* Browse Connectors Dropdown */}
         <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger asChild>
@@ -582,13 +582,13 @@ export function ConnectorSelector({
           <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
           <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
             ACTIVE CONNECTORS
-            </h4>
-            <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
-          </div>
-          
-          {selectedConnectors.length > 0 ? (
-            <div className="space-y-3">
-              {selectedConnectors.map(connector => {
+          </h4>
+          <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
+        </div>
+
+        {selectedConnectors.length > 0 ? (
+          <div className="space-y-3">
+            {selectedConnectors.map(connector => {
               const isConnecting = connectingIds.has(connector.id)
               const connectorInstance = getConnectorInstance(connector)
               const status = getConnectorStatus(connector)
@@ -812,19 +812,17 @@ export function ConnectorSelector({
                   </div>
                 </div>
               )
-              })}
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
+            <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Plug className="w-8 h-8 text-muted-foreground" />
             </div>
-          ) : (
-            <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
-              <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Plug className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <p className="text-base text-muted-foreground mb-3">
-                No connectors available
-              </p>
-            </div>
-          )}
-        </div>
+            <p className="text-base text-muted-foreground mb-3">No connectors available</p>
+          </div>
+        )}
+      </div>
 
       {/* Error Display */}
       {error && (

@@ -8,18 +8,18 @@ jest.mock('crypto', () => ({
   randomBytes: jest.fn().mockReturnValue(Buffer.from('1234567890123456', 'hex')),
   createHash: jest.fn().mockReturnValue({
     update: jest.fn().mockReturnThis(),
-    digest: jest.fn().mockReturnValue(Buffer.from('secret-key'))
+    digest: jest.fn().mockReturnValue(Buffer.from('secret-key')),
   }),
   createCipheriv: jest.fn().mockReturnValue({
     update: jest.fn().mockReturnValue('encrypted-part'),
     final: jest.fn().mockReturnValue('final-part'),
-    getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag'))
+    getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag')),
   }),
   createDecipheriv: jest.fn().mockReturnValue({
     setAuthTag: jest.fn(),
     update: jest.fn().mockReturnValue('decrypted-part'),
-    final: jest.fn().mockReturnValue('final-part')
-  })
+    final: jest.fn().mockReturnValue('final-part'),
+  }),
 }));
 
 import { NativeToolApiKeyRepository } from '../NativeToolApiKeyRepository';
@@ -60,7 +60,7 @@ describe('NativeToolApiKeyRepository', () => {
       new NativeToolApiKeyRepository();
 
       expect(crypto.createHash).toHaveBeenCalledWith('sha256');
-      
+
       process.env.API_KEY_ENCRYPTION_SECRET = originalEnv;
     });
 
@@ -71,7 +71,7 @@ describe('NativeToolApiKeyRepository', () => {
       new NativeToolApiKeyRepository();
 
       expect(crypto.createHash).toHaveBeenCalledWith('sha256');
-      
+
       process.env.API_KEY_ENCRYPTION_SECRET = originalEnv;
     });
   });
@@ -87,15 +87,19 @@ describe('NativeToolApiKeyRepository', () => {
         expect.objectContaining({
           starshipId: 'starship-123',
           toolName: 'openai',
-          encryptedApiKey: expect.any(String)
+          encryptedApiKey: expect.any(String),
         })
       );
     });
 
     it('should validate required parameters', async () => {
       await expect(repository.saveApiKey('', 'openai', 'key')).rejects.toThrow(ValidationError);
-      await expect(repository.saveApiKey('starship-123', '', 'key')).rejects.toThrow(ValidationError);
-      await expect(repository.saveApiKey('starship-123', 'openai', '')).rejects.toThrow(ValidationError);
+      await expect(repository.saveApiKey('starship-123', '', 'key')).rejects.toThrow(
+        ValidationError
+      );
+      await expect(repository.saveApiKey('starship-123', 'openai', '')).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should encrypt API key before saving', async () => {
@@ -104,13 +108,19 @@ describe('NativeToolApiKeyRepository', () => {
       await repository.saveApiKey('starship-123', 'openai', 'sk-test-key');
 
       expect(crypto.randomBytes).toHaveBeenCalledWith(16);
-      expect(crypto.createCipheriv).toHaveBeenCalledWith('aes-256-gcm', expect.any(Buffer), expect.any(Buffer));
+      expect(crypto.createCipheriv).toHaveBeenCalledWith(
+        'aes-256-gcm',
+        expect.any(Buffer),
+        expect.any(Buffer)
+      );
     });
 
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(DatabaseError);
+      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(
+        DatabaseError
+      );
     });
   });
 
@@ -151,11 +161,13 @@ describe('NativeToolApiKeyRepository', () => {
     it('should handle decryption errors', async () => {
       const invalidEncryptedKey = 'invalid-format';
       mockConnection.executeQuery.mockResolvedValue([{ encryptedApiKey: invalidEncryptedKey }]);
-      
+
       const mockDecipher = {
         setAuthTag: jest.fn(),
-        update: jest.fn().mockImplementation(() => { throw new Error('Invalid encrypted data'); }),
-        final: jest.fn()
+        update: jest.fn().mockImplementation(() => {
+          throw new Error('Invalid encrypted data');
+        }),
+        final: jest.fn(),
       };
       (crypto.createDecipheriv as jest.Mock).mockReturnValue(mockDecipher);
 
@@ -165,17 +177,16 @@ describe('NativeToolApiKeyRepository', () => {
       (crypto.createDecipheriv as jest.Mock).mockReturnValue({
         setAuthTag: jest.fn(),
         update: jest.fn().mockReturnValue('decrypted-part'),
-        final: jest.fn().mockReturnValue('final-part')
+        final: jest.fn().mockReturnValue('final-part'),
       });
     });
   });
 
   describe('getAllApiKeys', () => {
-
     it('should retrieve all API keys for starship', async () => {
       const mockResults = [
         { toolName: 'openai', encryptedApiKey: '1234:auth:encrypted1' },
-        { toolName: 'anthropic', encryptedApiKey: '5678:auth:encrypted2' }
+        { toolName: 'anthropic', encryptedApiKey: '5678:auth:encrypted2' },
       ];
       mockConnection.executeQuery.mockResolvedValue(mockResults);
 
@@ -183,7 +194,7 @@ describe('NativeToolApiKeyRepository', () => {
 
       expect(result).toEqual({
         openai: 'decrypted-partfinal-part',
-        anthropic: 'decrypted-partfinal-part'
+        anthropic: 'decrypted-partfinal-part',
       });
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('MATCH (k:NativeToolApiKey {starshipId: $starshipId})'),
@@ -202,14 +213,14 @@ describe('NativeToolApiKeyRepository', () => {
     it('should skip entries with null encrypted keys', async () => {
       const mockResults = [
         { toolName: 'openai', encryptedApiKey: '1234:auth:encrypted1' },
-        { toolName: 'anthropic', encryptedApiKey: null }
+        { toolName: 'anthropic', encryptedApiKey: null },
       ];
       mockConnection.executeQuery.mockResolvedValue(mockResults);
 
       const result = await repository.getAllApiKeys('starship-123');
 
       expect(result).toEqual({
-        openai: 'decrypted-partfinal-part'
+        openai: 'decrypted-partfinal-part',
       });
     });
 
@@ -244,7 +255,9 @@ describe('NativeToolApiKeyRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(DatabaseError);
+      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(
+        DatabaseError
+      );
     });
   });
 
@@ -293,43 +306,47 @@ describe('NativeToolApiKeyRepository', () => {
     it('should encrypt and decrypt consistently', () => {
       // Test with mocked crypto to ensure consistent behavior
       const originalKey = 'sk-test-api-key-12345';
-      
+
       // Reset crypto mocks to default behavior for this test
       (crypto.createCipheriv as jest.Mock).mockReturnValue({
         update: jest.fn().mockReturnValue('encrypted-part'),
         final: jest.fn().mockReturnValue('final-part'),
-        getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag'))
+        getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag')),
       });
-      
+
       (crypto.createDecipheriv as jest.Mock).mockReturnValue({
         setAuthTag: jest.fn(),
         update: jest.fn().mockReturnValue('decrypted-part'),
-        final: jest.fn().mockReturnValue('final-part')
+        final: jest.fn().mockReturnValue('final-part'),
       });
-      
+
       // Access private methods via any casting
       const encrypted = (repository as any).encrypt(originalKey);
       const decrypted = (repository as any).decrypt(encrypted);
-      
+
       expect(decrypted).toBe('decrypted-partfinal-part'); // This matches our mock return value
       expect(encrypted).toBe('1234567890123456:617574682d746167:encrypted-partfinal-part'); // 'auth-tag' in hex
     });
 
     it('should handle encryption errors', async () => {
       const mockCipher = {
-        update: jest.fn().mockImplementation(() => { throw new Error('Encryption failed'); }),
+        update: jest.fn().mockImplementation(() => {
+          throw new Error('Encryption failed');
+        }),
         final: jest.fn(),
-        getAuthTag: jest.fn()
+        getAuthTag: jest.fn(),
       };
       (crypto.createCipheriv as jest.Mock).mockReturnValue(mockCipher);
 
-      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(DatabaseError);
+      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(
+        DatabaseError
+      );
 
       // Reset crypto mock after this test
       (crypto.createCipheriv as jest.Mock).mockReturnValue({
         update: jest.fn().mockReturnValue('encrypted-part'),
         final: jest.fn().mockReturnValue('final-part'),
-        getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag'))
+        getAuthTag: jest.fn().mockReturnValue(Buffer.from('auth-tag')),
       });
     });
 
@@ -341,7 +358,6 @@ describe('NativeToolApiKeyRepository', () => {
   });
 
   describe('integration scenarios', () => {
-
     it('should handle complete workflow: save -> get -> check -> delete', async () => {
       const starshipId = 'starship-123';
       const toolName = 'openai';
@@ -372,7 +388,7 @@ describe('NativeToolApiKeyRepository', () => {
       const mockResults = [
         { toolName: 'openai', encryptedApiKey: '1234:auth:encrypted1' },
         { toolName: 'anthropic', encryptedApiKey: '5678:auth:encrypted2' },
-        { toolName: 'google', encryptedApiKey: '9abc:auth:encrypted3' }
+        { toolName: 'google', encryptedApiKey: '9abc:auth:encrypted3' },
       ];
       mockConnection.executeQuery.mockResolvedValue(mockResults);
 
@@ -392,16 +408,17 @@ describe('NativeToolApiKeyRepository', () => {
 
       // Save initial key
       await repository.saveApiKey('starship-123', 'openai', 'old-key');
-      
+
       // Overwrite with new key
       await repository.saveApiKey('starship-123', 'openai', 'new-key');
 
       expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2);
-      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(2,
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('MERGE'),
         expect.objectContaining({
           starshipId: 'starship-123',
-          toolName: 'openai'
+          toolName: 'openai',
         })
       );
     });
@@ -411,7 +428,9 @@ describe('NativeToolApiKeyRepository', () => {
     it('should handle constraint violations', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('constraint violation'));
 
-      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(ConflictError);
+      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(
+        ConflictError
+      );
     });
 
     it('should handle connection timeouts', async () => {
@@ -429,12 +448,13 @@ describe('NativeToolApiKeyRepository', () => {
     it('should handle network errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('network error'));
 
-      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(DatabaseError);
+      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(
+        DatabaseError
+      );
     });
   });
 
   describe('edge cases', () => {
-
     it('should handle special characters in tool names', async () => {
       mockConnection.executeWrite.mockResolvedValue([]);
 
@@ -443,7 +463,7 @@ describe('NativeToolApiKeyRepository', () => {
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          toolName: 'custom-tool-v2.1'
+          toolName: 'custom-tool-v2.1',
         })
       );
     });
@@ -461,14 +481,14 @@ describe('NativeToolApiKeyRepository', () => {
       const mockResults = [
         { toolName: 'openai', encryptedApiKey: 'valid:encrypted:data' },
         { toolName: 'empty', encryptedApiKey: '' },
-        { toolName: 'null', encryptedApiKey: null }
+        { toolName: 'null', encryptedApiKey: null },
       ];
       mockConnection.executeQuery.mockResolvedValue(mockResults);
 
       const result = await repository.getAllApiKeys('starship-123');
 
       expect(result).toEqual({
-        openai: 'decrypted-partfinal-part'
+        openai: 'decrypted-partfinal-part',
       });
     });
 
@@ -484,7 +504,6 @@ describe('NativeToolApiKeyRepository', () => {
   });
 
   describe('security considerations', () => {
-
     it('should use different IVs for each encryption', async () => {
       const mockRandomBytes = crypto.randomBytes as jest.Mock;
       mockRandomBytes
@@ -501,9 +520,11 @@ describe('NativeToolApiKeyRepository', () => {
 
     it('should handle authentication tag validation', async () => {
       const mockDecipher = {
-        setAuthTag: jest.fn().mockImplementation(() => { throw new Error('Invalid auth tag'); }),
+        setAuthTag: jest.fn().mockImplementation(() => {
+          throw new Error('Invalid auth tag');
+        }),
         update: jest.fn(),
-        final: jest.fn()
+        final: jest.fn(),
       };
       (crypto.createDecipheriv as jest.Mock).mockReturnValue(mockDecipher);
 
@@ -515,7 +536,7 @@ describe('NativeToolApiKeyRepository', () => {
       (crypto.createDecipheriv as jest.Mock).mockReturnValue({
         setAuthTag: jest.fn(),
         update: jest.fn().mockReturnValue('decrypted-part'),
-        final: jest.fn().mockReturnValue('final-part')
+        final: jest.fn().mockReturnValue('final-part'),
       });
     });
   });

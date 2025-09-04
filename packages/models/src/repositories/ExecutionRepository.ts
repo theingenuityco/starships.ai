@@ -5,7 +5,13 @@ import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/da
 /**
  * Execution status types
  */
-export type ExecutionStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+export type ExecutionStatus =
+  | 'pending'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 /**
  * Execution model for database operations
@@ -60,7 +66,7 @@ export class ExecutionRepository extends BaseRepository {
     return {
       ...execution,
       executionData: execution.executionData ? JSON.stringify(execution.executionData) : null,
-      result: execution.result ? JSON.stringify(execution.result) : null
+      result: execution.result ? JSON.stringify(execution.result) : null,
     };
   }
 
@@ -72,7 +78,7 @@ export class ExecutionRepository extends BaseRepository {
       return {
         ...execution,
         executionData: execution.executionData ? JSON.parse(execution.executionData) : undefined,
-        result: execution.result ? JSON.parse(execution.result) : undefined
+        result: execution.result ? JSON.parse(execution.result) : undefined,
       };
     } catch (error) {
       console.warn('Failed to deserialize execution fields:', error);
@@ -81,122 +87,175 @@ export class ExecutionRepository extends BaseRepository {
   }
 
   async create(request: CreateExecutionRequest): Promise<ExecutionModel> {
-    return this.executeWithErrorHandling(async () => {
-      this.validateRequired(request, ['workflowId'], 'create');
+    return this.executeWithErrorHandling(
+      async () => {
+        this.validateRequired(request, ['workflowId'], 'create');
 
-      const connection = this.connection;
-      const now = new Date().toISOString();
+        const connection = this.connection;
+        const now = new Date().toISOString();
 
-      const executionData = {
-        workflowId: request.workflowId,
-        status: 'pending',
-        createdAt: now,
-        executionData: request.executionData
-      };
+        const executionData = {
+          workflowId: request.workflowId,
+          status: 'pending',
+          createdAt: now,
+          executionData: request.executionData,
+        };
 
-      const executionForStorage = this.serializeComplexFields(executionData as ExecutionModel);
+        const executionForStorage = this.serializeComplexFields(executionData as ExecutionModel);
 
-      const execution = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionForStorage, this.connection);
+        const execution = await this.createEntityWithAutoId<ExecutionModel>(
+          'Execution',
+          executionForStorage,
+          this.connection
+        );
 
-      // Create relationship with workflow
-      await connection.executeWrite(
-        `MATCH (w:Workflow {id: $workflowId}), (e:Execution {id: $executionId})
+        // Create relationship with workflow
+        await connection.executeWrite(
+          `MATCH (w:Workflow {id: $workflowId}), (e:Execution {id: $executionId})
          CREATE (w)-[:HAS_EXECUTION]->(e)`,
-        { workflowId: execution.workflowId, executionId: execution.id }
-      );
+          { workflowId: execution.workflowId, executionId: execution.id }
+        );
 
-      // Deserialize complex fields before returning
-      return convertNeo4jIntsInObject(this.deserializeComplexFields(execution));
-    }, 'create', 'Execution');
+        // Deserialize complex fields before returning
+        return convertNeo4jIntsInObject(this.deserializeComplexFields(execution));
+      },
+      'create',
+      'Execution'
+    );
   }
 
   async findById(id: string): Promise<ExecutionModel | null> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = this.connection;
-      const result = await connection.executeQuery<{ e: ExecutionModel }>(
-        'MATCH (e:Execution) WHERE e.id = $id RETURN e',
-        { id }
-      );
-      
-      const execution = result[0]?.e || null;
-      return execution ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution)) : null;
-    }, 'findById', 'Execution', id);
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const result = await connection.executeQuery<{ e: ExecutionModel }>(
+          'MATCH (e:Execution) WHERE e.id = $id RETURN e',
+          { id }
+        );
+
+        const execution = result[0]?.e || null;
+        return execution
+          ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution))
+          : null;
+      },
+      'findById',
+      'Execution',
+      id
+    );
   }
 
   async findByWorkflowId(workflowId: string): Promise<ExecutionModel[]> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = this.connection;
-      const result = await connection.executeQuery<{ e: ExecutionModel }>(
-        'MATCH (e:Execution) WHERE e.workflowId = $workflowId RETURN e ORDER BY e.createdAt DESC',
-        { workflowId }
-      );
-      
-      return convertNeo4jIntsInArray(result.map(record => this.deserializeComplexFields(record.e)));
-    }, 'findByWorkflowId', 'Execution');
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const result = await connection.executeQuery<{ e: ExecutionModel }>(
+          'MATCH (e:Execution) WHERE e.workflowId = $workflowId RETURN e ORDER BY e.createdAt DESC',
+          { workflowId }
+        );
+
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.e))
+        );
+      },
+      'findByWorkflowId',
+      'Execution'
+    );
   }
 
   async update(id: string, updates: UpdateExecutionRequest): Promise<ExecutionModel | null> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = this.connection;
-      const now = new Date().toISOString();
-      
-      // Handle status transitions
-      const updateProps: any = { ...updates };
-      if (updates.status === 'running' && !Object.prototype.hasOwnProperty.call(updates, 'startTime')) {
-        updateProps.startTime = now;
-      }
-      if ((updates.status === 'completed' || updates.status === 'failed' || updates.status === 'cancelled') && !Object.prototype.hasOwnProperty.call(updates, 'endTime')) {
-        updateProps.endTime = now;
-      }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const now = new Date().toISOString();
 
-      const result = await connection.executeWrite<{ e: ExecutionModel }>(
-        'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
-        { id, updates: updateProps }
-      );
+        // Handle status transitions
+        const updateProps: any = { ...updates };
+        if (
+          updates.status === 'running' &&
+          !Object.prototype.hasOwnProperty.call(updates, 'startTime')
+        ) {
+          updateProps.startTime = now;
+        }
+        if (
+          (updates.status === 'completed' ||
+            updates.status === 'failed' ||
+            updates.status === 'cancelled') &&
+          !Object.prototype.hasOwnProperty.call(updates, 'endTime')
+        ) {
+          updateProps.endTime = now;
+        }
 
-      const execution = result[0]?.e || null;
-      return execution ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution)) : null;
-    }, 'update', 'Execution', id);
+        const result = await connection.executeWrite<{ e: ExecutionModel }>(
+          'MATCH (e:Execution) WHERE e.id = $id SET e += $updates RETURN e',
+          { id, updates: updateProps }
+        );
+
+        const execution = result[0]?.e || null;
+        return execution
+          ? convertNeo4jIntsInObject(this.deserializeComplexFields(execution))
+          : null;
+      },
+      'update',
+      'Execution',
+      id
+    );
   }
 
   async delete(id: string): Promise<boolean> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = this.connection;
-      const result = await connection.executeWrite<{ deletedCount: number }>(
-        'MATCH (e:Execution) WHERE e.id = $id DETACH DELETE e RETURN count(e) as deletedCount',
-        { id }
-      );
-      return result[0]?.deletedCount > 0;
-    }, 'delete', 'Execution', id);
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const result = await connection.executeWrite<{ deletedCount: number }>(
+          'MATCH (e:Execution) WHERE e.id = $id DETACH DELETE e RETURN count(e) as deletedCount',
+          { id }
+        );
+        return result[0]?.deletedCount > 0;
+      },
+      'delete',
+      'Execution',
+      id
+    );
   }
 
   async findByStatus(status: ExecutionStatus): Promise<ExecutionModel[]> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = this.connection;
-      const result = await connection.executeQuery<{ e: ExecutionModel }>(
-        'MATCH (e:Execution) WHERE e.status = $status RETURN e ORDER BY e.createdAt DESC',
-        { status }
-      );
-      
-      return convertNeo4jIntsInArray(result.map(record => this.deserializeComplexFields(record.e)));
-    }, 'findByStatus', 'Execution');
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const result = await connection.executeQuery<{ e: ExecutionModel }>(
+          'MATCH (e:Execution) WHERE e.status = $status RETURN e ORDER BY e.createdAt DESC',
+          { status }
+        );
+
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.e))
+        );
+      },
+      'findByStatus',
+      'Execution'
+    );
   }
 
   async findActiveExecutions(): Promise<ExecutionModel[]> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = this.connection;
-      const result = await connection.executeQuery<{ e: ExecutionModel }>(
-        'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
-      );
-      
-      return convertNeo4jIntsInArray(result.map(record => this.deserializeComplexFields(record.e)));
-    }, 'findActiveExecutions', 'Execution');
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.connection;
+        const result = await connection.executeQuery<{ e: ExecutionModel }>(
+          'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
+        );
+
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.e))
+        );
+      },
+      'findActiveExecutions',
+      'Execution'
+    );
   }
 
   async cancelExecution(id: string, reason?: string): Promise<ExecutionModel | null> {
     return this.update(id, {
       status: 'cancelled',
-      error: reason || 'Execution cancelled by user'
+      error: reason || 'Execution cancelled by user',
     });
   }
 }

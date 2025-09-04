@@ -12,17 +12,15 @@ import { UserService } from '../services/UserService';
 import { StarshipService } from '../services/StarshipService';
 import { StarshipRepository } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
-import {
-  sendSuccess,
-  sendError,
-  handleCommonError,
-} from '../utils/responseHelpers';
+import { sendSuccess, sendError, handleCommonError } from '../utils/responseHelpers';
 
 const router: Router = Router();
 const env = getEnvConfig();
 
 // JWT configuration
-const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');
+const JWT_SECRET = new TextEncoder().encode(
+  env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production'
+);
 const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
 
@@ -78,7 +76,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     const token = await new SignJWT({
       sub: user.id,
       email: user.email,
-      name: user.displayName || user.username
+      name: user.displayName || user.username,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(JWT_ISSUER)
@@ -89,21 +87,26 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
 
     console.log(`[AUTH] User registered: ${user.id} (${user.email})`);
 
-    sendSuccess(res, {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.displayName || user.username,
-        avatar: user.avatar,
+    sendSuccess(
+      res,
+      {
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.displayName || user.username,
+          avatar: user.avatar,
+        },
+        token,
+        starship: defaultStarship
+          ? {
+              id: defaultStarship.id,
+              slug: defaultStarship.slug,
+              name: defaultStarship.name,
+            }
+          : null,
       },
-      token,
-      starship: defaultStarship ? {
-        id: defaultStarship.id,
-        slug: defaultStarship.slug,
-        name: defaultStarship.name,
-      } : null,
-    }, 201);
-
+      201
+    );
   } catch (error: any) {
     console.error('[AUTH] Registration error:', error);
     if (!handleCommonError(error, res, 'user registration')) {
@@ -146,9 +149,12 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
-      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      firstStarship =
+        userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
       if (firstStarship) {
-        console.log(`[AUTH] Found first starship for redirect: ${firstStarship.name} (${firstStarship.slug})`);
+        console.log(
+          `[AUTH] Found first starship for redirect: ${firstStarship.name} (${firstStarship.slug})`
+        );
       }
     } catch (error) {
       console.error(`[AUTH] Failed to fetch starships for user ${user.id}:`, error);
@@ -159,7 +165,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     const token = await new SignJWT({
       sub: user.id,
       email: user.email,
-      name: user.displayName || user.username
+      name: user.displayName || user.username,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(JWT_ISSUER)
@@ -178,13 +184,14 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
         avatar: user.avatar,
       },
       token,
-      starship: firstStarship ? {
-        id: firstStarship.id,
-        slug: firstStarship.slug,
-        name: firstStarship.name,
-      } : null,
+      starship: firstStarship
+        ? {
+            id: firstStarship.id,
+            slug: firstStarship.slug,
+            name: firstStarship.name,
+          }
+        : null,
     });
-
   } catch (error: any) {
     console.error('[AUTH] Login error:', error);
     if (!handleCommonError(error, res, 'user login')) {
@@ -227,10 +234,9 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       name: user.displayName || user.username,
       avatar: user.avatar,
     });
-
   } catch (error: any) {
     console.error('[AUTH] Me endpoint error:', error);
-    
+
     if (error?.name === 'JWTExpired') {
       sendError(res, 'TOKEN_EXPIRED', 'Token expired', 401);
       return;
@@ -239,7 +245,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       sendError(res, 'AUTHENTICATION_FAILED', 'Invalid token', 401);
       return;
     }
-    
+
     if (!handleCommonError(error, res, 'get current user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Authentication failed', 500);
     }

@@ -6,7 +6,5 @@
   },
   "include": ["src/**/*"],
   "exclude": ["dist"],
-  "references": [
-    { "path": "../autopilot" }
-  ]
+  "references": [{ "path": "../autopilot" }]
 }

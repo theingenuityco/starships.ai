@@ -12,22 +12,22 @@
 /**
  * Mission phase - controls chat behavior and UI sections
  */
-export type MissionPhase = 
-  | 'welcome'      // Initial welcome and mission introduction
-  | 'analysis'     // Mission analysis and breakdown
-  | 'plan'         // Mission execution planning and approval
-  | 'execute'      // Running mission workflow tasks
-  | 'converse';    // General conversation and mission guidance
+export type MissionPhase =
+  | 'welcome' // Initial welcome and mission introduction
+  | 'analysis' // Mission analysis and breakdown
+  | 'plan' // Mission execution planning and approval
+  | 'execute' // Running mission workflow tasks
+  | 'converse'; // General conversation and mission guidance
 
 /**
  * Mission status - simplified lifecycle
  */
-export type MissionStatus = 
-  | 'draft'        // Created but not started
-  | 'active'       // Currently running
-  | 'completed'    // Successfully finished
-  | 'failed'       // Failed to complete
-  | 'cancelled';   // Cancelled by user
+export type MissionStatus =
+  | 'draft' // Created but not started
+  | 'active' // Currently running
+  | 'completed' // Successfully finished
+  | 'failed' // Failed to complete
+  | 'cancelled'; // Cancelled by user
 
 /**
  * Mission phase constants - use these instead of string literals
@@ -133,10 +133,10 @@ export interface MissionSort {
 /**
  * Mission message roles - determines UI styling and behavior
  */
-export type MissionMessageRole = 
-  | 'user'         // Human user messages
+export type MissionMessageRole =
+  | 'user' // Human user messages
   | 'orchestrator' // AI orchestrator responses
-  | 'system';      // System notifications
+  | 'system'; // System notifications
 
 /**
  * Core message entity for mission orchestrator communication
@@ -147,13 +147,13 @@ export interface MissionMessageModel {
   role: MissionMessageRole;
   content: string;
   timestamp: string;
-  
+
   // Neo4j relationship support
-  userId?: string;        // Set when role = 'user'
-  
+  userId?: string; // Set when role = 'user'
+
   // Display support
-  senderName?: string;    // Cached display name
-  
+  senderName?: string; // Cached display name
+
   // Extensibility
   metadata?: Record<string, unknown>;
 }
@@ -183,13 +183,13 @@ export interface MissionChatResponse {
 export interface MissionClarityModel {
   id: string;
   missionId: string;
-  objectiveClarity: number;        // 0-10: How specific and clear is the mission objective?
-  successMetrics: number;          // 0-10: Are success criteria well-defined?
-  timelineDefinition: number;      // 0-10: Is the timeline clear and realistic?
-  scopeBoundaries: number;         // 0-10: Are the boundaries and limitations defined?
-  overallScore: number;            // Calculated average of the 4 dimensions
-  reasoning: string;               // AI qualitative analysis and explanation
-  iteration: number;               // Which evaluation iteration (starts at 1)
+  objectiveClarity: number; // 0-10: How specific and clear is the mission objective?
+  successMetrics: number; // 0-10: Are success criteria well-defined?
+  timelineDefinition: number; // 0-10: Is the timeline clear and realistic?
+  scopeBoundaries: number; // 0-10: Are the boundaries and limitations defined?
+  overallScore: number; // Calculated average of the 4 dimensions
+  reasoning: string; // AI qualitative analysis and explanation
+  iteration: number; // Which evaluation iteration (starts at 1)
   createdAt: string;
   updatedAt: string;
 }
@@ -230,7 +230,6 @@ export interface UpdateBlueprintApprovalRequest {
   approvalStatus: 'approved' | 'rejected';
   rejectionReason?: string;
 }
-
 
 // ============================================================================
 // VALIDATION HELPERS

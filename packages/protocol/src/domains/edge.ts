@@ -6,9 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type {
-  Edge
-} from '@starships/autopilot';
+import type { Edge } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE EDGE INTERFACE
@@ -23,10 +21,10 @@ export interface EdgeModel extends Edge {
   id: string;
   createdAt?: string;
   updatedAt?: string;
-  
+
   // Workflow context fields
   workflowId?: string;
-  
+
   // Additional metadata for database storage
   metadata?: Record<string, unknown>;
 }

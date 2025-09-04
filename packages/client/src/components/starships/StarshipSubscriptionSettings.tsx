@@ -1,62 +1,73 @@
-'use client';
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { CreditCard, AlertTriangle, XCircle } from 'lucide-react';
-import { starshipAPI } from '@/lib/api';
+'use client'
+import { useState } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { CreditCard, AlertTriangle, XCircle } from 'lucide-react'
+import { starshipAPI } from '@/lib/api'
 
 interface StarshipSubscriptionSettingsProps {
   starship: {
-    id: string;
-    name: string;
-    plan: 'scout' | 'cruiser' | 'draught';
-    status: 'active' | 'restricted' | 'disabled';
-    subscriptionId?: string;
-  };
+    id: string
+    name: string
+    plan: 'scout' | 'cruiser' | 'draught'
+    status: 'active' | 'restricted' | 'disabled'
+    subscriptionId?: string
+  }
 }
 
 export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionSettingsProps) {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false)
 
   const handleManageSubscription = async () => {
-    setLoading(true);
+    setLoading(true)
     try {
-      const response = await starshipAPI.createBillingPortal(starship.id);
+      const response = await starshipAPI.createBillingPortal(starship.id)
       if (response.url) {
-        window.location.href = response.url;
+        window.location.href = response.url
       }
     } catch (error) {
-      console.error('Failed to open billing portal:', error);
+      console.error('Failed to open billing portal:', error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case 'active': return 'default';
-      case 'restricted': return 'destructive';  
-      case 'disabled': return 'secondary';
-      default: return 'default';
+      case 'active':
+        return 'default'
+      case 'restricted':
+        return 'destructive'
+      case 'disabled':
+        return 'secondary'
+      default:
+        return 'default'
     }
-  };
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'text-green-600';
-      case 'restricted': return 'text-orange-600';
-      case 'disabled': return 'text-red-600';
-      default: return 'text-gray-600';
+      case 'active':
+        return 'text-green-600'
+      case 'restricted':
+        return 'text-orange-600'
+      case 'disabled':
+        return 'text-red-600'
+      default:
+        return 'text-gray-600'
     }
-  };
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Subscription</span>
-          <Badge variant={getStatusVariant(starship.status)} className={getStatusColor(starship.status)}>
+          <Badge
+            variant={getStatusVariant(starship.status)}
+            className={getStatusColor(starship.status)}
+          >
             {starship.status}
           </Badge>
         </CardTitle>
@@ -77,7 +88,7 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
                     Payment issue detected. Some features may be limited.
                   </p>
                 </div>
-                <Button 
+                <Button
                   size="sm"
                   variant="outline"
                   onClick={handleManageSubscription}
@@ -100,7 +111,7 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
                     Subscription cancelled. Reactivate to continue using this starship.
                   </p>
                 </div>
-                <Button 
+                <Button
                   size="sm"
                   variant="outline"
                   onClick={handleManageSubscription}
@@ -126,5 +137,5 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
         )}
       </CardContent>
     </Card>
-  );
+  )
 }

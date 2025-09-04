@@ -7,14 +7,15 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { getConnection, StarshipRepository, UserRepository, AgentRepository } from '@starships/models';
+import {
+  getConnection,
+  StarshipRepository,
+  UserRepository,
+  AgentRepository,
+} from '@starships/models';
 import { logger } from '@starships/models';
 import { ErrorUtils } from '@starships/errors';
-import {
-  sendSuccess,
-  sendError,
-  handleCommonError,
-} from '../utils/responseHelpers';
+import { sendSuccess, sendError, handleCommonError } from '../utils/responseHelpers';
 
 const router: Router = Router();
 
@@ -71,7 +72,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
       const dbStart = Date.now();
       const connection = getConnection();
       await connection.executeQuery('RETURN 1 as health_check');
-      
+
       healthCheck.services.database = {
         status: 'healthy',
         responseTime: Date.now() - dbStart,
@@ -88,10 +89,10 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     try {
       const repoStart = Date.now();
       const starshipRepo = new StarshipRepository();
-      
+
       // Test basic repository functionality
       await starshipRepo.findAll();
-      
+
       healthCheck.services.repositories = {
         status: 'healthy',
         responseTime: Date.now() - repoStart,
@@ -124,14 +125,14 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     };
 
     const responseTime = Date.now() - startTime;
-    
+
     // Log health check
     logger.info('Health check completed', {
       requestId,
       metadata: {
         status: healthCheck.status,
         responseTime,
-        services: Object.keys(healthCheck.services).map(service => ({
+        services: Object.keys(healthCheck.services).map((service) => ({
           name: service,
           status: healthCheck.services[service].status,
         })),
@@ -139,11 +140,10 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     });
 
     // Set appropriate HTTP status code and send response
-    const statusCode = healthCheck.status === 'healthy' ? 200 :
-                      healthCheck.status === 'degraded' ? 200 : 503;
+    const statusCode =
+      healthCheck.status === 'healthy' ? 200 : healthCheck.status === 'degraded' ? 200 : 503;
 
     sendSuccess(res, healthCheck, statusCode);
-
   } catch (error) {
     const errorResponse: HealthCheckResponse = {
       status: 'unhealthy',
@@ -168,7 +168,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (!handleCommonError(error, res, 'health check')) {
-      sendError(res, "INTERNAL_SERVER_ERROR", 'Health check system failure', 503);
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Health check system failure', 503);
     }
   }
 });
@@ -192,21 +192,21 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
     try {
       const dbStart = Date.now();
       const connection = getConnection();
-      
+
       // Test basic connectivity
       await connection.executeQuery('RETURN 1 as health_check');
-      
+
       // Test database schema
       const schemaCheck = await connection.executeQuery(`
         CALL db.schema.visualization() YIELD nodes, relationships
         RETURN count(nodes) as nodeTypes, count(relationships) as relationshipTypes
       `);
-      
+
       // Test database performance
       const perfStart = Date.now();
       await connection.executeQuery('MATCH (n) RETURN count(n) as totalNodes LIMIT 1');
       const perfTime = Date.now() - perfStart;
-      
+
       healthCheck.services.database = {
         status: 'healthy',
         responseTime: Date.now() - dbStart,
@@ -235,10 +235,10 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
       try {
         const repoStart = Date.now();
         const repoInstance = repo.instance();
-        
+
         // Test basic functionality
         await repoInstance.findAll();
-        
+
         healthCheck.services[repo.name] = {
           status: 'healthy',
           responseTime: Date.now() - repoStart,
@@ -281,7 +281,7 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
     // Enhanced system metrics
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
-    
+
     healthCheck.metrics = {
       memory: {
         used: memUsage.heapUsed,
@@ -298,7 +298,7 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
     };
 
     const responseTime = Date.now() - startTime;
-    
+
     logger.info('Detailed health check completed', {
       requestId,
       metadata: {
@@ -308,11 +308,10 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
       },
     });
 
-    const statusCode = healthCheck.status === 'healthy' ? 200 :
-                      healthCheck.status === 'degraded' ? 200 : 503;
+    const statusCode =
+      healthCheck.status === 'healthy' ? 200 : healthCheck.status === 'degraded' ? 200 : 503;
 
     sendSuccess(res, healthCheck, statusCode);
-
   } catch (error) {
     logger.error('Detailed health check failed', {
       requestId,
@@ -323,7 +322,7 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
     });
 
     if (!handleCommonError(error, res, 'detailed health check')) {
-      sendError(res, "INTERNAL_SERVER_ERROR", 'Health check system failure', 503);
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Health check system failure', 503);
     }
   }
 });
@@ -334,7 +333,7 @@ router.get('/health/ready', async (req: Request, res: Response): Promise<void> =
     // Check if system is ready to accept requests
     const connection = getConnection();
     await connection.executeQuery('RETURN 1 as readiness_check');
-    
+
     // Check if essential repositories are available
     const starshipRepo = new StarshipRepository();
     await starshipRepo.findAll();
@@ -343,14 +342,18 @@ router.get('/health/ready', async (req: Request, res: Response): Promise<void> =
       status: 'ready',
       timestamp: new Date().toISOString(),
     });
-
   } catch (error) {
     logger.warn('Readiness check failed', {
       error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
     if (!handleCommonError(error, res, 'readiness check')) {
-      sendError(res, "SERVICE_UNAVAILABLE", error instanceof Error ? error.message : 'System not ready', 503);
+      sendError(
+        res,
+        'SERVICE_UNAVAILABLE',
+        error instanceof Error ? error.message : 'System not ready',
+        503
+      );
     }
   }
 });
@@ -370,7 +373,7 @@ router.get('/health/metrics', (req: Request, res: Response): void => {
   try {
     const memUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
-    
+
     const metrics = {
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
@@ -402,14 +405,13 @@ router.get('/health/metrics', (req: Request, res: Response): void => {
     };
 
     sendSuccess(res, metrics);
-
   } catch (error) {
     logger.error('Metrics collection failed', {
       error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
     if (!handleCommonError(error, res, 'metrics collection')) {
-      sendError(res, "INTERNAL_SERVER_ERROR", 'Failed to collect metrics');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to collect metrics');
     }
   }
 });

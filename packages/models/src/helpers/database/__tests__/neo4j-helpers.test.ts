@@ -7,7 +7,7 @@ import {
   convertNeo4jInt,
   convertNeo4jIntsInObject,
   convertNeo4jIntsInArray,
-  isNeo4jInt
+  isNeo4jInt,
 } from '../neo4j-helpers';
 
 describe('Neo4j Helpers', () => {
@@ -15,7 +15,7 @@ describe('Neo4j Helpers', () => {
     it('should convert Neo4j Integer to JavaScript number', () => {
       const neo4jInt = int(42);
       const result = convertNeo4jInt(neo4jInt);
-      
+
       expect(result).toBe(42);
       expect(typeof result).toBe('number');
     });
@@ -23,7 +23,7 @@ describe('Neo4j Helpers', () => {
     it('should return JavaScript number unchanged', () => {
       const number = 123;
       const result = convertNeo4jInt(number);
-      
+
       expect(result).toBe(123);
       expect(typeof result).toBe('number');
     });
@@ -51,7 +51,7 @@ describe('Neo4j Helpers', () => {
     it('should handle large Neo4j integers', () => {
       const largeInt = int(Number.MAX_SAFE_INTEGER); // Max safe integer
       const result = convertNeo4jInt(largeInt);
-      
+
       expect(typeof result).toBe('number');
       expect(result).toBe(Number.MAX_SAFE_INTEGER);
     });
@@ -59,7 +59,7 @@ describe('Neo4j Helpers', () => {
     it('should handle negative Neo4j integers', () => {
       const negativeInt = int(-456);
       const result = convertNeo4jInt(negativeInt);
-      
+
       expect(result).toBe(-456);
     });
   });
@@ -92,7 +92,7 @@ describe('Neo4j Helpers', () => {
         id: 'test-id',
         count: int(42),
         name: 'test',
-        active: true
+        active: true,
       };
 
       const result = convertNeo4jIntsInObject(input);
@@ -101,7 +101,7 @@ describe('Neo4j Helpers', () => {
         id: 'test-id',
         count: 42,
         name: 'test',
-        active: true
+        active: true,
       });
     });
 
@@ -112,12 +112,12 @@ describe('Neo4j Helpers', () => {
           age: int(25),
           profile: {
             score: int(100),
-            name: 'John'
-          }
+            name: 'John',
+          },
         },
         metadata: {
-          version: int(1)
-        }
+          version: int(1),
+        },
       };
 
       const result = convertNeo4jIntsInObject(input);
@@ -128,26 +128,26 @@ describe('Neo4j Helpers', () => {
           age: 25,
           profile: {
             score: 100,
-            name: 'John'
-          }
+            name: 'John',
+          },
         },
         metadata: {
-          version: 1
-        }
+          version: 1,
+        },
       });
     });
 
     it('should handle arrays with Neo4j integers', () => {
       const input = {
         numbers: [int(1), int(2), int(3)],
-        mixed: [int(42), 'text', true, { count: int(5) }]
+        mixed: [int(42), 'text', true, { count: int(5) }],
       };
 
       const result = convertNeo4jIntsInObject(input);
 
       expect(result).toEqual({
         numbers: [1, 2, 3],
-        mixed: [42, 'text', true, { count: 5 }]
+        mixed: [42, 'text', true, { count: 5 }],
       });
     });
 
@@ -166,13 +166,13 @@ describe('Neo4j Helpers', () => {
 
     it('should handle arrays of primitive Neo4j integers', () => {
       const input = {
-        scores: [int(10), int(20), int(30)]
+        scores: [int(10), int(20), int(30)],
       };
 
       const result = convertNeo4jIntsInObject(input);
 
       expect(result).toEqual({
-        scores: [10, 20, 30]
+        scores: [10, 20, 30],
       });
     });
 
@@ -182,10 +182,10 @@ describe('Neo4j Helpers', () => {
           level2: {
             level3: {
               value: int(999),
-              array: [int(1), { nested: int(2) }]
-            }
-          }
-        }
+              array: [int(1), { nested: int(2) }],
+            },
+          },
+        },
       };
 
       const result = convertNeo4jIntsInObject(input);
@@ -195,10 +195,10 @@ describe('Neo4j Helpers', () => {
           level2: {
             level3: {
               value: 999,
-              array: [1, { nested: 2 }]
-            }
-          }
-        }
+              array: [1, { nested: 2 }],
+            },
+          },
+        },
       });
     });
 
@@ -210,21 +210,14 @@ describe('Neo4j Helpers', () => {
           null,
           undefined,
           { id: 'test', count: int(5) },
-          [int(1), int(2)]
-        ]
+          [int(1), int(2)],
+        ],
       };
 
       const result = convertNeo4jIntsInObject(input);
 
       expect(result).toEqual({
-        mixed: [
-          42,
-          'string',
-          null,
-          undefined,
-          { id: 'test', count: 5 },
-          [1, 2]
-        ]
+        mixed: [42, 'string', null, undefined, { id: 'test', count: 5 }, [1, 2]],
       });
     });
   });
@@ -234,7 +227,7 @@ describe('Neo4j Helpers', () => {
       const input = [
         { id: 'item1', count: int(10) },
         { id: 'item2', count: int(20) },
-        { id: 'item3', count: int(30) }
+        { id: 'item3', count: int(30) },
       ];
 
       const result = convertNeo4jIntsInArray(input);
@@ -242,7 +235,7 @@ describe('Neo4j Helpers', () => {
       expect(result).toEqual([
         { id: 'item1', count: 10 },
         { id: 'item2', count: 20 },
-        { id: 'item3', count: 30 }
+        { id: 'item3', count: 30 },
       ]);
     });
 
@@ -254,39 +247,35 @@ describe('Neo4j Helpers', () => {
     it('should handle array with mixed object types', () => {
       const input = [
         { simple: int(1) },
-        { 
-          nested: { 
+        {
+          nested: {
             deep: int(2),
-            array: [int(3), int(4)]
-          }
+            array: [int(3), int(4)],
+          },
         },
-        { string: 'value', boolean: true }
+        { string: 'value', boolean: true },
       ];
 
       const result = convertNeo4jIntsInArray(input);
 
       expect(result).toEqual([
         { simple: 1 },
-        { 
-          nested: { 
+        {
+          nested: {
             deep: 2,
-            array: [3, 4]
-          }
+            array: [3, 4],
+          },
         },
-        { string: 'value', boolean: true }
+        { string: 'value', boolean: true },
       ]);
     });
 
     it('should handle objects with null and undefined values', () => {
-      const input = [
-        { id: 'test', count: int(5), nullable: null, undefined: undefined }
-      ];
+      const input = [{ id: 'test', count: int(5), nullable: null, undefined: undefined }];
 
       const result = convertNeo4jIntsInArray(input);
 
-      expect(result).toEqual([
-        { id: 'test', count: 5, nullable: null, undefined: undefined }
-      ]);
+      expect(result).toEqual([{ id: 'test', count: 5, nullable: null, undefined: undefined }]);
     });
   });
 
@@ -302,7 +291,7 @@ describe('Neo4j Helpers', () => {
     it('should handle very large integers safely', () => {
       const maxSafeInt = int(Number.MAX_SAFE_INTEGER);
       const result = convertNeo4jInt(maxSafeInt);
-      
+
       expect(typeof result).toBe('number');
       expect(result).toBe(Number.MAX_SAFE_INTEGER);
     });
@@ -310,7 +299,7 @@ describe('Neo4j Helpers', () => {
     it('should handle zero values correctly', () => {
       const zero = int(0);
       expect(convertNeo4jInt(zero)).toBe(0);
-      
+
       const obj = { count: int(0), active: false };
       const result = convertNeo4jIntsInObject(obj);
       expect(result.count).toBe(0);
@@ -319,13 +308,13 @@ describe('Neo4j Helpers', () => {
 
     it('should handle arrays with null elements', () => {
       const input = {
-        items: [int(1), null, int(2), undefined, int(3)]
+        items: [int(1), null, int(2), undefined, int(3)],
       };
 
       const result = convertNeo4jIntsInObject(input);
 
       expect(result).toEqual({
-        items: [1, null, 2, undefined, 3]
+        items: [1, null, 2, undefined, 3],
       });
     });
   });

@@ -1,15 +1,15 @@
-'use client';
+'use client'
 
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
+import { Button } from '@/components/ui/button'
+import { LogOut } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
 
 interface LogoutButtonProps {
-  variant?: 'default' | 'secondary' | 'outline' | 'ghost';
-  size?: 'default' | 'sm' | 'lg';
-  className?: string;
-  children?: React.ReactNode;
+  variant?: 'default' | 'secondary' | 'outline' | 'ghost'
+  size?: 'default' | 'sm' | 'lg'
+  className?: string
+  children?: React.ReactNode
 }
 
 /**
@@ -20,25 +20,25 @@ export function LogoutButton({
   variant = 'ghost',
   size = 'default',
   className,
-  children
+  children,
 }: LogoutButtonProps) {
-  const { logout } = useAuth();
+  const { logout } = useAuth()
 
   const handleLogout = async () => {
-    await logout();
+    await logout()
     // Optionally redirect to home page
-    window.location.href = '/';
-  };
+    window.location.href = '/'
+  }
 
   return (
     <Button
       variant={variant}
       size={size}
-      className={cn("flex items-center gap-2", className)}
+      className={cn('flex items-center gap-2', className)}
       onClick={handleLogout}
     >
       <LogOut className="h-4 w-4" />
       {children || 'Sign Out'}
     </Button>
-  );
+  )
 }

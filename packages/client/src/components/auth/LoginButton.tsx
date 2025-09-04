@@ -1,16 +1,16 @@
-'use client';
+'use client'
 
-import { Button } from "@/components/ui/button";
-import { LogIn } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { Button } from '@/components/ui/button'
+import { LogIn } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
 interface LoginButtonProps {
-  variant?: 'default' | 'secondary' | 'outline' | 'ghost';
-  size?: 'default' | 'sm' | 'lg';
-  className?: string;
-  children?: React.ReactNode;
-  redirectTo?: string;
+  variant?: 'default' | 'secondary' | 'outline' | 'ghost'
+  size?: 'default' | 'sm' | 'lg'
+  className?: string
+  children?: React.ReactNode
+  redirectTo?: string
 }
 
 /**
@@ -22,27 +22,27 @@ export function LoginButton({
   size = 'default',
   className,
   children,
-  redirectTo = '/'
+  redirectTo = '/',
 }: LoginButtonProps) {
-  const router = useRouter();
-  
+  const router = useRouter()
+
   const handleLogin = () => {
     // Store redirect URL in localStorage for post-login redirect
     if (redirectTo !== '/') {
-      localStorage.setItem('starships_redirect_after_login', redirectTo);
+      localStorage.setItem('starships_redirect_after_login', redirectTo)
     }
-    router.push('/login');
-  };
+    router.push('/login')
+  }
 
   return (
     <Button
       variant={variant}
       size={size}
-      className={cn("flex items-center gap-2", className)}
+      className={cn('flex items-center gap-2', className)}
       onClick={handleLogin}
     >
       <LogIn className="h-4 w-4" />
       {children || 'Sign In'}
     </Button>
-  );
+  )
 }

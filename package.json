@@ -28,7 +28,11 @@
     "migration:test": "cd deploy && npm run migration:test",
     "backup:create": "cd deploy && npm run backup:create",
     "backup:restore": "cd deploy && npm run backup:restore",
-    "backup:list": "cd deploy && npm run backup:list"
+    "backup:list": "cd deploy && npm run backup:list",
+    "neo4j:install": "docker run -d --name starships-neo4j -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:latest || echo 'Container may already exist. Use neo4j:reset to recreate.'",
+    "neo4j:reset": "docker stop starships-neo4j 2>/dev/null || true && docker rm starships-neo4j 2>/dev/null || true && echo 'Neo4j container cleaned up. Use neo4j:install to recreate.'",
+    "neo4j:shell": "docker exec -it starships-neo4j cypher-shell -u neo4j -p starships2024! || echo 'Container not running. Use neo4j:start first.'",
+    "neo4j:backup": "docker exec starships-neo4j neo4j-admin database dump --database=neo4j --to-path=/backups --verbose || echo 'Backup failed. Ensure container is running.'"
   },
   "devDependencies": {
     "@semantic-release/commit-analyzer": "^13.0.1",

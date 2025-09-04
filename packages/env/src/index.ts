@@ -1,9 +1,12 @@
 import * as dotenv from 'dotenv';
 import dotenvExpand from 'dotenv-expand';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { EnvironmentConfig } from './types';
 
 // Load environment variables from the root .env file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const rootEnvPath = path.resolve(__dirname, '../../../.env');
 
 // Only run dotenv config on server-side to prevent browser TTY errors
@@ -67,5 +70,3 @@ export function getEnvConfig(): EnvironmentConfig {
   };
 }
 
-// Re-export types for convenience
-export * from './types';

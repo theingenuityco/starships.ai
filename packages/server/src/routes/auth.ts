@@ -97,7 +97,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
         avatar: user.avatar,
       },
       token,
-      defaultStarship: defaultStarship ? {
+      starship: defaultStarship ? {
         id: defaultStarship.id,
         slug: defaultStarship.slug,
         name: defaultStarship.name,
@@ -178,7 +178,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
         avatar: user.avatar,
       },
       token,
-      firstStarship: firstStarship ? {
+      starship: firstStarship ? {
         id: firstStarship.id,
         slug: firstStarship.slug,
         name: firstStarship.name,

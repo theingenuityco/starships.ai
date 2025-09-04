@@ -402,7 +402,7 @@ pnpm deploy:production  # Deploy to production environment
 
 ## 📄 License
 
-Proprietary - All rights reserved by The Ingenuity Co
+Proprietary - All rights reserved by The Ingenuity Labs Inc.
 
 ---
 

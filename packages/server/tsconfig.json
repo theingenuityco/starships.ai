@@ -10,5 +10,11 @@
   },
   "include": ["src/**/*", "src/types/**/*"],
   "exclude": ["dist"],
-  "references": [{ "path": "../protocol" }, { "path": "../models" }, { "path": "../errors" }]
+  "references": [
+    { "path": "../autopilot" },
+    { "path": "../env" },
+    { "path": "../protocol" },
+    { "path": "../errors" },
+    { "path": "../models" }
+  ]
 }

@@ -7,7 +7,7 @@ on:
 jobs:
   lint:
     name: Lint Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
@@ -37,7 +37,7 @@ jobs:
 
   type-check:
     name: Type Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
@@ -67,7 +67,7 @@ jobs:
 
   test:
     name: Test Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
@@ -97,7 +97,7 @@ jobs:
 
   build:
     name: Build Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
     needs: [lint, type-check, test]
     environment: ci

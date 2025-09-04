@@ -157,23 +157,15 @@ describe('ErrorMappingUtils', () => {
   describe('getErrorCategory', () => {
     it('should return correct category for known error codes', () => {
       expect(ErrorMappingUtils.getErrorCategory('VALIDATION_ERROR')).toBe(ErrorCategory.VALIDATION);
-      expect(ErrorMappingUtils.getErrorCategory('AUTHENTICATION_REQUIRED')).toBe(
-        ErrorCategory.AUTHENTICATION
-      );
+      expect(ErrorMappingUtils.getErrorCategory('AUTHENTICATION_REQUIRED')).toBe(ErrorCategory.AUTHENTICATION);
       expect(ErrorMappingUtils.getErrorCategory('ACCESS_DENIED')).toBe(ErrorCategory.AUTHORIZATION);
-      expect(ErrorMappingUtils.getErrorCategory('RESOURCE_NOT_FOUND')).toBe(
-        ErrorCategory.NOT_FOUND
-      );
-      expect(ErrorMappingUtils.getErrorCategory('RESOURCE_ALREADY_EXISTS')).toBe(
-        ErrorCategory.CONFLICT
-      );
+      expect(ErrorMappingUtils.getErrorCategory('RESOURCE_NOT_FOUND')).toBe(ErrorCategory.NOT_FOUND);
+      expect(ErrorMappingUtils.getErrorCategory('RESOURCE_ALREADY_EXISTS')).toBe(ErrorCategory.CONFLICT);
       expect(ErrorMappingUtils.getErrorCategory('DATABASE_ERROR')).toBe(ErrorCategory.DATABASE);
     });
 
     it('should return INTERNAL category for unknown error codes', () => {
-      expect(ErrorMappingUtils.getErrorCategory('UNKNOWN_CODE' as StandardErrorCode)).toBe(
-        ErrorCategory.INTERNAL
-      );
+      expect(ErrorMappingUtils.getErrorCategory('UNKNOWN_CODE' as StandardErrorCode)).toBe(ErrorCategory.INTERNAL);
     });
   });
 

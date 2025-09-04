@@ -130,12 +130,7 @@ export class Logger {
   }
 
   /** Format log message with context */
-  private formatMessage(
-    level: LogLevel,
-    message: string,
-    context?: LogContext,
-    error?: Error | BaseError
-  ): Record<string, any> {
+  private formatMessage(level: LogLevel, message: string, context?: LogContext, error?: Error | BaseError): Record<string, any> {
     const logEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -267,18 +262,14 @@ export class Logger {
    */
   public health(status: HealthStatus): void {
     const level = status.status === 'healthy' ? LogLevel.INFO : LogLevel.WARN;
-    const logEntry = this.formatMessage(
-      level,
-      `Health Check: ${status.service} is ${status.status}`,
-      {
-        component: 'health',
-        metadata: {
-          service: status.service,
-          responseTime: status.responseTime,
-          ...status.details,
-        },
-      }
-    );
+    const logEntry = this.formatMessage(level, `Health Check: ${status.service} is ${status.status}`, {
+      component: 'health',
+      metadata: {
+        service: status.service,
+        responseTime: status.responseTime,
+        ...status.details,
+      },
+    });
     this.output(logEntry);
   }
 }
@@ -328,11 +319,7 @@ class PerformanceMonitorClass {
   }
 
   /** Measure async operation */
-  public static async measure<T>(
-    operation: string,
-    fn: () => Promise<T>,
-    metadata?: Record<string, any>
-  ): Promise<T> {
+  public static async measure<T>(operation: string, fn: () => Promise<T>, metadata?: Record<string, any>): Promise<T> {
     const operationId = ErrorUtils.generateRequestId();
     this.start(operationId);
 

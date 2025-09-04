@@ -96,11 +96,7 @@ export function useSessionMessages(sessionId: string, enabled: boolean = true) {
 }
 
 // Get sessions for a user
-export function useUserSessions(
-  userId: string,
-  onlyActive: boolean = false,
-  enabled: boolean = true
-) {
+export function useUserSessions(userId: string, onlyActive: boolean = false, enabled: boolean = true) {
   return useQuery({
     queryKey: SESSION_QUERY_KEYS.byUser(userId),
     queryFn: async () => {
@@ -121,11 +117,7 @@ export function useCreateSession() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: {
-      source: SessionSourceType
-      agentId?: string
-      starshipId?: string
-    }) => {
+    mutationFn: async (data: { source: SessionSourceType; agentId?: string; starshipId?: string }) => {
       const response = await api.post('/api/v1/sessions', data)
       return extractResponseData<SessionModel>(response)
     },
@@ -139,24 +131,20 @@ export function useCreateSession() {
 
       // Add new session to cache optimistically
       if (variables.starshipId) {
-        queryClient.setQueryData(
-          SESSION_QUERY_KEYS.byStarship(variables.starshipId),
-          (old: { sessions: SessionModel[] } | undefined) => {
-            if (!old) return { sessions: [session] }
-            // Add to beginning (most recent)
-            return {
-              ...old,
-              sessions: [session, ...old.sessions],
-            }
+        queryClient.setQueryData(SESSION_QUERY_KEYS.byStarship(variables.starshipId), (old: { sessions: SessionModel[] } | undefined) => {
+          if (!old) return { sessions: [session] }
+          // Add to beginning (most recent)
+          return {
+            ...old,
+            sessions: [session, ...old.sessions],
           }
-        )
+        })
       }
 
       toast.success('New session created successfully!')
     },
     onError: (error: any) => {
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to create session'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create session'
       toast.error('Failed to create session', {
         description: errorMessage,
       })
@@ -195,13 +183,10 @@ export function useSendMessage() {
         sending: true,
       }
 
-      queryClient.setQueryData(
-        SESSION_QUERY_KEYS.messages(sessionId),
-        (old: { messages: Message[] } | undefined) => {
-          const messages = old?.messages || []
-          return { messages: [...messages, userMessage] }
-        }
-      )
+      queryClient.setQueryData(SESSION_QUERY_KEYS.messages(sessionId), (old: { messages: Message[] } | undefined) => {
+        const messages = old?.messages || []
+        return { messages: [...messages, userMessage] }
+      })
 
       return { previousMessages, userMessage, sessionId }
     },
@@ -215,16 +200,13 @@ export function useSendMessage() {
         sessionId: variables.sessionId,
       }
 
-      queryClient.setQueryData(
-        SESSION_QUERY_KEYS.messages(variables.sessionId),
-        (old: Message[] | undefined) => {
-          const messages = old || []
-          // Remove the temporary sending user message and add both user + assistant messages
-          const withoutTempMessage = messages.filter(m => m.id !== context?.userMessage.id)
-          const finalUserMessage = { ...context!.userMessage, sending: false }
-          return [...withoutTempMessage, finalUserMessage, assistantMessage]
-        }
-      )
+      queryClient.setQueryData(SESSION_QUERY_KEYS.messages(variables.sessionId), (old: Message[] | undefined) => {
+        const messages = old || []
+        // Remove the temporary sending user message and add both user + assistant messages
+        const withoutTempMessage = messages.filter(m => m.id !== context?.userMessage.id)
+        const finalUserMessage = { ...context!.userMessage, sending: false }
+        return [...withoutTempMessage, finalUserMessage, assistantMessage]
+      })
 
       // Update session activity
       queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEYS.detail(variables.sessionId) })
@@ -232,14 +214,10 @@ export function useSendMessage() {
     onError: (error: any, variables, context) => {
       // Rollback the optimistic update
       if (context?.previousMessages) {
-        queryClient.setQueryData(
-          SESSION_QUERY_KEYS.messages(variables.sessionId),
-          context.previousMessages
-        )
+        queryClient.setQueryData(SESSION_QUERY_KEYS.messages(variables.sessionId), context.previousMessages)
       }
 
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to send message'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
       toast.error('Failed to send message', {
         description: errorMessage,
       })
@@ -268,8 +246,7 @@ export function useClearSessionMemory() {
       toast.success('Session memory cleared successfully!')
     },
     onError: (error: any) => {
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to clear session memory'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to clear session memory'
       toast.error('Failed to clear memory', {
         description: errorMessage,
       })
@@ -297,22 +274,17 @@ export function useDeleteSession() {
       }
 
       // Snapshot the previous sessions
-      const previousSessions = starshipId
-        ? queryClient.getQueryData(SESSION_QUERY_KEYS.byStarship(starshipId))
-        : null
+      const previousSessions = starshipId ? queryClient.getQueryData(SESSION_QUERY_KEYS.byStarship(starshipId)) : null
 
       // Optimistically remove the session
       if (starshipId) {
-        queryClient.setQueryData(
-          SESSION_QUERY_KEYS.byStarship(starshipId),
-          (old: { sessions: SessionModel[] } | undefined) => {
-            if (!old) return old
-            return {
-              ...old,
-              sessions: old.sessions.filter((session: SessionModel) => session.id !== sessionId),
-            }
+        queryClient.setQueryData(SESSION_QUERY_KEYS.byStarship(starshipId), (old: { sessions: SessionModel[] } | undefined) => {
+          if (!old) return old
+          return {
+            ...old,
+            sessions: old.sessions.filter((session: SessionModel) => session.id !== sessionId),
           }
-        )
+        })
       }
 
       return { previousSessions, sessionId, starshipId }
@@ -320,14 +292,10 @@ export function useDeleteSession() {
     onError: (error: any, sessionId, context) => {
       // Rollback the optimistic update
       if (context?.previousSessions && context.starshipId) {
-        queryClient.setQueryData(
-          SESSION_QUERY_KEYS.byStarship(context.starshipId),
-          context.previousSessions
-        )
+        queryClient.setQueryData(SESSION_QUERY_KEYS.byStarship(context.starshipId), context.previousSessions)
       }
 
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to delete session'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete session'
       toast.error('Failed to delete session', {
         description: errorMessage,
       })

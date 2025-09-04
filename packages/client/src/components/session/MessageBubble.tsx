@@ -15,30 +15,20 @@ export function MessageBubble({ message, streaming = false }: MessageBubbleProps
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-      <div
-        className={`flex max-w-[85%] ${isUser ? 'flex-row-reverse mr-20' : 'flex-row ml-2'} items-start gap-2`}
-      >
+      <div className={`flex max-w-[85%] ${isUser ? 'flex-row-reverse mr-20' : 'flex-row ml-2'} items-start gap-2`}>
         {/* Simple Avatar */}
         <div
           className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 
             ${isUser ? 'bg-blue-600' : 'bg-zinc-700'}`}
         >
-          {isUser ? (
-            <User className="h-4 w-4 text-white" />
-          ) : (
-            <Bot className="h-4 w-4 text-white" />
-          )}
+          {isUser ? <User className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4 text-white" />}
         </div>
 
         {/* Clean Message Content with stabilized layout */}
         <div
           className={`
             px-4 py-3 break-words
-            ${
-              isUser
-                ? 'bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm'
-                : 'bg-zinc-800 text-white rounded-t-2xl rounded-br-2xl rounded-bl-sm'
-            }
+            ${isUser ? 'bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl rounded-br-sm' : 'bg-zinc-800 text-white rounded-t-2xl rounded-br-2xl rounded-bl-sm'}
             ${isSending ? 'opacity-70' : ''}
             min-w-[200px] max-w-full
             transition-all duration-100 ease-in-out

@@ -63,21 +63,14 @@ describe('SessionRepository', () => {
 
   describe('findAll', () => {
     it('should return all sessions ordered by last activity', async () => {
-      const mockSessions = [
-        createMockSession({ id: 'session-1' }),
-        createMockSession({ id: 'session-2' }),
-      ];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockSessions.map((s) => ({ s: createMockSessionRecord(s) }))
-      );
+      const mockSessions = [createMockSession({ id: 'session-1' }), createMockSession({ id: 'session-2' })];
+      mockConnection.executeQuery.mockResolvedValue(mockSessions.map((s) => ({ s: createMockSessionRecord(s) })));
 
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ id: 'session-1' });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY s.last_activity_at DESC')
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY s.last_activity_at DESC'));
     });
 
     it('should return empty array when no sessions found', async () => {
@@ -106,10 +99,7 @@ describe('SessionRepository', () => {
         id: 'session-123',
         status: 'active',
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE s.id = $id'),
-        { id: 'session-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE s.id = $id'), { id: 'session-123' });
     });
 
     it('should return null when session not found', async () => {
@@ -296,9 +286,7 @@ describe('SessionRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.update('session-123', { status: 'completed' })).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.update('session-123', { status: 'completed' })).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -309,10 +297,7 @@ describe('SessionRepository', () => {
       const result = await repository.delete('session-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE s'),
-        { id: 'session-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE s'), { id: 'session-123' });
     });
 
     it('should return false when session not found', async () => {

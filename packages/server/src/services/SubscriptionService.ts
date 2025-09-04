@@ -35,9 +35,7 @@ export class SubscriptionService {
 
         // Check if customer is deleted
         if ((customer as any).deleted) {
-          console.log(
-            `[SUBSCRIPTION] Customer ${user.stripeCustomerId} is deleted in Stripe, creating new one`
-          );
+          console.log(`[SUBSCRIPTION] Customer ${user.stripeCustomerId} is deleted in Stripe, creating new one`);
         } else {
           console.log(`[SUBSCRIPTION] Using existing customer ${user.stripeCustomerId}`);
           return user.stripeCustomerId;
@@ -45,9 +43,7 @@ export class SubscriptionService {
       } catch (error: any) {
         // Customer doesn't exist
         if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {
-          console.log(
-            `[SUBSCRIPTION] Customer ${user.stripeCustomerId} not found in Stripe, creating new one`
-          );
+          console.log(`[SUBSCRIPTION] Customer ${user.stripeCustomerId} not found in Stripe, creating new one`);
         } else {
           // Real error - throw it
           throw error;
@@ -271,16 +267,12 @@ export class SubscriptionService {
         invoice_now: false, // Don't create final invoice
       });
 
-      console.log(
-        `[SUBSCRIPTION] Successfully cancelled subscription ${subscriptionId}, status: ${cancelledSub.status}`
-      );
+      console.log(`[SUBSCRIPTION] Successfully cancelled subscription ${subscriptionId}, status: ${cancelledSub.status}`);
       return cancelledSub.status === 'canceled';
     } catch (error: any) {
       // Check if error is because subscription doesn't exist
       if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {
-        console.log(
-          `[SUBSCRIPTION] Subscription ${subscriptionId} not found in Stripe - likely already cancelled`
-        );
+        console.log(`[SUBSCRIPTION] Subscription ${subscriptionId} not found in Stripe - likely already cancelled`);
         // Subscription doesn't exist = already cancelled = allow deletion
         return true;
       }

@@ -131,14 +131,10 @@ memory.addConversation('user', 'I was charged twice this month!', {
   priority: 'high',
 });
 
-memory.addConversation(
-  'assistant',
-  'I understand your frustration. Let me check your account right away.',
-  {
-    action: 'investigating',
-    empathy_level: 'high',
-  }
-);
+memory.addConversation('assistant', 'I understand your frustration. Let me check your account right away.', {
+  action: 'investigating',
+  empathy_level: 'high',
+});
 
 // LLM-formatted output includes structured context
 const messages = memory.toMessages();
@@ -234,11 +230,7 @@ agentMemory.setIdentity({
 });
 agentMemory.setPurpose({
   primary: 'Provide comprehensive customer support through multi-step workflow',
-  secondary: [
-    'Gather user data',
-    'Generate personalized responses',
-    'Process requests efficiently',
-  ],
+  secondary: ['Gather user data', 'Generate personalized responses', 'Process requests efficiently'],
 });
 agentMemory.setSpace({
   description:

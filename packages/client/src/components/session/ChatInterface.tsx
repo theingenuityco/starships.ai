@@ -20,12 +20,7 @@ interface ChatInterfaceProps {
   starshipSlug?: string
 }
 
-export function ChatInterface({
-  agent,
-  sessionId,
-  onSessionCreated,
-  starshipSlug,
-}: ChatInterfaceProps) {
+export function ChatInterface({ agent, sessionId, onSessionCreated, starshipSlug }: ChatInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
 
   // Socket.IO connection
@@ -153,18 +148,10 @@ export function ChatInterface({
                 streaming: true,
                 agentId: agent.id,
               }
-              return prev
-                .map(msg =>
-                  msg.id === userMessage.id && msg.sending ? { ...msg, sending: false } : msg
-                )
-                .concat(streamingMessage)
+              return prev.map(msg => (msg.id === userMessage.id && msg.sending ? { ...msg, sending: false } : msg)).concat(streamingMessage)
             } else {
               // Subsequent chunks - update existing message
-              return prev.map(msg =>
-                msg.id === assistantMessageId
-                  ? { ...msg, content: accumulated, streaming: true }
-                  : msg
-              )
+              return prev.map(msg => (msg.id === assistantMessageId ? { ...msg, content: accumulated, streaming: true } : msg))
             }
           })
         },
@@ -240,9 +227,7 @@ export function ChatInterface({
   }
 
   // Check if there are any active connectors
-  const hasActiveConnectors = connectorInstances.some(
-    instance => instance.status === 'active' && instance.isActive
-  )
+  const hasActiveConnectors = connectorInstances.some(instance => instance.status === 'active' && instance.isActive)
 
   return (
     <div className="flex flex-col h-full bg-zinc-900 w-full">
@@ -254,18 +239,13 @@ export function ChatInterface({
               <div className="flex items-center gap-2">
                 <h2 className="font-semibold text-lg text-white">{agent.name}</h2>
                 {hasActiveConnectors && (
-                  <Badge
-                    variant="default"
-                    className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                  >
+                  <Badge variant="default" className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                     <CheckCircle className="w-3 h-3 mr-1" />
                     Connected
                   </Badge>
                 )}
               </div>
-              <p className="text-sm text-zinc-400 flex items-center">
-                {agent.description || 'AI Assistant'}
-              </p>
+              <p className="text-sm text-zinc-400 flex items-center">{agent.description || 'AI Assistant'}</p>
             </div>
           </div>
 
@@ -288,15 +268,10 @@ export function ChatInterface({
 
       {/* Input */}
       <div className="border-t border-zinc-800 bg-zinc-900 p-4">
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          disabled={!currentSessionId.current || loading || !userId || !isConnected}
-        />
+        <MessageInput onSendMessage={handleSendMessage} disabled={!currentSessionId.current || loading || !userId || !isConnected} />
 
         {/* Connection Error Message */}
-        {error && (
-          <div className="mt-3 p-3 bg-red-500/10 rounded text-sm text-red-500">{error}</div>
-        )}
+        {error && <div className="mt-3 p-3 bg-red-500/10 rounded text-sm text-red-500">{error}</div>}
       </div>
     </div>
   )

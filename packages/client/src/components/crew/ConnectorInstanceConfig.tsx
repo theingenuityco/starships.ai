@@ -3,14 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Settings, Loader2, Check, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -33,23 +26,14 @@ interface ConnectorInstanceConfigProps {
   className?: string
 }
 
-export function ConnectorInstanceConfig({
-  connectorId,
-  connectorName,
-  currentConfig,
-  onTemplateApply,
-  disabled = false,
-  className,
-}: ConnectorInstanceConfigProps) {
+export function ConnectorInstanceConfig({ connectorId, connectorName, currentConfig, onTemplateApply, disabled = false, className }: ConnectorInstanceConfigProps) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Get environment variables from current config
   const getEnvVars = () => {
     try {
-      return currentConfig?.environmentVariables
-        ? JSON.parse(currentConfig.environmentVariables)
-        : {}
+      return currentConfig?.environmentVariables ? JSON.parse(currentConfig.environmentVariables) : {}
     } catch {
       return {}
     }
@@ -78,24 +62,9 @@ export function ConnectorInstanceConfig({
         <DropdownMenu>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={disabled || isUpdating}
-                className={cn(
-                  'relative',
-                  error && 'text-destructive hover:text-destructive',
-                  className
-                )}
-              >
-                {isUpdating ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Settings className="h-4 w-4" />
-                )}
-                {error && (
-                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-destructive rounded-full" />
-                )}
+              <Button variant="ghost" size="sm" disabled={disabled || isUpdating} className={cn('relative', error && 'text-destructive hover:text-destructive', className)}>
+                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
+                {error && <div className="absolute -top-1 -right-1 w-2 h-2 bg-destructive rounded-full" />}
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>
@@ -143,11 +112,7 @@ export function ConnectorInstanceConfig({
                               </Badge>
                             </div>
                           ))}
-                        {Object.keys(envVars).length > 3 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{Object.keys(envVars).length - 3} more...
-                          </div>
-                        )}
+                        {Object.keys(envVars).length > 3 && <div className="text-xs text-muted-foreground">+{Object.keys(envVars).length - 3} more...</div>}
                       </div>
                     ) : (
                       <span className="text-muted-foreground">None configured</span>
@@ -161,9 +126,7 @@ export function ConnectorInstanceConfig({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem disabled>
-                  <div className="text-xs text-muted-foreground">
-                    Last modified: {new Date(currentConfig.lastModified).toLocaleString()}
-                  </div>
+                  <div className="text-xs text-muted-foreground">Last modified: {new Date(currentConfig.lastModified).toLocaleString()}</div>
                 </DropdownMenuItem>
               </>
             )}
@@ -191,10 +154,7 @@ export function ConnectorInstanceConfig({
             </DropdownMenuItem>
 
             {currentConfig?.templateId && (
-              <DropdownMenuItem
-                onClick={() => handleTemplateApply(currentConfig.templateId!)}
-                disabled={isUpdating}
-              >
+              <DropdownMenuItem onClick={() => handleTemplateApply(currentConfig.templateId!)} disabled={isUpdating}>
                 <span className="text-sm">Reapply Template</span>
               </DropdownMenuItem>
             )}
@@ -204,11 +164,7 @@ export function ConnectorInstanceConfig({
         <TooltipContent>
           <div className="text-xs">
             <div className="font-medium">{connectorName} Configuration</div>
-            <div className="text-muted-foreground">
-              {hasConfig
-                ? `${Object.keys(envVars).length} variables configured`
-                : 'No configuration'}
-            </div>
+            <div className="text-muted-foreground">{hasConfig ? `${Object.keys(envVars).length} variables configured` : 'No configuration'}</div>
             {error && <div className="text-destructive mt-1">Error: {error}</div>}
           </div>
         </TooltipContent>

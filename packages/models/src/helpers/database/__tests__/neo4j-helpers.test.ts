@@ -3,12 +3,7 @@
  */
 
 import { Integer, int } from 'neo4j-driver';
-import {
-  convertNeo4jInt,
-  convertNeo4jIntsInObject,
-  convertNeo4jIntsInArray,
-  isNeo4jInt,
-} from '../neo4j-helpers';
+import { convertNeo4jInt, convertNeo4jIntsInObject, convertNeo4jIntsInArray, isNeo4jInt } from '../neo4j-helpers';
 
 describe('Neo4j Helpers', () => {
   describe('convertNeo4jInt', () => {
@@ -204,14 +199,7 @@ describe('Neo4j Helpers', () => {
 
     it('should preserve non-integer values in mixed arrays', () => {
       const input = {
-        mixed: [
-          int(42),
-          'string',
-          null,
-          undefined,
-          { id: 'test', count: int(5) },
-          [int(1), int(2)],
-        ],
+        mixed: [int(42), 'string', null, undefined, { id: 'test', count: int(5) }, [int(1), int(2)]],
       };
 
       const result = convertNeo4jIntsInObject(input);

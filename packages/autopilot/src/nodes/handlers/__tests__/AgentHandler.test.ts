@@ -127,9 +127,7 @@ describe('AgentHandler', () => {
       expect(Array.isArray(agentResult.workflowResults)).toBe(true);
 
       // Verify console.log was called correctly
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Executing agent: Basic Agent (model: openai/gpt-4) with workflow execution'
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Executing agent: Basic Agent (model: openai/gpt-4) with workflow execution');
 
       consoleSpy.mockRestore();
     });

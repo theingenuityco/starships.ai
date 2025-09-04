@@ -45,8 +45,7 @@ router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (r
     for (const [tool, key] of Object.entries(apiKeys)) {
       const keyStr = String(key || '');
       if (keyStr && keyStr.length > 8) {
-        maskedKeys[tool] =
-          `${keyStr.slice(0, 4)}${'*'.repeat(keyStr.length - 8)}${keyStr.slice(-4)}`;
+        maskedKeys[tool] = `${keyStr.slice(0, 4)}${'*'.repeat(keyStr.length - 8)}${keyStr.slice(-4)}`;
       } else {
         maskedKeys[tool] = keyStr ? '*'.repeat(keyStr.length) : '';
       }
@@ -82,16 +81,10 @@ router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (
     }
 
     if (!toolName || !apiKey) {
-      sendError(
-        res,
-        'MISSING_REQUIRED_FIELD' as StandardErrorCode,
-        'Tool name and API key are required',
-        400,
-        {
-          required_fields: ['toolName', 'apiKey'],
-          provided: { toolName: !!toolName, apiKey: !!apiKey },
-        }
-      );
+      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'Tool name and API key are required', 400, {
+        required_fields: ['toolName', 'apiKey'],
+        provided: { toolName: !!toolName, apiKey: !!apiKey },
+      });
       return;
     }
 
@@ -124,51 +117,42 @@ router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (
 /**
  * Delete a native tool API key
  */
-router.delete(
-  '/starships/:starshipId/native-api-keys/:toolName',
-  jwtAuthMiddleware,
-  async (req, res) => {
-    try {
-      const { starshipId, toolName } = req.params;
-      const userId = req.user?.id;
+router.delete('/starships/:starshipId/native-api-keys/:toolName', jwtAuthMiddleware, async (req, res) => {
+  try {
+    const { starshipId, toolName } = req.params;
+    const userId = req.user?.id;
 
-      if (!userId) {
-        sendError(
-          res,
-          'AUTHENTICATION_REQUIRED' as StandardErrorCode,
-          'User not authenticated',
-          401
-        );
-        return;
-      }
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+      return;
+    }
 
-      // Validate starshipId format
-      const { isValid, error } = validateUUID(starshipId, 'starshipId');
-      if (!isValid && error) {
-        sendError(res, error.code, error.message, 400, error.details);
-        return;
-      }
+    // Validate starshipId format
+    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
 
-      // Verify user owns this starship
-      const starshipRepo = new StarshipRepository();
-      const starship = await starshipRepo.findById(starshipId);
+    // Verify user owns this starship
+    const starshipRepo = new StarshipRepository();
+    const starship = await starshipRepo.findById(starshipId);
 
-      if (!starship || starship.ownerId !== userId) {
-        sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
-        return;
-      }
+    if (!starship || starship.ownerId !== userId) {
+      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
+      return;
+    }
 
-      // Delete the API key
-      const apiKeyRepo = new NativeToolApiKeyRepository();
-      await apiKeyRepo.deleteApiKey(starshipId, toolName);
+    // Delete the API key
+    const apiKeyRepo = new NativeToolApiKeyRepository();
+    await apiKeyRepo.deleteApiKey(starshipId, toolName);
 
-      sendSuccess(res, { message: 'API key deleted successfully' });
-    } catch (error) {
-      if (!handleCommonError(error, res, 'deleting native API key')) {
-        sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to delete API key');
-      }
+    sendSuccess(res, { message: 'API key deleted successfully' });
+  } catch (error) {
+    if (!handleCommonError(error, res, 'deleting native API key')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to delete API key');
     }
   }
-);
+});
 
 export default router;

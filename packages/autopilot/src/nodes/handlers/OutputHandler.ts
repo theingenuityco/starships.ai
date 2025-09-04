@@ -41,9 +41,7 @@ export class OutputHandler extends BaseHandler {
     }
 
     if (!params.sources || params.sources.length === 0) {
-      errors.push(
-        this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one source node is required')
-      );
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one source node is required'));
     }
 
     return {

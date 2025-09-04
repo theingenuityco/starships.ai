@@ -55,9 +55,6 @@ export interface WelcomeMessageData {
  */
 import { template } from 'lodash';
 
-export const renderTemplate = <T extends Record<string, any>>(
-  templateStr: string,
-  data: T
-): string => {
+export const renderTemplate = <T extends Record<string, any>>(templateStr: string, data: T): string => {
   return template(templateStr)(data);
 };

@@ -120,10 +120,7 @@ export class AgentService {
   /**
    * Update agent - Static method (returns AgentModel, not Agent)
    */
-  static async updateAgent(
-    agentId: string,
-    updates: UpdateAgentRequest
-  ): Promise<AgentModel | null> {
+  static async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
     const repository = new AgentRepository();
     return await repository.update(agentId, updates as Partial<AgentModel>);
   }
@@ -268,11 +265,7 @@ export class AgentService {
   /**
    * Update agent and return as Agent instance
    */
-  async updateAgent(
-    agentId: string,
-    updates: UpdateAgentRequest,
-    options: AgentOptions = {}
-  ): Promise<Agent | null> {
+  async updateAgent(agentId: string, updates: UpdateAgentRequest, options: AgentOptions = {}): Promise<Agent | null> {
     // Validate blueprint if being updated
     if (updates.blueprint) {
       const validation = this.validateBlueprint(updates.blueprint);
@@ -470,10 +463,7 @@ export class AgentService {
   /**
    * Execute an agent with user input
    */
-  async executeAgent(
-    context: AgentExecutionContext,
-    options: AgentOptions = {}
-  ): Promise<ExecuteAgentResponse> {
+  async executeAgent(context: AgentExecutionContext, options: AgentOptions = {}): Promise<ExecuteAgentResponse> {
     const startTime = Date.now();
 
     try {
@@ -531,10 +521,7 @@ export class AgentService {
    * Test agent execution (dry run without saving to memory)
    */
   async testAgent(agentId: string, testMessage: string): Promise<ExecuteAgentResponse> {
-    return this.executeAgent(
-      { agentId, userMessage: testMessage },
-      { includeMemory: false, loadConversationHistory: false }
-    );
+    return this.executeAgent({ agentId, userMessage: testMessage }, { includeMemory: false, loadConversationHistory: false });
   }
 
   // ============================================================================
@@ -632,9 +619,7 @@ export class AgentService {
    */
   private extractResponse(executionResult: any): string {
     if (executionResult.status !== 'completed') {
-      throw new InternalServerError(
-        `Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`
-      );
+      throw new InternalServerError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`);
     }
 
     // Look for LLM response in execution results
@@ -707,8 +692,7 @@ export class AgentService {
           description: 'Process user input and generate response',
           parameters: {
             model: dbAgent.model,
-            prompt:
-              'Respond to the user based on the conversation context and your system instructions.',
+            prompt: 'Respond to the user based on the conversation context and your system instructions.',
             temperature: dbAgent.temperature || 0.7,
             maxTokens: dbAgent.maxTokens || 2000,
             timeout: 30000,

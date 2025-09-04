@@ -5,30 +5,9 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import {
-  Eye,
-  EyeOff,
-  Save,
-  ExternalLink,
-  Zap,
-  Shield,
-  DollarSign,
-  Trash2,
-  Settings,
-  Check,
-  Key,
-  Info,
-  CheckCircle2,
-} from 'lucide-react'
+import { Eye, EyeOff, Save, ExternalLink, Zap, Shield, DollarSign, Trash2, Settings, Check, Key, Info, CheckCircle2 } from 'lucide-react'
 import api from '@/lib/api'
 
 interface ConfigField {
@@ -64,8 +43,7 @@ const NATIVE_TOOLS: NativeToolConfig[] = [
   {
     name: 'firecrawl',
     displayName: 'Firecrawl',
-    description:
-      'Web scraping with JavaScript rendering, clean markdown extraction, and structured data parsing',
+    description: 'Web scraping with JavaScript rendering, clean markdown extraction, and structured data parsing',
     apiKeyPlaceholder: 'fc_xxxxx',
     signupUrl: 'https://firecrawl.dev',
     pricing: '$19/month for 1,000 pages',
@@ -245,19 +223,13 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
             </span>
             <div className="flex-1 min-w-0 space-y-1">
               <h3 className="text-xl font-bold text-foreground">Tools</h3>
-              <p className="text-sm text-muted-foreground">
-                Add external capabilities to your agents
-              </p>
+              <p className="text-sm text-muted-foreground">Add external capabilities to your agents</p>
             </div>
           </div>
 
           {/* Browse Tools Button */}
           <div className="flex justify-start">
-            <Button
-              onClick={() => setIsModalOpen(true)}
-              size="sm"
-              className="h-9 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors border-0"
-            >
+            <Button onClick={() => setIsModalOpen(true)} size="sm" className="h-9 whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors border-0">
               <Settings className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>Browse Tools</span>
             </Button>
@@ -269,17 +241,12 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
           <div className="space-y-3">
             <div className="flex items-center gap-2 px-1">
               <div className="h-px bg-gradient-to-r from-primary/50 to-transparent flex-1"></div>
-              <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">
-                CONFIGURED TOOLS
-              </h4>
+              <h4 className="text-sm font-semibold text-primary uppercase tracking-wide">CONFIGURED TOOLS</h4>
               <div className="h-px bg-gradient-to-l from-primary/50 to-transparent flex-1"></div>
             </div>
             <div className="grid gap-2">
               {getConfiguredTools().map(tool => (
-                <div
-                  key={tool.name}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-card/70 transition-colors"
-                >
+                <div key={tool.name} className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-card/70 transition-colors">
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{tool.icon}</span>
                     <div>
@@ -287,12 +254,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       <p className="text-xs text-muted-foreground">{tool.pricing}</p>
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => openConfigModal(tool.name)}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => openConfigModal(tool.name)} className="text-muted-foreground hover:text-foreground">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </div>
@@ -304,9 +266,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
         {/* Security Alert */}
         <div className="flex items-center gap-2 p-3 rounded-lg border border-green-500/20 bg-green-500/5">
           <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500 flex-shrink-0" />
-          <p className="text-xs text-green-700 dark:text-green-400">
-            Your API keys are encrypted and stored securely.
-          </p>
+          <p className="text-xs text-green-700 dark:text-green-400">Your API keys are encrypted and stored securely.</p>
         </div>
       </div>
 
@@ -321,9 +281,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   <Settings className="h-5 w-5" />
                   Select a Tool to Configure
                 </DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  Choose from available native tool integrations
-                </DialogDescription>
+                <DialogDescription className="text-muted-foreground">Choose from available native tool integrations</DialogDescription>
               </DialogHeader>
 
               <div className="grid gap-3 py-4">
@@ -334,19 +292,14 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                     className="flex items-center justify-between p-4 rounded-lg border border-border/50 bg-card/30 hover:bg-card/50 hover:border-primary/50 transition-all text-left group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xl group-hover:bg-primary/20 transition-colors">
-                        {tool.icon}
-                      </div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-xl group-hover:bg-primary/20 transition-colors">{tool.icon}</div>
                       <div>
                         <p className="font-medium">{tool.displayName}</p>
                         <p className="text-xs text-muted-foreground">{tool.pricing}</p>
                       </div>
                     </div>
                     {apiKeys[tool.name] ? (
-                      <Badge
-                        variant="outline"
-                        className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400"
-                      >
+                      <Badge variant="outline" className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400">
                         <Check className="mr-1 h-3 w-3" />
                         Configured
                       </Badge>
@@ -364,14 +317,10 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
             <>
               <DialogHeader className="space-y-3">
                 <DialogTitle className="flex items-center gap-3 text-xl">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-2xl">
-                    {getSelectedTool()!.icon}
-                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-2xl">{getSelectedTool()!.icon}</div>
                   <span>Configure {getSelectedTool()!.displayName}</span>
                 </DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  {getSelectedTool()!.description}
-                </DialogDescription>
+                <DialogDescription className="text-muted-foreground">{getSelectedTool()!.description}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-5 py-6">
@@ -379,9 +328,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   <Alert
                     className={`${message.type === 'success' ? 'border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400' : 'border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400'}`}
                   >
-                    <AlertDescription className="text-sm font-medium">
-                      {message.text}
-                    </AlertDescription>
+                    <AlertDescription className="text-sm font-medium">{message.text}</AlertDescription>
                   </Alert>
                 )}
 
@@ -395,17 +342,8 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                         {getSelectedTool()!.pricing}
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 border-border/50 hover:bg-primary/10 hover:border-primary/50"
-                      asChild
-                    >
-                      <a
-                        href={getSelectedTool()!.signupUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                    <Button variant="outline" size="sm" className="gap-2 border-border/50 hover:bg-primary/10 hover:border-primary/50" asChild>
+                      <a href={getSelectedTool()!.signupUrl} target="_blank" rel="noopener noreferrer">
                         Get API Key
                         <ExternalLink className="h-3.5 w-3.5" />
                       </a>
@@ -416,18 +354,12 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                 {/* API Key Input Section */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label
-                      htmlFor="api-key"
-                      className="text-sm font-semibold flex items-center gap-2"
-                    >
+                    <Label htmlFor="api-key" className="text-sm font-semibold flex items-center gap-2">
                       <Key className="h-3.5 w-3.5 text-muted-foreground" />
                       API Key
                     </Label>
                     {tempApiKey && (
-                      <Badge
-                        variant="outline"
-                        className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400"
-                      >
+                      <Badge variant="outline" className="text-xs border-green-500/30 bg-green-500/5 text-green-600 dark:text-green-400">
                         <Check className="mr-1 h-3 w-3" />
                         Configured
                       </Badge>
@@ -439,31 +371,17 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                       type={showKey ? 'text' : 'password'}
                       placeholder={getSelectedTool()!.apiKeyPlaceholder}
                       value={tempApiKey}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setTempApiKey(e.target.value)
-                      }
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempApiKey(e.target.value)}
                       className="pr-10 bg-background/50 border-border/50 font-mono text-sm focus:border-primary/50"
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1 h-7 w-7 p-0 hover:bg-transparent"
-                      onClick={() => setShowKey(!showKey)}
-                    >
-                      {showKey ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                      )}
+                    <Button type="button" variant="ghost" size="sm" className="absolute right-1 top-1 h-7 w-7 p-0 hover:bg-transparent" onClick={() => setShowKey(!showKey)}>
+                      {showKey ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                     </Button>
                   </div>
                   {getSelectedTool()!.helpText && (
                     <div className="flex gap-2 rounded-md bg-yellow-500/5 border border-yellow-500/20 p-2.5">
                       <Info className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-500 mt-0.5 shrink-0" />
-                      <p className="text-xs text-yellow-700 dark:text-yellow-400">
-                        {getSelectedTool()!.helpText}
-                      </p>
+                      <p className="text-xs text-yellow-700 dark:text-yellow-400">{getSelectedTool()!.helpText}</p>
                     </div>
                   )}
                 </div>
@@ -471,10 +389,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                 {/* Additional Config Fields */}
                 {getSelectedTool()!.configFields?.map(field => (
                   <div key={field.name} className="space-y-3">
-                    <Label
-                      htmlFor={field.name}
-                      className="text-sm font-semibold flex items-center gap-2"
-                    >
+                    <Label htmlFor={field.name} className="text-sm font-semibold flex items-center gap-2">
                       <Settings className="h-3.5 w-3.5 text-muted-foreground" />
                       {field.label}
                     </Label>
@@ -500,8 +415,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   <div className="flex gap-3">
                     <Shield className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Your API key will be encrypted and stored securely. It will only be used by
-                      your agents to make API calls on your behalf.
+                      Your API key will be encrypted and stored securely. It will only be used by your agents to make API calls on your behalf.
                     </p>
                   </div>
                 </div>
@@ -510,13 +424,7 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
               <DialogFooter className="flex items-center justify-between sm:justify-between">
                 <div>
                   {apiKeys[selectedTool] && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={deleteApiKey}
-                      disabled={deleting}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-500/10"
-                    >
+                    <Button variant="ghost" size="sm" onClick={deleteApiKey} disabled={deleting} className="text-red-600 hover:text-red-700 hover:bg-red-500/10">
                       {deleting ? (
                         <span className="flex items-center gap-2">
                           <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -532,19 +440,10 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={closeModal}
-                    disabled={deleting}
-                    className="border-border/50"
-                  >
+                  <Button variant="outline" onClick={closeModal} disabled={deleting} className="border-border/50">
                     Cancel
                   </Button>
-                  <Button
-                    onClick={saveApiKey}
-                    disabled={!tempApiKey || deleting}
-                    className="bg-primary hover:bg-primary/90"
-                  >
+                  <Button onClick={saveApiKey} disabled={!tempApiKey || deleting} className="bg-primary hover:bg-primary/90">
                     {deleting ? (
                       <span className="flex items-center gap-2">
                         <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />

@@ -19,10 +19,7 @@ interface DebouncedFunction<T extends any[]> {
  * Creates a debounced version of a function that delays execution until after
  * the specified delay has passed since the last invocation
  */
-export function debounce<T extends any[]>(
-  func: (...args: T) => Promise<any>,
-  delay: number
-): DebouncedFunction<T> {
+export function debounce<T extends any[]>(func: (...args: T) => Promise<any>, delay: number): DebouncedFunction<T> {
   let timeoutId: NodeJS.Timeout | null = null;
   let latestArgs: T;
   let latestResolve: (value: any) => void;
@@ -286,11 +283,7 @@ export class BatchProcessor<T, R> {
   private batchDelay: number;
   private processor: (items: T[]) => Promise<R[]>;
 
-  constructor(
-    processor: (items: T[]) => Promise<R[]>,
-    maxBatchSize: number = 10,
-    batchDelay: number = 100
-  ) {
+  constructor(processor: (items: T[]) => Promise<R[]>, maxBatchSize: number = 10, batchDelay: number = 100) {
     this.processor = processor;
     this.maxBatchSize = maxBatchSize;
     this.batchDelay = batchDelay;

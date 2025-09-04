@@ -83,16 +83,12 @@ export const CACHE_KEYS = {
   TEMPLATES_SEARCH: (query: string) => `templates:search:${query}`,
   TEMPLATE_BY_ID: (id: string) => `template:${id}`,
   // NEW: Connector Instance cache keys
-  CONNECTOR_INSTANCES_BY_STARSHIP: (starshipId: string) =>
-    `connector-instances:starship:${starshipId}`,
+  CONNECTOR_INSTANCES_BY_STARSHIP: (starshipId: string) => `connector-instances:starship:${starshipId}`,
 }
 
 // Helper function to invalidate related caches when agents are modified
 export const invalidateAgentCaches = (agentId?: string) => {
-  console.log(
-    '[CACHE] Invalidating agent caches',
-    agentId ? `for agent ${agentId}` : 'for all agents'
-  )
+  console.log('[CACHE] Invalidating agent caches', agentId ? `for agent ${agentId}` : 'for all agents')
 
   if (agentId) {
     apiCache.invalidate(CACHE_KEYS.AGENT_BY_ID(agentId))
@@ -131,10 +127,7 @@ export const invalidateTemplateCaches = (templateId?: string) => {
 
 // NEW: Helper function to invalidate connector instance caches
 export const invalidateConnectorInstanceCaches = (starshipId?: string) => {
-  console.log(
-    '[CACHE] Invalidating connector instance caches',
-    starshipId ? `for starship ${starshipId}` : 'for all instances'
-  )
+  console.log('[CACHE] Invalidating connector instance caches', starshipId ? `for starship ${starshipId}` : 'for all instances')
 
   if (starshipId) {
     apiCache.invalidate(CACHE_KEYS.CONNECTOR_INSTANCES_BY_STARSHIP(starshipId))
@@ -142,9 +135,7 @@ export const invalidateConnectorInstanceCaches = (starshipId?: string) => {
   } else {
     // Invalidate all starship-specific connector instance caches
     apiCache.invalidatePattern('^connector-instances:starship:')
-    console.log(
-      '[CACHE] Invalidated all starship connector instance caches with pattern: ^connector-instances:starship:'
-    )
+    console.log('[CACHE] Invalidated all starship connector instance caches with pattern: ^connector-instances:starship:')
   }
 
   // Log remaining cache keys for debugging

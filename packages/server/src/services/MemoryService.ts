@@ -47,10 +47,7 @@ export class MemoryService {
   /**
    * Create a new memory
    */
-  async createMemory(
-    request: CreateMemoryRequest,
-    options: MemoryServiceOptions = {}
-  ): Promise<MemoryModel> {
+  async createMemory(request: CreateMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel> {
     console.log('🧠 [MEMORY-SERVICE] Creating memory:', {
       hasInitialMessages: !!(request.initialMessages && request.initialMessages.length > 0),
       timestamp: new Date().toISOString(),
@@ -81,10 +78,7 @@ export class MemoryService {
   /**
    * Create a new agent memory
    */
-  async createAgentMemory(
-    request: CreateAgentMemoryRequest,
-    options: MemoryServiceOptions = {}
-  ): Promise<MemoryModel> {
+  async createAgentMemory(request: CreateAgentMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel> {
     console.log('🤖 [MEMORY-SERVICE] Creating agent memory:', {
       hasIdentity: !!request.identity,
       hasPurpose: !!request.purpose,
@@ -121,10 +115,7 @@ export class MemoryService {
   /**
    * Get memory by ID
    */
-  async getMemory(
-    memoryId: string,
-    options: MemoryServiceOptions = {}
-  ): Promise<MemoryModel | null> {
+  async getMemory(memoryId: string, options: MemoryServiceOptions = {}): Promise<MemoryModel | null> {
     const memory = await this.memoryRepository.findById(memoryId);
 
     if (!memory) {
@@ -142,21 +133,14 @@ export class MemoryService {
   /**
    * Update memory
    */
-  async updateMemory(
-    memoryId: string,
-    updates: UpdateMemoryRequest,
-    options: MemoryServiceOptions = {}
-  ): Promise<MemoryModel | null> {
+  async updateMemory(memoryId: string, updates: UpdateMemoryRequest, options: MemoryServiceOptions = {}): Promise<MemoryModel | null> {
     console.log('✏️ [MEMORY-SERVICE] Updating memory:', {
       memoryId,
       updates: Object.keys(updates),
       timestamp: new Date().toISOString(),
     });
 
-    const updatedMemory = await this.memoryRepository.update(
-      memoryId,
-      updates as Partial<MemoryModel>
-    );
+    const updatedMemory = await this.memoryRepository.update(memoryId, updates as Partial<MemoryModel>);
 
     if (updatedMemory) {
       console.log('✅ [MEMORY-SERVICE] Memory updated:', memoryId);
@@ -308,11 +292,7 @@ export class MemoryService {
   /**
    * Get memories by filters
    */
-  async getMemoriesByFilters(
-    filters: MemoryFilters,
-    limit?: number,
-    offset?: number
-  ): Promise<MemoryModel[]> {
+  async getMemoriesByFilters(filters: MemoryFilters, limit?: number, offset?: number): Promise<MemoryModel[]> {
     console.log('🎯 [MEMORY-SERVICE] Getting memories by filters:', {
       filters,
       limit,
@@ -368,9 +348,7 @@ export class MemoryService {
     });
 
     // Get memories based on filters
-    const memories = filters
-      ? await this.memoryRepository.findWithFilters(filters)
-      : await this.memoryRepository.findAll();
+    const memories = filters ? await this.memoryRepository.findWithFilters(filters) : await this.memoryRepository.findAll();
 
     if (memories.length === 0) {
       return {
@@ -418,11 +396,7 @@ export class MemoryService {
   /**
    * Get memories by starship
    */
-  async getMemoriesByStarship(
-    starshipId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<MemoryModel[]> {
+  async getMemoriesByStarship(starshipId: string, limit?: number, offset?: number): Promise<MemoryModel[]> {
     const memories = await this.memoryRepository.findByStarshipId(starshipId);
 
     if (limit) {
@@ -435,11 +409,7 @@ export class MemoryService {
   /**
    * Get memories by agent
    */
-  async getMemoriesByAgent(
-    agentId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<MemoryModel[]> {
+  async getMemoriesByAgent(agentId: string, limit?: number, offset?: number): Promise<MemoryModel[]> {
     const memories = await this.memoryRepository.findByAgentId(agentId);
 
     if (limit) {
@@ -485,17 +455,11 @@ export class MemoryService {
     // Get source memory
     const sourceMemory = await this.memoryRepository.findById(sourceMemoryId);
     if (!sourceMemory) {
-      throw new NotFoundError(
-        `Source memory ${sourceMemoryId} not found`,
-        'Memory',
-        sourceMemoryId
-      );
+      throw new NotFoundError(`Source memory ${sourceMemoryId} not found`, 'Memory', sourceMemoryId);
     }
 
     // Create cloned memory
-    const sourceMessages = options.includeMessages
-      ? (sourceMemory.state as any).messages || []
-      : [];
+    const sourceMessages = options.includeMessages ? (sourceMemory.state as any).messages || [] : [];
     const clonedMemory = await this.memoryRepository.create({
       state: {
         ...sourceMemory.state,
@@ -535,25 +499,15 @@ export class MemoryService {
     // Get all memories
     const targetMemory = await this.memoryRepository.findById(targetMemoryId);
     if (!targetMemory) {
-      throw new NotFoundError(
-        `Target memory ${targetMemoryId} not found`,
-        'Memory',
-        targetMemoryId
-      );
+      throw new NotFoundError(`Target memory ${targetMemoryId} not found`, 'Memory', targetMemoryId);
     }
 
-    const sourceMemories = await Promise.all(
-      sourceMemoryIds.map((id) => this.memoryRepository.findById(id))
-    );
+    const sourceMemories = await Promise.all(sourceMemoryIds.map((id) => this.memoryRepository.findById(id)));
 
     // Check for missing source memories
     const missingMemories = sourceMemoryIds.filter((id, index) => !sourceMemories[index]);
     if (missingMemories.length > 0) {
-      throw new NotFoundError(
-        `Source memories not found: ${missingMemories.join(', ')}`,
-        'Memory',
-        missingMemories[0]
-      );
+      throw new NotFoundError(`Source memories not found: ${missingMemories.join(', ')}`, 'Memory', missingMemories[0]);
     }
 
     // Merge messages and metadata

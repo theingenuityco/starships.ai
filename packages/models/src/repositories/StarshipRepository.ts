@@ -14,16 +14,12 @@ export class StarshipRepository extends BaseRepository {
   /** Validate UUID format */
   private validateUUID(id: string, fieldName: string): void {
     if (!id || typeof id !== 'string') {
-      this.handleValidationError([
-        { field: fieldName, message: `${fieldName} is required and must be a string` },
-      ]);
+      this.handleValidationError([{ field: fieldName, message: `${fieldName} is required and must be a string` }]);
     }
 
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(id)) {
-      this.handleValidationError([
-        { field: fieldName, message: `${fieldName} must be a valid UUID format` },
-      ]);
+      this.handleValidationError([{ field: fieldName, message: `${fieldName} must be a valid UUID format` }]);
     }
   }
 
@@ -31,9 +27,7 @@ export class StarshipRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ s: StarshipModel }>(
-          'MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC'
-        );
+        const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
         return result.map((record) => record.s);
       },
       'findAll',
@@ -47,10 +41,7 @@ export class StarshipRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ s: StarshipModel }>(
-          'MATCH (s:Starship) WHERE s.id = $id RETURN s',
-          { id }
-        );
+        const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id });
         return result[0]?.s || null;
       },
       'findById',
@@ -95,10 +86,7 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<
-      StarshipModel,
-      'id' | 'createdAt' | 'maxAgents' | 'maxActiveMissions' | 'updatedAt' | 'slug'
-    > & { slug?: string }
+    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'maxActiveMissions' | 'updatedAt' | 'slug'> & { slug?: string }
   ): Promise<StarshipModel> {
     this.validateRequired(entity, ['name', 'ownerId', 'class'], 'create');
 
@@ -110,8 +98,7 @@ export class StarshipRepository extends BaseRepository {
         const maxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
 
         // Set maxActiveMissions based on class (Scout: 3, Cruiser: 6, Draught: 10)
-        const maxActiveMissions =
-          entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 6 : 10;
+        const maxActiveMissions = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 6 : 10;
 
         // Generate unique slug if not provided
         const slug = entity.slug || (await this.generateUniqueSlug(entity.name, entity.ownerId));
@@ -127,11 +114,7 @@ export class StarshipRepository extends BaseRepository {
         };
 
         // Use Neo4j auto-generated ID
-        const starship = await this.createEntityWithAutoId<StarshipModel>(
-          'Starship',
-          starshipProps,
-          this.connection
-        );
+        const starship = await this.createEntityWithAutoId<StarshipModel>('Starship', starshipProps, this.connection);
 
         // Create relationship with owner
         await connection.executeWrite(
@@ -439,10 +422,7 @@ export class StarshipRepository extends BaseRepository {
   /** Check if a Stripe webhook event has already been processed */
   async isEventProcessed(eventId: string): Promise<boolean> {
     const connection = this.connection;
-    const result = await connection.executeQuery(
-      'MATCH (e:StripeEvent {eventId: $eventId}) RETURN e LIMIT 1',
-      { eventId }
-    );
+    const result = await connection.executeQuery('MATCH (e:StripeEvent {eventId: $eventId}) RETURN e LIMIT 1', { eventId });
     return result.length > 0;
   }
 

@@ -14,9 +14,7 @@ export default function GlobalError() {
             fontFamily: 'system-ui, -apple-system, sans-serif',
           }}
         >
-          <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '16px' }}>
-            Something went wrong!
-          </h2>
+          <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '16px' }}>Something went wrong!</h2>
           <button
             onClick={() => {
               // Clear all caches and reload

@@ -93,13 +93,7 @@ class DiscordThreadManager {
       // Check permissions
       const botMember = guild.members.me;
       const permissions = channel.permissionsFor(botMember);
-      const requiredPermissions = [
-        'ViewChannel',
-        'SendMessages',
-        'CreatePrivateThreads',
-        'SendMessagesInThreads',
-        'ManageThreads',
-      ];
+      const requiredPermissions = ['ViewChannel', 'SendMessages', 'CreatePrivateThreads', 'SendMessagesInThreads', 'ManageThreads'];
 
       const missingPermissions = requiredPermissions.filter((perm) => !permissions.has(perm));
       if (missingPermissions.length > 0) {
@@ -109,10 +103,7 @@ class DiscordThreadManager {
       console.log('✓ Discord configuration validated successfully');
     } catch (error) {
       console.error('Discord configuration validation failed:', error.message);
-      console.error(
-        'Available guilds:',
-        this.client.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', ')
-      );
+      console.error('Available guilds:', this.client.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', '));
       throw new Error(`Discord configuration invalid: ${error.message}`);
     }
   }
@@ -126,13 +117,8 @@ class DiscordThreadManager {
         console.log(`Found guild: ${guild.name} (${guild.id})`);
       } catch (error) {
         console.error(`Failed to fetch guild ${this.guildId}: ${error.message}`);
-        console.error(
-          'Available guilds:',
-          this.client.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', ')
-        );
-        throw new Error(
-          `Bot is not in guild ${this.guildId} or guild ID is invalid. Please check DISCORD_GUILD_ID secret.`
-        );
+        console.error('Available guilds:', this.client.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', '));
+        throw new Error(`Bot is not in guild ${this.guildId} or guild ID is invalid. Please check DISCORD_GUILD_ID secret.`);
       }
 
       // Validate and fetch channel
@@ -142,9 +128,7 @@ class DiscordThreadManager {
         console.log(`Found channel: ${channel.name} (${channel.id})`);
       } catch (error) {
         console.error(`Failed to fetch channel ${this.channelId}: ${error.message}`);
-        throw new Error(
-          `Channel ${this.channelId} not found in guild. Please check DISCORD_CHANNEL_ID secret.`
-        );
+        throw new Error(`Channel ${this.channelId} not found in guild. Please check DISCORD_CHANNEL_ID secret.`);
       }
 
       if (!channel || channel.type !== ChannelType.GuildText) {
@@ -333,9 +317,7 @@ class DiscordThreadManager {
       try {
         guild = await this.client.guilds.fetch(this.guildId);
       } catch (error) {
-        console.error(
-          `Cannot find threads - guild ${this.guildId} not accessible: ${error.message}`
-        );
+        console.error(`Cannot find threads - guild ${this.guildId} not accessible: ${error.message}`);
         return null;
       }
 

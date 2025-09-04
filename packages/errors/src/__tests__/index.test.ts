@@ -42,15 +42,7 @@ describe('BaseError', () => {
   it('should create error with optional properties', () => {
     class TestError extends BaseError {
       constructor() {
-        super(
-          'Test message',
-          'VALIDATION_ERROR',
-          400,
-          ErrorCategory.VALIDATION,
-          { extra: 'data' },
-          'req-123',
-          '/api/test'
-        );
+        super('Test message', 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION, { extra: 'data' }, 'req-123', '/api/test');
       }
     }
 
@@ -64,15 +56,7 @@ describe('BaseError', () => {
   it('should convert to response format', () => {
     class TestError extends BaseError {
       constructor() {
-        super(
-          'Test message',
-          'VALIDATION_ERROR',
-          400,
-          ErrorCategory.VALIDATION,
-          { extra: 'data' },
-          'req-123',
-          '/api/test'
-        );
+        super('Test message', 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION, { extra: 'data' }, 'req-123', '/api/test');
       }
     }
 
@@ -128,13 +112,7 @@ describe('ValidationError', () => {
   });
 
   it('should create with all parameters', () => {
-    const error = new ValidationError(
-      'Invalid email',
-      'email',
-      { pattern: 'email' },
-      'req-123',
-      '/api/users'
-    );
+    const error = new ValidationError('Invalid email', 'email', { pattern: 'email' }, 'req-123', '/api/users');
 
     expect(error.field).toBe('email');
     expect(error.details).toEqual({ pattern: 'email' });
@@ -205,12 +183,7 @@ describe('AuthenticationError', () => {
   });
 
   it('should create with all parameters', () => {
-    const error = new AuthenticationError(
-      'Token expired',
-      { token: 'jwt-token' },
-      'req-123',
-      '/api/protected'
-    );
+    const error = new AuthenticationError('Token expired', { token: 'jwt-token' }, 'req-123', '/api/protected');
 
     expect(error.message).toBe('Token expired');
     expect(error.details).toEqual({ token: 'jwt-token' });
@@ -241,14 +214,7 @@ describe('AuthorizationError', () => {
   });
 
   it('should create with all parameters', () => {
-    const error = new AuthorizationError(
-      'Admin access required',
-      'admin',
-      'user',
-      { resource: 'users' },
-      'req-123',
-      '/api/admin/users'
-    );
+    const error = new AuthorizationError('Admin access required', 'admin', 'user', { resource: 'users' }, 'req-123', '/api/admin/users');
 
     expect(error.details).toEqual({ resource: 'users' });
     expect(error.requestId).toBe('req-123');
@@ -502,11 +468,7 @@ describe('ErrorUtils', () => {
     });
 
     it('should normalize not found errors', () => {
-      const error = (global as any).createMockGenericError(
-        'NotFoundError',
-        'Resource not found',
-        404
-      );
+      const error = (global as any).createMockGenericError('NotFoundError', 'Resource not found', 404);
 
       const normalized = ErrorUtils.normalize(error);
 
@@ -515,11 +477,7 @@ describe('ErrorUtils', () => {
     });
 
     it('should normalize conflict errors', () => {
-      const error = (global as any).createMockGenericError(
-        'ConflictError',
-        'Conflict occurred',
-        409
-      );
+      const error = (global as any).createMockGenericError('ConflictError', 'Conflict occurred', 409);
 
       const normalized = ErrorUtils.normalize(error);
 
@@ -537,10 +495,7 @@ describe('ErrorUtils', () => {
     });
 
     it('should normalize network errors', () => {
-      const error = (global as any).createMockNetworkLikeError(
-        'ECONNREFUSED',
-        'Connection refused'
-      );
+      const error = (global as any).createMockNetworkLikeError('ECONNREFUSED', 'Connection refused');
 
       const normalized = ErrorUtils.normalize(error);
 
@@ -549,11 +504,7 @@ describe('ErrorUtils', () => {
     });
 
     it('should normalize rate limit errors', () => {
-      const error = (global as any).createMockGenericError(
-        'TooManyRequestsError',
-        'Too many requests',
-        429
-      );
+      const error = (global as any).createMockGenericError('TooManyRequestsError', 'Too many requests', 429);
       error.limit = 100;
       error.retryAfter = 60;
 
@@ -600,13 +551,7 @@ describe('ErrorUtils', () => {
 
   describe('extractLogDetails', () => {
     it('should extract log details from error', () => {
-      const error = new ValidationError(
-        'Test error',
-        'email',
-        { extra: 'data' },
-        'req-123',
-        '/api/test'
-      );
+      const error = new ValidationError('Test error', 'email', { extra: 'data' }, 'req-123', '/api/test');
 
       const details = ErrorUtils.extractLogDetails(error);
 

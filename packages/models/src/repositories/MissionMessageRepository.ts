@@ -13,11 +13,7 @@ export class MissionMessageRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         // Validate required fields
-        this.validateRequired(
-          message,
-          ['missionId', 'role', 'content', 'timestamp'],
-          'saveMessage'
-        );
+        this.validateRequired(message, ['missionId', 'role', 'content', 'timestamp'], 'saveMessage');
 
         // Validate field types
         this.validateTypes(
@@ -59,20 +55,16 @@ export class MissionMessageRepository extends BaseRepository {
         const connection = getConnection();
 
         // Check if mission exists
-        const missionCheck = await connection.executeQuery<{ id: string }>(
-          'MATCH (m:Mission {id: $missionId}) RETURN m.id as id',
-          { missionId: message.missionId }
-        );
+        const missionCheck = await connection.executeQuery<{ id: string }>('MATCH (m:Mission {id: $missionId}) RETURN m.id as id', {
+          missionId: message.missionId,
+        });
 
         if (!missionCheck || missionCheck.length === 0) {
           this.handleNotFound('Mission', message.missionId, 'saveMessage');
         }
 
         // Create message with auto-generated ID
-        const createdMessage = await this.createEntityWithAutoId<MissionMessageModel>(
-          'MissionMessageModel',
-          message
-        );
+        const createdMessage = await this.createEntityWithAutoId<MissionMessageModel>('MissionMessageModel', message);
 
         // Create relationships
         if (message.role === 'user' && message.userId) {
@@ -98,11 +90,7 @@ export class MissionMessageRepository extends BaseRepository {
     );
   }
 
-  async getMessagesByMission(
-    missionId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<MissionMessageModel[]> {
+  async getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         this.validateRequired({ missionId }, ['missionId'], 'getMessagesByMission');
@@ -232,10 +220,9 @@ export class MissionMessageRepository extends BaseRepository {
         const connection = getConnection();
 
         // Check if mission exists
-        const missionCheck = await connection.executeQuery<{ id: string }>(
-          'MATCH (m:Mission {id: $missionId}) RETURN m.id as id',
-          { missionId }
-        );
+        const missionCheck = await connection.executeQuery<{ id: string }>('MATCH (m:Mission {id: $missionId}) RETURN m.id as id', {
+          missionId,
+        });
 
         if (!missionCheck || missionCheck.length === 0) {
           this.handleNotFound('Mission', missionId, 'deleteMessagesByMission');
@@ -271,10 +258,7 @@ export class MissionMessageRepository extends BaseRepository {
         }
 
         // Delete the message
-        await connection.executeWrite(
-          'MATCH (msg:MissionMessageModel {id: $messageId}) DETACH DELETE msg',
-          { messageId }
-        );
+        await connection.executeWrite('MATCH (msg:MissionMessageModel {id: $messageId}) DETACH DELETE msg', { messageId });
 
         return true;
       },

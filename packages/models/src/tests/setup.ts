@@ -2,13 +2,7 @@
  * Jest setup file for models package tests
  */
 
-import {
-  BaseError,
-  ValidationError,
-  NotFoundError,
-  DatabaseError,
-  ConflictError,
-} from '@starships/errors';
+import { BaseError, ValidationError, NotFoundError, DatabaseError, ConflictError } from '@starships/errors';
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -138,14 +132,12 @@ const mockDriver = {
 });
 
 // Error creation helpers
-(global as any).createValidationError = (message = 'Validation failed', field = 'testField') =>
-  new ValidationError(message, field);
+(global as any).createValidationError = (message = 'Validation failed', field = 'testField') => new ValidationError(message, field);
 
 (global as any).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') =>
   new NotFoundError(`${entityType} not found`, entityType, entityId);
 
-(global as any).createDatabaseError = (message = 'Database operation failed', operation = 'test') =>
-  new DatabaseError(message, operation);
+(global as any).createDatabaseError = (message = 'Database operation failed', operation = 'test') => new DatabaseError(message, operation);
 
 (global as any).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') =>
   new ConflictError(message, conflictType);

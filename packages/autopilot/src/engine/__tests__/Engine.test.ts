@@ -93,9 +93,7 @@ describe('Engine', () => {
         parameters: {},
       };
 
-      await expect(engine.createHandler(unsupportedNode)).rejects.toThrow(
-        'No handler available for node type: unsupported_type'
-      );
+      await expect(engine.createHandler(unsupportedNode)).rejects.toThrow('No handler available for node type: unsupported_type');
     });
   });
 

@@ -8,16 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Clock,
-  RefreshCw,
-  Activity,
-  Key,
-  Minus,
-} from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Clock, RefreshCw, Activity, Key, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConnectorStatusDashboardProps {
@@ -26,11 +17,7 @@ interface ConnectorStatusDashboardProps {
   compact?: boolean
 }
 
-export function ConnectorStatusDashboard({
-  connectorInstances,
-  className,
-  compact = false,
-}: ConnectorStatusDashboardProps) {
+export function ConnectorStatusDashboard({ connectorInstances, className, compact = false }: ConnectorStatusDashboardProps) {
   const [healthMetrics, setHealthMetrics] = useState<Map<string, ConnectorHealthMetrics>>(new Map())
   const [apiKeyStatus, setApiKeyStatus] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -144,13 +131,7 @@ export function ConnectorStatusDashboard({
             <Activity className="w-4 h-4" />
             Connector Status
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="h-7 px-2"
-          >
+          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing} className="h-7 px-2">
             <RefreshCw className={cn('w-3 h-3', isRefreshing && 'animate-spin')} />
           </Button>
         </div>
@@ -205,10 +186,7 @@ export function ConnectorStatusDashboard({
             }
 
             return (
-              <div
-                key={connector.id}
-                className="flex items-center justify-between p-2 rounded border bg-card/50"
-              >
+              <div key={connector.id} className="flex items-center justify-between p-2 rounded border bg-card/50">
                 <div className="flex items-center gap-2">
                   <div
                     className={cn(
@@ -229,9 +207,7 @@ export function ConnectorStatusDashboard({
                           <div className="flex items-center">{getApiKeyIcon()}</div>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <div className="text-xs whitespace-pre-line max-w-xs">
-                            {ConnectorApiKeyStatus.getTooltipContent(keyStatusInfo)}
-                          </div>
+                          <div className="text-xs whitespace-pre-line max-w-xs">{ConnectorApiKeyStatus.getTooltipContent(keyStatusInfo)}</div>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
@@ -239,15 +215,7 @@ export function ConnectorStatusDashboard({
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge
-                    variant={
-                      metrics.healthStatus === 'healthy'
-                        ? 'default'
-                        : metrics.healthStatus === 'warning'
-                          ? 'secondary'
-                          : metrics.healthStatus === 'critical'
-                            ? 'destructive'
-                            : 'outline'
-                    }
+                    variant={metrics.healthStatus === 'healthy' ? 'default' : metrics.healthStatus === 'warning' ? 'secondary' : metrics.healthStatus === 'critical' ? 'destructive' : 'outline'}
                     className="text-xs"
                   >
                     {metrics.healthStatus}
@@ -256,35 +224,19 @@ export function ConnectorStatusDashboard({
                   {/* API Key Status Badge */}
                   {keyStatusInfo && keyStatusInfo.status !== 'not_required' && (
                     <Badge
-                      variant={
-                        keyStatusInfo.status === 'configured'
-                          ? 'default'
-                          : keyStatusInfo.status === 'missing'
-                            ? 'secondary'
-                            : 'destructive'
-                      }
+                      variant={keyStatusInfo.status === 'configured' ? 'default' : keyStatusInfo.status === 'missing' ? 'secondary' : 'destructive'}
                       className={cn(
                         'text-xs',
-                        keyStatusInfo.status === 'configured' &&
-                          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-                        keyStatusInfo.status === 'missing' &&
-                          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                        keyStatusInfo.status === 'configured' && 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+                        keyStatusInfo.status === 'missing' && 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                       )}
                     >
-                      🔑{' '}
-                      {keyStatusInfo.status === 'configured'
-                        ? 'Configured'
-                        : keyStatusInfo.status === 'missing'
-                          ? 'Missing'
-                          : 'Invalid'}
+                      🔑 {keyStatusInfo.status === 'configured' ? 'Configured' : keyStatusInfo.status === 'missing' ? 'Missing' : 'Invalid'}
                     </Badge>
                   )}
 
                   {connector.errorMessage && (
-                    <span
-                      className="text-xs text-red-500 max-w-32 truncate"
-                      title={connector.errorMessage}
-                    >
+                    <span className="text-xs text-red-500 max-w-32 truncate" title={connector.errorMessage}>
                       {connector.errorMessage}
                     </span>
                   )}

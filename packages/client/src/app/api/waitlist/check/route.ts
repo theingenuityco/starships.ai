@@ -33,9 +33,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data)
   } catch (error) {
     console.error('Waitlist check error:', error)
-    return NextResponse.json(
-      { isApproved: false, message: 'Service temporarily unavailable' },
-      { status: 500 }
-    )
+    return NextResponse.json({ isApproved: false, message: 'Service temporarily unavailable' }, { status: 500 })
   }
 }

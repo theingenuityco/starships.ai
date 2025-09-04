@@ -13,17 +13,7 @@ interface KeyboardNavigationOptions {
 }
 
 export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
-  const {
-    onEscape,
-    onEnter,
-    onArrowUp,
-    onArrowDown,
-    onArrowLeft,
-    onArrowRight,
-    onTab,
-    isEnabled = true,
-    trapFocus = false,
-  } = options
+  const { onEscape, onEnter, onArrowUp, onArrowDown, onArrowLeft, onArrowRight, onTab, isEnabled = true, trapFocus = false } = options
 
   const containerRef = useRef<HTMLElement>(null)
   const focusableElementsRef = useRef<HTMLElement[]>([])
@@ -43,13 +33,9 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
       '[role="link"]:not([disabled])',
     ].join(', ')
 
-    const elements = Array.from(
-      containerRef.current.querySelectorAll(focusableSelectors)
-    ) as HTMLElement[]
+    const elements = Array.from(containerRef.current.querySelectorAll(focusableSelectors)) as HTMLElement[]
 
-    focusableElementsRef.current = elements.filter(
-      el => !el.hasAttribute('aria-hidden') && el.offsetParent !== null
-    )
+    focusableElementsRef.current = elements.filter(el => !el.hasAttribute('aria-hidden') && el.offsetParent !== null)
   }, [])
 
   // Focus management utilities
@@ -110,15 +96,7 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
       if (!isEnabled) return
 
       // Prevent default for navigation keys to avoid page scrolling
-      const navigationKeys = [
-        'ArrowUp',
-        'ArrowDown',
-        'ArrowLeft',
-        'ArrowRight',
-        'Tab',
-        'Enter',
-        'Escape',
-      ]
+      const navigationKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter', 'Escape']
       if (navigationKeys.includes(event.key)) {
         // Allow default Tab behavior unless we're handling it
         if (event.key !== 'Tab' || onTab || trapFocus) {
@@ -199,21 +177,7 @@ export function useKeyboardNavigation(options: KeyboardNavigationOptions = {}) {
           break
       }
     },
-    [
-      isEnabled,
-      onEscape,
-      onEnter,
-      onArrowUp,
-      onArrowDown,
-      onArrowLeft,
-      onArrowRight,
-      onTab,
-      trapFocus,
-      focusFirst,
-      focusLast,
-      focusNext,
-      focusPrevious,
-    ]
+    [isEnabled, onEscape, onEnter, onArrowUp, onArrowDown, onArrowLeft, onArrowRight, onTab, trapFocus, focusFirst, focusLast, focusNext, focusPrevious]
   )
 
   // Set up event listeners

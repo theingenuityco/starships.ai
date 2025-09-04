@@ -16,12 +16,7 @@ interface LogoutButtonProps {
  * Logout button that signs out the user via JWT auth
  * Integrates with existing UI components and theme
  */
-export function LogoutButton({
-  variant = 'ghost',
-  size = 'default',
-  className,
-  children,
-}: LogoutButtonProps) {
+export function LogoutButton({ variant = 'ghost', size = 'default', className, children }: LogoutButtonProps) {
   const { logout } = useAuth()
 
   const handleLogout = async () => {
@@ -31,12 +26,7 @@ export function LogoutButton({
   }
 
   return (
-    <Button
-      variant={variant}
-      size={size}
-      className={cn('flex items-center gap-2', className)}
-      onClick={handleLogout}
-    >
+    <Button variant={variant} size={size} className={cn('flex items-center gap-2', className)} onClick={handleLogout}>
       <LogOut className="h-4 w-4" />
       {children || 'Sign Out'}
     </Button>

@@ -85,18 +85,13 @@ describe('MessageRepository', () => {
 
   describe('findAll', () => {
     it('should return all messages ordered by timestamp', async () => {
-      const mockMessages = [
-        createMockMessage({ id: 'message-1' }),
-        createMockMessage({ id: 'message-2' }),
-      ];
+      const mockMessages = [createMockMessage({ id: 'message-1' }), createMockMessage({ id: 'message-2' })];
       mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
 
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.timestamp DESC')
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp DESC'));
     });
 
     it('should return empty array when no messages found', async () => {
@@ -125,10 +120,7 @@ describe('MessageRepository', () => {
         id: 'message-123',
         content: 'Hello, world!',
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.id = $id'),
-        { id: 'message-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id = $id'), { id: 'message-123' });
     });
 
     it('should return null when message not found', async () => {
@@ -154,10 +146,9 @@ describe('MessageRepository', () => {
       const result = await repository.findByStarshipId('starship-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.starshipId = $starshipId'),
-        { starshipId: 'starship-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.starshipId = $starshipId'), {
+        starshipId: 'starship-123',
+      });
     });
   });
 
@@ -169,10 +160,9 @@ describe('MessageRepository', () => {
       const result = await repository.findByAgentId('agent-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.agentId = $agentId'),
-        { agentId: 'agent-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.agentId = $agentId'), {
+        agentId: 'agent-123',
+      });
     });
   });
 
@@ -184,10 +174,9 @@ describe('MessageRepository', () => {
       const result = await repository.findByMemoryId('memory-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.timestamp ASC'),
-        { memoryId: 'memory-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp ASC'), {
+        memoryId: 'memory-123',
+      });
     });
   });
 
@@ -199,10 +188,9 @@ describe('MessageRepository', () => {
       const result = await repository.findByConversationId('conversation-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.conversationId = $conversationId'),
-        { conversationId: 'conversation-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.conversationId = $conversationId'), {
+        conversationId: 'conversation-123',
+      });
     });
 
     it('should return conversation messages with pagination', async () => {
@@ -231,10 +219,7 @@ describe('MessageRepository', () => {
       const result = await repository.findByRole('assistant');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.role = $role'),
-        { role: 'assistant' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.role = $role'), { role: 'assistant' });
     });
 
     it('should filter by role and starship', async () => {
@@ -244,10 +229,10 @@ describe('MessageRepository', () => {
       const result = await repository.findByRole('user', 'starship-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND m.starshipId = $starshipId'),
-        { role: 'user', starshipId: 'starship-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('AND m.starshipId = $starshipId'), {
+        role: 'user',
+        starshipId: 'starship-123',
+      });
     });
   });
 
@@ -411,9 +396,7 @@ describe('MessageRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.update('message-123', { content: 'New' })).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.update('message-123', { content: 'New' })).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -424,10 +407,7 @@ describe('MessageRepository', () => {
       const result = await repository.delete('message-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE m'),
-        { id: 'message-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE m'), { id: 'message-123' });
     });
 
     it('should return false when message not found', async () => {
@@ -517,10 +497,9 @@ describe('MessageRepository', () => {
       const result = await repository.searchMessages('search term');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.content CONTAINS $query'),
-        { query: 'search term' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.content CONTAINS $query'), {
+        query: 'search term',
+      });
     });
 
     it('should apply all filters', async () => {
@@ -559,10 +538,7 @@ describe('MessageRepository', () => {
 
       await repository.searchMessages('test');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('LIMIT 100'),
-        { query: 'test' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('LIMIT 100'), { query: 'test' });
     });
   });
 
@@ -574,10 +550,9 @@ describe('MessageRepository', () => {
       const result = await repository.getConversationMessages('conversation-123');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.timestamp ASC'),
-        { conversationId: 'conversation-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp ASC'), {
+        conversationId: 'conversation-123',
+      });
     });
 
     it('should respect custom ordering parameters', async () => {
@@ -585,10 +560,9 @@ describe('MessageRepository', () => {
 
       await repository.getConversationMessages('conversation-123', 'created_at', 'desc');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.createdAt DESC'),
-        { conversationId: 'conversation-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.createdAt DESC'), {
+        conversationId: 'conversation-123',
+      });
     });
   });
 
@@ -604,10 +578,7 @@ describe('MessageRepository', () => {
         failed: 0,
         errors: [],
       });
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.id IN $messageIds'),
-        { messageIds }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id IN $messageIds'), { messageIds });
     });
 
     it('should handle partial deletion', async () => {
@@ -760,10 +731,7 @@ describe('MessageRepository', () => {
 
       expect(deserialized.metadata).toBeUndefined();
       expect(deserialized.processingMetadata).toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to deserialize message'),
-        expect.any(Error)
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to deserialize message'), expect.any(Error));
 
       consoleSpy.mockRestore();
     });
@@ -823,9 +791,7 @@ describe('MessageRepository', () => {
         createMockMessage({ id: `msg-${i}`, parentMessageId: i > 0 ? `msg-${i - 1}` : undefined })
       );
 
-      jest
-        .spyOn(repository, 'findById')
-        .mockImplementation(async (id) => deepParentChain.find((m) => m.id === id) || null);
+      jest.spyOn(repository, 'findById').mockImplementation(async (id) => deepParentChain.find((m) => m.id === id) || null);
 
       mockConnection.executeQuery.mockResolvedValue([]);
 

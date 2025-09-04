@@ -6,14 +6,7 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import {
-  Execution,
-  NodeResult,
-  ValidationResult,
-  ConditionalNodeParameters,
-  ValidationError,
-  ValidationWarning,
-} from '@/types';
+import { Execution, NodeResult, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '@/types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
@@ -55,10 +48,7 @@ export class ConditionalHandler extends BaseHandler {
       execution.executionResults.set(this.node.ref, nodeResult);
       return execution;
     } catch (error) {
-      return this.createErrorResult(
-        execution,
-        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      return this.createErrorResult(execution, `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -67,15 +57,11 @@ export class ConditionalHandler extends BaseHandler {
     const params = this.node.parameters as ConditionalNodeParameters;
 
     if (!params.sourceNodeId) {
-      errors.push(
-        this.createValidationError('MISSING_REQUIRED_FIELD', 'Source node ID is required')
-      );
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Source node ID is required'));
     }
 
     if (!params.conditions || Object.keys(params.conditions).length === 0) {
-      errors.push(
-        this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one condition is required')
-      );
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one condition is required'));
     }
 
     // Validate JSONata expressions

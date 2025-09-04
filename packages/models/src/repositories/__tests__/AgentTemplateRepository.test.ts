@@ -117,10 +117,7 @@ describe('AgentTemplateRepository', () => {
 
   describe('findAll', () => {
     it('should return all agent templates', async () => {
-      const mockRawTemplates = [
-        createMockRawTemplate(),
-        createMockRawTemplate({ id: 'template-456' }),
-      ];
+      const mockRawTemplates = [createMockRawTemplate(), createMockRawTemplate({ id: 'template-456' })];
       mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.findAll();
@@ -138,9 +135,7 @@ describe('AgentTemplateRepository', () => {
           }),
         })
       );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (t:AgentTemplate)')
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (t:AgentTemplate)'));
     });
 
     it('should return empty array when no templates found', async () => {
@@ -177,10 +172,9 @@ describe('AgentTemplateRepository', () => {
           }),
         })
       );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'),
-        { id: 'template-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'), {
+        id: 'template-123',
+      });
     });
 
     it('should return null when template not found', async () => {
@@ -332,10 +326,9 @@ describe('AgentTemplateRepository', () => {
       );
 
       // Verify executeQuery was called (indicating findById path was taken)
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'),
-        { id: 'template-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'), {
+        id: 'template-123',
+      });
     });
 
     it('should validate id parameter', async () => {
@@ -379,10 +372,7 @@ describe('AgentTemplateRepository', () => {
       const result = await repository.delete('template-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE t'),
-        { id: 'template-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE t'), { id: 'template-123' });
     });
 
     it('should return false when template not found', async () => {
@@ -400,10 +390,7 @@ describe('AgentTemplateRepository', () => {
 
   describe('findByAuthor', () => {
     it('should return templates by author', async () => {
-      const mockRawTemplates = [
-        createMockRawTemplate(),
-        createMockRawTemplate({ id: 'template-456' }),
-      ];
+      const mockRawTemplates = [createMockRawTemplate(), createMockRawTemplate({ id: 'template-456' })];
       mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
 
       const result = await repository.findByAuthor('user-123');
@@ -419,10 +406,9 @@ describe('AgentTemplateRepository', () => {
           }),
         })
       );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (t:AgentTemplate {authorId: $authorId})'),
-        { authorId: 'user-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (t:AgentTemplate {authorId: $authorId})'), {
+        authorId: 'user-123',
+      });
     });
 
     it('should validate authorId parameter', async () => {
@@ -448,10 +434,7 @@ describe('AgentTemplateRepository', () => {
           }),
         })
       );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE t.isPublic = true'),
-        { category: 'general' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE t.isPublic = true'), { category: 'general' });
     });
 
     it('should validate category parameter', async () => {
@@ -477,10 +460,9 @@ describe('AgentTemplateRepository', () => {
           }),
         })
       );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ANY(tag IN $tags WHERE tag IN t.tags)'),
-        { tags: ['ai', 'assistant'] }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ANY(tag IN $tags WHERE tag IN t.tags)'), {
+        tags: ['ai', 'assistant'],
+      });
     });
 
     it('should validate tags parameter', async () => {
@@ -562,10 +544,9 @@ describe('AgentTemplateRepository', () => {
           }),
         })
       );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('toLower(t.name) CONTAINS toLower($query)'),
-        { query: 'assistant' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('toLower(t.name) CONTAINS toLower($query)'), {
+        query: 'assistant',
+      });
     });
 
     it('should validate query parameter', async () => {
@@ -618,9 +599,7 @@ describe('AgentTemplateRepository', () => {
       await expect(repository.updateRating('', 4.5)).rejects.toThrow(ValidationError);
       await expect(repository.updateRating('template-123', 6)).rejects.toThrow(ValidationError);
       await expect(repository.updateRating('template-123', -1)).rejects.toThrow(ValidationError);
-      await expect(repository.updateRating('template-123', 'invalid' as any)).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.updateRating('template-123', 'invalid' as any)).rejects.toThrow(ValidationError);
     });
   });
 
@@ -639,16 +618,9 @@ describe('AgentTemplateRepository', () => {
       jest.spyOn(repository, 'findById').mockResolvedValue(mockTemplate);
       jest.spyOn(repository, 'incrementUsageCount').mockResolvedValue();
       // Fix: createEntityWithAutoId expects result[0].n, not result[0].a
-      mockConnection.executeWrite
-        .mockResolvedValueOnce([{ n: mockAgent }])
-        .mockResolvedValueOnce([]); // For the relationship creation
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockAgent }]).mockResolvedValueOnce([]); // For the relationship creation
 
-      const result = await repository.createAgentFromTemplate(
-        'template-123',
-        'Test Agent',
-        'user-123',
-        'starship-123'
-      );
+      const result = await repository.createAgentFromTemplate('template-123', 'Test Agent', 'user-123', 'starship-123');
 
       expect(result).toMatchObject({
         name: 'Test Agent',
@@ -660,9 +632,9 @@ describe('AgentTemplateRepository', () => {
     it('should throw error when template not found', async () => {
       jest.spyOn(repository, 'findById').mockResolvedValue(null);
 
-      await expect(
-        repository.createAgentFromTemplate('non-existent', 'Agent', 'user-123', 'starship-123')
-      ).rejects.toThrow('Template with id non-existent not found');
+      await expect(repository.createAgentFromTemplate('non-existent', 'Agent', 'user-123', 'starship-123')).rejects.toThrow(
+        'Template with id non-existent not found'
+      );
     });
   });
 
@@ -695,10 +667,9 @@ describe('AgentTemplateRepository', () => {
           nodes: expect.any(Array),
         }),
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE a.isPublic = true'),
-        { agentId: 'agent-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE a.isPublic = true'), {
+        agentId: 'agent-123',
+      });
     });
 
     it('should return null when agent not found or not public', async () => {

@@ -4,13 +4,7 @@ const baseConfig = require('../../jest.preset.js');
 module.exports = {
   ...baseConfig,
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/**/index.ts',
-    '!src/scripts/**/*.ts',
-    '!src/migrations/**/*.ts',
-  ],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/**/index.ts', '!src/scripts/**/*.ts', '!src/migrations/**/*.ts'],
   coverageThreshold: {
     global: {
       branches: 70,

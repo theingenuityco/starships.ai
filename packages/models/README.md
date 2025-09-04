@@ -16,13 +16,7 @@ This package provides:
 ## Quick Start
 
 ```typescript
-import {
-  StarshipRepository,
-  AgentRepository,
-  UserRepository,
-  createConnection,
-  Neo4jConfig,
-} from '@starships/models';
+import { StarshipRepository, AgentRepository, UserRepository, createConnection, Neo4jConfig } from '@starships/models';
 
 // 1. Initialize database connection
 const config: Neo4jConfig = {
@@ -49,16 +43,12 @@ const starships = await starshipRepo.findAll();
 - **Missions**: Task execution contexts with phases and messaging
 
 ### Direct Repository Usage
+
 Direct repository instantiation for clean and simple data access:
 
 ```typescript
 // Import and instantiate repositories directly
-import {
-  StarshipRepository,
-  AgentRepository,
-  MissionRepository,
-  UserRepository,
-} from '@starships/models';
+import { StarshipRepository, AgentRepository, MissionRepository, UserRepository } from '@starships/models';
 
 const starshipRepo = new StarshipRepository();
 const agentRepo = new AgentRepository();
@@ -255,9 +245,7 @@ logger.info('Starship operation completed', {
 });
 
 // Performance monitoring
-const result = await PerformanceMonitor.measure('starship-creation', () =>
-  starshipRepo.create(starshipData)
-);
+const result = await PerformanceMonitor.measure('starship-creation', () => starshipRepo.create(starshipData));
 ```
 
 ## Environment Configuration

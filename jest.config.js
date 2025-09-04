@@ -1,7 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  
+
   // Handle multiple projects at once
   projects: [
     {
@@ -10,7 +10,7 @@ module.exports = {
       setupFilesAfterEnv: ['<rootDir>/packages/autopilot/src/tests/setup.ts'],
     },
     {
-      displayName: 'errors', 
+      displayName: 'errors',
       testMatch: ['<rootDir>/packages/errors/src/**/__tests__/**/*.test.ts'],
       setupFilesAfterEnv: ['<rootDir>/packages/errors/src/__tests__/setup.ts'],
     },
@@ -33,7 +33,7 @@ module.exports = {
     '!packages/*/src/**/index.ts',
     '!packages/*/src/scripts/**/*.ts',
   ],
-  
+
   testTimeout: 10000,
   clearMocks: true,
 };

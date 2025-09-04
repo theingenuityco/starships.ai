@@ -5,12 +5,7 @@
  * using direct LLM integration with mission context awareness.
  */
 
-import {
-  MissionRepository,
-  AgentRepository,
-  StarshipRepository,
-  MissionClarityRepository,
-} from '@starships/models';
+import { MissionRepository, AgentRepository, StarshipRepository, MissionClarityRepository } from '@starships/models';
 import { Logger } from '@/utils/logger';
 import { MissionEventService } from '@/services/MissionEventService';
 import { MissionService } from '@/services/MissionService';
@@ -19,12 +14,7 @@ import { MissionPromptBuilder } from '@/prompts/MissionPromptBuilder';
 import { MISSION_PHASES } from '@starships/protocol';
 import { Workflow, AgentMemory, LLM } from '@starships/autopilot';
 import type { LlmNodeParameters } from '@starships/autopilot';
-import type {
-  MissionModel,
-  MissionPhase,
-  MissionClarityModel,
-  CreateMissionClarityRequest,
-} from '@starships/protocol';
+import type { MissionModel, MissionPhase, MissionClarityModel, CreateMissionClarityRequest } from '@starships/protocol';
 import type { BlueprintModel } from '@starships/protocol';
 import type { StarshipModel } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
@@ -211,19 +201,12 @@ export class MissionOrchestratorAgent {
   /**
    * Build initial state for processing
    */
-  private async buildInitialState(
-    missionId: string,
-    message: string,
-    isSystemInitiated: boolean = false
-  ): Promise<MissionChatState> {
+  private async buildInitialState(missionId: string, message: string, isSystemInitiated: boolean = false): Promise<MissionChatState> {
     // Load mission metadata
     const metadata = await this.loadMissionMetadata(missionId);
 
     // Load existing blueprint and clarity
-    const [blueprint, clarity] = await Promise.all([
-      MissionService.getWorkflowByMissionId(missionId),
-      this.getClarityFromDB(missionId),
-    ]);
+    const [blueprint, clarity] = await Promise.all([MissionService.getWorkflowByMissionId(missionId), this.getClarityFromDB(missionId)]);
 
     // Create message object
     const messageObj: SimpleMessage = {
@@ -339,11 +322,7 @@ export class MissionOrchestratorAgent {
         if (recentMessage && recentMessage.content && typeof recentMessage.content === 'string') {
           const intent = await this.classifyWorkflowApprovalIntent(recentMessage.content, state);
           const taskCount = blueprint.nodes.filter((n: any) => n.type === 'agent').length;
-          const approvalResult = await this.processWorkflowApprovalIntent(
-            intent,
-            recentMessage.content,
-            taskCount
-          );
+          const approvalResult = await this.processWorkflowApprovalIntent(intent, recentMessage.content, taskCount);
 
           if (approvalResult.shouldUpdate && approvalResult.newStatus) {
             await MissionService.updateMission(metadata.mission.id, {
@@ -523,10 +502,7 @@ export class MissionOrchestratorAgent {
   /**
    * Generate blueprint using AI
    */
-  private async generateBlueprint(
-    missionId: string,
-    state: MissionChatState
-  ): Promise<BlueprintModel> {
+  private async generateBlueprint(missionId: string, state: MissionChatState): Promise<BlueprintModel> {
     const agents = await this.getAssignedAgents(missionId);
     const prompt = new MissionPromptBuilder(state).buildWorkflowGenerationPrompt(agents);
     const aiResponse = await this.callLLM(prompt.messages[0].content);
@@ -676,10 +652,7 @@ export class MissionOrchestratorAgent {
   /**
    * AI clarity assessment using LLM
    */
-  private async assessMissionClarity(
-    state: MissionChatState,
-    iteration: number
-  ): Promise<CreateMissionClarityRequest> {
+  private async assessMissionClarity(state: MissionChatState, iteration: number): Promise<CreateMissionClarityRequest> {
     const systemPrompt = new MissionPromptBuilder(state).buildClarityAssessmentPrompt();
 
     const response = await this.callLLM(systemPrompt);
@@ -704,9 +677,7 @@ export class MissionOrchestratorAgent {
     _clarity: MissionClarityModel,
     isFirstIteration: boolean = false
   ): Promise<string> {
-    const systemPrompt = new MissionPromptBuilder(state).buildClarityQuestionPrompt(
-      isFirstIteration
-    );
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityQuestionPrompt(isFirstIteration);
 
     return await this.callLLM(systemPrompt);
   }
@@ -719,9 +690,7 @@ export class MissionOrchestratorAgent {
     _clarity: MissionClarityModel,
     isFirstIteration: boolean = false
   ): Promise<string> {
-    const systemPrompt = new MissionPromptBuilder(state).buildClarityCompletionPrompt(
-      isFirstIteration
-    );
+    const systemPrompt = new MissionPromptBuilder(state).buildClarityCompletionPrompt(isFirstIteration);
 
     return await this.callLLM(systemPrompt);
   }
@@ -771,14 +740,7 @@ export class MissionOrchestratorAgent {
    * Validate clarity assessment structure
    */
   private validateClarity(clarity: any): void {
-    const requiredFields = [
-      'objectiveClarity',
-      'successMetrics',
-      'timelineDefinition',
-      'scopeBoundaries',
-      'visionAlignment',
-      'reasoning',
-    ];
+    const requiredFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'visionAlignment', 'reasoning'];
     const errors: string[] = [];
 
     for (const field of requiredFields) {
@@ -807,10 +769,7 @@ export class MissionOrchestratorAgent {
   /**
    * Classify user intent regarding workflow approval
    */
-  private async classifyWorkflowApprovalIntent(
-    message: string,
-    state: MissionChatState
-  ): Promise<WorkflowApprovalIntent> {
+  private async classifyWorkflowApprovalIntent(message: string, state: MissionChatState): Promise<WorkflowApprovalIntent> {
     try {
       const promptBuilder = new MissionPromptBuilder(state);
       const prompt = promptBuilder.buildWorkflowApprovalIntentPrompt(message);
@@ -899,15 +858,11 @@ export class MissionOrchestratorAgent {
 
       const parsed = JSON.parse(jsonStr);
 
-      if (
-        !parsed.intent ||
-        !['approve', 'reject', 'discussion', 'unclear'].includes(parsed.intent)
-      ) {
+      if (!parsed.intent || !['approve', 'reject', 'discussion', 'unclear'].includes(parsed.intent)) {
         throw new Error('Invalid intent value');
       }
 
-      const confidence =
-        typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : 0.0;
+      const confidence = typeof parsed.confidence === 'number' ? Math.max(0, Math.min(1, parsed.confidence)) : 0.0;
 
       return {
         intent: parsed.intent,

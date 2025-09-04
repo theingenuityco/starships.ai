@@ -38,11 +38,7 @@ export class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): Partial<State> {
     return {
       hasError: true,
-      error: ErrorRecoveryManager.enhanceError(
-        error,
-        ErrorRecoveryManager.createContext('render', 'ErrorBoundary'),
-        []
-      ),
+      error: ErrorRecoveryManager.enhanceError(error, ErrorRecoveryManager.createContext('render', 'ErrorBoundary'), []),
     }
   }
 
@@ -118,9 +114,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       const error = this.state.error
       const canRetry = this.state.retryCount < this.maxRetries
-      const userMessage = error
-        ? ErrorRecoveryManager.getUserFriendlyMessage(error)
-        : 'Something went wrong'
+      const userMessage = error ? ErrorRecoveryManager.getUserFriendlyMessage(error) : 'Something went wrong'
       const guidance = error ? ErrorRecoveryManager.getRecoveryGuidance(error) : ''
 
       return (
@@ -147,10 +141,7 @@ export class ErrorBoundary extends Component<Props, State> {
                     {error.category}
                   </Badge>
                   {error.severity && (
-                    <Badge
-                      variant={error.severity === 'critical' ? 'destructive' : 'secondary'}
-                      className="text-xs"
-                    >
+                    <Badge variant={error.severity === 'critical' ? 'destructive' : 'secondary'} className="text-xs">
                       {error.severity}
                     </Badge>
                   )}
@@ -159,9 +150,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
               {this.props.showDetails && error && (
                 <details className="rounded-lg border bg-muted/20 p-3">
-                  <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
-                    Technical Details
-                  </summary>
+                  <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">Technical Details</summary>
                   <div className="mt-2 space-y-2 text-xs">
                     <div>
                       <strong>Error:</strong> {error.message}
@@ -203,22 +192,13 @@ export class ErrorBoundary extends Component<Props, State> {
                 <Button onClick={this.handleReset} variant="ghost" size="sm" className="flex-1">
                   Reset Component
                 </Button>
-                <Button
-                  onClick={this.handleReportIssue}
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1"
-                >
+                <Button onClick={this.handleReportIssue} variant="ghost" size="sm" className="flex-1">
                   <Bug className="mr-2 h-4 w-4" />
                   Report Issue
                 </Button>
               </div>
 
-              {!canRetry && (
-                <p className="text-xs text-muted-foreground text-center">
-                  Maximum retry attempts reached. Please reload the page or contact support.
-                </p>
-              )}
+              {!canRetry && <p className="text-xs text-muted-foreground text-center">Maximum retry attempts reached. Please reload the page or contact support.</p>}
             </CardFooter>
           </Card>
         </div>
@@ -232,10 +212,7 @@ export class ErrorBoundary extends Component<Props, State> {
 /**
  * Higher-order component for wrapping components with error boundary
  */
-export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
-  errorBoundaryProps?: Omit<Props, 'children'>
-) {
+export function withErrorBoundary<P extends object>(Component: React.ComponentType<P>, errorBoundaryProps?: Omit<Props, 'children'>) {
   const WrappedComponent = (props: P) => (
     <ErrorBoundary {...errorBoundaryProps}>
       <Component {...props} />
@@ -254,10 +231,7 @@ export function useErrorHandler() {
   const [error, setError] = React.useState<EnhancedError | null>(null)
 
   const handleError = React.useCallback((error: Error, context?: string) => {
-    const enhanced = ErrorRecoveryManager.enhanceError(
-      error,
-      ErrorRecoveryManager.createContext('hook', context || 'useErrorHandler')
-    )
+    const enhanced = ErrorRecoveryManager.enhanceError(error, ErrorRecoveryManager.createContext('hook', context || 'useErrorHandler'))
 
     ErrorRecoveryManager.logError(enhanced)
     setError(enhanced)

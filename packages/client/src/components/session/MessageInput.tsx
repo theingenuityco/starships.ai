@@ -78,11 +78,7 @@ export function MessageInput({ onSendMessage, disabled = false }: MessageInputPr
         className="h-11 w-11 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
         title={sending ? CHAT_TEXT.SENDING_MESSAGE : 'Send message'}
       >
-        {sending ? (
-          <div className="h-4 w-4 bg-white/50 rounded-full"></div>
-        ) : (
-          <Send className="h-4 w-4" />
-        )}
+        {sending ? <div className="h-4 w-4 bg-white/50 rounded-full"></div> : <Send className="h-4 w-4" />}
       </Button>
     </div>
   )

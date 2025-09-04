@@ -13,12 +13,10 @@ const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
   start: () => import('@/nodes/handlers/StartHandler').then((m) => m.StartHandler),
   end: () => import('@/nodes/handlers/EndHandler').then((m) => m.EndHandler),
   agent: () => import('@/nodes/handlers/AgentHandler').then((m) => m.AgentHandler),
-  conditional: () =>
-    import('@/nodes/handlers/ConditionalHandler').then((m) => m.ConditionalHandler),
+  conditional: () => import('@/nodes/handlers/ConditionalHandler').then((m) => m.ConditionalHandler),
   user_prompt: () => import('@/nodes/handlers/PromptHandler').then((m) => m.PromptHandler),
   output: () => import('@/nodes/handlers/OutputHandler').then((m) => m.OutputHandler),
-  http_request: () =>
-    import('@/nodes/handlers/HttpRequestHandler').then((m) => m.HttpRequestHandler),
+  http_request: () => import('@/nodes/handlers/HttpRequestHandler').then((m) => m.HttpRequestHandler),
   llm: () => import('@/nodes/handlers/LlmHandler').then((m) => m.LlmHandler),
   workflow: () => import('@/nodes/handlers/WorkflowHandler').then((m) => m.WorkflowHandler),
 };
@@ -244,11 +242,7 @@ export class Engine {
   /**
    * Find the next node based on current node and edge condition
    */
-  private getNextNode(
-    blueprint: Blueprint,
-    currentNode: WorkflowNode,
-    edgeCondition?: string
-  ): WorkflowNode | null {
+  private getNextNode(blueprint: Blueprint, currentNode: WorkflowNode, edgeCondition?: string): WorkflowNode | null {
     // Find edges from current node
     const outgoingEdges = blueprint.edges.filter((edge) => edge.from === currentNode.ref);
 
@@ -343,11 +337,7 @@ export class Engine {
    * Cancel workflow execution
    */
   cancel(): boolean {
-    if (
-      !this.execution ||
-      this.execution.status === 'completed' ||
-      this.execution.status === 'failed'
-    ) {
+    if (!this.execution || this.execution.status === 'completed' || this.execution.status === 'failed') {
       return false;
     }
 

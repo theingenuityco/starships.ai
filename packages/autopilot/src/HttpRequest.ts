@@ -147,10 +147,7 @@ export class HttpRequest {
   /**
    * Add authentication to request configuration
    */
-  private addAuthentication(
-    config: AxiosRequestConfig,
-    auth: HttpRequestNodeParameters['authentication']
-  ) {
+  private addAuthentication(config: AxiosRequestConfig, auth: HttpRequestNodeParameters['authentication']) {
     if (!auth || !config.headers) return;
 
     switch (auth.type) {

@@ -14,9 +14,7 @@ interface UserProfileProps {
  * User profile component for navigation bottom
  * Shows user name and email with logout functionality via tooltip
  */
-export const UserProfile = React.memo(function UserProfile({
-  mode = 'expanded',
-}: UserProfileProps) {
+export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }: UserProfileProps) {
   const { user, userName, userEmail, isAuthenticated } = useAuth()
   const [showTooltip, setShowTooltip] = useState(false)
 
@@ -47,11 +45,7 @@ export const UserProfile = React.memo(function UserProfile({
           <div className="p-3">
             {/* Action buttons only */}
             <div className="space-y-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start h-9 hover:bg-accent"
-              >
+              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
                 <User className="w-4 h-4 mr-3" />
                 My Profile
               </Button>
@@ -95,11 +89,7 @@ export const UserProfile = React.memo(function UserProfile({
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent
-        side="right"
-        className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground"
-        sideOffset={10}
-      >
+      <TooltipContent side="right" className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground" sideOffset={10}>
         <div className="p-3">
           {/* Action buttons only */}
           <div className="space-y-1">

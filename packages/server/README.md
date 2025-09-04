@@ -496,19 +496,6 @@ GET /health/detailed
 }
 ```
 
-#### Redeploy Webhook
-```http
-POST /redeploy
-Authorization: Bearer <webhook-secret>
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Redeployment triggered"
-}
-```
 
 ## 🔧 Configuration
 
@@ -552,7 +539,6 @@ NOTION_API_KEY=your_notion_key
 BRAVE_SEARCH_API_KEY=your_brave_key
 
 # Security & Encryption
-WEBHOOK_SECRET=your_webhook_secret
 ENCRYPTION_KEY=your_32_byte_encryption_key
 
 # Socket.IO Configuration
@@ -579,7 +565,6 @@ interface ServerConfig {
     max: number;
   };
   security: {
-    webhookSecret: string;
     apiKey?: string;
   };
 }

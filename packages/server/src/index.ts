@@ -26,7 +26,6 @@ import sessionRoutes from './routes/sessions';
 import memoryRoutes from './routes/memory';
 import userRoutes from './routes/users';
 import starshipRoutes, { initializeStarshipRoutes } from './routes/starships';
-import redeployRoutes from './routes/redeploy';
 import agentTemplateRoutes from './routes/agent-templates';
 // import expeditionRoutes from './routes/expeditions';
 import missionRoutes from './routes/missions';
@@ -124,7 +123,6 @@ app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', missionRoutes); // Updated to OpenAPI standard with v1 prefix
 // app.use('/api', expeditionRoutes);
-app.use('/api', redeployRoutes);
 app.use('/api', nativeApiKeysRoutes);
 
 // Add 404 handler for unmatched routes

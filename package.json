@@ -56,6 +56,16 @@
       "prismjs": ">=1.30.0",
       "form-data": ">=4.0.4",
       "@eslint/plugin-kit@<0.3.4": ">=0.3.4"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@tailwindcss/oxide",
+      "bcrypt",
+      "cpu-features",
+      "esbuild",
+      "protobufjs",
+      "sharp",
+      "ssh2",
+      "unrs-resolver"
+    ]
   }
 }

@@ -1,19 +1,52 @@
-'use client';
+'use client'
 
-import { KindeProvider } from "@kinde-oss/kinde-auth-nextjs";
+import type { AuthUser } from '@/hooks/useAuth'
+import { useAuth } from '@/hooks/useAuth'
+import React, { createContext, useContext } from 'react'
+
+interface AuthContextValue {
+  user: AuthUser | null | undefined
+  syncedUser: any
+  isAuthenticated: boolean
+  isLoading: boolean
+  error: string | null
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>
+  register: (
+    email: string,
+    password: string,
+    name?: string
+  ) => Promise<{ success: boolean; error?: string }>
+  logout: () => Promise<void>
+  getToken: () => string | null
+  userId?: string
+  userEmail?: string
+  userName?: string
+  userAvatar?: string
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null)
 
 interface AuthProviderProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 /**
- * Authentication provider that wraps the app with Kinde auth context
+ * Authentication provider that wraps the app with JWT auth context
  * This should be placed high in the component tree to provide auth state to all components
  */
 export function AuthProvider({ children }: AuthProviderProps) {
-  return (
-    <KindeProvider>
-      {children}
-    </KindeProvider>
-  );
-} 
+  const auth = useAuth()
+
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>
+}
+
+/**
+ * Hook to use auth context
+ */
+export function useAuthContext() {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuthContext must be used within AuthProvider')
+  }
+  return context
+}

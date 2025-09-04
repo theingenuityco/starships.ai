@@ -1,28 +1,28 @@
-'use client';
+'use client'
 
-import { NavigationItem } from './NavigationItem';
-import { motion } from 'motion/react';
-import { ChevronRight } from 'lucide-react';
+import { NavigationItem } from './NavigationItem'
+import { motion } from 'motion/react'
+import { ChevronRight } from 'lucide-react'
 
 interface NavigationSectionProps {
-  title: string;
+  title: string
   items: Array<{
-    href: string;
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-  }>;
-  pathname: string;
-  compact?: boolean;
+    href: string
+    label: string
+    icon: React.ComponentType<{ className?: string }>
+  }>
+  pathname: string
+  compact?: boolean
 }
 
-export function NavigationSection({ 
-  title, 
-  items, 
-  pathname, 
-  compact = false 
+export function NavigationSection({
+  title,
+  items,
+  pathname,
+  compact = false,
 }: NavigationSectionProps) {
   return (
-    <motion.div 
+    <motion.div
       className="space-y-2"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -42,14 +42,10 @@ export function NavigationSection({
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.2, delay: index * 0.05 }}
           >
-            <NavigationItem
-              {...item}
-              isActive={pathname === item.href}
-              compact={compact}
-            />
+            <NavigationItem {...item} isActive={pathname === item.href} compact={compact} />
           </motion.div>
         ))}
       </div>
     </motion.div>
-  );
+  )
 }

@@ -23,27 +23,27 @@ const APPROVED_EMAILS = [
 export async function seedWaitlist(): Promise<void> {
   try {
     logger.info('Starting waitlist seeding...');
-    
+
     // Get the existing connection that was initialized by the server
     const connection = getConnection();
-    
+
     // Create the waitlist repository
     const waitlistRepo = new WaitlistRepository(connection);
-    
+
     // Initialize schema using the repository's method
     await waitlistRepo.initializeSchema();
-    
+
     logger.info('Seeding waitlist with approved emails...');
-    
+
     let addedCount = 0;
     let existingCount = 0;
     let errorCount = 0;
-    
+
     for (const { email, notes } of APPROVED_EMAILS) {
       try {
         // Check if email already exists
         const existing = await waitlistRepo.getByEmail(email);
-        
+
         if (existing) {
           existingCount++;
           logger.debug(`Waitlist: Email already exists: ${email} (status: ${existing.status})`);
@@ -55,27 +55,32 @@ export async function seedWaitlist(): Promise<void> {
         }
       } catch (error) {
         errorCount++;
-        logger.warn(`Waitlist: Error processing ${email}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        logger.warn(
+          `Waitlist: Error processing ${email}: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
-    
-    logger.info(`✅ Waitlist seeding completed: ${addedCount} new, ${existingCount} existing, ${errorCount} errors`);
-    
+
+    logger.info(
+      `✅ Waitlist seeding completed: ${addedCount} new, ${existingCount} existing, ${errorCount} errors`
+    );
+
     // Log current approved count
     try {
       const approvedCount = await waitlistRepo.getApprovedCount();
       logger.info(`Total approved waitlist emails: ${approvedCount}`);
     } catch (error) {
-      logger.warn('Could not get approved count', { 
-        error: { message: error instanceof Error ? error.message : 'Unknown error' }
+      logger.warn('Could not get approved count', {
+        error: { message: error instanceof Error ? error.message : 'Unknown error' },
       });
     }
-    
   } catch (error) {
-    logger.error(`Failed to seed waitlist: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(
+      `Failed to seed waitlist: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
     if (error instanceof Error) {
-      logger.error('Waitlist seeding error details', { 
-        stack: error.stack || 'No stack trace available' 
+      logger.error('Waitlist seeding error details', {
+        stack: error.stack || 'No stack trace available',
       });
     }
     // Don't throw - we don't want to prevent server startup if waitlist seeding fails

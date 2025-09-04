@@ -6,11 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type {
-  Execution,
-  NodeResult,
-  ExecutionStatus
-} from '@starships/autopilot';
+import type { Execution, NodeResult, ExecutionStatus } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE EXECUTION INTERFACE
@@ -131,10 +127,13 @@ export interface ExecutionAnalytics {
   totalExecutions: number;
   successRate: number;
   averageExecutionTime: number;
-  nodePerformance: Record<string, {
-    executions: number;
-    successRate: number;
-    averageTime: number;
-  }>;
+  nodePerformance: Record<
+    string,
+    {
+      executions: number;
+      successRate: number;
+      averageTime: number;
+    }
+  >;
   last30DaysUsage: number;
 }

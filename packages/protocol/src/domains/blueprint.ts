@@ -6,9 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type {
-  Blueprint
-} from '@starships/autopilot';
+import type { Blueprint } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE BLUEPRINT INTERFACE
@@ -23,15 +21,15 @@ export interface BlueprintModel extends Blueprint {
   id: string;
   createdAt?: string;
   updatedAt?: string;
-  
+
   // Template/workflow context fields
   name?: string;
   description?: string;
   category?: string;
-  
+
   // Usage tracking
   usageCount?: number;
-  
+
   // Additional metadata for database storage
   metadata?: Record<string, unknown>;
 }

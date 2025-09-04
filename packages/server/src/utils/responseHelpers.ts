@@ -9,9 +9,8 @@ import type {
   ApiErrorResponse,
   ApiResponseMeta,
   PaginationMeta,
-  StandardErrorCode
+  StandardErrorCode,
 } from '@starships/protocol';
-
 
 /**
  * Send standardized success response
@@ -52,17 +51,13 @@ export function sendError(
 /**
  * Create pagination metadata
  */
-export function createPaginationMeta(
-  page: number,
-  limit: number,
-  total: number
-): ApiResponseMeta {
+export function createPaginationMeta(page: number, limit: number, total: number): ApiResponseMeta {
   return {
     pagination: {
       page,
       limit,
       total,
-      has_next: (page * limit) < total,
+      has_next: page * limit < total,
       has_prev: page > 1,
     },
   };
@@ -71,7 +66,10 @@ export function createPaginationMeta(
 /**
  * Validate pagination parameters
  */
-export function validatePagination(page?: string, limit?: string): {
+export function validatePagination(
+  page?: string,
+  limit?: string
+): {
   page: number;
   limit: number;
   error?: { code: StandardErrorCode; message: string };
@@ -107,9 +105,12 @@ export function validatePagination(page?: string, limit?: string): {
 /**
  * UUID validation helper
  */
-export function validateUUID(id: string, fieldName: string): {
+export function validateUUID(
+  id: string,
+  fieldName: string
+): {
   isValid: boolean;
-  error?: { code: StandardErrorCode; message: string; details?: any }
+  error?: { code: StandardErrorCode; message: string; details?: any };
 } {
   if (!id || typeof id !== 'string') {
     return {
@@ -146,7 +147,13 @@ export function handleCommonError(error: any, res: Response, context: string): b
   // Check if it's already a structured error from @starships/errors
   if (ErrorUtils.isApplicationError(error)) {
     const response = error.toResponse();
-    sendError(res, response.code as StandardErrorCode, response.message, response.statusCode, response.details as Record<string, any> | undefined);
+    sendError(
+      res,
+      response.code as StandardErrorCode,
+      response.message,
+      response.statusCode,
+      response.details as Record<string, any> | undefined
+    );
     return true;
   }
 

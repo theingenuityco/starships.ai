@@ -2,21 +2,30 @@
  * Neo4j Database Connection Unit Tests
  */
 
-import { Neo4jConnection, createConnection, getConnection, resetConnection, Neo4jConfig } from '../connection';
+import {
+  Neo4jConnection,
+  createConnection,
+  getConnection,
+  resetConnection,
+  Neo4jConfig,
+} from '../connection';
 import neo4j, { Driver, Session, ManagedTransaction, Integer } from 'neo4j-driver';
 
 // Mock neo4j-driver
 jest.mock('neo4j-driver', () => {
-  const mockInteger = jest.fn((value: number) => ({ toNumber: () => value, toString: () => value.toString() }));
-  
+  const mockInteger = jest.fn((value: number) => ({
+    toNumber: () => value,
+    toString: () => value.toString(),
+  }));
+
   return {
     driver: jest.fn(),
     auth: {
-      basic: jest.fn()
+      basic: jest.fn(),
     },
     isInt: jest.fn(),
     int: mockInteger,
-    Integer: mockInteger
+    Integer: mockInteger,
   };
 });
 
@@ -25,35 +34,35 @@ describe('Neo4jConnection', () => {
   let mockSession: any;
   let mockTransaction: any;
   let connection: Neo4jConnection;
-  
+
   const testConfig: Neo4jConfig = {
     uri: 'bolt://localhost:7687',
     username: 'neo4j',
     password: 'password',
-    database: 'neo4j'
+    database: 'neo4j',
   };
 
   beforeEach(() => {
     mockTransaction = {
-      run: jest.fn()
+      run: jest.fn(),
     };
 
     mockSession = {
       close: jest.fn(),
       executeRead: jest.fn(),
       executeWrite: jest.fn(),
-      run: jest.fn()
+      run: jest.fn(),
     };
 
     mockDriver = {
       verifyConnectivity: jest.fn(),
       close: jest.fn(),
-      session: jest.fn(() => mockSession)
+      session: jest.fn(() => mockSession),
     };
 
     (neo4j.driver as jest.Mock).mockReturnValue(mockDriver);
     connection = new Neo4jConnection(testConfig);
-    
+
     jest.clearAllMocks();
   });
 
@@ -79,7 +88,7 @@ describe('Neo4jConnection', () => {
           maxConnectionPoolSize: 100,
           connectionAcquisitionTimeout: 10000,
           encrypted: false,
-          trust: 'TRUST_ALL_CERTIFICATES'
+          trust: 'TRUST_ALL_CERTIFICATES',
         })
       );
       expect(mockDriver.verifyConnectivity).toHaveBeenCalled();
@@ -98,22 +107,23 @@ describe('Neo4jConnection', () => {
     it('should handle connection timeout', async () => {
       // Use fake timers to speed up the test
       jest.useFakeTimers();
-      
+
       // Mock verifyConnectivity to never resolve, simulating a timeout scenario
       mockDriver.verifyConnectivity.mockImplementation(
-        () => new Promise(() => {
-          // Never resolves, causing the timeout to trigger
-        })
+        () =>
+          new Promise(() => {
+            // Never resolves, causing the timeout to trigger
+          })
       );
 
       // Start the connection attempt
       const connectPromise = connection.connect();
-      
+
       // Fast-forward time to trigger the timeout
       jest.advanceTimersByTime(5000);
-      
+
       await expect(connectPromise).rejects.toThrow('Neo4j connection timeout');
-      
+
       // Restore real timers
       jest.useRealTimers();
     });
@@ -152,7 +162,7 @@ describe('Neo4jConnection', () => {
       const session = connection.getSession();
 
       expect(mockDriver.session).toHaveBeenCalledWith({
-        database: testConfig.database
+        database: testConfig.database,
       });
       expect(session).toBe(mockSession);
     });
@@ -174,9 +184,9 @@ describe('Neo4jConnection', () => {
       const mockResult = {
         records: [
           {
-            toObject: () => ({ u: { properties: { id: 'user-1', name: 'John' } } })
-          }
-        ]
+            toObject: () => ({ u: { properties: { id: 'user-1', name: 'John' } } }),
+          },
+        ],
       };
 
       mockSession.executeRead.mockImplementation((fn: any) => {
@@ -199,7 +209,9 @@ describe('Neo4jConnection', () => {
       });
       mockTransaction.run.mockResolvedValue(mockResult);
 
-      const result = await connection.executeQuery('MATCH (u:User) WHERE u.id = $id RETURN u', { id: 'nonexistent' });
+      const result = await connection.executeQuery('MATCH (u:User) WHERE u.id = $id RETURN u', {
+        id: 'nonexistent',
+      });
 
       expect(result).toEqual([]);
     });
@@ -209,7 +221,7 @@ describe('Neo4jConnection', () => {
       const parametersWithMap = {
         id: 'user-1',
         metadata: new Map([['key', 'value']]),
-        limit: 10
+        limit: 10,
       };
 
       mockSession.executeRead.mockImplementation((fn: any) => {
@@ -224,7 +236,7 @@ describe('Neo4jConnection', () => {
         expect.objectContaining({
           id: 'user-1',
           metadata: { key: 'value' },
-          limit: expect.any(Object) // Neo4j Integer object
+          limit: expect.any(Object), // Neo4j Integer object
         })
       );
     });
@@ -233,9 +245,7 @@ describe('Neo4jConnection', () => {
       const queryError = new Error('Query failed');
       mockSession.executeRead.mockRejectedValue(queryError);
 
-      await expect(
-        connection.executeQuery('INVALID QUERY')
-      ).rejects.toThrow('Query failed');
+      await expect(connection.executeQuery('INVALID QUERY')).rejects.toThrow('Query failed');
 
       expect(mockSession.close).toHaveBeenCalled();
     });
@@ -247,10 +257,10 @@ describe('Neo4jConnection', () => {
             toObject: () => ({
               count: 5,
               name: 'test',
-              node: { properties: { id: 'node-1' } }
-            })
-          }
-        ]
+              node: { properties: { id: 'node-1' } },
+            }),
+          },
+        ],
       };
 
       mockSession.executeRead.mockImplementation((fn: any) => {
@@ -260,11 +270,13 @@ describe('Neo4jConnection', () => {
 
       const result = await connection.executeQuery('MATCH (n) RETURN count(n) as count');
 
-      expect(result).toEqual([{
-        count: 5,
-        name: 'test',
-        node: { id: 'node-1' }
-      }]);
+      expect(result).toEqual([
+        {
+          count: 5,
+          name: 'test',
+          node: { id: 'node-1' },
+        },
+      ]);
     });
   });
 
@@ -278,9 +290,9 @@ describe('Neo4jConnection', () => {
       const mockResult = {
         records: [
           {
-            toObject: () => ({ u: { properties: { id: 'user-1', name: 'John' } } })
-          }
-        ]
+            toObject: () => ({ u: { properties: { id: 'user-1', name: 'John' } } }),
+          },
+        ],
       };
 
       mockSession.executeWrite.mockImplementation((fn: any) => {
@@ -288,10 +300,9 @@ describe('Neo4jConnection', () => {
       });
       mockTransaction.run.mockResolvedValue(mockResult);
 
-      const result = await connection.executeWrite(
-        'CREATE (u:User $props) RETURN u',
-        { props: { id: 'user-1', name: 'John' } }
-      );
+      const result = await connection.executeWrite('CREATE (u:User $props) RETURN u', {
+        props: { id: 'user-1', name: 'John' },
+      });
 
       expect(mockSession.executeWrite).toHaveBeenCalled();
       expect(mockSession.close).toHaveBeenCalled();
@@ -302,9 +313,9 @@ describe('Neo4jConnection', () => {
       const writeError = new Error('Write failed');
       mockSession.executeWrite.mockRejectedValue(writeError);
 
-      await expect(
-        connection.executeWrite('CREATE (u:User) RETURN u')
-      ).rejects.toThrow('Write failed');
+      await expect(connection.executeWrite('CREATE (u:User) RETURN u')).rejects.toThrow(
+        'Write failed'
+      );
 
       expect(mockSession.close).toHaveBeenCalled();
     });
@@ -375,7 +386,10 @@ describe('Neo4jConnection', () => {
     });
 
     it('should convert Map objects to plain objects', () => {
-      const map = new Map([['key1', 'value1'], ['key2', 'value2']]);
+      const map = new Map([
+        ['key1', 'value1'],
+        ['key2', 'value2'],
+      ]);
       (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
       const result = sanitizeMethod(map);
@@ -384,15 +398,13 @@ describe('Neo4jConnection', () => {
     });
 
     it('should handle nested Map objects', () => {
-      const nestedMap = new Map([
-        ['outer', new Map([['inner', 'value']])]
-      ]);
+      const nestedMap = new Map([['outer', new Map([['inner', 'value']])]]);
       (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
       const result = sanitizeMethod(nestedMap);
 
       expect(result).toEqual({
-        outer: { inner: 'value' }
+        outer: { inner: 'value' },
       }); // Nested Maps are recursively converted
     });
 
@@ -407,7 +419,7 @@ describe('Neo4jConnection', () => {
 
     it('should convert integers to Neo4j integers', () => {
       (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
-      
+
       const result = sanitizeMethod(42);
 
       expect(neo4j.int).toHaveBeenCalledWith(42);
@@ -423,7 +435,7 @@ describe('Neo4jConnection', () => {
       expect(neo4j.int).toHaveBeenCalledWith(10);
       expect(result).toEqual({
         limit: expect.any(Object),
-        other: 'value'
+        other: 'value',
       });
     });
 
@@ -443,7 +455,7 @@ describe('Neo4jConnection', () => {
       const result = sanitizeMethod(circular, 11); // Exceed max depth
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[Neo4j] Maximum sanitization depth reached, returning value as-is:', 
+        '[Neo4j] Maximum sanitization depth reached, returning value as-is:',
         'object'
       );
 
@@ -455,7 +467,7 @@ describe('Neo4jConnection', () => {
         array: [1, 2, new Map([['nested', true]])],
         map: new Map([['key', { inner: 'value' }]]),
         limit: 50,
-        string: 'text'
+        string: 'text',
       };
       (neo4j.isInt as unknown as jest.Mock).mockReturnValue(false);
 
@@ -465,7 +477,7 @@ describe('Neo4jConnection', () => {
         array: [expect.any(Object), expect.any(Object), { nested: true }],
         map: { key: { inner: 'value' } },
         limit: expect.any(Object), // Neo4j Integer
-        string: 'text'
+        string: 'text',
       });
     });
   });
@@ -475,7 +487,7 @@ describe('Connection Factory Functions', () => {
   const testConfig: Neo4jConfig = {
     uri: 'bolt://localhost:7687',
     username: 'neo4j',
-    password: 'password'
+    password: 'password',
   };
 
   beforeEach(() => {
@@ -510,7 +522,7 @@ describe('Connection Factory Functions', () => {
     it('should throw error when no connection exists', () => {
       // Reset the connection instance to simulate no connection
       resetConnection();
-      
+
       expect(() => getConnection()).toThrow(
         'Neo4j connection not initialized. Call createConnection() first.'
       );
@@ -527,7 +539,7 @@ describe('Neo4jConnection Integration Scenarios', () => {
     uri: 'bolt://localhost:7687',
     username: 'neo4j',
     password: 'password',
-    database: 'test'
+    database: 'test',
   };
 
   beforeEach(() => {
@@ -535,13 +547,13 @@ describe('Neo4jConnection Integration Scenarios', () => {
       close: jest.fn(),
       executeRead: jest.fn(),
       executeWrite: jest.fn(),
-      run: jest.fn()
+      run: jest.fn(),
     };
 
     mockDriver = {
       verifyConnectivity: jest.fn(),
       close: jest.fn(),
-      session: jest.fn(() => mockSession)
+      session: jest.fn(() => mockSession),
     };
 
     (neo4j.driver as jest.Mock).mockReturnValue(mockDriver);
@@ -554,19 +566,18 @@ describe('Neo4jConnection Integration Scenarios', () => {
 
     // Mock user creation result
     const createResult = {
-      records: [{
-        toObject: () => ({ u: { properties: { id: 'user-1', email: 'test@example.com' } } })
-      }]
+      records: [
+        {
+          toObject: () => ({ u: { properties: { id: 'user-1', email: 'test@example.com' } } }),
+        },
+      ],
     };
 
-    mockSession.executeWrite.mockImplementation((fn: any) => 
-      Promise.resolve(createResult)
-    );
+    mockSession.executeWrite.mockImplementation((fn: any) => Promise.resolve(createResult));
 
-    const result = await connection.executeWrite(
-      'CREATE (u:User $props) RETURN u',
-      { props: { id: 'user-1', email: 'test@example.com' } }
-    );
+    const result = await connection.executeWrite('CREATE (u:User $props) RETURN u', {
+      props: { id: 'user-1', email: 'test@example.com' },
+    });
 
     expect(result).toEqual([{ u: { id: 'user-1', email: 'test@example.com' } }]);
     expect(mockSession.close).toHaveBeenCalled();
@@ -595,9 +606,7 @@ describe('Neo4jConnection Integration Scenarios', () => {
     const transactionError = new Error('Transaction failed');
     mockSession.executeWrite.mockRejectedValue(transactionError);
 
-    await expect(
-      connection.executeWrite('INVALID QUERY')
-    ).rejects.toThrow('Transaction failed');
+    await expect(connection.executeWrite('INVALID QUERY')).rejects.toThrow('Transaction failed');
 
     // Session should still be closed
     expect(mockSession.close).toHaveBeenCalled();

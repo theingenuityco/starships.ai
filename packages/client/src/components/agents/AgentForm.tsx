@@ -62,10 +62,10 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
   const [loading, setLoading] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({})
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
 
   const validateForm = (): boolean => {
-    const errors: {[key: string]: string} = {}
+    const errors: { [key: string]: string } = {}
 
     if (!formData.name.trim()) {
       errors.name = 'Agent name is required'
@@ -85,7 +85,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
@@ -158,7 +158,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <Input
                   value={formData.name}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setFormData(prev => ({ ...prev, name: e.target.value }))
+                  }
                   placeholder="Agent name"
                   className="border-muted-foreground/20 focus:border-primary"
                   required
@@ -216,9 +218,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <StarshipSelector
                   value={formData.starshipId}
-                  onValueChange={(starshipId) =>
-                    setFormData(prev => ({ ...prev, starshipId }))
-                  }
+                  onValueChange={starshipId => setFormData(prev => ({ ...prev, starshipId }))}
                   placeholder="Select a starship to deploy this agent"
                   className={`border-muted-foreground/20 focus:border-primary ${
                     formErrors.starshipId ? 'border-destructive' : ''
@@ -249,7 +249,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <Textarea
                   value={formData.description}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setFormData(prev => ({ ...prev, description: e.target.value }))
+                  }
                   placeholder="Brief description of what this agent does"
                   className="border-muted-foreground/20 focus:border-primary min-h-[80px]"
                   rows={2}
@@ -266,7 +268,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <Textarea
                   value={systemPrompt}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSystemPrompt(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setSystemPrompt(e.target.value)
+                  }
                   placeholder="Instructions that define the agent's behavior and personality"
                   className="border-muted-foreground/20 focus:border-primary min-h-[120px]"
                   rows={4}
@@ -320,7 +324,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTag(e.target.value)}
                     placeholder="Add tag"
                     className="border-muted-foreground/20 focus:border-primary"
-                    onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                    onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) =>
+                      e.key === 'Enter' && (e.preventDefault(), addTag())
+                    }
                   />
                   <Button type="button" onClick={addTag} size="sm" className="px-3">
                     <Plus className="w-4 h-4 mr-1" />

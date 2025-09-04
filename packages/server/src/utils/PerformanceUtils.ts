@@ -77,7 +77,8 @@ export class Memoizer<T> {
   private cache: Map<string, CacheEntry<T>> = new Map();
   private defaultTTL: number;
 
-  constructor(defaultTTL: number = 300000) { // 5 minutes default
+  constructor(defaultTTL: number = 300000) {
+    // 5 minutes default
     this.defaultTTL = defaultTTL;
   }
 
@@ -105,7 +106,7 @@ export class Memoizer<T> {
       this.cache.set(key, {
         value: result,
         timestamp: now,
-        expiresAt: now + ttl
+        expiresAt: now + ttl,
       });
       return result;
     };
@@ -119,7 +120,7 @@ export class Memoizer<T> {
       return JSON.stringify(args);
     } catch {
       // Fallback for non-serializable args
-      return args.map(arg => String(arg)).join('|');
+      return args.map((arg) => String(arg)).join('|');
     }
   }
 
@@ -170,7 +171,7 @@ export class Memoizer<T> {
     return {
       size: this.cache.size,
       expired,
-      memory: totalMemory
+      memory: totalMemory,
     };
   }
 
@@ -186,14 +187,14 @@ export class Memoizer<T> {
    */
   invalidatePattern(pattern: RegExp): number {
     let removedCount = 0;
-    
+
     for (const key of this.cache.keys()) {
       if (pattern.test(key)) {
         this.cache.delete(key);
         removedCount++;
       }
     }
-    
+
     return removedCount;
   }
 }
@@ -217,18 +218,18 @@ export class RateLimiter {
   isAllowed(key: string): boolean {
     const now = Date.now();
     const requests = this.requests.get(key) || [];
-    
+
     // Remove old requests outside the window
-    const validRequests = requests.filter(timestamp => now - timestamp < this.windowMs);
-    
+    const validRequests = requests.filter((timestamp) => now - timestamp < this.windowMs);
+
     if (validRequests.length >= this.maxRequests) {
       return false;
     }
-    
+
     // Add current request
     validRequests.push(now);
     this.requests.set(key, validRequests);
-    
+
     return true;
   }
 
@@ -238,8 +239,8 @@ export class RateLimiter {
   getRemainingRequests(key: string): number {
     const now = Date.now();
     const requests = this.requests.get(key) || [];
-    const validRequests = requests.filter(timestamp => now - timestamp < this.windowMs);
-    
+    const validRequests = requests.filter((timestamp) => now - timestamp < this.windowMs);
+
     return Math.max(0, this.maxRequests - validRequests.length);
   }
 
@@ -251,7 +252,7 @@ export class RateLimiter {
     if (requests.length === 0) {
       return 0;
     }
-    
+
     const oldestRequest = Math.min(...requests);
     return oldestRequest + this.windowMs;
   }
@@ -301,7 +302,7 @@ export class BatchProcessor<T, R> {
   async add(item: T): Promise<R> {
     return new Promise((resolve, reject) => {
       this.queue.push({ input: item, resolve, reject });
-      
+
       if (!this.processing) {
         this.processing = true;
         setTimeout(() => this.processBatch(), this.batchDelay);
@@ -319,11 +320,11 @@ export class BatchProcessor<T, R> {
     }
 
     const batch = this.queue.splice(0, this.maxBatchSize);
-    const inputs = batch.map(item => item.input);
+    const inputs = batch.map((item) => item.input);
 
     try {
       const results = await this.processor(inputs);
-      
+
       if (results.length !== batch.length) {
         throw new Error('Processor must return same number of results as inputs');
       }
@@ -332,7 +333,7 @@ export class BatchProcessor<T, R> {
         item.resolve(results[index]);
       });
     } catch (error) {
-      batch.forEach(item => {
+      batch.forEach((item) => {
         item.reject(error);
       });
     }
@@ -391,21 +392,21 @@ export class CircuitBreaker {
 
     try {
       const result = await func();
-      
+
       if (this.state === 'half-open') {
         this.state = 'closed';
         this.failures = 0;
       }
-      
+
       return result;
     } catch (error) {
       this.failures++;
       this.lastFailure = Date.now();
-      
+
       if (this.failures >= this.threshold) {
         this.state = 'open';
       }
-      
+
       throw error;
     }
   }

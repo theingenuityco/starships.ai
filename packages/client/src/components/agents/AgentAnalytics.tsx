@@ -6,15 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/useToast'
-import {
-  BarChart3,
-  TrendingUp,
-  Star,
-  Activity,
-  Calendar,
-  Eye,
-  MessageSquare,
-} from 'lucide-react'
+import { BarChart3, TrendingUp, Star, Activity, Calendar, Eye, MessageSquare } from 'lucide-react'
 
 interface AgentAnalytics {
   usageCount: number

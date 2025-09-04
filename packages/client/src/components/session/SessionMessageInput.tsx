@@ -40,7 +40,7 @@ export function SessionMessageInput({
   onMessageReceived,
   disabled = false,
   minimal = false,
-  children
+  children,
 }: SessionMessageInputProps) {
   const { userId } = useAuth()
   const [message, setMessage] = useState('')
@@ -67,7 +67,6 @@ export function SessionMessageInput({
 
     try {
       setSending(true)
-      
       // Create session if one doesn't exist
       let currentSessionId = sessionId
       if (!currentSessionId) {
@@ -75,7 +74,7 @@ export function SessionMessageInput({
         const newSession = await createSession.mutateAsync({
           source: 'agent',
           agentId: selectedAgent!.id,
-          starshipId: starshipId
+          starshipId: starshipId,
         })
         currentSessionId = newSession.id
         onSessionStart?.(currentSessionId)
@@ -89,7 +88,7 @@ export function SessionMessageInput({
         role: 'user',
         timestamp: new Date().toISOString(),
         sessionId: currentSessionId,
-        agentId: selectedAgent!.id
+        agentId: selectedAgent!.id,
       }
 
       // Emit user message
@@ -103,7 +102,7 @@ export function SessionMessageInput({
           onChunk: (chunk, accumulatedContent) => {
             // Handle streaming updates if needed
           },
-          onComplete: (assistantMessage) => {
+          onComplete: assistantMessage => {
             // Use the session ID from server response
             if (assistantMessage.sessionId) {
               onSessionStart?.(assistantMessage.sessionId)
@@ -111,15 +110,15 @@ export function SessionMessageInput({
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null
           },
-          onError: (error) => {
+          onError: error => {
             console.error('Agent chat error:', error)
             currentStreamRef.current = null
-          }
+          },
         }
       )
-      
+
       setMessage('')
-      
+
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto'
@@ -148,7 +147,6 @@ export function SessionMessageInput({
 
     try {
       setSending(true)
-      
       // Create session if one doesn't exist
       let currentSessionId = sessionId
       if (!currentSessionId) {
@@ -156,7 +154,7 @@ export function SessionMessageInput({
         const newSession = await createSession.mutateAsync({
           source: 'agent',
           agentId: selectedAgent!.id,
-          starshipId: starshipId
+          starshipId: starshipId,
         })
         currentSessionId = newSession.id
         onSessionStart?.(currentSessionId)
@@ -170,7 +168,7 @@ export function SessionMessageInput({
         role: 'user',
         timestamp: new Date().toISOString(),
         sessionId: currentSessionId,
-        agentId: selectedAgent!.id
+        agentId: selectedAgent!.id,
       }
 
       // Emit user message
@@ -184,7 +182,7 @@ export function SessionMessageInput({
           onChunk: (chunk, accumulatedContent) => {
             // Handle streaming updates if needed
           },
-          onComplete: (assistantMessage) => {
+          onComplete: assistantMessage => {
             // Use the session ID from server response
             if (assistantMessage.sessionId) {
               onSessionStart?.(assistantMessage.sessionId)
@@ -192,10 +190,10 @@ export function SessionMessageInput({
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null
           },
-          onError: (error) => {
+          onError: error => {
             console.error('Agent chat error:', error)
             currentStreamRef.current = null
-          }
+          },
         }
       )
     } catch (error) {
@@ -214,7 +212,7 @@ export function SessionMessageInput({
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value)
-    
+
     // Auto-resize textarea
     const textarea = e.target
     textarea.style.height = 'auto'
@@ -228,20 +226,17 @@ export function SessionMessageInput({
 
   const getPlaceholder = () => {
     if (mode === 'agent') {
-      return selectedAgent 
-        ? `Ask ${selectedAgent.name}...` 
-        : 'Select an agent to start chatting'
+      return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
     return minimal ? 'Ask anything...' : 'Ask anything...'
   }
 
-  const canSend = message.trim() && !disabled && !sending &&
-    (mode === 'agent' && selectedAgent)
+  const canSend = message.trim() && !disabled && !sending && mode === 'agent' && selectedAgent
 
   // Expose handleSuggestionSubmit for parent component
   const inputRef = useRef({ handleSuggestionSubmit })
   if (typeof window !== 'undefined') {
-    (window as any).sessionMessageInputRef = inputRef
+    ;(window as any).sessionMessageInputRef = inputRef
   }
 
   return (
@@ -251,24 +246,20 @@ export function SessionMessageInput({
       animate={{ opacity: 1, y: 0 }}
     >
       {/* Input Container */}
-      <div className={cn(
-        "relative transition-all",
-        minimal 
-          ? "rounded-xl border border-border/30" 
-          : "rounded-2xl border border-border/40",
-        "bg-card/50 backdrop-blur-sm",
-        minimal 
-          ? "shadow-sm focus-within:ring-1 focus-within:ring-primary/15" 
-          : "shadow-lg focus-within:ring-2 focus-within:ring-primary/20",
-        "focus-within:border-primary/40",
-        disabled && "opacity-50"
-      )}>
-        
+      <div
+        className={cn(
+          'relative transition-all',
+          minimal ? 'rounded-xl border border-border/30' : 'rounded-2xl border border-border/40',
+          'bg-card/50 backdrop-blur-sm',
+          minimal
+            ? 'shadow-sm focus-within:ring-1 focus-within:ring-primary/15'
+            : 'shadow-lg focus-within:ring-2 focus-within:ring-primary/20',
+          'focus-within:border-primary/40',
+          disabled && 'opacity-50'
+        )}
+      >
         {/* Main Input Section - Only Text Input */}
-        <div className={cn(
-          "flex items-end",
-          minimal ? "p-3" : "p-4"
-        )}>
+        <div className={cn('flex items-end', minimal ? 'p-3' : 'p-4')}>
           {/* Text Input */}
           <div className="flex-1 min-w-0">
             <textarea
@@ -279,12 +270,12 @@ export function SessionMessageInput({
               placeholder={getPlaceholder()}
               disabled={disabled || sending}
               className={cn(
-                "w-full bg-transparent resize-none",
-                minimal ? "min-h-[20px] max-h-[80px]" : "min-h-[24px] max-h-[120px]",
-                "text-foreground placeholder-muted-foreground",
-                "border-0 outline-none focus:ring-0",
-                "scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent",
-                minimal && "text-sm"
+                'w-full bg-transparent resize-none',
+                minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
+                'text-foreground placeholder-muted-foreground',
+                'border-0 outline-none focus:ring-0',
+                'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
+                minimal && 'text-sm'
               )}
               rows={1}
             />
@@ -296,10 +287,8 @@ export function SessionMessageInput({
           <div className="border-t border-border/20 bg-muted/10 px-4 py-3">
             <div className="flex items-center justify-between">
               {/* Left Side - Selectors */}
-              <div className="flex items-center gap-3">
-                {children}
-              </div>
-              
+              <div className="flex items-center gap-3">{children}</div>
+
               {/* Right Side - Action Buttons */}
               <div className="flex items-center gap-2">
                 {/* File Attachment */}
@@ -318,25 +307,21 @@ export function SessionMessageInput({
                   size="icon"
                   onClick={handleVoiceToggle}
                   className={cn(
-                    "h-8 w-8 rounded-full shrink-0 transition-colors",
-                    isRecording 
-                      ? "text-red-500 hover:text-red-600 bg-red-500/10" 
-                      : "text-muted-foreground hover:text-foreground"
+                    'h-8 w-8 rounded-full shrink-0 transition-colors',
+                    isRecording
+                      ? 'text-red-500 hover:text-red-600 bg-red-500/10'
+                      : 'text-muted-foreground hover:text-foreground'
                   )}
                   disabled={disabled}
                 >
-                  {isRecording ? (
-                    <StopCircle className="h-4 w-4" />
-                  ) : (
-                    <Mic className="h-4 w-4" />
-                  )}
+                  {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </Button>
 
                 {/* Send Button */}
                 <motion.div
                   animate={{
                     scale: canSend ? 1 : 0.8,
-                    opacity: canSend ? 1 : 0.5
+                    opacity: canSend ? 1 : 0.5,
                   }}
                 >
                   <Button
@@ -344,17 +329,17 @@ export function SessionMessageInput({
                     disabled={!canSend}
                     size="icon"
                     className={cn(
-                      "h-8 w-8 rounded-full shrink-0 transition-all",
+                      'h-8 w-8 rounded-full shrink-0 transition-all',
                       canSend
-                        ? "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl"
-                        : "bg-muted text-muted-foreground cursor-not-allowed"
+                        ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
+                        : 'bg-muted text-muted-foreground cursor-not-allowed'
                     )}
                   >
                     {sending ? (
                       <motion.div
                         className="h-4 w-4 border-2 border-current border-t-transparent rounded-full"
                         animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                       />
                     ) : (
                       <Send className="h-4 w-4" />

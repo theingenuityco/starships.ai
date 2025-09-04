@@ -22,29 +22,32 @@ export function SessionMessageList({
   mode,
   sessionId,
   starshipId,
-  onMessageAdded
+  onMessageAdded,
 }: SessionMessageListProps) {
   // Use TanStack Query to fetch messages
   const {
     data: messageData,
     isLoading: loading,
-    error: queryError
+    error: queryError,
   } = useSessionMessages(sessionId || '', !!sessionId)
-  
+
   const messages = messageData?.messages || []
-  
+
   const error = queryError ? 'Failed to load session history' : null
 
   // Convert session messages to unified message format
-  const sessionMessages: SessionMessageType[] = messages.map((msg: SessionMessage) => ({
-    id: msg.id,
-    content: msg.content,
-    role: msg.role,
-    timestamp: msg.timestamp,
-    sessionId: msg.sessionId,
-    // Add mode-specific fields based on message structure
-    agentId: sessionId?.split(':')[0]?.replace('agent-', '')
-  } as SessionMessageType))
+  const sessionMessages: SessionMessageType[] = messages.map(
+    (msg: SessionMessage) =>
+      ({
+        id: msg.id,
+        content: msg.content,
+        role: msg.role,
+        timestamp: msg.timestamp,
+        sessionId: msg.sessionId,
+        // Add mode-specific fields based on message structure
+        agentId: sessionId?.split(':')[0]?.replace('agent-', ''),
+      }) as SessionMessageType
+  )
 
   // Add new message to the list (for real-time updates)
   const addMessage = (newMessage: SessionMessageType) => {
@@ -57,9 +60,9 @@ export function SessionMessageList({
   // Expose method to parent component for compatibility
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).addMessage = addMessage
+      ;(window as any).addMessage = addMessage
     }
-    
+
     return () => {
       if (typeof window !== 'undefined') {
         delete (window as any).addMessage
@@ -102,14 +105,14 @@ interface EmptyStateProps {
 
 function EmptyState({ mode }: EmptyStateProps) {
   const content = {
-    title: "Connect with your Agent",
-    subtitle: "Select an agent and start a conversation to boost your productivity",
+    title: 'Connect with your Agent',
+    subtitle: 'Select an agent and start a conversation to boost your productivity',
     suggestions: [
-      "Help me plan my project timeline",
-      "Analyze this data for insights",
-      "Write code for my application",
-      "Research industry trends"
-    ]
+      'Help me plan my project timeline',
+      'Analyze this data for insights',
+      'Write code for my application',
+      'Research industry trends',
+    ],
   }
 
   return (
@@ -121,19 +124,13 @@ function EmptyState({ mode }: EmptyStateProps) {
       >
         {/* Title */}
         <div className="space-y-2">
-          <h3 className="text-2xl font-semibold text-foreground">
-            {content.title}
-          </h3>
-          <p className="text-muted-foreground">
-            {content.subtitle}
-          </p>
+          <h3 className="text-2xl font-semibold text-foreground">{content.title}</h3>
+          <p className="text-muted-foreground">{content.subtitle}</p>
         </div>
 
         {/* Example Suggestions */}
         <div className="space-y-3">
-          <p className="text-sm font-medium text-muted-foreground">
-            Try asking:
-          </p>
+          <p className="text-sm font-medium text-muted-foreground">Try asking:</p>
           <div className="grid gap-2">
             {content.suggestions.map((suggestion, index) => (
               <motion.div

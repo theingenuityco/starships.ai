@@ -6,11 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type {
-  AgentMemoryState,
-  Blueprint,
-  AgentNodeParameters
-} from '@starships/autopilot';
+import type { AgentMemoryState, Blueprint, AgentNodeParameters } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE AGENT INTERFACE
@@ -37,7 +33,6 @@ export interface AgentModel extends AgentNodeParameters {
   // Deployment settings
   starshipId: string;
 }
-
 
 // ============================================================================
 // AGENT REQUEST/RESPONSE TYPES

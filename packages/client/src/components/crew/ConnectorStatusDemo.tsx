@@ -193,16 +193,11 @@ export function ConnectorStatusDemo() {
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
-          <ConnectorStatusDashboard
-            connectorInstances={connectorInstances}
-          />
+          <ConnectorStatusDashboard connectorInstances={connectorInstances} />
         </TabsContent>
 
         <TabsContent value="monitor" className="space-y-4">
-          <ConnectorInstanceMonitor
-            connectorInstances={connectorInstances}
-            autoRefresh={false}
-          />
+          <ConnectorInstanceMonitor connectorInstances={connectorInstances} autoRefresh={false} />
         </TabsContent>
 
         <TabsContent value="performance" className="space-y-4">

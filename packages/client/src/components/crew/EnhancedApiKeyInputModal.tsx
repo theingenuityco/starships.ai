@@ -26,10 +26,7 @@ import {
   Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  ApiKeyRequirement,
-  ApiKeyValidationResult,
-} from '@/types/connector-api-keys'
+import { ApiKeyRequirement, ApiKeyValidationResult } from '@/types/connector-api-keys'
 import { ApiKeyValidator, ServiceType } from '@/lib/api-key-validation'
 import { MCPServerOption } from '@/lib/api'
 import { useErrorRecovery, ErrorRecoveryManager } from '@/lib/error-recovery'
@@ -536,7 +533,9 @@ export function EnhancedApiKeyInputModal({
             id={requirement.envKey}
             type={inputType}
             value={value}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(requirement.envKey, e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleInputChange(requirement.envKey, e.target.value)
+            }
             onBlur={() => handleFieldBlur(requirement.envKey)}
             placeholder={requirement.placeholder}
             className={cn(

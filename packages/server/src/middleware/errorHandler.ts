@@ -94,11 +94,7 @@ export function errorHandler(config: ErrorHandlerConfig = {}) {
 
   return (error: any, req: Request, res: Response, next: NextFunction): void => {
     // Use ErrorUtils.normalize from @starships/errors to convert error
-    const standardError = ErrorUtils.normalize(
-      error,
-      req.get('X-Request-ID'),
-      req.path
-    );
+    const standardError = ErrorUtils.normalize(error, req.get('X-Request-ID'), req.path);
 
     // Log server errors
     if (standardError.statusCode >= 500) {

@@ -47,7 +47,7 @@ export function ConnectorInstanceConfig({
   // Get environment variables from current config
   const getEnvVars = () => {
     try {
-      return currentConfig?.environmentVariables 
+      return currentConfig?.environmentVariables
         ? JSON.parse(currentConfig.environmentVariables)
         : {}
     } catch {
@@ -133,14 +133,16 @@ export function ConnectorInstanceConfig({
                     <div className="font-medium mb-1">Environment Variables:</div>
                     {Object.keys(envVars).length > 0 ? (
                       <div className="space-y-1">
-                        {Object.keys(envVars).slice(0, 3).map(key => (
-                          <div key={key} className="flex items-center gap-2">
-                            <span className="font-mono text-xs">{key}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {envVars[key] ? 'Set' : 'Empty'}
-                            </Badge>
-                          </div>
-                        ))}
+                        {Object.keys(envVars)
+                          .slice(0, 3)
+                          .map(key => (
+                            <div key={key} className="flex items-center gap-2">
+                              <span className="font-mono text-xs">{key}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {envVars[key] ? 'Set' : 'Empty'}
+                              </Badge>
+                            </div>
+                          ))}
                         {Object.keys(envVars).length > 3 && (
                           <div className="text-xs text-muted-foreground">
                             +{Object.keys(envVars).length - 3} more...
@@ -170,15 +172,13 @@ export function ConnectorInstanceConfig({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem disabled>
-                  <div className="text-xs text-destructive">
-                    Error: {error}
-                  </div>
+                  <div className="text-xs text-destructive">Error: {error}</div>
                 </DropdownMenuItem>
               </>
             )}
 
             <DropdownMenuSeparator />
-            
+
             {/* Actions */}
             <DropdownMenuItem
               onClick={() => {
@@ -205,13 +205,11 @@ export function ConnectorInstanceConfig({
           <div className="text-xs">
             <div className="font-medium">{connectorName} Configuration</div>
             <div className="text-muted-foreground">
-              {hasConfig ? `${Object.keys(envVars).length} variables configured` : 'No configuration'}
+              {hasConfig
+                ? `${Object.keys(envVars).length} variables configured`
+                : 'No configuration'}
             </div>
-            {error && (
-              <div className="text-destructive mt-1">
-                Error: {error}
-              </div>
-            )}
+            {error && <div className="text-destructive mt-1">Error: {error}</div>}
           </div>
         </TooltipContent>
       </Tooltip>

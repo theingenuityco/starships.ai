@@ -90,7 +90,6 @@ export function ChatInterface({
     setError(null)
   }
 
-
   const handleSendMessage = async (content: string) => {
     if (!currentSessionId.current) {
       setError(ERROR_TEXT.NO_ACTIVE_SESSION)
@@ -175,7 +174,7 @@ export function ChatInterface({
             currentSessionId.current = finalMessage.sessionId
             onSessionCreated(finalMessage.sessionId)
           }
-          
+
           // Update the streaming message to final state
           setMessages(prev => {
             const updatedMessages = prev.map(msg =>

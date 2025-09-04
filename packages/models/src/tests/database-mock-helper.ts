@@ -23,28 +23,32 @@ export function mockRepositorySuccess(mockConnection: any, data: any) {
 export function mockRepositoryQuery(mockConnection: any, data: any) {
   // Mock successful query operations
   if (Array.isArray(data)) {
-    mockConnection.executeQuery.mockResolvedValue(data.map(item => ({ 
-      n: item, 
-      // Also provide common field mappings
-      u: item,  // for User queries
-      s: item,  // for Starship queries
-      a: item,  // for Agent queries
-      m: item,  // for Message queries
-      session: item, // for Session queries
-      blueprint: item, // for Blueprint queries
-      mc: item, // for MissionClarity queries
-    })));
+    mockConnection.executeQuery.mockResolvedValue(
+      data.map((item) => ({
+        n: item,
+        // Also provide common field mappings
+        u: item, // for User queries
+        s: item, // for Starship queries
+        a: item, // for Agent queries
+        m: item, // for Message queries
+        session: item, // for Session queries
+        blueprint: item, // for Blueprint queries
+        mc: item, // for MissionClarity queries
+      }))
+    );
   } else if (data) {
-    mockConnection.executeQuery.mockResolvedValue([{ 
-      n: data,
-      u: data,
-      s: data,
-      a: data,
-      m: data,
-      session: data,
-      blueprint: data,
-      mc: data,
-    }]);
+    mockConnection.executeQuery.mockResolvedValue([
+      {
+        n: data,
+        u: data,
+        s: data,
+        a: data,
+        m: data,
+        session: data,
+        blueprint: data,
+        mc: data,
+      },
+    ]);
   } else {
     mockConnection.executeQuery.mockResolvedValue([]);
   }

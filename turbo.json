@@ -3,12 +3,6 @@
   "globalDependencies": ["**/.env.*local"],
   "globalEnv": [
     "NODE_ENV",
-    "KINDE_CLIENT_ID",
-    "KINDE_CLIENT_SECRET",
-    "KINDE_ISSUER_URL",
-    "KINDE_SITE_URL",
-    "KINDE_POST_LOGOUT_REDIRECT_URL",
-    "KINDE_POST_LOGIN_REDIRECT_URL",
     "NEO4J_URI",
     "NEO4J_USERNAME",
     "NEO4J_PASSWORD",
@@ -46,12 +40,17 @@
       "outputs": []
     },
     "@starships/client#lint": {
-      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
     "@starships/server#lint": {
-      "dependsOn": ["@starships/env-config#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
+      "dependsOn": [
+        "@starships/env#build",
+        "@starships/errors#build",
+        "@starships/models#build",
+        "@starships/protocol#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -65,7 +64,7 @@
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
-    "@starships/env-config#type-check": {
+    "@starships/env#type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
@@ -75,12 +74,17 @@
       "outputs": []
     },
     "@starships/server#type-check": {
-      "dependsOn": ["@starships/env-config#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
+      "dependsOn": [
+        "@starships/env#build",
+        "@starships/errors#build",
+        "@starships/models#build",
+        "@starships/protocol#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
     "@starships/client#type-check": {
-      "dependsOn": ["@starships/env-config#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
@@ -94,7 +98,11 @@
       "outputs": []
     },
     "@starships/models#test": {
-      "dependsOn": ["@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": [
+        "@starships/autopilot#build",
+        "@starships/errors#build",
+        "@starships/protocol#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "**/*.test.*", "**/__tests__/**"],
       "outputs": []
     },

@@ -2,9 +2,9 @@ name: Security Checks
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
 
 jobs:
   security-audit:
@@ -47,13 +47,13 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
@@ -75,71 +75,70 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'javascript-typescript' ]
+        language: ['javascript-typescript']
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
-      with:
-        languages: ${{ matrix.language }}
-        queries: security-extended,security-and-quality
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
 
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
-      with:
-        category: "/language:${{matrix.language}}"
-        output: codeql-results
-        upload: false
-    
-    - name: Check and display CodeQL results
-      run: |
-        if [ -f codeql-results/javascript.sarif ]; then
-          echo "## 🔍 CodeQL Security Analysis Results"
-          echo ""
-          
-          # Parse and display issues
-          jq -r '.runs[].results[] | 
-            "### \(if .level == "error" then "🔴 CRITICAL" elif .level == "warning" then "🟡 HIGH" else "🟢 INFO" end): \(.message.text)\n" +
-            "**File:** \(.locations[0].physicalLocation.artifactLocation.uri)\n" +
-            "**Line:** \(.locations[0].physicalLocation.region.startLine // "N/A")\n" +
-            "**Rule:** \(.ruleId)\n" +
-            "```\n\(.locations[0].physicalLocation.region.snippet.text // "Code snippet not available")\n```\n"
-          ' codeql-results/javascript.sarif 2>/dev/null || echo "No issues found ✅"
-          
-          # Count issues by severity
-          critical_count=$(jq '[.runs[].results[] | select(.level == "error")] | length' codeql-results/javascript.sarif)
-          high_count=$(jq '[.runs[].results[] | select(.level == "warning")] | length' codeql-results/javascript.sarif)
-          
-          echo ""
-          echo "## 📊 Summary"
-          echo "- Critical Issues: $critical_count"
-          echo "- High Issues: $high_count"
-          
-          if [ "$critical_count" -gt 0 ]; then
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{matrix.language}}'
+          output: codeql-results
+          upload: false
+
+      - name: Check and display CodeQL results
+        run: |
+          if [ -f codeql-results/javascript.sarif ]; then
+            echo "## 🔍 CodeQL Security Analysis Results"
             echo ""
-            echo "❌ Build failed due to critical security vulnerabilities"
-            exit 1
-          elif [ "$high_count" -gt 5 ]; then
+            
+            # Parse and display issues
+            jq -r '.runs[].results[] | 
+              "### \(if .level == "error" then "🔴 CRITICAL" elif .level == "warning" then "🟡 HIGH" else "🟢 INFO" end): \(.message.text)\n" +
+              "**File:** \(.locations[0].physicalLocation.artifactLocation.uri)\n" +
+              "**Line:** \(.locations[0].physicalLocation.region.startLine // "N/A")\n" +
+              "**Rule:** \(.ruleId)\n" +
+              "```\n\(.locations[0].physicalLocation.region.snippet.text // "Code snippet not available")\n```\n"
+            ' codeql-results/javascript.sarif 2>/dev/null || echo "No issues found ✅"
+            
+            # Count issues by severity
+            critical_count=$(jq '[.runs[].results[] | select(.level == "error")] | length' codeql-results/javascript.sarif)
+            high_count=$(jq '[.runs[].results[] | select(.level == "warning")] | length' codeql-results/javascript.sarif)
+            
             echo ""
-            echo "⚠️ Warning: Multiple high severity issues detected. Consider fixing them."
+            echo "## 📊 Summary"
+            echo "- Critical Issues: $critical_count"
+            echo "- High Issues: $high_count"
+            
+            if [ "$critical_count" -gt 0 ]; then
+              echo ""
+              echo "❌ Build failed due to critical security vulnerabilities"
+              exit 1
+            elif [ "$high_count" -gt 5 ]; then
+              echo ""
+              echo "⚠️ Warning: Multiple high severity issues detected. Consider fixing them."
+            else
+              echo ""
+              echo "✅ Security check passed"
+            fi
           else
-            echo ""
-            echo "✅ Security check passed"
+            echo "✅ No CodeQL results file found - analysis may have been skipped"
           fi
-        else
-          echo "✅ No CodeQL results file found - analysis may have been skipped"
-        fi
-    
-    - name: Upload CodeQL results as artifact
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: codeql-results
-        path: codeql-results/
 
+      - name: Upload CodeQL results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeql-results
+          path: codeql-results/

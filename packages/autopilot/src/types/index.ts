@@ -29,12 +29,7 @@ export * from './validation';
 export type { Message } from '../Memory';
 
 // Agent memory types only (no classes)
-export type {
-  AgentIdentity,
-  AgentPurpose,
-  AgentSpace,
-  AgentMemoryState
-} from '../AgentMemory';
+export type { AgentIdentity, AgentPurpose, AgentSpace, AgentMemoryState } from '../AgentMemory';
 
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)

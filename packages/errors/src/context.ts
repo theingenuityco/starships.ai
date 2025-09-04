@@ -14,7 +14,7 @@ export enum ErrorLayer {
   REPOSITORY = 'repository',
   DATABASE = 'database',
   CLIENT = 'client',
-  EXTERNAL = 'external'
+  EXTERNAL = 'external',
 }
 
 /**
@@ -23,31 +23,31 @@ export enum ErrorLayer {
 export interface ErrorContext {
   /** Component where error occurred (e.g., 'UserRepository', 'MissionService') */
   component: string;
-  
+
   /** Operation being performed (e.g., 'create', 'findById', 'handleMessage') */
   operation: string;
-  
+
   /** Layer where the error occurred */
   layer?: ErrorLayer;
-  
+
   /** Optional resource type (e.g., 'User', 'Agent', 'Mission') */
   resource?: string;
-  
+
   /** Optional resource ID */
   resourceId?: string;
-  
+
   /** Optional user ID for context */
   userId?: string;
-  
+
   /** Optional request ID for tracing */
   requestId?: string;
-  
+
   /** Timestamp when context was created */
   timestamp: Date;
-  
+
   /** User agent for client-side errors */
   userAgent?: string;
-  
+
   /** Any additional metadata */
   metadata?: Record<string, any>;
 }
@@ -85,7 +85,7 @@ export function createErrorContext(
     requestId: options?.requestId,
     userAgent: options?.userAgent,
     timestamp: new Date(),
-    metadata: options?.metadata
+    metadata: options?.metadata,
   };
 }
 
@@ -192,7 +192,6 @@ export class ErrorContextUtils {
     if (typeof globalThis !== 'undefined' && globalThis.crypto?.randomUUID) {
       return `req_${globalThis.crypto.randomUUID()}`;
     }
-    
     // Fallback for environments without crypto.randomUUID
     return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
@@ -211,20 +210,18 @@ export class ErrorContextUtils {
     const enhanced = new Error(error.message);
     enhanced.name = error.name;
     enhanced.stack = options?.preserveStack ? error.stack : enhanced.stack;
-    
     // Add original error as cause if supported (modern Error API)
     if ('cause' in Error.prototype || 'cause' in enhanced) {
       (enhanced as any).cause = error;
     }
-    
     // Add context as non-enumerable property
     Object.defineProperty(enhanced, 'context', {
       value: context,
       writable: false,
       enumerable: false,
-      configurable: false
+      configurable: false,
     });
-    
+
     return enhanced;
   }
 }
@@ -234,18 +231,18 @@ export class ErrorContextUtils {
  */
 export function contextToString(context: ErrorContext): string {
   const parts = [context.component, context.operation];
-  
+
   if (context.layer) {
     parts.splice(0, 0, context.layer);
   }
-  
+
   if (context.resource) {
     parts.push(`${context.resource}${context.resourceId ? `:${context.resourceId}` : ''}`);
   }
-  
+
   if (context.requestId) {
     parts.push(`(${context.requestId})`);
   }
-  
+
   return parts.join(' ');
 }

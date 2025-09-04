@@ -1,11 +1,11 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { useState, useEffect, useMemo } from 'react'
+import { motion, AnimatePresence } from 'motion/react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import {
   Wifi,
   WifiOff,
@@ -15,45 +15,45 @@ import {
   Clock,
   Activity,
   Shield,
-  X
-} from 'lucide-react';
+  X,
+} from 'lucide-react'
 // Note: ConnectionMetrics type definition for socket client connections
 interface ConnectionMetrics {
-  isConnected: boolean;
-  connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
-  circuitBreakerState: 'closed' | 'open' | 'half-open';
-  eventCount: number;
-  failureCount: number;
-  reconnectAttempts: number;
-  lastPing: number | null;
-  uptime: number | null;
+  isConnected: boolean
+  connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected'
+  circuitBreakerState: 'closed' | 'open' | 'half-open'
+  eventCount: number
+  failureCount: number
+  reconnectAttempts: number
+  lastPing: number | null
+  uptime: number | null
 }
 
 interface ConnectionStatusProps {
-  connectionState: ConnectionMetrics;
-  onForceReconnect?: () => void;
-  onResetCircuitBreaker?: () => void;
-  onClearQueue?: () => void;
+  connectionState: ConnectionMetrics
+  onForceReconnect?: () => void
+  onResetCircuitBreaker?: () => void
+  onClearQueue?: () => void
   getHealthStatus?: () => {
-    isHealthy: boolean;
-    connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected';
-    issues: string[];
-    recommendations: string[];
-  };
+    isHealthy: boolean
+    connectionQuality: 'excellent' | 'good' | 'poor' | 'disconnected'
+    issues: string[]
+    recommendations: string[]
+  }
   getOfflineQueueStatus?: () => {
-    queueSize: number;
-    maxQueueSize: number;
-    oldestOperationAge?: number;
-  };
+    queueSize: number
+    maxQueueSize: number
+    oldestOperationAge?: number
+  }
   getCircuitBreakerStatus?: () => {
-    state: 'closed' | 'open' | 'half-open';
-    failureCount: number;
-    nextRetryTime?: number;
-    timeUntilRetry?: number;
-  };
-  compact?: boolean;
-  showDetails?: boolean;
-  className?: string;
+    state: 'closed' | 'open' | 'half-open'
+    failureCount: number
+    nextRetryTime?: number
+    timeUntilRetry?: number
+  }
+  compact?: boolean
+  showDetails?: boolean
+  className?: string
 }
 
 export function ConnectionStatus({
@@ -66,70 +66,76 @@ export function ConnectionStatus({
   getCircuitBreakerStatus,
   compact = false,
   showDetails = false,
-  className = ''
+  className = '',
 }: ConnectionStatusProps) {
-  const [isExpanded, setIsExpanded] = useState(showDetails);
-  const [healthStatus, setHealthStatus] = useState<ReturnType<NonNullable<typeof getHealthStatus>> | null>(null);
-  const [queueStatus, setQueueStatus] = useState<ReturnType<NonNullable<typeof getOfflineQueueStatus>> | null>(null);
-  const [circuitBreakerStatus, setCircuitBreakerStatus] = useState<ReturnType<NonNullable<typeof getCircuitBreakerStatus>> | null>(null);
+  const [isExpanded, setIsExpanded] = useState(showDetails)
+  const [healthStatus, setHealthStatus] = useState<ReturnType<
+    NonNullable<typeof getHealthStatus>
+  > | null>(null)
+  const [queueStatus, setQueueStatus] = useState<ReturnType<
+    NonNullable<typeof getOfflineQueueStatus>
+  > | null>(null)
+  const [circuitBreakerStatus, setCircuitBreakerStatus] = useState<ReturnType<
+    NonNullable<typeof getCircuitBreakerStatus>
+  > | null>(null)
 
   // Update status information only when connection state changes
   useEffect(() => {
-    let mounted = true;
-    
+    let mounted = true
+
     const updateStatuses = () => {
-      if (!mounted) return;
-      
+      if (!mounted) return
+
       if (getHealthStatus) {
         try {
-          const newHealthStatus = getHealthStatus();
+          const newHealthStatus = getHealthStatus()
           if (mounted) {
-            setHealthStatus(newHealthStatus);
+            setHealthStatus(newHealthStatus)
           }
         } catch (error) {
-          console.error('Error getting health status:', error);
+          console.error('Error getting health status:', error)
           if (mounted) {
-            setHealthStatus(null);
+            setHealthStatus(null)
           }
         }
       }
-      
+
       if (getOfflineQueueStatus) {
         try {
-          const newQueueStatus = getOfflineQueueStatus();
+          const newQueueStatus = getOfflineQueueStatus()
           if (mounted) {
-            setQueueStatus(newQueueStatus);
+            setQueueStatus(newQueueStatus)
           }
         } catch (error) {
-          console.error('Error getting queue status:', error);
+          console.error('Error getting queue status:', error)
           if (mounted) {
-            setQueueStatus(null);
+            setQueueStatus(null)
           }
         }
       }
-      
+
       if (getCircuitBreakerStatus) {
         try {
-          const newCircuitBreakerStatus = getCircuitBreakerStatus();
+          const newCircuitBreakerStatus = getCircuitBreakerStatus()
           if (mounted) {
-            setCircuitBreakerStatus(newCircuitBreakerStatus);
+            setCircuitBreakerStatus(newCircuitBreakerStatus)
           }
         } catch (error) {
-          console.error('Error getting circuit breaker status:', error);
+          console.error('Error getting circuit breaker status:', error)
           if (mounted) {
-            setCircuitBreakerStatus(null);
+            setCircuitBreakerStatus(null)
           }
         }
       }
-    };
+    }
 
     // Use a timeout to prevent synchronous state updates
-    const timeoutId = setTimeout(updateStatuses, 0);
+    const timeoutId = setTimeout(updateStatuses, 0)
 
     return () => {
-      mounted = false;
-      clearTimeout(timeoutId);
-    };
+      mounted = false
+      clearTimeout(timeoutId)
+    }
   }, [
     connectionState.isConnected,
     connectionState.connectionQuality,
@@ -138,14 +144,14 @@ export function ConnectionStatus({
     connectionState.failureCount,
     connectionState.reconnectAttempts,
     connectionState.lastPing,
-    connectionState.uptime
+    connectionState.uptime,
     // Intentionally NOT including the function dependencies to prevent infinite loops
-  ]);
+  ])
 
   // Memoize the status configuration to prevent unnecessary recalculations
   const statusConfig = useMemo(() => {
-    const { isConnected, connectionQuality, circuitBreakerState } = connectionState;
-    
+    const { isConnected, connectionQuality, circuitBreakerState } = connectionState
+
     if (circuitBreakerState === 'open') {
       return {
         icon: Shield,
@@ -154,10 +160,10 @@ export function ConnectionStatus({
         borderColor: 'border-red-200',
         label: 'Circuit Breaker Open',
         description: 'Connection suspended due to repeated failures',
-        severity: 'error' as const
-      };
+        severity: 'error' as const,
+      }
     }
-    
+
     if (circuitBreakerState === 'half-open') {
       return {
         icon: Activity,
@@ -166,10 +172,10 @@ export function ConnectionStatus({
         borderColor: 'border-yellow-200',
         label: 'Testing Connection',
         description: 'Attempting to restore connection',
-        severity: 'warning' as const
-      };
+        severity: 'warning' as const,
+      }
     }
-    
+
     if (!isConnected) {
       return {
         icon: WifiOff,
@@ -178,10 +184,10 @@ export function ConnectionStatus({
         borderColor: 'border-red-200',
         label: 'Disconnected',
         description: 'Not connected to server',
-        severity: 'error' as const
-      };
+        severity: 'error' as const,
+      }
     }
-    
+
     switch (connectionQuality) {
       case 'excellent':
         return {
@@ -191,8 +197,8 @@ export function ConnectionStatus({
           borderColor: 'border-green-200',
           label: 'Excellent',
           description: 'Connection is stable and fast',
-          severity: 'success' as const
-        };
+          severity: 'success' as const,
+        }
       case 'good':
         return {
           icon: Wifi,
@@ -201,8 +207,8 @@ export function ConnectionStatus({
           borderColor: 'border-blue-200',
           label: 'Good',
           description: 'Connection is stable',
-          severity: 'info' as const
-        };
+          severity: 'info' as const,
+        }
       case 'poor':
         return {
           icon: AlertTriangle,
@@ -211,8 +217,8 @@ export function ConnectionStatus({
           borderColor: 'border-yellow-200',
           label: 'Poor',
           description: 'Connection is unstable',
-          severity: 'warning' as const
-        };
+          severity: 'warning' as const,
+        }
       default:
         return {
           icon: WifiOff,
@@ -221,32 +227,35 @@ export function ConnectionStatus({
           borderColor: 'border-gray-200',
           label: 'Unknown',
           description: 'Connection status unknown',
-          severity: 'info' as const
-        };
+          severity: 'info' as const,
+        }
     }
   }, [
     connectionState.isConnected,
     connectionState.connectionQuality,
-    connectionState.circuitBreakerState
-  ]);
+    connectionState.circuitBreakerState,
+  ])
 
-  const StatusIcon = statusConfig.icon;
+  const StatusIcon = statusConfig.icon
 
   // Format time duration
   const formatDuration = (ms: number) => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    
-    if (hours > 0) return `${hours}h ${minutes % 60}m`;
-    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-    return `${seconds}s`;
-  };
+    const seconds = Math.floor(ms / 1000)
+    const minutes = Math.floor(seconds / 60)
+    const hours = Math.floor(minutes / 60)
+
+    if (hours > 0) return `${hours}h ${minutes % 60}m`
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`
+    return `${seconds}s`
+  }
 
   // Compact view
   if (compact) {
     return (
-      <div className={`flex items-center space-x-2 ${className}`} title={`${statusConfig.label}: ${statusConfig.description}`}>
+      <div
+        className={`flex items-center space-x-2 ${className}`}
+        title={`${statusConfig.label}: ${statusConfig.description}`}
+      >
         <div className={`w-2 h-2 rounded-full ${statusConfig.bgColor.replace('bg-', 'bg-')}`} />
         <StatusIcon className={`h-4 w-4 ${statusConfig.color}`} />
         {connectionState.reconnectAttempts > 0 && (
@@ -255,7 +264,7 @@ export function ConnectionStatus({
           </Badge>
         )}
       </div>
-    );
+    )
   }
 
   return (
@@ -279,7 +288,7 @@ export function ConnectionStatus({
               <p className="text-sm text-muted-foreground">{statusConfig.description}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             {!isExpanded && (
               <Button
@@ -321,7 +330,9 @@ export function ConnectionStatus({
                 <div>
                   <span className="text-muted-foreground">Uptime:</span>
                   <span className="ml-2 font-medium">
-                    {connectionState.uptime ? formatDuration(Date.now() - connectionState.uptime) : 'N/A'}
+                    {connectionState.uptime
+                      ? formatDuration(Date.now() - connectionState.uptime)
+                      : 'N/A'}
                   </span>
                 </div>
                 <div>
@@ -331,10 +342,9 @@ export function ConnectionStatus({
                 <div>
                   <span className="text-muted-foreground">Last Ping:</span>
                   <span className="ml-2 font-medium">
-                    {connectionState.lastPing 
+                    {connectionState.lastPing
                       ? `${Math.round((Date.now() - connectionState.lastPing) / 1000)}s ago`
-                      : 'N/A'
-                    }
+                      : 'N/A'}
                   </span>
                 </div>
               </div>
@@ -344,17 +354,18 @@ export function ConnectionStatus({
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm">Circuit Breaker</h4>
                   <div className="flex items-center justify-between">
-                    <Badge 
+                    <Badge
                       variant={circuitBreakerStatus.state === 'closed' ? 'default' : 'destructive'}
                       className="text-xs"
                     >
                       {circuitBreakerStatus.state.toUpperCase()}
                     </Badge>
-                    {circuitBreakerStatus.timeUntilRetry && circuitBreakerStatus.timeUntilRetry > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        Retry in {formatDuration(circuitBreakerStatus.timeUntilRetry)}
-                      </span>
-                    )}
+                    {circuitBreakerStatus.timeUntilRetry &&
+                      circuitBreakerStatus.timeUntilRetry > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          Retry in {formatDuration(circuitBreakerStatus.timeUntilRetry)}
+                        </span>
+                      )}
                   </div>
                 </div>
               )}
@@ -366,10 +377,12 @@ export function ConnectionStatus({
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span>Queued Operations</span>
-                      <span>{queueStatus.queueSize}/{queueStatus.maxQueueSize}</span>
+                      <span>
+                        {queueStatus.queueSize}/{queueStatus.maxQueueSize}
+                      </span>
                     </div>
-                    <Progress 
-                      value={(queueStatus.queueSize / queueStatus.maxQueueSize) * 100} 
+                    <Progress
+                      value={(queueStatus.queueSize / queueStatus.maxQueueSize) * 100}
                       className="h-2"
                     />
                     {queueStatus.oldestOperationAge && (
@@ -418,28 +431,23 @@ export function ConnectionStatus({
                     variant="outline"
                     size="sm"
                     onClick={onForceReconnect}
-                    disabled={connectionState.isConnected && connectionState.circuitBreakerState === 'closed'}
+                    disabled={
+                      connectionState.isConnected &&
+                      connectionState.circuitBreakerState === 'closed'
+                    }
                   >
                     <RefreshCw className="h-3 w-3 mr-1" />
                     Force Reconnect
                   </Button>
                 )}
                 {onResetCircuitBreaker && connectionState.circuitBreakerState !== 'closed' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onResetCircuitBreaker}
-                  >
+                  <Button variant="outline" size="sm" onClick={onResetCircuitBreaker}>
                     <Shield className="h-3 w-3 mr-1" />
                     Reset Circuit Breaker
                   </Button>
                 )}
                 {onClearQueue && queueStatus && queueStatus.queueSize > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onClearQueue}
-                  >
+                  <Button variant="outline" size="sm" onClick={onClearQueue}>
                     <Clock className="h-3 w-3 mr-1" />
                     Clear Queue ({queueStatus.queueSize})
                   </Button>
@@ -450,5 +458,5 @@ export function ConnectionStatus({
         </AnimatePresence>
       </CardContent>
     </Card>
-  );
+  )
 }

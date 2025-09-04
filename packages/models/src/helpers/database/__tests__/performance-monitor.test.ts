@@ -25,7 +25,7 @@ describe('PerformanceMonitor', () => {
       const stats = performanceMonitor.getStats();
       expect(stats.totalQueries).toBe(1);
       expect(stats.recentQueries).toHaveLength(1);
-      
+
       const recorded = stats.recentQueries[0];
       expect(recorded).toMatchObject({
         operation,
@@ -33,7 +33,7 @@ describe('PerformanceMonitor', () => {
         parameters,
         resultCount,
         tags,
-        timestamp: expect.any(Number)
+        timestamp: expect.any(Number),
       });
     });
 
@@ -42,13 +42,13 @@ describe('PerformanceMonitor', () => {
 
       const stats = performanceMonitor.getStats();
       const recorded = stats.recentQueries[0];
-      
+
       expect(recorded).toMatchObject({
         operation: 'SIMPLE_QUERY',
         duration: 50,
         parameters: undefined,
         resultCount: 0, // Default value
-        tags: undefined
+        tags: undefined,
       });
     });
 
@@ -69,7 +69,7 @@ describe('PerformanceMonitor', () => {
 
       const allMetrics = (performanceMonitor as any).metrics;
       expect(allMetrics.length).toBe(maxMetrics);
-      
+
       // Should keep the most recent ones
       expect(allMetrics[0].operation).toBe('QUERY_100'); // First kept metric
       expect(allMetrics[maxMetrics - 1].operation).toBe(`QUERY_${maxMetrics + 99}`); // Last metric
@@ -80,9 +80,7 @@ describe('PerformanceMonitor', () => {
 
       performanceMonitor.recordQuery('SLOW_QUERY', 1500); // > 1000ms
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '🐌 Slow query detected: SLOW_QUERY took 1500ms'
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('🐌 Slow query detected: SLOW_QUERY took 1500ms');
 
       consoleSpy.mockRestore();
     });
@@ -120,7 +118,7 @@ describe('PerformanceMonitor', () => {
         totalQueries: 0,
         averageDuration: 0,
         slowQueries: 0,
-        recentQueries: []
+        recentQueries: [],
       });
     });
 
@@ -130,10 +128,10 @@ describe('PerformanceMonitor', () => {
         { operation: 'QUERY_2', duration: 200 },
         { operation: 'QUERY_3', duration: 1500 }, // Slow query
         { operation: 'QUERY_4', duration: 300 },
-        { operation: 'QUERY_5', duration: 2000 }  // Slow query
+        { operation: 'QUERY_5', duration: 2000 }, // Slow query
       ];
 
-      queries.forEach(q => performanceMonitor.recordQuery(q.operation, q.duration));
+      queries.forEach((q) => performanceMonitor.recordQuery(q.operation, q.duration));
 
       const stats = performanceMonitor.getStats();
 
@@ -198,7 +196,7 @@ describe('PerformanceMonitor', () => {
     it('should reset to initial state after clear', () => {
       performanceMonitor.recordQuery('BEFORE_CLEAR', 500);
       performanceMonitor.clear();
-      
+
       performanceMonitor.recordQuery('AFTER_CLEAR', 300);
 
       const stats = performanceMonitor.getStats();
@@ -210,7 +208,7 @@ describe('PerformanceMonitor', () => {
   describe('getMetricsForOperation', () => {
     it('should return metrics for specific operation', () => {
       const targetOperation = 'CREATE_USER';
-      
+
       // Record various operations
       performanceMonitor.recordQuery('CREATE_USER', 100, { name: 'John' });
       performanceMonitor.recordQuery('UPDATE_USER', 150);
@@ -221,12 +219,12 @@ describe('PerformanceMonitor', () => {
       const createUserMetrics = performanceMonitor.getMetricsForOperation(targetOperation);
 
       expect(createUserMetrics).toHaveLength(3);
-      createUserMetrics.forEach(metric => {
+      createUserMetrics.forEach((metric) => {
         expect(metric.operation).toBe(targetOperation);
       });
 
       // Verify durations
-      const durations = createUserMetrics.map(m => m.duration);
+      const durations = createUserMetrics.map((m) => m.duration);
       expect(durations).toEqual([100, 120, 90]);
     });
 
@@ -246,7 +244,7 @@ describe('PerformanceMonitor', () => {
 
     it('should handle operation filtering with special characters', () => {
       const specialOperation = 'QUERY_WITH_SPECIAL_CHARS_!@#$%';
-      
+
       performanceMonitor.recordQuery(specialOperation, 100);
       performanceMonitor.recordQuery('NORMAL_QUERY', 150);
 
@@ -260,17 +258,17 @@ describe('PerformanceMonitor', () => {
   describe('metrics data integrity', () => {
     it('should maintain chronological order of metrics', () => {
       const baseTime = Date.now();
-      
+
       // Mock Date.now to return incremental timestamps
       let timeCounter = 0;
-      jest.spyOn(Date, 'now').mockImplementation(() => baseTime + (timeCounter++ * 1000));
+      jest.spyOn(Date, 'now').mockImplementation(() => baseTime + timeCounter++ * 1000);
 
       performanceMonitor.recordQuery('QUERY_1', 100);
       performanceMonitor.recordQuery('QUERY_2', 200);
       performanceMonitor.recordQuery('QUERY_3', 300);
 
       const allMetrics = (performanceMonitor as any).metrics as QueryMetrics[];
-      
+
       for (let i = 1; i < allMetrics.length; i++) {
         expect(allMetrics[i].timestamp).toBeGreaterThan(allMetrics[i - 1].timestamp);
       }
@@ -282,18 +280,12 @@ describe('PerformanceMonitor', () => {
       const complexParameters = {
         filters: { status: 'active', type: 'user' },
         pagination: { page: 1, limit: 50 },
-        sort: { field: 'createdAt', order: 'DESC' }
+        sort: { field: 'createdAt', order: 'DESC' },
       };
 
       const complexTags = ['user-management', 'pagination', 'filtering'];
 
-      performanceMonitor.recordQuery(
-        'COMPLEX_QUERY',
-        250,
-        complexParameters,
-        42,
-        complexTags
-      );
+      performanceMonitor.recordQuery('COMPLEX_QUERY', 250, complexParameters, 42, complexTags);
 
       const metrics = performanceMonitor.getMetricsForOperation('COMPLEX_QUERY');
       const metric = metrics[0];
@@ -337,7 +329,7 @@ describe('PerformanceMonitor', () => {
 
     it('should handle very large durations', () => {
       const veryLargeDuration = Number.MAX_SAFE_INTEGER;
-      
+
       performanceMonitor.recordQuery('HUGE_QUERY', veryLargeDuration);
 
       const stats = performanceMonitor.getStats();
@@ -362,11 +354,11 @@ describe('PerformanceMonitor', () => {
           deep: {
             very: {
               deep: {
-                object: 'value'
-              }
-            }
-          }
-        }
+                object: 'value',
+              },
+            },
+          },
+        },
       };
 
       performanceMonitor.recordQuery('LARGE_PARAMS_QUERY', 500, largeParameters);
@@ -392,7 +384,7 @@ describe('PerformanceMonitor', () => {
   describe('statistical calculations', () => {
     it('should calculate average correctly with various durations', () => {
       const durations = [50, 100, 150, 200, 500]; // Average = 200
-      
+
       durations.forEach((duration, i) => {
         performanceMonitor.recordQuery(`QUERY_${i}`, duration);
       });
@@ -504,7 +496,7 @@ describe('PerformanceMonitor', () => {
   describe('tags functionality', () => {
     it('should store and retrieve tags correctly', () => {
       const tags = ['database', 'user-management', 'critical'];
-      
+
       performanceMonitor.recordQuery('TAGGED_QUERY', 200, { id: 123 }, 5, tags);
 
       const metrics = performanceMonitor.getMetricsForOperation('TAGGED_QUERY');
@@ -526,8 +518,13 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should handle tags with special characters', () => {
-      const specialTags = ['tag-with-hyphens', 'tag_with_underscores', 'tag.with.dots', 'tag with spaces'];
-      
+      const specialTags = [
+        'tag-with-hyphens',
+        'tag_with_underscores',
+        'tag.with.dots',
+        'tag with spaces',
+      ];
+
       performanceMonitor.recordQuery('SPECIAL_TAGS_QUERY', 100, {}, 0, specialTags);
 
       const metrics = performanceMonitor.getMetricsForOperation('SPECIAL_TAGS_QUERY');
@@ -538,13 +535,13 @@ describe('PerformanceMonitor', () => {
   describe('result count tracking', () => {
     it('should track result counts accurately', () => {
       const resultCounts = [0, 1, 10, 100, 1000];
-      
+
       resultCounts.forEach((count, i) => {
         performanceMonitor.recordQuery(`QUERY_${i}`, 100, {}, count);
       });
 
       const allMetrics = (performanceMonitor as any).metrics as QueryMetrics[];
-      
+
       resultCounts.forEach((expectedCount, i) => {
         expect(allMetrics[i].resultCount).toBe(expectedCount);
       });
@@ -559,7 +556,7 @@ describe('PerformanceMonitor', () => {
 
     it('should handle very large result counts', () => {
       const largeCount = 1000000;
-      
+
       performanceMonitor.recordQuery('LARGE_RESULTS', 100, {}, largeCount);
 
       const metrics = performanceMonitor.getMetricsForOperation('LARGE_RESULTS');
@@ -570,9 +567,9 @@ describe('PerformanceMonitor', () => {
   describe('timestamp tracking', () => {
     it('should record accurate timestamps', () => {
       const beforeTime = Date.now();
-      
+
       performanceMonitor.recordQuery('TIMESTAMP_TEST', 100);
-      
+
       const afterTime = Date.now();
       const metrics = performanceMonitor.getMetricsForOperation('TIMESTAMP_TEST');
 
@@ -581,7 +578,7 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should handle concurrent query recordings', () => {
-      const promises = Array.from({ length: 10 }, (_, i) => 
+      const promises = Array.from({ length: 10 }, (_, i) =>
         Promise.resolve(performanceMonitor.recordQuery(`CONCURRENT_${i}`, 100))
       );
 
@@ -590,7 +587,7 @@ describe('PerformanceMonitor', () => {
         expect(stats.totalQueries).toBe(10);
 
         // All timestamps should be unique or very close
-        const timestamps = stats.recentQueries.map(m => m.timestamp);
+        const timestamps = stats.recentQueries.map((m) => m.timestamp);
         const uniqueTimestamps = new Set(timestamps);
         expect(uniqueTimestamps.size).toBeGreaterThan(0); // At least some unique timestamps
       });
@@ -600,7 +597,7 @@ describe('PerformanceMonitor', () => {
   describe('memory management', () => {
     it('should not exceed maximum metrics limit during normal operation', () => {
       const maxMetrics = (performanceMonitor as any).maxMetrics;
-      
+
       // Record exactly max metrics
       for (let i = 0; i < maxMetrics; i++) {
         performanceMonitor.recordQuery(`QUERY_${i}`, 100);
@@ -617,14 +614,14 @@ describe('PerformanceMonitor', () => {
 
     it('should maintain most recent metrics when limit exceeded', () => {
       const maxMetrics = (performanceMonitor as any).maxMetrics;
-      
+
       // Record more than max
       for (let i = 0; i < maxMetrics + 5; i++) {
         performanceMonitor.recordQuery(`QUERY_${i}`, 100);
       }
 
       const metricsArray = (performanceMonitor as any).metrics;
-      
+
       // Should have most recent metrics (5 through maxMetrics + 4)
       expect(metricsArray[0].operation).toBe('QUERY_5');
       expect(metricsArray[metricsArray.length - 1].operation).toBe(`QUERY_${maxMetrics + 4}`);
@@ -643,7 +640,7 @@ describe('PerformanceMonitor', () => {
         { name: 'CREATE_INDEX', duration: 5000, resultCount: 0 }, // Very slow
       ];
 
-      operations.forEach(op => {
+      operations.forEach((op) => {
         performanceMonitor.recordQuery(
           op.name,
           op.duration,
@@ -654,11 +651,11 @@ describe('PerformanceMonitor', () => {
       });
 
       const stats = performanceMonitor.getStats();
-      
+
       expect(stats.totalQueries).toBe(6);
       expect(stats.slowQueries).toBe(2); // COMPLEX_JOIN and CREATE_INDEX
       expect(stats.averageDuration).toBe(Math.round((45 + 25 + 30 + 20 + 1200 + 5000) / 6));
-      
+
       // Verify specific operation metrics
       const selectMetrics = performanceMonitor.getMetricsForOperation('SELECT_USERS');
       expect(selectMetrics[0].resultCount).toBe(150);
@@ -671,16 +668,16 @@ describe('PerformanceMonitor', () => {
 
       // Record queries at different times
       performanceMonitor.recordQuery('MORNING_QUERY', 100);
-      
+
       mockTime += 60 * 60 * 1000; // 1 hour later
       performanceMonitor.recordQuery('AFTERNOON_QUERY', 150);
-      
+
       mockTime += 60 * 60 * 1000; // Another hour later
       performanceMonitor.recordQuery('EVENING_QUERY', 200);
 
       const stats = performanceMonitor.getStats();
-      const timestamps = stats.recentQueries.map(m => m.timestamp);
-      
+      const timestamps = stats.recentQueries.map((m) => m.timestamp);
+
       // Verify timestamps are properly spaced
       expect(timestamps[1] - timestamps[0]).toBe(60 * 60 * 1000);
       expect(timestamps[2] - timestamps[1]).toBe(60 * 60 * 1000);
@@ -690,7 +687,7 @@ describe('PerformanceMonitor', () => {
 
     it('should support monitoring workflow for performance optimization', () => {
       // Simulate before/after optimization scenario
-      
+
       // Before optimization - slow queries
       for (let i = 0; i < 5; i++) {
         performanceMonitor.recordQuery('UNOPTIMIZED_QUERY', 1500 + i * 100);
@@ -711,7 +708,8 @@ describe('PerformanceMonitor', () => {
 
       // Check specific operation performance
       const optimizedMetrics = performanceMonitor.getMetricsForOperation('OPTIMIZED_QUERY');
-      const avgOptimized = optimizedMetrics.reduce((sum, m) => sum + m.duration, 0) / optimizedMetrics.length;
+      const avgOptimized =
+        optimizedMetrics.reduce((sum, m) => sum + m.duration, 0) / optimizedMetrics.length;
       expect(avgOptimized).toBeLessThan(100);
     });
   });
@@ -723,7 +721,7 @@ describe('PerformanceMonitor', () => {
 
       // Import the same instance (simulated)
       const { performanceMonitor: importedMonitor } = jest.requireActual('../performance-monitor');
-      
+
       const stats = importedMonitor.getStats();
       expect(stats.totalQueries).toBeGreaterThan(0);
     });

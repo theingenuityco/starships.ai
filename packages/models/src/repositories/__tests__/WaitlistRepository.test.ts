@@ -19,17 +19,19 @@ describe('WaitlistRepository', () => {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     } as any;
-    
+
     repository = new WaitlistRepository(mockConnection);
     jest.clearAllMocks();
   });
 
-  const createMockWaitlistEntry = (overrides: Partial<WaitlistEntryModel> = {}): WaitlistEntryModel => ({
+  const createMockWaitlistEntry = (
+    overrides: Partial<WaitlistEntryModel> = {}
+  ): WaitlistEntryModel => ({
     email: 'test@example.com',
     status: 'approved',
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
     notes: 'Test entry',
-    ...overrides
+    ...overrides,
   });
 
   describe('constructor', () => {
@@ -64,10 +66,9 @@ describe('WaitlistRepository', () => {
 
       await repository.checkApproval('TEST@EXAMPLE.COM');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.any(String),
-        { email: 'test@example.com' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.any(String), {
+        email: 'test@example.com',
+      });
     });
 
     it('should validate email format', async () => {
@@ -88,10 +89,9 @@ describe('WaitlistRepository', () => {
 
       await repository.checkApproval('  test@example.com  ');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.any(String),
-        { email: 'test@example.com' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.any(String), {
+        email: 'test@example.com',
+      });
     });
   });
 
@@ -122,10 +122,9 @@ describe('WaitlistRepository', () => {
 
       await repository.getByEmail('CAPS@EXAMPLE.COM');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.any(String),
-        { email: 'caps@example.com' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.any(String), {
+        email: 'caps@example.com',
+      });
     });
 
     it('should handle database errors', async () => {
@@ -147,7 +146,7 @@ describe('WaitlistRepository', () => {
         expect.stringContaining('CREATE (w:Waitlist'),
         expect.objectContaining({
           email: 'test@example.com',
-          notes: 'Test notes'
+          notes: 'Test notes',
         })
       );
     });
@@ -162,7 +161,7 @@ describe('WaitlistRepository', () => {
         expect.any(String),
         expect.objectContaining({
           email: 'test@example.com',
-          notes: null
+          notes: null,
         })
       );
     });
@@ -176,7 +175,7 @@ describe('WaitlistRepository', () => {
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          notes: null
+          notes: null,
         })
       );
     });
@@ -194,7 +193,7 @@ describe('WaitlistRepository', () => {
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          email: 'caps@example.com'
+          email: 'caps@example.com',
         })
       );
     });
@@ -216,11 +215,9 @@ describe('WaitlistRepository', () => {
     it('should return all approved entries', async () => {
       const mockEntries = [
         createMockWaitlistEntry({ email: 'test1@example.com' }),
-        createMockWaitlistEntry({ email: 'test2@example.com' })
+        createMockWaitlistEntry({ email: 'test2@example.com' }),
       ];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockEntries.map(entry => ({ entry }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockEntries.map((entry) => ({ entry })));
 
       const result = await repository.getAllApproved();
 
@@ -276,10 +273,12 @@ describe('WaitlistRepository', () => {
       await repository.initializeSchema();
 
       expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2);
-      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1,
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
+        1,
         expect.stringContaining('CREATE CONSTRAINT waitlist_email_unique')
       );
-      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(2,
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('CREATE INDEX waitlist_status')
       );
     });
@@ -294,7 +293,7 @@ describe('WaitlistRepository', () => {
         'Waitlist schema initialization warning:',
         expect.any(Error)
       );
-      
+
       consoleSpy.mockRestore();
     });
   });
@@ -302,7 +301,7 @@ describe('WaitlistRepository', () => {
   describe('seedInitialEmails', () => {
     it('should seed initial emails when they do not exist', async () => {
       const mockEntry = createMockWaitlistEntry();
-      
+
       jest.spyOn(repository, 'getByEmail').mockResolvedValue(null);
       jest.spyOn(repository, 'addApprovedEmail').mockResolvedValue(mockEntry);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -316,13 +315,13 @@ describe('WaitlistRepository', () => {
         'Founder - Primary tester'
       );
       expect(consoleSpy).toHaveBeenCalledWith('Added approved email: dewang@theingenuity.co');
-      
+
       consoleSpy.mockRestore();
     });
 
     it('should skip existing emails', async () => {
       const mockEntry = createMockWaitlistEntry();
-      
+
       jest.spyOn(repository, 'getByEmail').mockResolvedValue(mockEntry);
       jest.spyOn(repository, 'addApprovedEmail').mockResolvedValue(mockEntry);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -332,18 +331,19 @@ describe('WaitlistRepository', () => {
       expect(repository.getByEmail).toHaveBeenCalledTimes(3);
       expect(repository.addApprovedEmail).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith('Email already exists: dewang@theingenuity.co');
-      
+
       consoleSpy.mockRestore();
     });
 
     it('should handle errors gracefully and continue with other emails', async () => {
       const mockEntry = createMockWaitlistEntry();
-      
-      jest.spyOn(repository, 'getByEmail')
+
+      jest
+        .spyOn(repository, 'getByEmail')
         .mockResolvedValueOnce(null) // First email doesn't exist
         .mockRejectedValueOnce(new Error('Database error')) // Second email fails
         .mockResolvedValueOnce(null); // Third email doesn't exist
-      
+
       jest.spyOn(repository, 'addApprovedEmail').mockResolvedValue(mockEntry);
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
       const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
@@ -356,7 +356,7 @@ describe('WaitlistRepository', () => {
       );
       expect(consoleLogSpy).toHaveBeenCalledWith('Added approved email: dewang@theingenuity.co');
       expect(consoleLogSpy).toHaveBeenCalledWith('Added approved email: prashant@theingenuity.co');
-      
+
       consoleErrorSpy.mockRestore();
       consoleLogSpy.mockRestore();
     });
@@ -366,7 +366,7 @@ describe('WaitlistRepository', () => {
     describe('normalizeEmail', () => {
       it('should convert to lowercase and trim whitespace', () => {
         const repo = repository as any;
-        
+
         expect(repo.normalizeEmail('  TEST@EXAMPLE.COM  ')).toBe('test@example.com');
         expect(repo.normalizeEmail('MixedCase@Domain.org')).toBe('mixedcase@domain.org');
         expect(repo.normalizeEmail('already@lowercase.com')).toBe('already@lowercase.com');
@@ -376,7 +376,7 @@ describe('WaitlistRepository', () => {
     describe('isValidEmail', () => {
       it('should validate correct email formats', () => {
         const repo = repository as any;
-        
+
         expect(repo.isValidEmail('test@example.com')).toBe(true);
         expect(repo.isValidEmail('user.name@domain.org')).toBe(true);
         expect(repo.isValidEmail('user+tag@domain.co.uk')).toBe(true);
@@ -385,7 +385,7 @@ describe('WaitlistRepository', () => {
 
       it('should reject invalid email formats', () => {
         const repo = repository as any;
-        
+
         expect(repo.isValidEmail('invalid-email')).toBe(false);
         expect(repo.isValidEmail('@example.com')).toBe(false);
         expect(repo.isValidEmail('test@')).toBe(false);
@@ -431,10 +431,9 @@ describe('WaitlistRepository', () => {
 
       await repository.checkApproval('user+test@example-domain.co.uk');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.any(String),
-        { email: 'user+test@example-domain.co.uk' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.any(String), {
+        email: 'user+test@example-domain.co.uk',
+      });
     });
 
     it('should handle very long valid emails', async () => {
@@ -451,16 +450,15 @@ describe('WaitlistRepository', () => {
 
       await repository.checkApproval('test@münchen.de');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.any(String),
-        { email: 'test@münchen.de' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.any(String), {
+        email: 'test@münchen.de',
+      });
     });
 
     it('should handle getByEmail with special characters in result', async () => {
       const mockEntry = createMockWaitlistEntry({
         email: 'test+special@example.com',
-        notes: 'Notes with "quotes" and special chars: äöü'
+        notes: 'Notes with "quotes" and special chars: äöü',
       });
       mockConnection.executeQuery.mockResolvedValue([{ entry: mockEntry }]);
 
@@ -478,7 +476,7 @@ describe('WaitlistRepository', () => {
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          notes: null
+          notes: null,
         })
       );
     });
@@ -510,16 +508,14 @@ describe('WaitlistRepository', () => {
 
     it('should handle bulk operations', async () => {
       const emails = ['user1@example.com', 'user2@example.com', 'user3@example.com'];
-      const mockEntries = emails.map(email => createMockWaitlistEntry({ email }));
+      const mockEntries = emails.map((email) => createMockWaitlistEntry({ email }));
 
-      mockConnection.executeQuery.mockResolvedValue(
-        mockEntries.map(entry => ({ entry }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockEntries.map((entry) => ({ entry })));
 
       const result = await repository.getAllApproved();
 
       expect(result).toHaveLength(3);
-      expect(result.map(e => e.email)).toEqual(emails);
+      expect(result.map((e) => e.email)).toEqual(emails);
     });
   });
 });

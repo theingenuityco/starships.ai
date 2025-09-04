@@ -246,7 +246,9 @@ export function ApiKeyInputModal({
             id={requirement.envKey}
             type={inputType}
             value={value}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(requirement.envKey, e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleInputChange(requirement.envKey, e.target.value)
+            }
             placeholder={requirement.placeholder}
             className={cn(
               'pr-10 border border-input',

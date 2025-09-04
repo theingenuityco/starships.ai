@@ -15,7 +15,12 @@ interface AgentSelectorProps {
   compact?: boolean
 }
 
-export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compact = false }: AgentSelectorProps) {
+export function AgentSelector({
+  selectedAgent,
+  onAgentChange,
+  starshipId,
+  compact = false,
+}: AgentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const { agents, loading } = useAgents(starshipId)
 
@@ -40,21 +45,21 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
         variant="outline"
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "justify-between",
-          compact ? "h-8 px-3 text-xs min-w-[120px]" : "min-w-[180px]"
+          'justify-between',
+          compact ? 'h-8 px-3 text-xs min-w-[120px]' : 'min-w-[180px]'
         )}
         disabled={loading}
       >
         <div className="flex items-center gap-2">
-          <Bot className={compact ? "h-3 w-3" : "h-4 w-4"} />
+          <Bot className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
           <span className="truncate">
-            {selectedAgent ? selectedAgent.name : (compact ? 'Select Agent' : 'Select an agent')}
+            {selectedAgent ? selectedAgent.name : compact ? 'Select Agent' : 'Select an agent'}
           </span>
         </div>
         {loading ? (
-          <Loader2 className={cn(compact ? "h-3 w-3" : "h-4 w-4", "animate-spin")} />
+          <Loader2 className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', 'animate-spin')} />
         ) : (
-          <ChevronDown className={cn(compact ? "h-3 w-3" : "h-4 w-4", isOpen && "rotate-180")} />
+          <ChevronDown className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />
         )}
       </Button>
 
@@ -66,8 +71,8 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              "absolute top-full left-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50",
-              compact ? "w-48" : "w-full min-w-[250px]"
+              'absolute top-full left-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50',
+              compact ? 'w-48' : 'w-full min-w-[250px]'
             )}
           >
             <div className="p-2 max-h-64 overflow-y-auto">
@@ -93,7 +98,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                       Clear selection
                     </button>
                   )}
-                  {agents.map((agent) => (
+                  {agents.map(agent => (
                     <button
                       key={agent.id}
                       onClick={() => {
@@ -101,10 +106,10 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                         setIsOpen(false)
                       }}
                       className={cn(
-                        "w-full text-left px-3 py-2 rounded-md transition-colors",
+                        'w-full text-left px-3 py-2 rounded-md transition-colors',
                         selectedAgent?.id === agent.id
-                          ? "bg-primary/10 text-primary"
-                          : "text-foreground hover:bg-muted"
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-foreground hover:bg-muted'
                       )}
                     >
                       <div className="font-medium">{agent.name}</div>

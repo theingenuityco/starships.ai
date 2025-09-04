@@ -6,12 +6,10 @@
  * stateless execution engine (autopilot Agent).
  */
 
+import { Agent, Blueprint } from '@starships/autopilot';
+import { InternalServerError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { Agent, AgentMemory, Blueprint } from '@starships/autopilot';
-import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
-import { ValidationError, NotFoundError, InternalServerError } from '@starships/errors';
-import getStore, { type MemoryStore } from '@/store';
+import type { AgentModel, CreateAgentRequest, SessionRequest, SessionResponse, UpdateAgentRequest } from '@starships/protocol';
 
 export interface AgentOptions {
   includeMemory?: boolean;
@@ -47,156 +45,6 @@ export class AgentService {
 
   constructor() {
     this.agentRepository = new AgentRepository();
-  }
-
-  // ============================================================================
-  // STATIC APIs FOR BACKWARD COMPATIBILITY
-  // ============================================================================
-
-  /**
-   * Get agents by category - Static method
-   */
-  static async getAgentsByCategory(category: string): Promise<AgentModel[]> {
-    const repository = new AgentRepository();
-    return await repository.findByCategory(category);
-  }
-
-  /**
-   * Get agents by author - Static method
-   */
-  static async getAgentsByAuthor(authorId: string): Promise<AgentModel[]> {
-    const repository = new AgentRepository();
-    return await repository.findByAuthor(authorId);
-  }
-
-  /**
-   * Get agents by tags - Static method
-   */
-  static async getAgentsByTags(tags: string[]): Promise<AgentModel[]> {
-    const repository = new AgentRepository();
-    return await repository.findByTags(tags);
-  }
-
-  /**
-   * Get public agents - Static method
-   */
-  static async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
-    const repository = new AgentRepository();
-    return await repository.findPublic(limit, offset);
-  }
-
-  /**
-   * Search agents - Static method
-   */
-  static async searchAgents(query: string): Promise<AgentModel[]> {
-    const repository = new AgentRepository();
-    return await repository.searchAgents(query);
-  }
-
-  /**
-   * Get agent by ID - Static method (returns AgentModel, not Agent)
-   */
-  static async getAgent(agentId: string): Promise<AgentModel | null> {
-    const repository = new AgentRepository();
-    return await repository.findById(agentId);
-  }
-
-  /**
-   * Create agent - Static method (returns AgentModel, not Agent)
-   */
-  static async createAgent(request: CreateAgentRequest): Promise<AgentModel> {
-    const repository = new AgentRepository();
-
-    // Provide defaults for core AgentNodeParameters fields
-    const agentData = {
-      ...request,
-      timeout: request.timeout || 30000,
-      version: '1.0.0', // Default version for all new agents
-    };
-
-    return await repository.create(agentData);
-  }
-
-  /**
-   * Update agent - Static method (returns AgentModel, not Agent)
-   */
-  static async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
-    const repository = new AgentRepository();
-    return await repository.update(agentId, updates as Partial<AgentModel>);
-  }
-
-  /**
-   * Delete agent - Static method
-   */
-  static async deleteAgent(agentId: string): Promise<boolean> {
-    const repository = new AgentRepository();
-    return await repository.delete(agentId);
-  }
-
-  /**
-   * Get agents by starship ID - Static method
-   */
-  static async getAgentsByStarshipId(starshipId: string): Promise<AgentModel[]> {
-    const repository = new AgentRepository();
-    return await repository.findByStarshipId(starshipId);
-  }
-
-  /**
-   * Track usage - Static method
-   */
-  static async trackUsage(agentId: string): Promise<boolean> {
-    const repository = new AgentRepository();
-    try {
-      await repository.incrementUsageCount(agentId);
-      return true;
-    } catch (error) {
-      console.error(`Failed to track usage for agent ${agentId}:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Rate agent - Static method
-   */
-  static async rateAgent(agentId: string, userId: string, rating: number): Promise<boolean> {
-    const repository = new AgentRepository();
-    try {
-      await repository.updateRating(agentId, rating);
-      return true;
-    } catch (error) {
-      console.error(`Failed to rate agent ${agentId}:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Get agent analytics - Static method
-   */
-  static async getAgentAnalytics(agentId: string): Promise<any> {
-    const repository = new AgentRepository();
-    const agent = await repository.findById(agentId);
-    if (!agent) {
-      return null;
-    }
-
-    // Return basic analytics from the agent model
-    return {
-      id: agent.id,
-      name: agent.name,
-      usageCount: agent.usageCount || 0,
-      rating: agent.rating || 0,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      category: agent.category,
-      isPublic: agent.isPublic,
-    };
-  }
-
-  /**
-   * Get memory store - Static method
-   */
-  static getMemoryStore(): MemoryStore {
-    return getStore();
   }
 
   // ============================================================================
@@ -567,51 +415,6 @@ export class AgentService {
     };
 
     return new Agent(agentParams);
-  }
-
-  /**
-   * Create agent memory from database agent configuration
-   */
-  private async createAgentMemory(
-    dbAgent: AgentModel,
-    options: {
-      includeMemory?: boolean;
-      userId?: string;
-      loadConversationHistory?: boolean;
-    }
-  ): Promise<AgentMemory> {
-    // Initialize memory with default prompt
-    const memory = new AgentMemory();
-    memory.addMessage('system', 'You are a helpful AI assistant.');
-
-    // Set structured context from database configuration
-    if (dbAgent.memory) {
-      if (dbAgent.memory.identity) {
-        memory.setIdentity(dbAgent.memory.identity);
-      }
-      if (dbAgent.memory.purpose) {
-        memory.setPurpose(dbAgent.memory.purpose);
-      }
-      if (dbAgent.memory.space) {
-        memory.setSpace(dbAgent.memory.space);
-      }
-    } else {
-      // Set default identity and purpose based on agent metadata
-      memory.setIdentity({
-        name: dbAgent.name as string,
-        role: this.getRoleFromCategory(dbAgent.category as string),
-        expertise: dbAgent.tags as string[],
-      });
-
-      memory.setPurpose({
-        primary: (dbAgent.description as string) || `Assist users as a ${dbAgent.category} agent`,
-        constraints: ['Be helpful and accurate', 'Follow ethical guidelines'],
-      });
-    }
-
-    // Note: Conversation history loading removed
-
-    return memory;
   }
 
   /**

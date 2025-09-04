@@ -1,10 +1,10 @@
-import { MessageRepository } from '@starships/models';
-import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@starships/protocol';
-import type { Socket, Server as SocketIOServer } from 'socket.io';
 import { AgentService } from '@/services/AgentService';
 import { SessionService } from '@/services/SessionService';
 import { SocketIOService } from '@/services/SocketIOService';
 import getStore from '@/store';
+import { AgentRepository, MessageRepository } from '@starships/models';
+import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@starships/protocol';
+import type { Socket, Server as SocketIOServer } from 'socket.io';
 
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
   const isSessionActive = (session: any): boolean => {
@@ -64,7 +64,8 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
         }
 
         // Get agent first to validate and get starshipId
-        const agent = await AgentService.getAgent(request.agentId);
+        const agentRepository = new AgentRepository();
+        const agent = await agentRepository.findById(request.agentId);
         if (!agent || !agent.starshipId) {
           socket.emit('session:stream-error', {
             streamId: request.streamId,
@@ -131,7 +132,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
 
         // Track agent usage
         try {
-          await AgentService.trackUsage(request.agentId);
+          await agentRepository.incrementUsageCount(request.agentId);
         } catch (error) {
           console.warn(`[AGENT SOCKET] Failed to track usage for agent ${request.agentId}:`, error);
           // Continue with streaming - don't fail on analytics

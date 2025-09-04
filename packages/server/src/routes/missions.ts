@@ -2,22 +2,22 @@
  * Mission management routes (OpenAPI pattern)
  */
 
-import { Router } from 'express';
-import type { Request, Response } from 'express';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MissionOrchestratorService } from '@/services/MissionOrchestratorService';
 import { MissionService } from '@/services/MissionService';
 import { WorkflowService } from '@/services/WorkflowService';
-import { AgentService } from '@/services/AgentService';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
+import { AgentRepository } from '@starships/models';
 import type {
   CreateMissionRequest,
-  UpdateMissionRequest,
   MissionFilters,
   MissionSort,
   SendMissionMessageRequest,
+  StandardErrorCode,
+  UpdateMissionRequest,
 } from '@starships/protocol';
-import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { StandardErrorCode } from '@starships/protocol';
-import { sendSuccess, sendError, handleCommonError, validateUUID, validatePagination, createPaginationMeta } from '@/utils/responseHelpers';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
 
 const router: Router = Router();
 
@@ -412,9 +412,10 @@ router.get('/missions/:id/workflow', async (req: Request, res: Response): Promis
         .filter((id: string, index: number, array: string[]) => array.indexOf(id) === index); // Remove duplicates
 
       // Fetch agent details for all unique agent IDs
+      const agentRepository = new AgentRepository();
       for (const agentId of agentIds) {
         try {
-          const agent = await AgentService.getAgent(agentId);
+          const agent = await agentRepository.findById(agentId);
           if (agent) {
             agents[agentId] = agent;
           }

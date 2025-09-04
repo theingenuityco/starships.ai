@@ -10,7 +10,7 @@ import type {
   UserRepository,
 } from '@starships/models';
 import type { StarshipModel } from '@starships/protocol';
-import { authMiddleware } from '../middleware/auth';
+import { jwtAuthMiddleware } from '../middleware/jwt-auth';
 import { SubscriptionService } from '../services/SubscriptionService';
 import {
   sendSuccess,
@@ -39,7 +39,7 @@ export function initializeStarshipRoutes(deps: {
 }
 
 // GET /starships - Get user's starships (OpenAPI pattern)
-router.get('/starships', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
     const { page, limit, error: paginationError } = validatePagination(
@@ -69,7 +69,7 @@ router.get('/starships', authMiddleware, async (req: Request, res: Response): Pr
 });
 
 // POST /starships/create-paid - Create paid starship with pending payment status (OpenAPI pattern)
-router.post('/starships/create-paid', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/create-paid', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
     const { name, plan, billingPeriod } = req.body;
@@ -149,7 +149,7 @@ router.post('/starships/create-paid', authMiddleware, async (req: Request, res: 
 });
 
 // POST /starships - Create new starship (OpenAPI pattern)
-router.post('/starships', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
     const { name, class: starshipClass, plan, billingPeriod } = req.body;
@@ -281,7 +281,7 @@ router.post('/starships', authMiddleware, async (req: Request, res: Response): P
 });
 
 // GET /starships/:id - Get specific starship (supports both ID and slug) (OpenAPI pattern)
-router.get('/starships/:idOrSlug', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { idOrSlug } = req.params;
     const userId = (req as any).user!.id;
@@ -326,7 +326,7 @@ router.get('/starships/:idOrSlug', authMiddleware, async (req: Request, res: Res
 });
 
 // POST /starships/:id/agents/:agentId - Deploy agent to starship (OpenAPI pattern)
-router.post('/starships/:id/agents/:agentId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id: starshipId, agentId } = req.params;
 
@@ -394,7 +394,7 @@ router.post('/starships/:id/agents/:agentId', authMiddleware, async (req: Reques
 });
 
 // DELETE /starships/:id/agents/:agentId - Remove agent from starship (OpenAPI pattern)
-router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id: starshipId, agentId } = req.params;
 
@@ -448,7 +448,7 @@ router.delete('/starships/:id/agents/:agentId', authMiddleware, async (req: Requ
 });
 
 // PUT /starships/:id - Update starship (name, status, class) (OpenAPI pattern)
-router.put('/starships/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
@@ -552,7 +552,7 @@ router.put('/starships/:id', authMiddleware, async (req: Request, res: Response)
 });
 
 // DELETE /starships/:id - Cancel subscription first, then delete starship (OpenAPI pattern)
-router.delete('/starships/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
@@ -642,7 +642,7 @@ router.delete('/starships/:id', authMiddleware, async (req: Request, res: Respon
 });
 
 // GET /starships/:id/agents - Get detailed agent information for starship (OpenAPI pattern)
-router.get('/starships/:id/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id;
@@ -706,7 +706,7 @@ router.get('/starships/pricing', async (req: Request, res: Response): Promise<vo
 });
 
 // POST /starships/checkout-sessions - Create checkout session (OpenAPI pattern)
-router.post('/starships/checkout-sessions', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/checkout-sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { starshipName, plan, billingPeriod } = req.body;
     const userId = (req as any).user?.id;
@@ -763,7 +763,7 @@ router.post('/starships/checkout-sessions', authMiddleware, async (req: Request,
 });
 
 // POST /starships/:id/billing-portal - Create billing portal session (OpenAPI pattern)
-router.post('/starships/:id/billing-portal', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:id/billing-portal', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user?.id;
@@ -793,7 +793,7 @@ router.post('/starships/:id/billing-portal', authMiddleware, async (req: Request
 });
 
 // POST /starships/:id/retry-payment - Retry payment for pending starship (OpenAPI pattern)
-router.post('/starships/:id/retry-payment', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:id/retry-payment', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user?.id;

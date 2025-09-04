@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { SessionModel, SessionSourceType } from '@starships/protocol';
 import type { Request, Response } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { jwtAuthMiddleware } from '../middleware/jwt-auth';
 import { SessionService } from '../services/SessionService';
 import { ValidationError, NotFoundError } from '@starships/errors';
 import type { StandardErrorCode } from '@starships/protocol';
@@ -28,7 +28,7 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 // POST /sessions/:sessionId/messages - Send message to agent (OpenAPI pattern)
-router.post('/sessions/:sessionId/messages', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/sessions/:sessionId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     const { sessionId } = req.params;
@@ -124,7 +124,7 @@ router.post('/sessions/:sessionId/messages', authMiddleware, async (req: Request
 });
 
 // DELETE /sessions/:sessionId/memory - Clear memory for a session (OpenAPI pattern)
-router.delete('/sessions/:sessionId/memory', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/sessions/:sessionId/memory', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId } = req.params;
     const userId = req.user?.id;
@@ -171,7 +171,7 @@ router.delete('/sessions/:sessionId/memory', authMiddleware, async (req: Request
 });
 
 // GET endpoint for fetching messages by memory ID (kept for backward compatibility)
-router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/messages/memory/:memoryId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { memoryId } = req.params;
     const userId = req.user?.id;
@@ -244,7 +244,7 @@ router.get('/messages/memory/:memoryId', authMiddleware, async (req: Request, re
 });
 
 // GET /starships/:starshipId/sessions - Fetch sessions by starship (OpenAPI pattern)
-router.get('/starships/:starshipId/sessions', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:starshipId/sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { starshipId } = req.params;
     const userId = req.user?.id;
@@ -311,7 +311,7 @@ router.get('/starships/:starshipId/sessions', authMiddleware, async (req: Reques
 });
 
 // GET /sessions/:sessionId - Fetch session details (OpenAPI pattern)
-router.get('/sessions/:sessionId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/sessions/:sessionId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId } = req.params;
     const userId = req.user?.id;
@@ -375,7 +375,7 @@ router.get('/sessions/:sessionId', authMiddleware, async (req: Request, res: Res
 });
 
 // GET /users/:userId/sessions - Get sessions for a user
-router.get('/users/:userId/sessions', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/users/:userId/sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId: targetUserId } = req.params;
     const userId = req.user?.id;
@@ -429,7 +429,7 @@ router.get('/users/:userId/sessions', authMiddleware, async (req: Request, res: 
 });
 
 // POST /sessions - Create a new session
-router.post('/sessions', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     const { source, agentId, starshipId, metadata } = req.body;
@@ -497,7 +497,7 @@ router.post('/sessions', authMiddleware, async (req: Request, res: Response): Pr
 });
 
 // DELETE /sessions/:sessionId - Delete a session
-router.delete('/sessions/:sessionId', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/sessions/:sessionId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { sessionId } = req.params;
     const userId = req.user?.id;

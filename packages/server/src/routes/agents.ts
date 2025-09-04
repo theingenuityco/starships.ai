@@ -6,7 +6,7 @@ import type {
   UpdateAgentRequest,
 } from '@starships/protocol';
 import type { Request, Response } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { jwtAuthMiddleware } from '../middleware/jwt-auth';
 import {
   sendSuccess,
   sendError,
@@ -19,7 +19,7 @@ import {
 const router: Router = Router();
 
 // POST /agents/:id/ratings - Rate agent (OpenAPI pattern)
-router.post('/agents/:id/ratings', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/agents/:id/ratings', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {
@@ -57,7 +57,7 @@ router.post('/agents/:id/ratings', authMiddleware, async (req: Request, res: Res
 });
 
 // POST /agents/:id/usage - Track agent usage (OpenAPI pattern)
-router.post('/agents/:id/usage', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/agents/:id/usage', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {
@@ -84,7 +84,7 @@ router.post('/agents/:id/usage', authMiddleware, async (req: Request, res: Respo
 });
 
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
-router.put('/agents/:id/starship', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id: agentId } = req.params;
     const { starshipId } = req.body;
@@ -138,7 +138,7 @@ router.put('/agents/:id/starship', authMiddleware, async (req: Request, res: Res
 });
 
 // GET /starships/:starshipId/agents - Fetch agents by starship (OpenAPI pattern)
-router.get('/starships/:starshipId/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { starshipId } = req.params;
     const userId = req.user?.id;
@@ -199,7 +199,7 @@ router.get('/starships/:starshipId/agents', authMiddleware, async (req: Request,
 });
 
 // GET /agents/:id - Get specific agent (OpenAPI pattern)
-router.get('/agents/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {
@@ -226,7 +226,7 @@ router.get('/agents/:id', authMiddleware, async (req: Request, res: Response): P
 });
 
 // GET /agents/:id/analytics - Get agent analytics (OpenAPI pattern)
-router.get('/agents/:id/analytics', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/agents/:id/analytics', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {
@@ -253,7 +253,7 @@ router.get('/agents/:id/analytics', authMiddleware, async (req: Request, res: Re
 });
 
 // GET /users/:userId/agents - Get agents for a user (OpenAPI pattern)
-router.get('/users/:userId/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/users/:userId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId: targetUserId } = req.params;
     const userId = req.user?.id;
@@ -302,7 +302,7 @@ router.get('/users/:userId/agents', authMiddleware, async (req: Request, res: Re
 });
 
 // GET /agents - List agents with filtering and pagination (OpenAPI pattern)
-router.get('/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { category, authorId, tags, isPublic, starshipId } = req.query;
     const userId = req.user?.id;
@@ -420,7 +420,7 @@ router.get('/agents', authMiddleware, async (req: Request, res: Response): Promi
 });
 
 // GET /agents/public - List public agents with pagination (OpenAPI pattern)
-router.get('/agents/public', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/agents/public', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { page, limit, error: paginationError } = validatePagination(
       req.query.page as string,
@@ -455,7 +455,7 @@ router.get('/agents/public', authMiddleware, async (req: Request, res: Response)
 });
 
 // GET /agents/search - Search agents (OpenAPI pattern)
-router.get('/agents/search', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/agents/search', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const query = req.query.q as string;
     
@@ -478,7 +478,7 @@ router.get('/agents/search', authMiddleware, async (req: Request, res: Response)
 });
 
 // POST /agents - Create new agent (OpenAPI pattern)
-router.post('/agents', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     const createRequest = req.body as CreateAgentRequest & { starshipId: string };
@@ -537,7 +537,7 @@ router.post('/agents', authMiddleware, async (req: Request, res: Response): Prom
 });
 
 // PUT /agents/:id - Update agent (OpenAPI pattern)
-router.put('/agents/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {
@@ -576,7 +576,7 @@ router.put('/agents/:id', authMiddleware, async (req: Request, res: Response): P
 });
 
 // DELETE /agents/:id - Delete agent (OpenAPI pattern)
-router.delete('/agents/:id', authMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {

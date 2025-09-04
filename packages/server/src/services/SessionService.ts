@@ -1,5 +1,5 @@
 import { SessionRepository } from '@starships/models';
-import { SessionModel, SessionRequest, SessionResponse, SessionSourceType } from '@starships/protocol';
+import { SessionModel, SessionSourceType } from '@starships/protocol';
 
 /**
  * Service for managing chat sessions
@@ -18,7 +18,7 @@ export class SessionService {
   }): Promise<SessionModel> {
     try {
       const sessionRepo = new SessionRepository();
-      
+
       const session = await sessionRepo.create({
         source: data.source,
         userId: data.userId,
@@ -28,7 +28,7 @@ export class SessionService {
         messageCount: 0,
         totalTokens: 0,
         status: 'active',
-        metadata: data.metadata
+        metadata: data.metadata,
       });
 
       console.log(`[SESSION-SERVICE] Created new session: ${session.id} for user: ${data.userId}`);
@@ -45,7 +45,8 @@ export class SessionService {
   static async getSessionById(id: string): Promise<SessionModel | null> {
     try {
       const sessionRepo = new SessionRepository();
-      return await sessionRepo.findById(id);
+      const a = await sessionRepo.findById(id);
+      return a;
     } catch (error) {
       console.error(`[SESSION-SERVICE] Failed to get session ${id}:`, error);
       throw new Error(`Failed to get session: ${error}`);
@@ -125,9 +126,14 @@ export class SessionService {
     try {
       const sessionRepo = new SessionRepository();
       await sessionRepo.incrementMessageCount(sessionId, increment);
-      console.log(`[SESSION-SERVICE] Incremented message count for session: ${sessionId} by ${increment}`);
+      console.log(
+        `[SESSION-SERVICE] Incremented message count for session: ${sessionId} by ${increment}`
+      );
     } catch (error) {
-      console.error(`[SESSION-SERVICE] Failed to increment message count for session ${sessionId}:`, error);
+      console.error(
+        `[SESSION-SERVICE] Failed to increment message count for session ${sessionId}:`,
+        error
+      );
       throw new Error(`Failed to increment message count: ${error}`);
     }
   }
@@ -139,9 +145,14 @@ export class SessionService {
     try {
       const sessionRepo = new SessionRepository();
       await sessionRepo.updateTokenCount(sessionId, tokens);
-      console.log(`[SESSION-SERVICE] Updated token count for session: ${sessionId} with ${tokens} tokens`);
+      console.log(
+        `[SESSION-SERVICE] Updated token count for session: ${sessionId} with ${tokens} tokens`
+      );
     } catch (error) {
-      console.error(`[SESSION-SERVICE] Failed to update token count for session ${sessionId}:`, error);
+      console.error(
+        `[SESSION-SERVICE] Failed to update token count for session ${sessionId}:`,
+        error
+      );
       throw new Error(`Failed to update token count: ${error}`);
     }
   }

@@ -26,6 +26,8 @@ export interface AgentModel extends AgentNodeParameters {
   // Marketplace fields
   category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
   usageCount: number;
+  isPublic?: boolean;
+  authorId?: string;
 
   // Template relationship
   templateId?: string;

@@ -5,8 +5,8 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from './types';
-import { Engine } from './engine/Engine';
+import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '@/types';
+import { Engine } from '@/engine/Engine';
 import { v4 as uuidv4 } from 'uuid';
 
 export class Workflow {

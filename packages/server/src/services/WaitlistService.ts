@@ -1,5 +1,5 @@
 import { WaitlistRepository } from '@starships/models';
-import { logger } from '../utils/logger';
+import { logger } from '@/utils/logger';
 
 export interface WaitlistCheckResult {
   isApproved: boolean;

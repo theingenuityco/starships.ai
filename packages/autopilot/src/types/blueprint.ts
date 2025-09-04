@@ -5,8 +5,8 @@
  * These are the main exported types for the autopilot API
  */
 
-import type { BaseNode, BaseBlueprint } from './base';
-import type { NodeParameters } from './node-parameters';
+import type { BaseNode, BaseBlueprint } from '@/types/base';
+import type { NodeParameters } from '@/types/node-parameters';
 
 /**
  * Workflow node with strongly typed parameters

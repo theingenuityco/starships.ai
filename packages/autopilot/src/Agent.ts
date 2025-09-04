@@ -6,9 +6,9 @@
  * Memory-first architecture with AgentMemory system.
  */
 
-import { Blueprint, Node, Edge, Execution, AgentNodeParameters } from './types';
-import { Engine } from './engine/Engine';
-import { AgentMemory, AgentMemoryState } from './AgentMemory';
+import { Blueprint, Node, Edge, Execution, AgentNodeParameters } from '@/types';
+import { Engine } from '@/engine/Engine';
+import { AgentMemory, AgentMemoryState } from '@/AgentMemory';
 
 export class Agent {
   private params: AgentNodeParameters;

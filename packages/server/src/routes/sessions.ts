@@ -398,9 +398,9 @@ router.post('/sessions', jwtAuthMiddleware, async (req: Request, res: Response):
     }
 
     // Validate source is a valid SessionSourceType
-    const validSources = ['agent', 'sibil', 'user'] as const;
+    const validSources = ['agent', 'user'] as const;
     if (!validSources.includes(source as any)) {
-      sendError(res, 'VALIDATION_ERROR', 'source must be one of: agent, sibil, user', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'source must be one of: agent, user', 400, {
         field: 'source',
         provided: source,
         allowedValues: validSources,

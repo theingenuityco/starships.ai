@@ -67,18 +67,46 @@ spec:
             - name: SKIP_INSTALL
               value: 'true'
 
+            # Server and Client Ports
+            - name: SERVER_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SERVER_PORT
+            - name: CLIENT_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: CLIENT_PORT
+            - name: LOG_LEVEL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: LOG_LEVEL
+
             # URLs (from secrets for flexibility)
+            - name: PUBLIC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: PUBLIC_URL
             - name: CLIENT_URL
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: CLIENT_URL
-            # Runtime server configuration (not NEXT_PUBLIC!)
             - name: SERVER_URL
               valueFrom:
                 secretKeyRef:
                   name: starships-secrets
                   key: SERVER_URL
+
+            # Authentication
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: JWT_SECRET
             - name: ENABLE_AUTH_TESTING_BACKDOOR
               valueFrom:
                 secretKeyRef:
@@ -107,7 +135,7 @@ spec:
                   name: starships-secrets
                   key: NEO4J_DATABASE
 
-            # API Keys from Secrets
+            # LLM Provider Configuration
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -118,6 +146,18 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: ANTHROPIC_API_KEY
+            - name: DEFAULT_LLM_PROVIDER
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DEFAULT_LLM_PROVIDER
+            - name: DEFAULT_CHAT_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DEFAULT_CHAT_MODEL
+
+            # Stripe Configuration
             - name: STRIPE_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -133,6 +173,50 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: STRIPE_PUBLISHABLE_KEY
+            - name: STRIPE_PRICE_CRUISER_MONTHLY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_PRICE_CRUISER_MONTHLY
+            - name: STRIPE_PRICE_CRUISER_YEARLY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_PRICE_CRUISER_YEARLY
+            - name: STRIPE_PRICE_DRAUGHT_MONTHLY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_PRICE_DRAUGHT_MONTHLY
+            - name: STRIPE_PRICE_DRAUGHT_YEARLY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: STRIPE_PRICE_DRAUGHT_YEARLY
+
+            # Analytics
+            - name: NEXT_PUBLIC_GA_MEASUREMENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: NEXT_PUBLIC_GA_MEASUREMENT_ID
+
+            # Legacy/Additional Environment Variables (kept for compatibility)
+            - name: DEFAULT_EMBEDDING_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: DEFAULT_EMBEDDING_MODEL
+            - name: SSE_CLIENT_TIMEOUT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SSE_CLIENT_TIMEOUT
+            - name: SSE_HEARTBEAT_INTERVAL
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: SSE_HEARTBEAT_INTERVAL
 
           # Resource Limits
           resources:

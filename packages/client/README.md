@@ -83,8 +83,8 @@ pnpm type-check   # TypeScript compilation check
 ### Environment Variables
 
 ```env
-# Backend API URL
-NEXT_PUBLIC_API_URL=http://localhost:4000
+# Backend API URL (automatically configured via SERVER_URL)
+SERVER_URL=http://localhost:4000
 ```
 
 ## 🎨 UI Components
@@ -206,7 +206,7 @@ CMD ["npm", "start"]
 
    ```bash
    # Check environment variable
-   echo $NEXT_PUBLIC_API_URL
+   echo $SERVER_URL
 
    # Verify backend is running
    curl http://localhost:4000/v1/agents

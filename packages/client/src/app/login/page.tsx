@@ -5,11 +5,10 @@ import { StarfieldBackground } from '@/components/StarfieldBackground'
 import { StarTheme } from '@/components/theme-context'
 import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Suspense } from 'react'
 
 export default function LoginPage() {
-  const router = useRouter()
   const { isAuthenticated, isLoading } = useAuth()
 
   // Redirect is handled by useAuth hook - no need for additional redirect logic here
@@ -75,12 +74,12 @@ export default function LoginPage() {
             transition={{ delay: 0.8, duration: 0.6 }}
             className="mt-8 text-center"
           >
-            <a
+            <Link
               href="/"
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               ← Back to home
-            </a>
+            </Link>
           </motion.div>
         </div>
       </div>

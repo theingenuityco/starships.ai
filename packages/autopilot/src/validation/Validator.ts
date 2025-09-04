@@ -4,7 +4,7 @@
  * Validates workflow structure and configuration
  */
 
-import { Blueprint, ValidationResult, ValidationError, Node } from '../types';
+import { Blueprint, ValidationResult, ValidationError, Node } from '@/types';
 
 export class Validator {
   validate(workflow: Blueprint): ValidationResult {

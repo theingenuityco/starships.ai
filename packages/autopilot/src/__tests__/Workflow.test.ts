@@ -2,8 +2,8 @@
  * Workflow Unit Tests
  */
 
-import { Workflow } from '../Workflow';
-import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '../types';
+import { Workflow } from '@/Workflow';
+import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '@/types';
 
 describe('Workflow', () => {
   let mockExecution: Execution;

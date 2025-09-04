@@ -2,8 +2,8 @@
  * Jest setup file for autopilot package tests
  */
 
-import type { Blueprint, Execution, Node } from '../types';
-import { AgentMemory } from '../AgentMemory';
+import type { Blueprint, Execution, Node } from '@/types';
+import { AgentMemory } from '@/AgentMemory';
 
 // Mock console methods to reduce noise in tests
 global.console = {

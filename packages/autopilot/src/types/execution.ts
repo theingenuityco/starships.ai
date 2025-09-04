@@ -4,7 +4,7 @@
  * Types related to workflow execution runtime state and context
  */
 
-import type { AgentMemory } from '../AgentMemory';
+import type { AgentMemory } from '@/AgentMemory';
 
 /**
  * Workflow execution state

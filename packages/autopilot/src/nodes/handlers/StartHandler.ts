@@ -5,8 +5,8 @@
  * Uses lazy loading with BaseHandler
  */
 
-import { BaseHandler } from '../Handler';
-import { Execution, ValidationResult } from '../../types';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult } from '@/types';
 
 export class StartHandler extends BaseHandler {
   readonly type = 'start';

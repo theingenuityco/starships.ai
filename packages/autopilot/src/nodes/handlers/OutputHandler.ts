@@ -4,8 +4,8 @@
  * Output formatting handler using BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
-import { Execution, ValidationResult, OutputNodeParameters, ValidationError } from '../../types';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult, OutputNodeParameters, ValidationError } from '@/types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';

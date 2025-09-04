@@ -5,15 +5,15 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
+import { BaseHandler } from '@/nodes/Handler';
 import {
   Execution,
   ValidationResult,
   HttpRequestNodeParameters,
   ValidationError,
   ValidationWarning,
-} from '../../types';
-import { HttpRequest } from '../../HttpRequest';
+} from '@/types';
+import { HttpRequest } from '@/HttpRequest';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';

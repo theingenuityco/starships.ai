@@ -124,9 +124,8 @@ CREATE RANGE INDEX message_created_at IF NOT EXISTS FOR (msg:Message) ON (msg.cr
 // Session constraints
 CREATE CONSTRAINT session_id_unique IF NOT EXISTS FOR (cs:Session) REQUIRE cs.id IS UNIQUE;
 
-// Session relationship constraints and indexes
-CREATE CONSTRAINT unique_starship_session_relationship IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() REQUIRE (startNode(r).id, endNode(r).id) IS UNIQUE;
-CREATE INDEX session_starship_relationship IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() ON (r.createdAt);
+// Session relationship constraints
+CREATE CONSTRAINT unique_starship_session IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() REQUIRE r.key IS UNIQUE;
 
 // ============================================================================
 // EXECUTION COLLECTION

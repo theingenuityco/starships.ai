@@ -68,11 +68,11 @@ export class SessionRepository extends BaseRepository {
         if (starshipId) {
           await connection.executeWrite(
             `MATCH (s:Starship {id: $starshipId}), (session:Session {id: $sessionId})
-             CREATE (s)-[:HAS_SESSION {createdAt: $timestamp}]->(session)`,
+             CREATE (s)-[:HAS_SESSION {key: $key}]->(session)`,
             {
               starshipId,
               sessionId: result.id,
-              timestamp: now,
+              key: `${starshipId}_${result.id}`,
             }
           );
         }
@@ -288,11 +288,11 @@ export class SessionRepository extends BaseRepository {
         const connection = this.connection;
         await connection.executeWrite(
           `MATCH (s:Starship {id: $starshipId}), (session:Session {id: $sessionId})
-           CREATE (s)-[:HAS_SESSION {createdAt: $timestamp}]->(session)`,
+           CREATE (s)-[:HAS_SESSION {key: $key}]->(session)`,
           {
             starshipId,
             sessionId,
-            timestamp: new Date().toISOString(),
+            key: `starship_${starshipId}_session_${sessionId}`,
           }
         );
       },

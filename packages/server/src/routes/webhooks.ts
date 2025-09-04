@@ -2,10 +2,10 @@ import { Router } from 'express';
 import type { Request, Response, Router as ExpressRouter } from 'express';
 import Stripe from 'stripe';
 import { StarshipRepository } from '@starships/models';
-import { loadServerEnvironment } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 const router: ExpressRouter = Router();
-const env = loadServerEnvironment();
+const env = getEnvConfig();
 
 const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
   apiVersion: '2025-07-30.basil',

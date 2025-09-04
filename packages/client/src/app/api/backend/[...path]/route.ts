@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadApiRuntimeConfig } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 /**
  * API Proxy Route - Forwards requests to the backend with runtime configuration
@@ -12,7 +12,7 @@ async function proxyRequest(
 ) {
   try {
     // Load server config at runtime (not build time!)
-    const { serverUrl } = loadApiRuntimeConfig();
+    const serverUrl = getEnvConfig().SERVER_URL;
     
     // Reconstruct the API path
     const path = params.path.join('/');

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { loadApiRuntimeConfig } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 export async function GET() {
   try {
     // Load server URL at runtime (not build time!)
-    const { serverUrl } = loadApiRuntimeConfig();
+    const serverUrl = getEnvConfig().SERVER_URL;
     
     const endpoint = `${serverUrl}/api/starships/pricing`;
     

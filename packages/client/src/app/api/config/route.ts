@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadApiRuntimeConfig } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 /**
  * Runtime Configuration Endpoint
@@ -8,11 +8,10 @@ import { loadApiRuntimeConfig } from '@starships/env-config';
 export async function GET() {
   try {
     // Load configuration at runtime (not build time!)
-    const { serverUrl, enableAuthTestingBackdoor } = loadApiRuntimeConfig();
+    const serverUrl = getEnvConfig().SERVER_URL;
     
     return NextResponse.json({
       serverUrl,
-      enableAuthTestingBackdoor,
     });
   } catch (error) {
     console.error('Error loading runtime config:', error);

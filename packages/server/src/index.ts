@@ -17,7 +17,7 @@ import {
   WaitlistRepository,
 } from '@starships/models';
 import { migrationRunner, seedWaitlist } from '@starships/models';
-import { getServerConfig } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 // Route imports
 import authRoutes from './routes/auth';
@@ -40,7 +40,7 @@ import { requestIdMiddleware, errorHandler, notFoundHandler } from './middleware
 import healthRoutes from './routes/health';
 
 // Load server configuration
-const config = getServerConfig();
+const config = getEnvConfig();
 
 /**
  * Validate URL format
@@ -54,7 +54,7 @@ function validateUrlFormat(url: string, name: string) {
 }
 
 const app: express.Application = express();
-const PORT = config.PORT || 3001;
+const PORT = config.SERVER_PORT || 3001;
 
 // Validate URL formats
 validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');

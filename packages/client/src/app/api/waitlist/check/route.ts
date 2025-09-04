@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadApiRuntimeConfig } from '@starships/env-config';
+import { getEnvConfig } from '@starships/env';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
     // Load server URL at runtime (not build time!)
-    const { serverUrl } = loadApiRuntimeConfig();
+    const serverUrl = getEnvConfig().SERVER_URL;
     
     const response = await fetch(`${serverUrl}/api/waitlist/check`, {
       method: 'POST',

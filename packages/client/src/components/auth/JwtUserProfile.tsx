@@ -1,26 +1,28 @@
-'use client';
+'use client'
 
-import React, { useState } from "react";
-import { useJwtAuth } from "@/hooks/useJwtAuth";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { JwtLogoutButton } from "./JwtLogoutButton";
-import { LogOut, User } from "lucide-react";
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuth } from '@/hooks/useAuth'
+import { User } from 'lucide-react'
+import React, { useState } from 'react'
+import { JwtLogoutButton } from './JwtLogoutButton'
 
 interface JwtUserProfileProps {
-  mode?: 'collapsed' | 'expanded';
+  mode?: 'collapsed' | 'expanded'
 }
 
 /**
  * User profile component for navigation bottom using JWT authentication
  * Shows user name and email with logout functionality via tooltip
  */
-export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expanded' }: JwtUserProfileProps) {
-  const { user, userName, userEmail, isAuthenticated } = useJwtAuth();
-  const [showTooltip, setShowTooltip] = useState(false);
+export const JwtUserProfile = React.memo(function JwtUserProfile({
+  mode = 'expanded',
+}: JwtUserProfileProps) {
+  const { user, userName, userEmail, isAuthenticated } = useAuth()
+  const [showTooltip, setShowTooltip] = useState(false)
 
   if (!isAuthenticated || !user) {
-    return null;
+    return null
   }
 
   if (mode === 'collapsed') {
@@ -46,21 +48,29 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expan
           <div className="p-3">
             {/* Action buttons only */}
             <div className="space-y-1">
-              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-9 hover:bg-accent"
+              >
                 <User className="w-4 h-4 mr-3" />
                 My Profile
               </Button>
-              <JwtLogoutButton variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground">
+              <JwtLogoutButton
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
+              >
                 Sign Out
               </JwtLogoutButton>
             </div>
           </div>
         </TooltipContent>
       </Tooltip>
-    );
+    )
   }
 
-    // Expanded mode - Professional design
+  // Expanded mode - Professional design
   return (
     <Tooltip delayDuration={200} open={showTooltip} onOpenChange={setShowTooltip}>
       <TooltipTrigger asChild>
@@ -76,9 +86,7 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expan
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-foreground truncate">{userName}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {userEmail}
-            </p>
+            <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
           </div>
         </div>
       </TooltipTrigger>
@@ -94,12 +102,16 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expan
               <User className="w-4 h-4 mr-3" />
               My Profile
             </Button>
-            <JwtLogoutButton variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground">
+            <JwtLogoutButton
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
+            >
               Sign Out
             </JwtLogoutButton>
           </div>
         </div>
       </TooltipContent>
     </Tooltip>
-  );
-});
+  )
+})

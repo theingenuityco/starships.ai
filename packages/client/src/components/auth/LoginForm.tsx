@@ -1,34 +1,41 @@
 'use client'
 
-import { useState } from 'react'
-import { useJwtAuth } from '@/hooks/useJwtAuth'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LogIn, UserPlus, Eye, EyeOff } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
+import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { motion } from 'motion/react'
+import { useState } from 'react'
 
 /**
  * JWT-based login and registration form
  */
 export function LoginForm() {
-  const { login, register, isLoading, error } = useJwtAuth()
-  
+  const { login, register, isLoading, error } = useAuth()
+
   const [loginData, setLoginData] = useState({
     email: '',
-    password: ''
+    password: '',
   })
-  
+
   const [registerData, setRegisterData] = useState({
     email: '',
     password: '',
     name: '',
-    confirmPassword: ''
+    confirmPassword: '',
   })
-  
+
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
@@ -84,9 +91,7 @@ export function LoginForm() {
       <Card>
         <CardHeader className="text-center">
           <CardTitle>Access Mission Control</CardTitle>
-          <CardDescription>
-            Sign in to your starship or create a new account
-          </CardDescription>
+          <CardDescription>Sign in to your starship or create a new account</CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -104,7 +109,7 @@ export function LoginForm() {
                     id="login-email"
                     type="email"
                     value={loginData.email}
-                    onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={e => setLoginData(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="captain@starships.ai"
                     disabled={isLoading}
                     required
@@ -118,7 +123,7 @@ export function LoginForm() {
                       id="login-password"
                       type={showPassword ? 'text' : 'password'}
                       value={loginData.password}
-                      onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                      onChange={e => setLoginData(prev => ({ ...prev, password: e.target.value }))}
                       placeholder="Enter your password"
                       disabled={isLoading}
                       required
@@ -131,11 +136,7 @@ export function LoginForm() {
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -167,7 +168,7 @@ export function LoginForm() {
                     id="register-name"
                     type="text"
                     value={registerData.name}
-                    onChange={(e) => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
+                    onChange={e => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Captain Starship"
                     disabled={isLoading}
                     required
@@ -180,7 +181,7 @@ export function LoginForm() {
                     id="register-email"
                     type="email"
                     value={registerData.email}
-                    onChange={(e) => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                    onChange={e => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
                     placeholder="captain@starships.ai"
                     disabled={isLoading}
                     required
@@ -194,7 +195,9 @@ export function LoginForm() {
                       id="register-password"
                       type={showPassword ? 'text' : 'password'}
                       value={registerData.password}
-                      onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                      onChange={e =>
+                        setRegisterData(prev => ({ ...prev, password: e.target.value }))
+                      }
                       placeholder="Create a strong password"
                       disabled={isLoading}
                       required
@@ -208,11 +211,7 @@ export function LoginForm() {
                       onClick={() => setShowPassword(!showPassword)}
                       disabled={isLoading}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>
                 </div>
@@ -224,7 +223,9 @@ export function LoginForm() {
                       id="register-confirm-password"
                       type={showConfirmPassword ? 'text' : 'password'}
                       value={registerData.confirmPassword}
-                      onChange={(e) => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      onChange={e =>
+                        setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))
+                      }
                       placeholder="Confirm your password"
                       disabled={isLoading}
                       required
@@ -269,7 +270,8 @@ export function LoginForm() {
 
         <CardFooter className="text-center">
           <p className="text-xs text-muted-foreground">
-            By signing {activeTab === 'login' ? 'in' : 'up'}, you agree to our Terms of Service and Privacy Policy
+            By signing {activeTab === 'login' ? 'in' : 'up'}, you agree to our Terms of Service and
+            Privacy Policy
           </p>
         </CardFooter>
       </Card>

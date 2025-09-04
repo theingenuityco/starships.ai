@@ -1,13 +1,13 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { motion, AnimatePresence } from 'motion/react'
-import { Navigation } from '@/components/navigation/Navigation'
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
-import { useJwtAuth } from '@/hooks/useJwtAuth'
-import { useState, useEffect } from 'react'
-import { Menu } from 'lucide-react'
+import { Navigation } from '@/components/navigation/Navigation'
+import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import { Menu } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 interface ClientLayoutProps {
   children: React.ReactNode
@@ -38,7 +38,7 @@ const pageVariants = {
 
 export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
-  useJwtAuth() // Keep the hook call but don't destructure unused values
+  useAuth() // Keep the hook call but don't destructure unused values
   const isDashboard = pathname === '/'
   const isWaitlist = pathname === '/waitlist'
 

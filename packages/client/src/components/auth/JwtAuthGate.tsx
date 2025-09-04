@@ -1,9 +1,9 @@
 'use client'
 
-import { useJwtAuth } from '@/hooks/useJwtAuth'
-import { LoginForm } from './LoginForm'
-import { motion } from 'motion/react'
+import { useAuth } from '@/hooks/useAuth'
 import { Rocket, Stars, Zap } from 'lucide-react'
+import { motion } from 'motion/react'
+import { LoginForm } from './LoginForm'
 
 interface JwtAuthGateProps {
   children: React.ReactNode
@@ -14,7 +14,7 @@ interface JwtAuthGateProps {
  * Shows login UI for unauthenticated users, or renders children for authenticated users
  */
 export function JwtAuthGate({ children }: JwtAuthGateProps) {
-  const { isAuthenticated, isLoading } = useJwtAuth()
+  const { isAuthenticated, isLoading } = useAuth()
 
   // Show loading state while checking authentication
   if (isLoading) {

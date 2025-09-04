@@ -1,0 +1,39 @@
+--- a/.github/workflows/security.yml
++++ b/.github/workflows/security.yml
+@@ -1,5 +1,9 @@
+ name: Security Checks
+ 
++env:
++  # Set to 'self-hosted' to use self-hosted runners, 'github' for GitHub-hosted
++  RUNNER_TYPE: 'github'  # Change to 'self-hosted' when ready
++
+ on:
+   push:
+     branches: [ "main" ]
+@@ -9,7 +13,7 @@
+ jobs:
+   security-audit:
+     name: Dependency Security Audit
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     timeout-minutes: 10
+ 
+     steps:
+@@ -42,7 +46,7 @@
+ 
+   gitleaks:
+     name: Secret Scanning
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     timeout-minutes: 10
+     permissions:
+       contents: read
+@@ -64,7 +68,7 @@
+ 
+   codeql:
+     name: CodeQL Analysis
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     timeout-minutes: 360
+     permissions:
+       security-events: write

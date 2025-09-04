@@ -1,0 +1,48 @@
+--- a/.github/workflows/ci-checks.yml
++++ b/.github/workflows/ci-checks.yml
+@@ -1,5 +1,9 @@
+ name: CI Checks
+ 
++env:
++  # Set to 'self-hosted' to use self-hosted runners, 'github' for GitHub-hosted
++  RUNNER_TYPE: 'github'  # Change to 'self-hosted' when ready
++
+ on:
+   pull_request:
+     branches: [main]
+@@ -7,7 +11,7 @@
+ jobs:
+   lint:
+     name: Lint Check
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     timeout-minutes: 10
+ 
+     steps:
+@@ -37,7 +41,7 @@
+ 
+   type-check:
+     name: Type Check
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     timeout-minutes: 10
+ 
+     steps:
+@@ -67,7 +71,7 @@
+ 
+   test:
+     name: Test Check
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     timeout-minutes: 10
+ 
+     steps:
+@@ -97,7 +101,7 @@
+ 
+   build:
+     name: Build Check
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     timeout-minutes: 15
+     needs: [lint, type-check, test]
+     environment: ci

@@ -1,0 +1,75 @@
+name: Test Self-Hosted Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_type:
+        description: 'Runner type to test'
+        required: true
+        default: 'self-hosted'
+        type: choice
+        options:
+          - self-hosted
+          - ubuntu-latest
+
+jobs:
+  test-runner:
+    name: Test Runner Environment
+    runs-on: ${{ github.event.inputs.runner_type == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    
+    steps:
+      - name: Runner Information
+        run: |
+          echo "🏃 Testing runner type: ${{ github.event.inputs.runner_type }}"
+          echo "================================================"
+          
+      - name: System Information
+        run: |
+          echo "📊 System Information:"
+          echo "Hostname: $(hostname)"
+          echo "OS: $(uname -a)"
+          echo "CPU: $(nproc) cores"
+          echo "Memory: $(free -h | grep Mem | awk '{print $2}')"
+          echo "Disk: $(df -h / | tail -1 | awk '{print $2}')"
+          
+      - name: Check Pre-installed Tools
+        run: |
+          echo "🔧 Checking tools:"
+          echo -n "Node.js: "; node --version 2>/dev/null || echo "Not installed"
+          echo -n "npm: "; npm --version 2>/dev/null || echo "Not installed"
+          echo -n "pnpm: "; pnpm --version 2>/dev/null || echo "Not installed"
+          echo -n "Python: "; python3 --version 2>/dev/null || echo "Not installed"
+          echo -n "Git: "; git --version 2>/dev/null || echo "Not installed"
+          echo -n "Docker: "; docker --version 2>/dev/null || echo "Not installed"
+          
+      - name: Network Connectivity Test
+        run: |
+          echo "🌐 Testing network:"
+          echo -n "GitHub API: "
+          curl -s -o /dev/null -w "%{http_code}" https://api.github.com || echo "Failed"
+          echo ""
+          echo -n "NPM Registry: "
+          curl -s -o /dev/null -w "%{http_code}" https://registry.npmjs.org || echo "Failed"
+          echo ""
+          
+      - name: Performance Test
+        run: |
+          echo "⚡ Simple performance test:"
+          echo "Download speed test (100MB file):"
+          time curl -s -o /dev/null https://speed.hetzner.de/100MB.bin || echo "Failed"
+          
+      - name: Runner Labels
+        run: |
+          echo "🏷️ Runner labels available:"
+          echo "${{ toJSON(runner) }}"
+          
+      - name: Summary
+        run: |
+          echo "✅ Runner test completed successfully!"
+          echo "Runner type: ${{ github.event.inputs.runner_type }}"
+          if [ "${{ github.event.inputs.runner_type }}" == "self-hosted" ]; then
+            echo "💰 This run used your self-hosted infrastructure"
+          else
+            echo "💵 This run used GitHub-hosted runners"
+          fi

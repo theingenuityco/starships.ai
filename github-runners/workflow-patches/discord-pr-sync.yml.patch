@@ -1,0 +1,21 @@
+--- a/.github/workflows/discord-pr-sync.yml
++++ b/.github/workflows/discord-pr-sync.yml
+@@ -1,5 +1,9 @@
+ name: Discord PR Sync
+ 
++env:
++  # Set to 'self-hosted' to use self-hosted runners, 'github' for GitHub-hosted
++  RUNNER_TYPE: 'github'  # Change to 'self-hosted' when ready
++
+ on:
+   pull_request:
+     types: [opened, closed, reopened, edited, assigned, unassigned, labeled, unlabeled, synchronize, converted_to_draft, ready_for_review, locked, unlocked, review_requested, review_request_removed, auto_merge_enabled, auto_merge_disabled]
+@@ -28,7 +32,7 @@
+ jobs:
+   discord-sync:
+     name: Sync to Discord
+-    runs-on: ubuntu-latest
++    runs-on: ${{ env.RUNNER_TYPE == 'self-hosted' && fromJSON('["self-hosted", "linux", "x64"]') || 'ubuntu-latest' }}
+     steps:
+       - name: Checkout code
+         uses: actions/checkout@v4

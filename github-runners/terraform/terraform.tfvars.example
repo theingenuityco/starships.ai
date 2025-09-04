@@ -1,0 +1,17 @@
+# Copy this file to terraform.tfvars and fill in your values
+
+# AWS Configuration
+aws_region = "us-east-1"
+environment = "prod"
+
+# GitHub App Configuration
+github_app_id = "YOUR_GITHUB_APP_ID"
+github_app_private_key_base64 = "YOUR_BASE64_ENCODED_PRIVATE_KEY"
+github_webhook_secret = "YOUR_WEBHOOK_SECRET"
+github_installation_id = "YOUR_INSTALLATION_ID"
+
+# Optional: Override default AMI (Ubuntu 22.04 LTS)
+# runner_ami_id = "ami-xxxxxxxxx"
+
+# Optional: Specify subnet ID (uses default VPC if not specified)
+# runner_subnet_id = "subnet-xxxxxxxxx"

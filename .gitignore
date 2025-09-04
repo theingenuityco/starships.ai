@@ -63,3 +63,14 @@ do-deployment/*secret*.yaml
 do-deployment/*.secret
 k8s/**/secrets/
 k8s/**/*-secrets.yaml
+
+# Terraform files with secrets
+terraform.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# GitHub Runner configuration
+.env.github-runner
+github-app-config.env

@@ -2,8 +2,8 @@ import {
   ApiKeyRequirement,
   ApiKeyValidationResult,
   ConnectorApiKeyState,
-} from '../types/connector-api-keys'
-import { MCPServerOption } from './api'
+} from '@/types/connector-api-keys'
+import { MCPServerOption } from '@/lib/api'
 
 /**
  * ConnectorApiKeyManager - Core utility for detecting and managing API key requirements

@@ -3,7 +3,7 @@ import { StarshipRepository, AgentRepository } from '@starships/models';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { Request, Response } from 'express';
 import { getConnection } from '@starships/models';
-import { AgentTemplateService } from '../services/AgentTemplateService';
+import { AgentTemplateService } from '@/services/AgentTemplateService';
 import {
   sendSuccess,
   sendError,

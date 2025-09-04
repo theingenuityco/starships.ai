@@ -2,10 +2,10 @@
 
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
-import { MessageList } from './MessageList'
-import { MessageBubble } from './MessageBubble'
+import { MessageList } from '@/components/session/MessageList'
+import { MessageBubble } from '@/components/session/MessageBubble'
 import type { Message } from '@/lib/agent-socket-api'
-import type { ChatMode } from './ChatModeSelector'
+import type { ChatMode } from '@/components/session/ChatModeSelector'
 import { useSessionMessages, type Message as SessionMessage } from '@/hooks/useSessions'
 
 interface SessionMessageListProps {

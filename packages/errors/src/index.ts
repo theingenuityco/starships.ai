@@ -7,7 +7,7 @@
 // Import types from protocol package
 import { ErrorCategory } from '@starships/protocol';
 import type { ErrorDetails, StandardErrorCode } from '@starships/protocol';
-import type { ErrorContext } from './context';
+import type { ErrorContext } from '@/context';
 
 /**
  * Base application error class with unified ErrorContext support

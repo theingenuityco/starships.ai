@@ -2,8 +2,8 @@
  * MissionClarityRepository Unit Tests
  */
 
-import { MissionClarityRepository } from '../MissionClarityRepository';
-import { Neo4jConnection, getConnection } from '../../helpers/database';
+import { MissionClarityRepository } from '@/repositories/MissionClarityRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '@starships/errors';
 import type {
   MissionClarityModel,

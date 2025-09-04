@@ -12,9 +12,9 @@ import {
   MissionClarityRepository,
 } from '@starships/models';
 import { Logger } from '@/utils/logger';
-import { MissionEventService } from './MissionEventService';
-import { MissionService } from './MissionService';
-import { WorkflowParsingService } from './WorkflowParsingService';
+import { MissionEventService } from '@/services/MissionEventService';
+import { MissionService } from '@/services/MissionService';
+import { WorkflowParsingService } from '@/services/WorkflowParsingService';
 import { MissionPromptBuilder } from '@/prompts/MissionPromptBuilder';
 import { MISSION_PHASES } from '@starships/protocol';
 import { Workflow, AgentMemory, LLM } from '@starships/autopilot';

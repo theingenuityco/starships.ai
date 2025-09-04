@@ -2,8 +2,8 @@
  * AgentTemplateRepository Unit Tests
  */
 
-import { AgentTemplateRepository } from '../AgentTemplateRepository';
-import { Neo4jConnection } from '../../helpers/database';
+import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
+import { Neo4jConnection } from '@/helpers/database';
 import { ValidationError, DatabaseError } from '@starships/errors';
 import type { AgentTemplateModel } from '@starships/protocol';
 

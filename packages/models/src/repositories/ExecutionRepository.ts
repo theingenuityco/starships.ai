@@ -1,6 +1,6 @@
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 
 /**
  * Execution status types

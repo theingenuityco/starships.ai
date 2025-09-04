@@ -11,7 +11,7 @@ import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starsh
 import { Agent, AgentMemory, Blueprint } from '@starships/autopilot';
 import type { SessionRequest, SessionResponse, MessageModel } from '@starships/protocol';
 import { ValidationError, NotFoundError, InternalServerError } from '@starships/errors';
-import getStore, { type MemoryStore } from '../store';
+import getStore, { type MemoryStore } from '@/store';
 
 export interface AgentOptions {
   includeMemory?: boolean;

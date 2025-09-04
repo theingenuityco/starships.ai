@@ -2,7 +2,7 @@
  * EdgeRepository Unit Tests
  */
 
-import { EdgeRepository } from '../EdgeRepository';
+import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { EdgeModel } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('EdgeRepository', () => {
   let repository: EdgeRepository;

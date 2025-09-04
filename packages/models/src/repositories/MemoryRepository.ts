@@ -1,8 +1,8 @@
-import { getConnection, Neo4jConnection } from '../helpers/database';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
 import type { MemoryModel } from '@starships/protocol';
-import { BaseRepository } from './BaseRepository';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 
 /**
  * Neo4j-based memory repository

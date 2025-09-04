@@ -2,7 +2,7 @@
  * BaseRepository Unit Tests
  */
 
-import { BaseRepository } from '../BaseRepository';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import {
   BaseError,
   ValidationError,

@@ -1,4 +1,4 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 import { Session } from 'neo4j-driver';
 import * as fs from 'fs';
 import * as path from 'path';

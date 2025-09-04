@@ -2,7 +2,7 @@
  * Tests for error mappings and utilities
  */
 
-import { ERROR_HTTP_STATUS_MAP, ERROR_CATEGORY_MAP, ErrorMappingUtils } from '../mappings';
+import { ERROR_HTTP_STATUS_MAP, ERROR_CATEGORY_MAP, ErrorMappingUtils } from '@/mappings';
 import { ErrorCategory } from '@starships/protocol';
 import type { StandardErrorCode } from '@starships/protocol';
 

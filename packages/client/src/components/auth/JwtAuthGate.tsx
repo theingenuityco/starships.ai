@@ -3,7 +3,7 @@
 import { useAuth } from '@/hooks/useAuth'
 import { Rocket, Stars, Zap } from 'lucide-react'
 import { motion } from 'motion/react'
-import { LoginForm } from './LoginForm'
+import { LoginForm } from '@/components/auth/LoginForm'
 
 interface JwtAuthGateProps {
   children: React.ReactNode

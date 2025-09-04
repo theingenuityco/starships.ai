@@ -5,8 +5,8 @@
  * Uses MERGE pattern for upsert operations following existing repository patterns.
  */
 
-import { BaseRepository } from './BaseRepository';
-import { getConnection } from '../helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { getConnection } from '@/helpers/database';
 import {
   MissionClarityModel,
   CreateMissionClarityRequest,

@@ -1,5 +1,5 @@
-import { MCPServerConnector, MCPServerOption } from './api'
-import { ConnectorApiKeyManager } from './connector-api-keys'
+import { MCPServerConnector, MCPServerOption } from '@/lib/api'
+import { ConnectorApiKeyManager } from '@/lib/connector-api-keys'
 import { ApiKeyRequirement } from '@/types/connector-api-keys'
 
 export type ApiKeyConfigStatus = 'configured' | 'missing' | 'invalid' | 'not_required'

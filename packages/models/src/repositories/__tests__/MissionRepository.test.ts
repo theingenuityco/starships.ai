@@ -2,8 +2,8 @@
  * MissionRepository Unit Tests
  */
 
-import { MissionRepository } from '../MissionRepository';
-import { getConnection } from '../../helpers/database';
+import { MissionRepository } from '@/repositories/MissionRepository';
+import { getConnection } from '@/helpers/database';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type {
   MissionModel,

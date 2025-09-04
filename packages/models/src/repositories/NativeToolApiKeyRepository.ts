@@ -1,5 +1,5 @@
-import { getConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { getConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import crypto from 'crypto';
 
 export class NativeToolApiKeyRepository extends BaseRepository {

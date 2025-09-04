@@ -7,7 +7,7 @@ import type {
   EventEmissionResult,
 } from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
-import { UserService } from './UserService';
+import { UserService } from '@/services/UserService';
 import { getEnvConfig } from '@starships/env';
 
 // JWT verification function for Socket.IO

@@ -2,8 +2,8 @@
  * WorkflowRepository Unit Tests
  */
 
-import { WorkflowRepository } from '../WorkflowRepository';
-import { getConnection } from '../../helpers/database';
+import { WorkflowRepository } from '@/repositories/WorkflowRepository';
+import { getConnection } from '@/helpers/database';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { WorkflowModel } from '@starships/protocol';
 import type { Blueprint } from '@starships/autopilot';

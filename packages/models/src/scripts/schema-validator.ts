@@ -1,4 +1,4 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 /**
  * Schema Validation and Data Integrity Checker

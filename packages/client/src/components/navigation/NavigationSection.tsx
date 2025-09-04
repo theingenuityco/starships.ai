@@ -1,6 +1,6 @@
 'use client'
 
-import { NavigationItem } from './NavigationItem'
+import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { motion } from 'motion/react'
 import { ChevronRight } from 'lucide-react'
 

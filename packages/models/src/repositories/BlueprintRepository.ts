@@ -5,10 +5,10 @@
  * following BaseRepository patterns and Neo4j relationship patterns.
  */
 
-import { BaseRepository } from './BaseRepository';
-import { getConnection, Neo4jConnection } from '../helpers/database';
-import { NodeRepository } from './NodeRepository';
-import { EdgeRepository } from './EdgeRepository';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { NodeRepository } from '@/repositories/NodeRepository';
+import { EdgeRepository } from '@/repositories/EdgeRepository';
 import type {
   BlueprintModel,
   CreateBlueprintRequest,

@@ -2,7 +2,7 @@
  * NodeRepository Unit Tests
  */
 
-import { NodeRepository } from '../NodeRepository';
+import { NodeRepository } from '@/repositories/NodeRepository';
 import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
 import type { NodeModel } from '@starships/protocol';
 
@@ -14,7 +14,7 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('NodeRepository', () => {
   let repository: NodeRepository;

@@ -18,7 +18,7 @@ import type {
   // MissionExecutionState - removed as it's not exported from protocol
   MissionPhase,
 } from '@starships/protocol'
-import api from './api'
+import api from '@/lib/api'
 
 /**
  * API response wrapper

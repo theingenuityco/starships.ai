@@ -1,6 +1,6 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 import { UserModel } from '@starships/protocol';
-import { BaseRepository } from './BaseRepository';
+import { BaseRepository } from '@/repositories/BaseRepository';
 
 export class UserRepository extends BaseRepository {
   constructor() {

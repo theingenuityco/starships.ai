@@ -1,8 +1,8 @@
 import type { AgentTemplateModel, AgentModel } from '@starships/protocol';
-import { Neo4jConnection, getConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '../helpers/database';
+import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 import { AgentMemoryState } from '@starships/autopilot';
 
 export class AgentTemplateRepository extends BaseRepository {

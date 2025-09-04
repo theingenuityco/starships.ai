@@ -4,8 +4,8 @@
 
 import { ConflictError, DatabaseError } from '@starships/errors';
 import type { SessionModel } from '@starships/protocol';
-import { Neo4jConnection, getConnection } from '../../helpers/database';
-import { SessionRepository } from '../SessionRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
+import { SessionRepository } from '@/repositories/SessionRepository';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');

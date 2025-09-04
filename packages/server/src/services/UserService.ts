@@ -1,6 +1,6 @@
 import { UserRepository } from '@starships/models';
 import { UserModel } from '@starships/protocol';
-import { StarshipService } from './StarshipService';
+import { StarshipService } from '@/services/StarshipService';
 
 /**
  * Service for managing users in local database

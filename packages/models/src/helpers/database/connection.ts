@@ -22,19 +22,15 @@ export class Neo4jConnection {
     }
 
     try {
-      this.driver = neo4j.driver(
-        this.config.uri,
-        auth.basic(this.config.username, this.config.password),
-        {
-          disableLosslessIntegers: true,
-          connectionTimeout: 5000, // 5 second timeout
-          maxConnectionLifetime: 30000, // 30 second max lifetime
-          maxConnectionPoolSize: 100,
-          connectionAcquisitionTimeout: 10000, // 10 second acquisition timeout
-          encrypted: false, // Disable encryption for local development
-          trust: 'TRUST_ALL_CERTIFICATES', // Trust all certificates for local development
-        }
-      );
+      this.driver = neo4j.driver(this.config.uri, auth.basic(this.config.username, this.config.password), {
+        disableLosslessIntegers: true,
+        connectionTimeout: 5000, // 5 second timeout
+        maxConnectionLifetime: 30000, // 30 second max lifetime
+        maxConnectionPoolSize: 100,
+        connectionAcquisitionTimeout: 10000, // 10 second acquisition timeout
+        encrypted: false, // Disable encryption for local development
+        trust: 'TRUST_ALL_CERTIFICATES', // Trust all certificates for local development
+      });
 
       // Add timeout to connectivity check
       let timeoutHandle: NodeJS.Timeout;
@@ -80,9 +76,7 @@ export class Neo4jConnection {
       // Convert any Map objects to plain objects for Neo4j compatibility
       const sanitizedParameters = this.sanitizeParameters(parameters);
 
-      const result = await session.executeRead((tx: ManagedTransaction) =>
-        tx.run(cypher, sanitizedParameters)
-      );
+      const result = await session.executeRead((tx: ManagedTransaction) => tx.run(cypher, sanitizedParameters));
 
       return result.records.map((record) => {
         const obj = record.toObject();
@@ -111,9 +105,7 @@ export class Neo4jConnection {
       // Convert any Map objects to plain objects for Neo4j compatibility
       const sanitizedParameters = this.sanitizeParameters(parameters);
 
-      const result = await session.executeWrite((tx: ManagedTransaction) =>
-        tx.run(cypher, sanitizedParameters)
-      );
+      const result = await session.executeWrite((tx: ManagedTransaction) => tx.run(cypher, sanitizedParameters));
 
       return result.records.map((record) => {
         const obj = record.toObject();
@@ -202,10 +194,7 @@ export class Neo4jConnection {
   private sanitizeParameters(params: any, depth: number = 0): any {
     // Prevent infinite recursion
     if (depth > 10) {
-      console.warn(
-        '[Neo4j] Maximum sanitization depth reached, returning value as-is:',
-        typeof params
-      );
+      console.warn('[Neo4j] Maximum sanitization depth reached, returning value as-is:', typeof params);
       return params;
     }
     if (params === null || params === undefined) {

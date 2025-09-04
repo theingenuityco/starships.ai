@@ -3,14 +3,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import api from '@/lib/api'
 import type { AxiosResponse } from 'axios'
-import type {
-  ApiResponse,
-  StarshipModel,
-  UpdateStarshipRequest,
-  StarshipResponse,
-  StarshipAgentsResponse,
-  AgentModel,
-} from '@starships/protocol'
+import type { ApiResponse, StarshipModel, UpdateStarshipRequest, StarshipResponse, StarshipAgentsResponse, AgentModel } from '@starships/protocol'
 
 // Helper to extract data from ApiResponse<T> - enforces response contract
 const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
@@ -102,8 +95,7 @@ export function useCreateStarship() {
       })
     },
     onError: (error: any) => {
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to create starship'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to create starship'
       toast.error('Failed to create starship', {
         description: errorMessage,
       })
@@ -134,9 +126,7 @@ export function useUpdateStarship() {
         if (!old?.starships) return old
         return {
           ...old,
-          starships: old.starships.map((starship: StarshipModel) =>
-            starship.id === id ? { ...starship, ...updates } : starship
-          ),
+          starships: old.starships.map((starship: StarshipModel) => (starship.id === id ? { ...starship, ...updates } : starship)),
         }
       })
 
@@ -159,8 +149,7 @@ export function useUpdateStarship() {
         queryClient.setQueryData(STARSHIP_QUERY_KEYS.detail(context.id), context.previousStarship)
       }
 
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to update starship'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update starship'
       toast.error('Failed to update starship', {
         description: errorMessage,
       })
@@ -214,8 +203,7 @@ export function useDeleteStarship() {
         queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), context.previousStarships)
       }
 
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to delete starship'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete starship'
       toast.error('Failed to delete starship', {
         description: errorMessage,
       })
@@ -259,9 +247,7 @@ export function useUpdateStarshipStatus() {
         if (!old?.starships) return old
         return {
           ...old,
-          starships: old.starships.map((starship: StarshipModel) =>
-            starship.id === id ? { ...starship, status } : starship
-          ),
+          starships: old.starships.map((starship: StarshipModel) => (starship.id === id ? { ...starship, status } : starship)),
         }
       })
 
@@ -284,8 +270,7 @@ export function useUpdateStarshipStatus() {
         queryClient.setQueryData(STARSHIP_QUERY_KEYS.detail(context.id), context.previousStarship)
       }
 
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to update starship status'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update starship status'
       toast.error('Failed to update starship status', {
         description: errorMessage,
       })
@@ -318,8 +303,7 @@ export function useDeployAgent() {
       toast.success('Agent deployed successfully!')
     },
     onError: (error: any) => {
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to deploy agent'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to deploy agent'
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })
@@ -344,8 +328,7 @@ export function useRemoveAgent() {
       toast.success('Agent removed successfully!')
     },
     onError: (error: any) => {
-      const errorMessage =
-        error?.response?.data?.error || error?.message || 'Failed to remove agent'
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to remove agent'
       toast.error('Failed to remove agent', {
         description: errorMessage,
       })

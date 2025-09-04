@@ -62,13 +62,9 @@ export class MigrationRunner {
           result.executionTime = Date.now() - startTime;
           return result;
         } else {
-          console.log(
-            '⚠️ Migration exists but verification failed, clearing incomplete migration and re-running...'
-          );
+          console.log('⚠️ Migration exists but verification failed, clearing incomplete migration and re-running...');
           // Clear the incomplete migration record and re-run
-          await this.getConnection().executeWrite(
-            'MATCH (m:Migration {id: "000_complete_schema"}) DELETE m'
-          );
+          await this.getConnection().executeWrite('MATCH (m:Migration {id: "000_complete_schema"}) DELETE m');
           console.log('   └─ Cleared incomplete migration record');
         }
       }
@@ -103,9 +99,7 @@ export class MigrationRunner {
       result.executionTime = Date.now() - startTime;
       console.log(`✅ Schema initialized successfully in ${result.executionTime}ms`);
     } catch (error) {
-      result.errors?.push(
-        `Schema initialization failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      result.errors?.push(`Schema initialization failed: ${error instanceof Error ? error.message : String(error)}`);
       console.error('❌ Schema initialization failed:', error);
     }
 
@@ -155,10 +149,7 @@ export class MigrationRunner {
       }
 
       // Find rollback file
-      const rollbackPath = join(
-        this.migrationsPath,
-        `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.cypher`
-      );
+      const rollbackPath = join(this.migrationsPath, `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.cypher`);
       if (!existsSync(rollbackPath)) {
         result.errors?.push(`Rollback file not found: ${rollbackPath}`);
         return result;
@@ -171,9 +162,7 @@ export class MigrationRunner {
       result.success = true;
       result.executionTime = Date.now() - startTime;
     } catch (error) {
-      result.errors?.push(
-        `Rollback execution failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      result.errors?.push(`Rollback execution failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     result.executionTime = Date.now() - startTime;
@@ -223,9 +212,7 @@ export class MigrationRunner {
     }
 
     const appliedMigrations = await this.getAppliedMigrations();
-    const appliedNumbers = appliedMigrations
-      .map((m) => parseInt(m.id.split('_')[0]))
-      .filter((num) => !isNaN(num));
+    const appliedNumbers = appliedMigrations.map((m) => parseInt(m.id.split('_')[0])).filter((num) => !isNaN(num));
 
     // Get all available migration files to understand which ones actually exist
     const availableMigrationFiles = readdirSync(this.migrationsPath)
@@ -255,10 +242,9 @@ export class MigrationRunner {
   /** Check if migration is already applied */
   private async isMigrationApplied(migrationId: string): Promise<boolean> {
     try {
-      const result = await this.getConnection().executeQuery(
-        'MATCH (m:Migration {id: $migrationId}) RETURN count(m) as count',
-        { migrationId }
-      );
+      const result = await this.getConnection().executeQuery('MATCH (m:Migration {id: $migrationId}) RETURN count(m) as count', {
+        migrationId,
+      });
       return result[0]?.count > 0;
     } catch (error) {
       console.error('Failed to check migration status:', error);
@@ -298,17 +284,11 @@ export class MigrationRunner {
         try {
           // Show friendly progress without revealing statement content
           const statementType = this.getStatementType(statement);
-          console.log(
-            `  └─ Executing statement ${i + 1}/${statements.length}: ${statementType}...`
-          );
+          console.log(`  └─ Executing statement ${i + 1}/${statements.length}: ${statementType}...`);
           await this.getConnection().executeWrite(statement);
         } catch (error) {
-          console.error(
-            `❌ Failed to execute statement ${i + 1}: ${this.getStatementType(statement)}`
-          );
-          throw new Error(
-            `Failed to execute statement ${i + 1}: ${error instanceof Error ? error.message : String(error)}`
-          );
+          console.error(`❌ Failed to execute statement ${i + 1}: ${this.getStatementType(statement)}`);
+          throw new Error(`Failed to execute statement ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }
@@ -384,16 +364,12 @@ export class MigrationRunner {
       }
 
       // Check that migration completed successfully
-      const migrationCheck = await this.getConnection().executeQuery(
-        'MATCH (m:Migration {id: "000_complete_schema"}) RETURN m'
-      );
+      const migrationCheck = await this.getConnection().executeQuery('MATCH (m:Migration {id: "000_complete_schema"}) RETURN m');
       if (!migrationCheck || migrationCheck.length === 0) {
         errors.push('Migration record was not created properly');
       }
     } catch (error) {
-      errors.push(
-        `Schema verification failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      errors.push(`Schema verification failed: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     return {
@@ -432,26 +408,20 @@ export class MigrationRunner {
   private async verifyConstraintsAndIndexes(errors: string[]): Promise<void> {
     try {
       // Check basic constraints exist
-      const constraints = await this.getConnection().executeQuery(
-        'SHOW CONSTRAINTS YIELD name RETURN count(*) as count'
-      );
+      const constraints = await this.getConnection().executeQuery('SHOW CONSTRAINTS YIELD name RETURN count(*) as count');
 
       if (constraints[0]?.count < 5) {
         errors.push('Expected constraints not found');
       }
 
       // Check basic indexes exist
-      const indexes = await this.getConnection().executeQuery(
-        'SHOW INDEXES YIELD name RETURN count(*) as count'
-      );
+      const indexes = await this.getConnection().executeQuery('SHOW INDEXES YIELD name RETURN count(*) as count');
 
       if (indexes[0]?.count < 5) {
         errors.push('Expected indexes not found');
       }
     } catch (error) {
-      errors.push(
-        `Constraint/index verification failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      errors.push(`Constraint/index verification failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

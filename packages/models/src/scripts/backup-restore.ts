@@ -57,9 +57,7 @@ export class BackupManager {
 
       // Gather metadata
       const metadata = await this.gatherBackupMetadata(session);
-      console.log(
-        `[BACKUP] 📊 Backup metadata: ${metadata.nodeCount} nodes, ${metadata.relationshipCount} relationships`
-      );
+      console.log(`[BACKUP] 📊 Backup metadata: ${metadata.nodeCount} nodes, ${metadata.relationshipCount} relationships`);
 
       // Export all nodes
       console.log('[BACKUP] 📦 Exporting nodes...');
@@ -123,9 +121,7 @@ export class BackupManager {
     try {
       // Load backup data
       const backupData = await this.loadBackupFromFile(backupPath);
-      console.log(
-        `[RESTORE] 📊 Backup contains: ${backupData.nodes.length} nodes, ${backupData.relationships.length} relationships`
-      );
+      console.log(`[RESTORE] 📊 Backup contains: ${backupData.nodes.length} nodes, ${backupData.relationships.length} relationships`);
 
       session = this.connection.getSession();
 
@@ -147,18 +143,13 @@ export class BackupManager {
 
       // Restore relationships
       console.log('[RESTORE] 🔗 Restoring relationships...');
-      result.restoredRelationships = await this.restoreRelationships(
-        session,
-        backupData.relationships
-      );
+      result.restoredRelationships = await this.restoreRelationships(session, backupData.relationships);
 
       result.success = true;
       result.duration = Date.now() - startTime;
 
       console.log(`[RESTORE] ✅ Restore completed in ${result.duration}ms`);
-      console.log(
-        `[RESTORE] 📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`
-      );
+      console.log(`[RESTORE] 📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`);
 
       return result;
     } catch (error) {
@@ -192,10 +183,7 @@ export class BackupManager {
 
     return fs
       .readdirSync(this.backupDir)
-      .filter(
-        (file) =>
-          file.startsWith('backup-') && (file.endsWith('.json') || file.endsWith('.json.gz'))
-      )
+      .filter((file) => file.startsWith('backup-') && (file.endsWith('.json') || file.endsWith('.json.gz')))
       .sort()
       .reverse(); // Most recent first
   }
@@ -513,9 +501,7 @@ export async function runRestore(): Promise<void> {
 
     if (result.success) {
       console.log('\n✅ Restore completed successfully!');
-      console.log(
-        `📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`
-      );
+      console.log(`📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`);
     } else {
       console.error('\n❌ Restore failed!');
       result.errors.forEach((error) => console.error(`   - ${error}`));

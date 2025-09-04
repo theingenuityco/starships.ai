@@ -94,12 +94,8 @@ describe('NativeToolApiKeyRepository', () => {
 
     it('should validate required parameters', async () => {
       await expect(repository.saveApiKey('', 'openai', 'key')).rejects.toThrow(ValidationError);
-      await expect(repository.saveApiKey('starship-123', '', 'key')).rejects.toThrow(
-        ValidationError
-      );
-      await expect(repository.saveApiKey('starship-123', 'openai', '')).rejects.toThrow(
-        ValidationError
-      );
+      await expect(repository.saveApiKey('starship-123', '', 'key')).rejects.toThrow(ValidationError);
+      await expect(repository.saveApiKey('starship-123', 'openai', '')).rejects.toThrow(ValidationError);
     });
 
     it('should encrypt API key before saving', async () => {
@@ -108,19 +104,13 @@ describe('NativeToolApiKeyRepository', () => {
       await repository.saveApiKey('starship-123', 'openai', 'sk-test-key');
 
       expect(crypto.randomBytes).toHaveBeenCalledWith(16);
-      expect(crypto.createCipheriv).toHaveBeenCalledWith(
-        'aes-256-gcm',
-        expect.any(Buffer),
-        expect.any(Buffer)
-      );
+      expect(crypto.createCipheriv).toHaveBeenCalledWith('aes-256-gcm', expect.any(Buffer), expect.any(Buffer));
     });
 
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -132,10 +122,10 @@ describe('NativeToolApiKeyRepository', () => {
       const result = await repository.getApiKey('starship-123', 'openai');
 
       expect(result).toBe('decrypted-partfinal-part');
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (k:NativeToolApiKey'),
-        { starshipId: 'starship-123', toolName: 'openai' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (k:NativeToolApiKey'), {
+        starshipId: 'starship-123',
+        toolName: 'openai',
+      });
       expect(crypto.createDecipheriv).toHaveBeenCalled();
     });
 
@@ -241,10 +231,10 @@ describe('NativeToolApiKeyRepository', () => {
 
       await repository.deleteApiKey('starship-123', 'openai');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE k'),
-        { starshipId: 'starship-123', toolName: 'openai' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DELETE k'), {
+        starshipId: 'starship-123',
+        toolName: 'openai',
+      });
     });
 
     it('should validate required parameters', async () => {
@@ -255,9 +245,7 @@ describe('NativeToolApiKeyRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -268,10 +256,10 @@ describe('NativeToolApiKeyRepository', () => {
       const result = await repository.hasApiKey('starship-123', 'openai');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('count(k) > 0 as hasKey'),
-        { starshipId: 'starship-123', toolName: 'openai' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('count(k) > 0 as hasKey'), {
+        starshipId: 'starship-123',
+        toolName: 'openai',
+      });
     });
 
     it('should return false when API key does not exist', async () => {
@@ -338,9 +326,7 @@ describe('NativeToolApiKeyRepository', () => {
       };
       (crypto.createCipheriv as jest.Mock).mockReturnValue(mockCipher);
 
-      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(DatabaseError);
 
       // Reset crypto mock after this test
       (crypto.createCipheriv as jest.Mock).mockReturnValue({
@@ -428,9 +414,7 @@ describe('NativeToolApiKeyRepository', () => {
     it('should handle constraint violations', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('constraint violation'));
 
-      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(
-        ConflictError
-      );
+      await expect(repository.saveApiKey('starship-123', 'openai', 'key')).rejects.toThrow(ConflictError);
     });
 
     it('should handle connection timeouts', async () => {
@@ -448,9 +432,7 @@ describe('NativeToolApiKeyRepository', () => {
     it('should handle network errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('network error'));
 
-      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.deleteApiKey('starship-123', 'openai')).rejects.toThrow(DatabaseError);
     });
   });
 

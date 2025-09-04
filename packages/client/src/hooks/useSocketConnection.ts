@@ -1,9 +1,5 @@
 import SocketClient from '@/lib/socket-client'
-import type {
-  ConnectionStatus,
-  ConnectionStatusEvent,
-  SocketConnectionState,
-} from '@starships/protocol'
+import type { ConnectionStatus, ConnectionStatusEvent, SocketConnectionState } from '@starships/protocol'
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 

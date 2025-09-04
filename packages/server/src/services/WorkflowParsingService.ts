@@ -16,11 +16,7 @@ export class WorkflowParsingService {
    * Parse AI response and convert to CreateWorkflowRequest with Blueprint
    * Migrated from legacy format to autopilot Blueprint pattern
    */
-  static parseAIResponse(
-    aiResponse: string,
-    missionId: string,
-    agents: AgentModel[]
-  ): CreateWorkflowRequest {
+  static parseAIResponse(aiResponse: string, missionId: string, agents: AgentModel[]): CreateWorkflowRequest {
     try {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -93,9 +89,7 @@ export class WorkflowParsingService {
       };
     } catch (error) {
       this.logger.error('Error parsing AI workflow response', { error });
-      throw new Error(
-        `Failed to parse workflow: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      throw new Error(`Failed to parse workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

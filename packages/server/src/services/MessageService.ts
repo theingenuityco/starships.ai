@@ -52,10 +52,7 @@ export class MessageService {
   /**
    * Create a new message
    */
-  async createMessage(
-    request: CreateMessageRequest,
-    options: MessageServiceOptions = {}
-  ): Promise<MessageModel> {
+  async createMessage(request: CreateMessageRequest, options: MessageServiceOptions = {}): Promise<MessageModel> {
     console.log('📝 [MESSAGE-SERVICE] Creating message:', {
       role: request.role,
       starshipId: request.starshipId,
@@ -84,10 +81,7 @@ export class MessageService {
   /**
    * Get message by ID
    */
-  async getMessage(
-    messageId: string,
-    options: MessageServiceOptions = {}
-  ): Promise<MessageModel | null> {
+  async getMessage(messageId: string, options: MessageServiceOptions = {}): Promise<MessageModel | null> {
     const message = await this.messageRepository.findById(messageId);
 
     if (!message) {
@@ -106,21 +100,14 @@ export class MessageService {
   /**
    * Update message
    */
-  async updateMessage(
-    messageId: string,
-    updates: UpdateMessageRequest,
-    options: MessageServiceOptions = {}
-  ): Promise<MessageModel | null> {
+  async updateMessage(messageId: string, updates: UpdateMessageRequest, options: MessageServiceOptions = {}): Promise<MessageModel | null> {
     console.log('✏️ [MESSAGE-SERVICE] Updating message:', {
       messageId,
       updates: Object.keys(updates),
       timestamp: new Date().toISOString(),
     });
 
-    const updatedMessage = await this.messageRepository.update(
-      messageId,
-      updates as Partial<MessageModel>
-    );
+    const updatedMessage = await this.messageRepository.update(messageId, updates as Partial<MessageModel>);
 
     if (updatedMessage) {
       console.log('✅ [MESSAGE-SERVICE] Message updated:', messageId);
@@ -200,28 +187,17 @@ export class MessageService {
       timestamp: new Date().toISOString(),
     });
 
-    const messages = await this.messageRepository.getConversationMessages(
-      request.conversationId,
-      request.orderBy,
-      request.orderDirection
-    );
+    const messages = await this.messageRepository.getConversationMessages(request.conversationId, request.orderBy, request.orderDirection);
 
     // Apply pagination if specified
-    const paginatedMessages = request.limit
-      ? messages.slice(request.offset || 0, (request.offset || 0) + request.limit)
-      : messages;
+    const paginatedMessages = request.limit ? messages.slice(request.offset || 0, (request.offset || 0) + request.limit) : messages;
 
     // Extract participants (unique agent IDs)
-    const participants = [
-      ...new Set(
-        messages.filter((m: MessageModel) => m.agentId).map((m: MessageModel) => m.agentId!)
-      ),
-    ];
+    const participants = [...new Set(messages.filter((m: MessageModel) => m.agentId).map((m: MessageModel) => m.agentId!))];
 
     // Get conversation metadata
     const startedAt = messages.length > 0 ? messages[0].timestamp : new Date().toISOString();
-    const lastActivityAt =
-      messages.length > 0 ? messages[messages.length - 1].timestamp : new Date().toISOString();
+    const lastActivityAt = messages.length > 0 ? messages[messages.length - 1].timestamp : new Date().toISOString();
 
     return {
       conversationId: request.conversationId,
@@ -249,8 +225,7 @@ export class MessageService {
       starshipId: context.starshipId,
       agentId: context.agentId,
       conversationId,
-      messageType:
-        role === 'system' ? 'system_message' : role === 'user' ? 'user_input' : 'agent_response',
+      messageType: role === 'system' ? 'system_message' : role === 'user' ? 'user_input' : 'agent_response',
       metadata,
     });
   }
@@ -337,11 +312,7 @@ export class MessageService {
   /**
    * Get messages by filters
    */
-  async getMessagesByFilters(
-    filters: MessageFilters,
-    limit?: number,
-    offset?: number
-  ): Promise<MessageModel[]> {
+  async getMessagesByFilters(filters: MessageFilters, limit?: number, offset?: number): Promise<MessageModel[]> {
     console.log('🎯 [MESSAGE-SERVICE] Getting messages by filters:', {
       filters,
       limit,
@@ -394,11 +365,7 @@ export class MessageService {
           const results = await Promise.allSettled(
             request.messageIds.map((id) =>
               this.messageRepository.update(id, {
-                processingStatus: request.operationData!.processingStatus as
-                  | 'pending'
-                  | 'processing'
-                  | 'completed'
-                  | 'failed',
+                processingStatus: request.operationData!.processingStatus as 'pending' | 'processing' | 'completed' | 'failed',
               })
             )
           );
@@ -458,12 +425,7 @@ export class MessageService {
   /**
    * Get message statistics
    */
-  async getMessageStats(filters?: {
-    starshipId?: string;
-    agentId?: string;
-    dateFrom?: string;
-    dateTo?: string;
-  }) {
+  async getMessageStats(filters?: { starshipId?: string; agentId?: string; dateFrom?: string; dateTo?: string }) {
     console.log('📊 [MESSAGE-SERVICE] Getting message statistics:', {
       filters,
       timestamp: new Date().toISOString(),
@@ -522,15 +484,12 @@ export class MessageService {
       totalTokens,
       averageTokensPerMessage: totalTokens > 0 ? Math.round(totalTokens / messages.length) : 0,
       totalProcessingTime,
-      averageProcessingTime:
-        totalProcessingTime > 0 ? Math.round(totalProcessingTime / messages.length) : 0,
+      averageProcessingTime: totalProcessingTime > 0 ? Math.round(totalProcessingTime / messages.length) : 0,
       participantCount: participants.size,
       participants: Array.from(participants),
       startedAt: messages[0].timestamp,
       lastActivityAt: messages[messages.length - 1].timestamp,
-      duration:
-        new Date(messages[messages.length - 1].timestamp).getTime() -
-        new Date(messages[0].timestamp).getTime(),
+      duration: new Date(messages[messages.length - 1].timestamp).getTime() - new Date(messages[0].timestamp).getTime(),
     };
   }
 
@@ -541,11 +500,7 @@ export class MessageService {
   /**
    * Get messages by starship
    */
-  async getMessagesByStarship(
-    starshipId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<MessageModel[]> {
+  async getMessagesByStarship(starshipId: string, limit?: number, offset?: number): Promise<MessageModel[]> {
     const messages = await this.messageRepository.findByStarshipId(starshipId);
 
     if (limit) {
@@ -558,11 +513,7 @@ export class MessageService {
   /**
    * Get messages by agent
    */
-  async getMessagesByAgent(
-    agentId: string,
-    limit?: number,
-    offset?: number
-  ): Promise<MessageModel[]> {
+  async getMessagesByAgent(agentId: string, limit?: number, offset?: number): Promise<MessageModel[]> {
     const messages = await this.messageRepository.findByAgentId(agentId);
 
     if (limit) {
@@ -582,10 +533,7 @@ export class MessageService {
   /**
    * Get messages by role
    */
-  async getMessagesByRole(
-    role: 'system' | 'user' | 'assistant',
-    starshipId?: string
-  ): Promise<MessageModel[]> {
+  async getMessagesByRole(role: 'system' | 'user' | 'assistant', starshipId?: string): Promise<MessageModel[]> {
     return await this.messageRepository.findByRole(role, starshipId);
   }
 }

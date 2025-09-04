@@ -25,11 +25,7 @@ interface StarfieldBackgroundProps {
   launching?: boolean
 }
 
-export function StarfieldBackground({
-  density = 150,
-  speed = 0.5,
-  launching = false,
-}: StarfieldBackgroundProps) {
+export function StarfieldBackground({ density = 150, speed = 0.5, launching = false }: StarfieldBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const starsRef = useRef<Star[]>([])
   const animationRef = useRef<number>(0)
@@ -106,11 +102,7 @@ export function StarfieldBackground({
         const y = (star.y / star.z) * 400 + centerY
 
         // Mark stars as dead if they go off-screen or behind camera
-        const isOffScreen =
-          x < -margin ||
-          x > dimensions.width + margin ||
-          y < -margin ||
-          y > dimensions.height + margin
+        const isOffScreen = x < -margin || x > dimensions.width + margin || y < -margin || y > dimensions.height + margin
         const isBehindCamera = star.z <= 0
 
         if (isOffScreen || isBehindCamera) {
@@ -183,9 +175,7 @@ export function StarfieldBackground({
         const size = (1 - star.z / 1000) * star.size
 
         // Calculate twinkling effect
-        const twinkle = clearWithTrail
-          ? Math.sin(timeRef.current * star.twinkleSpeed + star.twinkleOffset) * 0.3 + 0.7
-          : 1
+        const twinkle = clearWithTrail ? Math.sin(timeRef.current * star.twinkleSpeed + star.twinkleOffset) * 0.3 + 0.7 : 1
         const opacity = (1 - star.z / 1000) * star.brightness * twinkle
 
         // Draw star trail when launching
@@ -280,11 +270,7 @@ export function StarfieldBackground({
 
   return (
     <>
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0 w-full h-full pointer-events-none"
-        style={{ zIndex: 0 }}
-      />
+      <canvas ref={canvasRef} className="fixed inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }} />
       {launching && (
         <>
           {/* Speed lines effect */}
@@ -298,8 +284,7 @@ export function StarfieldBackground({
             className="fixed inset-0 pointer-events-none"
             style={{
               zIndex: 1,
-              background:
-                'radial-gradient(circle at center, transparent 30%, rgba(59, 130, 246, 0.1) 50%, rgba(59, 130, 246, 0.3) 100%)',
+              background: 'radial-gradient(circle at center, transparent 30%, rgba(59, 130, 246, 0.1) 50%, rgba(59, 130, 246, 0.3) 100%)',
             }}
           />
 

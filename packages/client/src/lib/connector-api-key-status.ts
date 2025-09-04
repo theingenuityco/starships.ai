@@ -21,10 +21,7 @@ export class ConnectorApiKeyStatus {
   /**
    * Check the API key configuration status for a connector instance
    */
-  static checkApiKeyStatus(
-    connector: MCPServerConnector,
-    template?: MCPServerOption
-  ): ApiKeyStatusInfo {
+  static checkApiKeyStatus(connector: MCPServerConnector, template?: MCPServerOption): ApiKeyStatusInfo {
     // Use template if provided, otherwise try to get from connector
     const sourceTemplate = template || connector.template
 
@@ -75,9 +72,7 @@ export class ConnectorApiKeyStatus {
     for (const requirement of requirements) {
       const value = currentEnv[requirement.envKey]
 
-      console.log(
-        `[ConnectorApiKeyStatus] DEBUG - Checking ${requirement.envKey}: "${value}" (type: ${typeof value})`
-      )
+      console.log(`[ConnectorApiKeyStatus] DEBUG - Checking ${requirement.envKey}: "${value}" (type: ${typeof value})`)
 
       if (value && value.trim() !== '') {
         configuredKeys.push(requirement.envKey)
@@ -85,9 +80,7 @@ export class ConnectorApiKeyStatus {
         console.log(`[ConnectorApiKeyStatus] DEBUG - ${requirement.envKey} is CONFIGURED`)
       } else if (requirement.required) {
         missingKeys.push(requirement.envKey)
-        console.log(
-          `[ConnectorApiKeyStatus] DEBUG - ${requirement.envKey} is MISSING (required: ${requirement.required})`
-        )
+        console.log(`[ConnectorApiKeyStatus] DEBUG - ${requirement.envKey} is MISSING (required: ${requirement.required})`)
       }
     }
 

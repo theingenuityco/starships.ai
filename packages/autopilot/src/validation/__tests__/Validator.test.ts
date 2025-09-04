@@ -66,9 +66,7 @@ describe('Validator', () => {
 
     it('should fail validation when edges are missing', () => {
       const blueprintWithoutEdges: Blueprint = {
-        nodes: [
-          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        ],
+        nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }],
         edges: [],
         metadata: {},
       };
@@ -85,9 +83,7 @@ describe('Validator', () => {
 
     it('should fail validation when edges array is undefined', () => {
       const blueprintWithUndefinedEdges = {
-        nodes: [
-          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        ],
+        nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }],
         metadata: {},
       } as Blueprint;
 
@@ -120,9 +116,7 @@ describe('Validator', () => {
 
     it('should fail validation when end node is missing', () => {
       const blueprintWithoutEnd: Blueprint = {
-        nodes: [
-          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        ],
+        nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }],
         edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
         metadata: {},
       };
@@ -201,11 +195,7 @@ describe('Validator', () => {
 
       expect(result.valid).toBe(false);
       expect(
-        result.errors.some(
-          (error) =>
-            error.code === 'CIRCULAR_DEPENDENCY' &&
-            error.message.includes('Circular dependency detected')
-        )
+        result.errors.some((error) => error.code === 'CIRCULAR_DEPENDENCY' && error.message.includes('Circular dependency detected'))
       ).toBe(true);
     });
 
@@ -477,9 +467,7 @@ describe('Validator', () => {
 
     it('should handle workflow with only start node', () => {
       const startOnlyBlueprint: Blueprint = {
-        nodes: [
-          { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        ],
+        nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} }],
         edges: [],
         metadata: {},
       };

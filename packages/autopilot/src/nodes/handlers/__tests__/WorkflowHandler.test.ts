@@ -409,8 +409,7 @@ describe('WorkflowHandler', () => {
       expect(result.valid).toBe(true);
       expect(result.warnings).toContainEqual({
         code: 'POTENTIAL_TIMEOUT',
-        message:
-          'Workflow timeout is less than 1 second, which may be too short for complex workflows',
+        message: 'Workflow timeout is less than 1 second, which may be too short for complex workflows',
         nodeRef: 'workflow-node',
       });
     });

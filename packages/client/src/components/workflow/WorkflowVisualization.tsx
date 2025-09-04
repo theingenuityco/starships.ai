@@ -1,21 +1,7 @@
 'use client'
 
 import React, { useCallback, useMemo } from 'react'
-import {
-  ReactFlow,
-  Node,
-  Edge,
-  Background,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
-  ReactFlowProvider,
-  MarkerType,
-  Position,
-  Handle,
-  useReactFlow,
-} from '@xyflow/react'
+import { ReactFlow, Node, Edge, Background, useNodesState, useEdgesState, addEdge, Connection, ReactFlowProvider, MarkerType, Position, Handle, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock } from 'lucide-react'
 import type { WorkflowModel, AgentModel } from '@starships/protocol'
@@ -99,19 +85,13 @@ const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
     const baseClasses = 'border rounded-lg p-3'
 
     const typeClasses = {
-      start:
-        'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-600 dark:text-green-300',
+      start: 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-600 dark:text-green-300',
       end: 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300',
-      agent:
-        'bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-900/20 dark:border-purple-600 dark:text-purple-300',
-      user_prompt:
-        'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/20 dark:border-amber-600 dark:text-amber-300',
-      conditional:
-        'bg-orange-50 border-orange-300 text-orange-700 dark:bg-orange-900/20 dark:border-orange-600 dark:text-orange-300',
-      output:
-        'bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-600 dark:text-indigo-300',
-      default:
-        'bg-gray-50 border-gray-300 text-gray-700 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300',
+      agent: 'bg-purple-50 border-purple-300 text-purple-700 dark:bg-purple-900/20 dark:border-purple-600 dark:text-purple-300',
+      user_prompt: 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-900/20 dark:border-amber-600 dark:text-amber-300',
+      conditional: 'bg-orange-50 border-orange-300 text-orange-700 dark:bg-orange-900/20 dark:border-orange-600 dark:text-orange-300',
+      output: 'bg-indigo-50 border-indigo-300 text-indigo-700 dark:bg-indigo-900/20 dark:border-indigo-600 dark:text-indigo-300',
+      default: 'bg-gray-50 border-gray-300 text-gray-700 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300',
     }
 
     const activeClasses = isActive ? 'ring-1 ring-current/50' : ''
@@ -148,32 +128,22 @@ const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
         </div>
 
         {/* Description if present - left aligned */}
-        {data.node.description && (
-          <div className="text-xs opacity-70 text-left">{data.node.description}</div>
-        )}
+        {data.node.description && <div className="text-xs opacity-70 text-left">{data.node.description}</div>}
 
         {/* Agent details for agent nodes */}
         {data.node.type === 'agent' && data.agent && (
           <div className="flex flex-col gap-1 text-left border-t border-current/10 pt-2 mt-1">
             <div className="flex items-center gap-1 text-xs">
               <User className="w-3 h-3 text-purple-500" />
-              <span className="font-medium text-purple-600 dark:text-purple-400">
-                {data.agent.name}
-              </span>
+              <span className="font-medium text-purple-600 dark:text-purple-400">{data.agent.name}</span>
             </div>
-            {data.agent.category && (
-              <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 text-xs rounded w-fit">
-                {data.agent.category}
-              </span>
-            )}
+            {data.agent.category && <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 text-xs rounded w-fit">{data.agent.category}</span>}
           </div>
         )}
 
         {/* Simple metadata - left aligned */}
         <div className="flex flex-col gap-1 text-left">
-          <span className="px-2 py-1 bg-current/5 rounded text-xs inline-block w-fit">
-            {data.node.type}
-          </span>
+          <span className="px-2 py-1 bg-current/5 rounded text-xs inline-block w-fit">{data.node.type}</span>
           {data.node.estimatedTime && (
             <div className="flex items-center gap-1 opacity-60 text-xs">
               <Clock className="w-3 h-3" />
@@ -221,10 +191,7 @@ const calculateCanvasHeight = (nodeCount: number) => {
 }
 
 // Traverse workflow graph starting from start node to determine execution order
-const traverseWorkflowGraph = (
-  workflowNodes: WorkflowDSLNode[],
-  workflowEdges: Array<{ from: string; to: string }>
-) => {
+const traverseWorkflowGraph = (workflowNodes: WorkflowDSLNode[], workflowEdges: Array<{ from: string; to: string }>) => {
   // Find start node
   const startNode = workflowNodes.find(node => node.type === 'start')
   if (!startNode) {
@@ -277,11 +244,7 @@ const traverseWorkflowGraph = (
 }
 
 // Convert workflow to React Flow format
-const convertToFlowData = (
-  workflow: WorkflowDSL | MissionWorkflow,
-  currentNodeId?: string,
-  agents?: Record<string, AgentModel>
-) => {
+const convertToFlowData = (workflow: WorkflowDSL | MissionWorkflow, currentNodeId?: string, agents?: Record<string, AgentModel>) => {
   const nodes: FlowNode[] = []
   const edges: Edge[] = []
 
@@ -297,10 +260,7 @@ const convertToFlowData = (
     const position = positions[index] || { x: 200, y: index * 200 }
 
     // Get agent data if this is an agent node
-    const agent =
-      node.type === 'agent' && node.parameters?.agentId
-        ? agents?.[node.parameters.agentId]
-        : undefined
+    const agent = node.type === 'agent' && node.parameters?.agentId ? agents?.[node.parameters.agentId] : undefined
 
     nodes.push({
       id: node.id,
@@ -374,10 +334,7 @@ const nodeTypes = {
 function FlowContent({ workflow, agents, currentNodeId, onNodeClick }: WorkflowVisualizationProps) {
   const { fitView } = useReactFlow()
 
-  const { nodes: computedNodes, edges: computedEdges } = useMemo(
-    () => convertToFlowData(workflow, currentNodeId, agents),
-    [workflow, currentNodeId, agents]
-  )
+  const { nodes: computedNodes, edges: computedEdges } = useMemo(() => convertToFlowData(workflow, currentNodeId, agents), [workflow, currentNodeId, agents])
 
   // Calculate dynamic height based on number of nodes
   const canvasHeight = useMemo(() => {
@@ -401,10 +358,7 @@ function FlowContent({ workflow, agents, currentNodeId, onNodeClick }: WorkflowV
     setEdges(computedEdges)
   }, [computedEdges, setEdges])
 
-  const onConnect = useCallback(
-    (params: Connection) => setEdges(eds => addEdge(params, eds)),
-    [setEdges]
-  )
+  const onConnect = useCallback((params: Connection) => setEdges(eds => addEdge(params, eds)), [setEdges])
 
   const handleNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
@@ -416,10 +370,7 @@ function FlowContent({ workflow, agents, currentNodeId, onNodeClick }: WorkflowV
   )
 
   return (
-    <div
-      className="w-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-900"
-      style={{ pointerEvents: 'none', height: `${canvasHeight}px` }}
-    >
+    <div className="w-full border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-900" style={{ pointerEvents: 'none', height: `${canvasHeight}px` }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -454,18 +405,10 @@ function FlowContent({ workflow, agents, currentNodeId, onNodeClick }: WorkflowV
 /**
  * Main workflow visualization component using React Flow
  */
-export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({
-  workflow,
-  agents,
-  currentNodeId,
-  onNodeClick,
-  className = '',
-}) => {
+export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({ workflow, agents, currentNodeId, onNodeClick, className = '' }) => {
   if (!workflow?.nodes || workflow.nodes.length === 0) {
     return (
-      <div
-        className={`h-[200px] flex items-center justify-center border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 ${className}`}
-      >
+      <div className={`h-[200px] flex items-center justify-center border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 ${className}`}>
         <p className="text-gray-400 dark:text-gray-500 text-sm">No workflow nodes to display</p>
       </div>
     )
@@ -474,12 +417,7 @@ export const WorkflowVisualization: React.FC<WorkflowVisualizationProps> = ({
   return (
     <ReactFlowProvider>
       <div className={className}>
-        <FlowContent
-          workflow={workflow}
-          agents={agents}
-          currentNodeId={currentNodeId}
-          onNodeClick={onNodeClick}
-        />
+        <FlowContent workflow={workflow} agents={agents} currentNodeId={currentNodeId} onNodeClick={onNodeClick} />
       </div>
     </ReactFlowProvider>
   )

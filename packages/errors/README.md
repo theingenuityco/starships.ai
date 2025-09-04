@@ -29,13 +29,7 @@ const normalizedError = ErrorUtils.normalize(someError);
 ### Error Mappings
 
 ```typescript
-import {
-  StandardErrorCode,
-  ErrorMappingUtils,
-  getHttpStatusCode,
-  getErrorCategory,
-  isRetryableError,
-} from '@starships/errors';
+import { StandardErrorCode, ErrorMappingUtils, getHttpStatusCode, getErrorCategory, isRetryableError } from '@starships/errors';
 
 // Get HTTP status code for an error
 const status = getHttpStatusCode('VALIDATION_ERROR'); // 400

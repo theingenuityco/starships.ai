@@ -114,24 +114,8 @@ export abstract class BaseError extends Error {
 export class ValidationError extends BaseError {
   public readonly field?: string;
 
-  constructor(
-    message: string,
-    field?: string,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(
-      message,
-      'VALIDATION_ERROR',
-      400,
-      ErrorCategory.VALIDATION,
-      details,
-      requestId,
-      path,
-      context
-    );
+  constructor(message: string, field?: string, details?: any, requestId?: string, path?: string, context?: ErrorContext) {
+    super(message, 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION, details, requestId, path, context);
     this.field = field;
   }
 
@@ -159,16 +143,7 @@ export class NotFoundError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(
-      message,
-      'RESOURCE_NOT_FOUND',
-      404,
-      ErrorCategory.NOT_FOUND,
-      details,
-      requestId,
-      path,
-      context
-    );
+    super(message, 'RESOURCE_NOT_FOUND', 404, ErrorCategory.NOT_FOUND, details, requestId, path, context);
     this.entityType = entityType;
     this.entityId = entityId;
   }
@@ -186,23 +161,8 @@ export class NotFoundError extends BaseError {
  * Authentication Error (401)
  */
 export class AuthenticationError extends BaseError {
-  constructor(
-    message: string = 'Authentication required',
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(
-      message,
-      'AUTHENTICATION_REQUIRED',
-      401,
-      ErrorCategory.AUTHENTICATION,
-      details,
-      requestId,
-      path,
-      context
-    );
+  constructor(message: string = 'Authentication required', details?: any, requestId?: string, path?: string, context?: ErrorContext) {
+    super(message, 'AUTHENTICATION_REQUIRED', 401, ErrorCategory.AUTHENTICATION, details, requestId, path, context);
   }
 }
 
@@ -222,16 +182,7 @@ export class AuthorizationError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(
-      message,
-      'ACCESS_DENIED',
-      403,
-      ErrorCategory.AUTHORIZATION,
-      details,
-      requestId,
-      path,
-      context
-    );
+    super(message, 'ACCESS_DENIED', 403, ErrorCategory.AUTHORIZATION, details, requestId, path, context);
     this.requiredPermission = requiredPermission;
     this.userRole = userRole;
   }
@@ -254,24 +205,8 @@ export class AuthorizationError extends BaseError {
 export class ConflictError extends BaseError {
   public readonly conflictType?: string;
 
-  constructor(
-    message: string,
-    conflictType?: string,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(
-      message,
-      'RESOURCE_CONFLICT',
-      409,
-      ErrorCategory.CONFLICT,
-      details,
-      requestId,
-      path,
-      context
-    );
+  constructor(message: string, conflictType?: string, details?: any, requestId?: string, path?: string, context?: ErrorContext) {
+    super(message, 'RESOURCE_CONFLICT', 409, ErrorCategory.CONFLICT, details, requestId, path, context);
     this.conflictType = conflictType;
   }
 
@@ -302,16 +237,7 @@ export class DatabaseError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(
-      message,
-      'DATABASE_ERROR',
-      500,
-      ErrorCategory.DATABASE,
-      details,
-      requestId,
-      path,
-      context
-    );
+    super(message, 'DATABASE_ERROR', 500, ErrorCategory.DATABASE, details, requestId, path, context);
     this.operation = operation;
     this.query = query;
   }
@@ -366,23 +292,8 @@ export class NetworkError extends BaseError {
  * Internal Server Error (500)
  */
 export class InternalServerError extends BaseError {
-  constructor(
-    message: string = 'Internal server error',
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(
-      message,
-      'INTERNAL_SERVER_ERROR',
-      500,
-      ErrorCategory.INTERNAL,
-      details,
-      requestId,
-      path,
-      context
-    );
+  constructor(message: string = 'Internal server error', details?: any, requestId?: string, path?: string, context?: ErrorContext) {
+    super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path, context);
   }
 }
 
@@ -404,16 +315,7 @@ export class RateLimitError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(
-      message,
-      'RATE_LIMIT_EXCEEDED',
-      429,
-      ErrorCategory.RATE_LIMIT,
-      details,
-      requestId,
-      path,
-      context
-    );
+    super(message, 'RATE_LIMIT_EXCEEDED', 429, ErrorCategory.RATE_LIMIT, details, requestId, path, context);
     this.limit = limit;
     this.retryAfter = retryAfter;
     this.remainingAttempts = remainingAttempts;
@@ -448,16 +350,7 @@ export class ServiceUnavailableError extends BaseError {
     path?: string,
     context?: ErrorContext
   ) {
-    super(
-      message,
-      'SERVICE_UNAVAILABLE',
-      503,
-      ErrorCategory.SERVICE_UNAVAILABLE,
-      details,
-      requestId,
-      path,
-      context
-    );
+    super(message, 'SERVICE_UNAVAILABLE', 503, ErrorCategory.SERVICE_UNAVAILABLE, details, requestId, path, context);
     this.service = service;
     this.retryAfter = retryAfter;
   }
@@ -501,22 +394,11 @@ export class ErrorUtils {
 
     // Handle specific error types
     if (error?.name === 'ValidationError' || error?.type === 'validation') {
-      return new ValidationError(
-        error.message || 'Validation failed',
-        error.field,
-        { originalError: error },
-        requestId,
-        path
-      );
+      return new ValidationError(error.message || 'Validation failed', error.field, { originalError: error }, requestId, path);
     }
 
     if (error?.name === 'UnauthorizedError' || error?.status === 401) {
-      return new AuthenticationError(
-        error.message || 'Authentication failed',
-        { originalError: error },
-        requestId,
-        path
-      );
+      return new AuthenticationError(error.message || 'Authentication failed', { originalError: error }, requestId, path);
     }
 
     if (error?.name === 'ForbiddenError' || error?.status === 403) {
@@ -531,32 +413,15 @@ export class ErrorUtils {
     }
 
     if (error?.name === 'NotFoundError' || error?.status === 404) {
-      return new NotFoundError(
-        error.message || 'Resource not found',
-        'Resource',
-        'unknown',
-        { originalError: error },
-        requestId,
-        path
-      );
+      return new NotFoundError(error.message || 'Resource not found', 'Resource', 'unknown', { originalError: error }, requestId, path);
     }
 
     if (error?.name === 'ConflictError' || error?.status === 409) {
-      return new ConflictError(
-        error.message || 'Conflict occurred',
-        undefined,
-        { originalError: error },
-        requestId,
-        path
-      );
+      return new ConflictError(error.message || 'Conflict occurred', undefined, { originalError: error }, requestId, path);
     }
 
     // Handle database errors
-    if (
-      error?.name === 'DatabaseError' ||
-      error?.code?.startsWith('ER_') ||
-      error?.code?.startsWith('SQLITE_')
-    ) {
+    if (error?.name === 'DatabaseError' || error?.code?.startsWith('ER_') || error?.code?.startsWith('SQLITE_')) {
       return new DatabaseError(
         error.message || 'Database operation failed',
         'database_operation',
@@ -568,11 +433,7 @@ export class ErrorUtils {
     }
 
     // Handle network/HTTP errors
-    if (
-      error?.code === 'ECONNREFUSED' ||
-      error?.code === 'ENOTFOUND' ||
-      error?.code === 'ETIMEDOUT'
-    ) {
+    if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' || error?.code === 'ETIMEDOUT') {
       return new NetworkError(
         error.message || 'Network operation failed',
         'external_service',
@@ -597,12 +458,7 @@ export class ErrorUtils {
     }
 
     // Default to internal server error
-    return new InternalServerError(
-      error?.message || 'An unexpected error occurred',
-      { originalError: error },
-      requestId,
-      path
-    );
+    return new InternalServerError(error?.message || 'An unexpected error occurred', { originalError: error }, requestId, path);
   }
 
   /**

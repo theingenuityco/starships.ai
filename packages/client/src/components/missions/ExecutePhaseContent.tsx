@@ -47,12 +47,7 @@ interface ExecutePhaseContentProps {
   onExecutionComplete?: () => void
 }
 
-export function ExecutePhaseContent({
-  mission,
-  workflow,
-  agents,
-  onExecutionComplete,
-}: ExecutePhaseContentProps) {
+export function ExecutePhaseContent({ mission, workflow, agents, onExecutionComplete }: ExecutePhaseContentProps) {
   const [executionState, setExecutionState] = useState<MissionExecutionState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -95,11 +90,7 @@ export function ExecutePhaseContent({
 
   if (loading) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex flex-col items-center justify-center p-8 space-y-4"
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center p-8 space-y-4">
         <Clock className="w-8 h-8 animate-spin text-orange-600" />
         <div className="text-center">
           <h3 className="text-lg font-semibold">Initializing Execution</h3>
@@ -111,11 +102,7 @@ export function ExecutePhaseContent({
 
   if (error) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex flex-col items-center justify-center p-8 space-y-4"
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center p-8 space-y-4">
         <AlertCircle className="w-8 h-8 text-red-600" />
         <div className="text-center">
           <h3 className="text-lg font-semibold text-red-800">Error Loading Execution Status</h3>
@@ -127,11 +114,7 @@ export function ExecutePhaseContent({
 
   if (!executionState) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex flex-col items-center justify-center p-8 space-y-4"
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center p-8 space-y-4">
         <Zap className="w-12 h-12 text-orange-600" />
         <div className="text-center">
           <h3 className="text-lg font-semibold">Ready to Execute</h3>
@@ -172,12 +155,7 @@ export function ExecutePhaseContent({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-6"
-    >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-6">
       {/* Execution Status Header */}
       <Card>
         <CardContent className="p-6">
@@ -185,24 +163,17 @@ export function ExecutePhaseContent({
             <div className="flex items-center space-x-3">
               {getStatusIcon(executionState.status)}
               <div>
-                <h3 className="text-lg font-semibold capitalize">
-                  {executionState.status} Execution
-                </h3>
+                <h3 className="text-lg font-semibold capitalize">{executionState.status} Execution</h3>
                 <p className="text-sm text-gray-600">
-                  {executionState.status === 'running' &&
-                    `Task ${executionState.currentNodeIndex + 1} of ${executionState.totalNodes}`}
-                  {executionState.status === 'completed' &&
-                    `All ${executionState.totalNodes} tasks completed`}
-                  {executionState.status === 'failed' &&
-                    `Stopped at task ${executionState.currentNodeIndex + 1}`}
+                  {executionState.status === 'running' && `Task ${executionState.currentNodeIndex + 1} of ${executionState.totalNodes}`}
+                  {executionState.status === 'completed' && `All ${executionState.totalNodes} tasks completed`}
+                  {executionState.status === 'failed' && `Stopped at task ${executionState.currentNodeIndex + 1}`}
                 </p>
               </div>
             </div>
             <div className="text-right text-sm text-gray-500">
               <p>Started: {new Date(executionState.startedAt).toLocaleString()}</p>
-              {executionState.completedAt && (
-                <p>Completed: {new Date(executionState.completedAt).toLocaleString()}</p>
-              )}
+              {executionState.completedAt && <p>Completed: {new Date(executionState.completedAt).toLocaleString()}</p>}
             </div>
           </div>
 
@@ -222,11 +193,7 @@ export function ExecutePhaseContent({
         <Card>
           <CardContent className="p-6">
             <h4 className="font-medium text-gray-900 mb-4">Mission Workflow</h4>
-            <WorkflowVisualization
-              workflow={workflow}
-              agents={agents}
-              currentNodeId={executionState?.nodeResults?.[executionState.currentNodeIndex]?.nodeId}
-            />
+            <WorkflowVisualization workflow={workflow} agents={agents} currentNodeId={executionState?.nodeResults?.[executionState.currentNodeIndex]?.nodeId} />
           </CardContent>
         </Card>
       )}
@@ -257,16 +224,10 @@ export function ExecutePhaseContent({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <p className="font-medium text-sm text-gray-900">{result.nodeName}</p>
-                        <span className="text-xs text-gray-500">
-                          {new Date(result.timestamp).toLocaleString()}
-                        </span>
+                        <span className="text-xs text-gray-500">{new Date(result.timestamp).toLocaleString()}</span>
                       </div>
 
-                      {result.output && (
-                        <p className="text-sm text-gray-700 mt-1 bg-white/50 p-2 rounded text-left">
-                          {result.output}
-                        </p>
-                      )}
+                      {result.output && <p className="text-sm text-gray-700 mt-1 bg-white/50 p-2 rounded text-left">{result.output}</p>}
 
                       {result.error && (
                         <p className="text-sm text-red-700 mt-1 bg-red-100/50 p-2 rounded">
@@ -284,36 +245,20 @@ export function ExecutePhaseContent({
 
       {/* Final Status Messages */}
       {executionState.status === 'completed' && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center p-6 bg-green-50 rounded-lg border border-green-200"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center p-6 bg-green-50 rounded-lg border border-green-200">
           <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
           <h3 className="text-green-800 font-semibold text-lg">Mission Execution Complete!</h3>
-          <p className="text-green-700 mt-2">
-            All {executionState.totalNodes} tasks have been successfully executed.
-          </p>
-          <p className="text-green-600 text-sm mt-1">
-            You can now continue the conversation to discuss results or plan next steps.
-          </p>
+          <p className="text-green-700 mt-2">All {executionState.totalNodes} tasks have been successfully executed.</p>
+          <p className="text-green-600 text-sm mt-1">You can now continue the conversation to discuss results or plan next steps.</p>
         </motion.div>
       )}
 
       {executionState.status === 'failed' && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center p-6 bg-red-50 rounded-lg border border-red-200"
-        >
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center p-6 bg-red-50 rounded-lg border border-red-200">
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-3" />
           <h3 className="text-red-800 font-semibold text-lg">Execution Failed</h3>
-          <p className="text-red-700 mt-2">
-            {executionState.error || 'One or more tasks failed during execution.'}
-          </p>
-          <p className="text-red-600 text-sm mt-1">
-            Check the task details above and consider regenerating the plan.
-          </p>
+          <p className="text-red-700 mt-2">{executionState.error || 'One or more tasks failed during execution.'}</p>
+          <p className="text-red-600 text-sm mt-1">Check the task details above and consider regenerating the plan.</p>
         </motion.div>
       )}
     </motion.div>

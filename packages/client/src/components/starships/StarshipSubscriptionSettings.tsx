@@ -64,10 +64,7 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Subscription</span>
-          <Badge
-            variant={getStatusVariant(starship.status)}
-            className={getStatusColor(starship.status)}
-          >
+          <Badge variant={getStatusVariant(starship.status)} className={getStatusColor(starship.status)}>
             {starship.status}
           </Badge>
         </CardTitle>
@@ -84,16 +81,9 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
               <div className="flex items-center space-x-3">
                 <AlertTriangle className="h-5 w-5 text-orange-600" />
                 <div className="flex-1">
-                  <p className="text-sm text-orange-800">
-                    Payment issue detected. Some features may be limited.
-                  </p>
+                  <p className="text-sm text-orange-800">Payment issue detected. Some features may be limited.</p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleManageSubscription}
-                  disabled={loading}
-                >
+                <Button size="sm" variant="outline" onClick={handleManageSubscription} disabled={loading}>
                   Update payment
                 </Button>
               </div>
@@ -107,16 +97,9 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
               <div className="flex items-center space-x-3">
                 <XCircle className="h-5 w-5 text-red-600" />
                 <div className="flex-1">
-                  <p className="text-sm text-red-800">
-                    Subscription cancelled. Reactivate to continue using this starship.
-                  </p>
+                  <p className="text-sm text-red-800">Subscription cancelled. Reactivate to continue using this starship.</p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleManageSubscription}
-                  disabled={loading}
-                >
+                <Button size="sm" variant="outline" onClick={handleManageSubscription} disabled={loading}>
                   Reactivate
                 </Button>
               </div>
@@ -125,12 +108,7 @@ export function StarshipSubscriptionSettings({ starship }: StarshipSubscriptionS
         )}
 
         {starship.plan !== 'scout' && (
-          <Button
-            onClick={handleManageSubscription}
-            disabled={loading}
-            className="w-full"
-            variant="outline"
-          >
+          <Button onClick={handleManageSubscription} disabled={loading} className="w-full" variant="outline">
             <CreditCard className="w-4 h-4 mr-2" />
             {loading ? 'Loading...' : 'Manage Subscription'}
           </Button>

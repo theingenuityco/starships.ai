@@ -46,17 +46,11 @@ export default function CheckoutSuccess() {
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md mx-auto">
           <CardContent className="p-8 text-center space-y-4">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center"
-            >
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-16 h-16 mx-auto bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </motion.div>
             <h1 className="text-xl font-semibold">🚀 Starship Created!</h1>
-            <p className="text-muted-foreground">
-              Payment successful. Redirecting to your starship...
-            </p>
+            <p className="text-muted-foreground">Payment successful. Redirecting to your starship...</p>
           </CardContent>
         </Card>
       </div>

@@ -40,24 +40,13 @@ export class ErrorRecoveryManager {
     baseDelay: 1000,
     maxDelay: 10000,
     backoffFactor: 2,
-    retryableErrors: [
-      'NetworkError',
-      'TimeoutError',
-      'ServiceUnavailable',
-      'InternalServerError',
-      'BadGateway',
-      'GatewayTimeout',
-    ],
+    retryableErrors: ['NetworkError', 'TimeoutError', 'ServiceUnavailable', 'InternalServerError', 'BadGateway', 'GatewayTimeout'],
   }
 
   /**
    * Enhanced error with recovery context and actions
    */
-  static enhanceError(
-    error: Error,
-    context: ErrorContext,
-    recoveryActions?: RecoveryAction[]
-  ): EnhancedError {
+  static enhanceError(error: Error, context: ErrorContext, recoveryActions?: RecoveryAction[]): EnhancedError {
     const enhanced = error as EnhancedError
     enhanced.context = context
     enhanced.recoveryActions = recoveryActions || []
@@ -79,10 +68,7 @@ export class ErrorRecoveryManager {
   /**
    * Retry mechanism with exponential backoff
    */
-  static async withRetry<T>(
-    operation: () => Promise<T>,
-    options: ErrorRecoveryOptions = {}
-  ): Promise<T> {
+  static async withRetry<T>(operation: () => Promise<T>, options: ErrorRecoveryOptions = {}): Promise<T> {
     const opts = { ...this.DEFAULT_OPTIONS, ...options }
     let lastError: Error
 
@@ -98,10 +84,7 @@ export class ErrorRecoveryManager {
         }
 
         // Calculate delay with exponential backoff
-        const delay = Math.min(
-          opts.baseDelay * Math.pow(opts.backoffFactor, attempt),
-          opts.maxDelay
-        )
+        const delay = Math.min(opts.baseDelay * Math.pow(opts.backoffFactor, attempt), opts.maxDelay)
 
         // Add jitter to prevent thundering herd
         const jitteredDelay = delay + Math.random() * 1000
@@ -124,11 +107,7 @@ export class ErrorRecoveryManager {
       return ErrorCategory.NETWORK
     }
 
-    if (
-      name.includes('validation') ||
-      message.includes('invalid') ||
-      message.includes('required')
-    ) {
+    if (name.includes('validation') || message.includes('invalid') || message.includes('required')) {
       return ErrorCategory.VALIDATION
     }
 
@@ -136,11 +115,7 @@ export class ErrorRecoveryManager {
       return ErrorCategory.AUTHENTICATION
     }
 
-    if (
-      message.includes('forbidden') ||
-      message.includes('permission') ||
-      message.includes('access denied')
-    ) {
+    if (message.includes('forbidden') || message.includes('permission') || message.includes('access denied')) {
       return ErrorCategory.AUTHORIZATION
     }
 
@@ -163,9 +138,7 @@ export class ErrorRecoveryManager {
 
     switch (category) {
       case ErrorCategory.NETWORK:
-        return context.operation.includes('save') || context.operation.includes('submit')
-          ? 'high'
-          : 'medium'
+        return context.operation.includes('save') || context.operation.includes('submit') ? 'high' : 'medium'
       case ErrorCategory.VALIDATION:
         return 'low'
       case ErrorCategory.AUTHENTICATION:
@@ -203,20 +176,9 @@ export class ErrorRecoveryManager {
     const message = error.message.toLowerCase()
 
     // Check against retryable error patterns
-    const retryablePatterns = [
-      'network',
-      'timeout',
-      'service unavailable',
-      'internal server error',
-      'bad gateway',
-      'gateway timeout',
-      'connection',
-      'fetch',
-    ]
+    const retryablePatterns = ['network', 'timeout', 'service unavailable', 'internal server error', 'bad gateway', 'gateway timeout', 'connection', 'fetch']
 
-    return retryablePatterns.some(
-      pattern => name.toLowerCase().includes(pattern) || message.includes(pattern)
-    )
+    return retryablePatterns.some(pattern => name.toLowerCase().includes(pattern) || message.includes(pattern))
   }
 
   /**
@@ -348,25 +310,16 @@ export class ErrorRecoveryManager {
     const category = error.category || ErrorCategory.INTERNAL
 
     const guidance: Record<ErrorCategory, string> = {
-      [ErrorCategory.NETWORK]:
-        'This usually happens when there are connectivity issues. Check your internet connection and try again.',
-      [ErrorCategory.VALIDATION]:
-        'Make sure all required fields are filled out correctly and match the expected format.',
-      [ErrorCategory.AUTHENTICATION]:
-        'Your login session may have expired. Refreshing the page should resolve this.',
-      [ErrorCategory.AUTHORIZATION]:
-        'Contact your system administrator if you believe you should have access to this feature.',
+      [ErrorCategory.NETWORK]: 'This usually happens when there are connectivity issues. Check your internet connection and try again.',
+      [ErrorCategory.VALIDATION]: 'Make sure all required fields are filled out correctly and match the expected format.',
+      [ErrorCategory.AUTHENTICATION]: 'Your login session may have expired. Refreshing the page should resolve this.',
+      [ErrorCategory.AUTHORIZATION]: 'Contact your system administrator if you believe you should have access to this feature.',
       [ErrorCategory.NOT_FOUND]: 'The resource you are looking for may have been moved or deleted.',
-      [ErrorCategory.CONFLICT]:
-        'Another user may have modified this resource. Please refresh and try again.',
-      [ErrorCategory.DATABASE]:
-        'There was a database issue. This is usually temporary - please try again.',
-      [ErrorCategory.RATE_LIMIT]:
-        'You have exceeded the rate limit. Please wait a few moments before trying again.',
-      [ErrorCategory.SERVICE_UNAVAILABLE]:
-        'Our servers are experiencing temporary issues. Please wait a moment and try again.',
-      [ErrorCategory.INTERNAL]:
-        'This is usually a temporary issue. Trying again often resolves the problem.',
+      [ErrorCategory.CONFLICT]: 'Another user may have modified this resource. Please refresh and try again.',
+      [ErrorCategory.DATABASE]: 'There was a database issue. This is usually temporary - please try again.',
+      [ErrorCategory.RATE_LIMIT]: 'You have exceeded the rate limit. Please wait a few moments before trying again.',
+      [ErrorCategory.SERVICE_UNAVAILABLE]: 'Our servers are experiencing temporary issues. Please wait a moment and try again.',
+      [ErrorCategory.INTERNAL]: 'This is usually a temporary issue. Trying again often resolves the problem.',
     }
 
     return guidance[category] || guidance[ErrorCategory.INTERNAL]
@@ -382,11 +335,7 @@ export class ErrorRecoveryManager {
   /**
    * Create error context using unified ErrorContextUtils
    */
-  static createContext(
-    operation: string,
-    component: string,
-    additionalData?: Record<string, any>
-  ): ErrorContext {
+  static createContext(operation: string, component: string, additionalData?: Record<string, any>): ErrorContext {
     return ErrorContextUtils.client(component, operation, {
       metadata: additionalData,
     })
@@ -422,20 +371,13 @@ export class ErrorRecoveryManager {
  * Hook for using error recovery in React components
  */
 export function useErrorRecovery() {
-  const handleError = (
-    error: Error,
-    context: ErrorContext,
-    recoveryActions?: RecoveryAction[]
-  ): EnhancedError => {
+  const handleError = (error: Error, context: ErrorContext, recoveryActions?: RecoveryAction[]): EnhancedError => {
     const enhanced = ErrorRecoveryManager.enhanceError(error, context, recoveryActions)
     ErrorRecoveryManager.logError(enhanced)
     return enhanced
   }
 
-  const withRetry = <T>(
-    operation: () => Promise<T>,
-    options?: ErrorRecoveryOptions
-  ): Promise<T> => {
+  const withRetry = <T>(operation: () => Promise<T>, options?: ErrorRecoveryOptions): Promise<T> => {
     return ErrorRecoveryManager.withRetry(operation, options)
   }
 

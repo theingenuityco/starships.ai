@@ -57,58 +57,22 @@ export class DisasterRecoveryManager {
     try {
       switch (scenario) {
         case DisasterScenario.MIGRATION_FAILURE:
-          return await this.handleMigrationFailure(
-            options,
-            actionsPerformed,
-            errors,
-            warnings,
-            startTime
-          );
+          return await this.handleMigrationFailure(options, actionsPerformed, errors, warnings, startTime);
 
         case DisasterScenario.DATA_CORRUPTION:
-          return await this.handleDataCorruption(
-            options,
-            actionsPerformed,
-            errors,
-            warnings,
-            startTime
-          );
+          return await this.handleDataCorruption(options, actionsPerformed, errors, warnings, startTime);
 
         case DisasterScenario.BACKUP_CORRUPTION:
-          return await this.handleBackupCorruption(
-            options,
-            actionsPerformed,
-            errors,
-            warnings,
-            startTime
-          );
+          return await this.handleBackupCorruption(options, actionsPerformed, errors, warnings, startTime);
 
         case DisasterScenario.PARTIAL_RESTORE:
-          return await this.handlePartialRestore(
-            options,
-            actionsPerformed,
-            errors,
-            warnings,
-            startTime
-          );
+          return await this.handlePartialRestore(options, actionsPerformed, errors, warnings, startTime);
 
         case DisasterScenario.CONNECTION_FAILURE:
-          return await this.handleConnectionFailure(
-            options,
-            actionsPerformed,
-            errors,
-            warnings,
-            startTime
-          );
+          return await this.handleConnectionFailure(options, actionsPerformed, errors, warnings, startTime);
 
         case DisasterScenario.DISK_SPACE_EXHAUSTION:
-          return await this.handleDiskSpaceExhaustion(
-            options,
-            actionsPerformed,
-            errors,
-            warnings,
-            startTime
-          );
+          return await this.handleDiskSpaceExhaustion(options, actionsPerformed, errors, warnings, startTime);
 
         default:
           throw new Error(`Unknown disaster scenario: ${scenario}`);
@@ -194,9 +158,7 @@ export class DisasterRecoveryManager {
         recoveryPath: options.backupPath || undefined,
       };
     } catch (error) {
-      errors.push(
-        `Migration failure recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      errors.push(`Migration failure recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const duration = Date.now() - startTime;
       return {
         success: false,
@@ -302,9 +264,7 @@ export class DisasterRecoveryManager {
         recoveryPath: backupPath,
       };
     } catch (error) {
-      errors.push(
-        `Data corruption recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      errors.push(`Data corruption recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const duration = Date.now() - startTime;
       return {
         success: false,
@@ -393,9 +353,7 @@ export class DisasterRecoveryManager {
         recoveryPath: latestValidBackup,
       };
     } catch (error) {
-      errors.push(
-        `Backup corruption recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      errors.push(`Backup corruption recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const duration = Date.now() - startTime;
       return {
         success: false,
@@ -422,9 +380,7 @@ export class DisasterRecoveryManager {
 
     try {
       // Step 1: Create emergency backup of current state
-      const emergencyBackupPath = this.backupManager.generateBackupPath(
-        'emergency-partial-restore'
-      );
+      const emergencyBackupPath = this.backupManager.generateBackupPath('emergency-partial-restore');
       await this.backupManager.createBackup(emergencyBackupPath);
       actionsPerformed.push(`Emergency backup created: ${emergencyBackupPath}`);
 
@@ -460,9 +416,7 @@ export class DisasterRecoveryManager {
         recoveryPath: options.backupPath,
       };
     } catch (error) {
-      errors.push(
-        `Partial restore recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      errors.push(`Partial restore recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const duration = Date.now() - startTime;
       return {
         success: false,
@@ -539,9 +493,7 @@ export class DisasterRecoveryManager {
         duration,
       };
     } catch (error) {
-      errors.push(
-        `Connection failure recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      errors.push(`Connection failure recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const duration = Date.now() - startTime;
       return {
         success: false,
@@ -592,9 +544,7 @@ export class DisasterRecoveryManager {
         duration,
       };
     } catch (error) {
-      errors.push(
-        `Disk space recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      errors.push(`Disk space recovery error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       const duration = Date.now() - startTime;
       return {
         success: false,
@@ -702,9 +652,7 @@ export class DisasterRecoveryManager {
   /**
    * Attempt to repair corrupted backup file
    */
-  private async attemptBackupRepair(
-    backupPath: string
-  ): Promise<{ success: boolean; error?: string }> {
+  private async attemptBackupRepair(backupPath: string): Promise<{ success: boolean; error?: string }> {
     try {
       const content = fs.readFileSync(backupPath, 'utf8');
 
@@ -740,9 +688,7 @@ export class DisasterRecoveryManager {
   /**
    * Clean up old backup files
    */
-  private async cleanupOldBackups(
-    maxToKeep: number
-  ): Promise<{ deletedCount: number; freedSpace: number }> {
+  private async cleanupOldBackups(maxToKeep: number): Promise<{ deletedCount: number; freedSpace: number }> {
     const allBackups = await this.findAllBackups();
     const toDelete = allBackups.slice(maxToKeep);
 

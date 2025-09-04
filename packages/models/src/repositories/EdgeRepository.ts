@@ -19,10 +19,9 @@ export class EdgeRepository extends BaseRepository {
         const connection = this.connection;
 
         // Check if blueprint exists
-        const blueprintCheck = await connection.executeQuery<{ id: string }>(
-          'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
-          { blueprintId }
-        );
+        const blueprintCheck = await connection.executeQuery<{ id: string }>('MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id', {
+          blueprintId,
+        });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
           this.handleNotFound('Blueprint', blueprintId, 'createEdge');
@@ -96,11 +95,7 @@ export class EdgeRepository extends BaseRepository {
     );
   }
 
-  async createEdges(
-    blueprintId: string,
-    edgesData: Array<Omit<EdgeModel, 'id'>>,
-    idMapping?: Map<string, string>
-  ): Promise<EdgeModel[]> {
+  async createEdges(blueprintId: string, edgesData: Array<Omit<EdgeModel, 'id'>>, idMapping?: Map<string, string>): Promise<EdgeModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         this.validateRequired({ blueprintId }, ['blueprintId'], 'createEdges');
@@ -121,10 +116,9 @@ export class EdgeRepository extends BaseRepository {
         const connection = this.connection;
 
         // Check if blueprint exists
-        const blueprintCheck = await connection.executeQuery<{ id: string }>(
-          'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
-          { blueprintId }
-        );
+        const blueprintCheck = await connection.executeQuery<{ id: string }>('MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id', {
+          blueprintId,
+        });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
           this.handleNotFound('Blueprint', blueprintId, 'createEdges');
@@ -331,10 +325,7 @@ export class EdgeRepository extends BaseRepository {
         if (updates.ref !== undefined) {
           const connection = this.connection;
 
-          await connection.executeWrite(
-            'MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() SET r.ref = $ref',
-            { edgeId, ref: updates.ref }
-          );
+          await connection.executeWrite('MATCH ()-[r:FLOWS_TO {id: $edgeId}]->() SET r.ref = $ref', { edgeId, ref: updates.ref });
         }
 
         // Return updated edge
@@ -384,10 +375,9 @@ export class EdgeRepository extends BaseRepository {
         const connection = this.connection;
 
         // Check if blueprint exists
-        const blueprintCheck = await connection.executeQuery<{ id: string }>(
-          'MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id',
-          { blueprintId }
-        );
+        const blueprintCheck = await connection.executeQuery<{ id: string }>('MATCH (b:Blueprint {id: $blueprintId}) RETURN b.id as id', {
+          blueprintId,
+        });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
           this.handleNotFound('Blueprint', blueprintId, 'deleteEdgesByBlueprintId');

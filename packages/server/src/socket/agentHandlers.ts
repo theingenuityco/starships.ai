@@ -31,8 +31,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
       // Provide defaults for required fields
       threadDepth: 0,
       processingStatus: 'pending',
-      messageType:
-        role === 'system' ? 'system_message' : role === 'user' ? 'user_input' : 'agent_response',
+      messageType: role === 'system' ? 'system_message' : role === 'user' ? 'user_input' : 'agent_response',
       importance: 'medium',
       hasAttachments: false,
     });
@@ -48,10 +47,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
       // Get current userId
       const currentUserId = socket.data.userId;
 
-      console.log(
-        `[AGENT SOCKET] Starting stream for user ${currentUserId}, agent ${request.agentId}:`,
-        request.streamId
-      );
+      console.log(`[AGENT SOCKET] Starting stream for user ${currentUserId}, agent ${request.agentId}:`, request.streamId);
 
       try {
         // Validate request
@@ -88,8 +84,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
             streamId: request.streamId,
             agentId: request.agentId,
             errorCode: 'SESSION_REQUIRED',
-            message:
-              'sessionId is required. Sessions must be created via API endpoints, not WebSocket.',
+            message: 'sessionId is required. Sessions must be created via API endpoints, not WebSocket.',
             timestamp: Date.now(),
             recoverable: false,
           });
@@ -109,10 +104,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           await SessionService.updateSessionActivity(sessionId);
           console.log(`✅ [AGENT SESSION] Using existing session: ${sessionId}`);
         } catch (error) {
-          console.error(
-            `❌ [AGENT SESSION] Session validation failed for ${request.sessionId}:`,
-            error
-          );
+          console.error(`❌ [AGENT SESSION] Session validation failed for ${request.sessionId}:`, error);
           socket.emit('session:stream-error', {
             streamId: request.streamId,
             agentId: request.agentId,
@@ -241,14 +233,9 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           throw agentError;
         }
 
-        console.log(
-          `[AGENT SOCKET] Stream completed for user ${socket.data.userId}, agent ${request.agentId}`
-        );
+        console.log(`[AGENT SOCKET] Stream completed for user ${socket.data.userId}, agent ${request.agentId}`);
       } catch (error) {
-        console.error(
-          `[AGENT SOCKET] Stream error for user ${socket.data.userId}, agent ${request.agentId}:`,
-          error
-        );
+        console.error(`[AGENT SOCKET] Stream error for user ${socket.data.userId}, agent ${request.agentId}:`, error);
         socket.emit('session:typing-stop', {
           userId: socket.data.userId,
           sessionId: 'unknown',
@@ -279,35 +266,25 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
     });
 
     // Handle agent room management
-    socket.on(
-      'session:join-room',
-      (data: { roomId: string; userId: string; sessionId?: string }) => {
-        const currentUserId = socket.data.userId;
-        // Only allow users to join their own agent rooms
-        if (data.userId === currentUserId) {
-          socket.join(data.roomId);
-          console.log(`[AGENT SOCKET] User ${currentUserId} joined room ${data.roomId}`);
-        } else {
-          console.warn(
-            `[AGENT SOCKET] User ${currentUserId} attempted to join room for user ${data.userId}`
-          );
-        }
+    socket.on('session:join-room', (data: { roomId: string; userId: string; sessionId?: string }) => {
+      const currentUserId = socket.data.userId;
+      // Only allow users to join their own agent rooms
+      if (data.userId === currentUserId) {
+        socket.join(data.roomId);
+        console.log(`[AGENT SOCKET] User ${currentUserId} joined room ${data.roomId}`);
+      } else {
+        console.warn(`[AGENT SOCKET] User ${currentUserId} attempted to join room for user ${data.userId}`);
       }
-    );
+    });
 
-    socket.on(
-      'session:leave-room',
-      (data: { roomId: string; userId: string; sessionId?: string }) => {
-        const currentUserId = socket.data.userId;
-        if (data.userId === currentUserId) {
-          socket.leave(data.roomId);
-          console.log(`[AGENT SOCKET] User ${currentUserId} left room ${data.roomId}`);
-        } else {
-          console.warn(
-            `[AGENT SOCKET] User ${currentUserId} attempted to leave room for user ${data.userId}`
-          );
-        }
+    socket.on('session:leave-room', (data: { roomId: string; userId: string; sessionId?: string }) => {
+      const currentUserId = socket.data.userId;
+      if (data.userId === currentUserId) {
+        socket.leave(data.roomId);
+        console.log(`[AGENT SOCKET] User ${currentUserId} left room ${data.roomId}`);
+      } else {
+        console.warn(`[AGENT SOCKET] User ${currentUserId} attempted to leave room for user ${data.userId}`);
       }
-    );
+    });
   });
 }

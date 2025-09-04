@@ -483,28 +483,20 @@ export class SchemaValidator {
 
     if (performanceIssues.length > 0) {
       recommendations.push('🚀 Consider running ANALYZE to update query planner statistics');
-      recommendations.push(
-        '📊 Monitor query performance and consider additional indexes for slow queries'
-      );
+      recommendations.push('📊 Monitor query performance and consider additional indexes for slow queries');
     }
 
     if (integrityIssues.length > 0) {
       recommendations.push('🔧 Run data cleanup procedures to fix integrity issues');
-      recommendations.push(
-        '📋 Implement data validation in application layer to prevent future issues'
-      );
+      recommendations.push('📋 Implement data validation in application layer to prevent future issues');
     }
 
-    const missingIndexes = results.filter(
-      (r) => r.category === 'Indexes' && !r.passed && r.severity === 'warning'
-    );
+    const missingIndexes = results.filter((r) => r.category === 'Indexes' && !r.passed && r.severity === 'warning');
     if (missingIndexes.length > 0) {
       recommendations.push('🔍 Run migration 003 and 004 to add missing performance indexes');
     }
 
-    const constraintIssues = results.filter(
-      (r) => r.category === 'Constraints' && !r.passed && r.severity === 'error'
-    );
+    const constraintIssues = results.filter((r) => r.category === 'Constraints' && !r.passed && r.severity === 'error');
     if (constraintIssues.length > 0) {
       recommendations.push('⚠️ Critical: Missing database constraints may lead to data corruption');
       recommendations.push('🛠️ Run constraint migrations immediately to ensure data integrity');

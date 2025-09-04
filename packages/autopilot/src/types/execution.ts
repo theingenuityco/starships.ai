@@ -31,13 +31,7 @@ export interface NodeResult {
 /**
  * Workflow execution status
  */
-export type ExecutionStatus =
-  | 'not_started'
-  | 'running'
-  | 'paused'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Workflow execution error

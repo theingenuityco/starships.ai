@@ -58,10 +58,7 @@ describe('PromptHandler', () => {
 
       // Verify console.log was called with correct parameters
       expect(consoleSpy).toHaveBeenCalledWith('User prompt: Please select an option:');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Choices:',
-        (mockNode.parameters as UserPromptNodeParameters).choices
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Choices:', (mockNode.parameters as UserPromptNodeParameters).choices);
 
       consoleSpy.mockRestore();
     });

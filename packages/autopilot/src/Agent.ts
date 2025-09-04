@@ -59,11 +59,7 @@ export class Agent {
   /**
    * Add content to agent memory
    */
-  addToMemory(
-    role: 'user' | 'assistant',
-    content: string,
-    metadata?: Record<string, unknown>
-  ): void {
+  addToMemory(role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
     this.memory.addConversation(role, content, metadata);
   }
 
@@ -161,20 +157,14 @@ export class Agent {
       // Check that all node types have handlers (delegate to engine)
       const unsupportedNodes = nodes.filter((node) => !this.engine.hasHandler(node.type));
       if (unsupportedNodes.length > 0) {
-        errors.push(
-          `Unsupported node types in agent blueprint: ${unsupportedNodes.map((n) => n.type).join(', ')}`
-        );
+        errors.push(`Unsupported node types in agent blueprint: ${unsupportedNodes.map((n) => n.type).join(', ')}`);
       }
 
       // Check edge references
       const nodeRefs = new Set(nodes.map((n) => n.ref));
-      const invalidEdges = edges.filter(
-        (edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to)
-      );
+      const invalidEdges = edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
       if (invalidEdges.length > 0) {
-        errors.push(
-          `Invalid edge references found in agent blueprint: ${invalidEdges.length} edges`
-        );
+        errors.push(`Invalid edge references found in agent blueprint: ${invalidEdges.length} edges`);
       }
     }
 
@@ -184,10 +174,7 @@ export class Agent {
     }
 
     // Validate temperature if provided
-    if (
-      this.params.temperature !== undefined &&
-      (this.params.temperature < 0 || this.params.temperature > 2)
-    ) {
+    if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
       errors.push('Agent temperature should be between 0 and 2');
     }
 

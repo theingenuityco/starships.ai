@@ -55,10 +55,7 @@ export class AgentTemplateService {
     });
   }
 
-  async updateTemplate(
-    id: string,
-    updates: Partial<AgentTemplateModel>
-  ): Promise<AgentTemplateModel | null> {
+  async updateTemplate(id: string, updates: Partial<AgentTemplateModel>): Promise<AgentTemplateModel | null> {
     // Don't allow updating certain fields
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _id, createdAt: _createdAt, ...allowedUpdates } = updates;
@@ -73,22 +70,12 @@ export class AgentTemplateService {
     return this.templateRepository.delete(id);
   }
 
-  async createAgentFromTemplate(
-    templateId: string,
-    agentName: string,
-    authorId: string,
-    starshipId: string
-  ): Promise<AgentModel> {
+  async createAgentFromTemplate(templateId: string, agentName: string, authorId: string, starshipId: string): Promise<AgentModel> {
     if (!agentName.trim()) {
       throw new ValidationError('Agent name is required', 'agentName');
     }
 
-    return this.templateRepository.createAgentFromTemplate(
-      templateId,
-      agentName.trim(),
-      authorId,
-      starshipId
-    );
+    return this.templateRepository.createAgentFromTemplate(templateId, agentName.trim(), authorId, starshipId);
   }
 
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {
@@ -113,11 +100,7 @@ export class AgentTemplateService {
   /**
    * Create default blueprint for simple agents
    */
-  private createSimpleBlueprint(
-    model: string,
-    temperature: number = 0.7,
-    maxTokens: number = 2000
-  ): Blueprint {
+  private createSimpleBlueprint(model: string, temperature: number = 0.7, maxTokens: number = 2000): Blueprint {
     return {
       nodes: [
         {
@@ -134,8 +117,7 @@ export class AgentTemplateService {
           description: 'Process user input and respond',
           parameters: {
             model,
-            prompt:
-              'Respond helpfully to the user based on the conversation context and your system instructions.',
+            prompt: 'Respond helpfully to the user based on the conversation context and your system instructions.',
             temperature,
             maxTokens,
           },
@@ -180,8 +162,7 @@ export class AgentTemplateService {
           description: 'Review overall code architecture and organization',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt:
-              'Analyze the code structure, architecture, and organization. Identify any structural issues.',
+            prompt: 'Analyze the code structure, architecture, and organization. Identify any structural issues.',
             temperature: 0.2,
             maxTokens: 1000,
           },
@@ -193,8 +174,7 @@ export class AgentTemplateService {
           description: 'Evaluate adherence to coding best practices',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt:
-              'Review the code for adherence to best practices, naming conventions, and code quality standards.',
+            prompt: 'Review the code for adherence to best practices, naming conventions, and code quality standards.',
             temperature: 0.1,
             maxTokens: 1200,
           },
@@ -206,8 +186,7 @@ export class AgentTemplateService {
           description: 'Provide comprehensive improvement recommendations',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt:
-              'Based on all analysis, provide specific, actionable recommendations for code improvement.',
+            prompt: 'Based on all analysis, provide specific, actionable recommendations for code improvement.',
             temperature: 0.3,
             maxTokens: 1500,
           },
@@ -255,8 +234,7 @@ export class AgentTemplateService {
           description: 'Generate creative concepts and themes',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt:
-              "Based on the user's request, brainstorm creative ideas, themes, and approaches for this writing project.",
+            prompt: "Based on the user's request, brainstorm creative ideas, themes, and approaches for this writing project.",
             temperature: 0.9,
             maxTokens: 800,
           },
@@ -268,8 +246,7 @@ export class AgentTemplateService {
           description: 'Create structured outline from ideas',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt:
-              'Create a detailed outline that structures the best ideas from the brainstorming session.',
+            prompt: 'Create a detailed outline that structures the best ideas from the brainstorming session.',
             temperature: 0.6,
             maxTokens: 1000,
           },
@@ -281,8 +258,7 @@ export class AgentTemplateService {
           description: 'Generate the main creative content',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt:
-              'Write the creative content following the outline, focusing on engaging storytelling and vivid details.',
+            prompt: 'Write the creative content following the outline, focusing on engaging storytelling and vivid details.',
             temperature: 0.8,
             maxTokens: 2500,
           },
@@ -313,12 +289,7 @@ export class AgentTemplateService {
   /**
    * Create memory configuration for agent category
    */
-  private createMemoryConfig(
-    name: string,
-    category: string,
-    description: string,
-    expertise: string[]
-  ): AgentMemoryState {
+  private createMemoryConfig(name: string, category: string, description: string, expertise: string[]): AgentMemoryState {
     const roleMap = {
       general: 'General Assistant',
       coding: 'Software Developer',
@@ -339,18 +310,13 @@ export class AgentTemplateService {
       identity: {
         name,
         role: roleMap[category as keyof typeof roleMap] || 'AI Assistant',
-        personality:
-          personalityMap[category as keyof typeof personalityMap] || 'Professional and helpful',
+        personality: personalityMap[category as keyof typeof personalityMap] || 'Professional and helpful',
         expertise,
       },
       purpose: {
         primary: description,
         secondary: this.getSecondaryGoals(category),
-        constraints: [
-          'Be helpful and accurate',
-          'Follow ethical guidelines',
-          'Respect user privacy',
-        ],
+        constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy'],
       },
       space: {
         description: `Professional ${category} assistance environment focused on providing accurate and helpful responses.`,
@@ -385,8 +351,7 @@ export class AgentTemplateService {
     > = [
       {
         name: 'General Assistant',
-        description:
-          'A helpful general-purpose assistant powered by autopilot workflows for enhanced capabilities.',
+        description: 'A helpful general-purpose assistant powered by autopilot workflows for enhanced capabilities.',
         category: 'general',
         tags: ['general', 'helpful', 'assistant', 'versatile', 'autopilot'],
         model: 'anthropic/claude-3.5-sonnet',
@@ -396,11 +361,7 @@ export class AgentTemplateService {
         isPublic: true,
         rating: 4.5,
         icon: '🤖',
-        previewPrompts: [
-          'Help me plan my day',
-          'Explain quantum computing in simple terms',
-          'What are some healthy meal ideas?',
-        ],
+        previewPrompts: ['Help me plan my day', 'Explain quantum computing in simple terms', 'What are some healthy meal ideas?'],
         blueprint: this.createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.7, 2000),
         memory: this.createMemoryConfig(
           'General Assistant',
@@ -434,20 +395,14 @@ export class AgentTemplateService {
           'Code Reviewer',
           'coding',
           'Provide comprehensive, constructive code reviews to improve software quality',
-          [
-            'software architecture',
-            'code quality',
-            'security practices',
-            'performance optimization',
-          ]
+          ['software architecture', 'code quality', 'security practices', 'performance optimization']
         ),
         executionMode: 'workflow',
         timeout: 60000,
       },
       {
         name: 'Creative Writer',
-        description:
-          'A creative writing assistant with structured autopilot workflows for ideation, planning, and content creation.',
+        description: 'A creative writing assistant with structured autopilot workflows for ideation, planning, and content creation.',
         category: 'creative',
         tags: ['writing', 'storytelling', 'creative', 'content', 'fiction', 'autopilot'],
         model: 'anthropic/claude-3.5-sonnet',
@@ -467,20 +422,14 @@ export class AgentTemplateService {
           'Creative Writer',
           'creative',
           'Create engaging, original content through a structured creative process',
-          [
-            'storytelling',
-            'character development',
-            'creative writing techniques',
-            'content strategy',
-          ]
+          ['storytelling', 'character development', 'creative writing techniques', 'content strategy']
         ),
         executionMode: 'workflow',
         timeout: 45000,
       },
       {
         name: 'Data Analyst',
-        description:
-          'An analytical assistant powered by autopilot for data interpretation, visualization, and insights.',
+        description: 'An analytical assistant powered by autopilot for data interpretation, visualization, and insights.',
         category: 'analysis',
         tags: ['data', 'analysis', 'statistics', 'insights', 'visualization', 'autopilot'],
         model: 'anthropic/claude-3.5-sonnet',
@@ -507,17 +456,9 @@ export class AgentTemplateService {
       },
       {
         name: 'Customer Support',
-        description:
-          'A friendly customer support assistant with autopilot-powered workflows for issue resolution.',
+        description: 'A friendly customer support assistant with autopilot-powered workflows for issue resolution.',
         category: 'support',
-        tags: [
-          'customer-service',
-          'support',
-          'help',
-          'professional',
-          'problem-solving',
-          'autopilot',
-        ],
+        tags: ['customer-service', 'support', 'help', 'professional', 'problem-solving', 'autopilot'],
         model: 'anthropic/claude-3.5-sonnet',
         temperature: 0.6,
         maxTokens: 2000,
@@ -525,11 +466,7 @@ export class AgentTemplateService {
         isPublic: true,
         rating: 4.4,
         icon: '🎧',
-        previewPrompts: [
-          'I need help with my account',
-          'How do I return a product?',
-          "My order hasn't arrived yet",
-        ],
+        previewPrompts: ['I need help with my account', 'How do I return a product?', "My order hasn't arrived yet"],
         blueprint: this.createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.6, 2000),
         memory: this.createMemoryConfig(
           'Support Specialist',
@@ -546,9 +483,7 @@ export class AgentTemplateService {
       try {
         // Check if template already exists
         const existing = await this.searchTemplates(template.name as string);
-        const alreadyExists = existing.some(
-          (t) => t.name === template.name && t.authorId === 'system'
-        );
+        const alreadyExists = existing.some((t) => t.name === template.name && t.authorId === 'system');
 
         if (!alreadyExists) {
           await this.createTemplate(template);

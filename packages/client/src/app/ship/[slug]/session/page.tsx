@@ -50,10 +50,7 @@ export default function StarshipSessionPage() {
       <div className="h-full flex flex-col items-center justify-center">
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-semibold text-foreground">Starship Not Found</h1>
-          <p className="text-muted-foreground">
-            {error ||
-              "The starship you're looking for could not be found or you don't have access to it."}
-          </p>
+          <p className="text-muted-foreground">{error || "The starship you're looking for could not be found or you don't have access to it."}</p>
         </div>
       </div>
     )
@@ -63,19 +60,11 @@ export default function StarshipSessionPage() {
     <div className="h-full flex">
       {/* Sessions Sidebar */}
       <div className="w-80 shrink-0">
-        <SessionsSidebar
-          starshipId={starship.id}
-          currentSessionId={currentSessionId}
-          onSessionSelect={setCurrentSessionId}
-        />
+        <SessionsSidebar starshipId={starship.id} currentSessionId={currentSessionId} onSessionSelect={setCurrentSessionId} />
       </div>
       {/* Main Session Interface */}
       <div className="flex-1 min-w-0">
-        <SessionInterface
-          starshipId={starship.id}
-          sessionId={currentSessionId}
-          onSessionChange={setCurrentSessionId}
-        />
+        <SessionInterface starshipId={starship.id} sessionId={currentSessionId} onSessionChange={setCurrentSessionId} />
       </div>
     </div>
   )

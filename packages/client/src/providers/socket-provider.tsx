@@ -23,8 +23,7 @@ interface SocketProviderProps {
 
 export function SocketProvider({ children }: SocketProviderProps) {
   const { isAuthenticated } = useAuth()
-  const { isConnected, connectionState, connectionStatus, connect, disconnect, reconnect, error } =
-    useSocketConnection()
+  const { isConnected, connectionState, connectionStatus, connect, disconnect, reconnect, error } = useSocketConnection()
 
   // Auto-connect when authenticated
   useEffect(() => {

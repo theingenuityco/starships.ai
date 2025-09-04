@@ -1,11 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import { Server as HTTPServer } from 'http';
-import type {
-  SocketConnectionState,
-  SessionSocketEvents,
-  EventEmissionOptions,
-  EventEmissionResult,
-} from '@starships/protocol';
+import type { SocketConnectionState, SessionSocketEvents, EventEmissionOptions, EventEmissionResult } from '@starships/protocol';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { UserService } from '@/services/UserService';
 import { getEnvConfig } from '@starships/env';
@@ -48,8 +43,7 @@ export class SocketIOService {
   private connections: Map<string, SocketConnectionState> = new Map();
   private userSockets: Map<string, Set<string>> = new Map(); // userId -> Set<socketId>
   private reconnectionAttempts: Map<string, number> = new Map();
-  private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> =
-    new Map();
+  private eventQueue: Map<string, Array<{ event: string; data: any; timestamp: number }>> = new Map();
   private healthCheckInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
 
@@ -110,8 +104,7 @@ export class SocketIOService {
     // Non-blocking authentication middleware
     this.io.use(async (socket, next) => {
       try {
-        const token =
-          socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
+        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.split(' ')[1];
 
         if (!token) {
           return next(new Error('Authentication token required'));
@@ -202,9 +195,7 @@ export class SocketIOService {
   }
 
   private handleDisconnection(socketId: string, userId: string, reason: string) {
-    console.log(
-      `[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`
-    );
+    console.log(`[SOCKET.IO] Handling disconnection for socket ${socketId}, user ${userId}, reason: ${reason}`);
 
     // Clean up connection state
     this.connections.delete(socketId);
@@ -270,9 +261,7 @@ export class SocketIOService {
     if (queuedEvents && queuedEvents.length > 0) {
       const socket = this.io.sockets.sockets.get(socketId);
       if (socket) {
-        console.log(
-          `[SOCKET.IO] Processing ${queuedEvents.length} queued events for user ${userId}`
-        );
+        console.log(`[SOCKET.IO] Processing ${queuedEvents.length} queued events for user ${userId}`);
 
         queuedEvents.forEach(({ event, data }) => {
           socket.emit(event as any, data);
@@ -432,9 +421,7 @@ export class SocketIOService {
 
       if (recipientCount === 0) {
         // Queue the event if no recipients are currently connected
-        console.log(
-          `[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`
-        );
+        console.log(`[SOCKET.IO] No recipients for ${String(event)} in room ${room}, considering queueing`);
       }
 
       // Emit to room with timeout
@@ -450,9 +437,7 @@ export class SocketIOService {
 
       await emissionPromise;
 
-      console.log(
-        `[SOCKET.IO] Emitted ${String(event)} to ${recipientCount} recipients in room ${room}`
-      );
+      console.log(`[SOCKET.IO] Emitted ${String(event)} to ${recipientCount} recipients in room ${room}`);
 
       return {
         success: true,
@@ -475,9 +460,7 @@ export class SocketIOService {
         success: false,
         eventType: event as string,
         recipientCount,
-        errors: [
-          { userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' },
-        ],
+        errors: [{ userId: 'room', error: error instanceof Error ? error.message : 'Unknown error' }],
         timestamp: new Date().toISOString(),
       };
     }
@@ -515,10 +498,7 @@ export class SocketIOService {
       totalUsers: this.userSockets.size,
       connectedUsers: this.userSockets.size, // For backward compatibility
       contextRooms: this.userSockets.size, // Migration note: was expeditionRooms, now represents user context rooms
-      queuedEvents: Array.from(this.eventQueue.values()).reduce(
-        (sum, queue) => sum + queue.length,
-        0
-      ),
+      queuedEvents: Array.from(this.eventQueue.values()).reduce((sum, queue) => sum + queue.length, 0),
       averagePingTime: this.getAveragePingTime(),
       healthyConnections: this.getHealthyConnectionsCount(),
       isHealthy: !this.isShuttingDown,
@@ -531,15 +511,11 @@ export class SocketIOService {
       .map((conn) => now - (conn.lastPing || now))
       .filter((time) => time < 60000); // Only consider pings within last minute
 
-    return pingTimes.length > 0
-      ? pingTimes.reduce((sum, time) => sum + time, 0) / pingTimes.length
-      : 0;
+    return pingTimes.length > 0 ? pingTimes.reduce((sum, time) => sum + time, 0) / pingTimes.length : 0;
   }
 
   private getHealthyConnectionsCount(): number {
     const now = Date.now();
-    return Array.from(this.connections.values()).filter(
-      (conn) => conn.connected && now - (conn.lastPing || 0) < 60000
-    ).length;
+    return Array.from(this.connections.values()).filter((conn) => conn.connected && now - (conn.lastPing || 0) < 60000).length;
   }
 }

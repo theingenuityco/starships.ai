@@ -6,17 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import {
-  Wifi,
-  WifiOff,
-  AlertTriangle,
-  CheckCircle,
-  RefreshCw,
-  Clock,
-  Activity,
-  Shield,
-  X,
-} from 'lucide-react'
+import { Wifi, WifiOff, AlertTriangle, CheckCircle, RefreshCw, Clock, Activity, Shield, X } from 'lucide-react'
 // Note: ConnectionMetrics type definition for socket client connections
 interface ConnectionMetrics {
   isConnected: boolean
@@ -69,15 +59,9 @@ export function ConnectionStatus({
   className = '',
 }: ConnectionStatusProps) {
   const [isExpanded, setIsExpanded] = useState(showDetails)
-  const [healthStatus, setHealthStatus] = useState<ReturnType<
-    NonNullable<typeof getHealthStatus>
-  > | null>(null)
-  const [queueStatus, setQueueStatus] = useState<ReturnType<
-    NonNullable<typeof getOfflineQueueStatus>
-  > | null>(null)
-  const [circuitBreakerStatus, setCircuitBreakerStatus] = useState<ReturnType<
-    NonNullable<typeof getCircuitBreakerStatus>
-  > | null>(null)
+  const [healthStatus, setHealthStatus] = useState<ReturnType<NonNullable<typeof getHealthStatus>> | null>(null)
+  const [queueStatus, setQueueStatus] = useState<ReturnType<NonNullable<typeof getOfflineQueueStatus>> | null>(null)
+  const [circuitBreakerStatus, setCircuitBreakerStatus] = useState<ReturnType<NonNullable<typeof getCircuitBreakerStatus>> | null>(null)
 
   // Update status information only when connection state changes
   useEffect(() => {
@@ -230,11 +214,7 @@ export function ConnectionStatus({
           severity: 'info' as const,
         }
     }
-  }, [
-    connectionState.isConnected,
-    connectionState.connectionQuality,
-    connectionState.circuitBreakerState,
-  ])
+  }, [connectionState.isConnected, connectionState.connectionQuality, connectionState.circuitBreakerState])
 
   const StatusIcon = statusConfig.icon
 
@@ -252,10 +232,7 @@ export function ConnectionStatus({
   // Compact view
   if (compact) {
     return (
-      <div
-        className={`flex items-center space-x-2 ${className}`}
-        title={`${statusConfig.label}: ${statusConfig.description}`}
-      >
+      <div className={`flex items-center space-x-2 ${className}`} title={`${statusConfig.label}: ${statusConfig.description}`}>
         <div className={`w-2 h-2 rounded-full ${statusConfig.bgColor.replace('bg-', 'bg-')}`} />
         <StatusIcon className={`h-4 w-4 ${statusConfig.color}`} />
         {connectionState.reconnectAttempts > 0 && (
@@ -291,22 +268,12 @@ export function ConnectionStatus({
 
           <div className="flex items-center space-x-2">
             {!isExpanded && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(true)}
-                className="h-8 w-8 p-0"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setIsExpanded(true)} className="h-8 w-8 p-0">
                 <Activity className="h-4 w-4" />
               </Button>
             )}
             {isExpanded && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(false)}
-                className="h-8 w-8 p-0"
-              >
+              <Button variant="ghost" size="sm" onClick={() => setIsExpanded(false)} className="h-8 w-8 p-0">
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -315,12 +282,7 @@ export function ConnectionStatus({
 
         <AnimatePresence>
           {isExpanded && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mt-4 space-y-4"
-            >
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-4 space-y-4">
               {/* Connection Metrics */}
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -329,11 +291,7 @@ export function ConnectionStatus({
                 </div>
                 <div>
                   <span className="text-muted-foreground">Uptime:</span>
-                  <span className="ml-2 font-medium">
-                    {connectionState.uptime
-                      ? formatDuration(Date.now() - connectionState.uptime)
-                      : 'N/A'}
-                  </span>
+                  <span className="ml-2 font-medium">{connectionState.uptime ? formatDuration(Date.now() - connectionState.uptime) : 'N/A'}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Failures:</span>
@@ -341,11 +299,7 @@ export function ConnectionStatus({
                 </div>
                 <div>
                   <span className="text-muted-foreground">Last Ping:</span>
-                  <span className="ml-2 font-medium">
-                    {connectionState.lastPing
-                      ? `${Math.round((Date.now() - connectionState.lastPing) / 1000)}s ago`
-                      : 'N/A'}
-                  </span>
+                  <span className="ml-2 font-medium">{connectionState.lastPing ? `${Math.round((Date.now() - connectionState.lastPing) / 1000)}s ago` : 'N/A'}</span>
                 </div>
               </div>
 
@@ -354,18 +308,12 @@ export function ConnectionStatus({
                 <div className="space-y-2">
                   <h4 className="font-medium text-sm">Circuit Breaker</h4>
                   <div className="flex items-center justify-between">
-                    <Badge
-                      variant={circuitBreakerStatus.state === 'closed' ? 'default' : 'destructive'}
-                      className="text-xs"
-                    >
+                    <Badge variant={circuitBreakerStatus.state === 'closed' ? 'default' : 'destructive'} className="text-xs">
                       {circuitBreakerStatus.state.toUpperCase()}
                     </Badge>
-                    {circuitBreakerStatus.timeUntilRetry &&
-                      circuitBreakerStatus.timeUntilRetry > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          Retry in {formatDuration(circuitBreakerStatus.timeUntilRetry)}
-                        </span>
-                      )}
+                    {circuitBreakerStatus.timeUntilRetry && circuitBreakerStatus.timeUntilRetry > 0 && (
+                      <span className="text-xs text-muted-foreground">Retry in {formatDuration(circuitBreakerStatus.timeUntilRetry)}</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -381,15 +329,8 @@ export function ConnectionStatus({
                         {queueStatus.queueSize}/{queueStatus.maxQueueSize}
                       </span>
                     </div>
-                    <Progress
-                      value={(queueStatus.queueSize / queueStatus.maxQueueSize) * 100}
-                      className="h-2"
-                    />
-                    {queueStatus.oldestOperationAge && (
-                      <p className="text-xs text-muted-foreground">
-                        Oldest: {formatDuration(queueStatus.oldestOperationAge)} ago
-                      </p>
-                    )}
+                    <Progress value={(queueStatus.queueSize / queueStatus.maxQueueSize) * 100} className="h-2" />
+                    {queueStatus.oldestOperationAge && <p className="text-xs text-muted-foreground">Oldest: {formatDuration(queueStatus.oldestOperationAge)} ago</p>}
                   </div>
                 </div>
               )}
@@ -427,15 +368,7 @@ export function ConnectionStatus({
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-2 pt-2 border-t">
                 {onForceReconnect && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onForceReconnect}
-                    disabled={
-                      connectionState.isConnected &&
-                      connectionState.circuitBreakerState === 'closed'
-                    }
-                  >
+                  <Button variant="outline" size="sm" onClick={onForceReconnect} disabled={connectionState.isConnected && connectionState.circuitBreakerState === 'closed'}>
                     <RefreshCw className="h-3 w-3 mr-1" />
                     Force Reconnect
                   </Button>

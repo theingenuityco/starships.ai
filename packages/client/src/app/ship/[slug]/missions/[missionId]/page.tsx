@@ -10,14 +10,7 @@ import { missionApi } from '@/lib/missionApi'
 import { agentAPI } from '@/lib/api'
 import { useSocket } from '@/providers/socket-provider'
 import SocketClient from '@/lib/socket-client'
-import type {
-  MissionModel,
-  MissionStatus,
-  MissionMessageModel,
-  AgentModel,
-  MissionClarityModel,
-  MissionPhase,
-} from '@starships/protocol'
+import type { MissionModel, MissionStatus, MissionMessageModel, AgentModel, MissionClarityModel, MissionPhase } from '@starships/protocol'
 import { MISSION_PHASES } from '@starships/protocol'
 import { getMissionPhaseConfig } from '@/types'
 import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent'
@@ -141,19 +134,11 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   const getAgentEmoji = (agent: AgentModel) => {
     if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
       return '🎧' // Headphones emoji
-    } else if (
-      agent.name.toLowerCase().includes('data') ||
-      agent.name.toLowerCase().includes('analyst') ||
-      agent.category === 'analysis'
-    ) {
+    } else if (agent.name.toLowerCase().includes('data') || agent.name.toLowerCase().includes('analyst') || agent.category === 'analysis') {
       return '📊' // Bar chart emoji
     } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
       return '✏️' // Pencil emoji
-    } else if (
-      agent.name.toLowerCase().includes('code') ||
-      agent.name.toLowerCase().includes('coding') ||
-      agent.category === 'coding'
-    ) {
+    } else if (agent.name.toLowerCase().includes('code') || agent.name.toLowerCase().includes('coding') || agent.category === 'coding') {
       return '🔍' // Magnifying glass emoji
     } else {
       return '🤖' // Robot emoji as default
@@ -193,18 +178,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     if (approved) {
       // Workflow was approved, mission should transition to execute phase
       // This will be handled by the WebSocket event or we can optimistically update
-      setMission((prev: ClientMissionModel | null) =>
-        prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null
-      )
+      setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null))
     }
     // If rejected, stay in plan phase for regeneration
   }
 
   const handleExecutionComplete = () => {
     // Execution completed, mission should transition to converse phase
-    setMission((prev: ClientMissionModel | null) =>
-      prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null
-    )
+    setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null))
   }
 
   // WebSocket setup for mission messages and real-time updates
@@ -239,16 +220,12 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
             setMission(response.data.mission)
           } else {
             // Fallback to just updating the phase if refetch fails
-            setMission((prev: ClientMissionModel | null) =>
-              prev ? { ...prev, phase: data.newPhase } : null
-            )
+            setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: data.newPhase } : null))
           }
         } catch (error) {
           console.error('Failed to refetch mission after phase change:', error)
           // Fallback to just updating the phase if refetch fails
-          setMission((prev: ClientMissionModel | null) =>
-            prev ? { ...prev, phase: data.newPhase } : null
-          )
+          setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: data.newPhase } : null))
         }
       }
     }
@@ -256,9 +233,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     const handleStatusChange = (data: any) => {
       console.log('[MISSION] Received status change:', data)
       if (data.missionId === missionId) {
-        setMission((prev: ClientMissionModel | null) =>
-          prev ? { ...prev, status: data.newStatus } : null
-        )
+        setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, status: data.newStatus } : null))
       }
     }
 
@@ -469,9 +444,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
           <div className="flex items-center gap-3">
             {statusIcons[mission.status as MissionStatus]}
             <h1 className="text-2xl font-bold">{mission.name}</h1>
-            <Badge className={statusColors[mission.status as MissionStatus]}>
-              {mission.status}
-            </Badge>
+            <Badge className={statusColors[mission.status as MissionStatus]}>{mission.status}</Badge>
           </div>
         </div>
       </div>
@@ -488,23 +461,10 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {/* Messages */}
               <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 lg:pr-4 min-h-0">
                 {messages.map(message => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[280px] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-lg ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      <p className="text-sm leading-relaxed whitespace-pre-line">
-                        {message.content}
-                      </p>
-                      <p className="text-xs mt-2 opacity-70">
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </p>
+                  <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[280px] sm:max-w-md lg:max-w-lg px-4 py-3 rounded-lg ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                      <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
+                      <p className="text-xs mt-2 opacity-70">{new Date(message.timestamp).toLocaleTimeString()}</p>
                     </div>
                   </div>
                 ))}
@@ -526,9 +486,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                 <Input
                   ref={inputRef}
                   value={newMessage}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setNewMessage(e.target.value)
-                  }
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Ask the orchestrator..."
                   disabled={chatLoading}
@@ -550,44 +508,29 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {/* Current Phase Section */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('progress')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
+                  <button onClick={() => toggleSection('progress')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                     {collapsedSections.progress ? (
                       <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     ) : (
                       <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     )}
                   </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Current Phase
-                  </h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Current Phase</h4>
                 </div>
                 {!collapsedSections.progress && (
                   <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
                     <div className="group relative mx-3 px-2 py-1 rounded-lg transition-all duration-300 hover:bg-gradient-to-r hover:from-muted/50 hover:to-muted/30 hover:shadow-sm">
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className="relative flex-shrink-0">
-                          <div
-                            className={`p-1.5 rounded-md ${getCurrentPhase(mission.phase).color.background} transition-all duration-300`}
-                          >
+                          <div className={`p-1.5 rounded-md ${getCurrentPhase(mission.phase).color.background} transition-all duration-300`}>
                             <div className="w-3.5 h-3.5 flex items-center justify-center">
-                              <span
-                                className={`text-xs ${getCurrentPhase(mission.phase).color.text}`}
-                              >
-                                {getCurrentPhase(mission.phase).icon}
-                              </span>
+                              <span className={`text-xs ${getCurrentPhase(mission.phase).color.text}`}>{getCurrentPhase(mission.phase).icon}</span>
                             </div>
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-primary transition-colors leading-tight">
-                            {getCurrentPhase(mission.phase).label}
-                          </span>
-                          <span className="text-xs text-muted-foreground leading-tight">
-                            {getCurrentPhase(mission.phase).description}
-                          </span>
+                          <span className="font-semibold text-sm truncate block text-primary transition-colors leading-tight">{getCurrentPhase(mission.phase).label}</span>
+                          <span className="text-xs text-muted-foreground leading-tight">{getCurrentPhase(mission.phase).description}</span>
                         </div>
                       </div>
                     </div>
@@ -599,27 +542,19 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {mission.phase === MISSION_PHASES.PLAN && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('plan')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('plan')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.plan ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Execution Workflow
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Execution Workflow</h4>
                   </div>
                   {!collapsedSections.plan && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
                       <div className="mx-3">
-                        <WorkflowPhaseContent
-                          mission={mission}
-                          onWorkflowApproval={handleWorkflowApproval}
-                        />
+                        <WorkflowPhaseContent mission={mission} onWorkflowApproval={handleWorkflowApproval} />
                       </div>
                     </div>
                   )}
@@ -630,27 +565,19 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {mission.phase === MISSION_PHASES.EXECUTE && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('execution')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('execution')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.execution ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Mission Execution
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mission Execution</h4>
                   </div>
                   {!collapsedSections.execution && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
                       <div className="mx-3">
-                        <ExecutePhaseContent
-                          mission={mission}
-                          onExecutionComplete={handleExecutionComplete}
-                        />
+                        <ExecutePhaseContent mission={mission} onExecutionComplete={handleExecutionComplete} />
                       </div>
                     </div>
                   )}
@@ -658,39 +585,28 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               )}
 
               {/* Agent Execution Results - Always show if execution results exist */}
-              {(mission.executionResult ||
-                mission.executionState?.nodeResults ||
-                mission.phase === MISSION_PHASES.CONVERSE) && (
+              {(mission.executionResult || mission.executionState?.nodeResults || mission.phase === MISSION_PHASES.CONVERSE) && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('agentResults')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('agentResults')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.agentResults ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Agent Execution Results
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Agent Execution Results</h4>
                     <div className="ml-auto">
                       <Badge
                         className={
-                          mission.executionResult?.success ||
-                          (mission.executionState?.status === 'completed' &&
-                            mission.executionState?.nodeResults?.every((r: any) => r.success))
+                          mission.executionResult?.success || (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
                             ? 'bg-green-100 text-green-800'
                             : mission.phase === MISSION_PHASES.CONVERSE
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
                         }
                       >
-                        {mission.executionResult?.success ||
-                        (mission.executionState?.status === 'completed' &&
-                          mission.executionState?.nodeResults?.every((r: any) => r.success))
+                        {mission.executionResult?.success || (mission.executionState?.status === 'completed' && mission.executionState?.nodeResults?.every((r: any) => r.success))
                           ? '✅ Completed'
                           : mission.phase === MISSION_PHASES.CONVERSE
                             ? '✅ Completed'
@@ -702,56 +618,29 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                     <div className="space-y-3 animate-in slide-in-from-top-2 duration-200">
                       {/* Agent Task Results */}
                       {(() => {
-                        const nodeResults =
-                          mission.executionResult?.nodeResults ||
-                          mission.executionState?.nodeResults ||
-                          []
+                        const nodeResults = mission.executionResult?.nodeResults || mission.executionState?.nodeResults || []
                         return nodeResults.length > 0 ? (
                           <div className="mx-3 space-y-3">
-                            <div className="text-xs font-medium text-muted-foreground mb-2">
-                              Agent Task Outputs:
-                            </div>
+                            <div className="text-xs font-medium text-muted-foreground mb-2">Agent Task Outputs:</div>
                             {nodeResults.map((result: any) => (
-                              <div
-                                key={result.nodeId}
-                                className="p-3 rounded-lg bg-muted/10 border border-muted/30"
-                              >
+                              <div key={result.nodeId} className="p-3 rounded-lg bg-muted/10 border border-muted/30">
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
                                     <span className="text-xs">{result.success ? '✅' : '❌'}</span>
-                                    <span className="text-sm font-semibold text-foreground">
-                                      {result.nodeName}
-                                    </span>
-                                    <div className="ml-auto text-xs text-muted-foreground">
-                                      {new Date(result.timestamp).toLocaleTimeString()}
-                                    </div>
+                                    <span className="text-sm font-semibold text-foreground">{result.nodeName}</span>
+                                    <div className="ml-auto text-xs text-muted-foreground">{new Date(result.timestamp).toLocaleTimeString()}</div>
                                   </div>
 
                                   {result.output && (
                                     <div className="text-xs text-muted-foreground">
-                                      <div
-                                        className={
-                                          expandedOutputs.has(result.nodeId)
-                                            ? ''
-                                            : 'max-h-24 overflow-hidden'
-                                        }
-                                      >
+                                      <div className={expandedOutputs.has(result.nodeId) ? '' : 'max-h-24 overflow-hidden'}>
                                         <div className="whitespace-pre-wrap break-words leading-relaxed">
-                                          {expandedOutputs.has(result.nodeId)
-                                            ? result.output
-                                            : result.output.length > 300
-                                              ? result.output.substring(0, 300) + '...'
-                                              : result.output}
+                                          {expandedOutputs.has(result.nodeId) ? result.output : result.output.length > 300 ? result.output.substring(0, 300) + '...' : result.output}
                                         </div>
                                       </div>
                                       {result.output.length > 300 && (
-                                        <button
-                                          onClick={() => toggleOutputExpansion(result.nodeId)}
-                                          className="text-blue-600 dark:text-blue-400 hover:underline mt-2 text-xs font-medium"
-                                        >
-                                          {expandedOutputs.has(result.nodeId)
-                                            ? 'Show less'
-                                            : 'Show more'}
+                                        <button onClick={() => toggleOutputExpansion(result.nodeId)} className="text-blue-600 dark:text-blue-400 hover:underline mt-2 text-xs font-medium">
+                                          {expandedOutputs.has(result.nodeId) ? 'Show less' : 'Show more'}
                                         </button>
                                       )}
                                     </div>
@@ -769,12 +658,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                         ) : (
                           <div className="mx-3 px-3 py-4 rounded-lg bg-muted/10 border border-dashed border-muted/30">
                             <div className="text-center">
-                              <div className="text-xs font-medium text-muted-foreground mb-1">
-                                No Agent Results Available
-                              </div>
-                              <p className="text-xs text-muted-foreground/70 leading-relaxed">
-                                Agent execution results will appear here once the workflow completes
-                              </p>
+                              <div className="text-xs font-medium text-muted-foreground mb-1">No Agent Results Available</div>
+                              <p className="text-xs text-muted-foreground/70 leading-relaxed">Agent execution results will appear here once the workflow completes</p>
                             </div>
                           </div>
                         )
@@ -790,19 +675,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                   {/* Mission Summary Header */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 px-3 group">
-                      <button
-                        onClick={() => toggleSection('summary')}
-                        className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                      >
+                      <button onClick={() => toggleSection('summary')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                         {collapsedSections.summary ? (
                           <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                         ) : (
                           <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                         )}
                       </button>
-                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                        Mission Summary
-                      </h4>
+                      <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mission Summary</h4>
                       <div className="ml-auto">
                         <Badge
                           className={
@@ -828,73 +708,35 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           <div className="mx-3 p-3 rounded-lg bg-muted/10 border border-muted/30">
                             <div className="space-y-3">
                               <div className="flex items-center gap-2 pb-2 border-b border-muted/30">
-                                <span className="text-sm font-semibold text-foreground">
-                                  {mission.executionResult.success
-                                    ? '✅ Execution Completed'
-                                    : '❌ Execution Failed'}
-                                </span>
-                                <div className="ml-auto text-xs text-muted-foreground">
-                                  {new Date(
-                                    mission.executionResult.executedAt
-                                  ).toLocaleDateString()}
-                                </div>
+                                <span className="text-sm font-semibold text-foreground">{mission.executionResult.success ? '✅ Execution Completed' : '❌ Execution Failed'}</span>
+                                <div className="ml-auto text-xs text-muted-foreground">{new Date(mission.executionResult.executedAt).toLocaleDateString()}</div>
                               </div>
 
-                              <div className="text-xs text-muted-foreground mb-2">
-                                {mission.executionResult.summary}
-                              </div>
+                              <div className="text-xs text-muted-foreground mb-2">{mission.executionResult.summary}</div>
 
                               {/* Task Results */}
                               <div className="space-y-2">
-                                <div className="text-xs font-medium text-muted-foreground">
-                                  Task Results:
-                                </div>
+                                <div className="text-xs font-medium text-muted-foreground">Task Results:</div>
                                 {mission.executionResult.nodeResults.map((result: any) => (
-                                  <div
-                                    key={result.nodeId}
-                                    className="flex items-start gap-2 p-2 rounded bg-background/50"
-                                  >
-                                    <span className="text-xs mt-0.5">
-                                      {result.success ? '✅' : '❌'}
-                                    </span>
+                                  <div key={result.nodeId} className="flex items-start gap-2 p-2 rounded bg-background/50">
+                                    <span className="text-xs mt-0.5">{result.success ? '✅' : '❌'}</span>
                                     <div className="flex-1 min-w-0">
-                                      <div className="text-xs font-medium text-foreground">
-                                        {result.nodeName}
-                                      </div>
+                                      <div className="text-xs font-medium text-foreground">{result.nodeName}</div>
                                       {result.output && (
                                         <div className="text-xs text-muted-foreground mt-1">
-                                          <div
-                                            className={
-                                              expandedOutputs.has(result.nodeId)
-                                                ? ''
-                                                : 'max-h-16 overflow-hidden'
-                                            }
-                                          >
+                                          <div className={expandedOutputs.has(result.nodeId) ? '' : 'max-h-16 overflow-hidden'}>
                                             <div className="whitespace-pre-wrap break-words">
-                                              {expandedOutputs.has(result.nodeId)
-                                                ? result.output
-                                                : result.output.length > 200
-                                                  ? result.output.substring(0, 200) + '...'
-                                                  : result.output}
+                                              {expandedOutputs.has(result.nodeId) ? result.output : result.output.length > 200 ? result.output.substring(0, 200) + '...' : result.output}
                                             </div>
                                           </div>
                                           {result.output.length > 200 && (
-                                            <button
-                                              onClick={() => toggleOutputExpansion(result.nodeId)}
-                                              className="text-blue-600 dark:text-blue-400 hover:underline mt-1 text-xs"
-                                            >
-                                              {expandedOutputs.has(result.nodeId)
-                                                ? 'Show less'
-                                                : 'Show more'}
+                                            <button onClick={() => toggleOutputExpansion(result.nodeId)} className="text-blue-600 dark:text-blue-400 hover:underline mt-1 text-xs">
+                                              {expandedOutputs.has(result.nodeId) ? 'Show less' : 'Show more'}
                                             </button>
                                           )}
                                         </div>
                                       )}
-                                      {result.error && (
-                                        <div className="text-xs text-red-600 dark:text-red-400 mt-1">
-                                          Error: {result.error}
-                                        </div>
-                                      )}
+                                      {result.error && <div className="text-xs text-red-600 dark:text-red-400 mt-1">Error: {result.error}</div>}
                                     </div>
                                   </div>
                                 ))}
@@ -905,11 +747,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
 
                         {/* Workflow Summary */}
                         <div className="mx-3">
-                          <WorkflowPhaseContent
-                            mission={mission}
-                            onWorkflowApproval={handleWorkflowApproval}
-                            readonly={true}
-                          />
+                          <WorkflowPhaseContent mission={mission} onWorkflowApproval={handleWorkflowApproval} readonly={true} />
                         </div>
                       </div>
                     )}
@@ -920,54 +758,31 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {/* Mission Clarity Section */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('clarity')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
+                  <button onClick={() => toggleSection('clarity')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                     {collapsedSections.clarity ? (
                       <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     ) : (
                       <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     )}
                   </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Mission Clarity
-                  </h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Mission Clarity</h4>
                   <div className="ml-auto flex items-center gap-1">
                     {clarity ? (
                       <>
                         <div
-                          className={`h-2 w-2 rounded-full transition-all duration-300 ${
-                            clarityUpdated ? 'animate-pulse ring-2 ring-blue-400' : ''
-                          } ${
-                            clarity.overallScore >= 8
-                              ? 'bg-green-500'
-                              : clarity.overallScore >= 6
-                                ? 'bg-yellow-500'
-                                : 'bg-red-500'
+                          className={`h-2 w-2 rounded-full transition-all duration-300 ${clarityUpdated ? 'animate-pulse ring-2 ring-blue-400' : ''} ${
+                            clarity.overallScore >= 8 ? 'bg-green-500' : clarity.overallScore >= 6 ? 'bg-yellow-500' : 'bg-red-500'
                           }`}
                         />
-                        <span
-                          className={`text-xs font-medium transition-colors ${
-                            clarityUpdated
-                              ? 'text-blue-600 dark:text-blue-400'
-                              : 'text-muted-foreground'
-                          }`}
-                        >
+                        <span className={`text-xs font-medium transition-colors ${clarityUpdated ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
                           {clarity.overallScore.toFixed(1)}/10
                         </span>
-                        {clarityUpdated && (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 animate-fade-in">
-                            ✨ Updated
-                          </span>
-                        )}
+                        {clarityUpdated && <span className="text-xs text-blue-600 dark:text-blue-400 animate-fade-in">✨ Updated</span>}
                       </>
                     ) : (
                       <>
                         <div className="h-2 w-2 rounded-full bg-muted-foreground/30 animate-pulse" />
-                        <span className="text-xs font-medium text-muted-foreground/60">
-                          Pending
-                        </span>
+                        <span className="text-xs font-medium text-muted-foreground/60">Pending</span>
                       </>
                     )}
                   </div>
@@ -982,11 +797,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                             <div className="relative flex-shrink-0">
                               <div
                                 className={`p-1.5 rounded-md transition-all duration-300 ${
-                                  clarity.overallScore >= 8
-                                    ? 'bg-green-500/20'
-                                    : clarity.overallScore >= 6
-                                      ? 'bg-yellow-500/20'
-                                      : 'bg-red-500/20'
+                                  clarity.overallScore >= 8 ? 'bg-green-500/20' : clarity.overallScore >= 6 ? 'bg-yellow-500/20' : 'bg-red-500/20'
                                 }`}
                               >
                                 <div className="w-3.5 h-3.5 flex items-center justify-center">
@@ -1005,16 +816,9 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="font-semibold text-sm truncate block text-foreground transition-colors leading-tight">
-                                Overall Score
-                              </span>
+                              <span className="font-semibold text-sm truncate block text-foreground transition-colors leading-tight">Overall Score</span>
                               <span className="text-xs text-muted-foreground leading-tight">
-                                Iteration {clarity.iteration} •{' '}
-                                {clarity.overallScore >= 8
-                                  ? 'Excellent'
-                                  : clarity.overallScore >= 6
-                                    ? 'Good'
-                                    : 'Needs Improvement'}
+                                Iteration {clarity.iteration} • {clarity.overallScore >= 8 ? 'Excellent' : clarity.overallScore >= 6 ? 'Good' : 'Needs Improvement'}
                               </span>
                             </div>
                           </div>
@@ -1051,30 +855,18 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                               <div className="relative flex-shrink-0">
                                 <div className="w-6 h-1.5 bg-muted/30 rounded-full overflow-hidden">
                                   <div
-                                    className={`h-full transition-all duration-500 ${
-                                      dimension.score >= 8
-                                        ? 'bg-green-500'
-                                        : dimension.score >= 6
-                                          ? 'bg-yellow-500'
-                                          : 'bg-red-500'
-                                    }`}
+                                    className={`h-full transition-all duration-500 ${dimension.score >= 8 ? 'bg-green-500' : dimension.score >= 6 ? 'bg-yellow-500' : 'bg-red-500'}`}
                                     style={{ width: `${(dimension.score / 10) * 100}%` }}
                                   />
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <span className="font-medium text-xs truncate block text-muted-foreground group-hover:text-foreground transition-colors leading-tight">
-                                  {dimension.label}
-                                </span>
+                                <span className="font-medium text-xs truncate block text-muted-foreground group-hover:text-foreground transition-colors leading-tight">{dimension.label}</span>
                               </div>
                               <div className="flex-shrink-0">
                                 <span
                                   className={`text-xs font-medium ${
-                                    dimension.score >= 8
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : dimension.score >= 6
-                                        ? 'text-yellow-600 dark:text-yellow-400'
-                                        : 'text-red-600 dark:text-red-400'
+                                    dimension.score >= 8 ? 'text-green-600 dark:text-green-400' : dimension.score >= 6 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                                   }`}
                                 >
                                   {dimension.score}/10
@@ -1088,12 +880,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                         {clarity.reasoning && (
                           <div className="group relative mx-3 px-3 py-2 rounded-lg bg-muted/20 border-l-2 border-blue-500/30 transition-all duration-300">
                             <div className="flex flex-col min-w-0">
-                              <span className="font-medium text-xs text-blue-600 dark:text-blue-400 leading-tight mb-1.5">
-                                Reasoning:
-                              </span>
-                              <blockquote className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-muted/40 pl-2">
-                                &ldquo;{clarity.reasoning}&rdquo;
-                              </blockquote>
+                              <span className="font-medium text-xs text-blue-600 dark:text-blue-400 leading-tight mb-1.5">Reasoning:</span>
+                              <blockquote className="text-xs text-muted-foreground leading-relaxed italic border-l-2 border-muted/40 pl-2">&ldquo;{clarity.reasoning}&rdquo;</blockquote>
                             </div>
                           </div>
                         )}
@@ -1107,13 +895,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                               <div className="h-3 w-3 rounded-full bg-muted-foreground/30 animate-pulse" />
                             </div>
                           </div>
-                          <span className="text-xs font-medium text-muted-foreground block mb-1">
-                            Clarity Assessment Pending
-                          </span>
-                          <p className="text-xs text-muted-foreground/70 leading-relaxed">
-                            Mission clarity will be evaluated during your conversation with the
-                            orchestrator
-                          </p>
+                          <span className="text-xs font-medium text-muted-foreground block mb-1">Clarity Assessment Pending</span>
+                          <p className="text-xs text-muted-foreground/70 leading-relaxed">Mission clarity will be evaluated during your conversation with the orchestrator</p>
                         </div>
                       </div>
                     )}
@@ -1125,19 +908,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {mission.agentIds && mission.agentIds.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 px-3 group">
-                    <button
-                      onClick={() => toggleSection('agents')}
-                      className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                    >
+                    <button onClick={() => toggleSection('agents')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                       {collapsedSections.agents ? (
                         <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       ) : (
                         <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                       )}
                     </button>
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Agents ({mission.agentIds.length})
-                    </h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Agents ({mission.agentIds.length})</h4>
                   </div>
                   {!collapsedSections.agents && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -1159,12 +937,8 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                                 </div>
                               </div>
                               <div className="flex-1 min-w-0">
-                                <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                                  {agent.name || `Agent ${index + 1}`}
-                                </span>
-                                <span className="text-xs text-muted-foreground truncate block">
-                                  {agent.description || `ID: ${agent.id}`}
-                                </span>
+                                <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">{agent.name || `Agent ${index + 1}`}</span>
+                                <span className="text-xs text-muted-foreground truncate block">{agent.description || `ID: ${agent.id}`}</span>
                               </div>
                             </div>
                           </div>
@@ -1178,19 +952,14 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
               {/* Timeline Section */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-3 group">
-                  <button
-                    onClick={() => toggleSection('timeline')}
-                    className="flex items-center gap-2 hover:text-muted-foreground transition-colors"
-                  >
+                  <button onClick={() => toggleSection('timeline')} className="flex items-center gap-2 hover:text-muted-foreground transition-colors">
                     {collapsedSections.timeline ? (
                       <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     ) : (
                       <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
                     )}
                   </button>
-                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    Timeline
-                  </h4>
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Timeline</h4>
                 </div>
                 {!collapsedSections.timeline && (
                   <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
@@ -1202,12 +971,9 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                            Created
-                          </span>
+                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">Created</span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(mission.createdAt).toLocaleDateString()} at{' '}
-                            {new Date(mission.createdAt).toLocaleTimeString()}
+                            {new Date(mission.createdAt).toLocaleDateString()} at {new Date(mission.createdAt).toLocaleTimeString()}
                           </span>
                         </div>
                       </div>
@@ -1221,12 +987,9 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
                           </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">
-                            Updated
-                          </span>
+                          <span className="font-semibold text-sm truncate block text-muted-foreground group-hover:text-foreground transition-colors">Updated</span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(mission.updatedAt).toLocaleDateString()} at{' '}
-                            {new Date(mission.updatedAt).toLocaleTimeString()}
+                            {new Date(mission.updatedAt).toLocaleDateString()} at {new Date(mission.updatedAt).toLocaleTimeString()}
                           </span>
                         </div>
                       </div>

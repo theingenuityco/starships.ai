@@ -6,13 +6,7 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import {
-  Execution,
-  ValidationResult,
-  AgentNodeParameters,
-  ValidationError,
-  ValidationWarning,
-} from '@/types';
+import { Execution, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '@/types';
 import { Agent } from '@/Agent';
 
 export class AgentHandler extends BaseHandler {
@@ -22,9 +16,7 @@ export class AgentHandler extends BaseHandler {
     const params = this.node.parameters as AgentNodeParameters;
 
     try {
-      console.log(
-        `Executing agent: ${params.name} (model: ${params.model}) with workflow execution`
-      );
+      console.log(`Executing agent: ${params.name} (model: ${params.model}) with workflow execution`);
 
       // Create agent instance from the full parameters and execute
       const agent = new Agent(params);
@@ -47,17 +39,11 @@ export class AgentHandler extends BaseHandler {
       } else {
         // Agent execution failed
         const errorMessage = agentResult.error?.message || 'Agent execution failed';
-        return this.createErrorResult(
-          execution,
-          `Agent ${params.name} workflow execution failed: ${errorMessage}`
-        );
+        return this.createErrorResult(execution, `Agent ${params.name} workflow execution failed: ${errorMessage}`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(
-        execution,
-        `Agent ${params.name} workflow execution failed: ${errorMessage}`
-      );
+      return this.createErrorResult(execution, `Agent ${params.name} workflow execution failed: ${errorMessage}`);
     }
   }
 
@@ -80,9 +66,7 @@ export class AgentHandler extends BaseHandler {
     }
 
     if (!params.blueprint) {
-      errors.push(
-        this.createValidationError('MISSING_REQUIRED_FIELD', 'Agent workflow is required')
-      );
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Agent workflow is required'));
     } else {
       // Only do comprehensive validation if basic fields are present
       // to avoid duplicate error messages

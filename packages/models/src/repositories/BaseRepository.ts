@@ -2,15 +2,7 @@
  * Base repository class with standardized error handling and validation utilities
  */
 
-import {
-  BaseError,
-  DatabaseError,
-  NotFoundError,
-  ConflictError,
-  ValidationError,
-  ErrorContextUtils,
-  ErrorLayer,
-} from '@starships/errors';
+import { BaseError, DatabaseError, NotFoundError, ConflictError, ValidationError, ErrorContextUtils, ErrorLayer } from '@starships/errors';
 import type { RepositoryErrorContext } from '@starships/errors';
 import { getConnection } from '@/helpers/database';
 
@@ -55,12 +47,7 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleDatabaseError(
-    error: any,
-    operation: string,
-    resource?: string,
-    resourceId?: string
-  ): never {
+  protected handleDatabaseError(error: any, operation: string, resource?: string, resourceId?: string): never {
     const context = this.createContext(operation, resource, resourceId, {
       originalError: error.message || error.toString(),
     });
@@ -158,10 +145,7 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleValidationError(
-    fieldErrors: Array<{ field: string; message: string; value?: any }>,
-    operation?: string
-  ): never {
+  protected handleValidationError(fieldErrors: Array<{ field: string; message: string; value?: any }>, operation?: string): never {
     const context = this.createContext(operation || 'validate', undefined, undefined, {
       fieldErrors,
     });
@@ -188,12 +172,7 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleConflict(
-    resource: string,
-    conflictReason: string,
-    operation?: string,
-    resourceId?: string
-  ): never {
+  protected handleConflict(resource: string, conflictReason: string, operation?: string, resourceId?: string): never {
     const context = this.createContext(operation || 'create', resource, resourceId, {
       conflictReason,
     });
@@ -257,12 +236,7 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected executeWithErrorHandlingSync<T>(
-    operation: () => T,
-    operationName: string,
-    resource?: string,
-    resourceId?: string
-  ): T {
+  protected executeWithErrorHandlingSync<T>(operation: () => T, operationName: string, resource?: string, resourceId?: string): T {
     try {
       return operation();
     } catch (error: any) {
@@ -286,22 +260,12 @@ export abstract class BaseRepository {
   private isConstraintViolationError(error: any): boolean {
     if (!error) return false;
 
-    const constraintPatterns = [
-      'constraint',
-      'unique',
-      'duplicate',
-      'foreign key',
-      'check constraint',
-      'not null',
-      'primary key',
-    ];
+    const constraintPatterns = ['constraint', 'unique', 'duplicate', 'foreign key', 'check constraint', 'not null', 'primary key'];
 
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();
 
-    return constraintPatterns.some(
-      (pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern)
-    );
+    return constraintPatterns.some((pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern));
   }
 
   /**
@@ -310,21 +274,12 @@ export abstract class BaseRepository {
   private isConnectionError(error: any): boolean {
     if (!error) return false;
 
-    const connectionPatterns = [
-      'connection',
-      'connect',
-      'econnrefused',
-      'enotfound',
-      'network',
-      'timeout',
-    ];
+    const connectionPatterns = ['connection', 'connect', 'econnrefused', 'enotfound', 'network', 'timeout'];
 
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();
 
-    return connectionPatterns.some(
-      (pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern)
-    );
+    return connectionPatterns.some((pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern));
   }
 
   /**
@@ -338,9 +293,7 @@ export abstract class BaseRepository {
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();
 
-    return timeoutPatterns.some(
-      (pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern)
-    );
+    return timeoutPatterns.some((pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern));
   }
 
   /**
@@ -349,13 +302,7 @@ export abstract class BaseRepository {
   private isQueryError(error: any): boolean {
     if (!error) return false;
 
-    const queryPatterns = [
-      'syntax error',
-      'invalid query',
-      'query failed',
-      'sql error',
-      'cypher error',
-    ];
+    const queryPatterns = ['syntax error', 'invalid query', 'query failed', 'sql error', 'cypher error'];
 
     const errorMessage = (error.message || '').toLowerCase();
 
@@ -411,11 +358,7 @@ export abstract class BaseRepository {
   /**
    * Validate string lengths
    */
-  protected validateStringLengths(
-    data: any,
-    lengthConstraints: Record<string, { min?: number; max?: number }>,
-    operation?: string
-  ): void {
+  protected validateStringLengths(data: any, lengthConstraints: Record<string, { min?: number; max?: number }>, operation?: string): void {
     const errors: Array<{ field: string; message: string; value?: any }> = [];
 
     for (const [field, constraints] of Object.entries(lengthConstraints)) {
@@ -446,11 +389,7 @@ export abstract class BaseRepository {
   /**
    * Validate enum values
    */
-  protected validateEnums(
-    data: any,
-    enumConstraints: Record<string, string[]>,
-    operation?: string
-  ): void {
+  protected validateEnums(data: any, enumConstraints: Record<string, string[]>, operation?: string): void {
     const errors: Array<{ field: string; message: string; value?: any }> = [];
 
     for (const [field, allowedValues] of Object.entries(enumConstraints)) {
@@ -481,11 +420,7 @@ export abstract class BaseRepository {
    * @param properties - Object properties to set on the node (excluding id)
    * @returns The created entity with generated ID
    */
-  protected async createEntityWithAutoId<T>(
-    nodeLabel: string,
-    properties: Record<string, any>,
-    connection?: any
-  ): Promise<T> {
+  protected async createEntityWithAutoId<T>(nodeLabel: string, properties: Record<string, any>, connection?: any): Promise<T> {
     // Use provided connection or get from module - this helps with testing
     let conn = connection;
     if (!conn) {
@@ -598,13 +533,7 @@ export abstract class BaseRepository {
   /**
    * Create a standardized error for business logic violations
    */
-  protected createBusinessLogicError(
-    code: string,
-    message: string,
-    operation?: string,
-    resource?: string,
-    resourceId?: string
-  ): never {
+  protected createBusinessLogicError(code: string, message: string, operation?: string, resource?: string, resourceId?: string): never {
     const context = this.createContext(operation || 'unknown', resource, resourceId, {
       businessLogicCode: code,
     });

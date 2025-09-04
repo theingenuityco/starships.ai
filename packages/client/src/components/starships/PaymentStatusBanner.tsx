@@ -47,9 +47,7 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              <span className="text-sm text-yellow-800">
-                Payment required to activate {starship.name}
-              </span>
+              <span className="text-sm text-yellow-800">Payment required to activate {starship.name}</span>
             </div>
             <Button size="sm" variant="outline" onClick={handleRetryPayment}>
               Complete Payment
@@ -67,9 +65,7 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <AlertTriangle className="h-5 w-5 text-orange-600" />
-              <span className="text-sm text-orange-800">
-                Payment issue detected for {starship.name}
-              </span>
+              <span className="text-sm text-orange-800">Payment issue detected for {starship.name}</span>
             </div>
             <Button size="sm" variant="outline" onClick={handleManageSubscription}>
               Update Payment
@@ -89,9 +85,7 @@ export function PaymentStatusBanner({ starship }: PaymentStatusBannerProps) {
               <XCircle className="h-5 w-5 text-red-600" />
               <div>
                 <span className="text-sm text-red-800">Subscription ended for {starship.name}</span>
-                <p className="text-xs text-red-600 mt-1">
-                  Create a new starship to start a new subscription
-                </p>
+                <p className="text-xs text-red-600 mt-1">Create a new starship to start a new subscription</p>
               </div>
             </div>
             {/* No button - disabled is terminal state */}

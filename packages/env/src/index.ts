@@ -43,13 +43,11 @@ export function getEnvConfig(): EnvironmentConfig {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
 
     // Default Model Configuration
-    DEFAULT_LLM_PROVIDER:
-      (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || 'openai',
+    DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || 'openai',
     DEFAULT_CHAT_MODEL: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
 
     // JWT Authentication Configuration
-    JWT_SECRET:
-      process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-at-least-32-characters-long',
+    JWT_SECRET: process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-at-least-32-characters-long',
 
     // Stripe Configuration
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
@@ -66,4 +64,3 @@ export function getEnvConfig(): EnvironmentConfig {
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,
   };
 }
-

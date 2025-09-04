@@ -1,42 +1,16 @@
 'use client'
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Eye,
-  EyeOff,
-  AlertCircle,
-  Loader2,
-  Key,
-  CheckCircle,
-  RefreshCw,
-  HelpCircle,
-  Copy,
-  Check,
-  AlertTriangle,
-  Info,
-} from 'lucide-react'
+import { Eye, EyeOff, AlertCircle, Loader2, Key, CheckCircle, RefreshCw, HelpCircle, Copy, Check, AlertTriangle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ApiKeyRequirement, ApiKeyValidationResult } from '@/types/connector-api-keys'
 import { ApiKeyValidator, ServiceType } from '@/lib/api-key-validation'
 import { MCPServerOption } from '@/lib/api'
 import { useErrorRecovery, ErrorRecoveryManager } from '@/lib/error-recovery'
-import {
-  LoadingOverlay,
-  ApiKeyValidationLoading,
-  MultiStepLoading,
-  LoadingStep,
-  InlineLoading,
-} from '@/components/ui/loading-states'
+import { LoadingOverlay, ApiKeyValidationLoading, MultiStepLoading, LoadingStep, InlineLoading } from '@/components/ui/loading-states'
 import { ErrorBoundary, useErrorHandler } from '@/components/ui/error-boundary'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Badge } from '@/components/ui/badge'
@@ -91,9 +65,7 @@ export function EnhancedApiKeyInputModal({
   const [fieldStates, setFieldStates] = useState<Record<string, FieldState>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitAttempts, setSubmitAttempts] = useState(0)
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle'
-  )
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Progress tracking
@@ -134,9 +106,7 @@ export function EnhancedApiKeyInputModal({
 
   // Update progress tracking
   const updateProgress = useCallback((states: Record<string, FieldState>) => {
-    const completedFields = Object.values(states).filter(
-      state => state.validationResult.isValid && state.hasBeenTouched
-    ).length
+    const completedFields = Object.values(states).filter(state => state.validationResult.isValid && state.hasBeenTouched).length
 
     setProgress(prev => ({
       ...prev,
@@ -328,9 +298,7 @@ export function EnhancedApiKeyInputModal({
     try {
       // Validate all fields if not in realtime mode
       if (validationMode === 'onsubmit') {
-        const validationPromises = requirements.map(req =>
-          validateField(req.envKey, fieldStates[req.envKey]?.value || '', true)
-        )
+        const validationPromises = requirements.map(req => validateField(req.envKey, fieldStates[req.envKey]?.value || '', true))
         await Promise.all(validationPromises)
 
         // Check if validation passed
@@ -397,8 +365,7 @@ export function EnhancedApiKeyInputModal({
     if (requirement.helpUrl) return requirement.helpUrl
 
     const helpUrls: Record<string, string> = {
-      github:
-        'https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
+      github: 'https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
       slack: 'https://api.slack.com/authentication/token-types',
       notion: 'https://developers.notion.com/docs/create-a-notion-integration',
       brave: 'https://api.search.brave.com/app/documentation/web-search/get-started',
@@ -418,22 +385,13 @@ export function EnhancedApiKeyInputModal({
     {
       id: 'input',
       label: 'Enter API Keys',
-      status:
-        progress.completedFields === 0
-          ? 'loading'
-          : progress.completedFields === progress.totalFields
-            ? 'completed'
-            : 'loading',
+      status: progress.completedFields === 0 ? 'loading' : progress.completedFields === progress.totalFields ? 'completed' : 'loading',
       description: `${progress.completedFields}/${progress.totalFields} fields completed`,
     },
     {
       id: 'validate',
       label: 'Validate Credentials',
-      status: isSubmitting
-        ? 'loading'
-        : progress.completedFields === progress.totalFields
-          ? 'completed'
-          : 'pending',
+      status: isSubmitting ? 'loading' : progress.completedFields === progress.totalFields ? 'completed' : 'pending',
       description: 'Checking API key formats and requirements',
     },
     {
@@ -452,22 +410,14 @@ export function EnhancedApiKeyInputModal({
     const { value, isVisible, isValidating, validationResult, hasBeenTouched } = fieldState
     const inputType = requirement.sensitive && !isVisible ? 'password' : 'text'
     const hasError = validationResult && !validationResult.isValid && hasBeenTouched
-    const hasSuccess =
-      validationResult && validationResult.isValid && hasBeenTouched && value.trim()
+    const hasSuccess = validationResult && validationResult.isValid && hasBeenTouched && value.trim()
 
     return (
       <div key={requirement.envKey} className="space-y-3">
         {/* Field Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Label
-              htmlFor={requirement.envKey}
-              className={cn(
-                'text-sm font-medium',
-                hasError && 'text-destructive',
-                hasSuccess && 'text-green-600'
-              )}
-            >
+            <Label htmlFor={requirement.envKey} className={cn('text-sm font-medium', hasError && 'text-destructive', hasSuccess && 'text-green-600')}>
               {requirement.displayName}
               {requirement.required && <span className="text-red-500 ml-1">*</span>}
             </Label>
@@ -481,13 +431,7 @@ export function EnhancedApiKeyInputModal({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => window.open(getServiceHelpUrl(requirement), '_blank')}
-                    >
+                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => window.open(getServiceHelpUrl(requirement), '_blank')}>
                       <HelpCircle className="h-3 w-3" />
                     </Button>
                   </TooltipTrigger>
@@ -503,18 +447,8 @@ export function EnhancedApiKeyInputModal({
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={() => copyFieldValue(requirement.envKey)}
-                    >
-                      {copiedField === requirement.envKey ? (
-                        <Check className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
-                      )}
+                    <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyFieldValue(requirement.envKey)}>
+                      {copiedField === requirement.envKey ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -533,16 +467,10 @@ export function EnhancedApiKeyInputModal({
             id={requirement.envKey}
             type={inputType}
             value={value}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              handleInputChange(requirement.envKey, e.target.value)
-            }
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleInputChange(requirement.envKey, e.target.value)}
             onBlur={() => handleFieldBlur(requirement.envKey)}
             placeholder={requirement.placeholder}
-            className={cn(
-              'pr-20',
-              hasError && 'border-destructive focus:border-destructive focus:ring-destructive',
-              hasSuccess && 'border-green-500 focus:border-green-500 focus:ring-green-500'
-            )}
+            className={cn('pr-20', hasError && 'border-destructive focus:border-destructive focus:ring-destructive', hasSuccess && 'border-green-500 focus:border-green-500 focus:ring-green-500')}
             disabled={isSubmitting}
             autoComplete="off"
             spellCheck={false}
@@ -564,11 +492,7 @@ export function EnhancedApiKeyInputModal({
                 disabled={isSubmitting}
                 tabIndex={-1}
               >
-                {isVisible ? (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                )}
+                {isVisible ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
               </Button>
             )}
           </div>
@@ -597,11 +521,7 @@ export function EnhancedApiKeyInputModal({
         {(requirement.type === 'file_path' || requirement.type === 'directory_path') && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Info className="h-3 w-3 flex-shrink-0" />
-            <span>
-              {requirement.type === 'file_path'
-                ? 'Enter the full path to the file (e.g., /path/to/file.json)'
-                : 'Enter the full path to the directory (e.g., /path/to/directory)'}
-            </span>
+            <span>{requirement.type === 'file_path' ? 'Enter the full path to the file (e.g., /path/to/file.json)' : 'Enter the full path to the directory (e.g., /path/to/directory)'}</span>
           </div>
         )}
       </div>
@@ -623,30 +543,17 @@ export function EnhancedApiKeyInputModal({
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="text-xs">
                       {autoSaveStatus === 'saving' && <InlineLoading size="xs" />}
-                      {autoSaveStatus === 'saved' && (
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                      )}
-                      {autoSaveStatus === 'error' && (
-                        <AlertTriangle className="h-3 w-3 text-red-500" />
-                      )}
+                      {autoSaveStatus === 'saved' && <CheckCircle className="h-3 w-3 text-green-500" />}
+                      {autoSaveStatus === 'error' && <AlertTriangle className="h-3 w-3 text-red-500" />}
                       <span className="ml-1">
-                        {autoSaveStatus === 'saving'
-                          ? 'Saving...'
-                          : autoSaveStatus === 'saved'
-                            ? 'Saved'
-                            : autoSaveStatus === 'error'
-                              ? 'Save failed'
-                              : 'Auto-save enabled'}
+                        {autoSaveStatus === 'saving' ? 'Saving...' : autoSaveStatus === 'saved' ? 'Saved' : autoSaveStatus === 'error' ? 'Save failed' : 'Auto-save enabled'}
                       </span>
                     </Badge>
                   </div>
                 )}
               </div>
             </DialogTitle>
-            <DialogDescription>
-              Enter the required API keys and credentials for {connector.name}. These will be
-              securely stored and used to authenticate with the service.
-            </DialogDescription>
+            <DialogDescription>Enter the required API keys and credentials for {connector.name}. These will be securely stored and used to authenticate with the service.</DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto">
@@ -671,13 +578,8 @@ export function EnhancedApiKeyInputModal({
                       <div className="flex items-start gap-3">
                         <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <h4 className="font-medium text-destructive mb-1">
-                            Configuration Failed
-                          </h4>
-                          <p className="text-sm text-destructive/80 mb-3">
-                            {formError?.message ||
-                              'An error occurred while saving your configuration.'}
-                          </p>
+                          <h4 className="font-medium text-destructive mb-1">Configuration Failed</h4>
+                          <p className="text-sm text-destructive/80 mb-3">{formError?.message || 'An error occurred while saving your configuration.'}</p>
                           {formError?.recoveryActions && formError.recoveryActions.length > 0 && (
                             <div className="flex gap-2">
                               {formError.recoveryActions.map(action => (
@@ -692,9 +594,7 @@ export function EnhancedApiKeyInputModal({
                                       action.action()
                                     }
                                   }}
-                                  className={
-                                    action.destructive ? 'border-destructive text-destructive' : ''
-                                  }
+                                  className={action.destructive ? 'border-destructive text-destructive' : ''}
                                 >
                                   {action.id === 'retry' && <RefreshCw className="h-3 w-3 mr-1" />}
                                   {action.label}
@@ -728,20 +628,10 @@ export function EnhancedApiKeyInputModal({
               </div>
 
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleClose}
-                  disabled={isSubmitting}
-                >
+                <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={!isFormValid() || isSubmitting}
-                  onClick={handleSubmit}
-                  className="min-w-[140px]"
-                >
+                <Button type="submit" disabled={!isFormValid() || isSubmitting} onClick={handleSubmit} className="min-w-[140px]">
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />

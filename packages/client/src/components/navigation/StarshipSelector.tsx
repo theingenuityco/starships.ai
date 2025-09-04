@@ -4,13 +4,7 @@ import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { ChevronDown, Plus, Rocket } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Badge } from '@/components/ui/badge'
 import { useStarships, useCreateStarship } from '@/hooks/useStarships'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -84,15 +78,8 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
   if (error) {
     return (
       <div className={cn('flex items-center gap-2', className)}>
-        <span className="text-sm text-red-400">
-          Error: {error?.message || 'Failed to load starships'}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => window.location.reload()}
-          className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-        >
+        <span className="text-sm text-red-400">Error: {error?.message || 'Failed to load starships'}</span>
+        <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="border-red-500/30 text-red-400 hover:bg-red-500/10">
           Retry
         </Button>
       </div>
@@ -103,20 +90,14 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
     <div className={cn('flex items-center gap-2', className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            className="flex items-center gap-3 px-4 py-2 bg-black/20 border-white/10 hover:bg-white/5 hover:border-white/20"
-          >
+          <Button variant="outline" className="flex items-center gap-3 px-4 py-2 bg-black/20 border-white/10 hover:bg-white/5 hover:border-white/20">
             {activeStarship ? (
               <>
                 <span className="text-lg">{getStarshipIcon(activeStarship.class)}</span>
                 <div className="flex flex-col items-start">
                   <span className="font-medium text-white">{activeStarship.name}</span>
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant="outline"
-                      className={cn('text-xs', getStatusColor(activeStarship.status))}
-                    >
+                    <Badge variant="outline" className={cn('text-xs', getStatusColor(activeStarship.status))}>
                       {activeStarship.status}
                     </Badge>
                     <span className="text-xs text-white/60 capitalize">{activeStarship.class}</span>
@@ -133,20 +114,14 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent
-          align="start"
-          className="w-[280px] bg-black/90 border-white/10 backdrop-blur-sm"
-        >
+        <DropdownMenuContent align="start" className="w-[280px] bg-black/90 border-white/10 backdrop-blur-sm">
           {starships.length > 0 && (
             <>
               {starships.map((starship: any) => (
                 <DropdownMenuItem
                   key={starship.id}
                   onClick={() => setActiveStarship(starship.id)}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-white/5 focus:bg-white/5',
-                    activeStarshipId === starship.id && 'bg-white/10'
-                  )}
+                  className={cn('flex items-center gap-3 px-3 py-3 cursor-pointer hover:bg-white/5 focus:bg-white/5', activeStarshipId === starship.id && 'bg-white/10')}
                 >
                   <span className="text-lg">{getStarshipIcon(starship.class)}</span>
                   <div className="flex flex-col flex-1">
@@ -155,10 +130,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
                       <span className="text-xs text-white/60">100%</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge
-                        variant="outline"
-                        className={cn('text-xs', getStatusColor(starship.status))}
-                      >
+                      <Badge variant="outline" className={cn('text-xs', getStatusColor(starship.status))}>
                         {starship.status}
                       </Badge>
                       <span className="text-xs text-white/60 capitalize">{starship.class}</span>
@@ -198,9 +170,7 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {(isLoading || createStarshipMutation.isPending) && (
-        <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />
-      )}
+      {(isLoading || createStarshipMutation.isPending) && <div className="w-4 h-4 border-2 border-t-transparent border-white/20 rounded-full animate-spin" />}
     </div>
   )
 }

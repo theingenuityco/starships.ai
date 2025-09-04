@@ -3,12 +3,7 @@
  * Business logic layer for mission operations
  */
 
-import {
-  MissionRepository,
-  StarshipRepository,
-  AgentRepository,
-  MissionClarityRepository,
-} from '@starships/models';
+import { MissionRepository, StarshipRepository, AgentRepository, MissionClarityRepository } from '@starships/models';
 import { MissionOrchestratorService } from '@/services/MissionOrchestratorService';
 import { MissionEventService } from '@/services/MissionEventService';
 import type {
@@ -52,10 +47,7 @@ export class MissionService {
           throw new NotFoundError('Agent not found', 'Agent', agentId);
         }
         if (agent.starshipId !== request.starshipId) {
-          throw new ValidationError(
-            `Agent ${agentId} does not belong to starship ${request.starshipId}`,
-            'agentIds'
-          );
+          throw new ValidationError(`Agent ${agentId} does not belong to starship ${request.starshipId}`, 'agentIds');
         }
         assignedAgents.push(agent);
       } catch (error) {
@@ -77,10 +69,7 @@ export class MissionService {
     );
 
     if (duplicateName) {
-      throw new ValidationError(
-        `A mission with the name "${request.name}" already exists for this starship`,
-        'name'
-      );
+      throw new ValidationError(`A mission with the name "${request.name}" already exists for this starship`, 'name');
     }
 
     const mission = await missionRepo.createMission(request, userId);
@@ -119,10 +108,7 @@ export class MissionService {
   /**
    * Get all missions with filtering and sorting
    */
-  static async getAllMissions(
-    filters?: MissionFilters,
-    sort?: MissionSort
-  ): Promise<MissionListResponse> {
+  static async getAllMissions(filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
     const missionRepo = new MissionRepository();
     return await missionRepo.getAllMissions(filters, sort);
   }
@@ -130,11 +116,7 @@ export class MissionService {
   /**
    * Get missions for a specific starship
    */
-  static async getMissionsByStarshipId(
-    starshipId: string,
-    filters?: MissionFilters,
-    sort?: MissionSort
-  ): Promise<MissionListResponse> {
+  static async getMissionsByStarshipId(starshipId: string, filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
     const missionRepo = new MissionRepository();
     const starshipRepo = new StarshipRepository();
 
@@ -176,10 +158,7 @@ export class MissionService {
             throw new NotFoundError('Agent not found', 'Agent', agentId);
           }
           if (agent.starshipId !== existingMission.starshipId) {
-            throw new ValidationError(
-              `Agent ${agentId} does not belong to mission's starship ${existingMission.starshipId}`,
-              'agentIds'
-            );
+            throw new ValidationError(`Agent ${agentId} does not belong to mission's starship ${existingMission.starshipId}`, 'agentIds');
           }
         } catch (error) {
           if (error instanceof NotFoundError) {
@@ -192,21 +171,14 @@ export class MissionService {
 
     // If updating name, check for duplicates
     if (updates.name && updates.name !== existingMission.name) {
-      const existingMissions = await missionRepo.getMissionModelsByStarshipId(
-        existingMission.starshipId,
-        { status: ['draft', 'active'] }
-      );
+      const existingMissions = await missionRepo.getMissionModelsByStarshipId(existingMission.starshipId, { status: ['draft', 'active'] });
 
       const duplicateName = existingMissions.missions.find(
-        (mission: MissionModel) =>
-          mission.id !== id && mission.name.toLowerCase() === updates.name!.toLowerCase()
+        (mission: MissionModel) => mission.id !== id && mission.name.toLowerCase() === updates.name!.toLowerCase()
       );
 
       if (duplicateName) {
-        throw new ValidationError(
-          `A mission with the name "${updates.name}" already exists for this starship`,
-          'name'
-        );
+        throw new ValidationError(`A mission with the name "${updates.name}" already exists for this starship`, 'name');
       }
     }
 
@@ -308,10 +280,7 @@ export class MissionService {
 
     // Get recent missions (last 5)
     const recentMissions = missions
-      .sort(
-        (a: MissionModel, b: MissionModel) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      )
+      .sort((a: MissionModel, b: MissionModel) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .slice(0, 5);
 
     return {
@@ -324,10 +293,7 @@ export class MissionService {
   /**
    * Validate status transitions according to business rules
    */
-  private static validateStatusTransition(
-    currentStatus: MissionStatus,
-    newStatus: MissionStatus
-  ): void {
+  private static validateStatusTransition(currentStatus: MissionStatus, newStatus: MissionStatus): void {
     const validTransitions: Record<MissionStatus, MissionStatus[]> = {
       draft: ['active', 'cancelled'],
       active: ['completed', 'failed', 'cancelled'],

@@ -5,33 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
-import {
-  Search,
-  Star,
-  Users,
-  Sparkles,
-  Code,
-  Palette,
-  BarChart3,
-  Headphones,
-  ChevronDown,
-} from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { Search, Star, Users, Sparkles, Code, Palette, BarChart3, Headphones, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AgentTemplate } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -58,10 +34,7 @@ const categoryColors = {
   support: 'bg-pink-100 text-pink-800 border-pink-200',
 }
 
-export function AgentTemplateSelector({
-  onCreateFromTemplate,
-  trigger,
-}: AgentTemplateSelectorProps) {
+export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTemplateSelectorProps) {
   const { userName } = useAuth()
   const [templates, setTemplates] = useState<AgentTemplate[]>([])
   const [filteredTemplates, setFilteredTemplates] = useState<AgentTemplate[]>([])
@@ -103,11 +76,7 @@ export function AgentTemplateSelector({
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        template =>
-          template.name.toLowerCase().includes(query) ||
-          (template.description && template.description.toLowerCase().includes(query))
-      )
+      filtered = filtered.filter(template => template.name.toLowerCase().includes(query) || (template.description && template.description.toLowerCase().includes(query)))
     }
 
     setFilteredTemplates(filtered)
@@ -141,10 +110,7 @@ export function AgentTemplateSelector({
     const CategoryIcon = categoryIcons[template.category as keyof typeof categoryIcons]
 
     return (
-      <Card
-        key={template.id}
-        className="cursor-pointer hover:shadow-md transition-all border-border/50 hover:border-primary/30 overflow-hidden"
-      >
+      <Card key={template.id} className="cursor-pointer hover:shadow-md transition-all border-border/50 hover:border-primary/30 overflow-hidden">
         <CardHeader className="pb-3 bg-muted/10">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -163,10 +129,7 @@ export function AgentTemplateSelector({
               <div>
                 <CardTitle className="text-lg">{template.name}</CardTitle>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge
-                    variant="outline"
-                    className={`text-xs ${categoryColors[template.category as keyof typeof categoryColors]}`}
-                  >
+                  <Badge variant="outline" className={`text-xs ${categoryColors[template.category as keyof typeof categoryColors]}`}>
                     <CategoryIcon className="w-3 h-3 mr-1" />
                     {template.category.charAt(0).toUpperCase() + template.category.slice(1)}
                   </Badge>
@@ -187,18 +150,8 @@ export function AgentTemplateSelector({
           {template.previewPrompts && template.previewPrompts.length > 0 && (
             <div className="mb-4 bg-muted/10 p-3 rounded-md">
               <p className="text-sm font-medium mb-2 flex items-center">
-                <svg
-                  className="w-4 h-4 mr-1.5 text-primary"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
+                <svg className="w-4 h-4 mr-1.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
                 Example prompts:
               </p>
@@ -237,40 +190,24 @@ export function AgentTemplateSelector({
               <Sparkles className="h-5 w-5 text-primary" />
               Agent Templates
             </DialogTitle>
-            <DialogDescription className="text-base mt-1">
-              Choose from pre-built agent templates to quickly create specialized agents.
-            </DialogDescription>
+            <DialogDescription className="text-base mt-1">Choose from pre-built agent templates to quickly create specialized agents.</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search templates..."
-                value={searchQuery}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  setSearchQuery(e.target.value)
-                }
-                className="pl-10 h-10"
-              />
+              <Input placeholder="Search templates..." value={searchQuery} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)} className="pl-10 h-10" />
             </div>
             <div className="w-full sm:w-56">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-10 px-3">
-                    <span className="truncate mr-1">
-                      {selectedCategory === 'all'
-                        ? 'All Categories'
-                        : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}
-                    </span>
+                    <span className="truncate mr-1">{selectedCategory === 'all' ? 'All Categories' : selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)}</span>
                     <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
-                  <DropdownMenuRadioGroup
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
-                  >
+                  <DropdownMenuRadioGroup value={selectedCategory} onValueChange={setSelectedCategory}>
                     <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuRadioItem value="general">General</DropdownMenuRadioItem>
@@ -294,9 +231,7 @@ export function AgentTemplateSelector({
                 <div className="text-muted-foreground">No templates found</div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">
-                {filteredTemplates.map(renderTemplateCard)}
-              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">{filteredTemplates.map(renderTemplateCard)}</div>
             )}
           </div>
         </DialogContent>
@@ -307,20 +242,13 @@ export function AgentTemplateSelector({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create Agent from Template</DialogTitle>
-            <DialogDescription>
-              Create a new agent based on the &ldquo;{selectedTemplate?.name}&rdquo; template.
-            </DialogDescription>
+            <DialogDescription>Create a new agent based on the &ldquo;{selectedTemplate?.name}&rdquo; template.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Agent Name</label>
-              <Input
-                value={agentName}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value)}
-                placeholder="Enter agent name..."
-                className="mt-1"
-              />
+              <Input value={agentName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value)} placeholder="Enter agent name..." className="mt-1" />
             </div>
 
             {selectedTemplate && (

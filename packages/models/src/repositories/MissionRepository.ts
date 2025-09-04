@@ -91,10 +91,9 @@ export class MissionRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Check if starship exists
-        const starshipCheck = await connection.executeQuery<{ id: string }>(
-          'MATCH (s:Starship {id: $starshipId}) RETURN s.id as id',
-          { starshipId: request.starshipId }
-        );
+        const starshipCheck = await connection.executeQuery<{ id: string }>('MATCH (s:Starship {id: $starshipId}) RETURN s.id as id', {
+          starshipId: request.starshipId,
+        });
 
         if (!starshipCheck || starshipCheck.length === 0) {
           this.handleNotFound('Starship', request.starshipId, 'create');
@@ -114,10 +113,7 @@ export class MissionRepository extends BaseRepository {
           createdBy: userId,
         };
 
-        const mission = await this.createEntityWithAutoId<MissionModel>(
-          'MissionModel',
-          missionProps
-        );
+        const mission = await this.createEntityWithAutoId<MissionModel>('MissionModel', missionProps);
         return mission;
       },
       'create',
@@ -131,10 +127,7 @@ export class MissionRepository extends BaseRepository {
         this.validateRequired({ id }, ['id'], 'findById');
 
         const connection = getConnection();
-        const result = await connection.executeQuery<{ m: MissionModel }>(
-          'MATCH (m:MissionModel {id: $id}) RETURN m',
-          { id }
-        );
+        const result = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:MissionModel {id: $id}) RETURN m', { id });
 
         if (!result || result.length === 0) {
           this.handleNotFound('MissionModel', id, 'findById');
@@ -149,11 +142,7 @@ export class MissionRepository extends BaseRepository {
     );
   }
 
-  async getMissionModelsByStarshipId(
-    starshipId: string,
-    filters?: MissionFilters,
-    sort?: MissionSort
-  ): Promise<MissionListResponse> {
+  async getMissionModelsByStarshipId(starshipId: string, filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
     return this.executeWithErrorHandling(
       async () => {
         this.validateRequired({ starshipId }, ['starshipId'], 'findByStarshipId');
@@ -189,8 +178,7 @@ export class MissionRepository extends BaseRepository {
 
         const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-        const missions: MissionModel[] =
-          result?.map((record) => this.parseMissionFromRecord(record.m)) || [];
+        const missions: MissionModel[] = result?.map((record) => this.parseMissionFromRecord(record.m)) || [];
 
         return {
           missions,
@@ -247,8 +235,7 @@ export class MissionRepository extends BaseRepository {
 
         const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-        const missions: MissionModel[] =
-          result?.map((record) => this.parseMissionFromRecord(record.m)) || [];
+        const missions: MissionModel[] = result?.map((record) => this.parseMissionFromRecord(record.m)) || [];
 
         return {
           missions,
@@ -297,10 +284,7 @@ export class MissionRepository extends BaseRepository {
         const connection = getConnection();
 
         // Check if mission exists
-        const existingResult = await connection.executeQuery<{ m: MissionModel }>(
-          'MATCH (m:MissionModel {id: $id}) RETURN m',
-          { id }
-        );
+        const existingResult = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:MissionModel {id: $id}) RETURN m', { id });
 
         if (!existingResult || existingResult.length === 0) {
           this.handleNotFound('MissionModel', id, 'update');
@@ -385,10 +369,7 @@ export class MissionRepository extends BaseRepository {
         const connection = getConnection();
 
         // Check if mission exists
-        const existingResult = await connection.executeQuery<{ m: MissionModel }>(
-          'MATCH (m:MissionModel {id: $id}) RETURN m',
-          { id }
-        );
+        const existingResult = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:MissionModel {id: $id}) RETURN m', { id });
 
         if (!existingResult || existingResult.length === 0) {
           this.handleNotFound('MissionModel', id, 'delete');

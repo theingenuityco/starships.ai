@@ -18,9 +18,7 @@ const router: Router = Router();
 const env = getEnvConfig();
 
 // JWT configuration
-const JWT_SECRET = new TextEncoder().encode(
-  env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production'
-);
+const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');
 const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
 
@@ -149,12 +147,9 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
-      firstStarship =
-        userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
       if (firstStarship) {
-        console.log(
-          `[AUTH] Found first starship for redirect: ${firstStarship.name} (${firstStarship.slug})`
-        );
+        console.log(`[AUTH] Found first starship for redirect: ${firstStarship.name} (${firstStarship.slug})`);
       }
     } catch (error) {
       console.error(`[AUTH] Failed to fetch starships for user ${user.id}:`, error);

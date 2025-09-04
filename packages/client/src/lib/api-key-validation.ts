@@ -90,10 +90,7 @@ export class ApiKeyValidator {
   }
 
   // Service-specific validation methods
-  private static validateOpenAI(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
+  private static validateOpenAI(value: string, requirement: ApiKeyRequirement): ApiKeyValidationResult {
     // OpenAI API keys start with 'sk-'
     if (requirement.type === 'api_key' && !value.startsWith('sk-')) {
       return {
@@ -104,10 +101,7 @@ export class ApiKeyValidator {
     return { isValid: true }
   }
 
-  private static validateAnthropic(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
+  private static validateAnthropic(value: string, requirement: ApiKeyRequirement): ApiKeyValidationResult {
     // Anthropic API keys start with 'sk-ant-'
     if (requirement.type === 'api_key' && !value.startsWith('sk-ant-')) {
       return {
@@ -118,10 +112,7 @@ export class ApiKeyValidator {
     return { isValid: true }
   }
 
-  private static validateGoogle(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
+  private static validateGoogle(value: string, requirement: ApiKeyRequirement): ApiKeyValidationResult {
     // Google API keys are typically 39 characters long
     if (requirement.type === 'api_key' && value.length !== 39) {
       return {
@@ -132,10 +123,7 @@ export class ApiKeyValidator {
     return { isValid: true }
   }
 
-  private static validateAzure(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
+  private static validateAzure(value: string, requirement: ApiKeyRequirement): ApiKeyValidationResult {
     // Azure keys are typically 32 characters long (hexadecimal)
     if (requirement.type === 'api_key') {
       const azureKeyPattern = /^[a-f0-9]{32}$/i
@@ -149,10 +137,7 @@ export class ApiKeyValidator {
     return { isValid: true }
   }
 
-  private static validateAWS(
-    value: string,
-    requirement: ApiKeyRequirement
-  ): ApiKeyValidationResult {
+  private static validateAWS(value: string, requirement: ApiKeyRequirement): ApiKeyValidationResult {
     // AWS Access Key ID is 20 characters, Secret Access Key is 40 characters
     if (requirement.envKey.includes('ACCESS_KEY_ID')) {
       if (value.length !== 20) {

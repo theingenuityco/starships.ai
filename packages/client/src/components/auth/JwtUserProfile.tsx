@@ -15,9 +15,7 @@ interface JwtUserProfileProps {
  * User profile component for navigation bottom using JWT authentication
  * Shows user name and email with logout functionality via tooltip
  */
-export const JwtUserProfile = React.memo(function JwtUserProfile({
-  mode = 'expanded',
-}: JwtUserProfileProps) {
+export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expanded' }: JwtUserProfileProps) {
   const { user, userName, userEmail, isAuthenticated } = useAuth()
   const [showTooltip, setShowTooltip] = useState(false)
 
@@ -48,19 +46,11 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({
           <div className="p-3">
             {/* Action buttons only */}
             <div className="space-y-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start h-9 hover:bg-accent"
-              >
+              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
                 <User className="w-4 h-4 mr-3" />
                 My Profile
               </Button>
-              <JwtLogoutButton
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
-              >
+              <JwtLogoutButton variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground">
                 Sign Out
               </JwtLogoutButton>
             </div>
@@ -90,11 +80,7 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent
-        side="right"
-        className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground"
-        sideOffset={10}
-      >
+      <TooltipContent side="right" className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground" sideOffset={10}>
         <div className="p-3">
           {/* Action buttons only */}
           <div className="space-y-1">
@@ -102,11 +88,7 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({
               <User className="w-4 h-4 mr-3" />
               My Profile
             </Button>
-            <JwtLogoutButton
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
-            >
+            <JwtLogoutButton variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground">
               Sign Out
             </JwtLogoutButton>
           </div>

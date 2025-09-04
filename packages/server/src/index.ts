@@ -171,10 +171,7 @@ httpServer.listen(PORT, async () => {
       await templateService.seedDefaultTemplates();
       console.log('✅ AgentTemplateService initialized with default templates');
     } catch (error) {
-      console.warn(
-        '⚠️ AgentTemplateService not available - database connection may be unavailable:',
-        error
-      );
+      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable:', error);
     }
 
     // Initialize Waitlist (seeds approved emails)

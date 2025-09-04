@@ -518,12 +518,7 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should handle tags with special characters', () => {
-      const specialTags = [
-        'tag-with-hyphens',
-        'tag_with_underscores',
-        'tag.with.dots',
-        'tag with spaces',
-      ];
+      const specialTags = ['tag-with-hyphens', 'tag_with_underscores', 'tag.with.dots', 'tag with spaces'];
 
       performanceMonitor.recordQuery('SPECIAL_TAGS_QUERY', 100, {}, 0, specialTags);
 
@@ -578,9 +573,7 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should handle concurrent query recordings', () => {
-      const promises = Array.from({ length: 10 }, (_, i) =>
-        Promise.resolve(performanceMonitor.recordQuery(`CONCURRENT_${i}`, 100))
-      );
+      const promises = Array.from({ length: 10 }, (_, i) => Promise.resolve(performanceMonitor.recordQuery(`CONCURRENT_${i}`, 100)));
 
       return Promise.all(promises).then(() => {
         const stats = performanceMonitor.getStats();
@@ -641,13 +634,10 @@ describe('PerformanceMonitor', () => {
       ];
 
       operations.forEach((op) => {
-        performanceMonitor.recordQuery(
-          op.name,
-          op.duration,
-          { table: 'users', operation: op.name.toLowerCase() },
-          op.resultCount,
-          ['database', 'users']
-        );
+        performanceMonitor.recordQuery(op.name, op.duration, { table: 'users', operation: op.name.toLowerCase() }, op.resultCount, [
+          'database',
+          'users',
+        ]);
       });
 
       const stats = performanceMonitor.getStats();
@@ -708,8 +698,7 @@ describe('PerformanceMonitor', () => {
 
       // Check specific operation performance
       const optimizedMetrics = performanceMonitor.getMetricsForOperation('OPTIMIZED_QUERY');
-      const avgOptimized =
-        optimizedMetrics.reduce((sum, m) => sum + m.duration, 0) / optimizedMetrics.length;
+      const avgOptimized = optimizedMetrics.reduce((sum, m) => sum + m.duration, 0) / optimizedMetrics.length;
       expect(avgOptimized).toBeLessThan(100);
     });
   });

@@ -86,9 +86,7 @@ export class Validator {
     if (!startNode) return errors;
 
     const reachableNodes = this.findReachableNodes(workflow, startNode.ref);
-    const unreachableNodes = workflow.nodes.filter(
-      (node) => !reachableNodes.has(node.ref) && node.type !== 'start'
-    );
+    const unreachableNodes = workflow.nodes.filter((node) => !reachableNodes.has(node.ref) && node.type !== 'start');
 
     unreachableNodes.forEach((node) => {
       errors.push({
@@ -122,9 +120,7 @@ export class Validator {
 
       reachable.add(currentId);
 
-      workflow.edges
-        .filter((edge) => edge.from === currentId)
-        .forEach((edge) => queue.push(edge.to));
+      workflow.edges.filter((edge) => edge.from === currentId).forEach((edge) => queue.push(edge.to));
     }
 
     return reachable;

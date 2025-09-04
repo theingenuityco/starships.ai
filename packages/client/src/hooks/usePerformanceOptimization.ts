@@ -46,8 +46,7 @@ export function usePerformanceOptimization(options: PerformanceOptimizationOptio
       }
 
       // Calculate average frame time and FPS
-      const avgFrameTime =
-        frameTimesRef.current.reduce((a, b) => a + b, 0) / frameTimesRef.current.length
+      const avgFrameTime = frameTimesRef.current.reduce((a, b) => a + b, 0) / frameTimesRef.current.length
       const fps = 1000 / avgFrameTime
 
       metricsRef.current = {

@@ -17,13 +17,7 @@ interface LoginButtonProps {
  * Login button that redirects to JWT-based login page
  * Integrates with existing UI components and theme
  */
-export function LoginButton({
-  variant = 'default',
-  size = 'default',
-  className,
-  children,
-  redirectTo = '/',
-}: LoginButtonProps) {
+export function LoginButton({ variant = 'default', size = 'default', className, children, redirectTo = '/' }: LoginButtonProps) {
   const router = useRouter()
 
   const handleLogin = () => {
@@ -35,12 +29,7 @@ export function LoginButton({
   }
 
   return (
-    <Button
-      variant={variant}
-      size={size}
-      className={cn('flex items-center gap-2', className)}
-      onClick={handleLogin}
-    >
+    <Button variant={variant} size={size} className={cn('flex items-center gap-2', className)} onClick={handleLogin}>
       <LogIn className="h-4 w-4" />
       {children || 'Sign In'}
     </Button>

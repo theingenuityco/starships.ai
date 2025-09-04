@@ -66,18 +66,13 @@ describe('MemoryRepository', () => {
 
   describe('findAll', () => {
     it('should return all memories ordered by creation date', async () => {
-      const mockMemories = [
-        createMockMemory({ id: 'memory-1' }),
-        createMockMemory({ id: 'memory-2' }),
-      ];
+      const mockMemories = [createMockMemory({ id: 'memory-1' }), createMockMemory({ id: 'memory-2' })];
       mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.createdAt DESC')
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.createdAt DESC'));
     });
 
     it('should return empty array when no memories found', async () => {
@@ -106,10 +101,7 @@ describe('MemoryRepository', () => {
         id: 'memory-123',
         version: '1.0.0',
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.id = $id'),
-        { id: 'memory-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id = $id'), { id: 'memory-123' });
     });
 
     it('should return null when memory not found', async () => {
@@ -173,10 +165,9 @@ describe('MemoryRepository', () => {
       const result = await repository.findByTags(['ai', 'conversation']);
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE any(tag IN $tags WHERE tag IN m.tags)'),
-        { tags: ['ai', 'conversation'] }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE any(tag IN $tags WHERE tag IN m.tags)'), {
+        tags: ['ai', 'conversation'],
+      });
     });
 
     it('should handle empty tag array', async () => {
@@ -342,9 +333,7 @@ describe('MemoryRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.update('memory-123', { messageCount: 5 })).rejects.toThrow(
-        DatabaseError
-      );
+      await expect(repository.update('memory-123', { messageCount: 5 })).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -355,10 +344,7 @@ describe('MemoryRepository', () => {
       const result = await repository.delete('memory-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE m'),
-        { id: 'memory-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE m'), { id: 'memory-123' });
     });
 
     it('should return false when memory not found', async () => {
@@ -384,10 +370,7 @@ describe('MemoryRepository', () => {
       const result = await repository.searchMemories('search term');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (m:Memory) WHERE m.id IS NOT NULL'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (m:Memory) WHERE m.id IS NOT NULL'), {});
     });
 
     it('should search memories with starship filter', async () => {
@@ -408,10 +391,7 @@ describe('MemoryRepository', () => {
 
       await repository.searchMemories('search');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('LIMIT 50'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('LIMIT 50'), {});
     });
 
     it('should handle database errors', async () => {
@@ -540,10 +520,7 @@ describe('MemoryRepository', () => {
 
       // Filter for memories with messages
       await repository.findWithFilters({ hasMessages: true });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND m.messageCount > 0'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('AND m.messageCount > 0'), {});
 
       // Filter for memories without messages
       await repository.findWithFilters({ hasMessages: false });
@@ -594,10 +571,7 @@ describe('MemoryRepository', () => {
       const result = await repository.findWithFilters({});
 
       expect(result).toEqual([]);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (m:Memory) WHERE 1=1'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (m:Memory) WHERE 1=1'), {});
     });
   });
 
@@ -659,10 +633,7 @@ describe('MemoryRepository', () => {
       const deserialized = repo.deserializeComplexFields(rawMemory);
 
       expect(deserialized.state).toEqual({});
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to deserialize memory'),
-        expect.any(Error)
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to deserialize memory'), expect.any(Error));
 
       consoleSpy.mockRestore();
     });

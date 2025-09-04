@@ -1,10 +1,5 @@
 import { io, Socket } from 'socket.io-client'
-import type {
-  SessionSocketEvents,
-  ConnectionStatus,
-  SocketConnectionState,
-  ConnectionStatusEvent,
-} from '@starships/protocol'
+import type { SessionSocketEvents, ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol'
 
 class SocketClient {
   private static instance: SocketClient
@@ -100,9 +95,7 @@ class SocketClient {
 
   private handleReconnection() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.warn(
-        '[SOCKET CLIENT] Max reconnection attempts reached, stopping reconnection attempts'
-      )
+      console.warn('[SOCKET CLIENT] Max reconnection attempts reached, stopping reconnection attempts')
       // Reset connection state but don't throw error
       this.connectionState.connected = false
       this.connectionState.authenticated = false

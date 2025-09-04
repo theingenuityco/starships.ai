@@ -56,11 +56,7 @@ export class Memory {
   /**
    * Add message to memory
    */
-  addMessage(
-    role: 'system' | 'user' | 'assistant',
-    content: string,
-    metadata?: Record<string, unknown>
-  ): void {
+  addMessage(role: 'system' | 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
     if (content && content.trim()) {
       const message: Message = {
         id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,

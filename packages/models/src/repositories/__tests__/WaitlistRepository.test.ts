@@ -24,9 +24,7 @@ describe('WaitlistRepository', () => {
     jest.clearAllMocks();
   });
 
-  const createMockWaitlistEntry = (
-    overrides: Partial<WaitlistEntryModel> = {}
-  ): WaitlistEntryModel => ({
+  const createMockWaitlistEntry = (overrides: Partial<WaitlistEntryModel> = {}): WaitlistEntryModel => ({
     email: 'test@example.com',
     status: 'approved',
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -103,10 +101,9 @@ describe('WaitlistRepository', () => {
       const result = await repository.getByEmail('test@example.com');
 
       expect(result).toEqual(mockEntry);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (w:Waitlist {email: $email})'),
-        { email: 'test@example.com' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (w:Waitlist {email: $email})'), {
+        email: 'test@example.com',
+      });
     });
 
     it('should return null when entry not found', async () => {
@@ -273,14 +270,8 @@ describe('WaitlistRepository', () => {
       await repository.initializeSchema();
 
       expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2);
-      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
-        1,
-        expect.stringContaining('CREATE CONSTRAINT waitlist_email_unique')
-      );
-      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
-        2,
-        expect.stringContaining('CREATE INDEX waitlist_status')
-      );
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1, expect.stringContaining('CREATE CONSTRAINT waitlist_email_unique'));
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(2, expect.stringContaining('CREATE INDEX waitlist_status'));
     });
 
     it('should handle schema initialization errors gracefully', async () => {
@@ -289,10 +280,7 @@ describe('WaitlistRepository', () => {
 
       // Should not throw
       await expect(repository.initializeSchema()).resolves.toBeUndefined();
-      expect(consoleSpy).toHaveBeenCalledWith(
-        'Waitlist schema initialization warning:',
-        expect.any(Error)
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Waitlist schema initialization warning:', expect.any(Error));
 
       consoleSpy.mockRestore();
     });
@@ -310,10 +298,7 @@ describe('WaitlistRepository', () => {
 
       expect(repository.getByEmail).toHaveBeenCalledTimes(3);
       expect(repository.addApprovedEmail).toHaveBeenCalledTimes(3);
-      expect(repository.addApprovedEmail).toHaveBeenCalledWith(
-        'dewang@theingenuity.co',
-        'Founder - Primary tester'
-      );
+      expect(repository.addApprovedEmail).toHaveBeenCalledWith('dewang@theingenuity.co', 'Founder - Primary tester');
       expect(consoleSpy).toHaveBeenCalledWith('Added approved email: dewang@theingenuity.co');
 
       consoleSpy.mockRestore();
@@ -350,10 +335,7 @@ describe('WaitlistRepository', () => {
 
       await repository.seedInitialEmails();
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to add email rudra@theingenuity.co:',
-        expect.any(Error)
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to add email rudra@theingenuity.co:', expect.any(Error));
       expect(consoleLogSpy).toHaveBeenCalledWith('Added approved email: dewang@theingenuity.co');
       expect(consoleLogSpy).toHaveBeenCalledWith('Added approved email: prashant@theingenuity.co');
 

@@ -5,12 +5,7 @@
 
 import { Server } from 'socket.io';
 import { Logger } from '@/utils/logger';
-import type {
-  MissionModel,
-  MissionClarityModel,
-  MissionPhase,
-  MissionStatus,
-} from '@starships/protocol';
+import type { MissionModel, MissionClarityModel, MissionPhase, MissionStatus } from '@starships/protocol';
 
 export class MissionEventService {
   private static instance: MissionEventService | null = null;
@@ -69,11 +64,7 @@ export class MissionEventService {
   /**
    * Emit phase change to all clients in mission room
    */
-  public emitPhaseChange(
-    missionId: string,
-    newPhase: MissionPhase,
-    previousPhase: MissionPhase
-  ): void {
+  public emitPhaseChange(missionId: string, newPhase: MissionPhase, previousPhase: MissionPhase): void {
     if (!this.io) {
       this.logger.warn('Socket.IO not initialized, cannot emit phase change');
       return;
@@ -107,11 +98,7 @@ export class MissionEventService {
   /**
    * Emit status change to all clients in mission room
    */
-  public emitStatusChange(
-    missionId: string,
-    newStatus: MissionStatus,
-    previousStatus: MissionStatus
-  ): void {
+  public emitStatusChange(missionId: string, newStatus: MissionStatus, previousStatus: MissionStatus): void {
     if (!this.io) {
       this.logger.warn('Socket.IO not initialized, cannot emit status change');
       return;

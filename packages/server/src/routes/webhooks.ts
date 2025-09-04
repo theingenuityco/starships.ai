@@ -97,8 +97,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
           break;
         }
 
-        const subscriptionId =
-          typeof subscriptionField === 'string' ? subscriptionField : subscriptionField.id;
+        const subscriptionId = typeof subscriptionField === 'string' ? subscriptionField : subscriptionField.id;
 
         const starship = await starshipRepository.findBySubscriptionId(subscriptionId);
 
@@ -110,13 +109,9 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
           });
 
           if (wasRestricted) {
-            console.log(
-              `✅ [WEBHOOK] Payment RECOVERED for starship: ${starship.name} (restricted → active)`
-            );
+            console.log(`✅ [WEBHOOK] Payment RECOVERED for starship: ${starship.name} (restricted → active)`);
           } else {
-            console.log(
-              `✅ [WEBHOOK] Payment successful for starship: ${starship.name} (${starship.status} → active)`
-            );
+            console.log(`✅ [WEBHOOK] Payment successful for starship: ${starship.name} (${starship.status} → active)`);
           }
           processed = true;
         } else {
@@ -135,8 +130,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
           break;
         }
 
-        const subscriptionId =
-          typeof subscriptionField === 'string' ? subscriptionField : subscriptionField.id;
+        const subscriptionId = typeof subscriptionField === 'string' ? subscriptionField : subscriptionField.id;
 
         const starship = await starshipRepository.findBySubscriptionId(subscriptionId);
 
@@ -152,9 +146,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
             ? new Date(failedInvoice.next_payment_attempt * 1000).toISOString()
             : 'No retry scheduled';
 
-          console.log(
-            `⚠️ [WEBHOOK] Payment failed for starship: ${starship.name} (${starship.status} → restricted)`
-          );
+          console.log(`⚠️ [WEBHOOK] Payment failed for starship: ${starship.name} (${starship.status} → restricted)`);
           console.log(`   Attempt: ${attemptCount}, Next retry: ${nextAttempt}`);
           processed = true;
         } else {
@@ -174,9 +166,7 @@ router.post('/stripe', async (req: Request, res: Response): Promise<void> => {
             status: 'disabled',
             // subscriptionId remains for audit trail
           });
-          console.log(
-            `❌ [WEBHOOK] Subscription cancelled for ${starship.name} (${starship.status} → disabled)`
-          );
+          console.log(`❌ [WEBHOOK] Subscription cancelled for ${starship.name} (${starship.status} → disabled)`);
           console.log(`   Cleared subscription ID: ${deletedSub.id}`);
           processed = true;
         } else {

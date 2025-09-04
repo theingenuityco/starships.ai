@@ -37,13 +37,7 @@ import { Starship, Mission, Agent, User, Workflow, NativeToolApiKey } from '@sta
 ### API Contracts
 
 ```typescript
-import {
-  ChatRequest,
-  ChatResponse,
-  SibilRequest,
-  SibilResponse,
-  AgentSocketRequest,
-} from '@starships/protocol';
+import { ChatRequest, ChatResponse, SibilRequest, SibilResponse, AgentSocketRequest } from '@starships/protocol';
 ```
 
 **Contract interfaces:**
@@ -69,11 +63,7 @@ export async function createMission(req: CreateMissionRequest): Promise<MissionR
 ### Socket.IO Communication
 
 ```typescript
-import {
-  SibilSocketRequest,
-  SibilSocketStreamChunk,
-  AgentSocketRequest,
-} from '@starships/protocol';
+import { SibilSocketRequest, SibilSocketStreamChunk, AgentSocketRequest } from '@starships/protocol';
 
 // Handle real-time AI streaming
 socket.on('sibil:stream', (request: SibilSocketRequest) => {

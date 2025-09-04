@@ -1,12 +1,7 @@
 import axios, { AxiosResponse } from 'axios'
 import type { ApiResponse } from '@starships/protocol'
 
-import {
-  apiCache,
-  CACHE_KEYS,
-  invalidateAgentCaches,
-  invalidateConnectorInstanceCaches,
-} from './cache'
+import { apiCache, CACHE_KEYS, invalidateAgentCaches, invalidateConnectorInstanceCaches } from './cache'
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 
 const api = axios.create({
@@ -57,12 +52,7 @@ const waitForTokenProvider = (): Promise<void> => {
 // Request interceptor to add authentication token
 api.interceptors.request.use(
   async config => {
-    console.log(
-      '[API] Request interceptor running for:',
-      config.url,
-      'at',
-      new Date().toISOString()
-    )
+    console.log('[API] Request interceptor running for:', config.url, 'at', new Date().toISOString())
 
     // Check if this is an authenticated endpoint
     const requiresAuth =
@@ -142,10 +132,7 @@ api.interceptors.response.use(
     console.error('[API] Request failed:', errorDetails)
 
     if (error.response?.status === 401) {
-      console.error(
-        '[API] Authentication failed - token may be invalid or expired:',
-        error.response.data
-      )
+      console.error('[API] Authentication failed - token may be invalid or expired:', error.response.data)
       // TODO: Trigger logout or token refresh
     } else if (error.response?.status === 500) {
       console.error('[API] Server error occurred:', error.response.data)
@@ -295,7 +282,6 @@ function toBackendRequest(req: ChatRequest): ChatBackendRequest {
   }
 }
 
-
 // API functions with caching
 export const agentAPI = {
   getAll: async (): Promise<Agent[]> => {
@@ -324,9 +310,7 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/starships/${starshipId}/agents`)
-      .then(res => extractResponseData<Agent[]>(res))
+    const data = await api.get(`/api/v1/starships/${starshipId}/agents`).then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -357,9 +341,7 @@ export const agentAPI = {
   },
 
   update: async (id: string, updates: UpdateAgentRequest): Promise<Agent> => {
-    const data = await api
-      .put(`/api/v1/agents/${id}`, updates)
-      .then(res => extractResponseData<Agent>(res))
+    const data = await api.put(`/api/v1/agents/${id}`, updates).then(res => extractResponseData<Agent>(res))
     invalidateAgentCaches(id)
     return data
   },
@@ -377,9 +359,7 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/agents?category=${category}`)
-      .then(res => extractResponseData<Agent[]>(res))
+    const data = await api.get(`/api/v1/agents?category=${category}`).then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -391,9 +371,7 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/users/${authorId}/agents`)
-      .then(res => extractResponseData<Agent[]>(res))
+    const data = await api.get(`/api/v1/users/${authorId}/agents`).then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -405,9 +383,7 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/agents/public?limit=${limit}&offset=${offset}`)
-      .then(res => extractResponseData<Agent[]>(res))
+    const data = await api.get(`/api/v1/agents/public?limit=${limit}&offset=${offset}`).then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -419,18 +395,14 @@ export const agentAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/agents/search?q=${encodeURIComponent(query)}`)
-      .then(res => extractResponseData<Agent[]>(res))
+    const data = await api.get(`/api/v1/agents/search?q=${encodeURIComponent(query)}`).then(res => extractResponseData<Agent[]>(res))
     apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
     return data
   },
 
   // Get agent analytics
   getAnalytics: async (id: string): Promise<any> => {
-    const data = await api
-      .get(`/api/v1/agents/${id}/analytics`)
-      .then(res => extractResponseData<any>(res))
+    const data = await api.get(`/api/v1/agents/${id}/analytics`).then(res => extractResponseData<any>(res))
     return data
   },
 }
@@ -444,9 +416,7 @@ export const templateAPI = {
       return cached
     }
 
-    const data = await api
-      .get('/api/v1/agent-templates')
-      .then(res => extractResponseData<AgentTemplate[]>(res))
+    const data = await api.get('/api/v1/agent-templates').then(res => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -458,9 +428,7 @@ export const templateAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/agent-templates/${id}`)
-      .then(res => extractResponseData<AgentTemplate>(res))
+    const data = await api.get(`/api/v1/agent-templates/${id}`).then(res => extractResponseData<AgentTemplate>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -472,9 +440,7 @@ export const templateAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/agent-templates?category=${category}`)
-      .then(res => extractResponseData<AgentTemplate[]>(res))
+    const data = await api.get(`/api/v1/agent-templates?category=${category}`).then(res => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
@@ -486,27 +452,19 @@ export const templateAPI = {
       return cached
     }
 
-    const data = await api
-      .get(`/api/v1/agent-templates?authorId=${authorId}`)
-      .then(res => extractResponseData<AgentTemplate[]>(res))
+    const data = await api.get(`/api/v1/agent-templates?authorId=${authorId}`).then(res => extractResponseData<AgentTemplate[]>(res))
     apiCache.set(cacheKey, data)
     return data
   },
 
-  createAgentFromTemplate: async (
-    templateId: string,
-    agentName: string,
-    starshipId?: string
-  ): Promise<Agent> => {
+  createAgentFromTemplate: async (templateId: string, agentName: string, starshipId?: string): Promise<Agent> => {
     try {
       const requestBody: { agentName: string; starshipId?: string } = { agentName }
       if (starshipId) {
         requestBody.starshipId = starshipId
       }
 
-      const data = await api
-        .post(`/api/v1/agent-templates/${templateId}/agents`, requestBody)
-        .then(res => extractResponseData<Agent>(res))
+      const data = await api.post(`/api/v1/agent-templates/${templateId}/agents`, requestBody).then(res => extractResponseData<Agent>(res))
 
       // Invalidate agent caches since we've created a new agent
       invalidateAgentCaches()
@@ -602,19 +560,12 @@ export const mcpServerAPI = {
 
   // Get connector instances - DEPRECATED
   getConnectorInstances: async (starshipId: string): Promise<MCPServerConnector[]> => {
-    console.warn(
-      '[API] MCP Connector instances functionality has been removed for starship:',
-      starshipId
-    )
+    console.warn('[API] MCP Connector instances functionality has been removed for starship:', starshipId)
     return []
   },
 
   // Create connector instance - DEPRECATED
-  createConnectorInstance: async (
-    starshipId: string,
-    templateId: string,
-    env?: string
-  ): Promise<MCPServerConnector> => {
+  createConnectorInstance: async (starshipId: string, templateId: string, env?: string): Promise<MCPServerConnector> => {
     console.warn('[API] MCP Connector instance creation has been removed:', {
       starshipId,
       templateId,
@@ -632,11 +583,7 @@ export const mcpServerAPI = {
   },
 
   // Update connector configuration - DEPRECATED
-  updateConnectorConfig: async (
-    starshipId: string,
-    connectorId: string,
-    config: ConnectorInstanceConfig
-  ): Promise<MCPServerConnector> => {
+  updateConnectorConfig: async (starshipId: string, connectorId: string, config: ConnectorInstanceConfig): Promise<MCPServerConnector> => {
     console.warn('[API] MCP Connector configuration update has been removed:', {
       starshipId,
       connectorId,
@@ -645,11 +592,7 @@ export const mcpServerAPI = {
   },
 
   // Apply configuration template - DEPRECATED
-  applyConfigTemplate: async (
-    starshipId: string,
-    connectorId: string,
-    templateId: string
-  ): Promise<MCPServerConnector> => {
+  applyConfigTemplate: async (starshipId: string, connectorId: string, templateId: string): Promise<MCPServerConnector> => {
     console.warn('[API] MCP Configuration template application has been removed:', {
       starshipId,
       connectorId,
@@ -706,8 +649,7 @@ export const mcpServerAPI = {
 
 export const userAPI = {
   // Get user by ID
-  getById: (id: string): Promise<SyncedUser> =>
-    api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
+  getById: (id: string): Promise<SyncedUser> => api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
 }
 
 // Memory API
@@ -729,9 +671,7 @@ export const starshipAPI = {
   // Get starship by slug
   getStarshipBySlug: async (slug: string): Promise<{ starship: Starship }> => {
     const response = await api.get(`/api/v1/starships/${slug}`)
-    const data = extractResponseData<{ starship: Starship; agents: any[]; availableSlots: number }>(
-      response
-    )
+    const data = extractResponseData<{ starship: Starship; agents: any[]; availableSlots: number }>(response)
     return { starship: data.starship }
   },
 

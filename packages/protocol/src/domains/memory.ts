@@ -6,13 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type {
-  MemoryState,
-  AgentMemoryState,
-  AgentIdentity,
-  AgentPurpose,
-  AgentSpace,
-} from '@starships/autopilot';
+import type { MemoryState, AgentMemoryState, AgentIdentity, AgentPurpose, AgentSpace } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE MEMORY INTERFACE

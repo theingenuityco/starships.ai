@@ -2,13 +2,7 @@
 
 import { useStarships } from '@/hooks/useStarships'
 import { Starship } from '@/lib/api'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, AlertCircle, Rocket } from 'lucide-react'
 
 interface StarshipSelectorProps {
@@ -20,13 +14,7 @@ interface StarshipSelectorProps {
   className?: string
 }
 
-export function StarshipSelector({
-  value,
-  onValueChange,
-  placeholder = 'Select a starship',
-  disabled = false,
-  className,
-}: StarshipSelectorProps) {
+export function StarshipSelector({ value, onValueChange, placeholder = 'Select a starship', disabled = false, className }: StarshipSelectorProps) {
   const { data: starshipsData, isLoading: loading, error } = useStarships()
   const starships = starshipsData?.starships || []
 
@@ -56,9 +44,7 @@ export function StarshipSelector({
     return (
       <div className="flex items-center space-x-2 p-3 border rounded-md bg-destructive/5 border-destructive/20">
         <AlertCircle className="w-4 h-4 text-destructive" />
-        <span className="text-sm text-destructive">
-          {error?.message || 'Failed to load starships'}
-        </span>
+        <span className="text-sm text-destructive">{error?.message || 'Failed to load starships'}</span>
       </div>
     )
   }
@@ -69,9 +55,7 @@ export function StarshipSelector({
         <Rocket className="w-8 h-8 text-muted-foreground" />
         <div>
           <p className="text-sm font-medium text-muted-foreground">No starships available</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Create a starship first to deploy agents
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">Create a starship first to deploy agents</p>
         </div>
       </div>
     )

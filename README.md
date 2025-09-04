@@ -1,4 +1,4 @@
-# starships.ai – AI-Powered Mission Control Platform
+# starships.ai – AI-Powered Agent Orchestration
 
 A comprehensive TypeScript monorepo for orchestrating AI-driven missions and missions. Built with Next.js 15, Express.js, Neo4j, and advanced workflow automation for transforming vision into reality.
 

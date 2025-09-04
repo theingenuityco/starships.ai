@@ -4,14 +4,14 @@
  * User prompt handler using BaseHandler pattern - will need UI integration
  */
 
-import { BaseHandler } from '../Handler';
+import { BaseHandler } from '@/nodes/Handler';
 import {
   Execution,
   ValidationResult,
   UserPromptNodeParameters,
   Node as WorkflowNode,
   ValidationError,
-} from '../../types';
+} from '@/types';
 
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';

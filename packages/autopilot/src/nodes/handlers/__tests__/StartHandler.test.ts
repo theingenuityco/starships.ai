@@ -4,8 +4,8 @@
  * Tests for start node handler with simplified types
  */
 
-import { StartHandler } from '../StartHandler';
-import { Node, Execution } from '../../../types';
+import { StartHandler } from '@/nodes/handlers/StartHandler';
+import { Node, Execution } from '@/types';
 
 describe('StartHandler', () => {
   let handler: StartHandler;

@@ -2,9 +2,9 @@
  * AgentHandler Unit Tests
  */
 
-import { AgentHandler } from '../AgentHandler';
-import { Node, Execution, AgentNodeParameters } from '../../../types';
-import { AgentMemoryState } from '../../../AgentMemory';
+import { AgentHandler } from '@/nodes/handlers/AgentHandler';
+import { Node, Execution, AgentNodeParameters } from '@/types';
+import { AgentMemoryState } from '@/AgentMemory';
 
 interface AgentExecutionResult {
   agentName: string;

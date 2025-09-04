@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { jwtAuthMiddleware } from '../middleware/jwt-auth';
-import { sendSuccess, sendError, handleCommonError, validateUUID } from '../utils/responseHelpers';
-import getStore from '../store';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
+import getStore from '@/store';
 
 const router: Router = Router();
 

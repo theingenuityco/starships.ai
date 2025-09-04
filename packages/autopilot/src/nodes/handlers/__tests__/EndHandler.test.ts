@@ -2,8 +2,8 @@
  * EndHandler Unit Tests
  */
 
-import { EndHandler } from '../EndHandler';
-import { Node, Execution } from '../../../types';
+import { EndHandler } from '@/nodes/handlers/EndHandler';
+import { Node, Execution } from '@/types';
 
 describe('EndHandler', () => {
   let handler: EndHandler;

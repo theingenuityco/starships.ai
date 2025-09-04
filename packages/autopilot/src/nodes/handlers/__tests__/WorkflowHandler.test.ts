@@ -2,9 +2,9 @@
  * WorkflowHandler Unit Tests
  */
 
-import { WorkflowHandler } from '../WorkflowHandler';
-import { Workflow } from '../../../Workflow';
-import { Node, Execution, WorkflowNodeParameters, Blueprint, NodeResult } from '../../../types';
+import { WorkflowHandler } from '@/nodes/handlers/WorkflowHandler';
+import { Workflow } from '@/Workflow';
+import { Node, Execution, WorkflowNodeParameters, Blueprint, NodeResult } from '@/types';
 
 // Mock Workflow class
 jest.mock('../../../Workflow');

@@ -8,11 +8,11 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import { SignJWT, jwtVerify } from 'jose';
-import { UserService } from '../services/UserService';
-import { StarshipService } from '../services/StarshipService';
+import { UserService } from '@/services/UserService';
+import { StarshipService } from '@/services/StarshipService';
 import { StarshipRepository } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
-import { sendSuccess, sendError, handleCommonError } from '../utils/responseHelpers';
+import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
 
 const router: Router = Router();
 const env = getEnvConfig();

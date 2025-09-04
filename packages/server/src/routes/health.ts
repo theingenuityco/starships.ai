@@ -15,7 +15,7 @@ import {
 } from '@starships/models';
 import { logger } from '@starships/models';
 import { ErrorUtils } from '@starships/errors';
-import { sendSuccess, sendError, handleCommonError } from '../utils/responseHelpers';
+import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
 
 const router: Router = Router();
 

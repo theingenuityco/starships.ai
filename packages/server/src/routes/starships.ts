@@ -6,8 +6,8 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { StarshipRepository, AgentRepository, UserRepository } from '@starships/models';
 import type { StarshipModel } from '@starships/protocol';
-import { jwtAuthMiddleware } from '../middleware/jwt-auth';
-import { SubscriptionService } from '../services/SubscriptionService';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { SubscriptionService } from '@/services/SubscriptionService';
 import {
   sendSuccess,
   sendError,
@@ -15,7 +15,7 @@ import {
   validateUUID,
   validatePagination,
   createPaginationMeta,
-} from '../utils/responseHelpers';
+} from '@/utils/responseHelpers';
 
 const router: Router = Router();
 

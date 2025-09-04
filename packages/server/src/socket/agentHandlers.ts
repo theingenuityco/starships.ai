@@ -1,10 +1,10 @@
 import { MessageRepository } from '@starships/models';
 import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@starships/protocol';
 import type { Socket, Server as SocketIOServer } from 'socket.io';
-import { AgentService } from '../services/AgentService';
-import { SessionService } from '../services/SessionService';
-import { SocketIOService } from '../services/SocketIOService';
-import getStore from '../store';
+import { AgentService } from '@/services/AgentService';
+import { SessionService } from '@/services/SessionService';
+import { SocketIOService } from '@/services/SocketIOService';
+import getStore from '@/store';
 
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
   const isSessionActive = (session: any): boolean => {

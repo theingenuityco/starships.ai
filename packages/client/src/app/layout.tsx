@@ -1,14 +1,14 @@
+import { GoogleAnalytics } from '@/components/analytics/google-analytics'
+import { ThemeProvider } from '@/components/theme-provider'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { UI_TEXT } from '@/constants/text'
+import { AuthProvider } from '@/providers/auth-provider'
+import { QueryProvider } from '@/providers/query-provider'
+import { SocketProvider } from '@/providers/socket-provider'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import './globals.css'
-import { ThemeProvider } from '@/components/theme-provider'
-import { QueryProvider } from '@/providers/query-provider'
-import { AuthProvider } from '@/providers/auth-provider'
-import { SocketProvider } from '@/providers/socket-provider'
-import { TooltipProvider } from '@/components/ui/tooltip'
-import { ClientLayout } from './client-layout'
-import { UI_TEXT } from '@/constants/text'
-import { GoogleAnalytics } from '@/components/analytics/google-analytics'
+import { ClientLayout } from '@/app/client-layout'
+import '@/app/globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,14 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            <QueryProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <QueryProvider>
+            <AuthProvider>
               <SocketProvider>
                 <TooltipProvider>
                   <div className="min-h-screen bg-background">
@@ -41,8 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </div>
                 </TooltipProvider>
               </SocketProvider>
-            </QueryProvider>
-          </AuthProvider>
+            </AuthProvider>
+          </QueryProvider>
         </ThemeProvider>
         <GoogleAnalytics />
       </body>

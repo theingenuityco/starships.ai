@@ -2,9 +2,20 @@
  * Jest setup file for errors package tests
  */
 
-import { BaseError, ValidationError, NotFoundError, AuthenticationError, AuthorizationError, 
-         ConflictError, DatabaseError, NetworkError, InternalServerError, RateLimitError, 
-         ServiceUnavailableError, ErrorCategory } from '../index';
+import {
+  BaseError,
+  ValidationError,
+  NotFoundError,
+  AuthenticationError,
+  AuthorizationError,
+  ConflictError,
+  DatabaseError,
+  NetworkError,
+  InternalServerError,
+  RateLimitError,
+  ServiceUnavailableError,
+} from '../index';
+import { ErrorCategory } from '@starships/protocol';
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -13,18 +24,16 @@ global.console = {
   warn: jest.fn(),
   error: jest.fn(),
   debug: jest.fn(),
-  info: jest.fn()
+  info: jest.fn(),
 };
 
 // Global test utilities for creating mock errors
-(global as any).createMockValidationError = (message = 'Validation failed', field = 'testField') => 
-  new ValidationError(message, field);
+(global as any).createMockValidationError = (message = 'Validation failed', field = 'testField') => new ValidationError(message, field);
 
 (global as any).createMockNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') =>
   new NotFoundError(`${entityType} not found`, entityType, entityId);
 
-(global as any).createMockAuthenticationError = (message = 'Authentication required') =>
-  new AuthenticationError(message);
+(global as any).createMockAuthenticationError = (message = 'Authentication required') => new AuthenticationError(message);
 
 (global as any).createMockAuthorizationError = (message = 'Access denied', requiredPermission = 'read', userRole = 'user') =>
   new AuthorizationError(message, requiredPermission, userRole);
@@ -38,8 +47,7 @@ global.console = {
 (global as any).createMockNetworkError = (message = 'Network operation failed', service = 'TestService', endpoint = '/api/test') =>
   new NetworkError(message, service, endpoint);
 
-(global as any).createMockInternalServerError = (message = 'Internal server error') =>
-  new InternalServerError(message);
+(global as any).createMockInternalServerError = (message = 'Internal server error') => new InternalServerError(message);
 
 (global as any).createMockRateLimitError = (message = 'Rate limit exceeded', limit = 100, retryAfter = 60, remainingAttempts = 0) =>
   new RateLimitError(message, limit, retryAfter, remainingAttempts);
@@ -77,7 +85,7 @@ global.console = {
   REQUEST_ID: 'test-req-123',
   PATH: '/api/test',
   TIMESTAMP_REGEX: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-  UUID_REGEX: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  UUID_REGEX: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
 };
 
 // Helper to validate error response structure
@@ -119,7 +127,7 @@ process.env.NODE_ENV = 'test';
 
 // Mock UUID generation for predictable testing
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+  v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
 }));
 
 // Mock Date.now for consistent timestamp testing
@@ -129,7 +137,7 @@ global.Date = class extends Date {
     super();
     return mockDate;
   }
-  
+
   static now() {
     return mockDate.getTime();
   }

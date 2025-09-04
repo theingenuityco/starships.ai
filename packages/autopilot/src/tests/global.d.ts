@@ -2,7 +2,7 @@
  * Global test utilities type declarations
  */
 
-import type { Blueprint, Execution, Node } from '../src/types';
+import type { Blueprint, Execution, Node } from '@/types';
 
 declare global {
   namespace NodeJS {

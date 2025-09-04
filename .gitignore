@@ -31,7 +31,6 @@ node_modules/
 .env.production.local
 
 # IDE / Editor settings
-.vscode/
 .idea/
 
 # macOS

@@ -2,15 +2,15 @@
  * MemoryRepository Unit Tests
  */
 
-import { MemoryRepository } from '../MemoryRepository';
-import { Neo4jConnection, getConnection } from '../../helpers/database';
+import { MemoryRepository } from '@/repositories/MemoryRepository';
+import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { DatabaseError, ConflictError } from '@starships/errors';
 import type { MemoryModel } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
 jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890')
+  v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
 }));
 
 describe('MemoryRepository', () => {
@@ -41,11 +41,11 @@ describe('MemoryRepository', () => {
     state: {
       messages: [
         { role: 'user', content: 'Hello' },
-        { role: 'assistant', content: 'Hi there!' }
+        { role: 'assistant', content: 'Hi there!' },
       ],
-      context: { currentTopic: 'greeting' }
+      context: { currentTopic: 'greeting' },
     },
-    ...overrides
+    ...overrides,
   });
 
   const createMockCreateInput = (overrides: any = {}) => ({
@@ -53,9 +53,9 @@ describe('MemoryRepository', () => {
     version: '1.0.0',
     state: {
       messages: [],
-      context: {}
+      context: {},
     },
-    ...overrides
+    ...overrides,
   });
 
   describe('constructor', () => {
@@ -66,20 +66,13 @@ describe('MemoryRepository', () => {
 
   describe('findAll', () => {
     it('should return all memories ordered by creation date', async () => {
-      const mockMemories = [
-        createMockMemory({ id: 'memory-1' }),
-        createMockMemory({ id: 'memory-2' })
-      ];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      const mockMemories = [createMockMemory({ id: 'memory-1' }), createMockMemory({ id: 'memory-2' })];
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.findAll();
 
       expect(result).toHaveLength(2);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('ORDER BY m.createdAt DESC')
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.createdAt DESC'));
     });
 
     it('should return empty array when no memories found', async () => {
@@ -106,12 +99,9 @@ describe('MemoryRepository', () => {
 
       expect(result).toMatchObject({
         id: 'memory-123',
-        version: '1.0.0'
+        version: '1.0.0',
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE m.id = $id'),
-        { id: 'memory-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id = $id'), { id: 'memory-123' });
     });
 
     it('should return null when memory not found', async () => {
@@ -132,9 +122,7 @@ describe('MemoryRepository', () => {
   describe('findByStarshipId', () => {
     it('should return memories for starship', async () => {
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.findByStarshipId('starship-123');
 
@@ -157,9 +145,7 @@ describe('MemoryRepository', () => {
   describe('findByAgentId', () => {
     it('should return memories for agent', async () => {
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.findByAgentId('agent-123');
 
@@ -174,17 +160,14 @@ describe('MemoryRepository', () => {
   describe('findByTags', () => {
     it('should return memories matching tags', async () => {
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.findByTags(['ai', 'conversation']);
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE any(tag IN $tags WHERE tag IN m.tags)'),
-        { tags: ['ai', 'conversation'] }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE any(tag IN $tags WHERE tag IN m.tags)'), {
+        tags: ['ai', 'conversation'],
+      });
     });
 
     it('should handle empty tag array', async () => {
@@ -199,33 +182,43 @@ describe('MemoryRepository', () => {
   describe('create', () => {
     it('should create memory successfully', async () => {
       const createInput = createMockCreateInput();
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        version: '1.0.0',
+        messageCount: 0,
+        state: '{"messages":[],"context":{}}',
+      };
+
+      // Mock createEntityWithAutoId format and relationship creation
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(createInput);
 
       expect(result).toMatchObject({
         version: '1.0.0',
         messageCount: 0,
-        state: { messages: [], context: {} }
+        state: { messages: [], context: {} },
       });
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (m:Memory $props)'),
-        expect.objectContaining({
-          props: expect.objectContaining({
-            state: JSON.stringify({ messages: [], context: {} })
-          }),
-          starshipId: 'starship-123'
-        })
-      );
     });
 
     it('should use default values for optional fields', async () => {
       const minimalInput = {
         starshipId: 'starship-123',
         version: '1.0.0',
-        state: {}
+        state: {},
       };
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        version: '1.0.0',
+        messageCount: 0,
+        state: '{}',
+      };
+
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(minimalInput);
 
@@ -238,10 +231,20 @@ describe('MemoryRepository', () => {
       const complexInput = createMockCreateInput({
         state: {
           messages: [{ role: 'user', content: 'test' }],
-          metadata: { complex: { nested: 'data' } }
-        }
+          metadata: { complex: { nested: 'data' } },
+        },
       });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        state: JSON.stringify({
+          messages: [{ role: 'user', content: 'test' }],
+          metadata: { complex: { nested: 'data' } },
+        }),
+      };
+
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       await repository.create(complexInput);
 
@@ -251,9 +254,9 @@ describe('MemoryRepository', () => {
           props: expect.objectContaining({
             state: JSON.stringify({
               messages: [{ role: 'user', content: 'test' }],
-              metadata: { complex: { nested: 'data' } }
-            })
-          })
+              metadata: { complex: { nested: 'data' } },
+            }),
+          }),
         })
       );
     });
@@ -269,34 +272,34 @@ describe('MemoryRepository', () => {
     it('should update memory successfully', async () => {
       const updates = {
         state: { messages: [{ role: 'user', content: 'updated' }] },
-        messageCount: 10
+        messageCount: 10,
       };
       const mockUpdated = createMockMemory({
         ...updates,
-        state: { messages: [{ role: 'user', content: 'updated' }] }
+        state: { messages: [{ role: 'user', content: 'updated' }] },
       });
-      
+
       // Mock the memory with serialized state as it would come from DB
       const mockUpdatedWithSerializedState = {
         ...mockUpdated,
-        state: JSON.stringify(mockUpdated.state)
+        state: JSON.stringify(mockUpdated.state),
       };
-      
+
       mockConnection.executeWrite.mockResolvedValue([{ m: mockUpdatedWithSerializedState }]);
 
       const result = await repository.update('memory-123', updates);
 
       expect(result).toMatchObject({
         messageCount: 10,
-        state: { messages: [{ role: 'user', content: 'updated' }] }
+        state: { messages: [{ role: 'user', content: 'updated' }] },
       });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('SET m += $updates'),
         expect.objectContaining({
           id: 'memory-123',
           updates: expect.objectContaining({
-            state: JSON.stringify({ messages: [{ role: 'user', content: 'updated' }] })
-          })
+            state: JSON.stringify({ messages: [{ role: 'user', content: 'updated' }] }),
+          }),
         })
       );
     });
@@ -311,7 +314,7 @@ describe('MemoryRepository', () => {
 
     it('should serialize complex fields in updates', async () => {
       const complexUpdates = {
-        state: { complex: { nested: { deep: 'value' } } }
+        state: { complex: { nested: { deep: 'value' } } },
       };
       mockConnection.executeWrite.mockResolvedValue([{ m: createMockMemory(complexUpdates) }]);
 
@@ -321,8 +324,8 @@ describe('MemoryRepository', () => {
         expect.any(String),
         expect.objectContaining({
           updates: expect.objectContaining({
-            state: JSON.stringify({ complex: { nested: { deep: 'value' } } })
-          })
+            state: JSON.stringify({ complex: { nested: { deep: 'value' } } }),
+          }),
         })
       );
     });
@@ -341,10 +344,7 @@ describe('MemoryRepository', () => {
       const result = await repository.delete('memory-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DETACH DELETE m'),
-        { id: 'memory-123' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE m'), { id: 'memory-123' });
     });
 
     it('should return false when memory not found', async () => {
@@ -365,24 +365,17 @@ describe('MemoryRepository', () => {
   describe('searchMemories', () => {
     it('should search memories without filters', async () => {
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.searchMemories('search term');
 
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (m:Memory) WHERE m.id IS NOT NULL'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (m:Memory) WHERE m.id IS NOT NULL'), {});
     });
 
     it('should search memories with starship filter', async () => {
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.searchMemories('search', { starshipId: 'starship-123' });
 
@@ -398,10 +391,7 @@ describe('MemoryRepository', () => {
 
       await repository.searchMemories('search');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('LIMIT 50'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('LIMIT 50'), {});
     });
 
     it('should handle database errors', async () => {
@@ -418,15 +408,15 @@ describe('MemoryRepository', () => {
           messages: [
             { role: 'user', content: 'Hello' },
             { role: 'assistant', content: 'Hi' },
-            { role: 'system', content: 'System message' }
-          ]
+            { role: 'system', content: 'System message' },
+          ],
         },
-        updatedAt: '2024-01-01T12:00:00.000Z'
+        updatedAt: '2024-01-01T12:00:00.000Z',
       });
       // Mock the memory with serialized state as it would come from DB
       const mockMemoryWithSerializedState = {
         ...mockMemory,
-        state: JSON.stringify(mockMemory.state)
+        state: JSON.stringify(mockMemory.state),
       };
       mockConnection.executeQuery.mockResolvedValue([{ m: mockMemoryWithSerializedState }]);
 
@@ -436,7 +426,7 @@ describe('MemoryRepository', () => {
         totalMessages: 3,
         messagesByRole: { system: 1, user: 1, assistant: 1 },
         sizeInBytes: expect.any(Number),
-        lastUpdated: '2024-01-01T12:00:00.000Z'
+        lastUpdated: '2024-01-01T12:00:00.000Z',
       });
       expect(result!.sizeInBytes).toBeGreaterThan(0);
     });
@@ -451,7 +441,7 @@ describe('MemoryRepository', () => {
 
     it('should handle memory with no messages', async () => {
       const mockMemory = createMockMemory({
-        state: { messages: [] }
+        state: { messages: [] },
       });
       mockConnection.executeQuery.mockResolvedValue([{ m: mockMemory }]);
 
@@ -461,13 +451,13 @@ describe('MemoryRepository', () => {
         totalMessages: 0,
         messagesByRole: { system: 0, user: 0, assistant: 0 },
         sizeInBytes: 2, // Empty array JSON: "[]"
-        lastUpdated: expect.any(String)
+        lastUpdated: expect.any(String),
       });
     });
 
     it('should handle memory with no state.messages', async () => {
       const mockMemory = createMockMemory({
-        state: { context: {} } // No messages array
+        state: { context: {} }, // No messages array
       });
       mockConnection.executeQuery.mockResolvedValue([{ m: mockMemory }]);
 
@@ -477,7 +467,7 @@ describe('MemoryRepository', () => {
         totalMessages: 0,
         messagesByRole: { system: 0, user: 0, assistant: 0 },
         sizeInBytes: 2, // Empty array JSON: "[]"
-        lastUpdated: expect.any(String)
+        lastUpdated: expect.any(String),
       });
     });
 
@@ -487,14 +477,14 @@ describe('MemoryRepository', () => {
           messages: [
             { role: 'user', content: 'Valid' },
             { role: 'invalid_role', content: 'Invalid' },
-            { content: 'No role' } // Missing role
-          ]
-        }
+            { content: 'No role' }, // Missing role
+          ],
+        },
       });
       // Mock the memory with serialized state as it would come from DB
       const mockMemoryWithSerializedState = {
         ...mockMemory,
-        state: JSON.stringify(mockMemory.state)
+        state: JSON.stringify(mockMemory.state),
       };
       mockConnection.executeQuery.mockResolvedValue([{ m: mockMemoryWithSerializedState }]);
 
@@ -514,9 +504,7 @@ describe('MemoryRepository', () => {
   describe('findWithFilters', () => {
     it('should find memories with starship filter', async () => {
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       const result = await repository.findWithFilters({ starshipId: 'starship-123' });
 
@@ -532,10 +520,7 @@ describe('MemoryRepository', () => {
 
       // Filter for memories with messages
       await repository.findWithFilters({ hasMessages: true });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND m.messageCount > 0'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('AND m.messageCount > 0'), {});
 
       // Filter for memories without messages
       await repository.findWithFilters({ hasMessages: false });
@@ -554,7 +539,7 @@ describe('MemoryRepository', () => {
         expect.stringContaining('SKIP $offset LIMIT $limit'),
         expect.objectContaining({
           limit: expect.any(Object), // Neo4j int
-          offset: expect.any(Object)  // Neo4j int
+          offset: expect.any(Object), // Neo4j int
         })
       );
     });
@@ -564,7 +549,7 @@ describe('MemoryRepository', () => {
         starshipId: 'starship-123',
         hasMessages: true,
         limit: 20,
-        offset: 5
+        offset: 5,
       };
       mockConnection.executeQuery.mockResolvedValue([]);
 
@@ -575,7 +560,7 @@ describe('MemoryRepository', () => {
         expect.objectContaining({
           starshipId: 'starship-123',
           limit: expect.any(Object),
-          offset: expect.any(Object)
+          offset: expect.any(Object),
         })
       );
     });
@@ -586,10 +571,7 @@ describe('MemoryRepository', () => {
       const result = await repository.findWithFilters({});
 
       expect(result).toEqual([]);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (m:Memory) WHERE 1=1'),
-        {}
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (m:Memory) WHERE 1=1'), {});
     });
   });
 
@@ -599,16 +581,18 @@ describe('MemoryRepository', () => {
       const memory = createMockMemory({
         state: {
           messages: [{ role: 'user', content: 'test' }],
-          context: { topic: 'greeting' }
-        }
+          context: { topic: 'greeting' },
+        },
       });
 
       const serialized = repo.serializeComplexFields(memory);
 
-      expect(serialized.state).toBe(JSON.stringify({
-        messages: [{ role: 'user', content: 'test' }],
-        context: { topic: 'greeting' }
-      }));
+      expect(serialized.state).toBe(
+        JSON.stringify({
+          messages: [{ role: 'user', content: 'test' }],
+          context: { topic: 'greeting' },
+        })
+      );
     });
 
     it('should handle null/undefined state', () => {
@@ -626,15 +610,15 @@ describe('MemoryRepository', () => {
         id: 'memory-123',
         state: JSON.stringify({
           messages: [{ role: 'user', content: 'test' }],
-          context: { topic: 'greeting' }
-        })
+          context: { topic: 'greeting' },
+        }),
       };
 
       const deserialized = repo.deserializeComplexFields(rawMemory);
 
       expect(deserialized.state).toEqual({
         messages: [{ role: 'user', content: 'test' }],
-        context: { topic: 'greeting' }
+        context: { topic: 'greeting' },
       });
     });
 
@@ -643,17 +627,14 @@ describe('MemoryRepository', () => {
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       const rawMemory = {
         id: 'memory-123',
-        state: 'invalid-json{'
+        state: 'invalid-json{',
       };
 
       const deserialized = repo.deserializeComplexFields(rawMemory);
 
       expect(deserialized.state).toEqual({});
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to deserialize memory'),
-        expect.any(Error)
-      );
-      
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to deserialize memory'), expect.any(Error));
+
       consoleSpy.mockRestore();
     });
 
@@ -661,7 +642,7 @@ describe('MemoryRepository', () => {
       const repo = repository as any;
       const rawMemory = {
         id: 'memory-123',
-        state: null
+        state: null,
       };
 
       const deserialized = repo.deserializeComplexFields(rawMemory);
@@ -674,17 +655,24 @@ describe('MemoryRepository', () => {
     it('should handle complete memory lifecycle', async () => {
       const starshipId = 'starship-123';
       const createInput = createMockCreateInput({ starshipId });
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        starshipId,
+        version: '1.0.0',
+        messageCount: 0,
+        state: '{"messages":[],"context":{}}',
+      };
 
-      // Create
-      mockConnection.executeWrite.mockResolvedValue([]);
+      // Create - mock createEntityWithAutoId format
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
       const created = await repository.create(createInput);
       expect(created.id).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
 
       // Find by starship
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
       const found = await repository.findByStarshipId(starshipId);
       expect(found).toHaveLength(1);
 
@@ -707,16 +695,16 @@ describe('MemoryRepository', () => {
 
     it('should handle search and filter operations', async () => {
       const mockMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        mockMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(mockMemories.map((m) => ({ m })));
 
       // Search all
       const searchResults = await repository.searchMemories('test');
       expect(searchResults).toHaveLength(1);
 
       // Search with starship filter
-      const filteredResults = await repository.searchMemories('test', { starshipId: 'starship-123' });
+      const filteredResults = await repository.searchMemories('test', {
+        starshipId: 'starship-123',
+      });
       expect(filteredResults).toHaveLength(1);
 
       // Find by tags
@@ -727,7 +715,7 @@ describe('MemoryRepository', () => {
       const filterResults = await repository.findWithFilters({
         starshipId: 'starship-123',
         hasMessages: true,
-        limit: 10
+        limit: 10,
       });
       expect(filterResults).toHaveLength(1);
 
@@ -766,12 +754,19 @@ describe('MemoryRepository', () => {
       const largeState = {
         messages: Array.from({ length: 1000 }, (_, i) => ({
           role: 'user',
-          content: `Message ${i}`
+          content: `Message ${i}`,
         })),
-        metadata: { size: 'large' }
+        metadata: { size: 'large' },
       };
       const createInput = createMockCreateInput({ state: largeState });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        state: JSON.stringify(largeState),
+      };
+
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(createInput);
 
@@ -785,18 +780,25 @@ describe('MemoryRepository', () => {
           conversation: {
             history: [
               { topic: 'greeting', sentiment: 'positive' },
-              { topic: 'question', sentiment: 'neutral' }
+              { topic: 'question', sentiment: 'neutral' },
             ],
-            preferences: { language: 'en', theme: 'dark' }
+            preferences: { language: 'en', theme: 'dark' },
           },
           agent: {
             personality: { traits: ['helpful', 'concise'] },
-            capabilities: ['text', 'analysis']
-          }
-        }
+            capabilities: ['text', 'analysis'],
+          },
+        },
       };
       const createInput = createMockCreateInput({ state: complexState });
-      mockConnection.executeWrite.mockResolvedValue([]);
+      const createdMemory = {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        state: JSON.stringify(complexState),
+      };
+
+      mockConnection.executeWrite
+        .mockResolvedValueOnce([{ n: createdMemory }]) // createEntityWithAutoId result
+        .mockResolvedValueOnce([]); // relationship creation
 
       const result = await repository.create(createInput);
 
@@ -806,9 +808,7 @@ describe('MemoryRepository', () => {
     it('should handle memories without starshipId relationship', async () => {
       // Create memory for agent instead of starship
       const agentMemories = [createMockMemory()];
-      mockConnection.executeQuery.mockResolvedValue(
-        agentMemories.map(m => ({ m }))
-      );
+      mockConnection.executeQuery.mockResolvedValue(agentMemories.map((m) => ({ m })));
 
       const result = await repository.findByAgentId('agent-123');
 
@@ -824,7 +824,7 @@ describe('MemoryRepository', () => {
       const filters = {
         starshipId: 'starship-123',
         agentId: 'agent-123', // This should be ignored since not implemented
-        tags: ['test']         // This should be ignored since not implemented
+        tags: ['test'], // This should be ignored since not implemented
       };
       mockConnection.executeQuery.mockResolvedValue([]);
 
@@ -839,7 +839,7 @@ describe('MemoryRepository', () => {
 
     it('should handle zero message count in stats', async () => {
       const mockMemory = createMockMemory({
-        state: {}
+        state: {},
       });
       mockConnection.executeQuery.mockResolvedValue([{ m: mockMemory }]);
 

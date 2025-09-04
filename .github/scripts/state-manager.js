@@ -17,12 +17,12 @@ class ThreadStateManager {
   async saveThreadId(prNumber, threadId, threadUrl) {
     try {
       const state = await this.loadState();
-      
+
       state[prNumber] = {
         threadId,
         threadUrl,
         createdAt: new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       };
 
       // Write to temporary file
@@ -31,15 +31,10 @@ class ThreadStateManager {
       await fs.writeFile(filePath, JSON.stringify(state, null, 2));
 
       // Upload as artifact
-      const uploadResponse = await this.artifactClient.uploadArtifact(
-        this.artifactName,
-        [filePath],
-        tempDir,
-        {
-          continueOnError: false,
-          retentionDays: 90
-        }
-      );
+      const uploadResponse = await this.artifactClient.uploadArtifact(this.artifactName, [filePath], tempDir, {
+        continueOnError: false,
+        retentionDays: 90,
+      });
 
       console.log(`State saved for PR #${prNumber}: ${threadId}`);
       return uploadResponse;
@@ -59,12 +54,12 @@ class ThreadStateManager {
     try {
       const state = await this.loadState();
       const threadData = state[prNumber];
-      
+
       if (threadData) {
         console.log(`Found thread for PR #${prNumber}: ${threadData.threadId}`);
         return threadData;
       }
-      
+
       console.log(`No thread found for PR #${prNumber}`);
       return null;
     } catch (error) {
@@ -80,10 +75,7 @@ class ThreadStateManager {
     try {
       // Download artifact
       const tempDir = process.env.RUNNER_TEMP || '/tmp';
-      const downloadResponse = await this.artifactClient.downloadArtifact(
-        this.artifactName,
-        tempDir
-      );
+      const downloadResponse = await this.artifactClient.downloadArtifact(this.artifactName, tempDir);
 
       if (downloadResponse.downloadPath) {
         const filePath = path.join(downloadResponse.downloadPath, this.stateFile);
@@ -103,25 +95,20 @@ class ThreadStateManager {
   async deleteThreadId(prNumber) {
     try {
       const state = await this.loadState();
-      
+
       if (state[prNumber]) {
         delete state[prNumber];
-        
+
         // Write updated state
         const tempDir = process.env.RUNNER_TEMP || '/tmp';
         const filePath = path.join(tempDir, this.stateFile);
         await fs.writeFile(filePath, JSON.stringify(state, null, 2));
 
         // Upload updated artifact
-        await this.artifactClient.uploadArtifact(
-          this.artifactName,
-          [filePath],
-          tempDir,
-          {
-            continueOnError: false,
-            retentionDays: 90
-          }
-        );
+        await this.artifactClient.uploadArtifact(this.artifactName, [filePath], tempDir, {
+          continueOnError: false,
+          retentionDays: 90,
+        });
 
         console.log(`Deleted thread state for PR #${prNumber}`);
       }
@@ -138,13 +125,13 @@ class ThreadStateManager {
     const data = {
       threadId,
       threadUrl,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     // GitHub Actions cache is handled via workflow, just output the data
     core.setOutput('thread_cache_key', cacheKey);
     core.setOutput('thread_cache_data', JSON.stringify(data));
-    
+
     return cacheKey;
   }
 
@@ -154,26 +141,21 @@ class ThreadStateManager {
   async updateThreadActivity(prNumber, eventType) {
     try {
       const state = await this.loadState();
-      
+
       if (state[prNumber]) {
         state[prNumber].lastUpdated = new Date().toISOString();
         state[prNumber].lastEvent = eventType;
-        
+
         // Write updated state
         const tempDir = process.env.RUNNER_TEMP || '/tmp';
         const filePath = path.join(tempDir, this.stateFile);
         await fs.writeFile(filePath, JSON.stringify(state, null, 2));
 
         // Upload updated artifact
-        await this.artifactClient.uploadArtifact(
-          this.artifactName,
-          [filePath],
-          tempDir,
-          {
-            continueOnError: false,
-            retentionDays: 90
-          }
-        );
+        await this.artifactClient.uploadArtifact(this.artifactName, [filePath], tempDir, {
+          continueOnError: false,
+          retentionDays: 90,
+        });
 
         console.log(`Updated activity for PR #${prNumber}: ${eventType}`);
       }
@@ -209,12 +191,10 @@ Thread ID: \`${threadId}\`
       const { data: comments } = await octokit.rest.issues.listComments({
         owner: context.repo.owner,
         repo: context.repo.repo,
-        issue_number: prNumber
+        issue_number: prNumber,
       });
 
-      const existingComment = comments.find(comment => 
-        comment.body.includes(commentMarker)
-      );
+      const existingComment = comments.find((comment) => comment.body.includes(commentMarker));
 
       if (existingComment) {
         // Update existing comment
@@ -222,7 +202,7 @@ Thread ID: \`${threadId}\`
           owner: context.repo.owner,
           repo: context.repo.repo,
           comment_id: existingComment.id,
-          body: commentBody
+          body: commentBody,
         });
       } else {
         // Create new comment
@@ -230,7 +210,7 @@ Thread ID: \`${threadId}\`
           owner: context.repo.owner,
           repo: context.repo.repo,
           issue_number: prNumber,
-          body: commentBody
+          body: commentBody,
         });
       }
 
@@ -250,21 +230,19 @@ Thread ID: \`${threadId}\`
       const { data: comments } = await octokit.rest.issues.listComments({
         owner: context.repo.owner,
         repo: context.repo.repo,
-        issue_number: prNumber
+        issue_number: prNumber,
       });
 
-      const threadComment = comments.find(comment => 
-        comment.body.includes('<!-- discord-thread-id -->')
-      );
+      const threadComment = comments.find((comment) => comment.body.includes('<!-- discord-thread-id -->'));
 
       if (threadComment) {
         const threadIdMatch = threadComment.body.match(/Discord Thread ID: (\d+)/);
         const threadUrlMatch = threadComment.body.match(/Discord Thread URL: (https:\/\/[^\s]+)/);
-        
+
         if (threadIdMatch && threadUrlMatch) {
           return {
             threadId: threadIdMatch[1],
-            threadUrl: threadUrlMatch[1]
+            threadUrl: threadUrlMatch[1],
           };
         }
       }
@@ -299,15 +277,10 @@ Thread ID: \`${threadId}\`
         const filePath = path.join(tempDir, this.stateFile);
         await fs.writeFile(filePath, JSON.stringify(state, null, 2));
 
-        await this.artifactClient.uploadArtifact(
-          this.artifactName,
-          [filePath],
-          tempDir,
-          {
-            continueOnError: false,
-            retentionDays: 90
-          }
-        );
+        await this.artifactClient.uploadArtifact(this.artifactName, [filePath], tempDir, {
+          continueOnError: false,
+          retentionDays: 90,
+        });
 
         console.log(`Cleaned up ${cleaned} old thread states`);
       }

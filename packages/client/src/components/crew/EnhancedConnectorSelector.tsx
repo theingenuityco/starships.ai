@@ -4,44 +4,19 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { MCPServerOption, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import { monitoringService } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
-import { EnhancedApiKeyInputModal } from './EnhancedApiKeyInputModal'
+import { EnhancedApiKeyInputModal } from '@/components/crew/EnhancedApiKeyInputModal'
 import { ConnectorApiKeyManager } from '@/lib/connector-api-keys'
 import { ApiKeyRequirement } from '@/types/connector-api-keys'
 import { useErrorRecovery, ErrorRecoveryManager } from '@/lib/error-recovery'
 import { ErrorBoundary, useErrorHandler } from '@/components/ui/error-boundary'
-import {
-  ConnectorListSkeleton,
-  ConnectionStatus,
-  InlineLoading,
-} from '@/components/ui/loading-states'
+import { ConnectorListSkeleton, ConnectionStatus, InlineLoading } from '@/components/ui/loading-states'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  Loader2,
-  Search,
-  ChevronDown,
-  Check,
-  X,
-  Plug,
-  AlertCircle,
-  AlertTriangle,
-  Key,
-  RefreshCw,
-  Filter,
-  SortAsc,
-  SortDesc,
-} from 'lucide-react'
+import { Loader2, Search, ChevronDown, Check, X, Plug, AlertCircle, AlertTriangle, Key, RefreshCw, Filter, SortAsc, SortDesc } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface EnhancedConnectorSelectorProps {
@@ -97,8 +72,7 @@ export function EnhancedConnectorSelector({
 
   // API Key Modal state
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false)
-  const [currentConnectorForApiKeys, setCurrentConnectorForApiKeys] =
-    useState<MCPServerOption | null>(null)
+  const [currentConnectorForApiKeys, setCurrentConnectorForApiKeys] = useState<MCPServerOption | null>(null)
   const [apiKeyRequirements, setApiKeyRequirements] = useState<ApiKeyRequirement[]>([])
 
   // API Key status tracking
@@ -120,9 +94,7 @@ export function EnhancedConnectorSelector({
     return availableConnectors.map(connector => {
       const instance = connectorInstanceMap.get(connector.id)
       const status = instance ? instance.status : 'disconnected'
-      const healthMetrics = instance
-        ? monitoringService.createHealthMetrics()
-        : null
+      const healthMetrics = instance ? monitoringService.createHealthMetrics() : null
       const apiKeyStatus = apiKeyStatusMap.get(connector.id)
       const isConnecting = connectingIds.has(connector.id)
 
@@ -145,12 +117,7 @@ export function EnhancedConnectorSelector({
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        connector =>
-          connector.name.toLowerCase().includes(query) ||
-          connector.command.toLowerCase().includes(query) ||
-          connector.id.toLowerCase().includes(query)
-      )
+      filtered = filtered.filter(connector => connector.name.toLowerCase().includes(query) || connector.command.toLowerCase().includes(query) || connector.id.toLowerCase().includes(query))
     }
 
     // Apply status filter
@@ -179,9 +146,7 @@ export function EnhancedConnectorSelector({
           break
         case 'status': {
           const statusOrder = { active: 0, connecting: 1, inactive: 2, error: 3, disconnected: 4 }
-          comparison =
-            (statusOrder[a.status as keyof typeof statusOrder] || 5) -
-            (statusOrder[b.status as keyof typeof statusOrder] || 5)
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] || 5) - (statusOrder[b.status as keyof typeof statusOrder] || 5)
           break
         }
         case 'lastUsed': {
@@ -194,9 +159,7 @@ export function EnhancedConnectorSelector({
           const aHealth = a.healthMetrics?.healthStatus || 'unknown'
           const bHealth = b.healthMetrics?.healthStatus || 'unknown'
           const healthOrder = { healthy: 0, warning: 1, critical: 2, unknown: 3 }
-          comparison =
-            (healthOrder[aHealth as keyof typeof healthOrder] || 3) -
-            (healthOrder[bHealth as keyof typeof healthOrder] || 3)
+          comparison = (healthOrder[aHealth as keyof typeof healthOrder] || 3) - (healthOrder[bHealth as keyof typeof healthOrder] || 3)
           break
         }
       }
@@ -322,16 +285,7 @@ export function EnhancedConnectorSelector({
         }
       }
     },
-    [
-      disabled,
-      connectingIds,
-      isConnectorSelected,
-      selectedConnectors,
-      onConnectorsChange,
-      clearError,
-      handleError,
-      setError,
-    ]
+    [disabled, connectingIds, isConnectorSelected, selectedConnectors, onConnectorsChange, clearError, handleError, setError]
   )
 
   // Handle API key modal submission
@@ -340,9 +294,7 @@ export function EnhancedConnectorSelector({
       if (!currentConnectorForApiKeys) return
 
       try {
-        const enhancedEnv = ConnectorApiKeyManager.buildEnvironmentString(
-          currentConnectorForApiKeys
-        )
+        const enhancedEnv = ConnectorApiKeyManager.buildEnvironmentString(currentConnectorForApiKeys)
 
         const enhancedConnector: MCPServerOption = {
           ...currentConnectorForApiKeys,
@@ -435,21 +387,14 @@ export function EnhancedConnectorSelector({
               <div className="flex flex-col items-center justify-center p-6 text-center">
                 <AlertCircle className="w-12 h-12 text-destructive mb-4" />
                 <h4 className="font-medium text-destructive mb-2">Failed to Load Connectors</h4>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {error?.message || 'Unable to fetch available connectors. Please try again.'}
-                </p>
+                <p className="text-sm text-muted-foreground mb-4">{error?.message || 'Unable to fetch available connectors. Please try again.'}</p>
                 <div className="flex gap-2">
                   <Button onClick={() => fetchConnectorData()} size="sm" variant="outline">
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Try Again
                   </Button>
                   {error?.recoveryActions?.map(action => (
-                    <Button
-                      key={action.id}
-                      onClick={action.action}
-                      size="sm"
-                      variant={action.primary ? 'default' : 'outline'}
-                    >
+                    <Button key={action.id} onClick={action.action} size="sm" variant={action.primary ? 'default' : 'outline'}>
                       {action.label}
                     </Button>
                   ))}
@@ -489,10 +434,7 @@ export function EnhancedConnectorSelector({
 
               <div className="flex items-center gap-2">
                 {selectedConnectors.length > 0 && (
-                  <Badge
-                    variant="default"
-                    className="text-sm px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-                  >
+                  <Badge variant="default" className="text-sm px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                     {selectedConnectors.length} Active
                   </Badge>
                 )}
@@ -501,12 +443,7 @@ export function EnhancedConnectorSelector({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => fetchConnectorData(false)}
-                          disabled={refreshing}
-                        >
+                        <Button variant="ghost" size="sm" onClick={() => fetchConnectorData(false)} disabled={refreshing}>
                           <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
                         </Button>
                       </TooltipTrigger>
@@ -543,35 +480,17 @@ export function EnhancedConnectorSelector({
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="min-w-[120px]">
                       <Filter className="h-4 w-4 mr-2" />
-                      {filterBy === 'all'
-                        ? 'All'
-                        : filterBy === 'connected'
-                          ? 'Connected'
-                          : filterBy === 'available'
-                            ? 'Available'
-                            : filterBy === 'error'
-                              ? 'Error'
-                              : 'Requires Keys'}
+                      {filterBy === 'all' ? 'All' : filterBy === 'connected' ? 'Connected' : filterBy === 'available' ? 'Available' : filterBy === 'error' ? 'Error' : 'Requires Keys'}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
                     <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setFilterBy('all')}>
-                      All Connectors
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterBy('connected')}>
-                      Connected Only
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterBy('available')}>
-                      Available Only
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterBy('error')}>
-                      Error Status
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setFilterBy('requires-keys')}>
-                      Requires API Keys
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterBy('all')}>All Connectors</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterBy('connected')}>Connected Only</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterBy('available')}>Available Only</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterBy('error')}>Error Status</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setFilterBy('requires-keys')}>Requires API Keys</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
 
@@ -579,11 +498,7 @@ export function EnhancedConnectorSelector({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" className="min-w-[120px]">
-                      {sortDirection === 'asc' ? (
-                        <SortAsc className="h-4 w-4 mr-2" />
-                      ) : (
-                        <SortDesc className="h-4 w-4 mr-2" />
-                      )}
+                      {sortDirection === 'asc' ? <SortAsc className="h-4 w-4 mr-2" /> : <SortDesc className="h-4 w-4 mr-2" />}
                       Sort
                     </Button>
                   </DropdownMenuTrigger>
@@ -592,16 +507,10 @@ export function EnhancedConnectorSelector({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => setSortBy('name')}>Name</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setSortBy('status')}>Status</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSortBy('lastUsed')}>
-                      Last Used
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortBy('lastUsed')}>Last Used</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setSortBy('health')}>Health</DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                    >
-                      {sortDirection === 'asc' ? 'Descending' : 'Ascending'}
-                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}>{sortDirection === 'asc' ? 'Descending' : 'Ascending'}</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -632,9 +541,7 @@ export function EnhancedConnectorSelector({
                 <div className="flex flex-1 mr-2 items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse"></div>
                   {selectedConnectors.length === 0 ? (
-                    <span className="text-muted-foreground font-medium">
-                      Browse & Select Connectors...
-                    </span>
+                    <span className="text-muted-foreground font-medium">Browse & Select Connectors...</span>
                   ) : (
                     <span className="text-foreground font-medium">Browse More Connectors</span>
                   )}
@@ -643,24 +550,16 @@ export function EnhancedConnectorSelector({
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent
-              className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[400px] overflow-y-auto bg-card/95 backdrop-blur-sm border-2 border-primary/20 shadow-xl"
-              align="start"
-            >
-              <DropdownMenuLabel className="text-primary font-semibold">
-                Available Connectors ({filteredConnectors.length})
-              </DropdownMenuLabel>
+            <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)] max-h-[400px] overflow-y-auto bg-card/95 backdrop-blur-sm border-2 border-primary/20 shadow-xl" align="start">
+              <DropdownMenuLabel className="text-primary font-semibold">Available Connectors ({filteredConnectors.length})</DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-primary/20" />
 
               {filteredConnectors.length === 0 ? (
-                <DropdownMenuItem disabled>
-                  {searchQuery ? 'No connectors match your search' : 'No connectors available'}
-                </DropdownMenuItem>
+                <DropdownMenuItem disabled>{searchQuery ? 'No connectors match your search' : 'No connectors available'}</DropdownMenuItem>
               ) : (
                 filteredConnectors.map(connector => {
                   const isSelected = isConnectorSelected(connector)
-                  const requiresApiKeys =
-                    ConnectorApiKeyManager.detectRequirements(connector).length > 0
+                  const requiresApiKeys = ConnectorApiKeyManager.detectRequirements(connector).length > 0
 
                   return (
                     <DropdownMenuItem
@@ -690,35 +589,19 @@ export function EnhancedConnectorSelector({
                       {/* Connector Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <span className="font-semibold text-sm text-foreground">
-                            {connector.name}
-                          </span>
+                          <span className="font-semibold text-sm text-foreground">{connector.name}</span>
 
-                          <Badge
-                            variant={getCommandBadgeVariant(connector.command)}
-                            className="text-xs font-medium"
-                          >
+                          <Badge variant={getCommandBadgeVariant(connector.command)} className="text-xs font-medium">
                             {connector.command.toUpperCase()}
                           </Badge>
 
                           <ConnectionStatus
-                            status={
-                              connector.isConnecting
-                                ? 'connecting'
-                                : connector.status === 'active'
-                                  ? 'connected'
-                                  : connector.status === 'error'
-                                    ? 'error'
-                                    : 'disconnected'
-                            }
+                            status={connector.isConnecting ? 'connecting' : connector.status === 'active' ? 'connected' : connector.status === 'error' ? 'error' : 'disconnected'}
                             showLabel={false}
                           />
 
                           {requiresApiKeys && (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
-                            >
+                            <Badge variant="secondary" className="text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
                               <Key className="w-3 h-3 mr-1" />
                               API Keys Required
                             </Badge>
@@ -731,9 +614,7 @@ export function EnhancedConnectorSelector({
                               try {
                                 const envVars = JSON.parse(connector.env)
                                 const keys = Object.keys(envVars)
-                                return keys.length > 0
-                                  ? `Requires: ${keys.join(', ')}`
-                                  : 'No configuration required'
+                                return keys.length > 0 ? `Requires: ${keys.join(', ')}` : 'No configuration required'
                               } catch {
                                 return 'No configuration required'
                               }
@@ -742,9 +623,7 @@ export function EnhancedConnectorSelector({
                         )}
 
                         {connector.instance?.errorMessage && connector.status === 'error' && (
-                          <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded mt-1 border border-red-200 dark:border-red-800">
-                            {connector.instance.errorMessage}
-                          </p>
+                          <p className="text-xs text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded mt-1 border border-red-200 dark:border-red-800">{connector.instance.errorMessage}</p>
                         )}
                       </div>
                     </DropdownMenuItem>
@@ -760,9 +639,7 @@ export function EnhancedConnectorSelector({
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <div className="h-px bg-gradient-to-r from-green-500/50 to-transparent flex-1"></div>
-              <h4 className="text-sm font-semibold text-green-600 uppercase tracking-wide">
-                Active Connectors
-              </h4>
+              <h4 className="text-sm font-semibold text-green-600 uppercase tracking-wide">Active Connectors</h4>
               <div className="h-px bg-gradient-to-l from-green-500/50 to-transparent flex-1"></div>
             </div>
 
@@ -777,51 +654,21 @@ export function EnhancedConnectorSelector({
                     key={connector.id}
                     className={cn(
                       'flex items-center justify-between p-4 border-2 rounded-xl bg-gradient-to-r from-card to-muted/20 transition-all duration-200 shadow-sm hover:shadow-md',
-                      status === 'active'
-                        ? 'border-green-200 dark:border-green-800'
-                        : status === 'error'
-                          ? 'border-red-200 dark:border-red-800'
-                          : 'border-border'
+                      status === 'active' ? 'border-green-200 dark:border-green-800' : status === 'error' ? 'border-red-200 dark:border-red-800' : 'border-border'
                     )}
                   >
                     <div className="flex items-center gap-4 flex-1 min-w-0">
                       <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 border-2 border-primary/20">
-                        <ConnectionStatus
-                          status={
-                            isConnecting
-                              ? 'connecting'
-                              : status === 'active'
-                                ? 'connected'
-                                : status === 'error'
-                                  ? 'error'
-                                  : 'disconnected'
-                          }
-                          showLabel={false}
-                        />
+                        <ConnectionStatus status={isConnecting ? 'connecting' : status === 'active' ? 'connected' : status === 'error' ? 'error' : 'disconnected'} showLabel={false} />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
-                          <span className="font-bold text-base text-foreground">
-                            {connector.name}
-                          </span>
-                          <Badge
-                            variant={getCommandBadgeVariant(connector.command)}
-                            className="text-xs font-semibold px-2 py-1"
-                          >
+                          <span className="font-bold text-base text-foreground">{connector.name}</span>
+                          <Badge variant={getCommandBadgeVariant(connector.command)} className="text-xs font-semibold px-2 py-1">
                             {connector.command.toUpperCase()}
                           </Badge>
-                          <ConnectionStatus
-                            status={
-                              isConnecting
-                                ? 'connecting'
-                                : status === 'active'
-                                  ? 'connected'
-                                  : status === 'error'
-                                    ? 'error'
-                                    : 'disconnected'
-                            }
-                          />
+                          <ConnectionStatus status={isConnecting ? 'connecting' : status === 'active' ? 'connected' : status === 'error' ? 'error' : 'disconnected'} />
                         </div>
 
                         {connector.env && (
@@ -830,9 +677,7 @@ export function EnhancedConnectorSelector({
                               try {
                                 const envVars = JSON.parse(connector.env)
                                 const keys = Object.keys(envVars)
-                                return keys.length > 0
-                                  ? `Requires: ${keys.join(', ')}`
-                                  : 'No configuration required'
+                                return keys.length > 0 ? `Requires: ${keys.join(', ')}` : 'No configuration required'
                               } catch {
                                 return 'No configuration required'
                               }
@@ -846,11 +691,7 @@ export function EnhancedConnectorSelector({
                           </p>
                         )}
 
-                        {connectorInstance?.lastUsed && (
-                          <p className="text-xs text-muted-foreground">
-                            Last used: {new Date(connectorInstance.lastUsed).toLocaleString()}
-                          </p>
-                        )}
+                        {connectorInstance?.lastUsed && <p className="text-xs text-muted-foreground">Last used: {new Date(connectorInstance.lastUsed).toLocaleString()}</p>}
                       </div>
                     </div>
 
@@ -881,9 +722,7 @@ export function EnhancedConnectorSelector({
                 <AlertTriangle className="h-5 w-5 text-destructive flex-shrink-0" />
                 <div className="flex-1">
                   <h4 className="font-medium text-destructive mb-1">Connection Error</h4>
-                  <p className="text-sm text-destructive/80 mb-3">
-                    {error?.message || 'An error occurred while managing connectors.'}
-                  </p>
+                  <p className="text-sm text-destructive/80 mb-3">{error?.message || 'An error occurred while managing connectors.'}</p>
                   {error?.recoveryActions && error.recoveryActions.length > 0 && (
                     <div className="flex gap-2">
                       {error.recoveryActions.map(action => (
@@ -898,9 +737,7 @@ export function EnhancedConnectorSelector({
                               action.action()
                             }
                           }}
-                          className={
-                            action.destructive ? 'border-destructive text-destructive' : ''
-                          }
+                          className={action.destructive ? 'border-destructive text-destructive' : ''}
                         >
                           {action.id === 'retry' && <RefreshCw className="h-3 w-3 mr-1" />}
                           {action.label}

@@ -29,13 +29,7 @@ const normalizedError = ErrorUtils.normalize(someError);
 ### Error Mappings
 
 ```typescript
-import {
-  StandardErrorCode,
-  ErrorMappingUtils,
-  getHttpStatusCode,
-  getErrorCategory,
-  isRetryableError
-} from '@starships/errors';
+import { StandardErrorCode, ErrorMappingUtils, getHttpStatusCode, getErrorCategory, isRetryableError } from '@starships/errors';
 
 // Get HTTP status code for an error
 const status = getHttpStatusCode('VALIDATION_ERROR'); // 400
@@ -57,33 +51,43 @@ const clientErrors = ErrorMappingUtils.getErrorCodesByStatusCode(400);
 ## Error Classes
 
 ### ValidationError (400)
+
 For input validation failures and malformed requests.
 
 ### AuthenticationError (401)
+
 For authentication failures and unauthorized access.
 
 ### AuthorizationError (403)
+
 For authorization failures and forbidden operations.
 
 ### NotFoundError (404)
+
 For when requested resources don't exist.
 
 ### ConflictError (409)
+
 For resource conflicts and business rule violations.
 
 ### DatabaseError (500)
+
 For database operation failures.
 
 ### NetworkError (502/503)
+
 For network and external service failures.
 
 ### InternalServerError (500)
+
 For unexpected internal errors.
 
 ### RateLimitError (429)
+
 For rate limiting and quota exceeded scenarios.
 
 ### ServiceUnavailableError (503)
+
 For temporary service unavailability.
 
 ## Error Mappings
@@ -91,7 +95,9 @@ For temporary service unavailability.
 The package provides comprehensive error code mappings:
 
 ### StandardErrorCode
+
 A union type containing all standardized error codes used across the platform:
+
 - Validation errors: `VALIDATION_ERROR`, `INVALID_INPUT`, etc.
 - Authentication: `AUTHENTICATION_REQUIRED`, `TOKEN_EXPIRED`, etc.
 - Authorization: `ACCESS_DENIED`, `INSUFFICIENT_PERMISSIONS`, etc.
@@ -102,19 +108,24 @@ A union type containing all standardized error codes used across the platform:
 - Internal: `INTERNAL_SERVER_ERROR`, `CONFIGURATION_ERROR`, etc.
 
 ### HTTP Status Mapping
+
 Each error code is mapped to appropriate HTTP status codes (400, 401, 403, 404, 409, 429, 500, etc.)
 
 ### Category Mapping
+
 Each error code is categorized using the `ErrorCategory` enum for consistent error classification.
 
 ### Utility Functions
+
 - `getHttpStatusCode(code)`: Get HTTP status for error code
 - `getErrorCategory(code)`: Get category for error code
 - `isRetryableError(code)`: Check if error should be retried
 - `shouldLogError(statusCode)`: Check if error should be logged
 
 ### ErrorMappingUtils Class
+
 Advanced utilities for working with error mappings:
+
 - `getErrorCodesByCategory(category)`: Get all codes for a category
 - `getErrorCodesByStatusCode(status)`: Get all codes for a status code
 

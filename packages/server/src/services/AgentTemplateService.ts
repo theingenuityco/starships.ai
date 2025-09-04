@@ -70,12 +70,7 @@ export class AgentTemplateService {
     return this.templateRepository.delete(id);
   }
 
-  async createAgentFromTemplate(
-    templateId: string,
-    agentName: string,
-    authorId: string,
-    starshipId: string
-  ): Promise<AgentModel> {
+  async createAgentFromTemplate(templateId: string, agentName: string, authorId: string, starshipId: string): Promise<AgentModel> {
     if (!agentName.trim()) {
       throw new ValidationError('Agent name is required', 'agentName');
     }
@@ -113,7 +108,7 @@ export class AgentTemplateService {
           type: 'start',
           name: 'Start',
           description: 'Begin conversation',
-          parameters: {}
+          parameters: {},
         },
         {
           ref: 'chat-response',
@@ -124,26 +119,26 @@ export class AgentTemplateService {
             model,
             prompt: 'Respond helpfully to the user based on the conversation context and your system instructions.',
             temperature,
-            maxTokens
-          }
+            maxTokens,
+          },
         },
         {
           ref: 'end',
           type: 'end',
           name: 'End',
           description: 'Complete conversation',
-          parameters: {}
-        }
+          parameters: {},
+        },
       ],
       edges: [
         { ref: 'edge-1', from: 'start', to: 'chat-response' },
-        { ref: 'edge-2', from: 'chat-response', to: 'end' }
+        { ref: 'edge-2', from: 'chat-response', to: 'end' },
       ],
       metadata: {
         version: '1.0',
         type: 'simple-chat',
-        complexity: 'basic'
-      }
+        complexity: 'basic',
+      },
     };
   }
 
@@ -158,7 +153,7 @@ export class AgentTemplateService {
           type: 'start',
           name: 'Start',
           description: 'Begin code review process',
-          parameters: {}
+          parameters: {},
         },
         {
           ref: 'analyze-structure',
@@ -169,8 +164,8 @@ export class AgentTemplateService {
             model: 'anthropic/claude-3.5-sonnet',
             prompt: 'Analyze the code structure, architecture, and organization. Identify any structural issues.',
             temperature: 0.2,
-            maxTokens: 1000
-          }
+            maxTokens: 1000,
+          },
         },
         {
           ref: 'check-best-practices',
@@ -181,8 +176,8 @@ export class AgentTemplateService {
             model: 'anthropic/claude-3.5-sonnet',
             prompt: 'Review the code for adherence to best practices, naming conventions, and code quality standards.',
             temperature: 0.1,
-            maxTokens: 1200
-          }
+            maxTokens: 1200,
+          },
         },
         {
           ref: 'generate-recommendations',
@@ -193,29 +188,29 @@ export class AgentTemplateService {
             model: 'anthropic/claude-3.5-sonnet',
             prompt: 'Based on all analysis, provide specific, actionable recommendations for code improvement.',
             temperature: 0.3,
-            maxTokens: 1500
-          }
+            maxTokens: 1500,
+          },
         },
         {
           ref: 'end',
           type: 'end',
           name: 'End',
           description: 'Complete code review workflow',
-          parameters: {}
-        }
+          parameters: {},
+        },
       ],
       edges: [
         { ref: 'edge-1', from: 'start', to: 'analyze-structure' },
         { ref: 'edge-2', from: 'analyze-structure', to: 'check-best-practices' },
         { ref: 'edge-3', from: 'check-best-practices', to: 'generate-recommendations' },
-        { ref: 'edge-4', from: 'generate-recommendations', to: 'end' }
+        { ref: 'edge-4', from: 'generate-recommendations', to: 'end' },
       ],
       metadata: {
         version: '1.0',
         type: 'code-review-workflow',
         complexity: 'advanced',
-        focus: ['structure', 'best-practices', 'recommendations']
-      }
+        focus: ['structure', 'best-practices', 'recommendations'],
+      },
     };
   }
 
@@ -230,7 +225,7 @@ export class AgentTemplateService {
           type: 'start',
           name: 'Start',
           description: 'Begin creative writing process',
-          parameters: {}
+          parameters: {},
         },
         {
           ref: 'brainstorm-ideas',
@@ -239,10 +234,10 @@ export class AgentTemplateService {
           description: 'Generate creative concepts and themes',
           parameters: {
             model: 'anthropic/claude-3.5-sonnet',
-            prompt: 'Based on the user\'s request, brainstorm creative ideas, themes, and approaches for this writing project.',
+            prompt: "Based on the user's request, brainstorm creative ideas, themes, and approaches for this writing project.",
             temperature: 0.9,
-            maxTokens: 800
-          }
+            maxTokens: 800,
+          },
         },
         {
           ref: 'develop-outline',
@@ -253,8 +248,8 @@ export class AgentTemplateService {
             model: 'anthropic/claude-3.5-sonnet',
             prompt: 'Create a detailed outline that structures the best ideas from the brainstorming session.',
             temperature: 0.6,
-            maxTokens: 1000
-          }
+            maxTokens: 1000,
+          },
         },
         {
           ref: 'write-content',
@@ -265,47 +260,42 @@ export class AgentTemplateService {
             model: 'anthropic/claude-3.5-sonnet',
             prompt: 'Write the creative content following the outline, focusing on engaging storytelling and vivid details.',
             temperature: 0.8,
-            maxTokens: 2500
-          }
+            maxTokens: 2500,
+          },
         },
         {
           ref: 'end',
           type: 'end',
           name: 'End',
           description: 'Complete creative writing workflow',
-          parameters: {}
-        }
+          parameters: {},
+        },
       ],
       edges: [
         { ref: 'edge-1', from: 'start', to: 'brainstorm-ideas' },
         { ref: 'edge-2', from: 'brainstorm-ideas', to: 'develop-outline' },
         { ref: 'edge-3', from: 'develop-outline', to: 'write-content' },
-        { ref: 'edge-4', from: 'write-content', to: 'end' }
+        { ref: 'edge-4', from: 'write-content', to: 'end' },
       ],
       metadata: {
         version: '1.0',
         type: 'creative-workflow',
         complexity: 'intermediate',
-        stages: ['ideation', 'planning', 'creation']
-      }
+        stages: ['ideation', 'planning', 'creation'],
+      },
     };
   }
 
   /**
    * Create memory configuration for agent category
    */
-  private createMemoryConfig(
-    name: string, 
-    category: string, 
-    description: string,
-    expertise: string[]
-  ): AgentMemoryState {
+  private createMemoryConfig(name: string, category: string, description: string, expertise: string[]): AgentMemoryState {
     const roleMap = {
       general: 'General Assistant',
       coding: 'Software Developer',
       creative: 'Creative Specialist',
       analysis: 'Data Analyst',
-      support: 'Support Specialist'
+      support: 'Support Specialist',
     };
 
     const personalityMap = {
@@ -313,7 +303,7 @@ export class AgentTemplateService {
       coding: 'Analytical, detail-oriented, and solution-focused',
       creative: 'Imaginative, inspiring, and innovative',
       analysis: 'Methodical, precise, and insightful',
-      support: 'Patient, empathetic, and problem-solving oriented'
+      support: 'Patient, empathetic, and problem-solving oriented',
     };
 
     return {
@@ -321,16 +311,16 @@ export class AgentTemplateService {
         name,
         role: roleMap[category as keyof typeof roleMap] || 'AI Assistant',
         personality: personalityMap[category as keyof typeof personalityMap] || 'Professional and helpful',
-        expertise
+        expertise,
       },
       purpose: {
         primary: description,
         secondary: this.getSecondaryGoals(category),
-        constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy']
+        constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy'],
       },
       space: {
-        description: `Professional ${category} assistance environment focused on providing accurate and helpful responses.`
-      }
+        description: `Professional ${category} assistance environment focused on providing accurate and helpful responses.`,
+      },
     };
   }
 
@@ -343,7 +333,7 @@ export class AgentTemplateService {
       coding: ['Write clean code', 'Follow best practices', 'Explain technical concepts'],
       creative: ['Inspire creativity', 'Encourage original thinking', 'Provide fresh perspectives'],
       analysis: ['Present clear insights', 'Support decision-making', 'Identify patterns'],
-      support: ['Resolve issues quickly', 'Ensure user satisfaction', 'Provide clear guidance']
+      support: ['Resolve issues quickly', 'Ensure user satisfaction', 'Provide clear guidance'],
     };
     return goals[category as keyof typeof goals] || ['Provide helpful assistance'];
   }
@@ -351,12 +341,14 @@ export class AgentTemplateService {
   async seedDefaultTemplates(): Promise<void> {
     console.log('🌱 Seeding default autopilot-enabled agent templates...');
 
-    const defaultTemplates: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> & {
-      blueprint?: Blueprint;
-      memory?: AgentMemoryState;
-      executionMode?: 'simple' | 'workflow';
-      timeout?: number;
-    }> = [
+    const defaultTemplates: Array<
+      Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> & {
+        blueprint?: Blueprint;
+        memory?: AgentMemoryState;
+        executionMode?: 'simple' | 'workflow';
+        timeout?: number;
+      }
+    > = [
       {
         name: 'General Assistant',
         description: 'A helpful general-purpose assistant powered by autopilot workflows for enhanced capabilities.',
@@ -369,11 +361,7 @@ export class AgentTemplateService {
         isPublic: true,
         rating: 4.5,
         icon: '🤖',
-        previewPrompts: [
-          'Help me plan my day',
-          'Explain quantum computing in simple terms',
-          'What are some healthy meal ideas?',
-        ],
+        previewPrompts: ['Help me plan my day', 'Explain quantum computing in simple terms', 'What are some healthy meal ideas?'],
         blueprint: this.createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.7, 2000),
         memory: this.createMemoryConfig(
           'General Assistant',
@@ -382,11 +370,12 @@ export class AgentTemplateService {
           ['general knowledge', 'conversation', 'problem solving']
         ),
         executionMode: 'simple',
-        timeout: 30000
+        timeout: 30000,
       },
       {
         name: 'Code Reviewer',
-        description: 'An expert code reviewer with advanced autopilot workflows for comprehensive code analysis and improvement suggestions.',
+        description:
+          'An expert code reviewer with advanced autopilot workflows for comprehensive code analysis and improvement suggestions.',
         category: 'coding',
         tags: ['programming', 'code-review', 'debugging', 'best-practices', 'autopilot'],
         model: 'anthropic/claude-3.5-sonnet',
@@ -409,7 +398,7 @@ export class AgentTemplateService {
           ['software architecture', 'code quality', 'security practices', 'performance optimization']
         ),
         executionMode: 'workflow',
-        timeout: 60000
+        timeout: 60000,
       },
       {
         name: 'Creative Writer',
@@ -436,7 +425,7 @@ export class AgentTemplateService {
           ['storytelling', 'character development', 'creative writing techniques', 'content strategy']
         ),
         executionMode: 'workflow',
-        timeout: 45000
+        timeout: 45000,
       },
       {
         name: 'Data Analyst',
@@ -463,7 +452,7 @@ export class AgentTemplateService {
           ['statistics', 'data interpretation', 'visualization', 'pattern recognition']
         ),
         executionMode: 'simple',
-        timeout: 35000
+        timeout: 35000,
       },
       {
         name: 'Customer Support',
@@ -477,11 +466,7 @@ export class AgentTemplateService {
         isPublic: true,
         rating: 4.4,
         icon: '🎧',
-        previewPrompts: [
-          'I need help with my account',
-          'How do I return a product?',
-          "My order hasn't arrived yet",
-        ],
+        previewPrompts: ['I need help with my account', 'How do I return a product?', "My order hasn't arrived yet"],
         blueprint: this.createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.6, 2000),
         memory: this.createMemoryConfig(
           'Support Specialist',
@@ -490,7 +475,7 @@ export class AgentTemplateService {
           ['troubleshooting', 'customer service', 'product knowledge', 'communication']
         ),
         executionMode: 'simple',
-        timeout: 30000
+        timeout: 30000,
       },
     ];
 
@@ -498,9 +483,7 @@ export class AgentTemplateService {
       try {
         // Check if template already exists
         const existing = await this.searchTemplates(template.name as string);
-        const alreadyExists = existing.some(
-          (t) => t.name === template.name && t.authorId === 'system'
-        );
+        const alreadyExists = existing.some((t) => t.name === template.name && t.authorId === 'system');
 
         if (!alreadyExists) {
           await this.createTemplate(template);

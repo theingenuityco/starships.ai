@@ -6,15 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { useToast } from '@/hooks/useToast'
-import {
-  BarChart3,
-  TrendingUp,
-  Star,
-  Activity,
-  Calendar,
-  Eye,
-  MessageSquare,
-} from 'lucide-react'
+import { BarChart3, TrendingUp, Star, Activity, Calendar, Eye, MessageSquare } from 'lucide-react'
 
 interface AgentAnalytics {
   usageCount: number
@@ -207,9 +199,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
             <div className="flex items-center justify-center mb-2">
               <Eye className="h-8 w-8 text-purple-500" />
             </div>
-            <Badge variant={analytics.isPublic ? 'default' : 'secondary'}>
-              {analytics.isPublic ? 'Public' : 'Private'}
-            </Badge>
+            <Badge variant={analytics.isPublic ? 'default' : 'secondary'}>{analytics.isPublic ? 'Public' : 'Private'}</Badge>
             <div className="text-sm text-muted-foreground mt-1">Visibility</div>
           </div>
 
@@ -229,9 +219,7 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
             <Badge variant="outline">{usageLevel.level}</Badge>
           </div>
           <Progress value={usageLevel.percentage} className="h-2" />
-          <p className="text-xs text-muted-foreground">
-            Based on {analytics.usageCount} total interactions
-          </p>
+          <p className="text-xs text-muted-foreground">Based on {analytics.usageCount} total interactions</p>
         </div>
 
         {/* Rating Section */}
@@ -239,22 +227,13 @@ export function AgentAnalytics({ agentId, agentName, onClose }: AgentAnalyticsPr
           <h3 className="text-sm font-medium">Rate this Agent</h3>
           <div className="flex items-center gap-2">
             {[1, 2, 3, 4, 5].map(star => (
-              <button
-                key={star}
-                onClick={() => submitRating(star)}
-                disabled={submittingRating}
-                className="p-1 rounded transition-colors text-gray-300 hover:text-yellow-400 disabled:opacity-50"
-              >
+              <button key={star} onClick={() => submitRating(star)} disabled={submittingRating} className="p-1 rounded transition-colors text-gray-300 hover:text-yellow-400 disabled:opacity-50">
                 <Star className="h-6 w-6 fill-current" />
               </button>
             ))}
-            {submittingRating && (
-              <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-            )}
+            {submittingRating && <div className="ml-2 animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Current rating: {analytics.rating.toFixed(1)}/5.0
-          </p>
+          <p className="text-xs text-muted-foreground">Current rating: {analytics.rating.toFixed(1)}/5.0</p>
         </div>
 
         {/* Timeline */}

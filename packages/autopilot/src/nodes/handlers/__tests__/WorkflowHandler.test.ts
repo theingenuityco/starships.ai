@@ -2,9 +2,9 @@
  * WorkflowHandler Unit Tests
  */
 
-import { WorkflowHandler } from '../WorkflowHandler';
-import { Workflow } from '../../../Workflow';
-import { Node, Execution, WorkflowNodeParameters, Blueprint, NodeResult } from '../../../types';
+import { WorkflowHandler } from '@/nodes/handlers/WorkflowHandler';
+import { Workflow } from '@/Workflow';
+import { Node, Execution, WorkflowNodeParameters, Blueprint, NodeResult } from '@/types';
 
 // Mock Workflow class
 jest.mock('../../../Workflow');
@@ -26,12 +26,10 @@ describe('WorkflowHandler', () => {
   const mockBlueprint: Blueprint = {
     nodes: [
       { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-      { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+      { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} },
     ],
-    edges: [
-      { ref: 'edge-1', from: 'start', to: 'end' }
-    ],
-    metadata: {}
+    edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
+    metadata: {},
   };
 
   beforeEach(() => {
@@ -41,8 +39,8 @@ describe('WorkflowHandler', () => {
       name: 'Test Workflow Node',
       description: 'Workflow node for testing',
       parameters: {
-        blueprint: mockBlueprint
-      } as WorkflowNodeParameters
+        blueprint: mockBlueprint,
+      } as WorkflowNodeParameters,
     };
 
     handler = new WorkflowHandler(mockNode);
@@ -60,7 +58,7 @@ describe('WorkflowHandler', () => {
       addEdge: jest.fn(),
       removeNode: jest.fn(),
       removeEdge: jest.fn(),
-      clone: jest.fn()
+      clone: jest.fn(),
     } as any;
 
     (Workflow as jest.MockedClass<typeof Workflow>).mockImplementation(() => mockWorkflow);
@@ -76,20 +74,20 @@ describe('WorkflowHandler', () => {
     it('should execute embedded workflow successfully', async () => {
       const mockNodeResult1: NodeResult = {
         nodeRef: 'start',
-        data: { message: 'Started' }
+        data: { message: 'Started' },
       };
 
       const mockNodeResult2: NodeResult = {
         nodeRef: 'end',
-        data: { message: 'Completed' }
+        data: { message: 'Completed' },
       };
 
       const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
         executionResults: new Map([
           ['start', mockNodeResult1],
-          ['end', mockNodeResult2]
-        ])
+          ['end', mockNodeResult2],
+        ]),
       });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
@@ -100,7 +98,7 @@ describe('WorkflowHandler', () => {
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('workflow-node');
-      
+
       const resultData = nodeResult?.data as WorkflowResponseData;
       expect(resultData.workflowStatus).toBe('completed');
       expect(resultData.workflowResults).toHaveLength(2);
@@ -109,7 +107,7 @@ describe('WorkflowHandler', () => {
 
     it('should execute workflow successfully', async () => {
       const mockRuntimeState: Execution = global.createMockExecution({
-        status: 'completed'
+        status: 'completed',
       });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
@@ -130,8 +128,8 @@ describe('WorkflowHandler', () => {
           code: 'NODE_EXECUTION_FAILED',
           message: 'Something went wrong',
           timestamp: new Date().toISOString(),
-          recoverable: false
-        }
+          recoverable: false,
+        },
       });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
@@ -146,7 +144,7 @@ describe('WorkflowHandler', () => {
 
     it('should handle workflow execution failure without error message', async () => {
       const mockRuntimeState: Execution = global.createMockExecution({
-        status: 'failed'
+        status: 'failed',
       });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
@@ -184,14 +182,14 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: mockBlueprint,
-          timeout: 30000
-        } as WorkflowNodeParameters
+          timeout: 30000,
+        } as WorkflowNodeParameters,
       };
 
       const timeoutHandler = new WorkflowHandler(nodeWithTimeout);
 
       const mockRuntimeState: Execution = global.createMockExecution({
-        status: 'completed'
+        status: 'completed',
       });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
@@ -206,20 +204,20 @@ describe('WorkflowHandler', () => {
     it('should filter successful results from workflow execution', async () => {
       const successfulResult: NodeResult = {
         nodeRef: 'success-node',
-        data: { result: 'success' }
+        data: { result: 'success' },
       };
 
       const failedResult: NodeResult = {
         nodeRef: 'failed-node',
-        error: 'Failed to execute'
+        error: 'Failed to execute',
       };
 
       const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
         executionResults: new Map([
           ['success-node', successfulResult],
-          ['failed-node', failedResult]
-        ])
+          ['failed-node', failedResult],
+        ]),
       });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
@@ -235,7 +233,7 @@ describe('WorkflowHandler', () => {
 
     it('should set execution timestamp', async () => {
       const mockRuntimeState: Execution = global.createMockExecution({
-        status: 'completed'
+        status: 'completed',
       });
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
@@ -264,8 +262,8 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: mockBlueprint,
-          timeout: 60000
-        } as WorkflowNodeParameters
+          timeout: 60000,
+        } as WorkflowNodeParameters,
       };
       const handlerWithTimeout = new WorkflowHandler(nodeWithTimeout);
 
@@ -278,7 +276,7 @@ describe('WorkflowHandler', () => {
     it('should fail validation when blueprint is missing', () => {
       const nodeWithoutBlueprint: Node = {
         ...mockNode,
-        parameters: {} as WorkflowNodeParameters
+        parameters: {} as WorkflowNodeParameters,
       };
       const handlerWithoutBlueprint = new WorkflowHandler(nodeWithoutBlueprint);
 
@@ -290,20 +288,20 @@ describe('WorkflowHandler', () => {
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Blueprint is required',
         nodeRef: 'workflow-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
     it('should validate successfully even without blueprint id', () => {
       const blueprintWithoutId: Blueprint = {
-        ...mockBlueprint
+        ...mockBlueprint,
       };
 
       const nodeWithInvalidBlueprint: Node = {
         ...mockNode,
         parameters: {
-          blueprint: blueprintWithoutId
-        } as WorkflowNodeParameters
+          blueprint: blueprintWithoutId,
+        } as WorkflowNodeParameters,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -315,14 +313,14 @@ describe('WorkflowHandler', () => {
     it('should fail validation when blueprint has no nodes', () => {
       const blueprintWithoutNodes: Blueprint = {
         ...mockBlueprint,
-        nodes: []
+        nodes: [],
       };
 
       const nodeWithInvalidBlueprint: Node = {
         ...mockNode,
         parameters: {
-          blueprint: blueprintWithoutNodes
-        } as WorkflowNodeParameters
+          blueprint: blueprintWithoutNodes,
+        } as WorkflowNodeParameters,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -333,23 +331,21 @@ describe('WorkflowHandler', () => {
         code: 'VALIDATION_FAILED',
         message: 'Blueprint must contain at least one node',
         nodeRef: 'workflow-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
     it('should fail validation when blueprint has no start node', () => {
       const blueprintWithoutStart: Blueprint = {
         ...mockBlueprint,
-        nodes: [
-          { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
-        ]
+        nodes: [{ ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }],
       };
 
       const nodeWithInvalidBlueprint: Node = {
         ...mockNode,
         parameters: {
-          blueprint: blueprintWithoutStart
-        } as WorkflowNodeParameters
+          blueprint: blueprintWithoutStart,
+        } as WorkflowNodeParameters,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -360,7 +356,7 @@ describe('WorkflowHandler', () => {
         code: 'MISSING_START_NODE',
         message: 'Blueprint must have a start node',
         nodeRef: 'workflow-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -369,15 +365,15 @@ describe('WorkflowHandler', () => {
         ...mockBlueprint,
         edges: [
           { ref: 'edge-1', from: 'start', to: 'nonexistent' },
-          { ref: 'edge-2', from: 'nonexistent2', to: 'end' }
-        ]
+          { ref: 'edge-2', from: 'nonexistent2', to: 'end' },
+        ],
       };
 
       const nodeWithInvalidBlueprint: Node = {
         ...mockNode,
         parameters: {
-          blueprint: blueprintWithInvalidEdges
-        } as WorkflowNodeParameters
+          blueprint: blueprintWithInvalidEdges,
+        } as WorkflowNodeParameters,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -388,13 +384,13 @@ describe('WorkflowHandler', () => {
         code: 'INVALID_EDGE_CONNECTION',
         message: 'Invalid edge reference in blueprint: start -> nonexistent',
         nodeRef: 'workflow-node',
-        severity: 'error'
+        severity: 'error',
       });
       expect(result.errors).toContainEqual({
         code: 'INVALID_EDGE_CONNECTION',
         message: 'Invalid edge reference in blueprint: nonexistent2 -> end',
         nodeRef: 'workflow-node',
-        severity: 'error'
+        severity: 'error',
       });
     });
 
@@ -403,8 +399,8 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: mockBlueprint,
-          timeout: 500
-        } as WorkflowNodeParameters
+          timeout: 500,
+        } as WorkflowNodeParameters,
       };
       const handlerWithLowTimeout = new WorkflowHandler(nodeWithLowTimeout);
 
@@ -414,7 +410,7 @@ describe('WorkflowHandler', () => {
       expect(result.warnings).toContainEqual({
         code: 'POTENTIAL_TIMEOUT',
         message: 'Workflow timeout is less than 1 second, which may be too short for complex workflows',
-        nodeRef: 'workflow-node'
+        nodeRef: 'workflow-node',
       });
     });
 
@@ -422,14 +418,14 @@ describe('WorkflowHandler', () => {
       const invalidBlueprint: Blueprint = {
         nodes: [], // Invalid: no nodes
         edges: [],
-        metadata: {}
+        metadata: {},
       };
 
       const nodeWithMultipleErrors: Node = {
         ...mockNode,
         parameters: {
-          blueprint: invalidBlueprint
-        } as WorkflowNodeParameters
+          blueprint: invalidBlueprint,
+        } as WorkflowNodeParameters,
       };
       const handlerWithMultipleErrors = new WorkflowHandler(nodeWithMultipleErrors);
 
@@ -437,8 +433,8 @@ describe('WorkflowHandler', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThan(1);
-      
-      const errorMessages = result.errors.map(e => e.message);
+
+      const errorMessages = result.errors.map((e) => e.message);
       expect(errorMessages).toContain('Blueprint must contain at least one node');
       expect(errorMessages).toContain('Blueprint must have a start node');
     });

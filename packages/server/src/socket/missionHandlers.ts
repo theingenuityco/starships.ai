@@ -4,7 +4,7 @@
 
 import { Server } from 'socket.io';
 import type { Socket } from 'socket.io';
-import { Logger } from '../utils/logger';
+import { Logger } from '@/utils/logger';
 
 const logger = Logger.getInstance();
 
@@ -16,7 +16,7 @@ export function setupMissionHandlers(io: Server) {
     socket.on('mission:join-room', (missionId: string) => {
       const roomName = `mission:${missionId}`;
       socket.join(roomName);
-      
+
       logger.info('Client joined mission room', {
         service: 'MissionSocketHandlers',
         operation: 'mission:join-room',
@@ -25,14 +25,14 @@ export function setupMissionHandlers(io: Server) {
         metadata: {
           socketId: socket.id,
           roomName,
-          totalClientsInRoom: io.sockets.adapter.rooms.get(roomName)?.size || 0
-        }
+          totalClientsInRoom: io.sockets.adapter.rooms.get(roomName)?.size || 0,
+        },
       });
 
-      socket.emit('mission:room-joined', { 
-        missionId, 
+      socket.emit('mission:room-joined', {
+        missionId,
         roomName,
-        message: 'Successfully joined mission room' 
+        message: 'Successfully joined mission room',
       });
     });
 
@@ -40,7 +40,7 @@ export function setupMissionHandlers(io: Server) {
     socket.on('mission:leave-room', (missionId: string) => {
       const roomName = `mission:${missionId}`;
       socket.leave(roomName);
-      
+
       logger.info('Client left mission room', {
         service: 'MissionSocketHandlers',
         operation: 'mission:leave-room',
@@ -49,8 +49,8 @@ export function setupMissionHandlers(io: Server) {
         metadata: {
           socketId: socket.id,
           roomName,
-          totalClientsInRoom: io.sockets.adapter.rooms.get(roomName)?.size || 0
-        }
+          totalClientsInRoom: io.sockets.adapter.rooms.get(roomName)?.size || 0,
+        },
       });
     });
 
@@ -61,8 +61,8 @@ export function setupMissionHandlers(io: Server) {
         operation: 'disconnect',
         metadata: {
           socketId: socket.id,
-          reason
-        }
+          reason,
+        },
       });
     });
   });

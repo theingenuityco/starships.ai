@@ -1,11 +1,11 @@
 /**
  * MissionPromptBuilder - State-driven prompt generation for mission orchestration
- * 
+ *
  * This class builds appropriate prompts based on the current mission state,
  * eliminating the need for separate phase-specific interfaces or complex template management.
  */
 
-import type { MissionChatState } from '../services/MissionOrchestratorAgent';
+import type { MissionChatState } from '@/services/MissionOrchestratorAgent';
 import { HumanMessage, AIMessage } from '@langchain/core/messages';
 // Note: LLMChatPrompt type needs to be defined based on the actual interface needed
 // For now, creating a local interface until the proper type is available
@@ -183,13 +183,12 @@ Guidelines:
 - Generic responses without clear action are unclear
 - Focus on the primary intent of the message
 
-Respond with only the JSON object:`
+Respond with only the JSON object:`,
 } as const;
 
 export class MissionPromptBuilder {
-
   constructor(private state: MissionChatState) {}
-  
+
   /**
    * Build welcome prompt for initial mission introduction
    */
@@ -203,7 +202,6 @@ export class MissionPromptBuilder {
   buildConversePrompt(): string {
     return this.buildCompletePrompt(SYSTEM_INSTRUCTIONS.CONVERSE);
   }
-  
 
   /**
    * Builds prompt specifically for clarity assessment (bypasses phase-based routing)
@@ -216,9 +214,7 @@ export class MissionPromptBuilder {
    * Builds prompt specifically for clarity questions (bypasses phase-based routing)
    */
   buildClarityQuestionPrompt(isFirstIteration: boolean): string {
-    const instruction = isFirstIteration 
-      ? SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_FIRST 
-      : SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_SUBSEQUENT;
+    const instruction = isFirstIteration ? SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_FIRST : SYSTEM_INSTRUCTIONS.CLARITY_QUESTION_SUBSEQUENT;
     return this.buildCompletePrompt(instruction);
   }
 
@@ -226,9 +222,7 @@ export class MissionPromptBuilder {
    * Builds prompt specifically for clarity completion (bypasses phase-based routing)
    */
   buildClarityCompletionPrompt(isFirstIteration: boolean): string {
-    const instruction = isFirstIteration 
-      ? SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_FIRST 
-      : SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_SUBSEQUENT;
+    const instruction = isFirstIteration ? SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_FIRST : SYSTEM_INSTRUCTIONS.CLARITY_COMPLETION_SUBSEQUENT;
     return this.buildCompletePrompt(instruction);
   }
 
@@ -236,16 +230,17 @@ export class MissionPromptBuilder {
    * Build workflow generation prompt
    */
   buildWorkflowGenerationPrompt(agents: AgentModel[]): LLMChatPrompt {
-    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION
-      .replace('{agentList}', this.buildAgentListSection(agents))
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_GENERATION.replace('{agentList}', this.buildAgentListSection(agents))
       .replace('{missionContext}', this.buildMissionSection())
       .replace('{clarityData}', this.buildClaritySection());
 
     return {
-      messages: [{
-        role: 'system',
-        content: systemPrompt
-      }]
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+      ],
     };
   }
 
@@ -253,14 +248,15 @@ export class MissionPromptBuilder {
    * Build workflow presentation prompt
    */
   buildWorkflowPresentationPrompt(blueprint: BlueprintModel): LLMChatPrompt {
-    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION
-      .replace('{planData}', this.buildWorkflowDataSection(blueprint));
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_PRESENTATION.replace('{planData}', this.buildWorkflowDataSection(blueprint));
 
     return {
-      messages: [{
-        role: 'system',
-        content: systemPrompt
-      }]
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+      ],
     };
   }
 
@@ -269,22 +265,25 @@ export class MissionPromptBuilder {
    */
   buildWorkflowApprovalIntentPrompt(userMessage: string): LLMChatPrompt {
     const missionContext = this.buildMissionSection();
-    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_APPROVAL_INTENT
-      .replace('{userMessage}', userMessage)
-      .replace('{missionContext}', missionContext);
+    const systemPrompt = SYSTEM_INSTRUCTIONS.WORKFLOW_APPROVAL_INTENT.replace('{userMessage}', userMessage).replace(
+      '{missionContext}',
+      missionContext
+    );
 
     return {
-      messages: [{
-        role: 'system',
-        content: systemPrompt
-      }]
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+      ],
     };
   }
-  
+
   // ============================================================================
   // CORE BUILDING METHODS
   // ============================================================================
-  
+
   /**
    * Core helper - combines universal context + phase context + instruction
    */
@@ -294,25 +293,22 @@ export class MissionPromptBuilder {
     const sections = [universal, phaseContext, instruction].filter(Boolean);
     return sections.join('\n\n');
   }
-  
+
   /**
    * Universal context - mission basics that appear in all prompts
    */
   private buildUniversalContext(): string {
-    return [
-      this.buildIdentitySection(),
-      this.buildMissionSection(),
-      this.buildStatusSection(),
-      this.buildConversationSection(),
-    ].filter(Boolean).join('\n');
+    return [this.buildIdentitySection(), this.buildMissionSection(), this.buildStatusSection(), this.buildConversationSection()]
+      .filter(Boolean)
+      .join('\n');
   }
-  
+
   /**
    * Phase-specific context - varies by current phase
    */
   private buildPhaseContext(): string {
     const { activePhase } = this.state;
-    
+
     switch (activePhase) {
       case MISSION_PHASES.WELCOME:
         return this.buildWelcomePhaseContext();
@@ -326,7 +322,7 @@ export class MissionPromptBuilder {
         return '';
     }
   }
-  
+
   /**
    * Welcome phase context - minimal context for initial setup
    */
@@ -334,24 +330,23 @@ export class MissionPromptBuilder {
     return `
 WELCOME PHASE: First interaction with user for this mission.`;
   }
-  
+
   /**
    * Analysis phase context - clarity data and conversation history
    */
   private buildAnalysisPhaseContext(): string {
-    return [
-      `ANALYSIS PHASE: Assessing mission clarity through iterative questioning.`,
-      this.buildClaritySection(),
-    ].filter(Boolean).join('\n\n');
+    return [`ANALYSIS PHASE: Assessing mission clarity through iterative questioning.`, this.buildClaritySection()]
+      .filter(Boolean)
+      .join('\n\n');
   }
-  
+
   /**
    * Plan phase context - plan data and status
    */
   private buildPlanPhaseContext(): string {
     return `PLAN PHASE: Mission execution planning and approval.`;
   }
-  
+
   /**
    * Converse phase context - includes all mission artifacts
    */
@@ -360,22 +355,22 @@ WELCOME PHASE: First interaction with user for this mission.`;
       `CONVERSE PHASE: Ongoing mission guidance and support.`,
       this.buildClaritySection(),
       this.buildWorkflowSection(),
-      this.buildExecutionResultsSection()
+      this.buildExecutionResultsSection(),
     ];
-    
+
     return sections.filter(Boolean).join('\n\n');
   }
-  
+
   // ============================================================================
   // CONTEXT SECTION BUILDERS
   // ============================================================================
-  
+
   private buildIdentitySection(): string {
     const { metadata } = this.state;
     if (!metadata) return '';
-    
+
     const { mission, starship } = metadata;
-    
+
     return `You ARE Commander ARIA-${mission.id.slice(-4)}, Mission Orchestrator for ${starship.name}.
 Your purpose is to manage this mission and ensure its success.
 You work for the User.
@@ -393,9 +388,9 @@ You coordinate starship missions by:
   private buildMissionSection(): string {
     const { metadata } = this.state;
     if (!metadata) return '';
-    
+
     const { mission, starship } = metadata;
-    
+
     return `MISSION: "${mission.name}"
 ├─ OBJECTIVE: ${mission.description}
 ├─ STARSHIP: ${starship.name} (${starship.class}-class)
@@ -411,9 +406,9 @@ You coordinate starship missions by:
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      timeZoneName: 'short'
+      timeZoneName: 'short',
     });
-    
+
     return `
 ACTIVE PHASE: ${activePhase}
 PHASES: INIT → WELCOME → ANALYSIS → PLAN → CONVERSE
@@ -423,7 +418,7 @@ CURRENT TIME: ${currentDateTime}`;
   private buildClaritySection(): string {
     const { clarity } = this.state;
     if (!clarity) return '';
-    
+
     return `
 MISSION CLARITY ASSESSMENT:
 ├─ Overall Score: ${clarity.overallScore.toFixed(1)}/10 (Iteration ${clarity.iteration})
@@ -437,19 +432,16 @@ MISSION CLARITY ASSESSMENT:
   private buildWorkflowSection(): string {
     const { blueprint, metadata } = this.state;
     if (!blueprint) return '';
-    
+
     const agentNodes = blueprint.nodes?.filter((n: any) => n.type === 'agent') || [];
     const approvalStatus = metadata?.mission.approvalStatus || 'pending';
-    const workflowStatus = approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' :
-                          approvalStatus === 'rejected' ? '❌ REJECTED' :
-                          '⏳ PENDING APPROVAL';
-    
-    const taskList = agentNodes.map((node: any, index: number) =>
-      `├─ Task ${index + 1}: ${node.name}`
-    ).join('\n');
-    
+    const workflowStatus =
+      approvalStatus === 'approved' ? '✅ APPROVED & EXECUTED' : approvalStatus === 'rejected' ? '❌ REJECTED' : '⏳ PENDING APPROVAL';
+
+    const taskList = agentNodes.map((node: any, index: number) => `├─ Task ${index + 1}: ${node.name}`).join('\n');
+
     const createdDate = blueprint.createdAt ? new Date(blueprint.createdAt).toLocaleDateString() : 'Unknown';
-    
+
     return `
 MISSION WORKFLOW:
 ├─ Status: ${workflowStatus}
@@ -461,17 +453,19 @@ ${taskList}
   private buildExecutionResultsSection(): string {
     const { executionResult } = this.state;
     if (!executionResult) return '';
-    
+
     const successfulTasks = executionResult.nodeResults.filter((r: any) => r.success).length;
     // const failedTasks = executionResult.nodeResults.filter((r: any) => !r.success).length;
     const statusIcon = executionResult.success ? '✅' : '❌';
-    
-    const taskResults = executionResult.nodeResults.map((result: any) => {
-      const icon = result.success ? '✅' : '❌';
-      const output = result.output ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}` : '';
-      return `├─ ${icon} ${result.nodeName}${output}`;
-    }).join('\n');
-    
+
+    const taskResults = executionResult.nodeResults
+      .map((result: any) => {
+        const icon = result.success ? '✅' : '❌';
+        const output = result.output ? ` - ${result.output.substring(0, 80)}${result.output.length > 80 ? '...' : ''}` : '';
+        return `├─ ${icon} ${result.nodeName}${output}`;
+      })
+      .join('\n');
+
     return `
 MISSION EXECUTION RESULTS:
 ├─ Status: ${statusIcon} ${executionResult.success ? 'COMPLETED SUCCESSFULLY' : 'FAILED'}
@@ -484,23 +478,23 @@ ${taskResults}
   private buildConversationSection(): string {
     const { messages } = this.state;
     if (!messages.length) return '';
-    
+
     // Separate latest message from conversation history
     const messageLimit = 8;
     const recentMessages = messages.slice(-messageLimit);
     const latestMessage = recentMessages[recentMessages.length - 1];
     const conversationHistory = recentMessages.slice(0, -1); // All except latest
-    
+
     let result = '';
-    
+
     // Build conversation history (excluding latest message)
     if (conversationHistory.length > 0) {
       const conversationText = conversationHistory
-        .filter(msg => msg.content && typeof msg.content === 'string')
+        .filter((msg) => msg.content && typeof msg.content === 'string')
         .map((msg, index) => {
           let speaker = '';
           let prefix = '';
-          
+
           if (msg instanceof HumanMessage) {
             speaker = 'User';
             prefix = '├─';
@@ -511,26 +505,26 @@ ${taskResults}
             speaker = 'System';
             prefix = '├─';
           }
-          
+
           // Use └─ for the last message in history
           if (index === conversationHistory.length - 1) {
             prefix = '└─';
           }
-          
+
           // Encapsulate complex messages with delimiters
           const content = this.encapsulateMessage(msg.content as string);
-          
+
           return `${prefix} ${speaker}: ${content}`;
         })
         .join('\n');
-      
+
       result += `\nCONVERSATION HISTORY:\n${conversationText}`;
     }
-    
+
     // Highlight latest message separately
     if (latestMessage && latestMessage.content && typeof latestMessage.content === 'string') {
       let speaker = '';
-      
+
       if (latestMessage instanceof HumanMessage) {
         speaker = 'User';
       } else if (latestMessage instanceof AIMessage) {
@@ -538,13 +532,13 @@ ${taskResults}
       } else {
         speaker = 'System';
       }
-      
+
       // Encapsulate the latest message content
       const content = this.encapsulateMessage(latestMessage.content as string);
-      
+
       result += `\n\nCURRENT REQUEST:\n>>> ${speaker}: ${content}`;
     }
-    
+
     return result;
   }
 
@@ -553,16 +547,13 @@ ${taskResults}
    */
   private encapsulateMessage(content: string): string {
     // Check if message is complex (contains newlines, special chars, or is long)
-    const isComplex = content.includes('\n') || 
-                     content.includes('```') || 
-                     content.includes('---') || 
-                     content.length > 100 ||
-                     /[{}<>]/.test(content);
-    
+    const isComplex =
+      content.includes('\n') || content.includes('```') || content.includes('---') || content.length > 100 || /[{}<>]/.test(content);
+
     if (isComplex) {
       return `---\n${content}\n---`;
     }
-    
+
     return content;
   }
 
@@ -570,10 +561,12 @@ ${taskResults}
    * Build agent list section for plan generation
    */
   private buildAgentListSection(agents: AgentModel[]): string {
-    return agents.map(agent => {
-      const capabilities = agent.category || 'general';
-      return `├─ ${agent.id}: ${agent.name} (${capabilities})\n   └─ ${agent.description || 'No description available'}`;
-    }).join('\n');
+    return agents
+      .map((agent) => {
+        const capabilities = agent.category || 'general';
+        return `├─ ${agent.id}: ${agent.name} (${capabilities})\n   └─ ${agent.description || 'No description available'}`;
+      })
+      .join('\n');
   }
 
   /**
@@ -581,16 +574,19 @@ ${taskResults}
    */
   private buildWorkflowDataSection(blueprint: BlueprintModel): string {
     const agentNodes = blueprint.nodes?.filter((node: any) => node.type === 'agent') || [];
-    const agentAssignments = agentNodes.reduce((assignments: Record<string, string[]>, node: any) => {
-      const agentId = node.parameters?.agentId;
-      if (agentId && typeof agentId === 'string') {
-        if (!assignments[agentId]) {
-          assignments[agentId] = [];
+    const agentAssignments = agentNodes.reduce(
+      (assignments: Record<string, string[]>, node: any) => {
+        const agentId = node.parameters?.agentId;
+        if (agentId && typeof agentId === 'string') {
+          if (!assignments[agentId]) {
+            assignments[agentId] = [];
+          }
+          assignments[agentId].push(node.id);
         }
-        assignments[agentId].push(node.id);
-      }
-      return assignments;
-    }, {} as Record<string, string[]>);
+        return assignments;
+      },
+      {} as Record<string, string[]>
+    );
 
     let workflowText = `EXECUTION WORKFLOW OVERVIEW:
 ├─ Total Nodes: ${blueprint.nodes?.length || 0}
@@ -630,5 +626,4 @@ WORKFLOW STRUCTURE:`;
 
     return workflowText;
   }
-  
 }

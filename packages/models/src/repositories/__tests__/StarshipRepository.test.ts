@@ -2,7 +2,7 @@
  * StarshipRepository Unit Tests
  */
 
-import { StarshipRepository } from '../StarshipRepository';
+import { StarshipRepository } from '@/repositories/StarshipRepository';
 import { ValidationError, NotFoundError } from '@starships/errors';
 import { StarshipModel } from '@starships/protocol';
 
@@ -11,22 +11,24 @@ jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(() => ({
     executeQuery: jest.fn(),
     executeWrite: jest.fn(),
-  }))
+  })),
 }));
 
-import { getConnection } from '../../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 describe('StarshipRepository', () => {
   let repository: StarshipRepository;
   let mockConnection: any;
 
   beforeEach(() => {
-    repository = new StarshipRepository();
+    // Create fresh mock connection for each test
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    repository = new StarshipRepository();
+    // Clear all mocks to ensure clean state
     jest.clearAllMocks();
   });
 
@@ -39,7 +41,7 @@ describe('StarshipRepository', () => {
   describe('validateUUID', () => {
     it('should validate valid UUID', () => {
       const validUUID = '123e4567-e89b-12d3-a456-426614174000';
-      
+
       expect(() => {
         (repository as any).validateUUID(validUUID, 'id');
       }).not.toThrow();
@@ -47,7 +49,7 @@ describe('StarshipRepository', () => {
 
     it('should throw ValidationError for invalid UUID', () => {
       const invalidUUID = 'invalid-uuid';
-      
+
       expect(() => {
         (repository as any).validateUUID(invalidUUID, 'id');
       }).toThrow(ValidationError);
@@ -70,19 +72,14 @@ describe('StarshipRepository', () => {
     it('should return all starships ordered by creation date', async () => {
       const mockStarships = [
         global.createMockStarship({ id: 'starship-1', name: 'Ship One' }),
-        global.createMockStarship({ id: 'starship-2', name: 'Ship Two' })
+        global.createMockStarship({ id: 'starship-2', name: 'Ship Two' }),
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { s: mockStarships[0] },
-        { s: mockStarships[1] }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ s: mockStarships[0] }, { s: mockStarships[1] }]);
 
       const result = await repository.findAll();
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC'
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
       expect(result).toEqual(mockStarships);
     });
 
@@ -102,10 +99,7 @@ describe('StarshipRepository', () => {
 
       const result = await repository.findById('starship-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (s:Starship) WHERE s.id = $id RETURN s',
-        { id: 'starship-123' }
-      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id: 'starship-123' });
       expect(result).toEqual(mockStarship);
     });
 
@@ -146,13 +140,10 @@ describe('StarshipRepository', () => {
     it('should return starships by owner ID', async () => {
       const mockStarships = [
         global.createMockStarship({ ownerId: 'owner-123', name: 'Ship A' }),
-        global.createMockStarship({ ownerId: 'owner-123', name: 'Ship B' })
+        global.createMockStarship({ ownerId: 'owner-123', name: 'Ship B' }),
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([
-        { s: mockStarships[0] },
-        { s: mockStarships[1] }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ s: mockStarships[0] }, { s: mockStarships[1] }]);
 
       const result = await repository.findByOwner('owner-123');
 
@@ -170,20 +161,32 @@ describe('StarshipRepository', () => {
         name: 'Test Scout',
         ownerId: 'owner-123',
         class: 'scout' as const,
-        status: 'active' as const
+        status: 'active' as const,
       };
 
-      mockConnection.executeWrite.mockResolvedValueOnce([]); // CREATE starship
+      const mockCreatedStarship = global.createMockStarship({
+        name: 'Test Scout',
+        ownerId: 'owner-123',
+        class: 'scout',
+        maxAgents: 3,
+        maxActiveMissions: 3,
+        slug: 'test-scout',
+        status: 'active',
+      });
+
+      // Fix: createEntityWithAutoId expects result[0].n, not direct result
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]); // CREATE starship
       mockConnection.executeWrite.mockResolvedValueOnce([]); // CREATE relationship
 
       // Mock slug generation
       jest.spyOn(repository as any, 'generateUniqueSlug').mockResolvedValue('test-scout');
 
-      await repository.create(starshipData);
+      const result = await repository.create(starshipData);
 
+      // The actual query uses CREATE (n:Starship) with createEntityWithAutoId
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'CREATE (s:Starship $props) RETURN s',
-        {
+        expect.stringContaining('CREATE (n:Starship)'),
+        expect.objectContaining({
           props: expect.objectContaining({
             name: 'Test Scout',
             ownerId: 'owner-123',
@@ -191,10 +194,11 @@ describe('StarshipRepository', () => {
             maxAgents: 3,
             maxActiveMissions: 3,
             slug: 'test-scout',
-            status: 'active'
-          })
-        }
+            status: 'active',
+          }),
+        })
       );
+      expect(result).toEqual(mockCreatedStarship);
     });
 
     it('should create starship with cruiser class defaults', async () => {
@@ -202,25 +206,37 @@ describe('StarshipRepository', () => {
         name: 'Test Cruiser',
         ownerId: 'owner-123',
         class: 'cruiser' as const,
-        status: 'active' as const
+        status: 'active' as const,
       };
 
-      mockConnection.executeWrite.mockResolvedValueOnce([]);
+      const mockCreatedStarship = global.createMockStarship({
+        name: 'Test Cruiser',
+        ownerId: 'owner-123',
+        class: 'cruiser',
+        maxAgents: 5,
+        maxActiveMissions: 6,
+        slug: 'test-cruiser',
+        status: 'active',
+      });
+
+      // Fix: createEntityWithAutoId expects result[0].n, not direct result
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
       mockConnection.executeWrite.mockResolvedValueOnce([]);
 
       jest.spyOn(repository as any, 'generateUniqueSlug').mockResolvedValue('test-cruiser');
 
-      await repository.create(starshipData);
+      const result = await repository.create(starshipData);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'CREATE (s:Starship $props) RETURN s',
-        {
+        expect.stringContaining('CREATE (n:Starship)'),
+        expect.objectContaining({
           props: expect.objectContaining({
             maxAgents: 5,
-            maxActiveMissions: 6
-          })
-        }
+            maxActiveMissions: 6,
+          }),
+        })
       );
+      expect(result).toEqual(mockCreatedStarship);
     });
 
     it('should create starship with draught class defaults', async () => {
@@ -228,30 +244,42 @@ describe('StarshipRepository', () => {
         name: 'Test Draught',
         ownerId: 'owner-123',
         class: 'draught' as const,
-        status: 'active' as const
+        status: 'active' as const,
       };
 
-      mockConnection.executeWrite.mockResolvedValueOnce([]);
+      const mockCreatedStarship = global.createMockStarship({
+        name: 'Test Draught',
+        ownerId: 'owner-123',
+        class: 'draught',
+        maxAgents: 10,
+        maxActiveMissions: 10,
+        slug: 'test-draught',
+        status: 'active',
+      });
+
+      // Fix: createEntityWithAutoId expects result[0].n, not direct result
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
       mockConnection.executeWrite.mockResolvedValueOnce([]);
 
       jest.spyOn(repository as any, 'generateUniqueSlug').mockResolvedValue('test-draught');
 
-      await repository.create(starshipData);
+      const result = await repository.create(starshipData);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'CREATE (s:Starship $props) RETURN s',
-        {
+        expect.stringContaining('CREATE (n:Starship)'),
+        expect.objectContaining({
           props: expect.objectContaining({
             maxAgents: 10,
-            maxActiveMissions: 10
-          })
-        }
+            maxActiveMissions: 10,
+          }),
+        })
       );
+      expect(result).toEqual(mockCreatedStarship);
     });
 
     it('should validate required fields', async () => {
       const incompleteData = {
-        name: 'Test Ship'
+        name: 'Test Ship',
         // Missing ownerId and class
       };
 
@@ -263,10 +291,19 @@ describe('StarshipRepository', () => {
         name: 'Test Ship',
         ownerId: 'owner-123',
         class: 'scout' as const,
-        status: 'active' as const
+        status: 'active' as const,
       };
 
-      mockConnection.executeWrite.mockResolvedValueOnce([]);
+      const mockCreatedStarship = global.createMockStarship({
+        name: 'Test Ship',
+        ownerId: 'owner-123',
+        class: 'scout',
+        slug: 'test-ship',
+        status: 'active',
+      });
+
+      // Fix: createEntityWithAutoId expects result[0].n, not direct result
+      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
       mockConnection.executeWrite.mockResolvedValueOnce([]);
 
       jest.spyOn(repository as any, 'generateUniqueSlug').mockResolvedValue('test-ship');
@@ -278,7 +315,7 @@ describe('StarshipRepository', () => {
         expect.objectContaining({
           ownerId: 'owner-123',
           starshipId: expect.any(String),
-          timestamp: expect.any(String)
+          timestamp: expect.any(String),
         })
       );
     });
@@ -288,13 +325,18 @@ describe('StarshipRepository', () => {
     it('should update starship successfully', async () => {
       const updates = {
         name: 'Updated Name',
-        description: 'Updated description'
+        description: 'Updated description',
       };
 
-      const existingStarship = global.createMockStarship({ id: 'starship-123', ownerId: 'owner-123' });
+      const existingStarship = global.createMockStarship({
+        id: 'starship-123',
+        ownerId: 'owner-123',
+      });
       const updatedStarship = global.createMockStarship({
         id: 'starship-123',
-        ...updates
+        name: 'Updated Name',
+        description: 'Updated description',
+        slug: 'updated-name',
       });
 
       // Mock findById call for slug generation
@@ -304,17 +346,14 @@ describe('StarshipRepository', () => {
 
       const result = await repository.update('starship-123', updates);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (s:Starship) WHERE s.id = $id SET s += $updates RETURN s',
-        {
-          id: 'starship-123',
-          updates: expect.objectContaining({
-            ...updates,
-            slug: 'updated-name',
-            updatedAt: expect.any(String)
-          })
-        }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $id SET s += $updates RETURN s', {
+        id: 'starship-123',
+        updates: expect.objectContaining({
+          ...updates,
+          slug: 'updated-name',
+          updatedAt: expect.any(String),
+        }),
+      });
       expect(result).toEqual(updatedStarship);
     });
 
@@ -380,7 +419,7 @@ describe('StarshipRepository', () => {
         expect.objectContaining({
           starshipId: 'starship-123',
           agentId: 'agent-456',
-          timestamp: expect.any(String)
+          timestamp: expect.any(String),
         })
       );
       expect(result).toBe(true);
@@ -389,18 +428,14 @@ describe('StarshipRepository', () => {
     it('should throw error when no available slots', async () => {
       jest.spyOn(repository, 'getAvailableSlots').mockResolvedValue(0);
 
-      await expect(
-        repository.deployAgent('starship-123', 'agent-456')
-      ).rejects.toThrow('No available slots on this starship');
+      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow('No available slots on this starship');
     });
 
     it('should throw error when agent already deployed', async () => {
       jest.spyOn(repository, 'getAvailableSlots').mockResolvedValue(2);
       mockConnection.executeQuery.mockResolvedValue([{ r: {} }]); // Existing deployment
 
-      await expect(
-        repository.deployAgent('starship-123', 'agent-456')
-      ).rejects.toThrow('Agent is already deployed on this starship');
+      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow('Agent is already deployed on this starship');
     });
 
     it('should validate required parameters', async () => {
@@ -415,10 +450,10 @@ describe('StarshipRepository', () => {
 
       const result = await repository.removeAgent('starship-123', 'agent-456');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('DELETE r'),
-        { starshipId: 'starship-123', agentId: 'agent-456' }
-      );
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DELETE r'), {
+        starshipId: 'starship-123',
+        agentId: 'agent-456',
+      });
       expect(result).toBe(true);
     });
 
@@ -433,9 +468,7 @@ describe('StarshipRepository', () => {
 
   describe('getAvailableSlots', () => {
     it('should calculate available slots correctly', async () => {
-      mockConnection.executeQuery.mockResolvedValue([
-        { maxAgents: 5, deployedCount: 2 }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ maxAgents: 5, deployedCount: 2 }]);
 
       const result = await repository.getAvailableSlots('starship-123');
 
@@ -443,9 +476,7 @@ describe('StarshipRepository', () => {
     });
 
     it('should handle no deployed agents', async () => {
-      mockConnection.executeQuery.mockResolvedValue([
-        { maxAgents: 3, deployedCount: 0 }
-      ]);
+      mockConnection.executeQuery.mockResolvedValue([{ maxAgents: 3, deployedCount: 0 }]);
 
       const result = await repository.getAvailableSlots('starship-123');
 
@@ -513,7 +544,8 @@ describe('StarshipRepository', () => {
       });
 
       it('should generate optimized slug when base is taken', async () => {
-        jest.spyOn(repository as any, 'isSlugAvailable')
+        jest
+          .spyOn(repository as any, 'isSlugAvailable')
           .mockResolvedValueOnce(false) // Base slug taken
           .mockResolvedValueOnce(true); // Optimized slug available
 
@@ -523,7 +555,8 @@ describe('StarshipRepository', () => {
       });
 
       it('should use fallback UUID when optimized slug is also taken', async () => {
-        jest.spyOn(repository as any, 'isSlugAvailable')
+        jest
+          .spyOn(repository as any, 'isSlugAvailable')
           .mockResolvedValueOnce(false) // Base slug taken
           .mockResolvedValueOnce(false); // Optimized slug taken
 
@@ -564,7 +597,7 @@ describe('StarshipRepository', () => {
         const updates = {
           subscriptionId: 'sub_123',
           status: 'active' as const,
-          plan: 'cruiser' as const
+          plan: 'cruiser' as const,
         };
 
         mockConnection.executeWrite.mockResolvedValue([]);
@@ -575,7 +608,7 @@ describe('StarshipRepository', () => {
           expect.stringContaining('SET starship.subscriptionId = $subscriptionId'),
           expect.objectContaining({
             starshipId: 'starship-123',
-            ...updates
+            ...updates,
           })
         );
       });
@@ -621,7 +654,7 @@ describe('StarshipRepository', () => {
           expect.stringContaining('CREATE (e:StripeEvent'),
           expect.objectContaining({
             eventId: 'evt_123',
-            eventType: 'customer.subscription.created'
+            eventType: 'customer.subscription.created',
           })
         );
       });
@@ -633,13 +666,10 @@ describe('StarshipRepository', () => {
       it('should return starship memories', async () => {
         const mockMemories = [
           { id: 'mem-1', content: 'Memory 1' },
-          { id: 'mem-2', content: 'Memory 2' }
+          { id: 'mem-2', content: 'Memory 2' },
         ];
 
-        mockConnection.executeQuery.mockResolvedValue([
-          { m: mockMemories[0] },
-          { m: mockMemories[1] }
-        ]);
+        mockConnection.executeQuery.mockResolvedValue([{ m: mockMemories[0] }, { m: mockMemories[1] }]);
 
         const result = await repository.getMemories('starship-123');
 
@@ -668,10 +698,10 @@ describe('StarshipRepository', () => {
         const result = await repository.removeMemory('starship-123', 'memory-456');
 
         expect(result).toBe(true);
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          expect.stringContaining('DETACH DELETE m'),
-          { starshipId: 'starship-123', memoryId: 'memory-456' }
-        );
+        expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE m'), {
+          starshipId: 'starship-123',
+          memoryId: 'memory-456',
+        });
       });
     });
   });
@@ -691,7 +721,7 @@ describe('StarshipRepository', () => {
         name: 'Test Ship',
         ownerId: 'owner-123',
         class: 'scout' as const,
-        status: 'active' as const
+        status: 'active' as const,
       };
 
       await expect(repository.create(starshipData)).rejects.toThrow();

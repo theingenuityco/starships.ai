@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
-import { createConnection } from '../helpers/database';
-import { BackupManager } from './backup-restore';
-import { DisasterRecoveryManager, DisasterScenario } from './disaster-recovery';
+import { createConnection } from '@/helpers/database';
+import { BackupManager } from '@/scripts/backup-restore';
+import { DisasterRecoveryManager, DisasterScenario } from '@/scripts/disaster-recovery';
 import * as fs from 'fs';
 
 /**
@@ -94,10 +94,7 @@ class BackupRestoreTestSuite {
       try {
         const backupContent = JSON.parse(fs.readFileSync(this.testBackupPath, 'utf8'));
         const hasRequiredFields =
-          backupContent.timestamp &&
-          backupContent.version &&
-          backupContent.metadata &&
-          Array.isArray(backupContent.starships);
+          backupContent.timestamp && backupContent.version && backupContent.metadata && Array.isArray(backupContent.starships);
 
         this.testResults['backup_content_structure'] = hasRequiredFields;
 
@@ -263,10 +260,10 @@ class BackupRestoreTestSuite {
     try {
       // Test 1: Connection failure recovery
       console.log('  🔄 Test 1: Connection failure recovery...');
-      const connectionRecovery = await this.recoveryManager.executeRecovery(
-        DisasterScenario.CONNECTION_FAILURE,
-        { maxRetries: 2, retryDelay: 1000 }
-      );
+      const connectionRecovery = await this.recoveryManager.executeRecovery(DisasterScenario.CONNECTION_FAILURE, {
+        maxRetries: 2,
+        retryDelay: 1000,
+      });
       this.testResults['disaster_recovery_connection'] = connectionRecovery.success;
 
       if (connectionRecovery.success) {
@@ -278,10 +275,10 @@ class BackupRestoreTestSuite {
 
       // Test 2: Disk space recovery
       console.log('  🔄 Test 2: Disk space recovery...');
-      const diskSpaceRecovery = await this.recoveryManager.executeRecovery(
-        DisasterScenario.DISK_SPACE_EXHAUSTION,
-        { cleanupOldBackups: true, maxBackupsToKeep: 3 }
-      );
+      const diskSpaceRecovery = await this.recoveryManager.executeRecovery(DisasterScenario.DISK_SPACE_EXHAUSTION, {
+        cleanupOldBackups: true,
+        maxBackupsToKeep: 3,
+      });
       this.testResults['disaster_recovery_disk_space'] = diskSpaceRecovery.success;
 
       if (diskSpaceRecovery.success) {

@@ -1,8 +1,8 @@
-import { getConnection } from '../helpers/database';
+import { getConnection } from '@/helpers/database';
 
 /**
  * Database Performance Monitoring and Query Optimization
- * 
+ *
  * Provides real-time performance monitoring, query analysis,
  * and optimization recommendations for the workflow system.
  */
@@ -62,7 +62,7 @@ export class PerformanceMonitor {
    */
   startMonitoring(): void {
     console.log('🔍 Performance monitoring started');
-    
+
     // Set up periodic reporting
     setInterval(() => {
       this.generatePeriodicReport();
@@ -77,13 +77,7 @@ export class PerformanceMonitor {
   /**
    * Record query execution metrics
    */
-  recordQuery(
-    queryType: string,
-    executionTime: number,
-    parameters?: any,
-    resultCount?: number,
-    indexesUsed?: string[]
-  ): void {
+  recordQuery(queryType: string, executionTime: number, parameters?: any, resultCount?: number, indexesUsed?: string[]): void {
     const metric: QueryMetrics = {
       queryId: `${queryType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       queryType,
@@ -91,7 +85,7 @@ export class PerformanceMonitor {
       timestamp: new Date().toISOString(),
       parameters,
       resultCount,
-      indexesUsed
+      indexesUsed,
     };
 
     this.queryMetrics.push(metric);
@@ -140,16 +134,15 @@ export class PerformanceMonitor {
         activeConnections: 1, // Neo4j doesn't expose this easily
         queryQueueLength: 0,
         memoryUsage: dbStats[0]?.data || {},
-        indexStats: indexStats[0]?.indexes || []
+        indexStats: indexStats[0]?.indexes || [],
       };
-
     } catch (error) {
       console.error('Failed to get current stats:', error);
       return {
         activeConnections: 0,
         queryQueueLength: 0,
         memoryUsage: {},
-        indexStats: []
+        indexStats: [],
       };
     }
   }
@@ -159,23 +152,17 @@ export class PerformanceMonitor {
    */
   async generateReport(periodHours: number = 1): Promise<PerformanceReport> {
     const cutoffTime = new Date(Date.now() - periodHours * 60 * 60 * 1000);
-    const recentMetrics = this.queryMetrics.filter(
-      m => new Date(m.timestamp) > cutoffTime
-    );
+    const recentMetrics = this.queryMetrics.filter((m) => new Date(m.timestamp) > cutoffTime);
 
     // Calculate summary statistics
     const totalQueries = recentMetrics.length;
-    const averageExecutionTime = totalQueries > 0 
-      ? recentMetrics.reduce((sum, m) => sum + m.executionTime, 0) / totalQueries 
-      : 0;
-    
-    const slowQueries = recentMetrics.filter(m => m.executionTime > this.SLOW_QUERY_THRESHOLD).length;
+    const averageExecutionTime = totalQueries > 0 ? recentMetrics.reduce((sum, m) => sum + m.executionTime, 0) / totalQueries : 0;
+
+    const slowQueries = recentMetrics.filter((m) => m.executionTime > this.SLOW_QUERY_THRESHOLD).length;
     const fastQueries = totalQueries - slowQueries;
 
     // Get slowest queries
-    const slowestQueries = recentMetrics
-      .sort((a, b) => b.executionTime - a.executionTime)
-      .slice(0, 10);
+    const slowestQueries = recentMetrics.sort((a, b) => b.executionTime - a.executionTime).slice(0, 10);
 
     // Analyze index usage
     const indexUsage = await this.analyzeIndexUsage();
@@ -194,12 +181,12 @@ export class PerformanceMonitor {
         averageExecutionTime: Math.round(averageExecutionTime),
         slowQueries,
         fastQueries,
-        errorRate: 0 // Would need error tracking
+        errorRate: 0, // Would need error tracking
       },
       slowestQueries,
       indexUsage,
       recommendations,
-      alerts
+      alerts,
     };
   }
 
@@ -220,11 +207,9 @@ export class PerformanceMonitor {
          RETURN name, type, state, populationPercent`
       );
 
-      return indexes.map(index => {
+      return indexes.map((index) => {
         // Calculate usage from recent queries
-        const usageCount = this.queryMetrics.filter(m => 
-          m.indexesUsed?.includes(index.name)
-        ).length;
+        const usageCount = this.queryMetrics.filter((m) => m.indexesUsed?.includes(index.name)).length;
 
         let effectiveness: 'high' | 'medium' | 'low' | 'unused' = 'unused';
         if (usageCount > 100) effectiveness = 'high';
@@ -236,10 +221,9 @@ export class PerformanceMonitor {
           usageCount,
           averageSelectivity: index.populationPercent / 100,
           lastUsed: new Date().toISOString(), // Would need actual tracking
-          effectiveness
+          effectiveness,
         };
       });
-
     } catch (error) {
       console.error('Failed to analyze index usage:', error);
       return [];
@@ -249,38 +233,36 @@ export class PerformanceMonitor {
   /**
    * Generate optimization recommendations
    */
-  private generateRecommendations(
-    metrics: QueryMetrics[], 
-    indexUsage: IndexUsageStats[]
-  ): string[] {
+  private generateRecommendations(metrics: QueryMetrics[], indexUsage: IndexUsageStats[]): string[] {
     const recommendations: string[] = [];
 
     // Analyze slow queries
-    const slowQueries = metrics.filter(m => m.executionTime > this.SLOW_QUERY_THRESHOLD);
+    const slowQueries = metrics.filter((m) => m.executionTime > this.SLOW_QUERY_THRESHOLD);
     if (slowQueries.length > metrics.length * 0.1) {
       recommendations.push('🐌 High percentage of slow queries detected. Consider query optimization.');
     }
 
     // Analyze query patterns
     const queryTypes = new Map<string, number>();
-    metrics.forEach(m => {
+    metrics.forEach((m) => {
       queryTypes.set(m.queryType, (queryTypes.get(m.queryType) || 0) + 1);
     });
 
-    const mostCommonQuery = Array.from(queryTypes.entries())
-      .sort((a, b) => b[1] - a[1])[0];
+    const mostCommonQuery = Array.from(queryTypes.entries()).sort((a, b) => b[1] - a[1])[0];
 
     if (mostCommonQuery && mostCommonQuery[1] > metrics.length * 0.3) {
-      recommendations.push(`🔄 Query type "${mostCommonQuery[0]}" represents ${Math.round(mostCommonQuery[1] / metrics.length * 100)}% of queries. Consider caching.`);
+      recommendations.push(
+        `🔄 Query type "${mostCommonQuery[0]}" represents ${Math.round((mostCommonQuery[1] / metrics.length) * 100)}% of queries. Consider caching.`
+      );
     }
 
     // Analyze index usage
-    const unusedIndexes = indexUsage.filter(i => i.effectiveness === 'unused');
+    const unusedIndexes = indexUsage.filter((i) => i.effectiveness === 'unused');
     if (unusedIndexes.length > 0) {
       recommendations.push(`🗂️ ${unusedIndexes.length} indexes are unused and could be dropped to save space.`);
     }
 
-    const lowEffectivenessIndexes = indexUsage.filter(i => i.effectiveness === 'low');
+    const lowEffectivenessIndexes = indexUsage.filter((i) => i.effectiveness === 'low');
     if (lowEffectivenessIndexes.length > 0) {
       recommendations.push(`📊 ${lowEffectivenessIndexes.length} indexes have low effectiveness. Review their necessity.`);
     }
@@ -294,7 +276,7 @@ export class PerformanceMonitor {
     }
 
     // Workflow-specific recommendations
-    const workflowQueries = metrics.filter(m => m.queryType.includes('workflow'));
+    const workflowQueries = metrics.filter((m) => m.queryType.includes('workflow'));
     if (workflowQueries.length > 0) {
       const avgWorkflowTime = workflowQueries.reduce((sum, m) => sum + m.executionTime, 0) / workflowQueries.length;
       if (avgWorkflowTime > 200) {
@@ -312,21 +294,18 @@ export class PerformanceMonitor {
   /**
    * Generate performance alerts
    */
-  private generateAlerts(
-    metrics: QueryMetrics[], 
-    indexUsage: IndexUsageStats[]
-  ): PerformanceAlert[] {
+  private generateAlerts(metrics: QueryMetrics[], indexUsage: IndexUsageStats[]): PerformanceAlert[] {
     const alerts: PerformanceAlert[] = [];
 
     // Critical slow queries
-    const criticalSlowQueries = metrics.filter(m => m.executionTime > this.VERY_SLOW_QUERY_THRESHOLD);
+    const criticalSlowQueries = metrics.filter((m) => m.executionTime > this.VERY_SLOW_QUERY_THRESHOLD);
     if (criticalSlowQueries.length > 0) {
       alerts.push({
         severity: 'critical',
         type: 'slow_query',
         message: `${criticalSlowQueries.length} queries exceeded ${this.VERY_SLOW_QUERY_THRESHOLD}ms threshold`,
         timestamp: new Date().toISOString(),
-        details: { count: criticalSlowQueries.length, threshold: this.VERY_SLOW_QUERY_THRESHOLD }
+        details: { count: criticalSlowQueries.length, threshold: this.VERY_SLOW_QUERY_THRESHOLD },
       });
     }
 
@@ -337,19 +316,19 @@ export class PerformanceMonitor {
         type: 'high_volume',
         message: `High query volume detected: ${metrics.length} queries in recent period`,
         timestamp: new Date().toISOString(),
-        details: { queryCount: metrics.length }
+        details: { queryCount: metrics.length },
       });
     }
 
     // Index issues
-    const failedIndexes = indexUsage.filter(i => i.indexName.includes('FAILED'));
+    const failedIndexes = indexUsage.filter((i) => i.indexName.includes('FAILED'));
     if (failedIndexes.length > 0) {
       alerts.push({
         severity: 'critical',
         type: 'index_failure',
         message: `${failedIndexes.length} indexes are in failed state`,
         timestamp: new Date().toISOString(),
-        details: { failedIndexes: failedIndexes.map(i => i.indexName) }
+        details: { failedIndexes: failedIndexes.map((i) => i.indexName) },
       });
     }
 
@@ -364,7 +343,7 @@ export class PerformanceMonitor {
       queryType: metric.queryType,
       executionTime: `${metric.executionTime}ms`,
       timestamp: metric.timestamp,
-      parameters: metric.parameters
+      parameters: metric.parameters,
     });
   }
 
@@ -374,10 +353,8 @@ export class PerformanceMonitor {
   private cleanupOldMetrics(): void {
     const cutoffTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours
     const initialCount = this.queryMetrics.length;
-    
-    this.queryMetrics = this.queryMetrics.filter(
-      m => new Date(m.timestamp) > cutoffTime
-    );
+
+    this.queryMetrics = this.queryMetrics.filter((m) => new Date(m.timestamp) > cutoffTime);
 
     const cleanedCount = initialCount - this.queryMetrics.length;
     if (cleanedCount > 0) {
@@ -391,24 +368,23 @@ export class PerformanceMonitor {
   private async generatePeriodicReport(): Promise<void> {
     try {
       const report = await this.generateReport(1); // Last hour
-      
+
       console.log('📊 Performance Report:', {
         period: report.period,
         totalQueries: report.summary.totalQueries,
         averageTime: `${report.summary.averageExecutionTime}ms`,
         slowQueries: report.summary.slowQueries,
-        alerts: report.alerts.length
+        alerts: report.alerts.length,
       });
 
       // Log critical alerts
-      const criticalAlerts = report.alerts.filter(a => a.severity === 'critical');
+      const criticalAlerts = report.alerts.filter((a) => a.severity === 'critical');
       if (criticalAlerts.length > 0) {
         console.error('🚨 Critical performance alerts:', criticalAlerts);
       }
 
       // Store report in database for historical analysis
       await this.storePerformanceReport(report);
-
     } catch (error) {
       console.error('Failed to generate periodic report:', error);
     }
@@ -436,7 +412,7 @@ export class PerformanceMonitor {
           summary: report.summary,
           alertCount: report.alerts.length,
           recommendationCount: report.recommendations.length,
-          data: JSON.stringify(report)
+          data: JSON.stringify(report),
         }
       );
     } catch (error) {
@@ -468,7 +444,7 @@ export class PerformanceMonitor {
       const averageResponseTimeByDay: Array<{ date: string; avgTime: number }> = [];
       const slowQueryTrend: Array<{ date: string; slowQueries: number }> = [];
 
-      reports.forEach(report => {
+      reports.forEach((report) => {
         const date = report.timestamp.split('T')[0];
         const summary = report.summary;
 
@@ -480,15 +456,14 @@ export class PerformanceMonitor {
       return {
         queryVolumeByDay,
         averageResponseTimeByDay,
-        slowQueryTrend
+        slowQueryTrend,
       };
-
     } catch (error) {
       console.error('Failed to get performance trends:', error);
       return {
         queryVolumeByDay: [],
         averageResponseTimeByDay: [],
-        slowQueryTrend: []
+        slowQueryTrend: [],
       };
     }
   }
@@ -509,9 +484,7 @@ export class PerformanceMonitor {
       );
 
       for (const cache of cacheNodes) {
-        const relatedQueries = this.queryMetrics.filter(m =>
-          m.queryType.includes(cache.type.replace('_', ''))
-        );
+        const relatedQueries = this.queryMetrics.filter((m) => m.queryType.includes(cache.type.replace('_', '')));
 
         // Adjust TTL based on query frequency
         let newTTL = 300000; // 5 minutes default
@@ -529,7 +502,6 @@ export class PerformanceMonitor {
       }
 
       console.log('🔧 Query cache optimized based on usage patterns');
-
     } catch (error) {
       console.error('Failed to optimize query cache:', error);
     }

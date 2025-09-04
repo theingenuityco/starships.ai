@@ -6,13 +6,13 @@
     "rootDir": "./src",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "types": ["node", "jest"]
+    "types": ["node", "jest"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["dist"],
-  "references": [
-    { "path": "../protocol" },
-    { "path": "../autopilot" },
-    { "path": "../errors" }
-  ]
+  "references": [{ "path": "../protocol" }, { "path": "../autopilot" }, { "path": "../errors" }]
 }

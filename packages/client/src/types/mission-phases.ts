@@ -1,23 +1,23 @@
 /**
  * Mission Phase UI Configuration
- * 
+ *
  * Client-side UI configuration for mission phases including colors, icons, and display properties.
  */
 
-import { MissionPhase, MISSION_PHASES } from '@starships/protocol';
+import { MissionPhase, MISSION_PHASES } from '@starships/protocol'
 
 /**
  * Mission phase configuration for UI display
  */
 export interface MissionPhaseConfig {
-  label: string;
-  description: string;
-  icon: string;
+  label: string
+  description: string
+  icon: string
   color: {
-    background: string;
-    border: string;
-    text: string;
-  };
+    background: string
+    border: string
+    text: string
+  }
 }
 
 /**
@@ -74,61 +74,57 @@ export const MISSION_PHASE_CONFIG: Record<MissionPhase, MissionPhaseConfig> = {
       text: 'text-green-800',
     },
   },
-} as const;
+} as const
 
 /**
  * Helper function to get phase configuration for UI
  */
 export function getMissionPhaseConfig(phase: MissionPhase): MissionPhaseConfig {
-  return MISSION_PHASE_CONFIG[phase] || {
-    label: phase,
-    description: 'Unknown phase',
-    icon: '❓',
-    color: {
-      background: 'bg-gray-100',
-      border: 'border-gray-200',
-      text: 'text-gray-800',
-    },
-  };
+  return (
+    MISSION_PHASE_CONFIG[phase] || {
+      label: phase,
+      description: 'Unknown phase',
+      icon: '❓',
+      color: {
+        background: 'bg-gray-100',
+        border: 'border-gray-200',
+        text: 'text-gray-800',
+      },
+    }
+  )
 }
 
 /**
  * Get all valid mission phases in order (UI utility)
  */
 export function getMissionPhasesInOrder(): MissionPhase[] {
-  return [
-    MISSION_PHASES.WELCOME,
-    MISSION_PHASES.ANALYSIS,
-    MISSION_PHASES.PLAN,
-    MISSION_PHASES.EXECUTE,
-    MISSION_PHASES.CONVERSE,
-  ];
+  return [MISSION_PHASES.WELCOME, MISSION_PHASES.ANALYSIS, MISSION_PHASES.PLAN, MISSION_PHASES.EXECUTE, MISSION_PHASES.CONVERSE]
 }
 
 /**
  * Get the next phase in the mission lifecycle (UI utility)
  */
 export function getNextMissionPhase(currentPhase: MissionPhase): MissionPhase | null {
-  const phases = getMissionPhasesInOrder();
-  const currentIndex = phases.indexOf(currentPhase);
-  
+  const phases = getMissionPhasesInOrder()
+  const currentIndex = phases.indexOf(currentPhase)
+
   if (currentIndex === -1 || currentIndex === phases.length - 1) {
-    return null; // Invalid phase or last phase
+    return null // Invalid phase or last phase
   }
-  
-  return phases[currentIndex + 1];
+
+  return phases[currentIndex + 1]
 }
 
 /**
  * Get the previous phase in the mission lifecycle (UI utility)
  */
 export function getPreviousMissionPhase(currentPhase: MissionPhase): MissionPhase | null {
-  const phases = getMissionPhasesInOrder();
-  const currentIndex = phases.indexOf(currentPhase);
-  
+  const phases = getMissionPhasesInOrder()
+  const currentIndex = phases.indexOf(currentPhase)
+
   if (currentIndex <= 0) {
-    return null; // Invalid phase or first phase
+    return null // Invalid phase or first phase
   }
-  
-  return phases[currentIndex - 1];
+
+  return phases[currentIndex - 1]
 }

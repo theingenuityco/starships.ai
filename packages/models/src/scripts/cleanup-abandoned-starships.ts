@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
-import { createConnection, Neo4jConfig } from '../helpers/database';
-import { StarshipRepository } from '../repositories/StarshipRepository';
+import { createConnection, Neo4jConfig } from '@/helpers/database';
+import { StarshipRepository } from '@/repositories/StarshipRepository';
 
 async function cleanupAbandonedStarships() {
   console.log('🧹 Starting cleanup of abandoned pending starships...');
@@ -30,20 +30,20 @@ async function cleanupAbandonedStarships() {
 
     // Find starships pending for more than 24 hours
     const abandonedStarships = await starshipRepo.findAbandonedPendingStarships(24);
-    
+
     if (abandonedStarships.length === 0) {
       console.log('✨ No abandoned starships found');
       return;
     }
 
     console.log(`Found ${abandonedStarships.length} abandoned starships:`);
-    
+
     for (const starship of abandonedStarships) {
       console.log(`  - ${starship.name} (ID: ${starship.id}, Created: ${starship.createdAt})`);
-      
+
       // Optional: Check with Stripe if there's an active subscription
       // If you want to be extra safe, you could check Stripe here
-      
+
       if (process.argv.includes('--dry-run')) {
         console.log('    [DRY RUN] Would delete this starship');
       } else {
@@ -55,7 +55,6 @@ async function cleanupAbandonedStarships() {
     if (!process.argv.includes('--dry-run')) {
       console.log(`\n✅ Cleaned up ${abandonedStarships.length} abandoned starships`);
     }
-
   } catch (error) {
     console.error('❌ Cleanup failed:', error);
     process.exit(1);

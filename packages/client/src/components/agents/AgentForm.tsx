@@ -6,34 +6,12 @@ import { agentAPI } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { StarshipSelector } from './StarshipSelector'
-import {
-  X,
-  Plus,
-  Bot,
-  Sparkles,
-  Code,
-  Palette,
-  BarChart3,
-  Headphones,
-  Tag,
-  Settings,
-  Info,
-  Globe,
-  Lock,
-  MessageSquare,
-  Rocket,
-} from 'lucide-react'
+import { StarshipSelector } from '@/components/agents/StarshipSelector'
+import { X, Plus, Bot, Sparkles, Code, Palette, BarChart3, Headphones, Tag, Settings, Info, Globe, Lock, MessageSquare, Rocket } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface AgentFormProps {
@@ -62,10 +40,10 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
   const [loading, setLoading] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({})
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({})
 
   const validateForm = (): boolean => {
-    const errors: {[key: string]: string} = {}
+    const errors: { [key: string]: string } = {}
 
     if (!formData.name.trim()) {
       errors.name = 'Agent name is required'
@@ -85,7 +63,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) {
       return
     }
@@ -163,9 +141,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   className="border-muted-foreground/20 focus:border-primary"
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Choose a descriptive name for your agent
-                </p>
+                <p className="text-xs text-muted-foreground">Choose a descriptive name for your agent</p>
               </div>
 
               <div className="space-y-2">
@@ -173,12 +149,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   <Tag className="h-4 w-4 text-muted-foreground" />
                   Category
                 </label>
-                <Select
-                  value={formData.category}
-                  onValueChange={value =>
-                    setFormData(prev => ({ ...prev, category: value as AgentModel['category'] }))
-                  }
-                >
+                <Select value={formData.category} onValueChange={value => setFormData(prev => ({ ...prev, category: value as AgentModel['category'] }))}>
                   <SelectTrigger className="border-muted-foreground/20 focus:border-primary">
                     <SelectValue />
                   </SelectTrigger>
@@ -202,9 +173,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Select the category that best describes your agent&apos;s purpose
-                </p>
+                <p className="text-xs text-muted-foreground">Select the category that best describes your agent&apos;s purpose</p>
               </div>
             </div>
 
@@ -216,20 +185,12 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                 </label>
                 <StarshipSelector
                   value={formData.starshipId}
-                  onValueChange={(starshipId) =>
-                    setFormData(prev => ({ ...prev, starshipId }))
-                  }
+                  onValueChange={starshipId => setFormData(prev => ({ ...prev, starshipId }))}
                   placeholder="Select a starship to deploy this agent"
-                  className={`border-muted-foreground/20 focus:border-primary ${
-                    formErrors.starshipId ? 'border-destructive' : ''
-                  }`}
+                  className={`border-muted-foreground/20 focus:border-primary ${formErrors.starshipId ? 'border-destructive' : ''}`}
                 />
-                {formErrors.starshipId && (
-                  <p className="text-sm text-destructive">{formErrors.starshipId}</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Choose the starship where this agent will be deployed
-                </p>
+                {formErrors.starshipId && <p className="text-sm text-destructive">{formErrors.starshipId}</p>}
+                <p className="text-xs text-muted-foreground">Choose the starship where this agent will be deployed</p>
               </div>
             </div>
           </div>
@@ -254,9 +215,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   className="border-muted-foreground/20 focus:border-primary min-h-[80px]"
                   rows={2}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Provide a clear, concise description of your agent&apos;s capabilities
-                </p>
+                <p className="text-xs text-muted-foreground">Provide a clear, concise description of your agent&apos;s capabilities</p>
               </div>
 
               <div className="space-y-2">
@@ -271,10 +230,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   className="border-muted-foreground/20 focus:border-primary min-h-[120px]"
                   rows={4}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Define how your agent should behave, what knowledge it should have, and any
-                  constraints it should follow
-                </p>
+                <p className="text-xs text-muted-foreground">Define how your agent should behave, what knowledge it should have, and any constraints it should follow</p>
               </div>
             </div>
           </div>
@@ -297,17 +253,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                     <span className="text-sm text-muted-foreground italic">No tags added yet</span>
                   ) : (
                     tags.map((tag: string) => (
-                      <Badge
-                        key={tag}
-                        variant="secondary"
-                        className="flex items-center gap-1 px-2 py-1"
-                      >
+                      <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-1">
                         {tag}
-                        <button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          className="ml-1 hover:bg-muted rounded-full"
-                        >
+                        <button type="button" onClick={() => removeTag(tag)} className="ml-1 hover:bg-muted rounded-full">
                           <X className="w-3 h-3" />
                         </button>
                       </Badge>
@@ -327,32 +275,20 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                     Add
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Add relevant tags to help others discover your agent
-                </p>
+                <p className="text-xs text-muted-foreground">Add relevant tags to help others discover your agent</p>
               </div>
 
               {/* Public/Private Toggle and Template Conversion */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-4 border rounded-md border-muted-foreground/20 bg-muted/5">
                   <div className="flex items-start gap-3">
-                    {isPublic ? (
-                      <Globe className="h-5 w-5 text-primary mt-0.5" />
-                    ) : (
-                      <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    )}
+                    {isPublic ? <Globe className="h-5 w-5 text-primary mt-0.5" /> : <Lock className="h-5 w-5 text-muted-foreground mt-0.5" />}
                     <div>
                       <label className="text-sm font-medium">Make Public</label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Allow other users to discover and use this agent
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Allow other users to discover and use this agent</p>
                     </div>
                   </div>
-                  <Switch
-                    checked={isPublic}
-                    onCheckedChange={setIsPublic}
-                    className="data-[state=checked]:bg-primary"
-                  />
+                  <Switch checked={isPublic} onCheckedChange={setIsPublic} className="data-[state=checked]:bg-primary" />
                 </div>
 
                 {/* Only show convert to template button when editing an existing public agent */}
@@ -362,9 +298,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                       <Sparkles className="h-5 w-5 text-blue-500 mt-0.5" />
                       <div>
                         <label className="text-sm font-medium">Convert to Template</label>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Make this agent available as a template for all users
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">Make this agent available as a template for all users</p>
                       </div>
                     </div>
                     <Button
@@ -391,10 +325,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
                           // Show detailed error toast with response data if available
                           const { toast } = await import('@/hooks/useToast')
-                          const errorMessage =
-                            error?.response?.data?.error ||
-                            error?.message ||
-                            'Failed to convert agent to template'
+                          const errorMessage = error?.response?.data?.error || error?.message || 'Failed to convert agent to template'
 
                           toast({
                             title: 'Conversion Failed',
@@ -414,12 +345,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
 
           {/* Advanced Settings */}
           <div>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex items-center gap-2 text-sm"
-            >
+            <Button type="button" variant="ghost" onClick={() => setShowAdvanced(!showAdvanced)} className="flex items-center gap-2 text-sm">
               <Settings className="h-4 w-4" />
               {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
             </Button>
@@ -452,10 +378,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                       placeholder="0.7"
                       className="border-muted-foreground/20 focus:border-primary"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Controls randomness: lower values are more deterministic, higher values more
-                      creative (0-2)
-                    </p>
+                    <p className="text-xs text-muted-foreground">Controls randomness: lower values are more deterministic, higher values more creative (0-2)</p>
                   </div>
 
                   <div className="space-y-2">
@@ -477,9 +400,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                       placeholder="4096"
                       className="border-muted-foreground/20 focus:border-primary"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Maximum length of the response (1-8192)
-                    </p>
+                    <p className="text-xs text-muted-foreground">Maximum length of the response (1-8192)</p>
                   </div>
                 </div>
 
@@ -490,16 +411,12 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   </label>
                   <Textarea
                     value={customInstructions}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                      setCustomInstructions(e.target.value)
-                    }
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCustomInstructions(e.target.value)}
                     placeholder="Additional instructions or constraints"
                     className="border-muted-foreground/20 focus:border-primary min-h-[100px]"
                     rows={3}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Add any additional instructions that should be applied to every interaction
-                  </p>
+                  <p className="text-xs text-muted-foreground">Add any additional instructions that should be applied to every interaction</p>
                 </div>
               </div>
             )}

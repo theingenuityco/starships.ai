@@ -56,28 +56,18 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
     })
   }
 
-  const hasActiveFilters =
-    filters.category || filters.tags.length > 0 || filters.isPublic !== undefined
+  const hasActiveFilters = filters.category || filters.tags.length > 0 || filters.isPublic !== undefined
 
   return (
     <div className="border rounded-lg bg-muted/10 shadow-sm overflow-hidden">
       {/* Filter Header */}
-      <div
-        className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/20 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
+      <div className="flex items-center justify-between p-3 cursor-pointer hover:bg-muted/20 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Filters</span>
           {hasActiveFilters && (
-            <Badge
-              variant="secondary"
-              className="ml-2 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-            >
-              {(filters.category ? 1 : 0) +
-                (filters.isPublic !== undefined ? 1 : 0) +
-                filters.tags.length}{' '}
-              active
+            <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+              {(filters.category ? 1 : 0) + (filters.isPublic !== undefined ? 1 : 0) + filters.tags.length} active
             </Badge>
           )}
         </div>
@@ -108,19 +98,12 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-9 px-3">
-                    <span className="truncate mr-1">
-                      {filters.category
-                        ? filters.category.charAt(0).toUpperCase() + filters.category.slice(1)
-                        : 'All categories'}
-                    </span>
+                    <span className="truncate mr-1">{filters.category ? filters.category.charAt(0).toUpperCase() + filters.category.slice(1) : 'All categories'}</span>
                     <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
-                  <DropdownMenuRadioGroup
-                    value={filters.category || ''}
-                    onValueChange={value => updateFilter('category', value || undefined)}
-                  >
+                  <DropdownMenuRadioGroup value={filters.category || ''} onValueChange={value => updateFilter('category', value || undefined)}>
                     <DropdownMenuRadioItem value="">All categories</DropdownMenuRadioItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuRadioItem value="general">General</DropdownMenuRadioItem>
@@ -139,22 +122,14 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-9 px-3">
-                    <span className="truncate mr-1">
-                      {filters.isPublic === undefined
-                        ? 'All agents'
-                        : filters.isPublic
-                          ? 'Public only'
-                          : 'Private only'}
-                    </span>
+                    <span className="truncate mr-1">{filters.isPublic === undefined ? 'All agents' : filters.isPublic ? 'Public only' : 'Private only'}</span>
                     <ChevronDown className="w-4 h-4 flex-shrink-0 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
                   <DropdownMenuRadioGroup
                     value={filters.isPublic === undefined ? '' : filters.isPublic.toString()}
-                    onValueChange={value =>
-                      updateFilter('isPublic', value === '' ? undefined : value === 'true')
-                    }
+                    onValueChange={value => updateFilter('isPublic', value === '' ? undefined : value === 'true')}
                   >
                     <DropdownMenuRadioItem value="">All agents</DropdownMenuRadioItem>
                     <DropdownMenuSeparator />
@@ -200,16 +175,9 @@ export function AgentFilters({ filters, onFiltersChange, availableTags }: AgentF
               <label className="block text-xs font-medium mb-2">Active tag filters:</label>
               <div className="flex flex-wrap gap-1.5">
                 {filters.tags.map(tag => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="flex items-center gap-1 px-2 py-1"
-                  >
+                  <Badge key={tag} variant="secondary" className="flex items-center gap-1 px-2 py-1">
                     {tag.charAt(0).toUpperCase() + tag.slice(1)}
-                    <button
-                      onClick={() => removeTag(tag)}
-                      className="ml-1 hover:bg-muted rounded-full"
-                    >
+                    <button onClick={() => removeTag(tag)} className="ml-1 hover:bg-muted rounded-full">
                       <X className="w-3 h-3" />
                     </button>
                   </Badge>

@@ -1,12 +1,12 @@
 /**
  * Conditional Node Handler
- * 
+ *
  * Conditional logic handler with JSONata
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '../Handler';
-import { Execution, NodeResult, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '../../types';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, NodeResult, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '@/types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
@@ -25,13 +25,13 @@ export class ConditionalHandler extends BaseHandler {
       for (const [conditionKey, expression] of Object.entries(params.conditions)) {
         const evaluator = jsonata(expression);
         const result = await evaluator.evaluate(sourceResult.data);
-        
+
         // Check for explicit true result (not just truthy values)
         if (result === true) {
           const nodeResult: NodeResult = {
             nodeRef: this.node.ref,
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
-            nextEdgeCondition: conditionKey
+            nextEdgeCondition: conditionKey,
           };
           execution.executionResults.set(this.node.ref, nodeResult);
           return execution;
@@ -43,15 +43,12 @@ export class ConditionalHandler extends BaseHandler {
       const nodeResult: NodeResult = {
         nodeRef: this.node.ref,
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
-        nextEdgeCondition: defaultCondition
+        nextEdgeCondition: defaultCondition,
       };
       execution.executionResults.set(this.node.ref, nodeResult);
       return execution;
-
     } catch (error) {
-      return this.createErrorResult(execution,
-        `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      return this.createErrorResult(execution, `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -60,17 +57,11 @@ export class ConditionalHandler extends BaseHandler {
     const params = this.node.parameters as ConditionalNodeParameters;
 
     if (!params.sourceNodeId) {
-      errors.push(this.createValidationError(
-        'MISSING_REQUIRED_FIELD',
-        'Source node ID is required'
-      ));
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Source node ID is required'));
     }
 
     if (!params.conditions || Object.keys(params.conditions).length === 0) {
-      errors.push(this.createValidationError(
-        'MISSING_REQUIRED_FIELD',
-        'At least one condition is required'
-      ));
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'At least one condition is required'));
     }
 
     // Validate JSONata expressions
@@ -79,10 +70,12 @@ export class ConditionalHandler extends BaseHandler {
         try {
           jsonata(expression);
         } catch (error) {
-          errors.push(this.createValidationError(
-            'INVALID_JSONATA_EXPRESSION',
-            `Invalid JSONata expression for condition '${key}': ${error instanceof Error ? error.message : 'Syntax error'}`
-          ));
+          errors.push(
+            this.createValidationError(
+              'INVALID_JSONATA_EXPRESSION',
+              `Invalid JSONata expression for condition '${key}': ${error instanceof Error ? error.message : 'Syntax error'}`
+            )
+          );
         }
       }
     }
@@ -91,7 +84,7 @@ export class ConditionalHandler extends BaseHandler {
       valid: errors.length === 0,
       errors,
       warnings: [],
-      suggestions: []
+      suggestions: [],
     };
   }
 

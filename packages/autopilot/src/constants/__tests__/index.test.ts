@@ -2,14 +2,14 @@
  * Configuration Constants Unit Tests
  */
 
-import { config, ConfigKey } from '../index';
+import { config, ConfigKey } from '@/constants/index';
 
 describe('Configuration Constants', () => {
   describe('config object', () => {
     it('should have all expected configuration keys', () => {
       const expectedKeys = [
         'APPROVAL_TIMEOUT',
-        'EXECUTION_TIMEOUT', 
+        'EXECUTION_TIMEOUT',
         'USER_PROMPT_TIMEOUT',
         'AGENT_EXECUTION_TIMEOUT',
         'MAX_NODES',
@@ -17,9 +17,9 @@ describe('Configuration Constants', () => {
         'DEFAULT_RETRIES',
         'RETRY_BACKOFF_MS',
         'JSONATA_EXPRESSION_TIMEOUT_MS',
-        'MAX_CONDITIONAL_DEPTH'
+        'MAX_CONDITIONAL_DEPTH',
       ];
-      
+
       const actualKeys = Object.keys(config);
       expect(actualKeys).toEqual(expectedKeys);
     });
@@ -47,7 +47,7 @@ describe('Configuration Constants', () => {
     });
 
     it('should have all values as numbers', () => {
-      Object.values(config).forEach(value => {
+      Object.values(config).forEach((value) => {
         expect(typeof value).toBe('number');
         expect(value).toBeGreaterThan(0);
       });
@@ -92,17 +92,17 @@ describe('Configuration Constants', () => {
       const allKeys: ConfigKey[] = [
         'APPROVAL_TIMEOUT',
         'EXECUTION_TIMEOUT',
-        'USER_PROMPT_TIMEOUT', 
+        'USER_PROMPT_TIMEOUT',
         'AGENT_EXECUTION_TIMEOUT',
         'MAX_NODES',
         'MAX_EDGES',
         'DEFAULT_RETRIES',
         'RETRY_BACKOFF_MS',
         'JSONATA_EXPRESSION_TIMEOUT_MS',
-        'MAX_CONDITIONAL_DEPTH'
+        'MAX_CONDITIONAL_DEPTH',
       ];
-      
-      allKeys.forEach(key => {
+
+      allKeys.forEach((key) => {
         expect(config[key]).toBeDefined();
         expect(typeof config[key]).toBe('number');
       });
@@ -125,14 +125,14 @@ describe('Configuration Constants', () => {
       // Workflow should be manageable but not too restrictive
       expect(config.MAX_NODES).toBeGreaterThanOrEqual(10); // Allow meaningful workflows
       expect(config.MAX_NODES).toBeLessThanOrEqual(200); // But not too complex
-      
+
       expect(config.MAX_EDGES).toBeGreaterThanOrEqual(config.MAX_NODES); // At least as many edges as nodes
     });
 
     it('should provide reasonable retry configuration', () => {
       expect(config.DEFAULT_RETRIES).toBeGreaterThan(0); // Should retry
       expect(config.DEFAULT_RETRIES).toBeLessThan(10); // But not too many times
-      
+
       expect(config.RETRY_BACKOFF_MS).toBeGreaterThanOrEqual(100); // Some delay
       expect(config.RETRY_BACKOFF_MS).toBeLessThanOrEqual(5000); // But not too long
     });
@@ -152,10 +152,10 @@ describe('Configuration Constants', () => {
         'USER_PROMPT_TIMEOUT',
         'AGENT_EXECUTION_TIMEOUT',
         'RETRY_BACKOFF_MS',
-        'JSONATA_EXPRESSION_TIMEOUT_MS'
+        'JSONATA_EXPRESSION_TIMEOUT_MS',
       ];
-      
-      timeoutKeys.forEach(key => {
+
+      timeoutKeys.forEach((key) => {
         const value = config[key as ConfigKey];
         // All should be reasonable millisecond values (> 100ms, < 24 hours)
         expect(value).toBeGreaterThanOrEqual(100);
@@ -165,8 +165,8 @@ describe('Configuration Constants', () => {
 
     it('should have consistent count limits', () => {
       const countKeys = ['MAX_NODES', 'MAX_EDGES', 'DEFAULT_RETRIES', 'MAX_CONDITIONAL_DEPTH'];
-      
-      countKeys.forEach(key => {
+
+      countKeys.forEach((key) => {
         const value = config[key as ConfigKey];
         expect(Number.isInteger(value)).toBe(true);
         expect(value).toBeGreaterThan(0);

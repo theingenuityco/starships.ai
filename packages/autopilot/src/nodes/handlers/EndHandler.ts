@@ -1,19 +1,19 @@
 /**
  * End Node Handler
- * 
+ *
  * Handles workflow end nodes - always succeeds immediately
  * Uses lazy loading with BaseHandler
  */
 
-import { BaseHandler } from '../Handler';
-import { Execution, ValidationResult } from '../../types';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, ValidationResult } from '@/types';
 
 export class EndHandler extends BaseHandler {
   readonly type = 'end';
 
   async execute(execution: Execution) {
     return this.createSuccessResult(execution, {
-      message: 'Workflow completed'
+      message: 'Workflow completed',
     });
   }
 
@@ -22,7 +22,7 @@ export class EndHandler extends BaseHandler {
       valid: true,
       errors: [],
       warnings: [],
-      suggestions: []
+      suggestions: [],
     };
   }
 

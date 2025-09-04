@@ -4,94 +4,83 @@ metadata:
   name: starships-app-ingress
   namespace: starships-prod
   annotations:
-    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: '10m'
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '60'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '60'
+    cert-manager.io/cluster-issuer: 'letsencrypt-prod'
+    nginx.ingress.kubernetes.io/ssl-redirect: 'true'
     # WebSocket support for Socket.IO
-    nginx.ingress.kubernetes.io/websocket-services: "starships-app-internal"
-    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/websocket-services: 'starships-app-internal'
+    nginx.ingress.kubernetes.io/proxy-http-version: '1.1'
     nginx.ingress.kubernetes.io/proxy-set-headers: |
       Upgrade $http_upgrade
       Connection "upgrade"
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: ws:;";
 spec:
   ingressClassName: nginx
   tls:
-  - hosts:
-    - starships.ai
-    - www.starships.ai
-    secretName: starships-tls-cert
+    - hosts:
+        - starships.ai
+        - www.starships.ai
+      secretName: starships-tls-cert
   rules:
-  - host: starships.ai
-    http:
-      paths:
-      # Auth routes must go to frontend (Next.js/Kinde handles these)
-      # This must come BEFORE the general /api rule
-      - path: /api/auth
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3000
-      # Socket.IO WebSocket route
-      - path: /socket.io
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3001
-      # Other API routes go to backend
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3001
-      # Everything else goes to frontend
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3000
-  - host: www.starships.ai
-    http:
-      paths:
-      # Auth routes must go to frontend (Next.js/Kinde handles these)
-      # This must come BEFORE the general /api rule
-      - path: /api/auth
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3000
-      # Socket.IO WebSocket route
-      - path: /socket.io
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3001
-      # Other API routes go to backend
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3001
-      # Everything else goes to frontend
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: starships-app-internal
-            port:
-              number: 3000
+    - host: starships.ai
+      http:
+        paths:
+          # Socket.IO WebSocket route - goes to server
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app-internal
+                port:
+                  name: backend
+          # ALL API routes go to server (backend) - no exceptions
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app-internal
+                port:
+                  name: backend
+          # Everything else (static files, pages, etc.) goes to client (frontend)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app-internal
+                port:
+                  name: frontend
+    - host: www.starships.ai
+      http:
+        paths:
+          # Socket.IO WebSocket route - goes to server
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app-internal
+                port:
+                  name: backend
+          # ALL API routes go to server (backend) - no exceptions
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app-internal
+                port:
+                  name: backend
+          # Everything else (static files, pages, etc.) goes to client (frontend)
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: starships-app-internal
+                port:
+                  name: frontend

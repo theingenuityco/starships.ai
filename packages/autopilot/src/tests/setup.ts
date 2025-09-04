@@ -2,28 +2,26 @@
  * Jest setup file for autopilot package tests
  */
 
-import type { Blueprint, Execution, Node } from '../types';
-import { AgentMemory } from '../AgentMemory';
+import type { Blueprint, Execution, Node } from '@/types';
+import { AgentMemory } from '@/AgentMemory';
 
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,
   log: jest.fn(),
   warn: jest.fn(),
-  error: jest.fn()
+  error: jest.fn(),
 };
 
 // Global test utilities with type assertions
 (global as any).createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
   nodes: [
     { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-    { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} }
+    { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} },
   ],
-  edges: [
-    { ref: 'edge-1', from: 'start', to: 'end' }
-  ],
+  edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
   metadata: {},
-  ...overrides
+  ...overrides,
 });
 
 // Legacy support for tests that haven't been updated yet
@@ -40,7 +38,7 @@ global.console = {
   status: 'not_started',
   executionResults: new Map(),
   agentMemory: (global as any).createAgentMemory(),
-  ...overrides
+  ...overrides,
 });
 
 // Create mock node helper
@@ -50,7 +48,7 @@ global.console = {
   name: 'Test Node',
   description: 'Test node description',
   parameters: {},
-  ...overrides
+  ...overrides,
 });
 
 // Setup common test timeouts

@@ -7,7 +7,7 @@ class DiscordThreadManager {
     this.guildId = guildId;
     this.channelId = channelId;
     this.client = null;
-    
+
     // Validate inputs without exposing sensitive data
     if (!token) throw new Error('Discord token is required');
     if (!guildId) throw new Error('Guild ID is required');
@@ -21,7 +21,7 @@ class DiscordThreadManager {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-      ]
+      ],
     });
 
     // Set up ready listener BEFORE login
@@ -43,7 +43,7 @@ class DiscordThreadManager {
       console.error('Failed to login to Discord. Please check if the bot token is valid.');
       throw new Error('Discord authentication failed');
     }
-    
+
     // Wait for ready event or timeout after 5 seconds
     const timeoutPromise = new Promise((resolve) => {
       setTimeout(() => {
@@ -53,61 +53,57 @@ class DiscordThreadManager {
         resolve();
       }, 5000);
     });
-    
+
     // Wait for either ready or timeout
     await Promise.race([readyPromise, timeoutPromise]);
-    
+
     // Double-check client is ready
     if (!this.client.isReady()) {
       console.log('Client not ready, waiting additional time...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     }
-    
+
     console.log('Discord client initialization complete');
-    
+
     // Validate guild and channel access
     try {
       console.log('Validating Discord configuration...');
       const guild = await this.client.guilds.fetch(this.guildId);
       console.log(`✓ Bot has access to guild: ${guild.name} (${guild.id})`);
-      
+
       const channel = await guild.channels.fetch(this.channelId);
       console.log(`✓ Bot has access to channel: ${channel.name} (${channel.id})`);
-      
+
       if (channel.type !== ChannelType.GuildText) {
         const channelTypes = {
           0: 'Text Channel',
-          2: 'Voice Channel', 
+          2: 'Voice Channel',
           4: 'Category',
           5: 'Announcement Channel',
           13: 'Stage Channel',
           15: 'Forum Channel',
-          16: 'Media Channel'
+          16: 'Media Channel',
         };
         const channelTypeName = channelTypes[channel.type] || `Unknown (${channel.type})`;
-        throw new Error(`Channel "${channel.name}" is a ${channelTypeName}, but threads can only be created in Text Channels (type 0). Please use a regular text channel instead of a forum channel.`);
+        throw new Error(
+          `Channel "${channel.name}" is a ${channelTypeName}, but threads can only be created in Text Channels (type 0). Please use a regular text channel instead of a forum channel.`
+        );
       }
-      
+
       // Check permissions
       const botMember = guild.members.me;
       const permissions = channel.permissionsFor(botMember);
-      const requiredPermissions = [
-        'ViewChannel',
-        'SendMessages',
-        'CreatePrivateThreads',
-        'SendMessagesInThreads',
-        'ManageThreads'
-      ];
-      
-      const missingPermissions = requiredPermissions.filter(perm => !permissions.has(perm));
+      const requiredPermissions = ['ViewChannel', 'SendMessages', 'CreatePrivateThreads', 'SendMessagesInThreads', 'ManageThreads'];
+
+      const missingPermissions = requiredPermissions.filter((perm) => !permissions.has(perm));
       if (missingPermissions.length > 0) {
         console.warn(`⚠️ Bot is missing permissions in channel: ${missingPermissions.join(', ')}`);
       }
-      
+
       console.log('✓ Discord configuration validated successfully');
     } catch (error) {
       console.error('Discord configuration validation failed:', error.message);
-      console.error('Available guilds:', this.client.guilds.cache.map(g => `${g.name} (${g.id})`).join(', '));
+      console.error('Available guilds:', this.client.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', '));
       throw new Error(`Discord configuration invalid: ${error.message}`);
     }
   }
@@ -121,10 +117,10 @@ class DiscordThreadManager {
         console.log(`Found guild: ${guild.name} (${guild.id})`);
       } catch (error) {
         console.error(`Failed to fetch guild ${this.guildId}: ${error.message}`);
-        console.error('Available guilds:', this.client.guilds.cache.map(g => `${g.name} (${g.id})`).join(', '));
+        console.error('Available guilds:', this.client.guilds.cache.map((g) => `${g.name} (${g.id})`).join(', '));
         throw new Error(`Bot is not in guild ${this.guildId} or guild ID is invalid. Please check DISCORD_GUILD_ID secret.`);
       }
-      
+
       // Validate and fetch channel
       let channel;
       try {
@@ -144,18 +140,20 @@ class DiscordThreadManager {
 
       // Create initial message in channel
       const starterMessage = await channel.send({
-        embeds: [{
-          title: `🚀 PR: ${prTitle}`,
-          description: `Thread for pull request #${prNumber}`,
-          color: 0x0366d6,
-          fields: [
-            { name: 'PR Number', value: `#${prNumber}`, inline: true },
-            { name: 'Author', value: prAuthor, inline: true },
-            { name: 'Status', value: '💬 Open', inline: true }
-          ],
-          url: prUrl,
-          timestamp: new Date().toISOString()
-        }]
+        embeds: [
+          {
+            title: `🚀 PR: ${prTitle}`,
+            description: `Thread for pull request #${prNumber}`,
+            color: 0x0366d6,
+            fields: [
+              { name: 'PR Number', value: `#${prNumber}`, inline: true },
+              { name: 'Author', value: prAuthor, inline: true },
+              { name: 'Status', value: '💬 Open', inline: true },
+            ],
+            url: prUrl,
+            timestamp: new Date().toISOString(),
+          },
+        ],
       });
 
       // Create private thread from the message
@@ -163,33 +161,35 @@ class DiscordThreadManager {
         name: threadName,
         autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
         type: ChannelType.PrivateThread,
-        reason: `PR #${prNumber} opened by ${prAuthor}`
+        reason: `PR #${prNumber} opened by ${prAuthor}`,
       });
 
       console.log(`Created private thread: ${thread.name} (${thread.id})`);
 
       // Send initial message in thread
       await thread.send({
-        embeds: [{
-          title: `Pull Request #${prNumber}`,
-          description: prTitle,
-          color: 0x0366d6,
-          fields: [
-            { name: '👤 Author', value: prAuthor, inline: true },
-            { name: '🔗 Link', value: `[View PR](${prUrl})`, inline: true },
-            { name: '📊 Status', value: 'Open', inline: true }
-          ],
-          footer: {
-            text: 'GitHub Bot',
-            icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
+        embeds: [
+          {
+            title: `Pull Request #${prNumber}`,
+            description: prTitle,
+            color: 0x0366d6,
+            fields: [
+              { name: '👤 Author', value: prAuthor, inline: true },
+              { name: '🔗 Link', value: `[View PR](${prUrl})`, inline: true },
+              { name: '📊 Status', value: 'Open', inline: true },
+            ],
+            footer: {
+              text: 'GitHub Bot',
+              icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png',
+            },
+            timestamp: new Date().toISOString(),
           },
-          timestamp: new Date().toISOString()
-        }]
+        ],
       });
 
       return {
         threadId: thread.id,
-        threadUrl: `https://discord.com/channels/${this.guildId}/${thread.id}`
+        threadUrl: `https://discord.com/channels/${this.guildId}/${thread.id}`,
       };
     } catch (error) {
       console.error('Error creating thread:', error);
@@ -215,7 +215,7 @@ class DiscordThreadManager {
         const baseName = currentName.replace(/^[🔒🚧🔵✅🔴⚠️🟣❌]\s*/, '');
         const statusEmoji = this.getStatusEmoji(status);
         const newName = `🔒${statusEmoji} ${baseName}`.substring(0, 100);
-        
+
         if (newName !== currentName) {
           await thread.setName(newName);
         }
@@ -275,7 +275,7 @@ class DiscordThreadManager {
 
       // Get all members with this role
       const membersWithRole = role.members;
-      
+
       for (const [, member] of membersWithRole) {
         try {
           await thread.members.add(member);
@@ -320,7 +320,7 @@ class DiscordThreadManager {
         console.error(`Cannot find threads - guild ${this.guildId} not accessible: ${error.message}`);
         return null;
       }
-      
+
       const channel = await guild.channels.fetch(this.channelId);
 
       if (!channel || channel.type !== ChannelType.GuildText) {
@@ -329,11 +329,11 @@ class DiscordThreadManager {
 
       // Fetch active threads
       const activeThreads = await channel.threads.fetchActive();
-      
+
       // Search for thread with PR number in name
       // Account for status emojis at the beginning
       const searchPattern = `PR #${prNumber}:`;
-      const thread = activeThreads.threads.find(t => {
+      const thread = activeThreads.threads.find((t) => {
         // Remove any emoji prefix and check
         const cleanName = t.name.replace(/^[📝💬✅🔄⚠️✨🔒]\s*/, '');
         return cleanName.startsWith(searchPattern) || t.name.includes(searchPattern);
@@ -343,13 +343,13 @@ class DiscordThreadManager {
         console.log(`Found existing active thread: ${thread.name} (${thread.id})`);
         return {
           threadId: thread.id,
-          threadUrl: `https://discord.com/channels/${this.guildId}/${thread.id}`
+          threadUrl: `https://discord.com/channels/${this.guildId}/${thread.id}`,
         };
       }
 
       // Check archived threads
       const archivedThreads = await channel.threads.fetchArchived();
-      const archivedThread = archivedThreads.threads.find(t => {
+      const archivedThread = archivedThreads.threads.find((t) => {
         // Remove any emoji prefix and check
         const cleanName = t.name.replace(/^[📝💬✅🔄⚠️✨🔒]\s*/, '');
         return cleanName.startsWith(searchPattern) || t.name.includes(searchPattern);
@@ -360,7 +360,7 @@ class DiscordThreadManager {
         await archivedThread.setArchived(false);
         return {
           threadId: archivedThread.id,
-          threadUrl: `https://discord.com/channels/${this.guildId}/${archivedThread.id}`
+          threadUrl: `https://discord.com/channels/${this.guildId}/${archivedThread.id}`,
         };
       }
 
@@ -373,13 +373,13 @@ class DiscordThreadManager {
 
   getStatusEmoji(status) {
     const statusMap = {
-      'draft': '📝',
-      'open': '💬',
-      'approved': '✅',
-      'changes_requested': '🔄',
-      'ci_failing': '⚠️',
-      'merged': '✨',
-      'closed': '🔒'
+      draft: '📝',
+      open: '💬',
+      approved: '✅',
+      changes_requested: '🔄',
+      ci_failing: '⚠️',
+      merged: '✨',
+      closed: '🔒',
     };
     return statusMap[status] || '';
   }
@@ -395,18 +395,18 @@ class DiscordThreadManager {
 
       // Update thread name with new status emoji
       const currentName = thread.name;
-      
+
       // Remove all status emojis and "PR #XXX:" patterns (including duplicates)
       let baseName = currentName
-        .replace(/^[📝💬✅🔄⚠️✨🔒]\s*/, '')  // Remove emoji
-        .replace(/PR #\d+:\s*/g, '');  // Remove ALL "PR #XXX:" occurrences (note the 'g' flag)
-      
+        .replace(/^[📝💬✅🔄⚠️✨🔒]\s*/, '') // Remove emoji
+        .replace(/PR #\d+:\s*/g, ''); // Remove ALL "PR #XXX:" occurrences (note the 'g' flag)
+
       // Clean up any extra whitespace
       baseName = baseName.trim();
-      
+
       // Build the new name with single PR prefix
       const newName = `${emoji} PR #${prNumber}: ${baseName}`.substring(0, 100);
-      
+
       if (newName !== currentName) {
         await thread.setName(newName);
         console.log(`Updated thread name from "${currentName}" to "${newName}"`);

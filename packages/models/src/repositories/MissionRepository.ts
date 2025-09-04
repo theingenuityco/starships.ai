@@ -1,6 +1,5 @@
-import { getConnection } from '../helpers/database';
-import { BaseRepository } from './BaseRepository';
-import { v4 as uuidv4 } from 'uuid';
+import { getConnection } from '@/helpers/database';
+import { BaseRepository } from '@/repositories/BaseRepository';
 import {
   MissionModel,
   MissionStatus,
@@ -8,7 +7,7 @@ import {
   UpdateMissionRequest,
   MissionFilters,
   MissionSort,
-  MissionListResponse
+  MissionListResponse,
 } from '@starships/protocol';
 
 export class MissionRepository extends BaseRepository {
@@ -19,334 +18,373 @@ export class MissionRepository extends BaseRepository {
   private validateMissionStatus(status: string): void {
     const validStatuses: MissionStatus[] = ['draft', 'active', 'completed', 'failed', 'cancelled'];
     if (!validStatuses.includes(status as MissionStatus)) {
-      this.handleValidationError([{
-        field: 'status',
-        message: `Status must be one of: ${validStatuses.join(', ')}`,
-        value: status
-      }], 'validateStatus');
+      this.handleValidationError(
+        [
+          {
+            field: 'status',
+            message: `Status must be one of: ${validStatuses.join(', ')}`,
+            value: status,
+          },
+        ],
+        'validateStatus'
+      );
     }
   }
 
   async createMission(request: CreateMissionRequest, userId: string): Promise<MissionModel> {
-    return this.executeWithErrorHandling(async () => {
-      // Validate required fields
-      this.validateRequired(request, ['starshipId', 'name', 'description', 'agentIds'], 'create');
-      this.validateRequired({ userId }, ['userId'], 'create');
+    return this.executeWithErrorHandling(
+      async () => {
+        // Validate required fields
+        this.validateRequired(request, ['starshipId', 'name', 'description', 'agentIds'], 'create');
+        this.validateRequired({ userId }, ['userId'], 'create');
 
-      // Validate field types
-      this.validateTypes(request, {
-        starshipId: 'string',
-        name: 'string',
-        description: 'string',
-        agentIds: 'object'
-      }, 'create');
+        // Validate field types
+        this.validateTypes(
+          request,
+          {
+            starshipId: 'string',
+            name: 'string',
+            description: 'string',
+            agentIds: 'object',
+          },
+          'create'
+        );
 
-      // Validate string lengths
-      this.validateStringLengths(request, {
-        name: { min: 1, max: 200 },
-        description: { min: 1, max: 1000 }
-      }, 'create');
+        // Validate string lengths
+        this.validateStringLengths(
+          request,
+          {
+            name: { min: 1, max: 200 },
+            description: { min: 1, max: 1000 },
+          },
+          'create'
+        );
 
-      // Validate agentIds array
-      if (!Array.isArray(request.agentIds)) {
-        this.handleValidationError([{
-          field: 'agentIds',
-          message: 'agentIds must be an array',
-          value: request.agentIds
-        }], 'create');
-      }
+        // Validate agentIds array
+        if (!Array.isArray(request.agentIds)) {
+          this.handleValidationError(
+            [
+              {
+                field: 'agentIds',
+                message: 'agentIds must be an array',
+                value: request.agentIds,
+              },
+            ],
+            'create'
+          );
+        }
 
-      if (request.agentIds.length === 0) {
-        this.handleValidationError([{
-          field: 'agentIds',
-          message: 'At least one agent must be assigned to the mission',
-          value: request.agentIds
-        }], 'create');
-      }
+        if (request.agentIds.length === 0) {
+          this.handleValidationError(
+            [
+              {
+                field: 'agentIds',
+                message: 'At least one agent must be assigned to the mission',
+                value: request.agentIds,
+              },
+            ],
+            'create'
+          );
+        }
 
-      const connection = getConnection();
-      const id = uuidv4();
-      const now = new Date().toISOString();
+        const connection = getConnection();
+        const now = new Date().toISOString();
 
-      // Check if starship exists
-      const starshipCheck = await connection.executeQuery<{ id: string }>(
-        'MATCH (s:Starship {id: $starshipId}) RETURN s.id as id',
-        { starshipId: request.starshipId }
-      );
+        // Check if starship exists
+        const starshipCheck = await connection.executeQuery<{ id: string }>('MATCH (s:Starship {id: $starshipId}) RETURN s.id as id', {
+          starshipId: request.starshipId,
+        });
 
-      if (!starshipCheck || starshipCheck.length === 0) {
-        this.handleNotFound('Starship', request.starshipId, 'create');
-      }
+        if (!starshipCheck || starshipCheck.length === 0) {
+          this.handleNotFound('Starship', request.starshipId, 'create');
+        }
 
-      // Create the mission
-      const missionData = {
-        id,
-        starshipId: request.starshipId,
-        name: request.name,
-        description: request.description,
-        status: 'draft',
-        phase: 'welcome',
-        agentIds: request.agentIds,
-        approvalStatus: 'pending',
-        createdAt: now,
-        updatedAt: now,
-        createdBy: userId
-      };
+        // Create the mission with auto-generated ID
+        const missionProps = {
+          starshipId: request.starshipId,
+          name: request.name,
+          description: request.description,
+          status: 'draft',
+          phase: 'welcome',
+          agentIds: request.agentIds,
+          approvalStatus: 'pending',
+          createdAt: now,
+          updatedAt: now,
+          createdBy: userId,
+        };
 
-      await connection.executeWrite(
-        'CREATE (m:MissionModel $props) RETURN m',
-        { props: missionData }
-      );
-
-      return missionData as MissionModel;
-    }, 'create', 'MissionModel');
+        const mission = await this.createEntityWithAutoId<MissionModel>('MissionModel', missionProps);
+        return mission;
+      },
+      'create',
+      'MissionModel'
+    );
   }
 
   async getMissionById(id: string): Promise<MissionModel> {
-    return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ id }, ['id'], 'findById');
+    return this.executeWithErrorHandling(
+      async () => {
+        this.validateRequired({ id }, ['id'], 'findById');
 
-      const connection = getConnection();
-      const result = await connection.executeQuery<{ m: MissionModel }>(
-        'MATCH (m:MissionModel {id: $id}) RETURN m',
-        { id }
-      );
+        const connection = getConnection();
+        const result = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:MissionModel {id: $id}) RETURN m', { id });
 
-      if (!result || result.length === 0) {
-        this.handleNotFound('MissionModel', id, 'findById');
-      }
+        if (!result || result.length === 0) {
+          this.handleNotFound('MissionModel', id, 'findById');
+        }
 
-      const mission = result[0].m;
-      return this.parseMissionFromRecord(mission);
-    }, 'findById', 'MissionModel', id);
+        const mission = result[0].m;
+        return this.parseMissionFromRecord(mission);
+      },
+      'findById',
+      'MissionModel',
+      id
+    );
   }
 
-  async getMissionModelsByStarshipId(
-    starshipId: string,
-    filters?: MissionFilters,
-    sort?: MissionSort
-  ): Promise<MissionListResponse> {
-    return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ starshipId }, ['starshipId'], 'findByStarshipId');
+  async getMissionModelsByStarshipId(starshipId: string, filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
+    return this.executeWithErrorHandling(
+      async () => {
+        this.validateRequired({ starshipId }, ['starshipId'], 'findByStarshipId');
 
-      const connection = getConnection();
-      
-      // Build WHERE clause
-      let whereClause = 'm.starshipId = $starshipId';
-      const params: any = { starshipId };
+        const connection = getConnection();
 
-      if (filters?.status && filters.status.length > 0) {
-        whereClause += ' AND m.status IN $statusList';
-        params.statusList = filters.status;
-      }
+        // Build WHERE clause
+        let whereClause = 'm.starshipId = $starshipId';
+        const params: any = { starshipId };
 
-      if (filters?.createdBy) {
-        whereClause += ' AND m.createdBy = $createdBy';
-        params.createdBy = filters.createdBy;
-      }
+        if (filters?.status && filters.status.length > 0) {
+          whereClause += ' AND m.status IN $statusList';
+          params.statusList = filters.status;
+        }
 
-      // Build ORDER BY clause
-      let orderByClause = 'ORDER BY m.createdAt DESC';
-      if (sort?.field && sort?.direction) {
-        orderByClause = `ORDER BY m.${sort.field} ${sort.direction.toUpperCase()}`;
-      }
+        if (filters?.createdBy) {
+          whereClause += ' AND m.createdBy = $createdBy';
+          params.createdBy = filters.createdBy;
+        }
 
-      const query = `
+        // Build ORDER BY clause
+        let orderByClause = 'ORDER BY m.createdAt DESC';
+        if (sort?.field && sort?.direction) {
+          orderByClause = `ORDER BY m.${sort.field} ${sort.direction.toUpperCase()}`;
+        }
+
+        const query = `
         MATCH (m:MissionModel)
         WHERE ${whereClause}
         RETURN m
         ${orderByClause}
       `;
 
-      const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
+        const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-      const missions: MissionModel[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
+        const missions: MissionModel[] = result?.map((record) => this.parseMissionFromRecord(record.m)) || [];
 
-      return {
-        missions,
-        total: missions.length
-      };
-    }, 'findByStarshipId', 'MissionModel');
+        return {
+          missions,
+          total: missions.length,
+        };
+      },
+      'findByStarshipId',
+      'MissionModel'
+    );
   }
 
   async getAllMissions(filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
-    return this.executeWithErrorHandling(async () => {
-      const connection = getConnection();
-      
-      // Build WHERE clause
-      let whereClause = '';
-      const params: any = {};
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = getConnection();
 
-      const conditions: string[] = [];
+        // Build WHERE clause
+        let whereClause = '';
+        const params: any = {};
 
-      if (filters?.starshipId) {
-        conditions.push('m.starshipId = $starshipId');
-        params.starshipId = filters.starshipId;
-      }
+        const conditions: string[] = [];
 
-      if (filters?.status && filters.status.length > 0) {
-        conditions.push('m.status IN $statusList');
-        params.statusList = filters.status;
-      }
+        if (filters?.starshipId) {
+          conditions.push('m.starshipId = $starshipId');
+          params.starshipId = filters.starshipId;
+        }
 
-      if (filters?.createdBy) {
-        conditions.push('m.createdBy = $createdBy');
-        params.createdBy = filters.createdBy;
-      }
+        if (filters?.status && filters.status.length > 0) {
+          conditions.push('m.status IN $statusList');
+          params.statusList = filters.status;
+        }
 
-      if (conditions.length > 0) {
-        whereClause = `WHERE ${conditions.join(' AND ')}`;
-      }
+        if (filters?.createdBy) {
+          conditions.push('m.createdBy = $createdBy');
+          params.createdBy = filters.createdBy;
+        }
 
-      // Build ORDER BY clause
-      let orderByClause = 'ORDER BY m.createdAt DESC';
-      if (sort?.field && sort?.direction) {
-        orderByClause = `ORDER BY m.${sort.field} ${sort.direction.toUpperCase()}`;
-      }
+        if (conditions.length > 0) {
+          whereClause = `WHERE ${conditions.join(' AND ')}`;
+        }
 
-      const query = `
+        // Build ORDER BY clause
+        let orderByClause = 'ORDER BY m.createdAt DESC';
+        if (sort?.field && sort?.direction) {
+          orderByClause = `ORDER BY m.${sort.field} ${sort.direction.toUpperCase()}`;
+        }
+
+        const query = `
         MATCH (m:MissionModel)
         ${whereClause}
         RETURN m
         ${orderByClause}
       `;
 
-      const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
+        const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-      const missions: MissionModel[] = result?.map(record => this.parseMissionFromRecord(record.m)) || [];
+        const missions: MissionModel[] = result?.map((record) => this.parseMissionFromRecord(record.m)) || [];
 
-      return {
-        missions,
-        total: missions.length
-      };
-    }, 'findAll', 'MissionModel');
+        return {
+          missions,
+          total: missions.length,
+        };
+      },
+      'findAll',
+      'MissionModel'
+    );
   }
 
   async updateMission(id: string, updates: UpdateMissionRequest): Promise<MissionModel> {
-    return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ id }, ['id'], 'update');
+    return this.executeWithErrorHandling(
+      async () => {
+        this.validateRequired({ id }, ['id'], 'update');
 
-      if (!updates || Object.keys(updates).length === 0) {
-        this.handleValidationError([{
-          field: 'updates',
-          message: 'At least one field must be provided for update'
-        }], 'update');
-      }
-
-      // Validate status if provided
-      if (updates.status) {
-        this.validateMissionStatus(updates.status);
-      }
-
-      // Validate string lengths if provided
-      if (updates.name !== undefined || updates.description !== undefined) {
-        this.validateStringLengths(updates, {
-          ...(updates.name !== undefined && { name: { min: 1, max: 200 } }),
-          ...(updates.description !== undefined && { description: { min: 1, max: 1000 } })
-        }, 'update');
-      }
-
-      const connection = getConnection();
-      
-      // Check if mission exists
-      const existingResult = await connection.executeQuery<{ m: MissionModel }>(
-        'MATCH (m:MissionModel {id: $id}) RETURN m',
-        { id }
-      );
-
-      if (!existingResult || existingResult.length === 0) {
-        this.handleNotFound('MissionModel', id, 'update');
-      }
-
-      // Build SET clause dynamically
-      const setClause: string[] = ['m.updatedAt = $updatedAt'];
-      const params: any = { 
-        id,
-        updatedAt: new Date().toISOString()
-      };
-
-      if (updates.name !== undefined) {
-        setClause.push('m.name = $name');
-        params.name = updates.name;
-      }
-
-      if (updates.description !== undefined) {
-        setClause.push('m.description = $description');
-        params.description = updates.description;
-      }
-
-      if (updates.status !== undefined) {
-        setClause.push('m.status = $status');
-        params.status = updates.status;
-      }
-
-      if (updates.phase !== undefined) {
-        setClause.push('m.phase = $phase');
-        params.phase = updates.phase;
-      }
-
-      if (updates.agentIds !== undefined) {
-        // Validate agentIds array if provided
-        if (!Array.isArray(updates.agentIds)) {
-          this.handleValidationError([{
-            field: 'agentIds',
-            message: 'agentIds must be an array',
-            value: updates.agentIds
-          }], 'update');
+        if (!updates || Object.keys(updates).length === 0) {
+          this.handleValidationError(
+            [
+              {
+                field: 'updates',
+                message: 'At least one field must be provided for update',
+              },
+            ],
+            'update'
+          );
         }
-        
-        setClause.push('m.agentIds = $agentIds');
-        params.agentIds = updates.agentIds;
-      }
 
-      if (updates.approvalStatus !== undefined) {
-        setClause.push('m.approvalStatus = $approvalStatus');
-        params.approvalStatus = updates.approvalStatus;
-      }
+        // Validate status if provided
+        if (updates.status) {
+          this.validateMissionStatus(updates.status);
+        }
 
-      const query = `
+        // Validate string lengths if provided
+        if (updates.name !== undefined || updates.description !== undefined) {
+          this.validateStringLengths(
+            updates,
+            {
+              ...(updates.name !== undefined && { name: { min: 1, max: 200 } }),
+              ...(updates.description !== undefined && { description: { min: 1, max: 1000 } }),
+            },
+            'update'
+          );
+        }
+
+        const connection = getConnection();
+
+        // Check if mission exists
+        const existingResult = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:MissionModel {id: $id}) RETURN m', { id });
+
+        if (!existingResult || existingResult.length === 0) {
+          this.handleNotFound('MissionModel', id, 'update');
+        }
+
+        // Build SET clause dynamically
+        const setClause: string[] = ['m.updatedAt = $updatedAt'];
+        const params: any = {
+          id,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (updates.name !== undefined) {
+          setClause.push('m.name = $name');
+          params.name = updates.name;
+        }
+
+        if (updates.description !== undefined) {
+          setClause.push('m.description = $description');
+          params.description = updates.description;
+        }
+
+        if (updates.status !== undefined) {
+          setClause.push('m.status = $status');
+          params.status = updates.status;
+        }
+
+        if (updates.phase !== undefined) {
+          setClause.push('m.phase = $phase');
+          params.phase = updates.phase;
+        }
+
+        if (updates.agentIds !== undefined) {
+          // Validate agentIds array if provided
+          if (!Array.isArray(updates.agentIds)) {
+            this.handleValidationError(
+              [
+                {
+                  field: 'agentIds',
+                  message: 'agentIds must be an array',
+                  value: updates.agentIds,
+                },
+              ],
+              'update'
+            );
+          }
+
+          setClause.push('m.agentIds = $agentIds');
+          params.agentIds = updates.agentIds;
+        }
+
+        if (updates.approvalStatus !== undefined) {
+          setClause.push('m.approvalStatus = $approvalStatus');
+          params.approvalStatus = updates.approvalStatus;
+        }
+
+        const query = `
         MATCH (m:MissionModel {id: $id})
         SET ${setClause.join(', ')}
         RETURN m
       `;
 
-      const result = await connection.executeWrite<{ m: MissionModel }>(query, params);
+        const result = await connection.executeWrite<{ m: MissionModel }>(query, params);
 
-      if (!result || result.length === 0) {
-        throw new Error('Failed to update mission');
-      }
+        if (!result || result.length === 0) {
+          throw new Error('Failed to update mission');
+        }
 
-      return this.parseMissionFromRecord(result[0].m);
-    }, 'update', 'MissionModel', id);
+        return this.parseMissionFromRecord(result[0].m);
+      },
+      'update',
+      'MissionModel',
+      id
+    );
   }
 
   async deleteMissionModel(id: string): Promise<void> {
-    return this.executeWithErrorHandling(async () => {
-      this.validateRequired({ id }, ['id'], 'delete');
+    return this.executeWithErrorHandling(
+      async () => {
+        this.validateRequired({ id }, ['id'], 'delete');
 
-      const connection = getConnection();
-      
-      // Check if mission exists
-      const existingResult = await connection.executeQuery<{ m: MissionModel }>(
-        'MATCH (m:MissionModel {id: $id}) RETURN m',
-        { id }
-      );
+        const connection = getConnection();
 
-      if (!existingResult || existingResult.length === 0) {
-        this.handleNotFound('MissionModel', id, 'delete');
-      }
+        // Check if mission exists
+        const existingResult = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:MissionModel {id: $id}) RETURN m', { id });
 
-      // Delete the mission
-      await connection.executeWrite(
-        'MATCH (m:MissionModel {id: $id}) DELETE m',
-        { id }
-      );
-    }, 'delete', 'MissionModel', id);
+        if (!existingResult || existingResult.length === 0) {
+          this.handleNotFound('MissionModel', id, 'delete');
+        }
+
+        // Delete the mission
+        await connection.executeWrite('MATCH (m:MissionModel {id: $id}) DELETE m', { id });
+      },
+      'delete',
+      'MissionModel',
+      id
+    );
   }
 
-  /**
-   * Parse mission from Neo4j record, handling JSON fields
-   */
+  /** Parse mission from Neo4j record, handling JSON fields */
   private parseMissionFromRecord(record: any): MissionModel {
     return {
       id: record.id,
@@ -359,7 +397,7 @@ export class MissionRepository extends BaseRepository {
       approvalStatus: record.approvalStatus || 'pending',
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
-      createdBy: record.createdBy
+      createdBy: record.createdBy,
     };
   }
 }

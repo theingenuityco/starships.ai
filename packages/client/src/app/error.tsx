@@ -3,13 +3,7 @@
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 
-export default function Error({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string }
-  reset: () => void
-}) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     // Log the error to an error reporting service
     console.error('App error:', error)
@@ -20,15 +14,13 @@ export default function Error({
     return (
       <div className="flex min-h-screen flex-col items-center justify-center">
         <h2 className="text-2xl font-semibold mb-4">Loading Error</h2>
-        <p className="text-muted-foreground mb-6">
-          There was a problem loading the application resources.
-        </p>
+        <p className="text-muted-foreground mb-6">There was a problem loading the application resources.</p>
         <Button
           onClick={() => {
             // Clear cache and reload
             if ('caches' in window) {
-              caches.keys().then((names) => {
-                names.forEach((name) => {
+              caches.keys().then(names => {
+                names.forEach(name => {
                   caches.delete(name)
                 })
               })

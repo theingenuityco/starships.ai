@@ -1,231 +1,344 @@
-import { useKindeBrowserClient } from '@kinde-oss/kinde-auth-nextjs'
-import { LoginLink, LogoutLink, RegisterLink } from '@kinde-oss/kinde-auth-nextjs/components'
-import { useEffect, useState } from 'react'
-import { userAPI, type SyncedUser, setTokenProvider } from '@/lib/api'
+import { setTokenProvider, type SyncedUser } from '@/lib/api'
+import type { ApiResponse } from '@starships/protocol'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { AxiosResponse } from 'axios'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect } from 'react'
+import { toast } from 'sonner'
 
-/**
- * Custom hook for accessing Kinde authentication state and synced user data
- * Provides a consistent interface for auth operations across the app
- */
-export function useAuth() {
-  const {
-    user,
-    isAuthenticated,
-    isLoading: kindeLoading,
-    getToken,
-    getClaim,
-    getAccessTokenRaw,
-    accessTokenRaw,
-  } = useKindeBrowserClient()
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  avatar?: string
+}
 
-  // TESTING BACKDOOR: Only activate when explicitly enabled
-  const enableTestingBackdoor = process.env.NEXT_PUBLIC_ENABLE_AUTH_TESTING_BACKDOOR === 'true'
-  const shouldUseTestingBackdoor = enableTestingBackdoor && !kindeLoading && !isAuthenticated
-  
-  if (shouldUseTestingBackdoor) {
-    console.log('[AUTH] Testing backdoor activated - auth testing mode enabled')
+interface AuthLoginResponse {
+  user: AuthUser
+  token: string
+  starship?: {
+    slug: string
   }
+}
 
-  const [syncedUser, setSyncedUser] = useState<SyncedUser | null>(null)
-  const [syncLoading, setSyncLoading] = useState(false)
-  const [syncError, setSyncError] = useState<string | null>(null)
+interface AuthRegisterResponse {
+  user: AuthUser
+  token: string
+  starship?: {
+    slug: string
+  }
+}
 
-  // Auto-sync user when Kinde authentication completes
-  useEffect(() => {
-    const syncUser = async () => {
-      if (!isAuthenticated || !user || syncedUser || syncLoading) {
-        return
+// Helper to extract data from ApiResponse<T> - enforces response contract
+const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
+
+// Centralized query keys
+export const AUTH_QUERY_KEYS = {
+  all: ['auth'] as const,
+  user: () => [...AUTH_QUERY_KEYS.all, 'user'] as const,
+  me: () => [...AUTH_QUERY_KEYS.user(), 'me'] as const,
+} as const
+
+// Token storage utilities
+const getStoredToken = (): string | null => {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('starships_auth_token')
+}
+
+const setStoredToken = (token: string | null) => {
+  if (typeof window === 'undefined') return
+  if (token) {
+    localStorage.setItem('starships_auth_token', token)
+  } else {
+    localStorage.removeItem('starships_auth_token')
+  }
+}
+
+// Validate token and get user info
+const validateToken = async (token: string): Promise<AuthUser | null> => {
+  try {
+    const response = await fetch('/api/v1/auth/me', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      return data.data || data // Handle different response formats
+    }
+
+    return null
+  } catch (error) {
+    console.error('[AUTH] Token validation failed:', error)
+    return null
+  }
+}
+
+// Get current user info using query
+export function useAuthUser() {
+  return useQuery({
+    queryKey: AUTH_QUERY_KEYS.me(),
+    queryFn: async (): Promise<AuthUser | null> => {
+      const token = getStoredToken()
+      if (!token) {
+        return null
       }
 
-      setSyncLoading(true)
-      setSyncError(null)
+      return await validateToken(token)
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401 (unauthorized) - token is invalid
+      if (error?.response?.status === 401) {
+        return false
+      }
+      return failureCount < 2
+    },
+    refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+  })
+}
+
+// Login mutation
+export function useLogin() {
+  const queryClient = useQueryClient()
+  const router = useRouter()
+
+  return useMutation({
+    mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      const response = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.data) {
+        throw new Error(data.error?.message || 'Login failed')
+      }
+
+      return data.data as AuthLoginResponse
+    },
+    onSuccess: data => {
+      const { user, token, starship } = data
+
+      // Store token
+      setStoredToken(token)
+
+      // Update auth user cache
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
+
+      console.log('[AUTH] User logged in:', user.email)
+
+      // Redirect to starship's session if available
+      if (starship) {
+        console.log('[AUTH] Redirecting to starship session:', starship.slug)
+        router.push(`/ship/${starship.slug}/session`)
+      }
+
+      // Invalidate all queries to refetch with new auth context
+      queryClient.invalidateQueries()
+    },
+    onError: (error: any) => {
+      console.error('[AUTH] Login error:', error)
+      const errorMessage = error.message || 'Login failed'
+      toast.error('Login failed', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
+// Register mutation
+export function useRegister() {
+  const queryClient = useQueryClient()
+  const router = useRouter()
+
+  return useMutation({
+    mutationFn: async ({ email, password, name }: { email: string; password: string; name?: string }) => {
+      const response = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, name }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.data) {
+        throw new Error(data.error?.message || 'Registration failed')
+      }
+
+      return data.data as AuthRegisterResponse
+    },
+    onSuccess: data => {
+      const { user, token, starship } = data
+
+      // Store token
+      setStoredToken(token)
+
+      // Update auth user cache
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
+
+      console.log('[AUTH] User registered:', user.email)
+
+      // Redirect to starship's session if available
+      if (starship) {
+        console.log('[AUTH] Redirecting to starship session:', starship.slug)
+        router.push(`/ship/${starship.slug}/session`)
+      }
+
+      // Invalidate all queries to refetch with new auth context
+      queryClient.invalidateQueries()
+    },
+    onError: (error: any) => {
+      console.error('[AUTH] Registration error:', error)
+      const errorMessage = error.message || 'Registration failed'
+      toast.error('Registration failed', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
+// Logout mutation
+export function useLogout() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      const token = getStoredToken()
 
       try {
-        console.log('[USER-SYNC] Syncing Kinde user to backend:', user.id)
-
-        const syncedUserData = await userAPI.syncUser({
-          kindeId: user.id,
-          email: user.email!,
-          name:
-            user.given_name || user.family_name
-              ? `${user.given_name} ${user.family_name}`.trim()
-              : undefined,
-          avatar: user.picture || undefined,
+        // Call logout endpoint (optional since JWT is stateless)
+        await fetch('/api/v1/auth/logout', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         })
-
-        setSyncedUser(syncedUserData)
-        console.log('[USER-SYNC] User synced successfully:', syncedUserData.id)
       } catch (error) {
-        console.error('[USER-SYNC] Failed to sync user:', error)
-        setSyncError('Failed to sync user data')
-      } finally {
-        setSyncLoading(false)
+        console.error('[AUTH] Logout API call failed:', error)
       }
-    }
+    },
+    onSuccess: () => {
+      // Clear token storage
+      setStoredToken(null)
 
-    syncUser()
-  }, [isAuthenticated, user?.id]) // Fixed: Only depend on auth state and user ID
+      // Clear all cached data
+      queryClient.clear()
 
-  // Set up token provider for API client authentication
+      // Set auth user to null
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
+
+      console.log('[AUTH] User logged out')
+    },
+    onError: (error: any) => {
+      console.error('[AUTH] Logout error:', error)
+      // Still clear local data even if API call fails
+      setStoredToken(null)
+      queryClient.clear()
+      queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
+    },
+  })
+}
+
+/**
+ * Main authentication hook - TanStack Query powered
+ * Handles all authentication operations using TanStack Query for optimal caching and state management
+ */
+export function useAuth() {
+  const { data: user, isLoading, error, refetch } = useAuthUser()
+  const loginMutation = useLogin()
+  const registerMutation = useRegister()
+  const logoutMutation = useLogout()
+
+  // Set up token provider for API calls on mount
   useEffect(() => {
-    console.log(
-      '[AUTH] Setting up token provider, isAuthenticated:',
-      isAuthenticated,
-      'kindeLoading:',
-      kindeLoading
-    )
+    setTokenProvider(async () => {
+      const token = getStoredToken()
+      return token
+    })
+  }, [])
 
-    // Critical: Only set up token provider after loading is complete
-    if (!kindeLoading) {
-      setTokenProvider(async () => {
-        // TESTING BACKDOOR: Provide test token when explicitly enabled
-        if (shouldUseTestingBackdoor) {
-          console.log('[AUTH] Providing test token for testing backdoor')
-          return 'test-auth-token'
-        }
-        
-        if (isAuthenticated) {
-          try {
-            console.log('[AUTH] Attempting to get access token...')
-
-            // Try multiple token methods for compatibility
-            let accessToken = null
-
-            // First try getToken() which is the most reliable method
-            try {
-              accessToken = await getToken()
-              console.log('[AUTH] getToken result:', accessToken ? 'Token present' : 'No token')
-            } catch (tokenError) {
-              console.warn('[AUTH] getToken failed:', tokenError)
-            }
-
-            // Fallback to raw token methods
-            if (!accessToken && getAccessTokenRaw) {
-              try {
-                accessToken = getAccessTokenRaw()
-                console.log(
-                  '[AUTH] getAccessTokenRaw result:',
-                  accessToken ? 'Token present' : 'No token'
-                )
-              } catch (rawError) {
-                console.warn('[AUTH] getAccessTokenRaw failed:', rawError)
-              }
-            }
-
-            if (!accessToken && accessTokenRaw) {
-              accessToken = accessTokenRaw
-              console.log(
-                '[AUTH] accessTokenRaw result:',
-                accessToken ? 'Token present' : 'No token'
-              )
-            }
-
-            if (accessToken) {
-              console.log('[AUTH] Access token retrieved for API - length:', accessToken.length)
-              // Validate token format (JWT should have 3 parts separated by dots)
-              const tokenParts = accessToken.split('.')
-              if (tokenParts.length !== 3) {
-                console.error('[AUTH] Invalid token format - not a valid JWT')
-                return null
-              }
-            } else {
-              console.error('[AUTH] No access token available despite being authenticated')
-            }
-
-            return accessToken
-          } catch (error) {
-            console.error('[AUTH] Failed to get access token:', error)
-            return null
-          }
-        }
-        console.log('[AUTH] Not authenticated, returning null token')
-        return null
-      })
-    }
-  }, [isAuthenticated, kindeLoading])
-
-  const isLoading = kindeLoading || syncLoading
-
-  // TESTING BACKDOOR: Return mock authenticated state when explicitly enabled
-  if (shouldUseTestingBackdoor) {
-    const mockUser = {
-      id: 'test-user-1',
-      email: 'test@starships.ai',
-      given_name: 'Test',
-      family_name: 'User',
-      picture: undefined
-    }
-    
-    return {
-      // Kinde user information
-      kindeUser: mockUser,
-      isAuthenticated: true,
-      isLoading: false,
-
-      // Synced user data (mock)
-      syncedUser: {
-        id: 'test-user-1',
-        email: 'test@starships.ai',
-        displayName: 'Test User',
-        username: 'test-user',
-        avatar: undefined,
-        kindeId: 'test-user-1',
+  // Create synced user data for compatibility
+  const syncedUser: SyncedUser | null = user
+    ? {
+        id: user.id,
+        username: user.name || user.email.split('@')[0],
+        email: user.email,
+        displayName: user.name,
+        avatar: user.avatar,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      syncError: null,
+      }
+    : null
 
-      // Token management (mock)
-      getToken: async () => 'test-auth-token',
-      getClaim: () => null,
+  // Login function
+  const login = useCallback(
+    async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        await loginMutation.mutateAsync({ email, password })
+        return { success: true }
+      } catch (error: any) {
+        return { success: false, error: error.message || 'Login failed' }
+      }
+    },
+    [loginMutation]
+  )
 
-      // Auth components
-      LoginLink,
-      LogoutLink,
-      RegisterLink,
+  // Register function
+  const register = useCallback(
+    async (email: string, password: string, name?: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        await registerMutation.mutateAsync({ email, password, name })
+        return { success: true }
+      } catch (error: any) {
+        return { success: false, error: error.message || 'Registration failed' }
+      }
+    },
+    [registerMutation]
+  )
 
-      // Convenience properties
-      userId: 'test-user-1',
-      userEmail: 'test@starships.ai',
-      userName: 'Test User',
-      userAvatar: undefined,
+  // Logout function
+  const logout = useCallback(async () => {
+    await logoutMutation.mutateAsync()
+  }, [logoutMutation])
 
-      // For backwards compatibility
-      user: mockUser,
-    }
-  }
+  const isAuthenticated = !!user
+  const authError = error?.message || loginMutation.error?.message || registerMutation.error?.message || null
+  const authLoading = isLoading || loginMutation.isPending || registerMutation.isPending || logoutMutation.isPending
 
   return {
-    // Kinde user information
-    kindeUser: user,
-    isAuthenticated,
-    isLoading,
-
-    // Synced user data (from our backend)
+    // Auth state
+    user,
     syncedUser,
-    syncError,
+    isAuthenticated,
+    isLoading: authLoading,
+    error: authError,
 
-    // Token management
-    getToken,
-    getClaim,
+    // Auth actions
+    login,
+    register,
+    logout,
+    getToken: getStoredToken, // Expose token getter
 
-    // Auth components (for use in JSX)
-    LoginLink,
-    LogoutLink,
-    RegisterLink,
-
-    // Convenience properties (prefer synced user data when available)
+    // Compatibility properties for existing components
     userId: syncedUser?.id || user?.id,
     userEmail: syncedUser?.email || user?.email,
-    userName:
-      syncedUser?.displayName ||
-      syncedUser?.username ||
-      (user?.given_name || user?.family_name
-        ? `${user?.given_name} ${user?.family_name}`.trim()
-        : user?.email),
-    userAvatar: syncedUser?.avatar || user?.picture,
+    userName: syncedUser?.displayName || user?.name,
+    userAvatar: syncedUser?.avatar || user?.avatar,
 
-    // For backwards compatibility
-    user: syncedUser || user,
+    // Additional TanStack Query utilities
+    refetchUser: refetch,
+    loginMutation,
+    registerMutation,
+    logoutMutation,
   }
 }

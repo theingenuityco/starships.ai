@@ -2,25 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { MCPServerConnector } from '@/lib/api'
-import {
-  ConnectorHealthMetrics,
-  monitoringService,
-  connectorMonitoring,
-} from '@/lib/connector-monitoring'
+import { ConnectorHealthMetrics, monitoringService, connectorMonitoring } from '@/lib/connector-monitoring'
 import { ConnectorApiKeyStatus, ApiKeyStatusInfo } from '@/lib/connector-api-key-status'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  Activity,
-  Clock,
-  TrendingUp,
-  Zap,
-  Target,
-  Key,
-  AlertTriangle,
-  CheckCircle,
-} from 'lucide-react'
+import { Activity, Clock, TrendingUp, Zap, Target, Key, AlertTriangle, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ConnectorPerformanceMetricsProps {
@@ -29,11 +16,7 @@ interface ConnectorPerformanceMetricsProps {
   showDetails?: boolean
 }
 
-export function ConnectorPerformanceMetrics({
-  connectorInstances,
-  className,
-  showDetails = false,
-}: ConnectorPerformanceMetricsProps) {
+export function ConnectorPerformanceMetrics({ connectorInstances, className, showDetails = false }: ConnectorPerformanceMetricsProps) {
   const [healthMetrics, setHealthMetrics] = useState<Map<string, ConnectorHealthMetrics>>(new Map())
   const [apiKeyStatus, setApiKeyStatus] = useState<Map<string, ApiKeyStatusInfo>>(new Map())
 
@@ -56,26 +39,15 @@ export function ConnectorPerformanceMetrics({
 
   // Calculate overall performance metrics
   const overallMetrics = {
-    averageUptime:
-      connectorInstances.length > 0
-        ? Array.from(healthMetrics.values()).reduce((sum, metric) => sum + metric.uptime, 0) /
-          connectorInstances.length
-        : 0,
-    averageSuccessRate:
-      connectorInstances.length > 0
-        ? Array.from(healthMetrics.values()).reduce((sum, metric) => sum + metric.successRate, 0) /
-          connectorInstances.length
-        : 0,
+    averageUptime: connectorInstances.length > 0 ? Array.from(healthMetrics.values()).reduce((sum, metric) => sum + metric.uptime, 0) / connectorInstances.length : 0,
+    averageSuccessRate: connectorInstances.length > 0 ? Array.from(healthMetrics.values()).reduce((sum, metric) => sum + metric.successRate, 0) / connectorInstances.length : 0,
     averageResponseTime:
       connectorInstances.length > 0
         ? Array.from(healthMetrics.values())
             .filter(metric => metric.lastResponseTime)
             .reduce((sum, metric, _, arr) => sum + (metric.lastResponseTime || 0) / arr.length, 0)
         : 0,
-    totalErrors: Array.from(healthMetrics.values()).reduce(
-      (sum, metric) => sum + metric.errorCount,
-      0
-    ),
+    totalErrors: Array.from(healthMetrics.values()).reduce((sum, metric) => sum + metric.errorCount, 0),
   }
 
   const activeConnectors = connectorInstances.filter(c => c.status === 'active')
@@ -83,12 +55,9 @@ export function ConnectorPerformanceMetrics({
   // Calculate API key status summary
   const apiKeysSummary = {
     total: connectorInstances.length,
-    configured: Array.from(apiKeyStatus.values()).filter(status => status.status === 'configured')
-      .length,
+    configured: Array.from(apiKeyStatus.values()).filter(status => status.status === 'configured').length,
     missing: Array.from(apiKeyStatus.values()).filter(status => status.status === 'missing').length,
-    notRequired: Array.from(apiKeyStatus.values()).filter(
-      status => status.status === 'not_required'
-    ).length,
+    notRequired: Array.from(apiKeyStatus.values()).filter(status => status.status === 'not_required').length,
   }
 
   if (connectorInstances.length === 0) {
@@ -119,9 +88,7 @@ export function ConnectorPerformanceMetrics({
             </div>
             <div className="flex items-center gap-2">
               <Progress value={overallMetrics.averageSuccessRate} className="flex-1 h-2" />
-              <span className="text-sm font-mono">
-                {connectorMonitoring.formatSuccessRate()}
-              </span>
+              <span className="text-sm font-mono">{connectorMonitoring.formatSuccessRate()}</span>
             </div>
           </div>
 
@@ -130,9 +97,7 @@ export function ConnectorPerformanceMetrics({
               <Clock className="w-3 h-3 text-blue-500" />
               <span className="text-xs text-muted-foreground">Avg Response</span>
             </div>
-            <div className="text-sm font-mono">
-              {connectorMonitoring.formatResponseTime()}
-            </div>
+            <div className="text-sm font-mono">{connectorMonitoring.formatResponseTime()}</div>
           </div>
 
           <div className="space-y-2">
@@ -144,16 +109,10 @@ export function ConnectorPerformanceMetrics({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex items-center gap-1 cursor-help">
-                    <span className="text-sm font-mono text-green-600">
-                      {apiKeysSummary.configured}
-                    </span>
+                    <span className="text-sm font-mono text-green-600">{apiKeysSummary.configured}</span>
                     <span className="text-xs text-muted-foreground">/</span>
-                    <span className="text-sm font-mono">
-                      {apiKeysSummary.total - apiKeysSummary.notRequired}
-                    </span>
-                    {apiKeysSummary.missing > 0 && (
-                      <AlertTriangle className="w-3 h-3 text-amber-500 ml-1" />
-                    )}
+                    <span className="text-sm font-mono">{apiKeysSummary.total - apiKeysSummary.notRequired}</span>
+                    {apiKeysSummary.missing > 0 && <AlertTriangle className="w-3 h-3 text-amber-500 ml-1" />}
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -196,10 +155,7 @@ export function ConnectorPerformanceMetrics({
                 }
 
                 return (
-                  <div
-                    key={connector.id}
-                    className="flex items-center justify-between p-2 rounded border bg-card/50"
-                  >
+                  <div key={connector.id} className="flex items-center justify-between p-2 rounded border bg-card/50">
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
@@ -210,9 +166,7 @@ export function ConnectorPerformanceMetrics({
                           metrics.healthStatus === 'unknown' && 'bg-gray-500'
                         )}
                       />
-                      <span className="text-sm font-medium">
-                        {connector.template?.name || connector.templateId}
-                      </span>
+                      <span className="text-sm font-medium">{connector.template?.name || connector.templateId}</span>
                       {getApiKeyIcon() && (
                         <TooltipProvider>
                           <Tooltip>
@@ -220,10 +174,7 @@ export function ConnectorPerformanceMetrics({
                               <div className="flex items-center">{getApiKeyIcon()}</div>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <div className="text-xs">
-                                {keyStatusInfo &&
-                                  ConnectorApiKeyStatus.getStatusMessage(keyStatusInfo)}
-                              </div>
+                              <div className="text-xs">{keyStatusInfo && ConnectorApiKeyStatus.getStatusMessage(keyStatusInfo)}</div>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -237,9 +188,7 @@ export function ConnectorPerformanceMetrics({
                       {metrics.lastResponseTime && (
                         <div className="flex items-center gap-1">
                           <Zap className="w-3 h-3 text-muted-foreground" />
-                          <span>
-                            {connectorMonitoring.formatResponseTime()}
-                          </span>
+                          <span>{connectorMonitoring.formatResponseTime()}</span>
                         </div>
                       )}
                     </div>
@@ -257,9 +206,7 @@ export function ConnectorPerformanceMetrics({
             <p className="text-xs text-muted-foreground">Active</p>
           </div>
           <div className="text-center">
-            <p className="text-lg font-semibold text-blue-600">
-              {connectorMonitoring.formatUptime()}
-            </p>
+            <p className="text-lg font-semibold text-blue-600">{connectorMonitoring.formatUptime()}</p>
             <p className="text-xs text-muted-foreground">Avg Uptime</p>
           </div>
           <div className="text-center">
@@ -270,9 +217,7 @@ export function ConnectorPerformanceMetrics({
             <div className="flex items-center justify-center gap-1">
               <p className="text-lg font-semibold text-green-600">{apiKeysSummary.configured}</p>
               <span className="text-sm text-muted-foreground">/</span>
-              <p className="text-lg font-semibold text-muted-foreground">
-                {apiKeysSummary.total - apiKeysSummary.notRequired}
-              </p>
+              <p className="text-lg font-semibold text-muted-foreground">{apiKeysSummary.total - apiKeysSummary.notRequired}</p>
             </div>
             <p className="text-xs text-muted-foreground">API Keys</p>
           </div>

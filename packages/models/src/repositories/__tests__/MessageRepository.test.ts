@@ -2,9 +2,9 @@
  * MessageRepository Unit Tests
  */
 
-import { MessageRepository } from '@/repositories/MessageRepository';
 import { Neo4jConnection, getConnection } from '@/helpers/database';
-import { ValidationError, DatabaseError } from '@starships/errors';
+import { MessageRepository } from '@/repositories/MessageRepository';
+import { DatabaseError, ValidationError } from '@starships/errors';
 import type { MessageModel } from '@starships/protocol';
 
 // Mock dependencies

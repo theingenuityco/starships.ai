@@ -21,9 +21,9 @@ export interface AgentOptions {
 export interface ExecuteAgentResponse {
   response: string;
   usage: {
-    total_tokens: number;
+    totalTokens: number;
     cost: number;
-    model_calls: number;
+    modelCalls: number;
   };
   executionTime: number;
   status: 'success' | 'error';
@@ -237,8 +237,8 @@ export class AgentService {
         content: executionResult.response,
         agentId: agentId,
         usage: {
-          promptTokens: Math.floor(executionResult.usage.total_tokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(executionResult.usage.total_tokens * 0.3), // Estimate completion tokens
+          promptTokens: Math.floor(executionResult.usage.totalTokens * 0.7), // Estimate prompt tokens
+          completionTokens: Math.floor(executionResult.usage.totalTokens * 0.3), // Estimate completion tokens
         },
       };
     } catch (error) {
@@ -357,7 +357,7 @@ export class AgentService {
 
       return {
         response: 'I apologize, but I encountered an error processing your request.',
-        usage: { total_tokens: 0, cost: 0, model_calls: 0 },
+        usage: { totalTokens: 0, cost: 0, modelCalls: 0 },
         executionTime,
         status: 'error',
         error: errorMessage,
@@ -463,15 +463,15 @@ export class AgentService {
 
     for (const result of results) {
       if (result.data?.usage) {
-        totalTokens += result.data.usage.total_tokens || 0;
+        totalTokens += result.data.usage.totalTokens || 0;
         totalCost += result.data.usage.cost || 0;
       }
     }
 
     return {
-      total_tokens: totalTokens,
+      totalTokens: totalTokens,
       cost: totalCost,
-      model_calls: results.filter((r: any) => !r.error).length,
+      modelCalls: results.filter((r: any) => !r.error).length,
     };
   }
 

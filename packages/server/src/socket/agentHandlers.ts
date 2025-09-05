@@ -9,7 +9,7 @@ import type { Socket, Server as SocketIOServer } from 'socket.io';
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
   const sessionService = createSessionService();
   const isSessionActive = (session: any): boolean => {
-    const lastActivity = new Date(session.last_activity_at);
+    const lastActivity = new Date(session.lastActivityAt);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
     return diffMinutes < 30; // 30 minute timeout

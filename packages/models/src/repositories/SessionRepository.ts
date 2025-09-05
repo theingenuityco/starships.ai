@@ -280,7 +280,7 @@ export class SessionRepository extends BaseRepository {
           {
             starshipId,
             sessionId,
-            key: `starship_${starshipId}_session_${sessionId}`,
+            key: `${starshipId}_${sessionId}`,
           }
         );
       },
@@ -316,8 +316,8 @@ export class SessionRepository extends BaseRepository {
     const mapped = {
       id: sessionModel.id,
       createdAt: sessionModel.createdAt,
-      updatedAt: sessionModel.updatedAt || sessionModel.createdAt,
-      lastActivityAt: sessionModel.lastActivityAt || sessionModel.createdAt,
+      updatedAt: sessionModel.updatedAt,
+      lastActivityAt: sessionModel.lastActivityAt,
       messageCount: sessionModel.messageCount || 0,
       totalTokens: sessionModel.totalTokens || 0,
       status: sessionModel.status || 'active',

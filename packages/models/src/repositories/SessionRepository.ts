@@ -39,7 +39,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const now = new Date().toISOString();
+        const now = this.getCurrentTimestamp();
 
         const sessionData = {
           createdAt: now,
@@ -100,7 +100,7 @@ export class SessionRepository extends BaseRepository {
 
         // Always update the updatedAt field
         setFields.push('s.updatedAt = $updatedAt');
-        params.updatedAt = new Date().toISOString();
+        params.updatedAt = this.getCurrentTimestamp();
 
         const result = await connection.executeWrite<{ s: SessionModel }>(
           `MATCH (s:Session) WHERE s.id = $id
@@ -144,7 +144,7 @@ export class SessionRepository extends BaseRepository {
         const connection = this.connection;
         await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.lastActivityAt = $timestamp', {
           id,
-          timestamp: new Date().toISOString(),
+          timestamp: this.getCurrentTimestamp(),
         });
       },
       'updateActivity',
@@ -159,7 +159,7 @@ export class SessionRepository extends BaseRepository {
         const connection = this.connection;
         await connection.executeWrite(
           'MATCH (s:Session) WHERE s.id = $id SET s.messageCount = s.messageCount + $increment, s.lastActivityAt = $timestamp',
-          { id, increment, timestamp: new Date().toISOString() }
+          { id, increment, timestamp: this.getCurrentTimestamp() }
         );
       },
       'incrementMessageCount',
@@ -174,7 +174,7 @@ export class SessionRepository extends BaseRepository {
         const connection = this.connection;
         await connection.executeWrite(
           'MATCH (s:Session) WHERE s.id = $id SET s.totalTokens = s.totalTokens + $tokens, s.lastActivityAt = $timestamp',
-          { id, tokens, timestamp: new Date().toISOString() }
+          { id, tokens, timestamp: this.getCurrentTimestamp() }
         );
       },
       'updateTokenCount',
@@ -184,32 +184,27 @@ export class SessionRepository extends BaseRepository {
   }
 
   async markAsCompleted(id: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.connection;
-        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.lastActivityAt = $timestamp', {
-          id,
-          status: 'completed',
-          timestamp: new Date().toISOString(),
-        });
-      },
-      'markAsCompleted',
-      'Session',
-      id
-    );
+    return this.updateStatus(id, 'completed', 'markAsCompleted');
   }
 
   async archiveSession(id: string): Promise<void> {
+    return this.updateStatus(id, 'archived', 'archiveSession');
+  }
+
+  /**
+   * Common method to update session status and activity timestamp
+   */
+  private async updateStatus(id: string, status: string, methodName: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
         await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.lastActivityAt = $timestamp', {
           id,
-          status: 'archived',
-          timestamp: new Date().toISOString(),
+          status,
+          timestamp: this.getCurrentTimestamp(),
         });
       },
-      'archiveSession',
+      methodName,
       'Session',
       id
     );
@@ -329,5 +324,12 @@ export class SessionRepository extends BaseRepository {
     }
 
     return mapped as SessionModel;
+  }
+
+  /**
+   * Get current timestamp in ISO format
+   */
+  private getCurrentTimestamp(): string {
+    return new Date().toISOString();
   }
 }

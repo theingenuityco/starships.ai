@@ -2,10 +2,10 @@
  * SessionRepository Unit Tests
  */
 
-import { ConflictError, DatabaseError } from '@starships/errors';
-import type { SessionModel } from '@starships/protocol';
 import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { SessionRepository } from '@/repositories/SessionRepository';
+import { ConflictError, DatabaseError } from '@starships/errors';
+import type { SessionModel } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
@@ -46,11 +46,11 @@ describe('SessionRepository', () => {
 
   const createMockSessionRecord = (session: SessionModel) => ({
     id: session.id,
-    created_at: session.createdAt,
-    updated_at: session.updatedAt,
-    last_activity_at: session.lastActivityAt,
-    message_count: session.messageCount,
-    total_tokens: session.totalTokens,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    lastActivityAt: session.lastActivityAt,
+    messageCount: session.messageCount,
+    totalTokens: session.totalTokens,
     status: session.status,
     metadata: session.metadata ? JSON.stringify(session.metadata) : null,
   });
@@ -70,7 +70,7 @@ describe('SessionRepository', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({ id: 'session-1' });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY s.last_activity_at DESC'));
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY s.lastActivityAt DESC'));
     });
 
     it('should return empty array when no sessions found', async () => {
@@ -126,10 +126,10 @@ describe('SessionRepository', () => {
       };
       const mockCreated = {
         id: 'test-session-id',
-        created_at: expect.any(String),
-        last_activity_at: '2024-01-01T00:00:00.000Z',
-        message_count: 0,
-        total_tokens: 0,
+        createdAt: expect.any(String),
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        totalTokens: 0,
         status: 'active',
         metadata: null,
       };
@@ -147,8 +147,8 @@ describe('SessionRepository', () => {
         expect.stringContaining('CREATE (n:Session)'),
         expect.objectContaining({
           props: expect.objectContaining({
-            message_count: 0,
-            total_tokens: 0,
+            messageCount: 0,
+            totalTokens: 0,
             status: 'active',
           }),
         })
@@ -163,10 +163,10 @@ describe('SessionRepository', () => {
       };
       const mockCreated = {
         id: 'test-session-id',
-        created_at: expect.any(String),
-        last_activity_at: '2024-01-01T00:00:00.000Z',
-        message_count: 0,
-        total_tokens: 0,
+        createdAt: expect.any(String),
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        totalTokens: 0,
         status: 'active',
         metadata: null,
       };
@@ -179,8 +179,8 @@ describe('SessionRepository', () => {
         expect.any(String),
         expect.objectContaining({
           props: expect.objectContaining({
-            message_count: 0,
-            total_tokens: 0,
+            messageCount: 0,
+            totalTokens: 0,
             status: 'active',
           }),
         })
@@ -196,10 +196,10 @@ describe('SessionRepository', () => {
       };
       const mockCreated = {
         id: 'test-session-id',
-        created_at: expect.any(String),
-        last_activity_at: '2024-01-01T00:00:00.000Z',
-        message_count: 0,
-        total_tokens: 0,
+        createdAt: expect.any(String),
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        totalTokens: 0,
         status: 'active',
         metadata: JSON.stringify({ theme: 'dark', language: 'en' }),
       };
@@ -322,7 +322,7 @@ describe('SessionRepository', () => {
       await repository.updateActivity('session-123');
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET s.last_activity_at = $timestamp'),
+        expect.stringContaining('SET s.lastActivityAt = $timestamp'),
         expect.objectContaining({
           id: 'session-123',
           timestamp: expect.any(String),
@@ -344,7 +344,7 @@ describe('SessionRepository', () => {
       await repository.incrementMessageCount('session-123');
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET s.message_count = s.message_count + $increment'),
+        expect.stringContaining('SET s.messageCount = s.messageCount + $increment'),
         expect.objectContaining({
           id: 'session-123',
           increment: 1,
@@ -380,7 +380,7 @@ describe('SessionRepository', () => {
       await repository.updateTokenCount('session-123', 500);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET s.total_tokens = s.total_tokens + $tokens'),
+        expect.stringContaining('SET s.totalTokens = s.totalTokens + $tokens'),
         expect.objectContaining({
           id: 'session-123',
           tokens: 500,
@@ -460,11 +460,11 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const dbRecord = {
         id: 'session-123',
-        created_at: '2024-01-01T00:00:00.000Z',
-        updated_at: '2024-01-01T01:00:00.000Z',
-        last_activity_at: '2024-01-01T02:00:00.000Z',
-        message_count: 10,
-        total_tokens: 2000,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T01:00:00.000Z',
+        lastActivityAt: '2024-01-01T02:00:00.000Z',
+        messageCount: 10,
+        totalTokens: 2000,
         status: 'active',
         metadata: JSON.stringify({ theme: 'space' }),
       };
@@ -487,7 +487,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const minimalRecord = {
         id: 'session-123',
-        created_at: '2024-01-01T00:00:00.000Z',
+        createdAt: '2024-01-01T00:00:00.000Z',
       };
 
       const result = repo.mapToSession(minimalRecord);
@@ -508,7 +508,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const recordWithNullMetadata = {
         id: 'session-123',
-        created_at: '2024-01-01T00:00:00.000Z',
+        createdAt: '2024-01-01T00:00:00.000Z',
         metadata: null,
       };
 
@@ -521,7 +521,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const recordWithMetadata = {
         id: 'session-123',
-        created_at: '2024-01-01T00:00:00.000Z',
+        createdAt: '2024-01-01T00:00:00.000Z',
         metadata: JSON.stringify({ complex: { nested: 'value' } }),
       };
 
@@ -534,7 +534,7 @@ describe('SessionRepository', () => {
       const repo = repository as any;
       const recordWithInvalidJson = {
         id: 'session-123',
-        created_at: '2024-01-01T00:00:00.000Z',
+        createdAt: '2024-01-01T00:00:00.000Z',
         metadata: 'invalid-json{',
       };
 
@@ -556,10 +556,10 @@ describe('SessionRepository', () => {
       // Create
       const mockCreated = {
         id: 'test-session-id',
-        created_at: expect.any(String),
-        last_activity_at: '2024-01-01T00:00:00.000Z',
-        message_count: 0,
-        total_tokens: 0,
+        createdAt: expect.any(String),
+        lastActivityAt: '2024-01-01T00:00:00.000Z',
+        messageCount: 0,
+        totalTokens: 0,
         status: 'active',
         metadata: null,
       };

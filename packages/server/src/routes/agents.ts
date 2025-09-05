@@ -1,15 +1,15 @@
-import { Router } from 'express';
-import { AgentService } from '@/services/AgentService';
+import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { AgentRepository } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
-import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { Router } from 'express';
 import {
-  sendSuccess,
-  sendError,
-  handleCommonError,
-  validateUUID,
-  validatePagination,
   createPaginationMeta,
+  handleCommonError,
+  sendError,
+  sendSuccess,
+  validatePagination,
+  validateUUID,
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -34,16 +34,18 @@ router.post('/agents/:id/ratings', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    const result = await AgentService.rateAgent(req.params.id, req.user!.id, rating);
-    if (!result) {
+    const agentRepository = new AgentRepository();
+    try {
+      await agentRepository.updateRating(req.params.id, rating);
+      sendSuccess(res, { message: 'Agent rated successfully' }, 201);
+    } catch (error) {
+      console.error(`Failed to rate agent ${req.params.id}:`, error);
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
       return;
     }
-
-    sendSuccess(res, result, 201);
   } catch (error) {
     if (!handleCommonError(error, res, 'rating agent')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to rate agent');
@@ -60,8 +62,11 @@ router.post('/agents/:id/usage', jwtAuthMiddleware, async (req: Request, res: Re
       return;
     }
 
-    const result = await AgentService.trackUsage(req.params.id);
-    if (!result) {
+    const agentRepository = new AgentRepository();
+    try {
+      await agentRepository.incrementUsageCount(req.params.id);
+    } catch (error) {
+      console.error(`Failed to track usage for agent ${req.params.id}:`, error);
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
@@ -110,7 +115,8 @@ router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: 
 
     console.log(`[AGENTS] Updating agent ${agentId} starship assignment to: ${starshipId}`);
 
-    const agent = await AgentService.updateAgent(agentId, { starshipId } as UpdateAgentRequest);
+    const agentRepository = new AgentRepository();
+    const agent = await agentRepository.update(agentId, { starshipId } as Partial<AgentModel>);
     if (!agent) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
@@ -174,7 +180,8 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
     }
 
     // Get agents for the starship
-    const allAgents = await AgentService.getAgentsByStarshipId(starshipId);
+    const agentRepository = new AgentRepository();
+    const allAgents = await agentRepository.findByStarshipId(starshipId);
 
     // Apply pagination
     const startIndex = (pagination.page - 1) * pagination.limit;
@@ -199,7 +206,8 @@ router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
       return;
     }
 
-    const agent = await AgentService.getAgent(req.params.id);
+    const agentRepository = new AgentRepository();
+    const agent = await agentRepository.findById(req.params.id);
     if (!agent) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
@@ -225,14 +233,28 @@ router.get('/agents/:id/analytics', jwtAuthMiddleware, async (req: Request, res:
       return;
     }
 
-    const analytics = await AgentService.getAgentAnalytics(req.params.id);
-    if (!analytics) {
+    const agentRepository = new AgentRepository();
+    const agent = await agentRepository.findById(req.params.id);
+
+    if (!agent) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
         id: req.params.id,
       });
       return;
     }
+
+    // Return basic analytics from the agent model
+    const analytics = {
+      id: agent.id,
+      name: agent.name,
+      usageCount: agent.usageCount || 0,
+      rating: agent.rating || 0,
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+      category: agent.category,
+      isPublic: agent.isPublic,
+    };
 
     sendSuccess(res, analytics);
   } catch (error) {
@@ -274,7 +296,8 @@ router.get('/users/:userId/agents', jwtAuthMiddleware, async (req: Request, res:
     }
 
     // Get user agents
-    const allAgents = await AgentService.getAgentsByAuthor(targetUserId);
+    const agentRepository = new AgentRepository();
+    const allAgents = await agentRepository.findByAuthor(targetUserId);
 
     // Apply pagination
     const startIndex = (pagination.page - 1) * pagination.limit;
@@ -328,10 +351,12 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
     let agents: AgentModel[];
 
     // Handle different query scenarios
+    const agentRepository = new AgentRepository();
+
     if (category) {
-      agents = await AgentService.getAgentsByCategory(category as string);
+      agents = await agentRepository.findByCategory(category as string);
     } else if (authorId) {
-      agents = await AgentService.getAgentsByAuthor(authorId as string);
+      agents = await agentRepository.findByAuthor(authorId as string);
     } else if (starshipId) {
       // Validate starship access
       const { StarshipRepository } = await import('@starships/models');
@@ -350,13 +375,13 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
         return;
       }
 
-      agents = await AgentService.getAgentsByStarshipId(starshipId as string);
+      agents = await agentRepository.findByStarshipId(starshipId as string);
     } else if (tags) {
       const tagArray = Array.isArray(tags) ? tags : [tags];
-      agents = await AgentService.getAgentsByTags(tagArray as string[]);
+      agents = await agentRepository.findByTags(tagArray as string[]);
     } else if (isPublic === 'true') {
       const offset = (page - 1) * limit;
-      agents = await AgentService.getPublicAgents(limit, offset);
+      agents = await agentRepository.findPublic(limit, offset);
     } else {
       // Default: get user's agents + public agents
       console.log(`[AGENTS] Loading agents for user: ${userId}`);
@@ -365,7 +390,7 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
       let publicAgents: AgentModel[] = [];
 
       try {
-        userAgents = await AgentService.getAgentsByAuthor(userId);
+        userAgents = await agentRepository.findByAuthor(userId);
         console.log(`[AGENTS] Found ${userAgents.length} user agents`);
       } catch (userError: any) {
         console.error(`[AGENTS] Failed to get user agents:`, userError);
@@ -373,7 +398,7 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
       }
 
       try {
-        publicAgents = await AgentService.getPublicAgents(50, 0);
+        publicAgents = await agentRepository.findPublic(50, 0);
         console.log(`[AGENTS] Found ${publicAgents.length} public agents`);
       } catch (publicError: any) {
         console.error(`[AGENTS] Failed to get public agents:`, publicError);
@@ -414,7 +439,8 @@ router.get('/agents/public', jwtAuthMiddleware, async (req: Request, res: Respon
     }
 
     const offset = (page - 1) * limit;
-    const agents = await AgentService.getPublicAgents(limit, offset);
+    const agentRepository = new AgentRepository();
+    const agents = await agentRepository.findPublic(limit, offset);
 
     // For proper pagination, we'd need total count from service
     // For now, assuming the returned count represents the page
@@ -447,7 +473,8 @@ router.get('/agents/search', jwtAuthMiddleware, async (req: Request, res: Respon
       return;
     }
 
-    const agents = await AgentService.searchAgents(query);
+    const agentRepository = new AgentRepository();
+    const agents = await agentRepository.searchAgents(query);
     sendSuccess(res, agents);
   } catch (error) {
     if (!handleCommonError(error, res, 'searching agents')) {
@@ -501,7 +528,16 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
 
     console.log(`[AGENTS] Creating agent with authorId: ${agentData.authorId}, starshipId: ${agentData.starshipId} for user: ${userId}`);
 
-    const agent = await AgentService.createAgent(agentData);
+    const agentRepository = new AgentRepository();
+
+    // Provide defaults for core AgentNodeParameters fields
+    const agentDataWithDefaults = {
+      ...agentData,
+      timeout: agentData.timeout || 30000,
+      version: '1.0.0', // Default version for all new agents
+    };
+
+    const agent = await agentRepository.create(agentDataWithDefaults);
     console.log(`[AGENTS] Agent created successfully: ${agent.id}, authorId: ${agent.authorId}`);
 
     sendSuccess(res, agent, 201);
@@ -533,7 +569,8 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
       console.log(`[AGENTS] Updating agent ${req.params.id} with new starshipId: ${updates.starshipId}`);
     }
 
-    const agent = await AgentService.updateAgent(req.params.id, updates);
+    const agentRepository = new AgentRepository();
+    const agent = await agentRepository.update(req.params.id, updates as Partial<AgentModel>);
     if (!agent) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
@@ -559,7 +596,8 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
       return;
     }
 
-    const deleted = await AgentService.deleteAgent(req.params.id);
+    const agentRepository = new AgentRepository();
+    const deleted = await agentRepository.delete(req.params.id);
     if (!deleted) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',

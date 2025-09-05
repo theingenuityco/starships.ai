@@ -1,6 +1,6 @@
-import { SessionModel } from '@starships/protocol';
 import { getConnection, Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import { SessionModel } from '@starships/protocol';
 
 export class SessionRepository extends BaseRepository {
   private connection: Neo4jConnection;
@@ -14,7 +14,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) RETURN s ORDER BY s.last_activity_at DESC');
+        const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) RETURN s ORDER BY s.lastActivityAt DESC');
         return result.map((record) => this.mapToSession(record.s));
       },
       'findAll',
@@ -26,7 +26,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ s: any }>('MATCH (s:Session) WHERE s.id = $id RETURN s', { id });
+        const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) WHERE s.id = $id RETURN s', { id });
         return result.length > 0 ? this.mapToSession(result[0].s) : null;
       },
       'findById',
@@ -42,15 +42,15 @@ export class SessionRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         const sessionData = {
-          created_at: now,
-          last_activity_at: entity.lastActivityAt || now,
-          message_count: entity.messageCount || 0,
-          total_tokens: entity.totalTokens || 0,
+          createdAt: now,
+          lastActivityAt: entity.lastActivityAt || now,
+          messageCount: entity.messageCount || 0,
+          totalTokens: entity.totalTokens || 0,
           status: entity.status || 'active',
-          metadata: entity.metadata ? JSON.stringify(entity.metadata) : null,
+          metadata: this.safeJsonStringify(entity.metadata),
         };
 
-        const result = await this.createEntityWithAutoId<any>('Session', sessionData, this.connection);
+        const result = await this.createEntityWithAutoId<SessionModel>('Session', sessionData, this.connection);
 
         // Create relationship with starship if starshipId is provided
         if (starshipId) {
@@ -78,19 +78,19 @@ export class SessionRepository extends BaseRepository {
         const connection = this.connection;
 
         const setFields = [];
-        const params: any = { id };
+        const params: Record<string, unknown> = { id };
 
         // Handle updatable fields
         if (updates.lastActivityAt !== undefined) {
-          setFields.push('s.last_activity_at = $lastActivityAt');
+          setFields.push('s.lastActivityAt = $lastActivityAt');
           params.lastActivityAt = updates.lastActivityAt;
         }
         if (updates.messageCount !== undefined) {
-          setFields.push('s.message_count = $messageCount');
+          setFields.push('s.messageCount = $messageCount');
           params.messageCount = updates.messageCount;
         }
         if (updates.totalTokens !== undefined) {
-          setFields.push('s.total_tokens = $totalTokens');
+          setFields.push('s.totalTokens = $totalTokens');
           params.totalTokens = updates.totalTokens;
         }
         if (updates.status !== undefined) {
@@ -99,7 +99,7 @@ export class SessionRepository extends BaseRepository {
         }
         if (updates.metadata !== undefined) {
           setFields.push('s.metadata = $metadata');
-          params.metadata = updates.metadata ? JSON.stringify(updates.metadata) : null;
+          params.metadata = this.safeJsonStringify(updates.metadata);
         }
 
         if (setFields.length === 0) {
@@ -107,10 +107,10 @@ export class SessionRepository extends BaseRepository {
         }
 
         // Always update the updatedAt field
-        setFields.push('s.updated_at = $updatedAt');
+        setFields.push('s.updatedAt = $updatedAt');
         params.updatedAt = new Date().toISOString();
 
-        const result = await connection.executeWrite<{ s: any }>(
+        const result = await connection.executeWrite<{ s: SessionModel }>(
           `MATCH (s:Session) WHERE s.id = $id
          SET ${setFields.join(', ')}
          RETURN s`,
@@ -150,7 +150,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.last_activity_at = $timestamp', {
+        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.lastActivityAt = $timestamp', {
           id,
           timestamp: new Date().toISOString(),
         });
@@ -166,7 +166,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.message_count = s.message_count + $increment, s.last_activity_at = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.messageCount = s.messageCount + $increment, s.lastActivityAt = $timestamp',
           { id, increment, timestamp: new Date().toISOString() }
         );
       },
@@ -181,7 +181,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.total_tokens = s.total_tokens + $tokens, s.last_activity_at = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.totalTokens = s.totalTokens + $tokens, s.lastActivityAt = $timestamp',
           { id, tokens, timestamp: new Date().toISOString() }
         );
       },
@@ -195,7 +195,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp', {
+        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.lastActivityAt = $timestamp', {
           id,
           status: 'completed',
           timestamp: new Date().toISOString(),
@@ -211,7 +211,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.last_activity_at = $timestamp', {
+        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.lastActivityAt = $timestamp', {
           id,
           status: 'archived',
           timestamp: new Date().toISOString(),
@@ -230,9 +230,9 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ s: any }>(
+        const result = await connection.executeQuery<{ s: SessionModel }>(
           `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
-           RETURN s ORDER BY s.last_activity_at DESC`,
+           RETURN s ORDER BY s.lastActivityAt DESC`,
           { starshipId }
         );
         return result.map((record) => this.mapToSession(record.s));
@@ -249,7 +249,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ starship: any }>(
+        const result = await connection.executeQuery<{ starship: { id: string; name: string; slug: string } }>(
           `MATCH (starship:Starship)-[:HAS_SESSION]->(s:Session {id: $sessionId})
            RETURN starship`,
           { sessionId }
@@ -311,26 +311,31 @@ export class SessionRepository extends BaseRepository {
    * Map database SessionModel to Session domain model
    */
   private mapToSession(sessionModel: any): SessionModel {
-    let parsedMetadata = undefined;
-    if (sessionModel.metadata) {
+    if (!sessionModel) return sessionModel;
+
+    const mapped = {
+      id: sessionModel.id,
+      createdAt: sessionModel.createdAt,
+      updatedAt: sessionModel.updatedAt || sessionModel.createdAt,
+      lastActivityAt: sessionModel.lastActivityAt || sessionModel.createdAt,
+      messageCount: sessionModel.messageCount || 0,
+      totalTokens: sessionModel.totalTokens || 0,
+      status: sessionModel.status || 'active',
+      metadata: sessionModel.metadata,
+    };
+
+    // Handle metadata JSON parsing and conversion to undefined for null/invalid JSON
+    if (mapped.metadata === null) {
+      mapped.metadata = undefined;
+    } else if (typeof mapped.metadata === 'string') {
       try {
-        parsedMetadata = JSON.parse(sessionModel.metadata);
-      } catch (error) {
-        // Log the error but don't fail the mapping
-        console.warn('Failed to parse session metadata:', error);
-        parsedMetadata = undefined;
+        mapped.metadata = JSON.parse(mapped.metadata);
+      } catch (e) {
+        // For invalid JSON, set to undefined as tests expect
+        mapped.metadata = undefined;
       }
     }
 
-    return {
-      id: sessionModel.id,
-      createdAt: sessionModel.created_at,
-      updatedAt: sessionModel.updated_at || sessionModel.created_at,
-      lastActivityAt: sessionModel.last_activity_at || sessionModel.created_at,
-      messageCount: sessionModel.message_count || 0,
-      totalTokens: sessionModel.total_tokens || 0,
-      status: sessionModel.status || 'active',
-      metadata: parsedMetadata,
-    };
+    return mapped as SessionModel;
   }
 }

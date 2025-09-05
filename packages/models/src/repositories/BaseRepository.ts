@@ -2,9 +2,10 @@
  * Base repository class with standardized error handling and validation utilities
  */
 
-import { BaseError, DatabaseError, NotFoundError, ConflictError, ValidationError, ErrorContextUtils, ErrorLayer } from '@starships/errors';
-import type { RepositoryErrorContext } from '@starships/errors';
 import { getConnection } from '@/helpers/database';
+import { ModelSerializer } from '@/helpers/serializer';
+import type { RepositoryErrorContext } from '@starships/errors';
+import { BaseError, ConflictError, DatabaseError, ErrorContextUtils, NotFoundError, ValidationError } from '@starships/errors';
 
 /**
  * Base repository with standardized error handling and validation
@@ -547,6 +548,133 @@ export abstract class BaseRepository {
       `${context.component}/${context.operation}`,
       context
     );
+  }
+
+  // ============================================================================
+  // SERIALIZATION HELPERS
+  // ============================================================================
+
+  /**
+   * Serialize model data for database storage
+   * Uses class-transformer for professional serialization
+   *
+   * @param data - The data to serialize
+   * @param modelClass - Optional model class with decorators
+   * @returns Serialized data ready for database storage
+   */
+  protected serializeForDatabase<T>(data: T, modelClass?: new (...args: any[]) => T): Record<string, any> {
+    try {
+      return ModelSerializer.serialize(data, modelClass);
+    } catch (error) {
+      this.log('warn', 'Serialization failed, using fallback', { error: error instanceof Error ? error.message : String(error) });
+      // Fallback to simple object spread for backward compatibility
+      return { ...(data as any) };
+    }
+  }
+
+  /**
+   * Deserialize model data from database storage
+   * Uses class-transformer for professional deserialization
+   *
+   * @param data - The data from database
+   * @param modelClass - Model class with decorators
+   * @returns Properly typed and transformed model instance
+   */
+  protected deserializeFromDatabase<T>(data: Record<string, any>, modelClass: new (...args: any[]) => T): T {
+    try {
+      return ModelSerializer.deserialize(data, modelClass);
+    } catch (error) {
+      this.log('warn', 'Deserialization failed, using plain object', { error: error instanceof Error ? error.message : String(error) });
+      // Fallback to plain object for backward compatibility
+      return data as T;
+    }
+  }
+
+  /**
+   * Safely parse JSON with fallback value
+   * Wrapper around ModelSerializer.safeJsonParse
+   */
+  protected safeJsonParse<T>(jsonString: string | null | undefined, fallback: T): T {
+    return ModelSerializer.safeJsonParse(jsonString, fallback);
+  }
+
+  /**
+   * Safely stringify JSON
+   * Wrapper around ModelSerializer.safeJsonStringify
+   */
+  protected safeJsonStringify(value: any): string | null {
+    return ModelSerializer.safeJsonStringify(value);
+  }
+
+  /**
+   * Get safe value with default fallback
+   * Wrapper around ModelSerializer.getSafeValue
+   */
+  protected getValueWithDefault<T>(value: T | {} | null | undefined, defaultValue: T): T {
+    return ModelSerializer.getSafeValue(value, defaultValue);
+  }
+
+  /**
+   * Helper method for common mapping operations from database records
+   * Handles JSON parsing, date conversion, and type safety
+   *
+   * @param record - Database record
+   * @param jsonFields - Fields that should be parsed as JSON
+   * @param dateFields - Fields that should be converted to Date objects
+   * @param defaultValues - Default values for missing fields
+   * @returns Mapped and transformed object
+   */
+  protected mapFromDatabaseRecord<T>(
+    record: any,
+    options?: {
+      jsonFields?: string[];
+      dateFields?: string[];
+      arrayFields?: string[];
+      defaultValues?: Record<string, any>;
+    }
+  ): T {
+    if (!record) return record;
+
+    const mapped = { ...record };
+    const opts = options || {};
+
+    // Handle JSON fields
+    if (opts.jsonFields) {
+      for (const field of opts.jsonFields) {
+        if (mapped[field] && typeof mapped[field] === 'string') {
+          mapped[field] = this.safeJsonParse(mapped[field], null);
+        }
+      }
+    }
+
+    // Handle date fields
+    if (opts.dateFields) {
+      for (const field of opts.dateFields) {
+        if (mapped[field]) {
+          mapped[field] = new Date(mapped[field]);
+        }
+      }
+    }
+
+    // Handle array fields with defaults
+    if (opts.arrayFields) {
+      for (const field of opts.arrayFields) {
+        if (!Array.isArray(mapped[field])) {
+          mapped[field] = [];
+        }
+      }
+    }
+
+    // Apply default values
+    if (opts.defaultValues) {
+      for (const [field, defaultValue] of Object.entries(opts.defaultValues)) {
+        if (mapped[field] === undefined || mapped[field] === null) {
+          mapped[field] = defaultValue;
+        }
+      }
+    }
+
+    return mapped as T;
   }
 }
 

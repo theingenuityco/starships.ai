@@ -1,8 +1,8 @@
-import axios, { AxiosResponse } from 'axios'
 import type { ApiResponse } from '@starships/protocol'
+import axios, { AxiosResponse } from 'axios'
 
-import { apiCache, CACHE_KEYS, invalidateAgentCaches, invalidateConnectorInstanceCaches } from './cache'
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
+import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
 const api = axios.create({
   timeout: 120000, // Increased to 120s (2 minutes) for long-running operations
@@ -162,31 +162,31 @@ api.interceptors.response.use(
 // Import Agent and Starship related types from protocol package
 import {
   AgentModel,
-  CreateAgentRequest,
-  UpdateAgentRequest,
   AgentTemplateModel,
-  UpdateStarshipRequest,
-  UpdateStarshipStatusRequest,
-  StarshipResponse,
-  StarshipAgentsResponse,
-  StarshipListResponse,
-  StarshipDetailsResponse,
+  CreateAgentRequest,
   CreateStarshipRequest,
   Session,
+  StarshipAgentsResponse,
+  StarshipDetailsResponse,
+  StarshipListResponse,
+  StarshipResponse,
+  UpdateAgentRequest,
+  UpdateStarshipRequest,
+  UpdateStarshipStatusRequest,
 } from '@starships/protocol'
 
 // Re-export types for use in other client components
 export type {
   CreateAgentRequest,
+  CreateStarshipRequest,
+  Session,
+  StarshipAgentsResponse,
+  StarshipDetailsResponse,
+  StarshipListResponse,
+  StarshipResponse,
   UpdateAgentRequest,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
-  StarshipResponse,
-  StarshipAgentsResponse,
-  StarshipListResponse,
-  StarshipDetailsResponse,
-  CreateStarshipRequest,
-  Session,
 }
 
 // For compatibility, alias the types
@@ -261,7 +261,7 @@ interface ChatBackendResponse {
 
 // Client-friendly request type (camelCase) - aligned with SessionRequest from protocol
 export interface ChatRequest {
-  source: 'agent' | 'sibil' | 'user'
+  source: 'agent' | 'user'
   agentId?: string
   userId?: string
   message: string

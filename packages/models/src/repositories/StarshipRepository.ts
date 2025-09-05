@@ -1,7 +1,7 @@
-import type { AgentModel } from '@starships/protocol';
-import { StarshipModel } from '@starships/protocol';
 import { getConnection, Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import type { AgentModel } from '@starships/protocol';
+import { StarshipModel } from '@starships/protocol';
 
 export class StarshipRepository extends BaseRepository {
   private connection: Neo4jConnection;
@@ -577,7 +577,7 @@ export class StarshipRepository extends BaseRepository {
     const connection = this.connection;
     const result = await connection.executeQuery<{ s: any }>(
       `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
-       RETURN s ORDER BY s.last_activity_at DESC`,
+       RETURN s ORDER BY s.lastActivityAt DESC`,
       { starshipId }
     );
 
@@ -618,7 +618,7 @@ export class StarshipRepository extends BaseRepository {
     const result = await connection.executeQuery<{ s: any }>(
       `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
        WHERE s.status = 'active'
-       RETURN s ORDER BY s.last_activity_at DESC`,
+       RETURN s ORDER BY s.lastActivityAt DESC`,
       { starshipId }
     );
 

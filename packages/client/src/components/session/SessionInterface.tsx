@@ -1,42 +1,35 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
-import { Users, Sparkles } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { useSocketConnection } from '@/hooks/useSocketConnection'
+import { AgentSelector } from '@/components/session/AgentSelector'
 import { SessionMessageInput } from '@/components/session/SessionMessageInput'
 import { SessionMessageList } from '@/components/session/SessionMessageList'
-import { ChatModeSelector } from '@/components/session/ChatModeSelector'
-import { AgentSelector } from '@/components/session/AgentSelector'
-import { ProviderSelector } from '@/components/session/ProviderSelector'
-import type { Agent } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
+import { useSocketConnection } from '@/hooks/useSocketConnection'
 import type { Message } from '@/lib/agent-socket-api'
-export type ChatMode = 'agent'
+import type { Agent } from '@/lib/api'
+import { Sparkles, Users } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useState } from 'react'
 
 interface SessionInterfaceProps {
-  defaultMode?: ChatMode
   starshipId?: string
   sessionId?: string | null
   onSessionChange?: (sessionId: string | null) => void
 }
 
-export function SessionInterface({ defaultMode = 'agent', starshipId, sessionId: externalSessionId, onSessionChange }: SessionInterfaceProps) {
+export function SessionInterface({ starshipId, sessionId: externalSessionId, onSessionChange }: SessionInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected } = useSocketConnection()
 
-  // Chat mode state
-  const [chatMode, setChatMode] = useState<ChatMode>(defaultMode)
+  // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
-  const [provider, setProvider] = useState<'openai' | 'anthropic'>('openai')
-  const [model, setModel] = useState<string>('gpt-4')
 
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [refreshMessages, setRefreshMessages] = useState(0)
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
 
-  // Reset session when mode/agent/starship changes - let server manage session IDs
+  // Reset session when agent/starship changes - let server manage session IDs
   useEffect(() => {
     if (userId && isAuthenticated) {
       if (externalSessionId !== undefined) {
@@ -44,18 +37,18 @@ export function SessionInterface({ defaultMode = 'agent', starshipId, sessionId:
         setCurrentSessionId(externalSessionId)
         setHasMessages(!!externalSessionId)
         setRefreshMessages(prev => prev + 1)
-      } else if (chatMode === 'agent' && selectedAgent) {
-        // Reset session for agent mode - server will provide actual session ID
+      } else if (selectedAgent) {
+        // Reset session for agent - server will provide actual session ID
         setCurrentSessionId(null)
         setHasMessages(false)
         setRefreshMessages(prev => prev + 1)
       } else {
-        // No session for agent mode without selected agent
+        // No session without selected agent
         setCurrentSessionId(null)
         setHasMessages(false)
       }
     }
-  }, [userId, isAuthenticated, chatMode, selectedAgent, starshipId, externalSessionId])
+  }, [userId, isAuthenticated, selectedAgent, starshipId, externalSessionId])
 
   // Show loading state
   if (isLoading) {
@@ -114,7 +107,7 @@ export function SessionInterface({ defaultMode = 'agent', starshipId, sessionId:
       <AnimatePresence>
         {hasMessages && currentSessionId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0 overflow-hidden">
-            <SessionMessageList mode={chatMode} sessionId={currentSessionId} starshipId={starshipId} key={`${chatMode}-${currentSessionId}-${refreshMessages}`} />
+            <SessionMessageList sessionId={currentSessionId} starshipId={starshipId} key={`${currentSessionId}-${refreshMessages}`} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -147,10 +140,10 @@ export function SessionInterface({ defaultMode = 'agent', starshipId, sessionId:
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1 }}
                   >
-                    {chatMode === 'agent' ? 'Meet Agent Mode' : 'Meet AI Mode'}
+                    Meet Your AI Agents
                   </motion.h1>
                   <motion.p className="text-muted-foreground text-lg font-light" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                    {chatMode === 'agent' ? 'Connect with specialized agents for focused assistance' : 'Ask detailed questions for better responses'}
+                    Connect with specialized agents for focused assistance
                   </motion.p>
                 </motion.div>
               )}
@@ -168,10 +161,7 @@ export function SessionInterface({ defaultMode = 'agent', starshipId, sessionId:
               className="relative"
             >
               <SessionMessageInput
-                mode={chatMode}
                 selectedAgent={selectedAgent}
-                provider={provider}
-                model={model}
                 starshipId={starshipId}
                 sessionId={currentSessionId}
                 onSessionStart={handleSessionStart}
@@ -179,23 +169,11 @@ export function SessionInterface({ defaultMode = 'agent', starshipId, sessionId:
                 onMessageReceived={(message: Message) => {
                   setRefreshMessages(prev => prev + 1)
                 }}
-                disabled={!isConnected || (chatMode === 'agent' && !selectedAgent)}
+                disabled={!isConnected || !selectedAgent}
                 minimal={hasMessages}
               >
-                {/* Footer Content - Selectors */}
-                <ChatModeSelector mode={chatMode} onModeChange={setChatMode} disabled={!isConnected} compact={true} />
-
-                <AnimatePresence mode="wait">
-                  {chatMode === 'agent' ? (
-                    <motion.div key="agent-selector" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2 }}>
-                      <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
-                    </motion.div>
-                  ) : (
-                    <motion.div key="provider-selector" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.2 }}>
-                      <ProviderSelector provider={provider} model={model} onProviderChange={setProvider} onModelChange={setModel} compact={true} />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/* Footer Content - Agent Selector */}
+                <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
               </SessionMessageInput>
             </motion.div>
 

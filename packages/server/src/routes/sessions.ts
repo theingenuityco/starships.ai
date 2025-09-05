@@ -1,67 +1,87 @@
-import { MemoryRepository, MessageRepository } from '@starships/models';
-import type { Request, Response } from 'express';
-import { Router } from 'express';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { SessionService } from '@/services/SessionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
+import { createSessionService } from '@/services/SessionService';
+import getStore from '@/store';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { AgentRepository, MemoryRepository, MessageRepository } from '@starships/models';
+import { Request, Response, Router } from 'express';
+import { z, ZodError } from 'zod';
 
 const router: Router = Router();
+const sessionService = createSessionService();
 
-/**
- * Error helper consistent with project patterns
- */
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) {
-    return error.message;
+// Zod schemas for validation
+const UuidSchema = z.string().uuid('Invalid UUID format');
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+const SessionSourceSchema = z.enum(['agent', 'user']);
+
+// Helper function for authentication check
+const checkAuth = (req: Request, res: Response): boolean => {
+  const user = req.user;
+  if (!user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return false;
   }
-  return String(error);
+  return true;
 };
 
-// POST /sessions/:sessionId/messages - Send message to agent (OpenAPI pattern)
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
+
+/**
+ * POST /sessions/:sessionId/messages - Send message to agent
+ */
 router.post('/sessions/:sessionId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id;
-    const { sessionId } = req.params;
-    const { agentId, message } = req.body;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate sessionId parameter
+    const paramValidation = validateData(z.object({ sessionId: UuidSchema }), req.params, res, 'session parameter');
+    if (!paramValidation) return;
 
-    // Validate required fields
-    if (!agentId || typeof agentId !== 'string') {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'agentId is required and must be a string', 400, {
-        field: 'agentId',
-        provided: typeof agentId,
-      });
-      return;
-    }
+    // Validate request body
+    const bodyValidation = validateData(
+      z.object({
+        agentId: z.string().min(1, 'agentId is required'),
+        message: z.string().min(1, 'message is required'),
+      }),
+      req.body,
+      res,
+      'message data'
+    );
+    if (!bodyValidation) return;
 
-    if (!message || typeof message !== 'string') {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'message is required and must be a string', 400, {
-        field: 'message',
-        provided: typeof message,
-      });
-      return;
-    }
-
-    // Validate sessionId format
-    const sessionValidation = validateUUID(sessionId, 'sessionId');
-    if (!sessionValidation.isValid && sessionValidation.error) {
-      sendError(res, sessionValidation.error.code, sessionValidation.error.message, 400, sessionValidation.error.details);
-      return;
-    }
-
-    // Validate agentId format
-    const { isValid, error } = validateUUID(agentId, 'agentId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const { sessionId } = paramValidation;
+    const { agentId, message } = bodyValidation;
+    const userId = (req as any).user!.id;
 
     // Verify session exists
-    const session = await SessionService.getSessionById(sessionId);
+    const session = await sessionService.getSessionById(sessionId);
     if (!session) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Session not found', 404, {
         resource: 'session',
@@ -70,32 +90,27 @@ router.post('/sessions/:sessionId/messages', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
-    // Build chat request using session and authenticated user
+    // Process chat request
     const chatRequest = {
       source: 'agent' as const,
       agentId,
       userId,
       message,
-      conversationId: sessionId, // Use sessionId as conversationId for compatibility
+      conversationId: sessionId,
       stream: false,
     };
 
-    console.log(`[SESSION] Processing message for authenticated user: ${userId} in session: ${sessionId}`);
-
-    // Import AgentService dynamically to avoid circular dependencies
     const { AgentService } = await import('../services/AgentService');
     const result = await AgentService.executeChat(chatRequest);
 
-    // Update session activity and message count
-    await SessionService.updateSessionActivity(sessionId);
-    await SessionService.incrementMessageCount(sessionId);
+    // Update session metrics
+    await Promise.all([sessionService.updateSessionActivity(sessionId), sessionService.incrementMessageCount(sessionId)]);
 
-    // Track agent usage after successful chat
+    // Track agent usage (non-blocking)
     try {
-      await AgentService.trackUsage(chatRequest.agentId!);
-      console.log(`[ANALYTICS] Tracked usage for agent: ${chatRequest.agentId}`);
+      const agentRepository = new AgentRepository();
+      await agentRepository.incrementUsageCount(agentId);
     } catch (trackingError) {
-      // Don't fail the chat request if usage tracking fails
       console.warn('Failed to track agent usage:', trackingError);
     }
 
@@ -107,26 +122,22 @@ router.post('/sessions/:sessionId/messages', jwtAuthMiddleware, async (req: Requ
   }
 });
 
-// DELETE /sessions/:sessionId/memory - Clear memory for a session (OpenAPI pattern)
+/**
+ * DELETE /sessions/:sessionId/memory - Clear session memory
+ */
 router.delete('/sessions/:sessionId/memory', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate sessionId parameter
+    const paramValidation = validateData(z.object({ sessionId: UuidSchema }), req.params, res, 'session parameter');
+    if (!paramValidation) return;
 
-    // Validate sessionId format
-    const { isValid, error } = validateUUID(sessionId, 'sessionId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const { sessionId } = paramValidation;
 
     // Verify session exists
-    const session = await SessionService.getSessionById(sessionId);
+    const session = await sessionService.getSessionById(sessionId);
     if (!session) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Session not found', 404, {
         resource: 'session',
@@ -135,9 +146,8 @@ router.delete('/sessions/:sessionId/memory', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
-    // Import AgentService dynamically to avoid circular dependencies
-    const { AgentService } = await import('../services/AgentService');
-    const store = AgentService.getMemoryStore();
+    // Clear session memory
+    const store = getStore();
     await store.clear(sessionId);
 
     sendSuccess(res, { message: 'Session memory cleared successfully' }, 200);
@@ -148,51 +158,37 @@ router.delete('/sessions/:sessionId/memory', jwtAuthMiddleware, async (req: Requ
   }
 });
 
-// GET endpoint for fetching messages by memory ID (kept for backward compatibility)
+/**
+ * GET /messages/memory/:memoryId - Get messages by memory ID (backward compatibility)
+ */
 router.get('/messages/memory/:memoryId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { memoryId } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate memoryId parameter
+    const paramValidation = validateData(z.object({ memoryId: UuidSchema }), req.params, res, 'memory parameter');
+    if (!paramValidation) return;
 
-    // Validate memoryId is a UUID
-    const memoryValidation = validateUUID(memoryId, 'memoryId');
-    if (!memoryValidation.isValid && memoryValidation.error) {
-      sendError(res, memoryValidation.error.code, memoryValidation.error.message, 400, memoryValidation.error.details);
-      return;
-    }
+    // Validate and parse query parameters
+    const queryValidation = validateData(
+      z.object({
+        limit: z.coerce.number().int().min(1).max(200).default(50),
+        offset: z.coerce.number().int().min(0).default(0),
+      }),
+      req.query,
+      res,
+      'query parameters'
+    );
+    if (!queryValidation) return;
 
-    // Parse limit and offset parameters
-    const limit = Math.floor(parseInt(req.query.limit as string) || 50);
-    const offset = Math.floor(parseInt(req.query.offset as string) || 0);
-
-    // Validate limit range
-    if (limit < 1 || limit > 200) {
-      sendError(res, 'VALIDATION_ERROR', 'Limit must be between 1 and 200', 400, {
-        field: 'limit',
-        provided: limit,
-        constraint: 'between 1 and 200',
-      });
-      return;
-    }
-
-    if (offset < 0) {
-      sendError(res, 'VALIDATION_ERROR', 'Offset must be non-negative', 400, {
-        field: 'offset',
-        provided: offset,
-        constraint: 'non-negative',
-      });
-      return;
-    }
+    const { memoryId } = paramValidation;
+    const { limit, offset } = queryValidation;
 
     const messageRepository = new MessageRepository();
     const memoryRepository = new MemoryRepository();
 
-    // First, verify the memory exists
+    // Verify memory exists
     const memory = await memoryRepository.findById(memoryId);
     if (!memory) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Memory not found', 404, {
@@ -202,7 +198,7 @@ router.get('/messages/memory/:memoryId', jwtAuthMiddleware, async (req: Request,
       return;
     }
 
-    // Fetch messages for the memory with pagination
+    // Fetch messages with pagination
     const allMessages = await messageRepository.findByMemoryId(memoryId);
     const messages = allMessages.slice(offset, offset + limit);
 
@@ -220,52 +216,26 @@ router.get('/messages/memory/:memoryId', jwtAuthMiddleware, async (req: Request,
   }
 });
 
-// GET /starships/:starshipId/sessions - Fetch sessions by starship (OpenAPI pattern)
+/**
+ * GET /starships/:starshipId/sessions - Get sessions by starship (deprecated)
+ */
 router.get('/starships/:starshipId/sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { starshipId } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    console.log('🚀 [SESSION ROUTE] GET starships/:starshipId/sessions endpoint called:', {
-      starshipId,
-      userId,
-      userObject: req.user,
-      headers: req.headers.authorization ? 'Bearer token present' : 'No auth header',
-      timestamp: new Date().toISOString(),
-    });
+    // Validate starshipId parameter
+    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
 
-    if (!userId) {
-      console.error('🚀 [SESSION ROUTE] User not authenticated - missing userId');
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate pagination query
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
 
-    // Validate starshipId format
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const { page, limit } = paginationValidation;
 
-    console.log('🚀 [SESSION ROUTE] StarshipId validation passed:', starshipId);
-
-    // Parse and validate pagination parameters
-    const pagination = validatePagination(req.query.page as string, req.query.limit as string);
-    if (pagination.error) {
-      sendError(res, pagination.error.code, pagination.error.message, 400);
-      return;
-    }
-
-    console.log('🚀 [SESSION ROUTE] Calling SessionService with params:', {
-      starshipId,
-      pagination,
-    });
-
-    // Since sessions no longer have starship relationships, return empty array
-    const paginationMeta = createPaginationMeta(pagination.page, pagination.limit, 0);
-
-    console.log('🚀 [SESSION ROUTE] Sessions no longer have starship relationships - returning empty array');
-
+    // Sessions no longer have starship relationships
+    const paginationMeta = createPaginationMeta(page, limit, 0);
     sendSuccess(res, [], 200, paginationMeta);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship sessions')) {
@@ -274,26 +244,27 @@ router.get('/starships/:starshipId/sessions', jwtAuthMiddleware, async (req: Req
   }
 });
 
-// GET /sessions/:sessionId - Fetch session details (OpenAPI pattern)
+/**
+ * GET /sessions/:sessionId - Get session details with messages
+ */
 router.get('/sessions/:sessionId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate sessionId parameter
+    const paramValidation = validateData(z.object({ sessionId: UuidSchema }), req.params, res, 'session parameter');
+    if (!paramValidation) return;
 
-    // Validate sessionId format
-    const { isValid, error } = validateUUID(sessionId, 'sessionId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    // Validate pagination query
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
+
+    const { sessionId } = paramValidation;
+    const { page, limit } = paginationValidation;
 
     // Get session details
-    const session = await SessionService.getSessionById(sessionId);
+    const session = await sessionService.getSessionById(sessionId);
     if (!session) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Session not found', 404, {
         resource: 'session',
@@ -302,28 +273,22 @@ router.get('/sessions/:sessionId', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    // Parse and validate pagination parameters for messages within session
-    const pagination = validatePagination(req.query.page as string, req.query.limit as string);
-    if (pagination.error) {
-      sendError(res, pagination.error.code, pagination.error.message, 400);
-      return;
-    }
-
-    const offset = (pagination.page - 1) * pagination.limit;
+    // Fetch session messages with pagination
+    const offset = (page - 1) * limit;
     const messageRepository = new MessageRepository();
+    const messages = await messageRepository.findByConversationId(sessionId, limit, offset);
 
-    // Fetch session messages with pagination (using sessionId as conversationId for compatibility)
-    const messages = await messageRepository.findByConversationId(sessionId, pagination.limit, offset);
+    const paginationMeta = createPaginationMeta(page, limit, messages.length);
 
-    const paginationMeta = createPaginationMeta(pagination.page, pagination.limit, messages.length);
-
-    // Return session with its messages
-    const sessionData = {
-      ...session,
-      messages: messages,
-    };
-
-    sendSuccess(res, sessionData, 200, paginationMeta);
+    sendSuccess(
+      res,
+      {
+        ...session,
+        messages,
+      },
+      200,
+      paginationMeta
+    );
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching session details')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch session details');
@@ -331,16 +296,25 @@ router.get('/sessions/:sessionId', jwtAuthMiddleware, async (req: Request, res: 
   }
 });
 
-// GET /users/:userId/sessions - Get sessions for a user
+/**
+ * GET /users/:userId/sessions - Get sessions for user (deprecated)
+ */
 router.get('/users/:userId/sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { userId: targetUserId } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate userId parameter
+    const paramValidation = validateData(z.object({ userId: UuidSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
+
+    // Validate pagination query
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
+
+    const { userId: targetUserId } = paramValidation;
+    const { page, limit } = paginationValidation;
+    const userId = (req as any).user!.id;
 
     // Users can only access their own sessions
     if (targetUserId !== userId) {
@@ -348,26 +322,8 @@ router.get('/users/:userId/sessions', jwtAuthMiddleware, async (req: Request, re
       return;
     }
 
-    // Validate userId format
-    const { isValid, error } = validateUUID(targetUserId, 'userId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    // Parse and validate pagination parameters
-    const pagination = validatePagination(req.query.page as string, req.query.limit as string);
-    if (pagination.error) {
-      sendError(res, pagination.error.code, pagination.error.message, 400);
-      return;
-    }
-
-    // Check if only active sessions are requested
-    const onlyActive = req.query.active === 'true';
-
-    // Since sessions no longer have user relationships, return empty array
-    const paginationMeta = createPaginationMeta(pagination.page, pagination.limit, 0);
-
+    // Sessions no longer have user relationships
+    const paginationMeta = createPaginationMeta(page, limit, 0);
     sendSuccess(res, [], 200, paginationMeta);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching user sessions')) {
@@ -376,60 +332,29 @@ router.get('/users/:userId/sessions', jwtAuthMiddleware, async (req: Request, re
   }
 });
 
-// POST /sessions - Create a new session
+/**
+ * POST /sessions - Create new session
+ */
 router.post('/sessions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id;
-    const { source, agentId, starshipId, metadata } = req.body;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate request body
+    const bodyValidation = validateData(
+      z.object({
+        source: SessionSourceSchema,
+        metadata: z.object({}).passthrough().optional(),
+      }),
+      req.body,
+      res,
+      'session creation data'
+    );
+    if (!bodyValidation) return;
 
-    // Validate required fields
-    if (!source || typeof source !== 'string') {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'source is required and must be a string', 400, {
-        field: 'source',
-        provided: typeof source,
-      });
-      return;
-    }
+    const { metadata } = bodyValidation;
 
-    // Validate source is a valid SessionSourceType
-    const validSources = ['agent', 'sibil', 'user'] as const;
-    if (!validSources.includes(source as any)) {
-      sendError(res, 'VALIDATION_ERROR', 'source must be one of: agent, sibil, user', 400, {
-        field: 'source',
-        provided: source,
-        allowedValues: validSources,
-      });
-      return;
-    }
-
-    // Validate optional UUIDs if provided
-    if (agentId) {
-      const agentValidation = validateUUID(agentId, 'agentId');
-      if (!agentValidation.isValid && agentValidation.error) {
-        sendError(res, agentValidation.error.code, agentValidation.error.message, 400, agentValidation.error.details);
-        return;
-      }
-    }
-
-    if (starshipId) {
-      const starshipValidation = validateUUID(starshipId, 'starshipId');
-      if (!starshipValidation.isValid && starshipValidation.error) {
-        sendError(res, starshipValidation.error.code, starshipValidation.error.message, 400, starshipValidation.error.details);
-        return;
-      }
-    }
-
-    // Create new session
-    const session = await SessionService.createSession({
-      metadata,
-    });
-
-    console.log(`[SESSION] Created new session: ${session.id} for user: ${userId}`);
+    const session = await sessionService.createSession({ metadata });
 
     sendSuccess(res, session, 201);
   } catch (error) {
@@ -439,26 +364,22 @@ router.post('/sessions', jwtAuthMiddleware, async (req: Request, res: Response):
   }
 });
 
-// DELETE /sessions/:sessionId - Delete a session
+/**
+ * DELETE /sessions/:sessionId - Delete session
+ */
 router.delete('/sessions/:sessionId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate sessionId parameter
+    const paramValidation = validateData(z.object({ sessionId: UuidSchema }), req.params, res, 'session parameter');
+    if (!paramValidation) return;
 
-    // Validate sessionId format
-    const { isValid, error } = validateUUID(sessionId, 'sessionId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const { sessionId } = paramValidation;
 
     // Verify session exists
-    const session = await SessionService.getSessionById(sessionId);
+    const session = await sessionService.getSessionById(sessionId);
     if (!session) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Session not found', 404, {
         resource: 'session',
@@ -467,8 +388,7 @@ router.delete('/sessions/:sessionId', jwtAuthMiddleware, async (req: Request, re
       return;
     }
 
-    // Delete the session
-    const deleted = await SessionService.deleteSession(sessionId);
+    const deleted = await sessionService.deleteSession(sessionId);
 
     if (deleted) {
       sendSuccess(res, { message: 'Session deleted successfully' }, 200);

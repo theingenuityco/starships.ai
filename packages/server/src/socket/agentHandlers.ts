@@ -1,14 +1,15 @@
-import { MessageRepository } from '@starships/models';
-import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@starships/protocol';
-import type { Socket, Server as SocketIOServer } from 'socket.io';
 import { AgentService } from '@/services/AgentService';
-import { SessionService } from '@/services/SessionService';
+import { createSessionService } from '@/services/SessionService';
 import { SocketIOService } from '@/services/SocketIOService';
 import getStore from '@/store';
+import { AgentRepository, MessageRepository } from '@starships/models';
+import type { BaseSocketEvents, SessionRequest, SessionStreamChunk } from '@starships/protocol';
+import type { Socket, Server as SocketIOServer } from 'socket.io';
 
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
+  const sessionService = createSessionService();
   const isSessionActive = (session: any): boolean => {
-    const lastActivity = new Date(session.last_activity_at);
+    const lastActivity = new Date(session.lastActivityAt);
     const now = new Date();
     const diffMinutes = (now.getTime() - lastActivity.getTime()) / (1000 * 60);
     return diffMinutes < 30; // 30 minute timeout
@@ -64,7 +65,8 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
         }
 
         // Get agent first to validate and get starshipId
-        const agent = await AgentService.getAgent(request.agentId);
+        const agentRepository = new AgentRepository();
+        const agent = await agentRepository.findById(request.agentId);
         if (!agent || !agent.starshipId) {
           socket.emit('session:stream-error', {
             streamId: request.streamId,
@@ -93,7 +95,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
 
         // Validate provided session exists
         try {
-          const existingSession = await SessionService.getSessionById(request.sessionId);
+          const existingSession = await sessionService.getSessionById(request.sessionId);
 
           // Check if session exists
           if (!existingSession) {
@@ -101,7 +103,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
           }
 
           sessionId = request.sessionId;
-          await SessionService.updateSessionActivity(sessionId);
+          await sessionService.updateSessionActivity(sessionId);
           console.log(`✅ [AGENT SESSION] Using existing session: ${sessionId}`);
         } catch (error) {
           console.error(`❌ [AGENT SESSION] Session validation failed for ${request.sessionId}:`, error);
@@ -131,7 +133,7 @@ export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
 
         // Track agent usage
         try {
-          await AgentService.trackUsage(request.agentId);
+          await agentRepository.incrementUsageCount(request.agentId);
         } catch (error) {
           console.warn(`[AGENT SOCKET] Failed to track usage for agent ${request.agentId}:`, error);
           // Continue with streaming - don't fail on analytics

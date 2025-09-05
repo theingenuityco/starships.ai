@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
-import { ChevronDown, Loader2, Bot } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { useAgents } from '@/hooks/useAgents'
 import type { Agent } from '@/lib/api'
+import { cn } from '@/lib/utils'
+import { Bot, ChevronDown, Loader2 } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useEffect, useState } from 'react'
 
 interface AgentSelectorProps {
   selectedAgent: Agent | null
@@ -18,6 +18,13 @@ interface AgentSelectorProps {
 export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compact = false }: AgentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const { agents, loading } = useAgents(starshipId)
+
+  // Auto-select first agent when agents are loaded
+  useEffect(() => {
+    if (!loading && agents.length > 0 && !selectedAgent) {
+      onAgentChange(agents[0])
+    }
+  }, [agents, loading, selectedAgent, onAgentChange])
 
   // Close dropdown when clicking outside
   useEffect(() => {

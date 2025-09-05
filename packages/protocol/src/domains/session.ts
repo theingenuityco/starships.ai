@@ -93,7 +93,7 @@ export interface EventEmissionResult {
 /**
  * Session source type
  */
-export type SessionSourceType = 'agent' | 'sibil' | 'user';
+export type SessionSourceType = 'agent' | 'user';
 
 /**
  * Base session request interface

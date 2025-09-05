@@ -15,7 +15,16 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = getConnection();
         const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) RETURN s ORDER BY s.lastActivityAt DESC');
-        return result.map((record) => this.mapToSession(record.s));
+        return result.map((record) =>
+          this.mapFromDatabaseRecord<SessionModel>(record.s, {
+            jsonFields: ['metadata'],
+            defaultValues: {
+              messageCount: 0,
+              totalTokens: 0,
+              status: 'active',
+            },
+          })
+        );
       },
       'findAll',
       'Session'
@@ -27,7 +36,16 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) WHERE s.id = $id RETURN s', { id });
-        return result.length > 0 ? this.mapToSession(result[0].s) : null;
+        return result.length > 0
+          ? this.mapFromDatabaseRecord<SessionModel>(result[0].s, {
+              jsonFields: ['metadata'],
+              defaultValues: {
+                messageCount: 0,
+                totalTokens: 0,
+                status: 'active',
+              },
+            })
+          : null;
       },
       'findById',
       'Session',
@@ -38,9 +56,43 @@ export class SessionRepository extends BaseRepository {
   async create(entity: Omit<SessionModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<SessionModel> {
     return this.executeWithErrorHandling(
       async () => {
+        // Validate required fields using BaseRepository validation
+        this.validateRequired(entity, ['lastActivityAt', 'messageCount', 'status'], 'create');
+
+        // Validate field types
+        this.validateTypes(
+          entity,
+          {
+            lastActivityAt: 'string',
+            messageCount: 'number',
+            status: 'string',
+            totalTokens: 'number',
+          },
+          'create'
+        );
+
+        // Validate enum values (status)
+        this.validateEnums(
+          entity,
+          {
+            status: ['active', 'paused', 'completed', 'archived'],
+          },
+          'create'
+        );
+
+        // Validate string lengths
+        this.validateStringLengths(
+          entity,
+          {
+            status: { min: 1, max: 50 },
+          },
+          'create'
+        );
+
         const connection = this.connection;
         const now = this.getCurrentTimestamp();
 
+        // Prepare session data with defaults and validation
         const sessionData = {
           createdAt: now,
           lastActivityAt: entity.lastActivityAt || now,
@@ -50,6 +102,7 @@ export class SessionRepository extends BaseRepository {
           metadata: this.safeJsonStringify(entity.metadata),
         };
 
+        // Use BaseRepository serialization (the sessionData is already properly prepared)
         const result = await this.createEntityWithAutoId<SessionModel>('Session', sessionData, this.connection);
 
         // Create relationship with starship if starshipId is provided
@@ -57,7 +110,15 @@ export class SessionRepository extends BaseRepository {
           await this.linkToStarship(result.id, starshipId);
         }
 
-        return this.mapToSession(result);
+        // Use consistent mapping from database record
+        return this.mapFromDatabaseRecord<SessionModel>(result, {
+          jsonFields: ['metadata'],
+          defaultValues: {
+            messageCount: 0,
+            totalTokens: 0,
+            status: 'active',
+          },
+        });
       },
       'create',
       'Session'
@@ -67,12 +128,33 @@ export class SessionRepository extends BaseRepository {
   async update(id: string, updates: Partial<SessionModel>): Promise<SessionModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        // Validate updates using BaseRepository validation
+        if (updates.status !== undefined) {
+          this.validateEnums(
+            updates,
+            {
+              status: ['active', 'paused', 'completed', 'archived'],
+            },
+            'update'
+          );
+        }
 
+        if (updates.messageCount !== undefined || updates.totalTokens !== undefined) {
+          this.validateTypes(
+            updates,
+            {
+              messageCount: 'number',
+              totalTokens: 'number',
+            },
+            'update'
+          );
+        }
+
+        const connection = this.connection;
         const setFields = [];
         const params: Record<string, unknown> = { id };
 
-        // Handle updatable fields
+        // Handle updatable fields with proper serialization
         if (updates.lastActivityAt !== undefined) {
           setFields.push('s.lastActivityAt = $lastActivityAt');
           params.lastActivityAt = updates.lastActivityAt;
@@ -113,7 +195,15 @@ export class SessionRepository extends BaseRepository {
           this.handleNotFound('Session', id, 'update');
         }
 
-        return this.mapToSession(result[0].s);
+        // Use consistent mapping from database record
+        return this.mapFromDatabaseRecord<SessionModel>(result[0].s, {
+          jsonFields: ['metadata'],
+          defaultValues: {
+            messageCount: 0,
+            totalTokens: 0,
+            status: 'active',
+          },
+        });
       },
       'update',
       'Session',
@@ -222,7 +312,16 @@ export class SessionRepository extends BaseRepository {
            RETURN s ORDER BY s.lastActivityAt DESC`,
           { starshipId }
         );
-        return result.map((record) => this.mapToSession(record.s));
+        return result.map((record) =>
+          this.mapFromDatabaseRecord<SessionModel>(record.s, {
+            jsonFields: ['metadata'],
+            defaultValues: {
+              messageCount: 0,
+              totalTokens: 0,
+              status: 'active',
+            },
+          })
+        );
       },
       'findByStarship',
       'Session'
@@ -295,36 +394,15 @@ export class SessionRepository extends BaseRepository {
   }
 
   /**
-   * Map database SessionModel to Session domain model
+   * Legacy mapToSession method has been replaced with BaseRepository.mapFromDatabaseRecord()
+   * This provides consistent JSON parsing, default values, and type safety across all repositories.
+   *
+   * Usage example:
+   * this.mapFromDatabaseRecord<SessionModel>(record, {
+   *   jsonFields: ['metadata'],
+   *   defaultValues: { messageCount: 0, totalTokens: 0, status: 'active' }
+   * });
    */
-  private mapToSession(sessionModel: any): SessionModel {
-    if (!sessionModel) return sessionModel;
-
-    const mapped = {
-      id: sessionModel.id,
-      createdAt: sessionModel.createdAt,
-      updatedAt: sessionModel.updatedAt,
-      lastActivityAt: sessionModel.lastActivityAt,
-      messageCount: sessionModel.messageCount || 0,
-      totalTokens: sessionModel.totalTokens || 0,
-      status: sessionModel.status || 'active',
-      metadata: sessionModel.metadata,
-    };
-
-    // Handle metadata JSON parsing and conversion to undefined for null/invalid JSON
-    if (mapped.metadata === null) {
-      mapped.metadata = undefined;
-    } else if (typeof mapped.metadata === 'string') {
-      try {
-        mapped.metadata = JSON.parse(mapped.metadata);
-      } catch (e) {
-        // For invalid JSON, set to undefined as tests expect
-        mapped.metadata = undefined;
-      }
-    }
-
-    return mapped as SessionModel;
-  }
 
   /**
    * Get current timestamp in ISO format

@@ -8,6 +8,7 @@ This package provides:
 
 - **Neo4j Database Integration** - Graph database connectivity and session management
 - **Repository Pattern** - Standardized data access with direct repository imports
+- **Serialization System** - Professional data transformation using class-transformer
 - **Error Handling** - Unified error system with proper categorization
 - **Performance Monitoring** - Built-in logging and performance tracking
 - **Migration System** - Database schema management and seeding
@@ -229,6 +230,60 @@ await workflowRepo.updateStarshipId(workflow.id, 'starship-456');
 // Find workflows by category
 const automationWorkflows = await workflowRepo.findByCategory('automation');
 ```
+
+## Serialization System
+
+Professional data serialization/deserialization using class-transformer:
+
+```typescript
+import { ModelSerializer, Transformers, Transform, SerializableModel } from '@starships/models';
+
+// Using ModelSerializer for simple transformations
+const serializedData = ModelSerializer.serialize(data);
+const deserializedData = ModelSerializer.deserialize(data, MyModelClass);
+
+// Safe JSON operations with fallbacks
+const parsed = ModelSerializer.safeJsonParse(jsonString, defaultValue);
+const stringified = ModelSerializer.safeJsonStringify(object);
+
+// Creating serializable model classes with decorators
+class SessionModel extends SerializableModel {
+  @Transform(({ value }) => value)
+  id!: string;
+
+  @Transformers.DateTransform()
+  createdAt!: Date;
+
+  @Transformers.JsonTransform()
+  metadata?: any;
+
+  @Transformers.ArrayTransform([])
+  tags!: string[];
+
+  @Transformers.NumberTransform(0)
+  messageCount!: number;
+}
+
+// Repositories automatically use serialization utilities
+class MyRepository extends BaseRepository {
+  // Built-in serialization methods available:
+  // - this.serializeForDatabase(data, ModelClass?)
+  // - this.deserializeFromDatabase(data, ModelClass)
+  // - this.mapFromDatabaseRecord(data, options)
+  // - this.safeJsonParse(json, fallback)
+  // - this.safeJsonStringify(value)
+}
+```
+
+### Available Transformers
+
+| Transformer                 | Purpose                 | Example                                 |
+| --------------------------- | ----------------------- | --------------------------------------- |
+| `JsonTransform()`           | JSON string ↔ object   | `@Transformers.JsonTransform()`         |
+| `DateTransform()`           | ISO string ↔ Date      | `@Transformers.DateTransform()`         |
+| `ArrayTransform(default)`   | Ensure array type       | `@Transformers.ArrayTransform([])`      |
+| `NumberTransform(default)`  | Safe number parsing     | `@Transformers.NumberTransform(0)`      |
+| `BooleanTransform(default)` | Safe boolean conversion | `@Transformers.BooleanTransform(false)` |
 
 ## Logging & Monitoring
 

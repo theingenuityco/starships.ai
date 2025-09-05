@@ -54,15 +54,7 @@ export class SessionRepository extends BaseRepository {
 
         // Create relationship with starship if starshipId is provided
         if (starshipId) {
-          await connection.executeWrite(
-            `MATCH (s:Starship {id: $starshipId}), (session:Session {id: $sessionId})
-             CREATE (s)-[:HAS_SESSION {key: $key}]->(session)`,
-            {
-              starshipId,
-              sessionId: result.id,
-              key: `${starshipId}_${result.id}`,
-            }
-          );
+          await this.linkToStarship(result.id, starshipId);
         }
 
         return this.mapToSession(result);

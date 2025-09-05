@@ -1,8 +1,7 @@
-import { getConnection } from '@/helpers/database';
-import type { WorkflowModel } from '@starships/protocol';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject, getConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 import { Blueprint } from '@starships/autopilot';
+import type { WorkflowModel } from '@starships/protocol';
 
 /**
  * WorkflowRepository - Database operations for workflows
@@ -14,41 +13,37 @@ export class WorkflowRepository extends BaseRepository {
 
   /**
    * Safe value getter with null/undefined/empty object handling
+   * Now using inherited method from BaseRepository
    */
-  private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
-      return defaultValue;
-    }
-    return value as T;
+  private getSafeValueLocal<T>(value: T | {} | null | undefined, defaultValue: T): T {
+    return this.getValueWithDefault(value, defaultValue);
   }
 
   /**
-   * Serialize complex fields for Neo4j storage
+   * Serialize complex fields for Neo4j storage using new serialization utilities
    */
   private serializeComplexFields(workflow: WorkflowModel): any {
-    return {
-      ...workflow,
-      blueprint: workflow.blueprint ? JSON.stringify(workflow.blueprint) : null,
-      tags: workflow.tags || [],
-      allowedStarshipClasses: workflow.allowedStarshipClasses || [],
-    };
+    return this.serializeForDatabase(workflow);
   }
 
   /**
-   * Deserialize complex fields from Neo4j
+   * Deserialize complex fields from Neo4j using new serialization utilities
    */
   private deserializeComplexFields(workflow: any): WorkflowModel {
-    try {
-      return {
-        ...workflow,
-        blueprint: workflow.blueprint ? JSON.parse(workflow.blueprint) : null,
-        tags: workflow.tags || [],
-        allowedStarshipClasses: workflow.allowedStarshipClasses || [],
-      };
-    } catch (error) {
-      console.warn('Failed to deserialize workflow fields:', error);
-      return workflow;
-    }
+    return this.mapFromDatabaseRecord<WorkflowModel>(workflow, {
+      jsonFields: ['blueprint'],
+      arrayFields: ['tags', 'allowedStarshipClasses'],
+      dateFields: ['createdAt', 'updatedAt'],
+      defaultValues: {
+        tags: [],
+        allowedStarshipClasses: [],
+        timeout: 30000,
+        usageCount: 0,
+        isPublic: false,
+        version: '1.0.0',
+        executionMode: 'workflow',
+      },
+    });
   }
 
   async findAll(): Promise<WorkflowModel[]> {
@@ -181,7 +176,7 @@ export class WorkflowRepository extends BaseRepository {
             entity.blueprint && typeof entity.blueprint === 'object' && 'nodes' in entity.blueprint
               ? (entity.blueprint as Blueprint)
               : defaultBlueprint,
-          timeout: this.getSafeValue(entity.timeout, 30000) as number,
+          timeout: this.getValueWithDefault(entity.timeout, 30000) as number,
 
           // Database fields
           name: entity.name as string,
@@ -189,10 +184,10 @@ export class WorkflowRepository extends BaseRepository {
           updatedAt: now,
           authorId: entity.authorId as string,
           starshipId: entity.starshipId as string | undefined,
-          version: this.getSafeValue(entity.version, '1.0.0') as string,
+          version: this.getValueWithDefault(entity.version, '1.0.0') as string,
           category: entity.category as WorkflowModel['category'],
           usageCount: 0,
-          isPublic: this.getSafeValue(entity.isPublic, false) as boolean,
+          isPublic: this.getValueWithDefault(entity.isPublic, false) as boolean,
           tags: (entity.tags as string[]) || [],
           rating: entity.rating as number | undefined,
           executionMode: (entity.executionMode as 'simple' | 'workflow') || 'workflow',

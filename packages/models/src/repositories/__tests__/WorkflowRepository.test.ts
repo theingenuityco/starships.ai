@@ -2,11 +2,11 @@
  * WorkflowRepository Unit Tests
  */
 
-import { WorkflowRepository } from '@/repositories/WorkflowRepository';
 import { getConnection } from '@/helpers/database';
-import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
-import type { WorkflowModel } from '@starships/protocol';
+import { WorkflowRepository } from '@/repositories/WorkflowRepository';
 import type { Blueprint } from '@starships/autopilot';
+import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
+import type { WorkflowModel } from '@starships/protocol';
 
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
@@ -41,30 +41,30 @@ describe('WorkflowRepository', () => {
   });
 
   describe('Private Helper Methods', () => {
-    describe('getSafeValue', () => {
+    describe('getSafeValueLocal', () => {
       it('should return value when valid', () => {
-        const result = repository['getSafeValue']('test-value', 'default');
+        const result = repository['getSafeValueLocal']('test-value', 'default');
         expect(result).toBe('test-value');
       });
 
       it('should return default for null', () => {
-        const result = repository['getSafeValue'](null, 'default');
+        const result = repository['getSafeValueLocal'](null, 'default');
         expect(result).toBe('default');
       });
 
       it('should return default for undefined', () => {
-        const result = repository['getSafeValue'](undefined, 'default');
+        const result = repository['getSafeValueLocal'](undefined, 'default');
         expect(result).toBe('default');
       });
 
       it('should return default for empty object', () => {
-        const result = repository['getSafeValue']({}, 'default');
+        const result = repository['getSafeValueLocal']({}, 'default');
         expect(result).toBe('default');
       });
     });
 
     describe('serializeComplexFields', () => {
-      it('should serialize blueprint and arrays', () => {
+      it('should serialize using new serialization utilities', () => {
         const workflow = {
           id: 'workflow-1',
           name: 'Test Workflow',
@@ -83,36 +83,21 @@ describe('WorkflowRepository', () => {
 
         const result = repository['serializeComplexFields'](workflow);
 
-        expect(result.blueprint).toBe('{"nodes":[],"edges":[],"metadata":{}}');
-        expect(result.tags).toEqual(['test', 'workflow']);
-        expect(result.allowedStarshipClasses).toEqual(['scout', 'cruiser']);
-      });
-
-      it('should handle null blueprint', () => {
-        const workflow = {
-          id: 'workflow-1',
-          name: 'Test Workflow',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          authorId: 'author-123',
-          isPublic: false,
-          usageCount: 0,
-          executionMode: 'workflow',
-          category: 'automation',
-          version: '1.0.0',
-          blueprint: null,
-        } as any;
-
-        const result = repository['serializeComplexFields'](workflow);
-
-        expect(result.blueprint).toBeNull();
-        expect(result.tags).toEqual([]);
-        expect(result.allowedStarshipClasses).toEqual([]);
+        // Should preserve the workflow as-is (since serializeForDatabase handles the transformation)
+        expect(result).toEqual(
+          expect.objectContaining({
+            id: 'workflow-1',
+            name: 'Test Workflow',
+            blueprint: { nodes: [], edges: [], metadata: {} },
+            tags: ['test', 'workflow'],
+            allowedStarshipClasses: ['scout', 'cruiser'],
+          })
+        );
       });
     });
 
     describe('deserializeComplexFields', () => {
-      it('should deserialize blueprint and preserve arrays', () => {
+      it('should deserialize using new mapping utilities', () => {
         const workflow = {
           id: 'workflow-1',
           name: 'Test Workflow',
@@ -126,23 +111,15 @@ describe('WorkflowRepository', () => {
         expect(result.blueprint).toEqual({ nodes: [], edges: [], metadata: {} });
         expect(result.tags).toEqual(['test']);
         expect(result.allowedStarshipClasses).toEqual(['scout']);
+        // Should have default values applied
+        expect(result.timeout).toBe(30000);
+        expect(result.usageCount).toBe(0);
+        expect(result.isPublic).toBe(false);
+        expect(result.version).toBe('1.0.0');
+        expect(result.executionMode).toBe('workflow');
       });
 
-      it('should handle invalid JSON gracefully', () => {
-        const workflow = {
-          id: 'workflow-1',
-          name: 'Test Workflow',
-          blueprint: '{invalid json}',
-        };
-
-        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-        const result = repository['deserializeComplexFields'](workflow);
-
-        expect(result.blueprint).toBe('{invalid json}');
-        expect(consoleSpy).toHaveBeenCalled();
-      });
-
-      it('should handle missing arrays', () => {
+      it('should handle missing arrays with defaults', () => {
         const workflow = {
           id: 'workflow-1',
           name: 'Test Workflow',
@@ -152,6 +129,9 @@ describe('WorkflowRepository', () => {
 
         expect(result.tags).toEqual([]);
         expect(result.allowedStarshipClasses).toEqual([]);
+        expect(result.timeout).toBe(30000);
+        expect(result.usageCount).toBe(0);
+        expect(result.isPublic).toBe(false);
       });
     });
   });

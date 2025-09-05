@@ -44,8 +44,8 @@ export class SessionRepository extends BaseRepository {
         const sessionData = {
           createdAt: now,
           lastActivityAt: entity.lastActivityAt || now,
-          messageCount: entity.messageCount || 0,
-          totalTokens: entity.totalTokens || 0,
+          message_count: entity.messageCount || 0,
+          total_tokens: entity.totalTokens || 0,
           status: entity.status || 'active',
           metadata: this.safeJsonStringify(entity.metadata),
         };
@@ -150,7 +150,7 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.lastActivityAt = $timestamp', {
+        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.last_activity_at = $timestamp', {
           id,
           timestamp: new Date().toISOString(),
         });
@@ -166,7 +166,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.messageCount = s.messageCount + $increment, s.lastActivityAt = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.message_count = s.message_count + $increment, s.lastActivityAt = $timestamp',
           { id, increment, timestamp: new Date().toISOString() }
         );
       },
@@ -181,7 +181,7 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.totalTokens = s.totalTokens + $tokens, s.lastActivityAt = $timestamp',
+          'MATCH (s:Session) WHERE s.id = $id SET s.total_tokens = s.total_tokens + $tokens, s.lastActivityAt = $timestamp',
           { id, tokens, timestamp: new Date().toISOString() }
         );
       },
@@ -310,17 +310,33 @@ export class SessionRepository extends BaseRepository {
   /**
    * Map database SessionModel to Session domain model using new serialization utilities
    */
-  private mapToSession(sessionModel: SessionModel): SessionModel {
-    return this.mapFromDatabaseRecord<SessionModel>(sessionModel, {
-      jsonFields: ['metadata'],
-      dateFields: ['createdAt', 'updatedAt', 'lastActivityAt'],
-      defaultValues: {
-        updatedAt: sessionModel.createdAt,
-        lastActivityAt: sessionModel.createdAt,
-        messageCount: 0,
-        totalTokens: 0,
-        status: 'active',
-      },
-    });
+  private mapToSession(sessionModel: any): SessionModel {
+    if (!sessionModel) return sessionModel;
+
+    // Convert snake_case database fields to camelCase model fields
+    const mapped = {
+      id: sessionModel.id,
+      createdAt: sessionModel.created_at || sessionModel.createdAt,
+      updatedAt: sessionModel.updated_at || sessionModel.updatedAt || sessionModel.created_at || sessionModel.createdAt,
+      lastActivityAt: sessionModel.last_activity_at || sessionModel.lastActivityAt || sessionModel.created_at || sessionModel.createdAt,
+      messageCount: sessionModel.message_count !== undefined ? sessionModel.message_count : sessionModel.messageCount || 0,
+      totalTokens: sessionModel.total_tokens !== undefined ? sessionModel.total_tokens : sessionModel.totalTokens || 0,
+      status: sessionModel.status || 'active',
+      metadata: sessionModel.metadata,
+    };
+
+    // Handle metadata JSON parsing and conversion to undefined for null/invalid JSON
+    if (mapped.metadata === null) {
+      mapped.metadata = undefined;
+    } else if (typeof mapped.metadata === 'string') {
+      try {
+        mapped.metadata = JSON.parse(mapped.metadata);
+      } catch (e) {
+        // For invalid JSON, set to undefined as tests expect
+        mapped.metadata = undefined;
+      }
+    }
+
+    return mapped as SessionModel;
   }
 }

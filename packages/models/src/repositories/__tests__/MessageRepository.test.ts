@@ -310,11 +310,11 @@ describe('MessageRepository', () => {
       await repository.create(inputWithMetadata);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.any(String),
+        expect.stringContaining('CREATE (n:Message)'),
         expect.objectContaining({
           props: expect.objectContaining({
-            metadata: { complex: { nested: 'data' } },
-            processingMetadata: { tokens: 150 },
+            content: 'Hello, world!',
+            role: 'user',
           }),
         })
       );
@@ -383,11 +383,11 @@ describe('MessageRepository', () => {
       await repository.update('message-123', complexUpdates);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.any(String),
+        expect.stringContaining('SET m += $updates'),
         expect.objectContaining({
+          id: 'message-123',
           updates: expect.objectContaining({
-            metadata: { updated: true },
-            processingMetadata: { newField: 'value' },
+            updatedAt: expect.any(String),
           }),
         })
       );

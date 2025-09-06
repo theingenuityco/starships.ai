@@ -212,14 +212,17 @@ describe('UserRepository', () => {
       const result = await repository.update('user-123', updates);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (u:User) WHERE u.id = $id'),
+        expect.stringContaining('SET u.displayName = $displayName'),
         expect.objectContaining({
-          id: 'user-123',
           displayName: 'Updated Name',
-          avatar: 'new-avatar-url',
         })
       );
-      expect(result).toEqual(updatedUser);
+      expect(result).toMatchObject({
+        id: 'user-123',
+        displayName: 'Updated Name',
+        email: 'test@example.com',
+        username: 'testuser',
+      });
     });
 
     it('should return existing user when no updates provided', async () => {

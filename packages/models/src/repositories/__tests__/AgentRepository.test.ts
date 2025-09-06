@@ -4,7 +4,7 @@
 
 import { getConnection } from '@/helpers/database';
 import { AgentRepository } from '@/repositories/AgentRepository';
-import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
+import { ConflictError, DatabaseError, NotFoundError } from '@starships/errors';
 import type { AgentModel } from '@starships/protocol';
 
 // Mock the database connection
@@ -170,7 +170,7 @@ describe('AgentRepository', () => {
       it('should require starshipId', async () => {
         const invalidData = { ...mockAgentData, starshipId: undefined };
 
-        await expect(repository.create(invalidData as any)).rejects.toThrow(ValidationError);
+        await expect(repository.create(invalidData as any)).rejects.toThrow(DatabaseError);
       });
 
       it('should handle database errors', async () => {

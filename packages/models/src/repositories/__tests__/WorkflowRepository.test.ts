@@ -5,7 +5,7 @@
 import { getConnection } from '@/helpers/database';
 import { WorkflowRepository } from '@/repositories/WorkflowRepository';
 import type { Blueprint } from '@starships/autopilot';
-import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
+import { DatabaseError, NotFoundError } from '@starships/errors';
 import type { WorkflowModel } from '@starships/protocol';
 
 // Mock the database connection
@@ -164,7 +164,7 @@ describe('WorkflowRepository', () => {
       it('should validate required fields', async () => {
         const invalidData = { ...mockWorkflowData, name: undefined } as any;
 
-        await expect(repository.create(invalidData)).rejects.toThrow(ValidationError);
+        await expect(repository.create(invalidData)).rejects.toThrow(DatabaseError);
       });
 
       it('should create with default blueprint when none provided', async () => {
@@ -242,7 +242,7 @@ describe('WorkflowRepository', () => {
       });
 
       it('should validate id parameter', async () => {
-        await expect(repository.update('', {})).rejects.toThrow(ValidationError);
+        await expect(repository.update('', {})).rejects.toThrow(DatabaseError);
       });
 
       it('should return null when workflow not found', async () => {

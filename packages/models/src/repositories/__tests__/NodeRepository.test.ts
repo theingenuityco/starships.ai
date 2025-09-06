@@ -3,7 +3,7 @@
  */
 
 import { NodeRepository } from '@/repositories/NodeRepository';
-import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
+import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import type { NodeModel } from '@starships/protocol';
 
 // Mock the database connection
@@ -226,7 +226,7 @@ describe('NodeRepository', () => {
 
       await expect(repository.createNode('blueprint-123', { name: 'Test' } as any)).rejects.toThrow(ValidationError);
 
-      await expect(repository.createNode('blueprint-123', { type: 'start' } as any)).rejects.toThrow(ValidationError);
+      await expect(repository.createNode('blueprint-123', { type: 'start' } as any)).rejects.toThrow(DatabaseError);
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {

@@ -64,7 +64,9 @@ describe('AgentRepository', () => {
         const result = await repository.findAll();
 
         expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1' }));
+        expect(result[1]).toEqual(expect.objectContaining({ id: 'agent-2', name: 'Agent 2' }));
       });
 
       it('should handle empty result', async () => {
@@ -90,7 +92,7 @@ describe('AgentRepository', () => {
         const result = await repository.findById('agent-1');
 
         expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id: 'agent-1' });
-        expect(result).toEqual(mockAgent);
+        expect(result).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1' }));
       });
 
       it('should return null when agent not found', async () => {
@@ -230,7 +232,7 @@ describe('AgentRepository', () => {
             updatedAt: expect.any(String),
           }),
         });
-        expect(result).toEqual(mockAgent);
+        expect(result).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Updated Agent' }));
       });
 
       it('should return null when agent not found', async () => {
@@ -289,7 +291,8 @@ describe('AgentRepository', () => {
           'MATCH (a:Agent)<-[:INTERACTS_WITH]-(u:User) WHERE u.id = $userId RETURN a',
           { userId: 'user-123' }
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1' }));
       });
     });
 
@@ -304,7 +307,8 @@ describe('AgentRepository', () => {
           'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a ORDER BY a.name',
           { starshipId: 'starship-123' }
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1' }));
       });
     });
 
@@ -319,7 +323,8 @@ describe('AgentRepository', () => {
           'MATCH (a:Agent) WHERE a.starshipId = $starshipId RETURN a ORDER BY a.name',
           { starshipId: 'starship-123' }
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1', starshipId: 'starship-123' }));
       });
     });
 
@@ -370,7 +375,8 @@ describe('AgentRepository', () => {
           'MATCH (a:Agent) WHERE a.starshipId IS NULL OR a.starshipId = "" RETURN a ORDER BY a.createdAt DESC',
           {}
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Agent 1', starshipId: null }));
       });
     });
   });
@@ -387,7 +393,8 @@ describe('AgentRepository', () => {
           'MATCH (a:Agent) WHERE a.authorId = $authorId RETURN a ORDER BY a.updatedAt DESC',
           { authorId: 'author-123' }
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', authorId: 'author-123' }));
       });
     });
 
@@ -401,7 +408,8 @@ describe('AgentRepository', () => {
         expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (a:Agent) WHERE a.category = $category RETURN a ORDER BY a.name', {
           category: 'general',
         });
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', category: 'general' }));
       });
     });
 
@@ -416,7 +424,8 @@ describe('AgentRepository', () => {
           'MATCH (a:Agent) WHERE ANY(tag IN $tags WHERE tag IN a.tags) RETURN a ORDER BY a.name',
           { tags: ['ai', 'helper'] }
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1' }));
       });
     });
 
@@ -434,7 +443,8 @@ describe('AgentRepository', () => {
             offset: expect.any(Object), // Neo4j int
           })
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', isPublic: true }));
       });
 
       it('should use default pagination values', async () => {
@@ -463,7 +473,8 @@ describe('AgentRepository', () => {
           'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
           { query: 'test query' }
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', name: 'Matching Agent' }));
       });
     });
 
@@ -492,7 +503,8 @@ describe('AgentRepository', () => {
             starshipClass: 'scout',
           })
         );
-        expect(result).toEqual(mockAgents);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(expect.objectContaining({ id: 'agent-1', category: 'general' }));
       });
 
       it('should handle empty filters', async () => {

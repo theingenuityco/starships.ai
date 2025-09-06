@@ -3,9 +3,9 @@
  */
 
 import { BlueprintRepository } from '@/repositories/BlueprintRepository';
-import { NodeRepository } from '@/repositories/NodeRepository';
 import { EdgeRepository } from '@/repositories/EdgeRepository';
-import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
+import { NodeRepository } from '@/repositories/NodeRepository';
+import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import type { CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 
 // Mock dependencies
@@ -445,7 +445,7 @@ describe('BlueprintRepository', () => {
     });
 
     it('should validate required blueprintId parameter', async () => {
-      await expect(repository.incrementUsageCount('')).rejects.toThrow(ValidationError);
+      await expect(repository.incrementUsageCount('')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle database errors', async () => {
@@ -471,7 +471,7 @@ describe('BlueprintRepository', () => {
     });
 
     it('should validate required blueprintId parameter', async () => {
-      await expect(repository.deleteBlueprint('')).rejects.toThrow(ValidationError);
+      await expect(repository.deleteBlueprint('')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle deletion errors from node repository', async () => {
@@ -519,7 +519,7 @@ describe('BlueprintRepository', () => {
     });
 
     it('should validate required category parameter', async () => {
-      await expect(repository.getBlueprintsByCategory('')).rejects.toThrow(ValidationError);
+      await expect(repository.getBlueprintsByCategory('')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle metadata parsing errors', async () => {

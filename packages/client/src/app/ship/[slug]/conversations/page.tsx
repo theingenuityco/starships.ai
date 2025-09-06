@@ -34,5 +34,5 @@ export default function ConversationsPage() {
     )
   }
 
-  return <ConversationInterface starshipId={starshipData.starship.id} />
+  return <ConversationInterface starshipId={starshipData.id} />
 }

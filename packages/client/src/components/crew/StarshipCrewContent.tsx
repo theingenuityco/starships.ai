@@ -10,7 +10,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStarshipBySlug, useStarships } from '@/hooks/useStarships'
 import { useToast } from '@/hooks/useToast'
-import { Agent, MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import { MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import type { AgentModel } from '@starships/protocol'
 import { Activity, ArrowLeft, Bot, Info, Loader2, MessageSquare, Plug, Shield, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
 
@@ -19,14 +20,14 @@ interface StarshipCrewContentProps {
 }
 
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
   const { data: starshipsResponse } = useStarships()
   const { data: starshipData, isLoading: starshipLoading, error: starshipError } = useStarshipBySlug(slug)
   const starships = starshipsResponse?.starships || []
-  const starship = starshipData?.starship || null
+  const starship = starshipData || null
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
@@ -37,7 +38,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [isManualOpen, setIsManualOpen] = useState(false)
   const [currentTab, setCurrentTab] = useState('agents')
 
-  const handleAgentSelect = (agent: Agent) => {
+  const handleAgentSelect = (agent: AgentModel) => {
     setSelectedAgent(agent)
     setConversationId(null) // Reset conversation when agent changes
   }

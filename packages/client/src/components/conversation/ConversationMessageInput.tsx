@@ -3,15 +3,15 @@
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useSendMessage } from '@/hooks/useConversations'
-import type { Agent } from '@/lib/api'
 import { cn, generateId } from '@/lib/utils'
 import type { Message } from '@/types/chat'
+import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 interface ConversationMessageInputProps {
-  selectedAgent?: Agent | null
+  selectedAgent?: AgentModel | null
   starshipId?: string
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
@@ -75,7 +75,6 @@ export function ConversationMessageInput({
         console.log('Creating new conversation for agent chat...')
         const newConversation = await createConversation.mutateAsync({
           source: 'agent',
-          agentId: selectedAgent!.id,
           starshipId: starshipId,
         })
         currentConversationId = newConversation.id
@@ -135,7 +134,6 @@ export function ConversationMessageInput({
         console.log('Creating new conversation for agent chat suggestion...')
         const newConversation = await createConversation.mutateAsync({
           source: 'agent',
-          agentId: selectedAgent!.id,
           starshipId: starshipId,
         })
         currentConversationId = newConversation.id

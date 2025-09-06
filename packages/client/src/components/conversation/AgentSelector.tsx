@@ -1,23 +1,23 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { useAgents } from '@/hooks/useAgents'
-import type { Agent } from '@/lib/api'
+import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
+import type { AgentModel } from '@starships/protocol'
 import { Bot, ChevronDown, Loader2 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 
 interface AgentSelectorProps {
-  selectedAgent: Agent | null
-  onAgentChange: (agent: Agent | null) => void
+  selectedAgent: AgentModel | null
+  onAgentChange: (agent: AgentModel | null) => void
   starshipId?: string
   compact?: boolean
 }
 
 export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compact = false }: AgentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const { agents, loading } = useAgents(starshipId)
+  const { data: agents = [], isLoading: loading } = useStarshipAgents(starshipId || '')
 
   // Auto-select first agent when agents are loaded
   useEffect(() => {

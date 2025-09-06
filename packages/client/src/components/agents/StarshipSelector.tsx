@@ -1,9 +1,9 @@
 'use client'
 
-import { useStarships } from '@/hooks/useStarships'
-import { Starship } from '@/lib/api'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, AlertCircle, Rocket } from 'lucide-react'
+import { useStarships } from '@/hooks/useStarships'
+import type { StarshipModel } from '@starships/protocol'
+import { AlertCircle, Loader2, Rocket } from 'lucide-react'
 
 interface StarshipSelectorProps {
   value?: string
@@ -67,7 +67,7 @@ export function StarshipSelector({ value, onValueChange, placeholder = 'Select a
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {starships.map(starship => (
+        {starships.map((starship: StarshipModel) => (
           <SelectItem key={starship.id} value={starship.id}>
             <div className="flex items-center space-x-3 py-1">
               <span className="text-lg">{getStarshipIcon(starship.class)}</span>

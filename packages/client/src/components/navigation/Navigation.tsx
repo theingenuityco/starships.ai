@@ -18,8 +18,8 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
     title: 'Starship Systems',
     items: [
       {
-        href: `/ship/${starshipSlug}/conversation`,
-        label: 'Conversation',
+        href: `/ship/${starshipSlug}/conversations`,
+        label: 'Conversations',
         icon: MessageSquare,
         status: 'optimal',
       },

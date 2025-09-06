@@ -1,5 +1,5 @@
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 
-export default function ConversationPage() {
+export default function ConversationsPage() {
   return <ConversationInterface />
 }

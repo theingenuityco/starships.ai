@@ -15,16 +15,7 @@ export class ConversationRepository extends BaseRepository {
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
         );
-        return result.map((record) =>
-          this.mapFromDatabaseRecord<ConversationModel>(record.c, {
-            jsonFields: ['metadata'],
-            defaultValues: {
-              messageCount: 0,
-              totalTokens: 0,
-              status: 'active',
-            },
-          })
-        );
+        return result.map((record) => ConversationEntity.fromData(record.c));
       },
       'findAll',
       'Conversation'
@@ -36,16 +27,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0
-          ? this.mapFromDatabaseRecord<ConversationModel>(result[0].c, {
-              jsonFields: ['metadata'],
-              defaultValues: {
-                messageCount: 0,
-                totalTokens: 0,
-                status: 'active',
-              },
-            })
-          : null;
+        return result.length > 0 ? ConversationEntity.fromData(result[0].c) : null;
       },
       'findById',
       'Conversation',
@@ -63,14 +45,18 @@ export class ConversationRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare conversation data with defaults and validation
-        const conversationData = {
+        const conversationEntity = ConversationEntity.fromData({
+          ...entity,
           createdAt: now,
           lastActivityAt: entity.lastActivityAt || now,
           messageCount: entity.messageCount || 0,
           totalTokens: entity.totalTokens || 0,
           status: entity.status || 'active',
-          metadata: this.safeJsonStringify(entity.metadata),
-        };
+        });
+
+        const conversationData = conversationEntity.toDatabase();
+        // Remove id since it will be auto-generated
+        delete conversationData.id;
 
         // Use BaseRepository serialization (the conversationData is already properly prepared)
         const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
@@ -80,15 +66,8 @@ export class ConversationRepository extends BaseRepository {
           await this.linkToStarship(result.id, starshipId);
         }
 
-        // Use consistent mapping from database record
-        return this.mapFromDatabaseRecord<ConversationModel>(result, {
-          jsonFields: ['metadata'],
-          defaultValues: {
-            messageCount: 0,
-            totalTokens: 0,
-            status: 'active',
-          },
-        });
+        // Use ConversationEntity for consistent mapping
+        return ConversationEntity.fromData(result);
       },
       'create',
       'Conversation'
@@ -124,7 +103,10 @@ export class ConversationRepository extends BaseRepository {
         }
         if (updates.metadata !== undefined) {
           setFields.push('c.metadata = $metadata');
-          params.metadata = this.safeJsonStringify(updates.metadata);
+          // Use ConversationEntity to handle metadata serialization
+          const tempEntity = ConversationEntity.fromData({ metadata: updates.metadata });
+          const serialized = tempEntity.toDatabase();
+          params.metadata = serialized.metadata;
         }
 
         if (setFields.length === 0) {
@@ -146,15 +128,8 @@ export class ConversationRepository extends BaseRepository {
           this.handleNotFound('Conversation', id, 'update');
         }
 
-        // Use consistent mapping from database record
-        return this.mapFromDatabaseRecord<ConversationModel>(result[0].c, {
-          jsonFields: ['metadata'],
-          defaultValues: {
-            messageCount: 0,
-            totalTokens: 0,
-            status: 'active',
-          },
-        });
+        // Use ConversationEntity for consistent mapping
+        return ConversationEntity.fromData(result[0].c);
       },
       'update',
       'Conversation',
@@ -263,16 +238,7 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.lastActivityAt DESC`,
           { starshipId }
         );
-        return result.map((record) =>
-          this.mapFromDatabaseRecord<ConversationModel>(record.c, {
-            jsonFields: ['metadata'],
-            defaultValues: {
-              messageCount: 0,
-              totalTokens: 0,
-              status: 'active',
-            },
-          })
-        );
+        return result.map((record) => ConversationEntity.fromData(record.c));
       },
       'findByStarship',
       'Conversation'

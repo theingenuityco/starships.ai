@@ -25,7 +25,7 @@ export class StarshipRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
-        return result.map((record) => record.s);
+        return result.map((record) => StarshipEntity.deserialize(record.s));
       },
       'findAll',
       'Starship'
@@ -33,13 +33,12 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async findById(id: string): Promise<StarshipModel | null> {
-    this.validateRequired({ id }, ['id'], 'findById');
-
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id });
-        return result[0]?.s || null;
+        const starship = result[0]?.s || null;
+        return starship ? StarshipEntity.deserialize(starship) : null;
       },
       'findById',
       'Starship',
@@ -85,11 +84,13 @@ export class StarshipRepository extends BaseRepository {
   async create(
     entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'maxActiveMissions' | 'updatedAt' | 'slug'> & { slug?: string }
   ): Promise<StarshipModel> {
-    this.validateRequired(entity, ['name', 'ownerId', 'class'], 'create');
-
     return this.executeWithErrorHandling(
       async () => {
+        // Validate using Entity
+        await StarshipEntity.validate(entity, 'create');
+
         const connection = this.getConnection();
+        const now = new Date().toISOString();
 
         // Set maxAgents based on class (Scout: 3, Cruiser: 5, Draught: 10)
         const maxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
@@ -100,18 +101,21 @@ export class StarshipRepository extends BaseRepository {
         // Generate unique slug if not provided
         const slug = entity.slug || (await this.generateUniqueSlug(entity.name, entity.ownerId));
 
-        const starshipProps = {
+        const starshipData = {
           ...entity,
           slug,
           maxAgents,
           maxActiveMissions,
           status: entity.status || 'active', // Default to active
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          createdAt: now,
+          updatedAt: now,
         };
 
-        // Use Neo4j auto-generated ID
-        const starship = await this.createEntityWithAutoId<StarshipModel>('Starship', starshipProps);
+        // Transform using Entity
+        const starshipEntity = StarshipEntity.deserialize(starshipData);
+
+        // Use base repository for database operation
+        const starship = await this.createEntityWithAutoId<StarshipModel>('Starship', starshipEntity.serialize());
 
         // Create relationship with owner
         await connection.executeWrite(
@@ -124,7 +128,7 @@ export class StarshipRepository extends BaseRepository {
           }
         );
 
-        return starship;
+        return StarshipEntity.deserialize(starship);
       },
       'create',
       'Starship'

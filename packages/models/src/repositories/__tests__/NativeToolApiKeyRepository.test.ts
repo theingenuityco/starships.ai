@@ -24,7 +24,7 @@ jest.mock('crypto', () => ({
 
 import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { NativeToolApiKeyRepository } from '@/repositories/NativeToolApiKeyRepository';
-import { ConflictError, DatabaseError } from '@starships/errors';
+import { ConflictError, DatabaseError, ValidationError } from '@starships/errors';
 import crypto from 'crypto';
 
 describe('NativeToolApiKeyRepository', () => {
@@ -93,9 +93,9 @@ describe('NativeToolApiKeyRepository', () => {
     });
 
     it('should validate required parameters', async () => {
-      await expect(repository.saveApiKey('', 'openai', 'key')).rejects.toThrow(DatabaseError);
-      await expect(repository.saveApiKey('starship-123', '', 'key')).rejects.toThrow(DatabaseError);
-      await expect(repository.saveApiKey('starship-123', 'openai', '')).rejects.toThrow(DatabaseError);
+      await expect(repository.saveApiKey('', 'openai', 'key')).rejects.toThrow(ValidationError);
+      await expect(repository.saveApiKey('starship-123', '', 'key')).rejects.toThrow(ValidationError);
+      await expect(repository.saveApiKey('starship-123', 'openai', '')).rejects.toThrow(ValidationError);
     });
 
     it('should encrypt API key before saving', async () => {
@@ -138,8 +138,8 @@ describe('NativeToolApiKeyRepository', () => {
     });
 
     it('should validate required parameters', async () => {
-      await expect(repository.getApiKey('', 'openai')).rejects.toThrow(DatabaseError);
-      await expect(repository.getApiKey('starship-123', '')).rejects.toThrow(DatabaseError);
+      await expect(repository.getApiKey('', 'openai')).rejects.toThrow(ValidationError);
+      await expect(repository.getApiKey('starship-123', '')).rejects.toThrow(ValidationError);
     });
 
     it('should handle database errors', async () => {
@@ -215,7 +215,7 @@ describe('NativeToolApiKeyRepository', () => {
     });
 
     it('should validate starshipId parameter', async () => {
-      await expect(repository.getAllApiKeys('')).rejects.toThrow(DatabaseError);
+      await expect(repository.getAllApiKeys('')).rejects.toThrow(ValidationError);
     });
 
     it('should handle database errors', async () => {
@@ -238,8 +238,8 @@ describe('NativeToolApiKeyRepository', () => {
     });
 
     it('should validate required parameters', async () => {
-      await expect(repository.deleteApiKey('', 'openai')).rejects.toThrow(DatabaseError);
-      await expect(repository.deleteApiKey('starship-123', '')).rejects.toThrow(DatabaseError);
+      await expect(repository.deleteApiKey('', 'openai')).rejects.toThrow(ValidationError);
+      await expect(repository.deleteApiKey('starship-123', '')).rejects.toThrow(ValidationError);
     });
 
     it('should handle database errors', async () => {
@@ -279,8 +279,8 @@ describe('NativeToolApiKeyRepository', () => {
     });
 
     it('should validate required parameters', async () => {
-      await expect(repository.hasApiKey('', 'openai')).rejects.toThrow(DatabaseError);
-      await expect(repository.hasApiKey('starship-123', '')).rejects.toThrow(DatabaseError);
+      await expect(repository.hasApiKey('', 'openai')).rejects.toThrow(ValidationError);
+      await expect(repository.hasApiKey('starship-123', '')).rejects.toThrow(ValidationError);
     });
 
     it('should handle database errors', async () => {

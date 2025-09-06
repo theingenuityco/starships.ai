@@ -60,9 +60,12 @@ export interface ConversationModel {
   updatedAt?: string;
   lastActivityAt: string;
   messageCount: number;
-  totalTokens?: number;
+  totalTokens: number; // Made required for consistency
   status: 'active' | 'paused' | 'completed' | 'archived';
   metadata?: Record<string, unknown>;
+  // Add relationship fields
+  starshipId?: string;
+  userId?: string;
 }
 
 /**

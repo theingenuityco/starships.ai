@@ -1,8 +1,14 @@
-import { ConversationRepository } from '@starships/models';
+import { ConversationRepository, MessageRepository } from '@starships/models';
 import { ConversationModel } from '@starships/protocol';
 
 export interface CreateConversationData {
   metadata?: Record<string, unknown>;
+  starshipId?: string;
+  userId?: string;
+}
+
+export interface ConversationWithMessages extends ConversationModel {
+  messages: any[]; // Using any[] to match existing Message type from routes
 }
 
 /**
@@ -10,24 +16,77 @@ export interface CreateConversationData {
  */
 export class ConversationService {
   private conversationRepository: ConversationRepository;
+  private messageRepository: MessageRepository;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
+    this.messageRepository = new MessageRepository();
   }
 
   /**
    * Create a new conversation
    */
   async createConversation(data: CreateConversationData): Promise<ConversationModel> {
-    const conversation = await this.conversationRepository.create({
-      lastActivityAt: new Date().toISOString(),
-      messageCount: 0,
-      totalTokens: 0,
-      status: 'active',
-      metadata: data.metadata,
-    });
+    const conversation = await this.conversationRepository.create(
+      {
+        lastActivityAt: new Date().toISOString(),
+        messageCount: 0,
+        totalTokens: 0,
+        status: 'active',
+        metadata: data.metadata,
+      },
+      data.starshipId
+    );
 
     return conversation;
+  }
+
+  /**
+   * Get conversations by starship
+   */
+  async getConversationsByStarship(starshipId: string): Promise<ConversationModel[]> {
+    return this.conversationRepository.findByStarship(starshipId);
+  }
+
+  /**
+   * Get conversations by user (placeholder for future implementation)
+   */
+  async getConversationsByUser(userId: string): Promise<ConversationModel[]> {
+    // TODO: Implement user-conversation relationship in repository
+    return [];
+  }
+
+  /**
+   * Get conversation with messages
+   */
+  async getConversationWithMessages(
+    conversationId: string,
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<ConversationWithMessages | null> {
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation) return null;
+
+    const messages = await this.messageRepository.findByConversationId(conversationId, limit, offset);
+
+    return {
+      ...conversation,
+      messages,
+    };
+  }
+
+  /**
+   * Link conversation to starship
+   */
+  async linkConversationToStarship(conversationId: string, starshipId: string): Promise<void> {
+    await this.conversationRepository.linkToStarship(conversationId, starshipId);
+  }
+
+  /**
+   * Get starship for conversation
+   */
+  async getConversationStarship(conversationId: string): Promise<{ id: string; name: string; slug: string } | null> {
+    return this.conversationRepository.getConversationStarship(conversationId);
   }
 
   /**

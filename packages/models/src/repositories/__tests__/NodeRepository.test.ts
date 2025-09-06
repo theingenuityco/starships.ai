@@ -226,7 +226,7 @@ describe('NodeRepository', () => {
 
       await expect(repository.createNode('blueprint-123', { name: 'Test' } as any)).rejects.toThrow(ValidationError);
 
-      await expect(repository.createNode('blueprint-123', { type: 'start' } as any)).rejects.toThrow(DatabaseError);
+      await expect(repository.createNode('blueprint-123', { type: 'start' } as any)).rejects.toThrow(ValidationError);
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {

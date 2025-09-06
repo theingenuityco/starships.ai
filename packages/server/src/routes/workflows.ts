@@ -100,20 +100,26 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
         starshipClass,
       });
       // Convert Workflow instances to WorkflowModel for API response
-      workflows = workflows.map((w) => ({
-        id: w.parameters?.workflowId || '',
-        name: w.parameters?.name || '',
-        // Add other required WorkflowModel fields
-      }));
+      workflows = workflows.map((w) => {
+        const params = w.getParameters();
+        return {
+          id: params?.workflowId || '',
+          name: params?.name || '',
+          // Add other required WorkflowModel fields
+        };
+      });
     } else {
       // Get all workflows using instance method
       const workflowService = new WorkflowService();
       const workflowInstances = await workflowService.getAllWorkflows();
-      workflows = workflowInstances.map((w) => ({
-        id: w.parameters?.workflowId || '',
-        name: w.parameters?.name || '',
-        // Add other required WorkflowModel fields
-      }));
+      workflows = workflowInstances.map((w) => {
+        const params = w.getParameters();
+        return {
+          id: params?.workflowId || '',
+          name: params?.name || '',
+          // Add other required WorkflowModel fields
+        };
+      });
     }
 
     // Apply pagination

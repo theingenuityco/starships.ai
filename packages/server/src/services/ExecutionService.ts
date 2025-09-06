@@ -69,7 +69,7 @@ export class ExecutionService {
       throw new Error(`Execution not found: ${executionId}`);
     }
 
-    if (execution.status !== 'pending') {
+    if (execution.status !== 'not_started') {
       throw new Error(`Cannot start execution in ${execution.status} status`);
     }
 
@@ -140,20 +140,27 @@ export class ExecutionService {
   /**
    * Fail execution (business logic for status transitions)
    */
-  async failExecution(executionId: string, error: string): Promise<ExecutionModel | null> {
+  async failExecution(executionId: string, errorMessage: string): Promise<ExecutionModel | null> {
     const execution = await this.executionRepository.findById(executionId);
     if (!execution) {
       throw new Error(`Execution not found: ${executionId}`);
     }
 
-    if (!['pending', 'running', 'paused'].includes(execution.status)) {
+    if (!['not_started', 'running', 'paused'].includes(execution.status)) {
       throw new Error(`Cannot fail execution in ${execution.status} status`);
     }
+
+    const executionError = {
+      code: 'SYSTEM_ERROR' as const,
+      message: errorMessage,
+      timestamp: new Date().toISOString(),
+      recoverable: false,
+    };
 
     return this.executionRepository.update(executionId, {
       status: 'failed',
       endTime: new Date().toISOString(),
-      error,
+      error: executionError,
     });
   }
 

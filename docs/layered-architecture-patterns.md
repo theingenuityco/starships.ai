@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document explains the layered architecture and patterns used in the Starships.ai monorepo, using the **conversation** feature as a comprehensive example. The architecture follows a clean, separation-of-concerns approach with 6 distinct layers, each with specific responsibilities and patterns.
+This document explains the layered architecture and patterns used in the Starships.ai monorepo, using the **conversation** and **starship** features as comprehensive examples. The architecture follows a clean, separation-of-concerns approach with 6 distinct layers, each with specific responsibilities and patterns.
+
+Both **conversations** and **starships** have been successfully migrated to follow this layered architecture pattern.
 
 ## Architecture Layers
 
@@ -10,6 +12,7 @@ This document explains the layered architecture and patterns used in the Starshi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     CLIENT LAYER (Layer 6)                         │
 │  packages/client/src/hooks/useConversations.ts                     │
+│  packages/client/src/hooks/useStarships.ts                         │
 │  • React hooks with TanStack Query                                  │
 │  • Client-side state management and caching                        │
 │  • Optimistic updates and error handling                           │
@@ -18,6 +21,7 @@ This document explains the layered architecture and patterns used in the Starshi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   API ROUTES LAYER (Layer 5)                       │
 │  packages/server/src/routes/conversations.ts                       │
+│  packages/server/src/routes/starships.ts                           │
 │  • Express REST endpoints with OpenAPI format                      │
 │  • Request validation with Zod schemas                             │
 │  • Authentication and error handling                               │
@@ -26,6 +30,7 @@ This document explains the layered architecture and patterns used in the Starshi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   SERVICE LAYER (Layer 4)                          │
 │  packages/server/src/services/ConversationService.ts               │
+│  packages/server/src/services/StarshipService.ts                   │
 │  • Business logic and complex operations                           │
 │  • Orchestrates repository interactions                            │
 │  • Handles cross-cutting concerns                                  │
@@ -34,6 +39,7 @@ This document explains the layered architecture and patterns used in the Starshi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                  REPOSITORY LAYER (Layer 3)                        │
 │  packages/models/src/repositories/ConversationRepository.ts        │
+│  packages/models/src/repositories/StarshipRepository.ts            │
 │  • Database operations and queries                                 │
 │  • Data access abstraction                                         │
 │  • Neo4j relationship management                                   │
@@ -42,6 +48,7 @@ This document explains the layered architecture and patterns used in the Starshi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    ENTITY LAYER (Layer 2)                          │
 │  packages/models/src/entities/ConversationEntity.ts                │
+│  packages/models/src/entities/StarshipEntity.ts                    │
 │  • Data validation and transformation                              │
 │  • Serialization/deserialization logic                            │
 │  • Business object representation                                  │
@@ -50,6 +57,7 @@ This document explains the layered architecture and patterns used in the Starshi
 ┌─────────────────────────────────────────────────────────────────────┐
 │                   DOMAIN LAYER (Layer 1)                           │
 │  packages/protocol/src/domains/conversation.ts                     │
+│  packages/protocol/src/domains/starship.ts                         │
 │  • Pure TypeScript interfaces and types                            │
 │  • Domain contracts and models                                     │
 │  • Cross-package type sharing                                      │
@@ -564,5 +572,18 @@ Standardized patterns across layers make the codebase predictable and easier for
 - **Mixed Responsibilities**: Keep each layer focused on its single responsibility
 - **Database Leakage**: Don't let database structures leak to outer layers
 - **Business Logic in Routes**: Keep business logic in the service layer
+
+## Migration Status
+
+### ✅ Successfully Migrated
+
+- **Conversations**: Complete implementation following all 6 layers
+- **Starships**: Complete implementation following all 6 layers
+
+### 🚧 Pending Migration
+
+Other features in the monorepo may still use direct repository access patterns and should be migrated to follow this layered architecture as development continues.
+
+---
 
 This layered architecture ensures that the Starships.ai codebase remains maintainable, testable, and scalable as the application grows in complexity.

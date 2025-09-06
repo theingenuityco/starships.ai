@@ -33,9 +33,6 @@ export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } fro
 
 export type { HealthStatus, LogContext, LogLevel, PerformanceMetrics } from './helpers/logging';
 
-// Serialization utilities
-export { ModelSerializer, SerializableModel, Transform, Transformers, Type } from './helpers/serializer';
-
 // Management scripts
 export { migrationRunner } from './scripts/migration-runner';
 export { seedWaitlist } from './scripts/seed-waitlist';

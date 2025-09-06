@@ -1,6 +1,7 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { ConversationModel } from '@starships/protocol';
+import { ConversationValidation } from '../validation/ConversationValidation';
 
 export class ConversationRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -55,38 +56,8 @@ export class ConversationRepository extends BaseRepository {
   async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate required fields using BaseRepository validation
-        this.validateRequired(entity, ['lastActivityAt', 'messageCount', 'status'], 'create');
-
-        // Validate field types
-        this.validateTypes(
-          entity,
-          {
-            lastActivityAt: 'string',
-            messageCount: 'number',
-            status: 'string',
-            totalTokens: 'number',
-          },
-          'create'
-        );
-
-        // Validate enum values (status)
-        this.validateEnums(
-          entity,
-          {
-            status: ['active', 'paused', 'completed', 'archived'],
-          },
-          'create'
-        );
-
-        // Validate string lengths
-        this.validateStringLengths(
-          entity,
-          {
-            status: { min: 1, max: 50 },
-          },
-          'create'
-        );
+        // Use shared validation logic
+        ConversationValidation.validateAll(entity, 'create');
 
         const connection = this.getConnection();
         const now = new Date().toISOString();
@@ -127,27 +98,8 @@ export class ConversationRepository extends BaseRepository {
   async update(id: string, updates: Partial<ConversationModel>): Promise<ConversationModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate updates using BaseRepository validation
-        if (updates.status !== undefined) {
-          this.validateEnums(
-            updates,
-            {
-              status: ['active', 'paused', 'completed', 'archived'],
-            },
-            'update'
-          );
-        }
-
-        if (updates.messageCount !== undefined || updates.totalTokens !== undefined) {
-          this.validateTypes(
-            updates,
-            {
-              messageCount: 'number',
-              totalTokens: 'number',
-            },
-            'update'
-          );
-        }
+        // Use shared validation logic for updates
+        ConversationValidation.validateAll(updates, 'update');
 
         const connection = this.getConnection();
         const setFields = [];

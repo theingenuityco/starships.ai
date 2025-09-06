@@ -45,12 +45,19 @@ export class ConversationEntity extends SerializableModel implements Conversatio
   @Transformers.JsonTransform()
   metadata?: Record<string, unknown>;
 
+  // Add relationship fields
+  @Expose()
+  starshipId?: string;
+
+  @Expose()
+  userId?: string;
+
   /**
    * Validation constants for conversation fields
    * Used by repositories for consistent validation
    */
   static readonly VALIDATION = {
-    REQUIRED_FIELDS: ['id', 'createdAt', 'lastActivityAt', 'messageCount', 'status'] as const,
+    REQUIRED_FIELDS: ['id', 'createdAt', 'lastActivityAt', 'messageCount', 'totalTokens', 'status'] as const,
     STATUS_VALUES: ['active', 'paused', 'completed', 'archived'] as const,
     FIELD_TYPES: {
       id: 'string',
@@ -60,10 +67,14 @@ export class ConversationEntity extends SerializableModel implements Conversatio
       messageCount: 'number',
       totalTokens: 'number',
       status: 'string',
+      starshipId: 'string',
+      userId: 'string',
     } as const,
     STRING_LENGTHS: {
       id: { min: 1, max: 255 },
       status: { min: 1, max: 50 },
+      starshipId: { min: 1, max: 255 },
+      userId: { min: 1, max: 255 },
     } as const,
     ENUM_CONSTRAINTS: {
       status: ['active', 'paused', 'completed', 'archived'],

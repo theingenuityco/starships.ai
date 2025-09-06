@@ -2,15 +2,15 @@
  * Global test utilities type declarations
  */
 
-import { UserModel } from '@starships/protocol/domains/user';
 import { StarshipModel } from '@starships/protocol/domains/starship';
+import { UserModel } from '@starships/protocol/domains/user';
 
 declare global {
   var createMockDriver: () => any;
   var createMockUser: (overrides?: Partial<UserModel>) => UserModel;
   var createMockStarship: (overrides?: Partial<StarshipModel>) => StarshipModel;
   var createMockAgent: (overrides?: any) => any;
-  var createMockSession: (overrides?: any) => any;
+  var createMockConversation: (overrides?: any) => any;
   var createMockMessage: (overrides?: any) => any;
   var createMockBlueprint: (overrides?: any) => any;
   var createMockExecution: (overrides?: any) => any;

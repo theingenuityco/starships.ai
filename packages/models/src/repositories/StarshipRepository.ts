@@ -568,36 +568,36 @@ export class StarshipRepository extends BaseRepository {
     return result[0]?.deletedCount > 0;
   }
 
-  /** Get all sessions for a starship using Neo4j relationships */
-  async getSessions(starshipId: string): Promise<any[]> {
+  /** Get all conversations for a starship using Neo4j relationships */
+  async getConversations(starshipId: string): Promise<any[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
     const connection = this.connection;
-    const result = await connection.executeQuery<{ s: any }>(
-      `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
-       RETURN s ORDER BY s.lastActivityAt DESC`,
+    const result = await connection.executeQuery<{ c: any }>(
+      `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
+       RETURN c ORDER BY c.lastActivityAt DESC`,
       { starshipId }
     );
 
-    return result.map((record) => record.s);
+    return result.map((record) => record.c);
   }
 
   /**
-   * Get session count for a starship
+   * Get conversation count for a starship
    * @param starshipId - The starship ID
-   * @returns Number of sessions
+   * @returns Number of conversations
    */
-  async getSessionCount(starshipId: string): Promise<number> {
+  async getConversationCount(starshipId: string): Promise<number> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
     const connection = this.connection;
     const result = await connection.executeQuery<{ count: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[:HAS_SESSION]->(session:Session)
-       RETURN count(session) as count`,
+      `MATCH (s:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(conversation:Conversation)
+       RETURN count(conversation) as count`,
       { starshipId }
     );
 
@@ -605,46 +605,46 @@ export class StarshipRepository extends BaseRepository {
   }
 
   /**
-   * Get active sessions for a starship
+   * Get active conversations for a starship
    * @param starshipId - The starship ID
-   * @returns Array of active sessions
+   * @returns Array of active conversations
    */
-  async getActiveSessions(starshipId: string): Promise<any[]> {
+  async getActiveConversations(starshipId: string): Promise<any[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
     const connection = this.connection;
-    const result = await connection.executeQuery<{ s: any }>(
-      `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
-       WHERE s.status = 'active'
-       RETURN s ORDER BY s.lastActivityAt DESC`,
+    const result = await connection.executeQuery<{ c: any }>(
+      `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
+       WHERE c.status = 'active'
+       RETURN c ORDER BY c.lastActivityAt DESC`,
       { starshipId }
     );
 
-    return result.map((record) => record.s);
+    return result.map((record) => record.c);
   }
 
   /**
-   * Remove a specific session from a starship (deletes the relationship)
+   * Remove a specific conversation from a starship (deletes the relationship)
    * @param starshipId - The starship ID
-   * @param sessionId - The session ID
+   * @param conversationId - The conversation ID
    * @returns Success boolean
    */
-  async removeSession(starshipId: string, sessionId: string): Promise<boolean> {
+  async removeConversation(starshipId: string, conversationId: string): Promise<boolean> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
-    if (!sessionId) {
-      throw new Error('Session ID is required');
+    if (!conversationId) {
+      throw new Error('Conversation ID is required');
     }
 
     const connection = this.connection;
     const result = await connection.executeWrite<{ deletedCount: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[r:HAS_SESSION]->(session:Session {id: $sessionId})
+      `MATCH (s:Starship {id: $starshipId})-[r:HAS_CONVERSATION]->(conversation:Conversation {id: $conversationId})
        DELETE r
        RETURN count(r) as deletedCount`,
-      { starshipId, sessionId }
+      { starshipId, conversationId }
     );
 
     return result[0]?.deletedCount > 0;

@@ -1,5 +1,7 @@
 export { AgentRepository } from './AgentRepository';
+export { AgentTemplateRepository } from './AgentTemplateRepository';
 export { BlueprintRepository } from './BlueprintRepository';
+export { ConversationRepository } from './ConversationRepository';
 export { EdgeRepository } from './EdgeRepository';
 export { ExecutionRepository } from './ExecutionRepository';
 export { MemoryRepository } from './MemoryRepository';

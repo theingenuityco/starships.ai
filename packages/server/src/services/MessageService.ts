@@ -7,19 +7,18 @@
 
 import { MessageRepository } from '@starships/models';
 import type {
-  MessageModel,
-  CreateMessageRequest,
-  UpdateMessageRequest,
-  MessageListResponse,
-  SearchMessagesRequest,
-  SearchMessagesResponse,
-  MessageFilters,
-  GetMessageThreadRequest,
-  MessageThreadResponse,
-  GetConversationRequest,
-  ConversationResponse,
   BulkMessageRequest,
   BulkMessageResponse,
+  CreateMessageRequest,
+  GetConversationRequest,
+  GetMessageThreadRequest,
+  MessageConversationResponse,
+  MessageFilters,
+  MessageModel,
+  MessageThreadResponse,
+  SearchMessagesRequest,
+  SearchMessagesResponse,
+  UpdateMessageRequest,
 } from '@starships/protocol';
 
 export interface MessageServiceOptions {
@@ -179,7 +178,7 @@ export class MessageService {
   /**
    * Get conversation messages
    */
-  async getConversation(request: GetConversationRequest): Promise<ConversationResponse> {
+  async getConversation(request: GetConversationRequest): Promise<MessageConversationResponse> {
     console.log('📖 [MESSAGE-SERVICE] Getting conversation:', {
       conversationId: request.conversationId,
       limit: request.limit,

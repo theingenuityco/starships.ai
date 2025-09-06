@@ -15,7 +15,7 @@ export class ConversationRepository extends BaseRepository {
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
         );
-        return result.map((record) => ConversationEntity.fromData(record.c));
+        return result.map((record) => ConversationEntity.deserialize(record.c));
       },
       'findAll',
       'Conversation'
@@ -27,7 +27,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0 ? ConversationEntity.fromData(result[0].c) : null;
+        return result.length > 0 ? ConversationEntity.deserialize(result[0].c) : null;
       },
       'findById',
       'Conversation',
@@ -45,7 +45,7 @@ export class ConversationRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare conversation data with defaults and validation
-        const conversationEntity = ConversationEntity.fromData({
+        const conversationEntity = ConversationEntity.deserialize({
           ...entity,
           createdAt: now,
           lastActivityAt: entity.lastActivityAt || now,
@@ -54,7 +54,7 @@ export class ConversationRepository extends BaseRepository {
           status: entity.status || 'active',
         });
 
-        const conversationData = conversationEntity.toDatabase();
+        const conversationData = conversationEntity.serialize();
         // Remove id since it will be auto-generated
         delete conversationData.id;
 
@@ -67,7 +67,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.fromData(result);
+        return ConversationEntity.deserialize(result);
       },
       'create',
       'Conversation'
@@ -104,8 +104,8 @@ export class ConversationRepository extends BaseRepository {
         if (updates.metadata !== undefined) {
           setFields.push('c.metadata = $metadata');
           // Use ConversationEntity to handle metadata serialization
-          const tempEntity = ConversationEntity.fromData({ metadata: updates.metadata });
-          const serialized = tempEntity.toDatabase();
+          const tempEntity = ConversationEntity.deserialize({ metadata: updates.metadata });
+          const serialized = tempEntity.serialize();
           params.metadata = serialized.metadata;
         }
 
@@ -129,7 +129,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.fromData(result[0].c);
+        return ConversationEntity.deserialize(result[0].c);
       },
       'update',
       'Conversation',
@@ -238,7 +238,7 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.lastActivityAt DESC`,
           { starshipId }
         );
-        return result.map((record) => ConversationEntity.fromData(record.c));
+        return result.map((record) => ConversationEntity.deserialize(record.c));
       },
       'findByStarship',
       'Conversation'

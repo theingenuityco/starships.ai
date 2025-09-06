@@ -5,15 +5,15 @@
  * using class-transformer decorators and class-validator for lean validation.
  */
 
-import { SerializableModel, Transformers } from '@/helpers/serializer';
+import { Transformers } from '@/helpers/serializer';
 import type { ConversationModel } from '@starships/protocol';
-import { Expose, Transform } from 'class-transformer';
+import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsIn, IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
 
 /**
- * Serializable Conversation class with validation and transformation decorators
+ * Conversation Entity with validation and serialization
  */
-export class ConversationEntity extends SerializableModel implements ConversationModel {
+export class ConversationEntity implements ConversationModel {
   @Expose()
   @Transform(({ value }) => value)
   @IsString()
@@ -101,10 +101,25 @@ export class ConversationEntity extends SerializableModel implements Conversatio
   } as const;
 
   /**
-   * Create a ConversationEntity from plain data
+   * Deserialize database record into ConversationEntity
+   * Converts raw database records to fully typed and validated ConversationEntity instances
    */
-  static fromData(data: Record<string, any>): ConversationEntity {
-    return this.fromDatabase(data);
+  static deserialize(data: Record<string, any>): ConversationEntity {
+    return plainToInstance(ConversationEntity, data, {
+      strategy: 'excludeAll',
+      excludeExtraneousValues: true,
+    });
+  }
+
+  /**
+   * Serialize ConversationEntity to database record
+   * Converts entity instance to plain object suitable for database storage
+   */
+  serialize(): Record<string, any> {
+    return instanceToPlain(this, {
+      strategy: 'excludeAll',
+      excludeExtraneousValues: true,
+    });
   }
 
   /**

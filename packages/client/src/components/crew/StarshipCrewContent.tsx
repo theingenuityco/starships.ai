@@ -1,18 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 // import { motion, AnimatePresence } from 'motion/react'
-import { Agent, MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import { AgentSelector } from '@/components/agents/AgentSelector'
+import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
-import { ChatInterface } from '@/components/session/ChatInterface'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Users, Plug, Bot, Loader2, Activity, Shield, Zap, MessageSquare, Info } from 'lucide-react'
-import Link from 'next/link'
+import { useStarshipBySlug, useStarships } from '@/hooks/useStarships'
 import { useToast } from '@/hooks/useToast'
-import { useStarships, useStarshipBySlug } from '@/hooks/useStarships'
+import { Agent, MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import { Activity, ArrowLeft, Bot, Info, Loader2, MessageSquare, Plug, Shield, Users, Zap } from 'lucide-react'
+import Link from 'next/link'
 
 interface StarshipCrewContentProps {
   slug: string
@@ -20,7 +20,7 @@ interface StarshipCrewContentProps {
 
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
   const { data: starshipsResponse } = useStarships()
@@ -39,11 +39,11 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   const handleAgentSelect = (agent: Agent) => {
     setSelectedAgent(agent)
-    setSessionId(null) // Reset session when agent changes
+    setConversationId(null) // Reset conversation when agent changes
   }
 
-  const handleSessionCreated = (newSessionId: string) => {
-    setSessionId(newSessionId)
+  const handleConversationCreated = (newConversationId: string | null) => {
+    setConversationId(newConversationId)
   }
 
   // Function to manually show the info modal
@@ -359,7 +359,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         {/* Enhanced Right Content Area */}
         <div className="bg-gradient-to-br from-background via-background to-muted/5 overflow-hidden h-full">
           {selectedAgent ? (
-            <ChatInterface agent={selectedAgent} sessionId={sessionId} onSessionCreated={handleSessionCreated} starshipSlug={slug} />
+            <ConversationInterface starshipId={slug} conversationId={conversationId} onConversationChange={handleConversationCreated} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full">
               <div className="bg-gradient-to-br from-card via-card/95 to-primary/5 p-10 rounded-2xl text-center max-w-lg shadow-xl border border-primary/20">

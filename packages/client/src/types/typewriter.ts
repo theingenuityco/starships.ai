@@ -28,9 +28,3 @@ export type AgentSocketStreamChunk = ConversationStreamChunk & {
 
 // Re-export for external use
 export type { ConversationStreamChunk }
-
-/**
- * @deprecated Use ConversationStreamChunk instead
- * Legacy type alias for backward compatibility
- */
-export type SessionStreamChunk = ConversationStreamChunk

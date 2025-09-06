@@ -129,34 +129,6 @@ export interface ConversationResponse {
   metadata?: Record<string, unknown>;
 }
 
-// ============================================================================
-// LEGACY COMPATIBILITY TYPES
-// ============================================================================
-
-/**
- * @deprecated Use ConversationRequest instead
- * Legacy session request type for backward compatibility during transition
- */
-export type SessionRequest = ConversationRequest;
-
-/**
- * @deprecated Use ConversationResponse instead
- * Legacy session response type for backward compatibility during transition
- */
-export type SessionResponse = ConversationResponse;
-
-/**
- * @deprecated Use ConversationSocketEvents instead
- * Legacy socket events type for backward compatibility during transition
- */
-export type SessionSocketEvents = ConversationSocketEvents;
-
-/**
- * @deprecated Use ConversationStreamChunk instead
- * Legacy stream chunk type for backward compatibility during transition
- */
-export type SessionStreamChunk = ConversationStreamChunk;
-
 /**
  * Conversation stream chunk for real-time streaming
  */

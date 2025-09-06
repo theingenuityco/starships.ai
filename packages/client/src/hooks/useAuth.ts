@@ -136,10 +136,10 @@ export function useLogin() {
 
       console.log('[AUTH] User logged in:', user.email)
 
-      // Redirect to starship's session if available
+      // Redirect to starship's conversation if available
       if (starship) {
-        console.log('[AUTH] Redirecting to starship session:', starship.slug)
-        router.push(`/ship/${starship.slug}/session`)
+        console.log('[AUTH] Redirecting to starship conversation:', starship.slug)
+        router.push(`/ship/${starship.slug}/conversation`)
       }
 
       // Invalidate all queries to refetch with new auth context
@@ -189,10 +189,10 @@ export function useRegister() {
 
       console.log('[AUTH] User registered:', user.email)
 
-      // Redirect to starship's session if available
+      // Redirect to starship's conversation if available
       if (starship) {
-        console.log('[AUTH] Redirecting to starship session:', starship.slug)
-        router.push(`/ship/${starship.slug}/session`)
+        console.log('[AUTH] Redirecting to starship conversation:', starship.slug)
+        router.push(`/ship/${starship.slug}/conversation`)
       }
 
       // Invalidate all queries to refetch with new auth context

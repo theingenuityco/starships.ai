@@ -63,11 +63,6 @@ src/
 │   ├── BidirectionalCommunicationService.ts # Agent-to-First Officer communication
 │   ├── SubscriptionService.ts        # Stripe subscription management
 │   └── AgentService.ts               # Agent marketplace operations
-├── socket/
-│   ├── expeditionHandlers.ts         # Real-time expedition events
-│   ├── missionHandlers.ts           # Mission chat and updates
-│   ├── agentHandlers.ts             # Agent communication events
-│   └── sibilHandlers.ts             # Sibil assistant events
 └── middleware/
     ├── auth.ts                      # JWT authentication
     ├── starship-access.ts           # Resource ownership validation
@@ -452,12 +447,9 @@ Content-Type: application/json
 }
 ```
 
-### Real-Time Communication
+### HTTP Communication
 
-- `expedition:progress` - Real-time expedition updates
-- `mission:message` - Mission chat messages
-- `agent:activity` - Agent status and activity
-- `workflow:status` - Workflow execution progress
+All communication is handled through REST API endpoints with JSON request/response format.
 
 ### Stripe Billing Integration
 
@@ -503,8 +495,6 @@ GET /health/detailed
     "database": {
       "status": "healthy",
       "latency": 12
-    },
-      "connectedClients": 45
     },
     "stripe": {
       "status": "healthy",

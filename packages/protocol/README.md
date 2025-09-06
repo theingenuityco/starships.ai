@@ -37,7 +37,7 @@ import { Starship, Mission, Agent, User, Workflow, NativeToolApiKey } from '@sta
 ### API Contracts
 
 ```typescript
-import { ChatRequest, ChatResponse, SibilRequest, SibilResponse, AgentSocketRequest } from '@starships/protocol';
+import { ChatRequest, ChatResponse, SibilRequest, SibilResponse } from '@starships/protocol';
 ```
 
 **Contract interfaces:**
@@ -46,7 +46,6 @@ import { ChatRequest, ChatResponse, SibilRequest, SibilResponse, AgentSocketRequ
 - [`Chat contracts`](src/contracts/chat.ts) - Chat system interfaces
 - [`LLM contracts`](src/contracts/llm.ts) - Language model provider APIs
 - [`Sibil contracts`](src/contracts/sibil.ts) - AI assistant communication protocols
-- [`Socket contracts`](src/contracts/socket.ts) - Real-time event definitions
 
 ## Usage Examples
 
@@ -75,8 +74,7 @@ src/
 │   ├── agent.ts            # Agent management contracts
 │   ├── chat.ts             # Chat system interfaces
 │   ├── llm.ts              # LLM provider contracts
-│   ├── sibil.ts            # AI assistant protocols
-│   └── socket.ts           # Real-time event contracts
+│   └── sibil.ts            # AI assistant protocols
 ├── domains/                # Database domain types
 │   ├── agent.ts            # AI agent configurations and deployment
 │   ├── starship.ts         # Starship management
@@ -92,8 +90,8 @@ src/
 
 This package is imported across the entire starships.ai platform:
 
-- **`@starships/server`** - API route definitions, middleware, socket handlers
-- **`@starships/client`** - Frontend API calls, socket communication, forms
+- **`@starships/server`** - API route definitions, middleware, and services
+- **`@starships/client`** - Frontend API calls, forms, and user interfaces
 - **`@starships/models`** - Repository interfaces, database collection mapping
 - **`@starships/agent-engine`** - Chat processing, LLM integration
 

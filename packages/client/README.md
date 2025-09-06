@@ -244,7 +244,6 @@ CMD ["npm", "start"]
 
 ### Future Enhancements
 
-- [ ] **Real-time**: WebSocket integration
 - [ ] **Voice**: Speech-to-text input
 - [ ] **Files**: Drag-and-drop file sharing
 - [ ] **Export**: Download chat history

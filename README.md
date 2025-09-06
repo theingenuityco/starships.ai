@@ -7,11 +7,10 @@ A comprehensive TypeScript monorepo for orchestrating AI-driven missions and mis
 ## 🌟 Key Features
 
 - **Vision Chamber**: AI-powered vision refinement with quality metrics and intelligent suggestions
-- **Mission Orchestration**: Advanced mission planning and execution with real-time chat interfaces
+- **Mission Orchestration**: Advanced mission planning and execution with chat interfaces
 - **Autopilot Workflow Engine**: DAG-based workflow execution with conditional routing and AI model integration
-- **Multi-Agent missions**: Complex mission management with real-time agent coordination
+- **Multi-Agent missions**: Complex mission management with agent coordination
 - **Starship Management**: Enhanced starship creation with vision integration and subscription tiers
-- **Real-time Communication**: Socket.IO integration for live updates and progress tracking
 - **Production-Ready**: Docker containerization, Kubernetes deployment, SSL certificates, and comprehensive monitoring
 
 ## 📚 Documentation
@@ -69,14 +68,14 @@ pnpm lint         # Run ESLint
 
 ## 📦 Package Architecture
 
-| Package                                                  | Description                                                                                      |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with mission control UI, Vision Chamber, and real-time Socket.IO integration |
-| [`@starships/server`](./packages/server/README.md)       | Express.js API server with Socket.IO, authentication, missions, missions, and Stripe webhooks    |
-| [`@starships/autopilot`](./packages/autopilot/README.md) | Workflow execution engine with DAG-based flows, conditional routing, and AI model integration    |
-| [`@starships/models`](./packages/models/)                | Neo4j database models, repositories, migration system, and data access patterns                  |
-| [`@starships/protocol`](./packages/protocol/)            | Shared TypeScript types, interfaces, and Socket.IO event contracts                               |
-| [`@starships/env-config`](./packages/env-config/)        | Centralized environment configuration with validation and type safety                            |
+| Package                                                  | Description                                                                                   |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with mission control UI and Vision Chamber                                |
+| [`@starships/server`](./packages/server/README.md)       | Express.js API server with authentication, missions, and Stripe webhooks                      |
+| [`@starships/autopilot`](./packages/autopilot/README.md) | Workflow execution engine with DAG-based flows, conditional routing, and AI model integration |
+| [`@starships/models`](./packages/models/)                | Neo4j database models, repositories, migration system, and data access patterns               |
+| [`@starships/protocol`](./packages/protocol/)            | Shared TypeScript types and interfaces                                                        |
+| [`@starships/env-config`](./packages/env-config/)        | Centralized environment configuration with validation and type safety                         |
 
 ---
 
@@ -93,7 +92,6 @@ pnpm lint         # Run ESLint
 - **Framework**: Next.js 15 with App Router
 - **UI**: Tailwind CSS + shadcn/ui components
 - **State**: Zustand with persistence
-- **Real-time**: Socket.IO client
 - **Animations**: Framer Motion
 - **React**: React 19
 
@@ -101,7 +99,6 @@ pnpm lint         # Run ESLint
 
 - **API**: Express.js 5+ with comprehensive middleware
 - **Database**: Neo4j graph database with driver
-- **Real-time**: Socket.IO server
 - **Authentication**: Kinde OAuth with JWT
 - **Payments**: Stripe with webhook idempotency
 
@@ -180,8 +177,6 @@ graph TD
 
 **Real-time Features**
 
-- Socket.IO for live updates across all systems
-- Mission progress streaming
 - mission status broadcasting
 - Vision refinement suggestions
 
@@ -293,7 +288,6 @@ kubectl logs -n starships-prod -l app=starships-ai --follow
 - **Health Endpoints**: `/health`, `/health/detailed`
 - **Real-time Metrics**: Memory, CPU, connection counts
 - **Database Monitoring**: Neo4j connection and query performance
-- **Socket.IO Metrics**: Connected users and event tracking
 - **Error Tracking**: Comprehensive error handling and logging
 
 ---
@@ -322,7 +316,6 @@ pnpm deploy:production  # Deploy to production environment
 - **Unit Tests**: Jest configuration in autopilot package
 - **Type Safety**: Strict TypeScript across all packages
 - **API Testing**: Comprehensive endpoint testing
-- **Integration**: Socket.IO event testing
 
 ### VSCode Debugging
 
@@ -368,7 +361,6 @@ Simple and efficient debug configurations for development:
 - ✅ Mission orchestration system
 - ✅ Multi-agent mission framework
 - ✅ Autopilot workflow execution engine
-- ✅ Real-time Socket.IO communication
 - ✅ Stripe payment processing
 - ✅ Production Kubernetes deployment
 - ✅ Docker containerization

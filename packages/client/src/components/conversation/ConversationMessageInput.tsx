@@ -3,10 +3,9 @@
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation } from '@/hooks/useConversations'
-import type { Message } from '@/lib/agent-socket-api'
-import { agentSocketAPI } from '@/lib/agent-socket-api'
 import type { Agent } from '@/lib/api'
 import { cn, generateId } from '@/lib/utils'
+import type { Message } from '@/types/chat'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { KeyboardEvent, useEffect, useRef, useState } from 'react'
@@ -39,19 +38,7 @@ export function ConversationMessageInput({
   const [sending, setSending] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const currentStreamRef = useRef<{ abort: () => void } | null>(null)
   const createConversation = useCreateConversation()
-
-  // Auto-focus on textarea when component mounts and when agent is selected
-  useEffect(() => {
-    if (textareaRef.current && selectedAgent && !disabled) {
-      // Small delay to ensure the component is fully rendered
-      const timer = setTimeout(() => {
-        textareaRef.current?.focus()
-      }, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [selectedAgent, disabled])
 
   // Auto-focus on textarea when component mounts and when agent is selected
   useEffect(() => {
@@ -108,28 +95,21 @@ export function ConversationMessageInput({
       // Emit user message
       onMessageSent?.(userMessage)
 
-      // Send to agent API with valid conversationId
-      currentStreamRef.current = agentSocketAPI.sendMessageStream(
-        selectedAgent!.id,
-        { conversationId: currentConversationId!, message: messageToSend },
-        {
-          onChunk: (chunk, accumulatedContent) => {
-            // Handle streaming updates if needed
-          },
-          onComplete: assistantMessage => {
-            // Use the conversation ID from server response
-            if (assistantMessage.conversationId) {
-              onConversationStart?.(assistantMessage.conversationId)
-            }
-            onMessageReceived?.(assistantMessage)
-            currentStreamRef.current = null
-          },
-          onError: error => {
-            console.error('Agent chat error:', error)
-            currentStreamRef.current = null
-          },
+      // Socket.IO streaming has been removed - show placeholder response
+      console.warn('Real-time streaming is no longer available')
+
+      // Simulate a basic response (replace with actual HTTP API call)
+      setTimeout(() => {
+        const assistantMessage: Message = {
+          id: generateId(),
+          content: 'Socket.IO streaming has been removed. Real-time agent communication is currently unavailable.',
+          role: 'assistant',
+          timestamp: new Date().toISOString(),
+          conversationId: currentConversationId!,
+          agentId: selectedAgent!.id,
         }
-      )
+        onMessageReceived?.(assistantMessage)
+      }, 1000)
 
       setMessage('')
 
@@ -188,28 +168,21 @@ export function ConversationMessageInput({
       // Emit user message
       onMessageSent?.(userMessage)
 
-      // Send to agent API with valid conversationId
-      currentStreamRef.current = agentSocketAPI.sendMessageStream(
-        selectedAgent!.id,
-        { conversationId: currentConversationId!, message: suggestionText },
-        {
-          onChunk: (chunk, accumulatedContent) => {
-            // Handle streaming updates if needed
-          },
-          onComplete: assistantMessage => {
-            // Use the conversation ID from server response
-            if (assistantMessage.conversationId) {
-              onConversationStart?.(assistantMessage.conversationId)
-            }
-            onMessageReceived?.(assistantMessage)
-            currentStreamRef.current = null
-          },
-          onError: error => {
-            console.error('Agent chat error:', error)
-            currentStreamRef.current = null
-          },
+      // Socket.IO streaming has been removed - show placeholder response
+      console.warn('Real-time streaming is no longer available')
+
+      // Simulate a basic response (replace with actual HTTP API call)
+      setTimeout(() => {
+        const assistantMessage: Message = {
+          id: generateId(),
+          content: 'Socket.IO streaming has been removed. Real-time agent communication is currently unavailable.',
+          role: 'assistant',
+          timestamp: new Date().toISOString(),
+          conversationId: currentConversationId!,
+          agentId: selectedAgent!.id,
         }
-      )
+        onMessageReceived?.(assistantMessage)
+      }, 1000)
     } catch (error) {
       console.error('Failed to send suggestion:', error)
     } finally {

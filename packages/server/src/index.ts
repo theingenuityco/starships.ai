@@ -3,7 +3,6 @@
  * Main server entry point with enhanced repository pattern
  */
 
-import { initializeSocketIO } from '@/socket';
 import { getEnvConfig } from '@starships/env';
 import {
   AgentRepository,
@@ -137,11 +136,8 @@ app.use(
   })
 );
 
-// Create HTTP server and initialize Socket.IO
+// Create HTTP server
 const httpServer = createServer(app);
-
-// Initialize Socket.IO
-const socketService = initializeSocketIO(httpServer);
 
 // Start server
 httpServer.listen(PORT, async () => {
@@ -183,10 +179,6 @@ httpServer.listen(PORT, async () => {
       console.error('⚠️ Failed to seed waitlist:', error);
       // Continue - seeding is not critical for startup
     }
-
-    // Log Socket.IO status
-    console.log('✅ Socket.IO server initialized');
-    console.log(`📡 WebSocket connections: ${socketService.getConnectedUsersCount()}`);
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);
@@ -194,7 +186,6 @@ httpServer.listen(PORT, async () => {
 
   console.log(`🚀 Aether Core Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔌 Socket.IO: ws://localhost:${PORT}`);
   console.log(`🛸 Starships ready for launch!`);
 });
 

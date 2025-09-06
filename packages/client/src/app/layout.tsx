@@ -1,14 +1,13 @@
+import { ClientLayout } from '@/app/client-layout'
+import '@/app/globals.css'
 import { GoogleAnalytics } from '@/components/analytics/google-analytics'
 import { ThemeProvider } from '@/components/theme-provider'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { UI_TEXT } from '@/constants/text'
 import { AuthProvider } from '@/providers/auth-provider'
 import { QueryProvider } from '@/providers/query-provider'
-import { SocketProvider } from '@/providers/socket-provider'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { ClientLayout } from '@/app/client-layout'
-import '@/app/globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -29,13 +28,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <QueryProvider>
             <AuthProvider>
-              <SocketProvider>
-                <TooltipProvider>
-                  <div className="min-h-screen bg-background">
-                    <ClientLayout>{children}</ClientLayout>
-                  </div>
-                </TooltipProvider>
-              </SocketProvider>
+              <TooltipProvider>
+                <div className="min-h-screen bg-background">
+                  <ClientLayout>{children}</ClientLayout>
+                </div>
+              </TooltipProvider>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

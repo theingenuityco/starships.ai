@@ -183,7 +183,7 @@ const user = await this.mergeEntityWithAutoId<UserModel>(
 
 Client-side ID generation remains unchanged for:
 
-- **Stream IDs**: Real-time communication identifiers
+- **Stream IDs**: Communication identifiers for HTTP polling/streaming
 - **Conversation IDs**: Application-level conversation tracking
 - **Temporary Message IDs**: Optimistic UI updates
 - **Cache Keys**: Client-side caching mechanisms

@@ -5,12 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
-import { useSocketConnection } from '@/hooks/useSocketConnection'
 import { useToast } from '@/hooks/useToast'
 import { useTypewriter } from '@/hooks/useTypewriter'
-import type { Message } from '@/lib/agent-socket-api'
-import { agentSocketAPI } from '@/lib/agent-socket-api'
 import api, { Agent } from '@/lib/api'
+import type { Message } from '@/types/chat'
 import { AlertCircle, Play, Plus, RotateCcw, Send, Trash2, Wifi, WifiOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -40,8 +38,10 @@ interface TestResult {
 export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const { toast } = useToast()
 
-  // Socket.IO connection
-  const { isConnected, connectionStatus, error: connectionError } = useSocketConnection()
+  // Real-time connection is not implemented
+  const isConnected = false
+  const connectionStatus = 'disconnected' as const
+  const connectionError = 'Real-time communication is not yet implemented'
 
   // Typewriter effect
   const typewriter = useTypewriter({
@@ -101,125 +101,14 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const sendMessage = async (messageContent: string) => {
     if (!messageContent.trim() || loading) return
 
-    // Check Socket.IO connection
-    if (!isConnected) {
-      setError('Socket.IO connection required. Please check your connection and try again.')
-      toast({
-        title: 'Connection Error',
-        description: 'Socket.IO connection required. Please check your connection.',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      content: messageContent.trim(),
-      role: 'user',
-      timestamp: new Date().toISOString(),
-      conversationId,
-      sending: true,
-    }
-
-    setMessages(prev => [...prev, userMessage])
-    setLoading(true)
-    setError(null)
-    typewriter.reset()
-
-    // Create streaming assistant message
-    const assistantMessageId = `assistant-${Date.now()}`
-    setStreamingMessageId(assistantMessageId)
-
-    const streamingMessage: Message = {
-      id: assistantMessageId,
-      content: '',
-      role: 'assistant',
-      timestamp: new Date().toISOString(),
-      conversationId,
-      streaming: true,
-      agentId: agent.id,
-    }
-
-    setMessages(prev => [
-      ...prev, // Keep all messages including the sending user message
-      streamingMessage, // Add streaming assistant message
-    ])
-
-    // Start Socket.IO streaming
-    const { abort } = agentSocketAPI.sendMessageStream(
-      agent.id,
-      {
-        conversationId,
-        message: messageContent,
-      },
-      {
-        onChunk: (chunk, accumulated) => {
-          // Update streaming message with accumulated content immediately (no typewriter delay)
-          // Also mark user message as no longer sending on first chunk
-          setMessages(prev =>
-            prev.map(msg => {
-              if (msg.id === assistantMessageId) {
-                return {
-                  ...msg,
-                  content: accumulated,
-                  streaming: true, // Ensure streaming flag is set for proper rendering
-                }
-              }
-              if (msg.id === userMessage.id && msg.sending) {
-                return { ...msg, sending: false }
-              }
-              return msg
-            })
-          )
-        },
-        onComplete: finalMessage => {
-          // Replace streaming message with final message
-          setMessages(prev =>
-            prev.map(msg =>
-              msg.id === assistantMessageId
-                ? {
-                    ...finalMessage,
-                    id: assistantMessageId,
-                    streaming: false,
-                  }
-                : msg
-            )
-          )
-          setStreamingMessageId(null)
-          setLoading(false)
-
-          toast({
-            title: 'Success',
-            description: 'Message sent successfully',
-            variant: 'success',
-          })
-        },
-        onError: error => {
-          console.error('Failed to send message:', error)
-          setError(`Chat failed: ${error}. Please check your connection and try again.`)
-
-          // Remove failed streaming message
-          setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId))
-          setStreamingMessageId(null)
-          setLoading(false)
-
-          toast({
-            title: 'Error',
-            description: `Failed to send message: ${error}`,
-            variant: 'destructive',
-          })
-        },
-        onTypingStart: () => {
-          setIsTyping(true)
-        },
-        onTypingStop: () => {
-          setIsTyping(false)
-        },
-      }
-    )
-
-    // Store abort function for stream cancellation
-    setCurrentStreamAbort(() => abort)
+    // Real-time testing not yet implemented
+    setError('Real-time agent testing is currently unavailable.')
+    toast({
+      title: 'Feature Unavailable',
+      description: 'Real-time agent testing is not yet implemented.',
+      variant: 'destructive',
+    })
+    return
   }
 
   const handleSendMessage = () => {
@@ -285,71 +174,12 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   }
 
   const runTestCase = async (testCase: TestCase) => {
-    if (!isConnected) {
-      toast({
-        title: 'Connection Error',
-        description: 'Socket.IO connection required to run test cases',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    try {
-      setLoading(true)
-
-      // Use Socket.IO streaming for test case execution
-      agentSocketAPI.sendMessageStream(
-        agent.id,
-        {
-          conversationId: `test-case-${testCase.id}-${Date.now()}`,
-          message: testCase.input,
-        },
-        {
-          onChunk: () => {
-            // Test cases don't need real-time display, just collect the response
-          },
-          onComplete: finalMessage => {
-            // Create test result
-            const result: TestResult = {
-              id: `result-${Date.now()}`,
-              testCaseId: testCase.id,
-              response: finalMessage.content,
-              timestamp: new Date().toISOString(),
-              passed: false, // User will need to manually evaluate
-              notes: '',
-            }
-
-            // Update test case with result
-            const updatedCases = testCases.map(tc => (tc.id === testCase.id ? { ...tc, result } : tc))
-            saveTestCases(updatedCases)
-            setLoading(false)
-
-            toast({
-              title: 'Success',
-              description: 'Test case executed successfully',
-              variant: 'success',
-            })
-          },
-          onError: error => {
-            console.error('Failed to run test case:', error)
-            setLoading(false)
-            toast({
-              title: 'Error',
-              description: `Failed to run test case: ${error}`,
-              variant: 'destructive',
-            })
-          },
-        }
-      )
-    } catch (error) {
-      console.error('Failed to run test case:', error)
-      setLoading(false)
-      toast({
-        title: 'Error',
-        description: 'Failed to run test case',
-        variant: 'destructive',
-      })
-    }
+    toast({
+      title: 'Feature Unavailable',
+      description: 'Test case execution is not yet implemented.',
+      variant: 'destructive',
+    })
+    return
   }
 
   const getCategoryColor = (category: TestCase['category']) => {
@@ -392,20 +222,11 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
           </div>
           <div className="flex items-center gap-2">
             {/* Clean Connection Status Badge */}
-            <div
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
-                isConnected ? 'bg-green-500/10 text-green-500' : connectionStatus === 'reconnecting' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-red-500/10 text-red-500'
-              }`}
-            >
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${'bg-red-500/10 text-red-500'}`}>
               {isConnected ? (
                 <>
                   <Wifi className="w-3 h-3" />
                   <span>Connected</span>
-                </>
-              ) : connectionStatus === 'reconnecting' ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
-                  <span>Reconnecting</span>
                 </>
               ) : (
                 <>
@@ -498,7 +319,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
               <Textarea
                 value={input}
                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
-                placeholder={isConnected ? 'Type a message to test the agent...' : 'Connect to Socket.IO to send messages...'}
+                placeholder="Real-time agent testing is currently unavailable..."
                 className="flex-1 min-h-[60px] resize-none bg-zinc-800 text-white placeholder-zinc-500 border-none rounded-lg focus:ring-1 focus:ring-blue-500"
                 disabled={!isConnected}
                 onKeyPress={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {

@@ -5,19 +5,23 @@
  * using direct LLM integration with mission context awareness.
  */
 
-import { MissionRepository, AgentRepository, StarshipRepository, MissionClarityRepository } from '@starships/models';
-import { Logger } from '@/utils/logger';
-import { MissionEventService } from '@/services/MissionEventService';
+import { MissionPromptBuilder } from '@/prompts/MissionPromptBuilder';
 import { MissionService } from '@/services/MissionService';
 import { WorkflowParsingService } from '@/services/WorkflowParsingService';
-import { MissionPromptBuilder } from '@/prompts/MissionPromptBuilder';
-import { MISSION_PHASES } from '@starships/protocol';
-import { Workflow, AgentMemory, LLM } from '@starships/autopilot';
+import { Logger } from '@/utils/logger';
 import type { LlmNodeParameters } from '@starships/autopilot';
-import type { MissionModel, MissionPhase, MissionClarityModel, CreateMissionClarityRequest } from '@starships/protocol';
-import type { BlueprintModel } from '@starships/protocol';
-import type { StarshipModel } from '@starships/protocol';
-import type { AgentModel } from '@starships/protocol';
+import { AgentMemory, LLM, Workflow } from '@starships/autopilot';
+import { AgentRepository, MissionClarityRepository, MissionRepository, StarshipRepository } from '@starships/models';
+import type {
+  AgentModel,
+  BlueprintModel,
+  CreateMissionClarityRequest,
+  MissionClarityModel,
+  MissionModel,
+  MissionPhase,
+  StarshipModel,
+} from '@starships/protocol';
+import { MISSION_PHASES } from '@starships/protocol';
 
 /**
  * Configuration for MissionOrchestratorAgent
@@ -638,9 +642,6 @@ export class MissionOrchestratorAgent {
       clarityRequest.missionId = state.missionId;
       const clarityRepo = new MissionClarityRepository();
       const updatedClarity = await clarityRepo.upsertByMissionId(state.missionId, clarityRequest);
-
-      const missionEventService = MissionEventService.getInstance();
-      missionEventService.emitClarityUpdate(state.missionId, updatedClarity);
 
       return updatedClarity;
     } catch (error) {

@@ -139,7 +139,7 @@ export function useLogin() {
       // Redirect to starship's conversation if available
       if (starship) {
         console.log('[AUTH] Redirecting to starship conversation:', starship.slug)
-        router.push(`/ship/${starship.slug}/conversation`)
+        router.push(`/ship/${starship.slug}/conversations`)
       }
 
       // Invalidate all queries to refetch with new auth context
@@ -192,7 +192,7 @@ export function useRegister() {
       // Redirect to starship's conversation if available
       if (starship) {
         console.log('[AUTH] Redirecting to starship conversation:', starship.slug)
-        router.push(`/ship/${starship.slug}/conversation`)
+        router.push(`/ship/${starship.slug}/conversations`)
       }
 
       // Invalidate all queries to refetch with new auth context

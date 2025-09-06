@@ -1,5 +1,5 @@
 import { AgentService } from '@/services/AgentService';
-import { createConversationService } from '@/services/ConversationService';
+import { ConversationService } from '@/services/ConversationService';
 import { SocketIOService } from '@/services/SocketIOService';
 import getStore from '@/store';
 import { AgentRepository, MessageRepository } from '@starships/models';
@@ -7,7 +7,7 @@ import type { BaseSocketEvents, ConversationRequest } from '@starships/protocol'
 import type { Socket, Server as SocketIOServer } from 'socket.io';
 
 export function setupAgentHandlers(io: SocketIOServer<BaseSocketEvents>) {
-  const conversationService = createConversationService();
+  const conversationService = new ConversationService();
 
   const isConversationActive = (conversation: any): boolean => {
     const lastActivity = new Date(conversation.lastActivityAt);

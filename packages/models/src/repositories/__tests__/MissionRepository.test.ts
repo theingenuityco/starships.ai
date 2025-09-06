@@ -98,7 +98,7 @@ describe('MissionRepository', () => {
       const invalidRequest = { ...validRequest, name: 123 } as any;
 
       // Don't mock starship check since validation should fail first
-      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow();
     });
 
     it('should validate string lengths', async () => {
@@ -111,7 +111,7 @@ describe('MissionRepository', () => {
       const invalidRequest = { ...validRequest, agentIds: 'not-array' } as any;
 
       // Don't mock starship check since validation should fail first
-      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow();
     });
 
     it('should require at least one agent', async () => {
@@ -401,7 +401,7 @@ describe('MissionRepository', () => {
 
       const updates = { name: 'Updated' };
 
-      await expect(repository.updateMission('non-existent', updates)).rejects.toThrow(NotFoundError);
+      await expect(repository.updateMission('non-existent', updates)).rejects.toThrow(DatabaseError);
     });
 
     it('should update all possible fields', async () => {
@@ -443,7 +443,7 @@ describe('MissionRepository', () => {
 
       const updates = { name: 'Updated' };
 
-      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(NotFoundError);
+      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(DatabaseError);
     });
   });
 

@@ -3,17 +3,24 @@ import { BaseRepository } from '@/repositories/BaseRepository';
 import { ConversationModel } from '@starships/protocol';
 
 export class ConversationRepository extends BaseRepository {
-  private connection: Neo4jConnection;
+  private connection: Neo4jConnection | null = null;
 
   constructor(connection?: Neo4jConnection) {
     super('ConversationRepository');
-    this.connection = connection || getConnection();
+    this.connection = connection || null;
+  }
+
+  private getConnection(): Neo4jConnection {
+    if (!this.connection) {
+      this.connection = getConnection();
+    }
+    return this.connection;
   }
 
   async findAll(): Promise<ConversationModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
         );
@@ -36,7 +43,7 @@ export class ConversationRepository extends BaseRepository {
   async findById(id: string): Promise<ConversationModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
         return result.length > 0
           ? this.mapFromDatabaseRecord<ConversationModel>(result[0].c, {
@@ -91,7 +98,7 @@ export class ConversationRepository extends BaseRepository {
           'create'
         );
 
-        const connection = this.connection;
+        const connection = this.getConnection();
         const now = this.getCurrentTimestamp();
 
         // Prepare conversation data with defaults and validation
@@ -105,7 +112,7 @@ export class ConversationRepository extends BaseRepository {
         };
 
         // Use BaseRepository serialization (the conversationData is already properly prepared)
-        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData, this.connection);
+        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData, connection);
 
         // Create relationship with starship if starshipId is provided
         if (starshipId) {
@@ -152,7 +159,7 @@ export class ConversationRepository extends BaseRepository {
           );
         }
 
-        const connection = this.connection;
+        const connection = this.getConnection();
         const setFields = [];
         const params: Record<string, unknown> = { id };
 
@@ -216,7 +223,7 @@ export class ConversationRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (c:Conversation) WHERE c.id = $id DETACH DELETE c RETURN count(c) as deletedCount',
           { id }
@@ -233,7 +240,7 @@ export class ConversationRepository extends BaseRepository {
   async updateActivity(id: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.lastActivityAt = $timestamp', {
           id,
           timestamp: this.getCurrentTimestamp(),
@@ -248,7 +255,7 @@ export class ConversationRepository extends BaseRepository {
   async incrementMessageCount(id: string, increment: number = 1): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite(
           'MATCH (c:Conversation) WHERE c.id = $id SET c.messageCount = c.messageCount + $increment, c.lastActivityAt = $timestamp',
           { id, increment, timestamp: this.getCurrentTimestamp() }
@@ -263,7 +270,7 @@ export class ConversationRepository extends BaseRepository {
   async updateTokenCount(id: string, tokens: number): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite(
           'MATCH (c:Conversation) WHERE c.id = $id SET c.totalTokens = c.totalTokens + $tokens, c.lastActivityAt = $timestamp',
           { id, tokens, timestamp: this.getCurrentTimestamp() }
@@ -289,7 +296,7 @@ export class ConversationRepository extends BaseRepository {
   private async updateStatus(id: string, status: string, methodName: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.status = $status, c.lastActivityAt = $timestamp', {
           id,
           status,
@@ -308,7 +315,7 @@ export class ConversationRepository extends BaseRepository {
   async findByStarship(starshipId: string): Promise<ConversationModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
            RETURN c ORDER BY c.lastActivityAt DESC`,
@@ -336,7 +343,7 @@ export class ConversationRepository extends BaseRepository {
   async getConversationStarship(conversationId: string): Promise<{ id: string; name: string; slug: string } | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ starship: { id: string; name: string; slug: string } }>(
           `MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})
            RETURN starship`,
@@ -361,7 +368,7 @@ export class ConversationRepository extends BaseRepository {
   async linkToStarship(conversationId: string, starshipId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite(
           `MATCH (s:Starship {id: $starshipId}), (conversation:Conversation {id: $conversationId})
            CREATE (s)-[:HAS_CONVERSATION {key: $key}]->(conversation)`,
@@ -383,7 +390,7 @@ export class ConversationRepository extends BaseRepository {
   async unlinkFromStarship(conversationId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite(
           `MATCH (s:Starship)-[r:HAS_CONVERSATION]->(conversation:Conversation {id: $conversationId})
            DELETE r`,

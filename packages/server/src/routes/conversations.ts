@@ -1,6 +1,6 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { AgentService } from '@/services';
-import { createConversationService } from '@/services/ConversationService';
+import { ConversationService } from '@/services/ConversationService';
 import getStore from '@/store';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { MessageRepository } from '@starships/models';
@@ -9,7 +9,6 @@ import { Router } from 'express';
 import { z, ZodError } from 'zod';
 
 const router: Router = Router();
-const conversationService = createConversationService();
 
 // Zod schemas for validation
 const UuidSchema = z.string().uuid('Invalid UUID format');
@@ -83,6 +82,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const userId = req.user!.id;
 
     // Verify conversation exists
+    const conversationService = new ConversationService();
     const conversation = await conversationService.getConversationById(conversationId);
     if (!conversation) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
@@ -134,6 +134,7 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
     const { conversationId } = paramValidation;
 
     // Verify conversation exists
+    const conversationService = new ConversationService();
     const conversation = await conversationService.getConversationById(conversationId);
     if (!conversation) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
@@ -175,6 +176,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     const { page, limit } = paginationValidation;
 
     // Get conversation details
+    const conversationService = new ConversationService();
     const conversation = await conversationService.getConversationById(conversationId);
     if (!conversation) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
@@ -303,6 +305,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
 
     const { metadata } = bodyValidation;
 
+    const conversationService = new ConversationService();
     const conversation = await conversationService.createConversation({ metadata });
 
     sendSuccess(res, conversation, 201);
@@ -328,6 +331,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
     const { conversationId } = paramValidation;
 
     // Verify conversation exists
+    const conversationService = new ConversationService();
     const conversation = await conversationService.getConversationById(conversationId);
     if (!conversation) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {

@@ -13,7 +13,7 @@ export class ConversationRepository extends BaseRepository {
   async findAll(): Promise<ConversationModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.connection;
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
         );

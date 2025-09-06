@@ -239,103 +239,6 @@ describe('ConversationRepository', () => {
     });
   });
 
-  describe('updateActivity', () => {
-    it('should update conversation activity timestamp', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
-
-      await repository.updateActivity('conv-123');
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (c:Conversation) WHERE c.id = $id SET c.lastActivityAt = $timestamp',
-        {
-          id: 'conv-123',
-          timestamp: expect.any(String),
-        }
-      );
-    });
-  });
-
-  describe('incrementMessageCount', () => {
-    it('should increment message count by default amount', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
-
-      await repository.incrementMessageCount('conv-123');
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (c:Conversation) WHERE c.id = $id SET c.messageCount = c.messageCount + $increment, c.lastActivityAt = $timestamp',
-        {
-          id: 'conv-123',
-          increment: 1,
-          timestamp: expect.any(String),
-        }
-      );
-    });
-
-    it('should increment message count by specified amount', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
-
-      await repository.incrementMessageCount('conv-123', 5);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('c.messageCount + $increment'),
-        expect.objectContaining({
-          increment: 5,
-        })
-      );
-    });
-  });
-
-  describe('updateTokenCount', () => {
-    it('should update total token count', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
-
-      await repository.updateTokenCount('conv-123', 150);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (c:Conversation) WHERE c.id = $id SET c.totalTokens = c.totalTokens + $tokens, c.lastActivityAt = $timestamp',
-        {
-          id: 'conv-123',
-          tokens: 150,
-          timestamp: expect.any(String),
-        }
-      );
-    });
-  });
-
-  describe('markAsCompleted', () => {
-    it('should mark conversation as completed', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
-
-      await repository.markAsCompleted('conv-123');
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (c:Conversation) WHERE c.id = $id SET c.status = $status, c.lastActivityAt = $timestamp',
-        {
-          id: 'conv-123',
-          status: 'completed',
-          timestamp: expect.any(String),
-        }
-      );
-    });
-  });
-
-  describe('archiveConversation', () => {
-    it('should archive conversation', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
-
-      await repository.archiveConversation('conv-123');
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (c:Conversation) WHERE c.id = $id SET c.status = $status, c.lastActivityAt = $timestamp',
-        {
-          id: 'conv-123',
-          status: 'archived',
-          timestamp: expect.any(String),
-        }
-      );
-    });
-  });
-
   describe('findByStarship', () => {
     it('should return conversations for a specific starship', async () => {
       const mockConversations: ConversationModel[] = [
@@ -430,6 +333,7 @@ describe('ConversationRepository', () => {
       const conversationData = {
         lastActivityAt: '2023-01-01T00:00:00.000Z',
         messageCount: 0,
+        totalTokens: 0,
         status: 'active' as const,
       };
 
@@ -460,20 +364,9 @@ describe('ConversationRepository', () => {
       const newConversation = await repository.create(conversationData);
       expect(newConversation.status).toBe('active');
 
-      // Update activity
-      mockConnection.executeWrite.mockResolvedValue([]);
-      await repository.updateActivity(newConversation.id);
-
-      // Increment message count
-      await repository.incrementMessageCount(newConversation.id, 2);
-
-      // Update token count
-      await repository.updateTokenCount(newConversation.id, 100);
-
-      // Mark as completed
-      await repository.markAsCompleted(newConversation.id);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(4);
+      // The business logic methods (updateActivity, incrementMessageCount, etc.)
+      // have been moved to ConversationService and are no longer part of the repository
+      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(0);
     });
 
     it('should handle starship relationship operations', async () => {

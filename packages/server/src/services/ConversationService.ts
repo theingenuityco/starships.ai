@@ -100,35 +100,63 @@ export class ConversationService {
    * Update conversation activity timestamp
    */
   async updateConversationActivity(conversationId: string): Promise<void> {
-    await this.conversationRepository.updateActivity(conversationId);
+    await this.conversationRepository.update(conversationId, {
+      lastActivityAt: new Date().toISOString(),
+    });
   }
 
   /**
    * Increment message count for a conversation
    */
   async incrementMessageCount(conversationId: string, increment: number = 1): Promise<void> {
-    await this.conversationRepository.incrementMessageCount(conversationId, increment);
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation) {
+      throw new Error(`Conversation not found: ${conversationId}`);
+    }
+
+    await this.conversationRepository.update(conversationId, {
+      messageCount: (conversation.messageCount || 0) + increment,
+      lastActivityAt: new Date().toISOString(),
+    });
   }
 
   /**
    * Update token usage for a conversation
    */
   async updateTokenCount(conversationId: string, tokens: number): Promise<void> {
-    await this.conversationRepository.updateTokenCount(conversationId, tokens);
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation) {
+      throw new Error(`Conversation not found: ${conversationId}`);
+    }
+
+    await this.conversationRepository.update(conversationId, {
+      totalTokens: (conversation.totalTokens || 0) + tokens,
+      lastActivityAt: new Date().toISOString(),
+    });
   }
 
   /**
    * Complete a conversation
    */
   async completeConversation(conversationId: string): Promise<void> {
-    await this.conversationRepository.markAsCompleted(conversationId);
+    await this.updateConversationStatus(conversationId, 'completed');
   }
 
   /**
    * Archive a conversation
    */
   async archiveConversation(conversationId: string): Promise<void> {
-    await this.conversationRepository.archiveConversation(conversationId);
+    await this.updateConversationStatus(conversationId, 'archived');
+  }
+
+  /**
+   * Common method to update conversation status and activity timestamp
+   */
+  private async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
+    await this.conversationRepository.update(conversationId, {
+      status,
+      lastActivityAt: new Date().toISOString(),
+    });
   }
 
   /**

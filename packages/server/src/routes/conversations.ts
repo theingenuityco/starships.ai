@@ -1,7 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { AgentService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
-import getStore from '@/store';
+import { MemoryService } from '@/services/MemoryService';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -143,9 +143,9 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
       return;
     }
 
-    // Clear conversation memory
-    const store = getStore();
-    await store.clear(conversationId);
+    // Clear conversation memory using service layer
+    const memoryService = new MemoryService();
+    await memoryService.clearConversationSessionMemory(conversationId);
 
     sendSuccess(res, { message: 'Conversation memory cleared successfully' }, 200);
   } catch (error) {

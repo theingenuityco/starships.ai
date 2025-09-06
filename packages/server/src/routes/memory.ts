@@ -1,21 +1,22 @@
-import { Router } from 'express';
-import type { Request, Response } from 'express';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
-import getStore from '@/store';
+import { MemoryService } from '@/services/MemoryService';
+import { handleCommonError, sendError, sendSuccess, validateUUID } from '@/utils/responseHelpers';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
 
 const router: Router = Router();
 
 // POST /memory/reset - Clear memory for agent and user (OpenAPI pattern)
 router.post('/memory/reset', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Authentication check
     const userId = req.user?.id;
-    const { agentId } = req.body;
-
     if (!userId) {
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
+
+    const { agentId } = req.body;
 
     // Validate required fields
     if (!agentId || typeof agentId !== 'string') {
@@ -33,9 +34,9 @@ router.post('/memory/reset', jwtAuthMiddleware, async (req: Request, res: Respon
       return;
     }
 
-    const store = getStore();
-    const key = store.makeKey(agentId, userId);
-    await store.clear(key);
+    // Delegate to service layer
+    const memoryService = new MemoryService();
+    await memoryService.clearAgentSessionMemory(agentId, userId);
 
     sendSuccess(res, { message: 'Memory cleared successfully' }, 200);
   } catch (error) {

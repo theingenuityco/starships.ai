@@ -21,12 +21,12 @@ describe('ConversationRepository', () => {
   let mockConnection: any;
 
   beforeEach(() => {
-    repository = new ConversationRepository();
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    repository = new ConversationRepository(mockConnection);
     jest.clearAllMocks();
   });
 

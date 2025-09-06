@@ -95,14 +95,11 @@ export function ConversationMessageInput({
       // Emit user message
       onMessageSent?.(userMessage)
 
-      // Socket.IO streaming has been removed - show placeholder response
-      console.warn('Real-time streaming is no longer available')
-
-      // Simulate a basic response (replace with actual HTTP API call)
+      // TODO: Implement actual HTTP API call for agent communication
       setTimeout(() => {
         const assistantMessage: Message = {
           id: generateId(),
-          content: 'Socket.IO streaming has been removed. Real-time agent communication is currently unavailable.',
+          content: 'Real-time agent communication is not yet implemented.',
           role: 'assistant',
           timestamp: new Date().toISOString(),
           conversationId: currentConversationId!,
@@ -168,14 +165,11 @@ export function ConversationMessageInput({
       // Emit user message
       onMessageSent?.(userMessage)
 
-      // Socket.IO streaming has been removed - show placeholder response
-      console.warn('Real-time streaming is no longer available')
-
-      // Simulate a basic response (replace with actual HTTP API call)
+      // TODO: Implement actual HTTP API call for agent communication
       setTimeout(() => {
         const assistantMessage: Message = {
           id: generateId(),
-          content: 'Socket.IO streaming has been removed. Real-time agent communication is currently unavailable.',
+          content: 'Real-time agent communication is not yet implemented.',
           role: 'assistant',
           timestamp: new Date().toISOString(),
           conversationId: currentConversationId!,

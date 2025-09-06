@@ -2,7 +2,6 @@
  * Typewriter Effect Types
  *
  * Client-side types for character-by-character text display functionality.
- * Socket.IO streaming functionality has been removed.
  */
 
 /**

@@ -8,7 +8,7 @@ The protocol package serves as the single source of truth for:
 
 - **API Contracts** - Interface definitions for cross-service communication
 - **Collection Types** - Database collection types (Starship, Mission, Agent, etc.)
-- **Event Types** - Communication protocol types (Socket.IO functionality has been removed)
+- **Event Types** - Communication protocol types
 - **Request/Response Types** - HTTP API input/output structures
 
 ## Installation
@@ -60,15 +60,10 @@ export async function createMission(req: CreateMissionRequest): Promise<MissionR
 }
 ```
 
-### Communication Types (Deprecated)
-
-Socket.IO functionality has been removed from the application. The following types remain for legacy compatibility:
+### Communication Types
 
 ```typescript
-import { ConversationRequest, ConversationStreamChunk } from '@starships/protocol';
-
-// Note: Real-time streaming has been removed
-// These types are maintained for legacy compatibility only
+import { ConversationRequest, ConversationResponse } from '@starships/protocol';
 ```
 
 ## Package Structure

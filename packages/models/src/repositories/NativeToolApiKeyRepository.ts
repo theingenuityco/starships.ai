@@ -52,7 +52,10 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    * Save or update an API key for a starship and tool
    */
   async saveApiKey(starshipId: string, toolName: string, apiKey: string): Promise<void> {
-    this.validateRequired({ starshipId, toolName, apiKey }, ['starshipId', 'toolName', 'apiKey'], 'saveApiKey');
+    // Basic validation - entities handle detailed validation
+    if (!starshipId || !toolName || !apiKey) {
+      this.handleValidationError([{ field: 'parameters', message: 'starshipId, toolName, and apiKey are all required' }], 'saveApiKey');
+    }
 
     return this.executeWithErrorHandling(
       async () => {
@@ -80,7 +83,10 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    * Get an API key for a starship and tool
    */
   async getApiKey(starshipId: string, toolName: string): Promise<string | null> {
-    this.validateRequired({ starshipId, toolName }, ['starshipId', 'toolName'], 'getApiKey');
+    // Basic validation - entities handle detailed validation
+    if (!starshipId || !toolName) {
+      this.handleValidationError([{ field: 'parameters', message: 'starshipId and toolName are required' }], 'getApiKey');
+    }
 
     return this.executeWithErrorHandling(
       async () => {
@@ -110,7 +116,10 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    * Get all API keys for a starship
    */
   async getAllApiKeys(starshipId: string): Promise<Record<string, string>> {
-    this.validateRequired({ starshipId }, ['starshipId'], 'getAllApiKeys');
+    // Basic validation - entities handle detailed validation
+    if (!starshipId) {
+      this.handleValidationError([{ field: 'starshipId', message: 'starshipId is required' }], 'getAllApiKeys');
+    }
 
     return this.executeWithErrorHandling(
       async () => {
@@ -145,7 +154,10 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    * Delete an API key
    */
   async deleteApiKey(starshipId: string, toolName: string): Promise<void> {
-    this.validateRequired({ starshipId, toolName }, ['starshipId', 'toolName'], 'deleteApiKey');
+    // Basic validation - entities handle detailed validation
+    if (!starshipId || !toolName) {
+      this.handleValidationError([{ field: 'parameters', message: 'starshipId and toolName are required' }], 'deleteApiKey');
+    }
 
     return this.executeWithErrorHandling(
       async () => {
@@ -168,7 +180,10 @@ export class NativeToolApiKeyRepository extends BaseRepository {
    * Check if a starship has a specific API key
    */
   async hasApiKey(starshipId: string, toolName: string): Promise<boolean> {
-    this.validateRequired({ starshipId, toolName }, ['starshipId', 'toolName'], 'hasApiKey');
+    // Basic validation - entities handle detailed validation
+    if (!starshipId || !toolName) {
+      this.handleValidationError([{ field: 'parameters', message: 'starshipId and toolName are required' }], 'hasApiKey');
+    }
 
     return this.executeWithErrorHandling(
       async () => {

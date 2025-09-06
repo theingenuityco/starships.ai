@@ -10,8 +10,13 @@ export class EdgeRepository extends BaseRepository {
   async createEdge(blueprintId: string, edgeData: Omit<EdgeModel, 'id'>): Promise<EdgeModel> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'createEdge');
-        this.validateRequired(edgeData, ['from', 'to'], 'createEdge');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createEdge');
+        }
+        if (!edgeData?.from || !edgeData?.to) {
+          this.handleValidationError([{ field: 'edgeData', message: 'from and to fields are required' }], 'createEdge');
+        }
 
         const connection = this.getConnection();
 
@@ -95,7 +100,10 @@ export class EdgeRepository extends BaseRepository {
   async createEdges(blueprintId: string, edgesData: Array<Omit<EdgeModel, 'id'>>, idMapping?: Map<string, string>): Promise<EdgeModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'createEdges');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createEdges');
+        }
 
         if (!Array.isArray(edgesData)) {
           this.handleValidationError(
@@ -193,7 +201,10 @@ export class EdgeRepository extends BaseRepository {
   async getEdgesByBlueprintId(blueprintId: string): Promise<EdgeModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'getEdgesByBlueprintId');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'getEdgesByBlueprintId');
+        }
 
         const connection = this.getConnection();
 
@@ -226,7 +237,10 @@ export class EdgeRepository extends BaseRepository {
   async getEdgeById(edgeId: string): Promise<EdgeModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ edgeId }, ['edgeId'], 'getEdgeById');
+        // Basic validation - entities handle detailed validation
+        if (!edgeId) {
+          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }], 'getEdgeById');
+        }
 
         const connection = this.getConnection();
 
@@ -261,7 +275,10 @@ export class EdgeRepository extends BaseRepository {
   async updateEdge(edgeId: string, updates: Partial<EdgeModel>): Promise<EdgeModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ edgeId }, ['edgeId'], 'updateEdge');
+        // Basic validation - entities handle detailed validation
+        if (!edgeId) {
+          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }], 'updateEdge');
+        }
 
         if (!updates || Object.keys(updates).length === 0) {
           this.handleValidationError(
@@ -337,7 +354,10 @@ export class EdgeRepository extends BaseRepository {
   async deleteEdge(edgeId: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ edgeId }, ['edgeId'], 'deleteEdge');
+        // Basic validation - entities handle detailed validation
+        if (!edgeId) {
+          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }], 'deleteEdge');
+        }
 
         const connection = this.getConnection();
 
@@ -367,7 +387,10 @@ export class EdgeRepository extends BaseRepository {
   async deleteEdgesByBlueprintId(blueprintId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'deleteEdgesByBlueprintId');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'deleteEdgesByBlueprintId');
+        }
 
         const connection = this.getConnection();
 
@@ -398,7 +421,10 @@ export class EdgeRepository extends BaseRepository {
   async getEdgesByFromNode(fromNodeId: string): Promise<EdgeModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ fromNodeId }, ['fromNodeId'], 'getEdgesByFromNode');
+        // Basic validation - entities handle detailed validation
+        if (!fromNodeId) {
+          this.handleValidationError([{ field: 'fromNodeId', message: 'fromNodeId is required' }], 'getEdgesByFromNode');
+        }
 
         const connection = this.getConnection();
 
@@ -430,7 +456,10 @@ export class EdgeRepository extends BaseRepository {
   async getEdgesByToNode(toNodeId: string): Promise<EdgeModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ toNodeId }, ['toNodeId'], 'getEdgesByToNode');
+        // Basic validation - entities handle detailed validation
+        if (!toNodeId) {
+          this.handleValidationError([{ field: 'toNodeId', message: 'toNodeId is required' }], 'getEdgesByToNode');
+        }
 
         const connection = this.getConnection();
 

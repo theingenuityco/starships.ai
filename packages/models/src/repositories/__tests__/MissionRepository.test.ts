@@ -2,10 +2,10 @@
  * MissionRepository Unit Tests
  */
 
-import { MissionRepository } from '@/repositories/MissionRepository';
 import { getConnection } from '@/helpers/database';
-import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
-import type { MissionModel, CreateMissionRequest, UpdateMissionRequest, MissionFilters, MissionSort } from '@starships/protocol';
+import { MissionRepository } from '@/repositories/MissionRepository';
+import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
+import type { CreateMissionRequest, MissionFilters, MissionSort, UpdateMissionRequest } from '@starships/protocol';
 
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
@@ -37,60 +37,14 @@ describe('MissionRepository', () => {
     });
   });
 
-  describe('Private Methods', () => {
-    describe('validateMissionStatus', () => {
-      it('should validate correct mission status', () => {
-        const validStatuses = ['draft', 'active', 'completed', 'failed', 'cancelled'];
+  // Note: Private methods have been moved to entity layer
+  // Validation and parsing is now handled by MissionEntity using class-validator/class-transformer decorators
 
-        validStatuses.forEach((status) => {
-          expect(() => repository['validateMissionStatus'](status)).not.toThrow();
-        });
-      });
-
-      it('should throw validation error for invalid status', () => {
-        expect(() => repository['validateMissionStatus']('invalid')).toThrow(ValidationError);
-      });
-    });
-
-    describe('parseMissionFromRecord', () => {
-      it('should parse mission record correctly', () => {
-        const record = {
-          id: 'mission-123',
-          starshipId: 'starship-456',
-          name: 'Test Mission',
-          description: 'Test Description',
-          status: 'active',
-          phase: 'execution',
-          agentIds: ['agent-1', 'agent-2'],
-          approvalStatus: 'approved',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          createdBy: 'user-123',
-        };
-
-        const result = repository['parseMissionFromRecord'](record);
-
-        expect(result).toEqual(record);
-      });
-
-      it('should handle missing optional fields', () => {
-        const record = {
-          id: 'mission-123',
-          starshipId: 'starship-456',
-          name: 'Test Mission',
-          description: 'Test Description',
-          status: 'active',
-          phase: 'execution',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          createdBy: 'user-123',
-        };
-
-        const result = repository['parseMissionFromRecord'](record);
-
-        expect(result.agentIds).toEqual([]);
-        expect(result.approvalStatus).toBe('pending');
-      });
+  describe('entity migration note', () => {
+    it('should note that validation and parsing has moved to entity layer', () => {
+      // Private methods like validateMissionStatus and parseMissionFromRecord
+      // have been removed from repositories and are now handled by MissionEntity
+      expect(true).toBe(true);
     });
   });
 

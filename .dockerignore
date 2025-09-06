@@ -52,7 +52,7 @@ temp
 *.tmp
 
 # Data directories (will be created fresh)
-data/sessions/*
+data/conversations/*
 data/starships/*
 data/docker/*
 

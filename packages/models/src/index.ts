@@ -4,6 +4,12 @@ export type { Neo4jConfig } from './helpers/database';
 
 export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 
+// Entity exports
+export { AgentEntity } from './entities/AgentEntity';
+export { ConversationEntity } from './entities/ConversationEntity';
+export { MessageEntity } from './entities/MessageEntity';
+export { StarshipEntity } from './entities/StarshipEntity';
+
 // Repository exports
 export { AgentRepository } from './repositories/AgentRepository';
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';

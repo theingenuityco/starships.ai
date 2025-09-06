@@ -55,22 +55,16 @@ export class AgentService {
    * Create a new agent and return as Agent instance
    */
   async createAgent(request: CreateAgentRequest, options: AgentOptions = {}): Promise<Agent> {
-    // Validate blueprint if provided
-    if (request.blueprint) {
-      const validation = this.validateBlueprint(request.blueprint);
-      if (!validation.valid) {
-        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
-      }
-    }
-
-    // Create agent with default blueprint if none provided
+    // Create agent with default blueprint and memory if none provided
     const agentData = {
       ...request,
       blueprint: request.blueprint || this.createDefaultBlueprint(request),
+      memory: request.memory || this.createDefaultMemoryConfig(request),
       timeout: request.timeout || 30000,
       version: '1.0.0', // Default version for all new agents
     };
 
+    // Entity validation and transformation is now handled in the repository layer
     const dbAgent = await this.agentRepository.create(agentData);
     return await this.createAgentInstance(dbAgent, options);
   }
@@ -573,6 +567,26 @@ export class AgentService {
     return {
       valid: errors.length === 0,
       errors,
+    };
+  }
+
+  /**
+   * Create default memory configuration for agents
+   */
+  private createDefaultMemoryConfig(request: CreateAgentRequest): any {
+    return {
+      identity: {
+        name: request.name,
+        role: this.getRoleFromCategory(request.category),
+        expertise: [], // No tags by default
+      },
+      purpose: {
+        primary: request.description || `Assist users as a ${request.category} agent`,
+        constraints: ['Be helpful and accurate', 'Follow ethical guidelines'],
+      },
+      space: {
+        description: `Professional ${request.category} assistance environment. Focused on providing accurate and helpful responses.`,
+      },
     };
   }
 

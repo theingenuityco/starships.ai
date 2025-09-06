@@ -200,12 +200,12 @@ export function useSendMessage() {
         conversationId: variables.conversationId,
       }
 
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: Message[] | undefined) => {
-        const messages = old || []
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: { messages: Message[] } | undefined) => {
+        const messages = old?.messages || []
         // Remove the temporary sending user message and add both user + assistant messages
         const withoutTempMessage = messages.filter(m => m.id !== context?.userMessage.id)
         const finalUserMessage = { ...context!.userMessage, sending: false }
-        return [...withoutTempMessage, finalUserMessage, assistantMessage]
+        return { messages: [...withoutTempMessage, finalUserMessage, assistantMessage] }
       })
 
       // Update conversation activity

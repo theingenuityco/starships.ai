@@ -4,30 +4,24 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Lint Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install pnpm
+      - name: Configure pnpm
         run: |
-          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
-          chmod +x pnpm
-          sudo mv pnpm /usr/local/bin/
           pnpm --version
-          # Configure pnpm to use the official npm registry
           pnpm config set registry https://registry.npmjs.org
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -37,27 +31,17 @@ jobs:
 
   type-check:
     name: Type Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install pnpm
+      - name: Configure pnpm
         run: |
-          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
-          chmod +x pnpm
-          sudo mv pnpm /usr/local/bin/
           pnpm --version
-          # Configure pnpm to use the official npm registry
           pnpm config set registry https://registry.npmjs.org
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -67,27 +51,17 @@ jobs:
 
   test:
     name: Test Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install pnpm
+      - name: Configure pnpm
         run: |
-          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
-          chmod +x pnpm
-          sudo mv pnpm /usr/local/bin/
           pnpm --version
-          # Configure pnpm to use the official npm registry
           pnpm config set registry https://registry.npmjs.org
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -97,7 +71,7 @@ jobs:
 
   build:
     name: Build Check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
     needs: [lint, type-check, test]
     environment: ci
@@ -137,20 +111,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install pnpm
+      - name: Configure pnpm
         run: |
-          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
-          chmod +x pnpm
-          sudo mv pnpm /usr/local/bin/
           pnpm --version
-          # Configure pnpm to use the official npm registry
           pnpm config set registry https://registry.npmjs.org
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

@@ -3,21 +3,20 @@
  * Business logic layer for mission operations
  */
 
-import { MissionRepository, StarshipRepository, AgentRepository, MissionClarityRepository } from '@starships/models';
 import { MissionOrchestratorService } from '@/services/MissionOrchestratorService';
-import { MissionEventService } from '@/services/MissionEventService';
+import { NotFoundError, ValidationError } from '@starships/errors';
+import { AgentRepository, MissionClarityRepository, MissionRepository, StarshipRepository } from '@starships/models';
 import type {
-  MissionModel,
   CreateMissionRequest,
-  UpdateMissionRequest,
-  MissionFilters,
-  MissionSort,
-  MissionListResponse,
-  MissionStatus,
-  MissionPhase,
   MissionClarityModel,
+  MissionFilters,
+  MissionListResponse,
+  MissionModel,
+  MissionPhase,
+  MissionSort,
+  MissionStatus,
+  UpdateMissionRequest,
 } from '@starships/protocol';
-import { ValidationError, NotFoundError } from '@starships/errors';
 
 export class MissionService {
   /**
@@ -139,7 +138,6 @@ export class MissionService {
   static async updateMission(id: string, updates: UpdateMissionRequest): Promise<MissionModel> {
     const missionRepo = new MissionRepository();
     const agentRepo = new AgentRepository();
-    const missionEventService = MissionEventService.getInstance();
 
     // Get existing mission first
     const existingMission = await missionRepo.getMissionById(id);
@@ -183,15 +181,6 @@ export class MissionService {
     }
 
     const updatedMission = await missionRepo.updateMission(id, updates);
-
-    // Emit real-time events for specific changes
-    if (updates.status && updates.status !== existingMission.status) {
-      missionEventService.emitStatusChange(id, updates.status, existingMission.status);
-    }
-
-    if (updates.phase && updates.phase !== existingMission.phase) {
-      missionEventService.emitPhaseChange(id, updates.phase, existingMission.phase);
-    }
 
     return updatedMission;
   }

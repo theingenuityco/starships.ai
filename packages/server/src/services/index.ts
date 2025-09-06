@@ -6,7 +6,6 @@
 
 // Existing comprehensive services
 export { AgentService } from './AgentService';
-export { SocketIOService } from './SocketIOService';
 export { UserService } from './UserService';
 
 // Core data management services

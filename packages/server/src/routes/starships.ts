@@ -315,7 +315,7 @@ router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: 
 
     const starshipService = new StarshipService();
     // Try to find by ID first, then by slug
-    let starship = await starshipService.getStarship(idOrSlug, userId);
+    const starship = await starshipService.getStarship(idOrSlug, userId);
 
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {

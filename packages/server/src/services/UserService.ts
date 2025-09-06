@@ -189,7 +189,7 @@ export class UserService {
     }
 
     // Business logic: Password change
-    let updateData: any = { ...updates };
+    const updateData: any = { ...updates };
     if (updates.newPassword) {
       // Verify current password if provided
       if (updates.currentPassword) {

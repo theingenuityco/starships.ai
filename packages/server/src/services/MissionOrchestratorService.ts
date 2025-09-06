@@ -1,18 +1,16 @@
 /**
  * Mission Orchestrator Service - Core Orchestration and Chat Management
  *
- * Manages mission orchestrator lifecycle, AI chat handling, and WebSocket integration
- * for real-time mission coordination.
+ * Manages mission orchestrator lifecycle and AI chat handling for mission coordination.
  */
 
-import { MissionOrchestratorAgent, type MissionChatState } from '@/services/MissionOrchestratorAgent';
 import { SYSTEM_INSTRUCTIONS } from '@/prompts/MissionPromptBuilder';
+import { MissionOrchestratorAgent, type MissionChatState } from '@/services/MissionOrchestratorAgent';
 import { MissionService } from '@/services/MissionService';
-import { MissionRepository, MissionMessageRepository } from '@starships/models';
 import { Logger } from '@/utils/logger';
-import { SocketIOService } from '@/services/SocketIOService';
-import { ValidationError, InternalServerError } from '@starships/errors';
-import type { MissionMessageModel, MissionChatResponse, MissionPhase } from '@starships/protocol';
+import { InternalServerError, ValidationError } from '@starships/errors';
+import { MissionMessageRepository, MissionRepository } from '@starships/models';
+import type { MissionChatResponse, MissionMessageModel, MissionPhase } from '@starships/protocol';
 
 /**
  * Configuration for MissionOrchestratorService
@@ -27,7 +25,6 @@ export interface MissionOrchestratorServiceConfig {
 export class MissionOrchestratorService {
   private static instance: MissionOrchestratorService;
   private logger: Logger;
-  private socketService: SocketIOService | null = null;
 
   private readonly config: Required<MissionOrchestratorServiceConfig> = {
     // Removed maxConcurrentOrchestrators - using stateless agents now
@@ -40,9 +37,6 @@ export class MissionOrchestratorService {
     if (config) {
       Object.assign(this.config, config);
     }
-
-    // Initialize WebSocket service integration
-    this.initializeSocketService();
 
     this.logger.info('MissionOrchestratorService initialized', {
       service: 'MissionOrchestratorService',
@@ -84,8 +78,7 @@ export class MissionOrchestratorService {
 
     // Save input message (user only, system messages don't save input)
     if (userId && !isSystemMessage) {
-      const savedUserMessage = await this.saveUserMessage(missionId, userId, message);
-      this.emitMessageEvent(missionId, savedUserMessage);
+      await this.saveUserMessage(missionId, userId, message);
     }
 
     // Execute with callbacks
@@ -95,8 +88,7 @@ export class MissionOrchestratorService {
       message,
       {
         onMessageGenerated: async (aiMessage: any) => {
-          const savedMessage = await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
-          this.emitMessageEvent(missionId, savedMessage);
+          await this.saveOrchestratorMessage(missionId, aiMessage.content as string);
         },
 
         onPhaseChange: async (newPhase: MissionPhase) => {
@@ -293,45 +285,6 @@ export class MissionOrchestratorService {
         error as Error
       );
       throw error;
-    }
-  }
-
-  /**
-   * Initialize WebSocket service integration
-   */
-  private initializeSocketService(): void {
-    try {
-      this.socketService = SocketIOService.getInstance();
-      this.logger.info('WebSocket service integrated successfully', {
-        service: 'MissionOrchestratorService',
-        operation: 'initializeSocketService',
-      });
-    } catch {
-      this.logger.warn('WebSocket service not available - continuing without real-time updates', {
-        service: 'MissionOrchestratorService',
-        operation: 'initializeSocketService',
-      });
-      this.socketService = null;
-    }
-  }
-
-  /**
-   * Emit message event via WebSocket for real-time updates
-   */
-  private emitMessageEvent(missionId: string, message: MissionMessageModel): void {
-    if (this.socketService) {
-      const missionRoom = `mission:${missionId}`;
-      const eventData = {
-        type: 'mission:message-sent',
-        missionId,
-        message,
-        timestamp: new Date().toISOString(),
-      };
-
-      this.socketService
-        .getIO()
-        .to(missionRoom)
-        .emit('mission:message-sent' as any, eventData);
     }
   }
 

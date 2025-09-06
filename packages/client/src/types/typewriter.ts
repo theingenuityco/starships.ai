@@ -16,15 +16,3 @@ export interface TypewriterChunk {
   isCode?: boolean
   isMarkdown?: boolean
 }
-
-// Import unified types from protocol
-import type { ConversationStreamChunk } from '@starships/protocol'
-
-export type AgentSocketStreamChunk = ConversationStreamChunk & {
-  source: 'agent'
-  agentId: string
-  typewriter?: TypewriterChunk
-}
-
-// Re-export for external use
-export type { ConversationStreamChunk }

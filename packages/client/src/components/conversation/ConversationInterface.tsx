@@ -4,9 +4,8 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
-import { useSocketConnection } from '@/hooks/useSocketConnection'
-import type { Message } from '@/lib/agent-socket-api'
 import type { Agent } from '@/lib/api'
+import type { Message } from '@/types/chat'
 import { Sparkles, Users } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
@@ -19,7 +18,6 @@ interface ConversationInterfaceProps {
 
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
-  const { isConnected } = useSocketConnection()
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
@@ -169,7 +167,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 onMessageReceived={(message: Message) => {
                   setRefreshMessages(prev => prev + 1)
                 }}
-                disabled={!isConnected || !selectedAgent}
+                disabled={!selectedAgent}
                 minimal={hasMessages}
               >
                 {/* Footer Content - Agent Selector */}
@@ -217,19 +215,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         </motion.div>
       </div>
 
-      {/* Connection Status Indicator */}
-      <AnimatePresence>
-        {!isConnected && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="fixed bottom-4 right-4 px-3 py-2 bg-yellow-500/10 text-yellow-600 text-xs rounded-lg border border-yellow-500/20"
-          >
-            Reconnecting...
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Connection Status Indicator - Currently disabled */}
+      <AnimatePresence>{/* Connection status functionality not yet implemented */}</AnimatePresence>
     </div>
   )
 }

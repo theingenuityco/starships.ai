@@ -8,7 +8,7 @@ The protocol package serves as the single source of truth for:
 
 - **API Contracts** - Interface definitions for cross-service communication
 - **Collection Types** - Database collection types (Starship, Mission, Agent, etc.)
-- **Socket.IO Events** - Real-time communication protocols
+- **Event Types** - Communication protocol types
 - **Request/Response Types** - HTTP API input/output structures
 
 ## Installation
@@ -37,7 +37,7 @@ import { Starship, Mission, Agent, User, Workflow, NativeToolApiKey } from '@sta
 ### API Contracts
 
 ```typescript
-import { ChatRequest, ChatResponse, SibilRequest, SibilResponse, AgentSocketRequest } from '@starships/protocol';
+import { ChatRequest, ChatResponse, SibilRequest, SibilResponse } from '@starships/protocol';
 ```
 
 **Contract interfaces:**
@@ -46,7 +46,6 @@ import { ChatRequest, ChatResponse, SibilRequest, SibilResponse, AgentSocketRequ
 - [`Chat contracts`](src/contracts/chat.ts) - Chat system interfaces
 - [`LLM contracts`](src/contracts/llm.ts) - Language model provider APIs
 - [`Sibil contracts`](src/contracts/sibil.ts) - AI assistant communication protocols
-- [`Socket contracts`](src/contracts/socket.ts) - Real-time event definitions
 
 ## Usage Examples
 
@@ -60,15 +59,10 @@ export async function createMission(req: CreateMissionRequest): Promise<MissionR
 }
 ```
 
-### Socket.IO Communication
+### Communication Types
 
 ```typescript
-import { SibilSocketRequest, SibilSocketStreamChunk, AgentSocketRequest } from '@starships/protocol';
-
-// Handle real-time AI streaming
-socket.on('sibil:stream', (request: SibilSocketRequest) => {
-  // Process AI request
-});
+import { ConversationRequest, ConversationResponse } from '@starships/protocol';
 ```
 
 ## Package Structure
@@ -80,8 +74,7 @@ src/
 │   ├── agent.ts            # Agent management contracts
 │   ├── chat.ts             # Chat system interfaces
 │   ├── llm.ts              # LLM provider contracts
-│   ├── sibil.ts            # AI assistant protocols
-│   └── socket.ts           # Real-time event contracts
+│   └── sibil.ts            # AI assistant protocols
 ├── domains/                # Database domain types
 │   ├── agent.ts            # AI agent configurations and deployment
 │   ├── starship.ts         # Starship management
@@ -97,8 +90,8 @@ src/
 
 This package is imported across the entire starships.ai platform:
 
-- **`@starships/server`** - API route definitions, middleware, socket handlers
-- **`@starships/client`** - Frontend API calls, socket communication, forms
+- **`@starships/server`** - API route definitions, middleware, and services
+- **`@starships/client`** - Frontend API calls, forms, and user interfaces
 - **`@starships/models`** - Repository interfaces, database collection mapping
 - **`@starships/agent-engine`** - Chat processing, LLM integration
 

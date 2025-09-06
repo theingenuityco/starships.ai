@@ -1,20 +1,18 @@
 'use client'
 
-import { use, useEffect, useState, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { ArrowLeft, Target, Clock, Calendar, Send, ChevronDown, ChevronRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { missionApi } from '@/lib/missionApi'
-import { agentAPI } from '@/lib/api'
-import { useSocket } from '@/providers/socket-provider'
-import SocketClient from '@/lib/socket-client'
-import type { MissionModel, MissionStatus, MissionMessageModel, AgentModel, MissionClarityModel, MissionPhase } from '@starships/protocol'
-import { MISSION_PHASES } from '@starships/protocol'
-import { getMissionPhaseConfig } from '@/types'
-import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent'
 import { ExecutePhaseContent } from '@/components/missions/ExecutePhaseContent'
+import { WorkflowPhaseContent } from '@/components/missions/WorkflowPhaseContent'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { agentAPI } from '@/lib/api'
+import { missionApi } from '@/lib/missionApi'
+import { getMissionPhaseConfig } from '@/types'
+import type { AgentModel, MissionClarityModel, MissionMessageModel, MissionModel, MissionPhase, MissionStatus } from '@starships/protocol'
+import { MISSION_PHASES } from '@starships/protocol'
+import { ArrowLeft, Calendar, ChevronDown, ChevronRight, Clock, Send, Target } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { use, useEffect, useRef, useState } from 'react'
 
 // Extended mission type for client-side usage (includes execution properties)
 interface ClientMissionModel extends MissionModel {
@@ -91,10 +89,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   const [chatLoading, setChatLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  // WebSocket state
-  const { isConnected } = useSocket()
-  const socketClient = SocketClient.getInstance()
 
   // Collapsible sections state
   const [collapsedSections, setCollapsedSections] = useState({
@@ -177,7 +171,6 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
   const handleWorkflowApproval = (approved: boolean) => {
     if (approved) {
       // Workflow was approved, mission should transition to execute phase
-      // This will be handled by the WebSocket event or we can optimistically update
       setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: MISSION_PHASES.EXECUTE } : null))
     }
     // If rejected, stay in plan phase for regeneration
@@ -188,72 +181,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null))
   }
 
-  // WebSocket setup for mission messages and real-time updates
-  useEffect(() => {
-    if (!isConnected || !socketClient) return
-
-    const handleMissionMessage = (data: any) => {
-      console.log('[MISSION] Received WebSocket message:', data)
-      if (data.message && data.missionId === missionId) {
-        addMessageToUI(data.message)
-      }
-    }
-
-    const handleClarityUpdate = (data: any) => {
-      console.log('[MISSION] Received clarity update:', data)
-      if (data.missionId === missionId && data.clarity) {
-        setClarity(data.clarity)
-        setClarityUpdated(true)
-        // Remove the update indicator after 3 seconds
-        setTimeout(() => setClarityUpdated(false), 3000)
-      }
-    }
-
-    const handlePhaseChange = async (data: any) => {
-      console.log('[MISSION] Received phase change:', data)
-      if (data.missionId === missionId) {
-        // Phase changes (especially to CONVERSE) might include new mission data like execution results
-        // So we need to refetch the mission to get the complete updated state
-        try {
-          const response = await missionApi.getMissionById(missionId)
-          if (response.data) {
-            setMission(response.data.mission)
-          } else {
-            // Fallback to just updating the phase if refetch fails
-            setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: data.newPhase } : null))
-          }
-        } catch (error) {
-          console.error('Failed to refetch mission after phase change:', error)
-          // Fallback to just updating the phase if refetch fails
-          setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: data.newPhase } : null))
-        }
-      }
-    }
-
-    const handleStatusChange = (data: any) => {
-      console.log('[MISSION] Received status change:', data)
-      if (data.missionId === missionId) {
-        setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, status: data.newStatus } : null))
-      }
-    }
-
-    // Listen for mission events
-    socketClient.on('mission:message-sent', handleMissionMessage)
-    socketClient.on('mission:clarity-updated', handleClarityUpdate)
-    socketClient.on('mission:phase-changed', handlePhaseChange)
-    socketClient.on('mission:status-changed', handleStatusChange)
-
-    // Join mission room for real-time updates
-    socketClient.emit('mission:join-room', missionId)
-
-    return () => {
-      socketClient.off('mission:message-sent', handleMissionMessage)
-      socketClient.off('mission:clarity-updated', handleClarityUpdate)
-      socketClient.off('mission:phase-changed', handlePhaseChange)
-      socketClient.off('mission:status-changed', handleStatusChange)
-      socketClient.emit('mission:leave-room', missionId)
-    }
-  }, [isConnected, missionId, socketClient])
+  // Real-time updates are not yet implemented
 
   // Fetch agent details
   const loadAgents = async (agentIds: string[]) => {
@@ -354,13 +282,12 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     setChatLoading(true)
 
     try {
-      // WebSocket-first: Server saves messages to DB and emits WebSocket events
-      // WebSocket handler will automatically add both user and orchestrator messages to UI
+      // Send message via HTTP API
       const response = await missionApi.sendMessage(missionId, messageContent)
 
-      // HTTP fallback: Only add messages if WebSocket is not connected
-      if (!isConnected && response.data) {
-        console.log('[MISSION] WebSocket disconnected, using HTTP fallback for messages')
+      // Add messages from HTTP response since real-time updates are not available
+      if (response.data) {
+        console.log('[MISSION] Adding messages from HTTP response')
 
         // Add user message
         const userMessage: MissionMessageModel = {

@@ -1,13 +1,12 @@
 # @starships/server
 
-Production-ready Express.js HTTP API server powering the Starships mission control platform. Features mission orchestration, multi-agent expedition management, real-time communication, MCP tool integration, and Stripe billing with comprehensive security and monitoring.
+Production-ready Express.js HTTP API server powering the Starships mission control platform. Features mission orchestration, multi-agent expedition management, MCP tool integration, and Stripe billing with comprehensive security and monitoring.
 
 ## 🚀 Features
 
 - **Mission Orchestration**: Advanced mission planning and execution with AI-powered orchestrators
-- **Multi-Agent Expeditions**: Complex expedition management with real-time agent coordination
+- **Multi-Agent Expeditions**: Complex expedition management with agent coordination
 - **Workflow DSL**: Complete workflow definition and execution system with approval workflows
-- **Real-time Communication**: Socket.IO integration for live updates and progress tracking
 - **MCP Tool Integration**: HTTP bridge for Model Context Protocol tool discovery and execution
 - **Stripe Integration**: Complete subscription billing with webhook idempotency
 - **Enterprise Security**: JWT authentication, rate limiting, and comprehensive audit logging
@@ -36,7 +35,7 @@ pnpm start
 
 ```
 src/
-├── index.ts                     # Main server with Socket.IO integration
+├── index.ts                     # Main server
 ├── config/
 │   └── environment.ts          # Environment configuration
 ├── routes/
@@ -61,15 +60,9 @@ src/
 │   ├── MissionService.ts             # Mission lifecycle management
 │   ├── WorkflowExecutionService.ts   # Workflow DSL execution
 │   ├── FirstOfficerService.ts        # AI expedition coordinator
-│   ├── SocketIOService.ts            # Real-time communication
 │   ├── BidirectionalCommunicationService.ts # Agent-to-First Officer communication
 │   ├── SubscriptionService.ts        # Stripe subscription management
 │   └── AgentService.ts               # Agent marketplace operations
-├── socket/
-│   ├── expeditionHandlers.ts         # Real-time expedition events
-│   ├── missionHandlers.ts           # Mission chat and updates
-│   ├── agentHandlers.ts             # Agent communication events
-│   └── sibilHandlers.ts             # Sibil assistant events
 └── middleware/
     ├── auth.ts                      # JWT authentication
     ├── starship-access.ts           # Resource ownership validation
@@ -454,14 +447,9 @@ Content-Type: application/json
 }
 ```
 
-### Real-Time Communication
+### HTTP Communication
 
-**Socket.IO Events:**
-
-- `expedition:progress` - Real-time expedition updates
-- `mission:message` - Mission chat messages
-- `agent:activity` - Agent status and activity
-- `workflow:status` - Workflow execution progress
+All communication is handled through REST API endpoints with JSON request/response format.
 
 ### Stripe Billing Integration
 
@@ -507,10 +495,6 @@ GET /health/detailed
     "database": {
       "status": "healthy",
       "latency": 12
-    },
-    "socketio": {
-      "status": "healthy",
-      "connectedClients": 45
     },
     "stripe": {
       "status": "healthy",
@@ -573,9 +557,6 @@ BRAVE_SEARCH_API_KEY=your_brave_key
 # Security & Encryption
 ENCRYPTION_KEY=your_32_byte_encryption_key
 
-# Socket.IO Configuration
-SOCKET_IO_CORS_ORIGIN=http://localhost:3000
-SOCKET_IO_TRANSPORTS=websocket,polling
 
 # Logging & Monitoring
 LOG_LEVEL=info
@@ -950,13 +931,12 @@ node --inspect-brk dist/index.js
 
 ### Core Dependencies
 
-- **express**: Web framework for Node.js with Socket.IO integration
-- **socket.io**: Real-time bidirectional communication
+- **express**: Web framework for Node.js
 - **stripe**: Payment processing and subscription management
 - **jose**: JWT token validation and management
 - **@starships/agent-engine**: Advanced AI orchestration with MCP tools
 - **@starships/models**: Neo4j database with migration system
-- **@starships/protocol**: Shared types for missions, workflows, and Socket.IO events
+- **@starships/protocol**: Shared types for missions and workflows
 - **@starships/core**: MCP HTTP bridge services
 
 ### Development Dependencies

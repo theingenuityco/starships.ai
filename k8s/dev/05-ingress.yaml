@@ -9,19 +9,13 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: '60'
     cert-manager.io/cluster-issuer: 'letsencrypt-prod'
     nginx.ingress.kubernetes.io/ssl-redirect: 'true'
-    # WebSocket support for Socket.IO
-    nginx.ingress.kubernetes.io/websocket-services: 'starships-app-internal'
-    nginx.ingress.kubernetes.io/proxy-http-version: '1.1'
-    nginx.ingress.kubernetes.io/proxy-set-headers: |
-      Upgrade $http_upgrade
-      Connection "upgrade"
     # Security headers
     nginx.ingress.kubernetes.io/configuration-snippet: |
       more_set_headers "X-Frame-Options: DENY";
       more_set_headers "X-Content-Type-Options: nosniff";
       more_set_headers "X-XSS-Protection: 1; mode=block";
       more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
-      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: ws:;";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self';";
 spec:
   ingressClassName: nginx
   tls:
@@ -32,14 +26,6 @@ spec:
     - host: dev.starships.ai
       http:
         paths:
-          # Socket.IO WebSocket route - goes to server
-          - path: /socket.io
-            pathType: Prefix
-            backend:
-              service:
-                name: starships-app-internal
-                port:
-                  name: backend
           # ALL API routes go to server (backend) - no exceptions
           - path: /api
             pathType: Prefix

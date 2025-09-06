@@ -326,101 +326,9 @@ export abstract class BaseRepository {
   // ============================================================================
   // VALIDATION HELPERS
   // ============================================================================
-
-  /**
-   * Validate required fields
-   */
-  protected validateRequired(data: any, requiredFields: string[], operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const field of requiredFields) {
-      if (data[field] === undefined || data[field] === null || data[field] === '') {
-        errors.push({
-          field,
-          message: `${field} is required`,
-          value: data[field],
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
-
-  /**
-   * Validate field types
-   */
-  protected validateTypes(data: any, fieldTypes: Record<string, string>, operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const [field, expectedType] of Object.entries(fieldTypes)) {
-      if (data[field] !== undefined && typeof data[field] !== expectedType) {
-        errors.push({
-          field,
-          message: `${field} must be of type ${expectedType}`,
-          value: data[field],
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
-
-  /**
-   * Validate string lengths
-   */
-  protected validateStringLengths(data: any, lengthConstraints: Record<string, { min?: number; max?: number }>, operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const [field, constraints] of Object.entries(lengthConstraints)) {
-      const value = data[field];
-      if (typeof value === 'string') {
-        if (constraints.min !== undefined && value.length < constraints.min) {
-          errors.push({
-            field,
-            message: `${field} must be at least ${constraints.min} characters long`,
-            value: value.length,
-          });
-        }
-        if (constraints.max !== undefined && value.length > constraints.max) {
-          errors.push({
-            field,
-            message: `${field} must be no more than ${constraints.max} characters long`,
-            value: value.length,
-          });
-        }
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
-
-  /**
-   * Validate enum values
-   */
-  protected validateEnums(data: any, enumConstraints: Record<string, string[]>, operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const [field, allowedValues] of Object.entries(enumConstraints)) {
-      const value = data[field];
-      if (value !== undefined && !allowedValues.includes(value)) {
-        errors.push({
-          field,
-          message: `${field} must be one of: ${allowedValues.join(', ')}`,
-          value,
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
+  // Note: Entity-specific validation is now handled by individual entities
+  // using class-validator decorators. These methods are kept for backward compatibility
+  // with repositories that haven't migrated to the entity validation pattern.
 
   // ============================================================================
   // SIMPLIFIED ENTITY CREATION HELPERS
@@ -558,46 +466,12 @@ export abstract class BaseRepository {
   // ============================================================================
   // SERIALIZATION HELPERS
   // ============================================================================
-
-  /**
-   * Serialize model data for database storage
-   * Uses class-transformer for professional serialization
-   *
-   * @param data - The data to serialize
-   * @param modelClass - Optional model class with decorators
-   * @returns Serialized data ready for database storage
-   */
-  protected serializeForDatabase<T>(data: T, modelClass?: new (...args: any[]) => T): Record<string, any> {
-    try {
-      return ModelSerializer.serialize(data, modelClass);
-    } catch (error) {
-      this.log('warn', 'Serialization failed, using fallback', { error: error instanceof Error ? error.message : String(error) });
-      // Fallback to simple object spread for backward compatibility
-      return { ...(data as any) };
-    }
-  }
-
-  /**
-   * Deserialize model data from database storage
-   * Uses class-transformer for professional deserialization
-   *
-   * @param data - The data from database
-   * @param modelClass - Model class with decorators
-   * @returns Properly typed and transformed model instance
-   */
-  protected deserializeFromDatabase<T>(data: Record<string, any>, modelClass: new (...args: any[]) => T): T {
-    try {
-      return ModelSerializer.deserialize(data, modelClass);
-    } catch (error) {
-      this.log('warn', 'Deserialization failed, using plain object', { error: error instanceof Error ? error.message : String(error) });
-      // Fallback to plain object for backward compatibility
-      return data as T;
-    }
-  }
+  // Note: Complex serialization/deserialization is now handled by individual entities
+  // using class-transformer decorators. Use Entity.fromData() and entity.toPlainObject().
 
   /**
    * Safely parse JSON with fallback value
-   * Wrapper around ModelSerializer.safeJsonParse
+   * Essential utility for database JSON fields
    */
   protected safeJsonParse<T>(jsonString: string | null | undefined, fallback: T): T {
     return ModelSerializer.safeJsonParse(jsonString, fallback);
@@ -605,18 +479,10 @@ export abstract class BaseRepository {
 
   /**
    * Safely stringify JSON
-   * Wrapper around ModelSerializer.safeJsonStringify
+   * Essential utility for database JSON fields
    */
   protected safeJsonStringify(value: any): string | null {
     return ModelSerializer.safeJsonStringify(value);
-  }
-
-  /**
-   * Get safe value with default fallback
-   * Wrapper around ModelSerializer.getSafeValue
-   */
-  protected getValueWithDefault<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    return ModelSerializer.getSafeValue(value, defaultValue);
   }
 
   /**

@@ -1,7 +1,7 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { ConversationModel } from '@starships/protocol';
-import { ConversationValidation } from '../validation/ConversationValidation';
+import { ConversationEntity } from '../entities/ConversationEntity';
 
 export class ConversationRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -56,8 +56,8 @@ export class ConversationRepository extends BaseRepository {
   async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Use shared validation logic
-        ConversationValidation.validateAll(entity, 'create');
+        // Use lean validation from ConversationEntity
+        await ConversationEntity.validateConversationData(entity, 'create');
 
         const connection = this.getConnection();
         const now = new Date().toISOString();
@@ -98,8 +98,8 @@ export class ConversationRepository extends BaseRepository {
   async update(id: string, updates: Partial<ConversationModel>): Promise<ConversationModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        // Use shared validation logic for updates
-        ConversationValidation.validateAll(updates, 'update');
+        // Use lean validation from ConversationEntity for updates
+        await ConversationEntity.validateConversationData(updates, 'update');
 
         const connection = this.getConnection();
         const setFields = [];

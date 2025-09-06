@@ -83,6 +83,7 @@ try {
 | **AgentRepository**            | Agent management, template instantiation           |
 | **AgentTemplateRepository**    | Reusable agent configurations                      |
 | **UserRepository**             | User accounts and authentication                   |
+| **ConversationRepository**     | Conversation management with lean validation       |
 | **MissionRepository**          | Mission lifecycle management                       |
 | **MissionMessageRepository**   | Mission communication logs                         |
 | **MissionClarityRepository**   | Mission requirement analysis                       |
@@ -233,7 +234,7 @@ const automationWorkflows = await workflowRepo.findByCategory('automation');
 
 ## Serialization System
 
-Professional data serialization/deserialization using class-transformer:
+Professional data serialization/deserialization using class-transformer with lean validation using class-validator:
 
 ```typescript
 import { ModelSerializer, Transformers, Transform, SerializableModel } from '@starships/models';
@@ -246,22 +247,39 @@ const deserializedData = ModelSerializer.deserialize(data, MyModelClass);
 const parsed = ModelSerializer.safeJsonParse(jsonString, defaultValue);
 const stringified = ModelSerializer.safeJsonStringify(object);
 
-// Creating serializable model classes with decorators
+// Creating serializable model classes with validation and transformation decorators
+import { IsString, IsNumber, IsOptional, Length, Min } from 'class-validator';
+
 class SessionModel extends SerializableModel {
   @Transform(({ value }) => value)
+  @IsString()
+  @Length(1, 255)
   id!: string;
 
   @Transformers.DateTransform()
   createdAt!: Date;
 
   @Transformers.JsonTransform()
+  @IsOptional()
   metadata?: any;
 
   @Transformers.ArrayTransform([])
   tags!: string[];
 
   @Transformers.NumberTransform(0)
+  @IsNumber()
+  @Min(0)
   messageCount!: number;
+
+  // Simple validation method
+  static async validateData(data: any): Promise<void> {
+    const entity = new SessionModel();
+    Object.assign(entity, data);
+    const errors = await validate(entity);
+    if (errors.length > 0) {
+      throw new Error(`Validation failed: ${errors.map((e) => Object.values(e.constraints || {}).join(', ')).join('; ')}`);
+    }
+  }
 }
 
 // Repositories automatically use serialization utilities

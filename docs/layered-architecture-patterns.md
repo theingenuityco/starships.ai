@@ -168,6 +168,50 @@ export class ConversationEntity implements ConversationModel {
 - **Entity Integration**: Uses `ConversationEntity` for data transformation
 - **Relationship Management**: Handles Neo4j graph relationships
 
+#### Repository Logic Boundaries
+
+**CRITICAL: Repositories are for SIMPLE data operations only. Complex business logic belongs in the Service layer.**
+
+**Repository Responsibilities (Simple Operations):**
+
+- **CRUD Operations**: `findById()`, `create()`, `update()`, `delete()`
+- **Basic Queries**: `findByStarship()`, `findAll()`
+- **Relationship Management**: `linkToStarship()`, `getConversationStarship()`
+- **Data Validation**: Entity-level validation using `ConversationEntity.validate()`
+- **Data Transformation**: Serialization/deserialization using entities
+
+**What Does NOT Belong in Repository:**
+
+- Business rule enforcement
+- Multi-step operations
+- Complex calculations
+- Cross-entity business logic
+- Conditional business flows
+
+#### Neo4j Relationship Management Pattern
+
+```typescript
+// Relationship creation with proper error handling
+async linkToStarship(conversationId: string, starshipId: string): Promise<void> {
+  return this.executeWithErrorHandling(
+    async () => {
+      const connection = this.getConnection();
+      await connection.executeWrite(
+        `MATCH (s:Starship {id: $starshipId}), (conversation:Conversation {id: $conversationId})
+         CREATE (s)-[:HAS_CONVERSATION {key: $key}]->(conversation)`,
+        {
+          starshipId,
+          conversationId,
+          key: `${starshipId}_${conversationId}`, // Composite key for relationship
+        }
+      );
+    },
+    'linkToStarship',
+    'Conversation'
+  );
+}
+```
+
 **Example:**
 
 ```typescript
@@ -222,6 +266,77 @@ export class ConversationRepository extends BaseRepository {
 - **Repository Composition**: Combines multiple repositories (ConversationRepository + MessageRepository)
 - **Business Operation Methods**: High-level operations that combine multiple repository calls
 - **Error Propagation**: Lets repository errors bubble up with context
+
+#### Business Logic Encapsulation
+
+**CRITICAL: Services contain ALL complex business logic. Repositories handle only simple data operations.**
+
+**Service Layer Responsibilities (Complex Business Logic):**
+
+- **Multi-Step Operations**: Operations requiring multiple repository calls
+- **Business Rule Enforcement**: Domain-specific validation and constraints
+- **Cross-Entity Operations**: Operations involving multiple entities
+- **Activity Tracking**: Automatic timestamp updates and activity logging
+- **Domain Calculations**: Token counting, message counting, status transitions
+
+**Business Logic Examples:**
+
+```typescript
+// Complex business operation with multiple steps
+async incrementMessageCount(conversationId: string, increment: number = 1): Promise<void> {
+  // 1. Fetch current state (business rule: conversation must exist)
+  const conversation = await this.conversationRepository.findById(conversationId);
+  if (!conversation) {
+    throw new Error(`Conversation not found: ${conversationId}`);
+  }
+
+  // 2. Apply business logic (increment + activity update)
+  await this.conversationRepository.update(conversationId, {
+    messageCount: (conversation.messageCount || 0) + increment,
+    lastActivityAt: new Date().toISOString(), // Cross-cutting concern
+  });
+}
+
+// Domain-specific status transitions
+async completeConversation(conversationId: string): Promise<void> {
+  await this.updateConversationStatus(conversationId, 'completed');
+}
+
+// Private business helper methods
+private async updateConversationStatus(
+  conversationId: string,
+  status: 'active' | 'paused' | 'completed' | 'archived'
+): Promise<void> {
+  await this.conversationRepository.update(conversationId, {
+    status,
+    lastActivityAt: new Date().toISOString(), // Always update activity
+  });
+}
+```
+
+**Multi-Repository Coordination Pattern:**
+
+```typescript
+// Service coordinates multiple repositories for business operations
+async getConversationWithMessages(
+  conversationId: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<ConversationWithMessages | null> {
+  // Repository 1: Get conversation
+  const conversation = await this.conversationRepository.findById(conversationId);
+  if (!conversation) return null;
+
+  // Repository 2: Get related messages
+  const messages = await this.messageRepository.findByConversationId(conversationId, limit, offset);
+
+  // Business logic: Combine data with proper typing
+  return {
+    ...conversation,
+    messages,
+  };
+}
+```
 
 **Example:**
 
@@ -356,6 +471,100 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
 - **Optimistic Updates**: Immediate UI updates with rollback on failure
 - **Error Handling**: User-friendly error messages with toast notifications
 - **Response Data Extraction**: Consistent API response handling
+
+#### Centralized Query Key Management Pattern
+
+**CRITICAL: All cache keys must be centralized and hierarchical for proper invalidation.**
+
+```typescript
+// Hierarchical query key structure for efficient cache management
+export const CONVERSATION_QUERY_KEYS = {
+  all: ['conversations'] as const,
+  lists: () => [...CONVERSATION_QUERY_KEYS.all, 'list'] as const,
+  details: () => [...CONVERSATION_QUERY_KEYS.all, 'detail'] as const,
+  detail: (id: string) => [...CONVERSATION_QUERY_KEYS.details(), id] as const,
+  byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
+  messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
+} as const;
+```
+
+**Benefits:**
+
+- **Precise Invalidation**: Can invalidate specific cache segments
+- **Cache Relationships**: Parent keys invalidate child keys automatically
+- **Type Safety**: `as const` ensures compile-time key validation
+- **Debugging**: Clear cache key structure for development tools
+
+#### Optimistic Update Pattern with Rollback
+
+**CRITICAL: All mutations must provide immediate feedback with proper error rollback.**
+
+```typescript
+// Three-phase optimistic update pattern
+export function useSendMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data) => {
+      // Server mutation
+      const response = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, data);
+      return response.data;
+    },
+    onMutate: async ({ conversationId, message }) => {
+      // PHASE 1: Cancel competing queries
+      await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) });
+
+      // PHASE 2: Snapshot current state
+      const previousMessages = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId));
+
+      // PHASE 3: Optimistic update
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        content: message,
+        role: 'user',
+        timestamp: new Date().toISOString(),
+        conversationId,
+        sending: true, // Visual indicator
+      };
+
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old) => {
+        const messages = old?.messages || [];
+        return { messages: [...messages, optimisticMessage] };
+      });
+
+      return { previousMessages, optimisticMessage, conversationId };
+    },
+    onSuccess: (response, variables, context) => {
+      // Replace optimistic update with real data
+      // ... implementation
+    },
+    onError: (error, variables, context) => {
+      // CRITICAL: Always rollback on error
+      if (context?.previousMessages) {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), context.previousMessages);
+      }
+      toast.error('Failed to send message');
+    },
+  });
+}
+```
+
+#### Response Data Extraction Pattern
+
+**CRITICAL: Enforce consistent API response handling.**
+
+```typescript
+// Type-safe response extraction helper
+const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data;
+
+// Usage in query functions
+queryFn: async () => {
+  const response = await api.get(`/api/v1/starships/${starshipId}/conversations`);
+  // Enforces ApiResponse<T> contract from server
+  const conversations = extractResponseData<ConversationModel[]>(response);
+  return { conversations };
+};
+```
 
 **Example:**
 
@@ -501,7 +710,153 @@ Validation happens at multiple layers with different purposes:
 - **API Layer**: Request format validation
 - **Client Layer**: UI input validation
 
-### 4. Dependency Direction
+#### Route Layer Validation Rules
+
+The API Routes layer implements **HTTP-specific validation** using Zod schemas that complement (not duplicate) entity validation:
+
+**Request Parameter Validation:**
+
+```typescript
+// UUID format validation for path parameters
+const UuidSchema = z.string().uuid('Invalid UUID format');
+const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+```
+
+**Query Parameter Validation with Coercion:**
+
+```typescript
+// Pagination with type coercion and defaults
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+```
+
+**Request Body Validation:**
+
+```typescript
+// Input data validation with business context
+const bodyValidation = validateData(
+  z.object({
+    agentId: z.string().min(1, 'agentId is required'),
+    message: z.string().min(1, 'message is required'),
+  }),
+  req.body,
+  res,
+  'conversation message'
+);
+```
+
+**Enum Validation:**
+
+```typescript
+// Business operation source validation
+const ConversationSourceSchema = z.enum(['agent', 'user']);
+```
+
+**Why Route Validation is Essential:**
+
+- **HTTP-Specific Concerns**: Validates request format, parameters, and query strings
+- **Type Coercion**: Converts string parameters to appropriate types (`z.coerce.number()`)
+- **Early Failure Detection**: Catches malformed requests before they reach business logic
+- **API Consumer Experience**: Provides contextual, HTTP-appropriate error messages
+- **Security**: Acts as the first line of defense against malformed requests
+- **Request Context**: Validates data in the context of HTTP operations (pagination, filtering, etc.)
+
+This validation works **alongside** entity validation, not as a replacement - each layer protects its specific boundaries and concerns.
+
+### 4. Data Transformation Boundary Pattern
+
+**CRITICAL: Each layer has specific data transformation responsibilities and boundaries.**
+
+#### Transformation Flow Through Layers
+
+```typescript
+// Layer 1: Domain (Protocol) - Pure contracts
+export interface ConversationModel {
+  id: string;
+  messageCount: number;
+  status: 'active' | 'paused' | 'completed' | 'archived';
+}
+
+// Layer 2: Entity - Domain ↔ Database transformation
+export class ConversationEntity implements ConversationModel {
+  @Expose()
+  @Transformers.NumberTransform(0)
+  @IsNumber()
+  @Min(0)
+  messageCount!: number;
+
+  static deserialize(data: Record<string, any>): ConversationEntity {
+    return plainToInstance(ConversationEntity, data, {
+      strategy: 'excludeAll',
+      excludeExtraneousValues: true,
+    });
+  }
+}
+
+// Layer 3: Repository - Entity serialization/deserialization
+async create(entity: ConversationModel): Promise<ConversationModel> {
+  const conversationEntity = ConversationEntity.deserialize({
+    ...entity,
+    createdAt: now,
+  });
+
+  const result = await this.createEntityWithAutoId('Conversation', conversationEntity.serialize());
+  return ConversationEntity.deserialize(result);
+}
+
+// Layer 4: Service - Business object composition
+async getConversationWithMessages(conversationId: string): Promise<ConversationWithMessages | null> {
+  const conversation = await this.conversationRepository.findById(conversationId);
+  const messages = await this.messageRepository.findByConversationId(conversationId);
+
+  // Business transformation: combine related entities
+  return {
+    ...conversation,
+    messages,
+  };
+}
+
+// Layer 5: API Routes - HTTP transformation
+router.get('/conversations/:conversationId', async (req, res) => {
+  const { conversationId } = validateData(UuidSchema, req.params); // HTTP → validated data
+  const result = await conversationService.getConversationWithMessages(conversationId);
+
+  // Business object → HTTP response
+  sendSuccess(res, result, 200, paginationMeta);
+});
+
+// Layer 6: Client - API response ↔ UI state transformation
+const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data;
+
+queryFn: async () => {
+  const response = await api.get('/conversations');
+  // HTTP response → typed domain objects
+  const conversations = extractResponseData<ConversationModel[]>(response);
+  return { conversations };
+}
+```
+
+#### Transformation Boundaries and Responsibilities
+
+| Layer            | Input Format         | Output Format        | Transformation Type           |
+| ---------------- | -------------------- | -------------------- | ----------------------------- |
+| **Entity**       | Raw database records | Typed domain objects | Data structure validation     |
+| **Repository**   | Domain objects       | Persisted entities   | Serialization/deserialization |
+| **Service**      | Single entities      | Business composites  | Multi-entity aggregation      |
+| **API Routes**   | HTTP requests        | JSON responses       | Protocol transformation       |
+| **Client Hooks** | HTTP responses       | React state          | UI state management           |
+
+#### Key Transformation Patterns
+
+- **Entity Boundaries**: Always use `ConversationEntity.deserialize()` when converting from database
+- **Repository Boundaries**: Always return domain objects, never raw database records
+- **Service Boundaries**: Compose multiple repository calls into business objects
+- **API Boundaries**: Transform between HTTP protocols and domain objects
+- **Client Boundaries**: Transform between API responses and UI state
+
+### 5. Dependency Direction
 
 Dependencies always point **inward** toward the domain:
 

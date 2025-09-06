@@ -2,7 +2,7 @@
  * Jest setup file for models package tests
  */
 
-import { BaseError, ValidationError, NotFoundError, DatabaseError, ConflictError } from '@starships/errors';
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -66,13 +66,14 @@ const mockDriver = {
   ...overrides,
 });
 
-// Mock session data
-(global as any).createMockSession = (overrides: any = {}) => ({
-  id: 'session-123',
-  userId: 'user-123',
-  starshipId: 'starship-123',
-  agentId: 'agent-123',
-  title: 'Test Session',
+// Mock conversation data
+(global as any).createMockConversation = (overrides: any = {}) => ({
+  id: 'conversation-123',
+  lastActivityAt: '2024-01-01T00:00:00.000Z',
+  messageCount: 0,
+  totalTokens: 0,
+  status: 'active',
+  metadata: {},
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
   ...overrides,
@@ -81,7 +82,7 @@ const mockDriver = {
 // Mock message data
 (global as any).createMockMessage = (overrides: any = {}) => ({
   id: 'message-123',
-  sessionId: 'session-123',
+  conversationId: 'conversation-123',
   role: 'user',
   content: 'Hello, world!',
   timestamp: '2024-01-01T00:00:00.000Z',

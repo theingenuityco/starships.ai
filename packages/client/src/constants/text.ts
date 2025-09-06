@@ -30,8 +30,8 @@ export const UI_TEXT = {
     FAILED_TO_LOAD_AGENTS: 'Failed to load agents. Please try again.',
     FAILED_TO_LOAD_MESSAGES: 'Failed to load messages. Please try again.',
     FAILED_TO_SEND_MESSAGE: 'Failed to send message. Please try again.',
-    FAILED_TO_START_SESSION: 'Failed to start chat session. Please try again.',
-    NO_ACTIVE_SESSION: 'No active chat session',
+    FAILED_TO_START_CONVERSATION: 'Failed to start conversation. Please try again.',
+    NO_ACTIVE_CONVERSATION: 'No active conversation',
     GENERIC_ERROR: 'An unexpected error occurred. Please try again.',
   },
 

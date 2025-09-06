@@ -1,49 +1,27 @@
 'use client'
 
-import { MessageBubble } from '@/components/session/MessageBubble'
-import { MessageList } from '@/components/session/MessageList'
-import { useSessionMessages, type Message as SessionMessage } from '@/hooks/useSessions'
-import type { Message } from '@/lib/agent-socket-api'
+import { useConversationMessages, type Message } from '@/hooks/useConversations'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect } from 'react'
 
-interface SessionMessageListProps {
-  sessionId: string | null
+interface ConversationMessageListProps {
+  conversationId: string | null
   starshipId?: string
-  onMessageAdded?: (message: SessionMessage) => void
+  onMessageAdded?: (message: Message) => void
 }
 
-// Union type for session messages
-type SessionMessageType = Message
-
-export function SessionMessageList({ sessionId, starshipId, onMessageAdded }: SessionMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, onMessageAdded }: ConversationMessageListProps) {
   // Use TanStack Query to fetch messages
-  const { data: messageData, isLoading: loading, error: queryError } = useSessionMessages(sessionId || '', !!sessionId)
+  const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
 
   const messages = messageData?.messages || []
-
-  const error = queryError ? 'Failed to load session history' : null
-
-  // Convert session messages to unified message format
-  const sessionMessages: SessionMessageType[] = messages.map(
-    (msg: SessionMessage) =>
-      ({
-        id: msg.id,
-        content: msg.content,
-        role: msg.role,
-        timestamp: msg.timestamp,
-        sessionId: msg.sessionId,
-        // Add mode-specific fields based on message structure
-        agentId: sessionId?.split(':')[0]?.replace('agent-', ''),
-      }) as SessionMessageType
-  )
+  const error = queryError ? 'Failed to load conversation history' : null
 
   // Add new message to the list (for real-time updates)
-  const addMessage = (newMessage: SessionMessageType) => {
+  const addMessage = (newMessage: Message) => {
     // Note: With TanStack Query, real-time updates should be handled
     // by invalidating queries or using optimistic updates in mutations
-    // This function is kept for compatibility but may not be needed
-    onMessageAdded?.(newMessage as SessionMessage)
+    onMessageAdded?.(newMessage)
   }
 
   // Expose method to parent component for compatibility
@@ -57,21 +35,39 @@ export function SessionMessageList({ sessionId, starshipId, onMessageAdded }: Se
         delete (window as any).addMessage
       }
     }
-  }, [sessionId])
+  }, [conversationId])
 
-  // Get appropriate message component based on mode
-  const getMessageComponent = () => {
-    return MessageBubble
+  if (!conversationId) {
+    return <EmptyState />
   }
 
-  if (!sessionId) {
-    return <EmptyState />
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-muted-foreground">Loading conversation...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-red-500">{error}</div>
+      </div>
+    )
   }
 
   return (
     <AnimatePresence mode="wait">
-      <motion.div key={sessionId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full">
-        <MessageList messages={sessionMessages} loading={loading} error={error} MessageComponent={getMessageComponent() as any} />
+      <motion.div key={conversationId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full overflow-auto p-4 space-y-4">
+        {messages.map((message: Message) => (
+          <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+              <p className="text-sm">{message.content}</p>
+              <p className="text-xs opacity-70 mt-1">{new Date(message.timestamp).toLocaleTimeString()}</p>
+            </div>
+          </div>
+        ))}
       </motion.div>
     </AnimatePresence>
   )

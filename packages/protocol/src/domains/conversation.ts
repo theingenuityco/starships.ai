@@ -1,7 +1,7 @@
 /**
- * Session Domain Types
+ * Conversation Domain Types
  *
- * Types for session functionality including requests, responses, streaming, and socket events
+ * Types for conversation functionality including requests, responses, streaming, and socket events
  */
 
 // ============================================================================
@@ -45,7 +45,7 @@ export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | '
 export interface ChatRoomData {
   roomId: string;
   userId: string;
-  sessionId?: string;
+  conversationId?: string;
 }
 
 /**
@@ -53,7 +53,7 @@ export interface ChatRoomData {
  */
 export interface ChatTypingData {
   userId: string;
-  sessionId?: string;
+  conversationId?: string;
   roomId?: string;
   isTyping: boolean;
 }
@@ -87,23 +87,23 @@ export interface EventEmissionResult {
 }
 
 // ============================================================================
-// SESSION SOURCE TYPE
+// CONVERSATION SOURCE TYPE
 // ============================================================================
 
 /**
- * Session source type
+ * Conversation source type
  */
-export type SessionSourceType = 'agent' | 'user';
+export type ConversationSourceType = 'agent' | 'user';
 
 /**
- * Base session request interface
+ * Base conversation request interface
  */
-export interface SessionRequest {
-  source: SessionSourceType;
+export interface ConversationRequest {
+  source: ConversationSourceType;
   agentId?: string;
   userId?: string;
   message: string;
-  sessionId?: string;
+  conversationId?: string;
   stream?: boolean;
   streamId?: string;
   typingSpeed?: number;
@@ -112,13 +112,13 @@ export interface SessionRequest {
 }
 
 /**
- * Base session response interface
+ * Base conversation response interface
  */
-export interface SessionResponse {
-  source: SessionSourceType;
+export interface ConversationResponse {
+  source: ConversationSourceType;
   content: string;
   agentId?: string;
-  sessionId?: string;
+  conversationId?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -130,10 +130,10 @@ export interface SessionResponse {
 }
 
 /**
- * Session stream chunk for real-time streaming
+ * Conversation stream chunk for real-time streaming
  */
-export interface SessionStreamChunk {
-  source: SessionSourceType;
+export interface ConversationStreamChunk {
+  source: ConversationSourceType;
   streamId: string;
   agentId?: string;
   type: 'content' | 'status' | 'error' | 'complete';
@@ -152,13 +152,13 @@ export interface SessionStreamChunk {
 }
 
 // ============================================================================
-// SESSION TYPES
+// CONVERSATION TYPES
 // ============================================================================
 
 /**
- * Core session model - database entity
+ * Core conversation model - database entity
  */
-export interface SessionModel {
+export interface ConversationModel {
   id: string;
   createdAt: string;
   updatedAt?: string;
@@ -170,18 +170,18 @@ export interface SessionModel {
 }
 
 /**
- * Session type alias for client compatibility
+ * Conversation type alias for client compatibility
  */
-export type Session = SessionModel;
+export type Conversation = ConversationModel;
 
 // ============================================================================
-// SESSION ERROR TYPES
+// CONVERSATION ERROR TYPES
 // ============================================================================
 
 /**
- * Session error response
+ * Conversation error response
  */
-export interface SessionError {
+export interface ConversationError {
   streamId?: string;
   agentId?: string;
   errorCode: string;
@@ -196,24 +196,24 @@ export interface SessionError {
 // ============================================================================
 
 /**
- * Base socket events for session management
+ * Base socket events for conversation management
  */
-export interface SessionSocketEvents {
+export interface ConversationSocketEvents {
   connect: () => void;
   disconnect: () => void;
   error: (error: Error) => void;
   ping: () => void;
   pong: () => void;
   'connection-status': (data: ConnectionStatusEvent) => void;
-  'session:start-stream': (data: SessionRequest) => void;
-  'session:stream-chunk': (data: SessionStreamChunk) => void;
-  'session:stream-complete': (data: SessionStreamChunk) => void;
-  'session:stream-error': (data: SessionError) => void;
-  'session:typing-start': (data: ChatTypingData) => void;
-  'session:typing-stop': (data: ChatTypingData) => void;
-  'session:join-room': (data: ChatRoomData) => void;
-  'session:leave-room': (data: ChatRoomData) => void;
-  'session:stop-stream': (streamId: string) => void;
+  'conversation:start-stream': (data: ConversationRequest) => void;
+  'conversation:stream-chunk': (data: ConversationStreamChunk) => void;
+  'conversation:stream-complete': (data: ConversationStreamChunk) => void;
+  'conversation:stream-error': (data: ConversationError) => void;
+  'conversation:typing-start': (data: ChatTypingData) => void;
+  'conversation:typing-stop': (data: ChatTypingData) => void;
+  'conversation:join-room': (data: ChatRoomData) => void;
+  'conversation:leave-room': (data: ChatRoomData) => void;
+  'conversation:stop-stream': (streamId: string) => void;
 }
 
 /**
@@ -224,4 +224,4 @@ export type SocketEventData<T extends (...args: unknown[]) => unknown> = Paramet
 /**
  * Base socket events type alias for server compatibility
  */
-export type BaseSocketEvents = SessionSocketEvents;
+export type BaseSocketEvents = ConversationSocketEvents;

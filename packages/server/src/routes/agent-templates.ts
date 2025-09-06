@@ -2,6 +2,7 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { getConnection } from '@starships/models';
 import { Request, Response, Router } from 'express';
+import { z, ZodError } from 'zod';
 import {
   createPaginationMeta,
   handleCommonError,
@@ -12,6 +13,56 @@ import {
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
+
+// Zod schemas for validation
+const UuidSchema = z.string().uuid('Invalid UUID format');
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const CreateAgentFromTemplateSchema = z.object({
+  agentName: z
+    .string()
+    .min(1, 'Agent name is required and must be a non-empty string')
+    .max(255, 'Agent name must be less than 255 characters'),
+  starshipId: z.string().uuid('Invalid starship ID').optional(),
+});
+
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
+
+// Helper function for authentication check
+const checkAuth = (req: Request, res: Response): boolean => {
+  const user = req.user;
+  if (!user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return false;
+  }
+  return true;
+};
 
 // Helper function to get AgentTemplateService instance
 function getAgentTemplateService(): AgentTemplateService | null {

@@ -5,23 +5,98 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
 import { SubscriptionService } from '@/services/SubscriptionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateUUID } from '@/utils/responseHelpers';
 import type { StarshipModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
+import { z, ZodError } from 'zod';
 
 const router: Router = Router();
+
+// Zod schemas for validation
+const UuidSchema = z.string().uuid('Invalid UUID format');
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const StarshipClassSchema = z.enum(['scout', 'cruiser', 'draught']);
+const StarshipStatusSchema = z.enum(['active', 'inactive', 'pending_payment', 'restricted', 'disabled']);
+const PlanSchema = z.enum(['scout', 'cruiser', 'draught']);
+const BillingPeriodSchema = z.enum(['monthly', 'yearly']);
+
+const CreateStarshipSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
+  class: StarshipClassSchema,
+  plan: PlanSchema.optional(),
+  billingPeriod: BillingPeriodSchema.optional(),
+});
+
+const CreatePaidStarshipSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
+  plan: z.enum(['cruiser', 'draught']),
+  billingPeriod: BillingPeriodSchema,
+});
+
+const UpdateStarshipSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  status: StarshipStatusSchema.optional(),
+  class: StarshipClassSchema.optional(),
+});
+
+const CreateCheckoutSessionSchema = z.object({
+  starshipName: z.string().min(1, 'Starship name is required').max(255, 'Starship name must be less than 255 characters'),
+  plan: z.enum(['cruiser', 'draught']),
+  billingPeriod: BillingPeriodSchema,
+});
+
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
+
+// Helper function for authentication check
+const checkAuth = (req: Request, res: Response): boolean => {
+  const user = (req as any).user;
+  if (!user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return false;
+  }
+  return true;
+};
 
 // GET /starships - Get user's starships (OpenAPI pattern)
 router.get('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user!.id;
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
+    // Validate pagination query parameters
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
+
+    const userId = (req as any).user!.id;
+    const { page, limit } = paginationValidation;
 
     const starshipService = new StarshipService();
     const starships = await starshipService.getStarshipsByOwner(userId);
@@ -42,46 +117,17 @@ router.get('/starships', jwtAuthMiddleware, async (req: Request, res: Response):
 // POST /starships/create-paid - Create paid starship with pending payment status (OpenAPI pattern)
 router.post('/starships/create-paid', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Authentication check
+    if (!checkAuth(req, res)) return;
+
+    // Validate request body
+    const bodyValidation = validateData(CreatePaidStarshipSchema, req.body, res, 'paid starship creation data');
+    if (!bodyValidation) return;
+
     const userId = (req as any).user!.id;
-    const { name, plan, billingPeriod } = req.body;
+    const { name, plan, billingPeriod } = bodyValidation;
 
     console.log('[STARSHIP-CREATE-PAID] Starting paid starship creation for user:', userId);
-
-    // Validate required fields
-    if (!name || !plan || !billingPeriod) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
-        required_fields: ['name', 'plan', 'billingPeriod'],
-        provided: { name: !!name, plan: !!plan, billingPeriod: !!billingPeriod },
-      });
-      return;
-    }
-
-    if (typeof name !== 'string' || name.trim().length === 0) {
-      sendError(res, 'VALIDATION_ERROR', 'Name must be a non-empty string', 400, {
-        field: 'name',
-      });
-      return;
-    }
-
-    // Validate paid plan only
-    if (!['cruiser', 'draught'].includes(plan)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid paid plan', 400, {
-        field: 'plan',
-        allowed_values: ['cruiser', 'draught'],
-        provided: plan,
-      });
-      return;
-    }
-
-    // Validate billing period
-    if (!['monthly', 'yearly'].includes(billingPeriod)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid billing period', 400, {
-        field: 'billingPeriod',
-        allowed_values: ['monthly', 'yearly'],
-        provided: billingPeriod,
-      });
-      return;
-    }
 
     console.log('[STARSHIP-CREATE-PAID] Creating paid starship...');
 

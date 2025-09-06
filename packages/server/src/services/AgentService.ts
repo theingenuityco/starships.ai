@@ -13,7 +13,7 @@ import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgent
 
 export interface AgentOptions {
   includeMemory?: boolean;
-  sessionId?: string;
+  conversationId?: string;
   userId?: string;
   loadConversationHistory?: boolean;
 }
@@ -33,7 +33,7 @@ export interface ExecuteAgentResponse {
 export interface AgentExecutionContext {
   agentId: string;
   userId?: string;
-  sessionId?: string;
+  conversationId?: string;
   userMessage: string;
 }
 
@@ -215,13 +215,13 @@ export class AgentService {
         {
           agentId: agentId,
           userId: userId,
-          sessionId: conversationId,
+          conversationId: conversationId,
           userMessage: message,
         },
         {
           includeMemory: true,
           userId: userId,
-          sessionId: conversationId,
+          conversationId: conversationId,
           loadConversationHistory: true,
         }
       );

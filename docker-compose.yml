@@ -62,7 +62,6 @@ services:
     volumes:
       # Application data
       - starships-data:/app/data
-      - starships-sessions:/app/data/sessions
 
       # Neo4j data (only used if internal Neo4j is active)
       - neo4j-data:/var/lib/neo4j/data
@@ -86,8 +85,6 @@ services:
 volumes:
   # Application volumes
   starships-data:
-    driver: local
-  starships-sessions:
     driver: local
 
   # Neo4j volumes (only used with internal Neo4j)

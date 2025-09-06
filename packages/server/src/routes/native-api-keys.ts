@@ -1,9 +1,9 @@
-import { Router } from 'express';
-import type { Router as ExpressRouter } from 'express';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { StarshipRepository, NativeToolApiKeyRepository } from '@starships/models';
+import { handleCommonError, sendError, sendSuccess, validateUUID } from '@/utils/responseHelpers';
 import type { StandardErrorCode } from '@starships/protocol';
-import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
+import type { Router as ExpressRouter } from 'express';
+import { Router } from 'express';
+import { NativeApiKeyService } from '../services/NativeApiKeyService';
 
 const router: ExpressRouter = Router();
 
@@ -27,30 +27,9 @@ router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (r
       return;
     }
 
-    // Verify user owns this starship
-    const starshipRepo = new StarshipRepository();
-    const starship = await starshipRepo.findById(starshipId);
-
-    if (!starship || starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Get API keys (returns decrypted keys)
-    const apiKeyRepo = new NativeToolApiKeyRepository();
-    const apiKeys = await apiKeyRepo.getAllApiKeys(starshipId);
-
-    // Return keys with masked values for security
-    const maskedKeys: Record<string, string> = {};
-    for (const [tool, key] of Object.entries(apiKeys)) {
-      const keyStr = String(key || '');
-      if (keyStr && keyStr.length > 8) {
-        maskedKeys[tool] = `${keyStr.slice(0, 4)}${'*'.repeat(keyStr.length - 8)}${keyStr.slice(-4)}`;
-      } else {
-        maskedKeys[tool] = keyStr ? '*'.repeat(keyStr.length) : '';
-      }
-    }
-
+    // Delegate to service layer
+    const apiKeyService = new NativeApiKeyService();
+    const maskedKeys = await apiKeyService.getStarshipApiKeys(starshipId, userId);
     sendSuccess(res, maskedKeys);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching native API keys')) {
@@ -88,24 +67,9 @@ router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (
       return;
     }
 
-    // Verify user owns this starship
-    const starshipRepo = new StarshipRepository();
-    const starship = await starshipRepo.findById(starshipId);
-
-    if (!starship || starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Save the API key (it will be encrypted)
-    const apiKeyRepo = new NativeToolApiKeyRepository();
-    await apiKeyRepo.saveApiKey(starshipId, toolName, apiKey);
-
-    // Save additional config if provided - commented out since GitHub was removed
-    // if (config && Object.keys(config).length > 0) {
-    //   await apiKeyRepo.saveToolConfig(starshipId, toolName, config);
-    // }
-
+    // Delegate to service layer
+    const apiKeyService = new NativeApiKeyService();
+    await apiKeyService.saveApiKey(starshipId, userId, toolName, apiKey);
     sendSuccess(res, { message: 'API key saved successfully' }, 201);
   } catch (error) {
     if (!handleCommonError(error, res, 'saving native API key')) {
@@ -134,19 +98,9 @@ router.delete('/starships/:starshipId/native-api-keys/:toolName', jwtAuthMiddlew
       return;
     }
 
-    // Verify user owns this starship
-    const starshipRepo = new StarshipRepository();
-    const starship = await starshipRepo.findById(starshipId);
-
-    if (!starship || starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Delete the API key
-    const apiKeyRepo = new NativeToolApiKeyRepository();
-    await apiKeyRepo.deleteApiKey(starshipId, toolName);
-
+    // Delegate to service layer
+    const apiKeyService = new NativeApiKeyService();
+    await apiKeyService.deleteApiKey(starshipId, userId, toolName);
     sendSuccess(res, { message: 'API key deleted successfully' });
   } catch (error) {
     if (!handleCommonError(error, res, 'deleting native API key')) {

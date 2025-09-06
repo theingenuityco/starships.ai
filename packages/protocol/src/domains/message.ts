@@ -185,9 +185,9 @@ export interface GetConversationRequest {
 }
 
 /**
- * Conversation response
+ * Message conversation response
  */
-export interface ConversationResponse {
+export interface MessageConversationResponse {
   conversationId: string;
   messages: MessageModel[];
   total: number;

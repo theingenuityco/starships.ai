@@ -1,20 +1,20 @@
 'use client'
 
-import { motion } from 'motion/react'
-import { useEffect, useState, memo, lazy, Suspense } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { LoginButton } from '@/components/auth/LoginButton'
 import { StarTheme } from '@/components/theme-context'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarships } from '@/hooks/useStarships'
+import { Book, Brain, ChevronDown, Compass, Lightbulb, Minus, Rocket, Sparkles, Star, User, Users } from 'lucide-react'
+import { motion } from 'motion/react'
+import { lazy, memo, Suspense, useEffect, useState } from 'react'
 const StarfieldBackground = lazy(() =>
   import('@/components/StarfieldBackground').then(module => ({
     default: module.StarfieldBackground,
   }))
 )
-import { Sparkles, Rocket, Brain, Compass, Users, User, Book, ChevronDown, Star, Lightbulb, Minus } from 'lucide-react'
 
 // System component cards
 const SystemCard = memo(
@@ -109,7 +109,7 @@ export default function HomePage() {
       if (isAuthenticated) {
         // If user has starships, redirect to first one, otherwise stay on main page to create
         if (hasExistingStarships && starships && starships.length > 0) {
-          window.location.href = `/ship/${starships[0].slug}/session`
+          window.location.href = `/ship/${starships[0].slug}/conversation`
         } else {
           // Stay on current page - they can create a starship here
           setLaunching(false)

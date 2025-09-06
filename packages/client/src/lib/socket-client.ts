@@ -1,9 +1,9 @@
+import type { ConnectionStatusEvent, ConversationSocketEvents, SocketConnectionState } from '@starships/protocol'
 import { io, Socket } from 'socket.io-client'
-import type { SessionSocketEvents, ConnectionStatus, SocketConnectionState, ConnectionStatusEvent } from '@starships/protocol'
 
 class SocketClient {
   private static instance: SocketClient
-  private socket: Socket<SessionSocketEvents> | null = null
+  private socket: Socket<ConversationSocketEvents> | null = null
   private connectionState: SocketConnectionState = {
     connected: false,
     authenticated: false,
@@ -135,7 +135,7 @@ class SocketClient {
     }
   }
 
-  getSocket(): Socket<SessionSocketEvents> | null {
+  getSocket(): Socket<ConversationSocketEvents> | null {
     return this.socket
   }
 
@@ -150,7 +150,7 @@ class SocketClient {
   // Agent-specific room management
   joinAgentRoom(agentId: string, userId: string) {
     if (this.socket?.connected) {
-      this.socket.emit('session:join-room', { roomId: `agent:${agentId}:${userId}`, userId })
+      this.socket.emit('conversation:join-room', { roomId: `agent:${agentId}:${userId}`, userId })
       console.log(`[SOCKET CLIENT] Joining agent room: agent:${agentId}:${userId}`)
     } else {
       console.warn('[SOCKET CLIENT] Cannot join agent room - not connected')
@@ -159,7 +159,7 @@ class SocketClient {
 
   leaveAgentRoom(agentId: string, userId: string) {
     if (this.socket?.connected) {
-      this.socket.emit('session:leave-room', { roomId: `agent:${agentId}:${userId}`, userId })
+      this.socket.emit('conversation:leave-room', { roomId: `agent:${agentId}:${userId}`, userId })
       console.log(`[SOCKET CLIENT] Leaving agent room: agent:${agentId}:${userId}`)
     } else {
       console.warn('[SOCKET CLIENT] Cannot leave agent room - not connected')

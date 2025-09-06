@@ -5,14 +5,14 @@
  */
 
 // Existing comprehensive services
-export { SocketIOService } from './SocketIOService';
 export { AgentService } from './AgentService';
+export { SocketIOService } from './SocketIOService';
 export { UserService } from './UserService';
 
 // Core data management services
-export { MessageService } from './MessageService';
+export { ConversationService } from './ConversationService';
 export { MemoryService } from './MemoryService';
-export { SessionService } from './SessionService';
+export { MessageService } from './MessageService';
 
 // Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';

@@ -57,7 +57,7 @@ jobs:
   codeql:
     name: CodeQL Analysis
     runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 360
+    timeout-minutes: 720
     permissions:
       security-events: write
       packages: read
@@ -78,6 +78,8 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
+          ram: 4096
+          threads: 4
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
@@ -88,6 +90,8 @@ jobs:
           category: '/language:${{matrix.language}}'
           output: codeql-results
           upload: false
+          ram: 4096
+          threads: 4
 
       - name: Check and display CodeQL results
         run: |

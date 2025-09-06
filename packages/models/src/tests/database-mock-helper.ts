@@ -31,7 +31,7 @@ export function mockRepositoryQuery(mockConnection: any, data: any) {
         s: item, // for Starship queries
         a: item, // for Agent queries
         m: item, // for Message queries
-        session: item, // for Session queries
+        c: item, // for Conversation queries
         blueprint: item, // for Blueprint queries
         mc: item, // for MissionClarity queries
       }))
@@ -44,7 +44,7 @@ export function mockRepositoryQuery(mockConnection: any, data: any) {
         s: data,
         a: data,
         m: data,
-        session: data,
+        c: data,
         blueprint: data,
         mc: data,
       },

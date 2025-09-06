@@ -9,7 +9,7 @@
 import { Agent, Blueprint } from '@starships/autopilot';
 import { InternalServerError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
-import type { AgentModel, CreateAgentRequest, SessionRequest, SessionResponse, UpdateAgentRequest } from '@starships/protocol';
+import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 
 export interface AgentOptions {
   includeMemory?: boolean;
@@ -173,10 +173,10 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Execute agent chat using SessionRequest format (replaces AgentExecutionService.executeChat)
+   * Execute agent chat using ConversationRequest format (replaces AgentExecutionService.executeChat)
    */
-  static async executeChat(request: SessionRequest): Promise<SessionResponse> {
-    const { agentId, userId, message, sessionId } = request;
+  static async executeChat(request: ConversationRequest): Promise<ConversationResponse> {
+    const { agentId, userId, message, conversationId } = request;
 
     if (!agentId) {
       throw new ValidationError('agentId is required for agent chat', 'agentId');
@@ -186,7 +186,7 @@ export class AgentService {
       agentId,
       userId,
       message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
-      sessionId,
+      conversationId,
       timestamp: new Date().toISOString(),
     });
 
@@ -215,13 +215,13 @@ export class AgentService {
         {
           agentId: agentId,
           userId: userId,
-          sessionId: sessionId,
+          sessionId: conversationId,
           userMessage: message,
         },
         {
           includeMemory: true,
           userId: userId,
-          sessionId: sessionId,
+          sessionId: conversationId,
           loadConversationHistory: true,
         }
       );

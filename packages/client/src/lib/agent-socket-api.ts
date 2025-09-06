@@ -1,13 +1,13 @@
 import SocketClient from '@/lib/socket-client'
 import { generateId } from '@/lib/utils'
-import type { ChatTypingData } from '@starships/protocol'
+import type { ChatTypingData, ConversationError, ConversationRequest, ConversationStreamChunk } from '@starships/protocol'
 
 export interface Message {
   id: string
   content: string
   role: 'user' | 'assistant'
   timestamp: string
-  sessionId: string
+  conversationId: string
   agentId?: string
   sending?: boolean
   streaming?: boolean
@@ -21,13 +21,13 @@ export interface Message {
 export interface AgentRequest {
   agentId: string
   message: string
-  sessionId?: string
+  conversationId?: string
 }
 
 export const agentSocketAPI = {
   sendMessageStream: (
     agentId: string,
-    request: { sessionId?: string; message: string },
+    request: { conversationId?: string; message: string },
     callbacks: {
       onChunk: (chunk: ConversationStreamChunk, accumulatedContent: string) => void
       onComplete: (message: Message) => void
@@ -51,7 +51,7 @@ export const agentSocketAPI = {
     const socketRequest: ConversationRequest = {
       source: 'agent',
       agentId: agentId,
-      sessionId: request.sessionId,
+      conversationId: request.conversationId,
       message: request.message,
       streamId: streamId,
       userId: 'client-user', // Overridden by server auth
@@ -59,7 +59,7 @@ export const agentSocketAPI = {
       typingSpeed: 75,
     }
 
-    const handleStreamChunk = (chunk: SessionStreamChunk) => {
+    const handleStreamChunk = (chunk: ConversationStreamChunk) => {
       if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && !isAborted) {
         if (chunk.typewriter?.type === 'character') {
           accumulatedContent += chunk.typewriter.content
@@ -74,16 +74,16 @@ export const agentSocketAPI = {
 
     const handleStreamComplete = (chunk: ConversationStreamChunk) => {
       if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && chunk.type === 'complete' && !isAborted) {
-        // Extract sessionId from server's metadata or fallback to provided sessionId
-        const serverSessionId = chunk.metadata?.sessionId as string
-        const finalSessionId = serverSessionId || request.sessionId || 'unknown'
+        // Extract conversationId from server's metadata or fallback to provided conversationId
+        const serverConversationId = chunk.metadata?.conversationId as string
+        const finalConversationId = serverConversationId || request.conversationId || 'unknown'
 
         const finalMessage: Message = {
           id: generateId(),
           content: chunk.content,
           role: 'assistant',
           timestamp: new Date(chunk.timestamp).toISOString(),
-          sessionId: finalSessionId, // Use server-provided sessionId
+          conversationId: finalConversationId, // Use server-provided conversationId
           agentId: chunk.agentId,
           streaming: false,
           usage: undefined, // Usage not available in stream chunks
@@ -113,30 +113,30 @@ export const agentSocketAPI = {
     }
 
     const cleanup = () => {
-      socket.off('session:stream-chunk', handleStreamChunk)
-      socket.off('session:stream-complete', handleStreamComplete)
-      socket.off('session:stream-error', handleStreamError)
-      socket.off('session:typing-start', handleTypingStart)
-      socket.off('session:typing-stop', handleTypingStop)
+      socket.off('conversation:stream-chunk', handleStreamChunk)
+      socket.off('conversation:stream-complete', handleStreamComplete)
+      socket.off('conversation:stream-error', handleStreamError)
+      socket.off('conversation:typing-start', handleTypingStart)
+      socket.off('conversation:typing-stop', handleTypingStop)
     }
 
     // Set up event listeners
-    socket.on('session:stream-chunk', handleStreamChunk)
-    socket.on('session:stream-complete', handleStreamComplete)
-    socket.on('session:stream-error', handleStreamError)
-    socket.on('session:typing-start', handleTypingStart)
-    socket.on('session:typing-stop', handleTypingStop)
+    socket.on('conversation:stream-chunk', handleStreamChunk)
+    socket.on('conversation:stream-complete', handleStreamComplete)
+    socket.on('conversation:stream-error', handleStreamError)
+    socket.on('conversation:typing-start', handleTypingStart)
+    socket.on('conversation:typing-stop', handleTypingStop)
 
-    // Join agent room for this session
+    // Join agent room for this conversation
     socketClient.joinAgentRoom(agentId, 'current-user') // Will be overridden by server auth
 
     // Start the stream
-    socket.emit('session:start-stream', socketRequest)
+    socket.emit('conversation:start-stream', socketRequest)
 
     return {
       abort: () => {
         isAborted = true
-        socket.emit('session:stop-stream', streamId)
+        socket.emit('conversation:stop-stream', streamId)
         socketClient.leaveAgentRoom(agentId, 'current-user')
         cleanup()
       },

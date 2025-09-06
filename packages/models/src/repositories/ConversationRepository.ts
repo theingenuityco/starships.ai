@@ -89,7 +89,7 @@ export class ConversationRepository extends BaseRepository {
         );
 
         const connection = this.getConnection();
-        const now = this.getCurrentTimestamp();
+        const now = new Date().toISOString();
 
         // Prepare conversation data with defaults and validation
         const conversationData = {
@@ -181,7 +181,7 @@ export class ConversationRepository extends BaseRepository {
 
         // Always update the updatedAt field
         setFields.push('c.updatedAt = $updatedAt');
-        params.updatedAt = this.getCurrentTimestamp();
+        params.updatedAt = new Date().toISOString();
 
         const result = await connection.executeWrite<{ c: ConversationModel }>(
           `MATCH (c:Conversation) WHERE c.id = $id
@@ -233,7 +233,7 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.lastActivityAt = $timestamp', {
           id,
-          timestamp: this.getCurrentTimestamp(),
+          timestamp: new Date().toISOString(),
         });
       },
       'updateActivity',
@@ -248,7 +248,7 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         await connection.executeWrite(
           'MATCH (c:Conversation) WHERE c.id = $id SET c.messageCount = c.messageCount + $increment, c.lastActivityAt = $timestamp',
-          { id, increment, timestamp: this.getCurrentTimestamp() }
+          { id, increment, timestamp: new Date().toISOString() }
         );
       },
       'incrementMessageCount',
@@ -263,7 +263,7 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         await connection.executeWrite(
           'MATCH (c:Conversation) WHERE c.id = $id SET c.totalTokens = c.totalTokens + $tokens, c.lastActivityAt = $timestamp',
-          { id, tokens, timestamp: this.getCurrentTimestamp() }
+          { id, tokens, timestamp: new Date().toISOString() }
         );
       },
       'updateTokenCount',
@@ -290,7 +290,7 @@ export class ConversationRepository extends BaseRepository {
         await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.status = $status, c.lastActivityAt = $timestamp', {
           id,
           status,
-          timestamp: this.getCurrentTimestamp(),
+          timestamp: new Date().toISOString(),
         });
       },
       methodName,
@@ -390,12 +390,5 @@ export class ConversationRepository extends BaseRepository {
       'unlinkFromStarship',
       'Conversation'
     );
-  }
-
-  /**
-   * Get current timestamp in ISO format
-   */
-  private getCurrentTimestamp(): string {
-    return new Date().toISOString();
   }
 }

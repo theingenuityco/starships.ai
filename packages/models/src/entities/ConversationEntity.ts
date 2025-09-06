@@ -97,7 +97,7 @@ export class ConversationEntity implements ConversationModel {
    * Simple validation function using class-validator
    * This replaces the complex ConversationValidation class with a lean solution
    */
-  static async validateConversationData(data: any, operation: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: any, operation: 'create' | 'update' = 'create'): Promise<void> {
     const entity = new ConversationEntity();
 
     // For create operations, validate all required fields

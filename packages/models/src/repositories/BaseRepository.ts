@@ -3,7 +3,6 @@
  */
 
 import { getConnection, Neo4jConnection } from '@/helpers/database';
-import { ModelSerializer } from '@/helpers/serializer';
 import type { RepositoryErrorContext } from '@starships/errors';
 import { BaseError, ConflictError, DatabaseError, ErrorContextUtils, NotFoundError, ValidationError } from '@starships/errors';
 
@@ -461,91 +460,6 @@ export abstract class BaseRepository {
       `${context.component}/${context.operation}`,
       context
     );
-  }
-
-  // ============================================================================
-  // SERIALIZATION HELPERS
-  // ============================================================================
-  // Note: Complex serialization/deserialization is now handled by individual entities
-  // using class-transformer decorators. Use Entity.fromData() and entity.toPlainObject().
-
-  /**
-   * Safely parse JSON with fallback value
-   * Essential utility for database JSON fields
-   */
-  protected safeJsonParse<T>(jsonString: string | null | undefined, fallback: T): T {
-    return ModelSerializer.safeJsonParse(jsonString, fallback);
-  }
-
-  /**
-   * Safely stringify JSON
-   * Essential utility for database JSON fields
-   */
-  protected safeJsonStringify(value: any): string | null {
-    return ModelSerializer.safeJsonStringify(value);
-  }
-
-  /**
-   * Helper method for common mapping operations from database records
-   * Handles JSON parsing, date conversion, and type safety
-   *
-   * @param record - Database record
-   * @param jsonFields - Fields that should be parsed as JSON
-   * @param dateFields - Fields that should be converted to Date objects
-   * @param defaultValues - Default values for missing fields
-   * @returns Mapped and transformed object
-   */
-  protected mapFromDatabaseRecord<T>(
-    record: any,
-    options?: {
-      jsonFields?: string[];
-      dateFields?: string[];
-      arrayFields?: string[];
-      defaultValues?: Record<string, any>;
-    }
-  ): T {
-    if (!record) return record;
-
-    const mapped = { ...record };
-    const opts = options || {};
-
-    // Handle JSON fields
-    if (opts.jsonFields) {
-      for (const field of opts.jsonFields) {
-        if (mapped[field] && typeof mapped[field] === 'string') {
-          mapped[field] = this.safeJsonParse(mapped[field], null);
-        }
-      }
-    }
-
-    // Handle date fields
-    if (opts.dateFields) {
-      for (const field of opts.dateFields) {
-        if (mapped[field]) {
-          mapped[field] = new Date(mapped[field]);
-        }
-      }
-    }
-
-    // Handle array fields with defaults
-    if (opts.arrayFields) {
-      for (const field of opts.arrayFields) {
-        if (!Array.isArray(mapped[field])) {
-          mapped[field] = [];
-        }
-      }
-    }
-
-    // Apply default values
-    if (opts.defaultValues) {
-      for (const [field, defaultValue] of Object.entries(opts.defaultValues)) {
-        if (mapped[field] === undefined || mapped[field] === null) {
-          mapped[field] = defaultValue;
-        }
-      }
-    }
-
-    return mapped as T;
   }
 }
 

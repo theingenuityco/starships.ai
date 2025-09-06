@@ -215,19 +215,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         </motion.div>
       </div>
 
-      {/* Connection Status Indicator */}
-      <AnimatePresence>
-        {false && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="fixed bottom-4 right-4 px-3 py-2 bg-yellow-500/10 text-yellow-600 text-xs rounded-lg border border-yellow-500/20"
-          >
-            Reconnecting...
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Connection Status Indicator - Currently disabled */}
+      <AnimatePresence>{/* Connection status functionality not yet implemented */}</AnimatePresence>
     </div>
   )
 }

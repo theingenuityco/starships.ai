@@ -205,3 +205,8 @@ process.env.LOG_LEVEL = 'error'; // Reduce log noise in tests
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
 }));
+
+// Mock nanoid generation for predictable testing
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'mock-nanoid-123'),
+}));

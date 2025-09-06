@@ -72,35 +72,6 @@ export class ConversationEntity implements ConversationModel {
   userId?: string;
 
   /**
-   * Validation constants for conversation fields
-   * Used by repositories for consistent validation
-   */
-  static readonly VALIDATION = {
-    REQUIRED_FIELDS: ['id', 'createdAt', 'lastActivityAt', 'messageCount', 'totalTokens', 'status'] as const,
-    STATUS_VALUES: ['active', 'paused', 'completed', 'archived'] as const,
-    FIELD_TYPES: {
-      id: 'string',
-      createdAt: 'string',
-      updatedAt: 'string',
-      lastActivityAt: 'string',
-      messageCount: 'number',
-      totalTokens: 'number',
-      status: 'string',
-      starshipId: 'string',
-      userId: 'string',
-    } as const,
-    STRING_LENGTHS: {
-      id: { min: 1, max: 255 },
-      status: { min: 1, max: 50 },
-      starshipId: { min: 1, max: 255 },
-      userId: { min: 1, max: 255 },
-    } as const,
-    ENUM_CONSTRAINTS: {
-      status: ['active', 'paused', 'completed', 'archived'],
-    } as const,
-  } as const;
-
-  /**
    * Deserialize database record into ConversationEntity
    * Converts raw database records to fully typed and validated ConversationEntity instances
    */

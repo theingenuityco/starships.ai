@@ -5,6 +5,7 @@
 import { getConnection, Neo4jConnection } from '@/helpers/database';
 import type { RepositoryErrorContext } from '@starships/errors';
 import { BaseError, ConflictError, DatabaseError, ErrorContextUtils, NotFoundError, ValidationError } from '@starships/errors';
+import { nanoid } from 'nanoid';
 
 /**
  * Base repository with standardized error handling and validation
@@ -335,7 +336,7 @@ export abstract class BaseRepository {
 
   /**
    * Create a new entity with automatic ID generation
-   * This method automatically generates a UUID for the entity using Neo4j's randomUUID()
+   * This method automatically generates a nanoid for the entity using application logic
    *
    * @param nodeLabel - Neo4j node label (e.g., 'User', 'Starship')
    * @param properties - Object properties to set on the node (excluding id)
@@ -345,15 +346,18 @@ export abstract class BaseRepository {
     // Use provided connection or get from centralized getConnection method
     const conn = connection || this.getConnection();
 
-    // Remove any existing 'id' from properties - Neo4j will generate it
+    // Generate nanoid in application layer for consistent, compact IDs
+    const generatedId = nanoid();
+
+    // Remove any existing 'id' from properties and add the generated one
     const { id, ...propsWithoutId } = properties;
+    const propsWithGeneratedId = { ...propsWithoutId, id: generatedId };
 
     const result = await conn.executeWrite(
       `CREATE (n:${nodeLabel})
-       SET n.id = randomUUID(),
-           n += $props
+       SET n += $props
        RETURN n`,
-      { props: propsWithoutId }
+      { props: propsWithGeneratedId }
     );
 
     if (!result || result.length === 0) {
@@ -384,20 +388,22 @@ export abstract class BaseRepository {
     // Use provided connection or get from centralized getConnection method
     const conn = connection || this.getConnection();
 
-    // Remove ID from all property sets - Neo4j will generate it
+    // Generate nanoid in application layer
+    const generatedId = nanoid();
+
+    // Remove ID from all property sets and add generated ID to create properties
     const { id: _, ...matchProps } = matchProperties;
     const { id: __, ...createProps } = createProperties;
     const { id: ___, ...updateProps } = updateProperties;
+
+    // Add generated ID to create properties
+    const createPropsWithId = { ...createProps, id: generatedId };
 
     let cypher = `MERGE (n:${nodeLabel} {${Object.keys(matchProps)
       .map((key) => `${key}: $match.${key}`)
       .join(', ')}})`;
 
-    if (Object.keys(createProps).length > 0) {
-      cypher += `\nON CREATE SET n.id = randomUUID(), n += $create`;
-    } else {
-      cypher += `\nON CREATE SET n.id = randomUUID()`;
-    }
+    cypher += `\nON CREATE SET n += $create`;
 
     if (Object.keys(updateProps).length > 0) {
       cypher += `\nON MATCH SET n += $update`;
@@ -405,10 +411,11 @@ export abstract class BaseRepository {
 
     cypher += `\nRETURN n`;
 
-    const parameters: Record<string, any> = { match: matchProps };
-    if (Object.keys(createProps).length > 0) {
-      parameters.create = createProps;
-    }
+    const parameters: Record<string, any> = {
+      match: matchProps,
+      create: createPropsWithId,
+    };
+
     if (Object.keys(updateProps).length > 0) {
       parameters.update = updateProps;
     }

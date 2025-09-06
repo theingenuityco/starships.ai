@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateSession } from '@/hooks/useSessions'
+import { useCreateConversation } from '@/hooks/useConversations'
 import type { Message } from '@/lib/agent-socket-api'
 import { agentSocketAPI } from '@/lib/agent-socket-api'
 import type { Agent } from '@/lib/api'
@@ -11,11 +11,11 @@ import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { KeyboardEvent, useEffect, useRef, useState } from 'react'
 
-interface SessionMessageInputProps {
+interface ConversationMessageInputProps {
   selectedAgent?: Agent | null
   starshipId?: string
-  sessionId?: string | null
-  onSessionStart?: (sessionId: string) => void
+  conversationId?: string | null
+  onConversationStart?: (conversationId: string) => void
   onMessageSent?: (message: Message) => void
   onMessageReceived?: (message: Message) => void
   disabled?: boolean
@@ -23,14 +23,24 @@ interface SessionMessageInputProps {
   children?: React.ReactNode // For footer content
 }
 
-export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSessionStart, onMessageSent, onMessageReceived, disabled = false, minimal = false, children }: SessionMessageInputProps) {
+export function ConversationMessageInput({
+  selectedAgent,
+  starshipId,
+  conversationId,
+  onConversationStart,
+  onMessageSent,
+  onMessageReceived,
+  disabled = false,
+  minimal = false,
+  children,
+}: ConversationMessageInputProps) {
   const { userId } = useAuth()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const currentStreamRef = useRef<{ abort: () => void } | null>(null)
-  const createSession = useCreateSession()
+  const createConversation = useCreateConversation()
 
   // Auto-focus on textarea when component mounts and when agent is selected
   useEffect(() => {
@@ -60,18 +70,18 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
 
     try {
       setSending(true)
-      // Create session if one doesn't exist
-      let currentSessionId = sessionId
-      if (!currentSessionId) {
-        console.log('Creating new session for agent chat...')
-        const newSession = await createSession.mutateAsync({
+      // Create conversation if one doesn't exist
+      let currentConversationId = conversationId
+      if (!currentConversationId) {
+        console.log('Creating new conversation for agent chat...')
+        const newConversation = await createConversation.mutateAsync({
           source: 'agent',
           agentId: selectedAgent!.id,
           starshipId: starshipId,
         })
-        currentSessionId = newSession.id
-        onSessionStart?.(currentSessionId)
-        console.log('Session created:', currentSessionId)
+        currentConversationId = newConversation.id
+        onConversationStart?.(currentConversationId!)
+        console.log('Conversation created:', currentConversationId)
       }
 
       // Create user message
@@ -80,7 +90,7 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
         content: messageToSend,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentSessionId,
+        sessionId: currentConversationId!,
         agentId: selectedAgent!.id,
       }
 
@@ -90,15 +100,15 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
       // Send to agent API with valid sessionId
       currentStreamRef.current = agentSocketAPI.sendMessageStream(
         selectedAgent!.id,
-        { sessionId: currentSessionId, message: messageToSend },
+        { sessionId: currentConversationId!, message: messageToSend },
         {
           onChunk: (chunk, accumulatedContent) => {
             // Handle streaming updates if needed
           },
           onComplete: assistantMessage => {
-            // Use the session ID from server response
+            // Use the session ID from server response (sessionId represents conversationId)
             if (assistantMessage.sessionId) {
-              onSessionStart?.(assistantMessage.sessionId)
+              onConversationStart?.(assistantMessage.sessionId)
             }
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null
@@ -140,18 +150,18 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
 
     try {
       setSending(true)
-      // Create session if one doesn't exist
-      let currentSessionId = sessionId
-      if (!currentSessionId) {
-        console.log('Creating new session for agent chat suggestion...')
-        const newSession = await createSession.mutateAsync({
+      // Create conversation if one doesn't exist
+      let currentConversationId = conversationId
+      if (!currentConversationId) {
+        console.log('Creating new conversation for agent chat suggestion...')
+        const newConversation = await createConversation.mutateAsync({
           source: 'agent',
           agentId: selectedAgent!.id,
           starshipId: starshipId,
         })
-        currentSessionId = newSession.id
-        onSessionStart?.(currentSessionId)
-        console.log('Session created:', currentSessionId)
+        currentConversationId = newConversation.id
+        onConversationStart?.(currentConversationId!)
+        console.log('Conversation created:', currentConversationId)
       }
 
       // Create user message
@@ -160,7 +170,7 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
         content: suggestionText,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentSessionId,
+        sessionId: currentConversationId!,
         agentId: selectedAgent!.id,
       }
 
@@ -170,15 +180,15 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
       // Send to agent API with valid sessionId
       currentStreamRef.current = agentSocketAPI.sendMessageStream(
         selectedAgent!.id,
-        { sessionId: currentSessionId, message: suggestionText },
+        { sessionId: currentConversationId!, message: suggestionText },
         {
           onChunk: (chunk, accumulatedContent) => {
             // Handle streaming updates if needed
           },
           onComplete: assistantMessage => {
-            // Use the session ID from server response
+            // Use the session ID from server response (sessionId represents conversationId)
             if (assistantMessage.sessionId) {
-              onSessionStart?.(assistantMessage.sessionId)
+              onConversationStart?.(assistantMessage.sessionId)
             }
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null
@@ -226,7 +236,7 @@ export function SessionMessageInput({ selectedAgent, starshipId, sessionId, onSe
   // Expose handleSuggestionSubmit for parent component
   const inputRef = useRef({ handleSuggestionSubmit })
   if (typeof window !== 'undefined') {
-    ;(window as any).sessionMessageInputRef = inputRef
+    ;(window as any).conversationMessageInputRef = inputRef
   }
 
   return (

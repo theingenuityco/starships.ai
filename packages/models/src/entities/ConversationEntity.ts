@@ -1,18 +1,18 @@
 /**
- * Session Entity with Validation and Serialization
+ * Conversation Entity with Validation and Serialization
  *
- * This class extends the SessionModel interface with professional validation and serialization capabilities
+ * This class extends the ConversationModel interface with professional validation and serialization capabilities
  * using class-transformer decorators and BaseRepository validation patterns.
  */
 
 import { SerializableModel, Transformers } from '@/helpers/serializer';
-import type { SessionModel } from '@starships/protocol';
+import type { ConversationModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
 
 /**
- * Serializable Session class with validation and transformation decorators
+ * Serializable Conversation class with validation and transformation decorators
  */
-export class SessionEntity extends SerializableModel implements SessionModel {
+export class ConversationEntity extends SerializableModel implements ConversationModel {
   @Expose()
   @Transform(({ value }) => value)
   id!: string;
@@ -46,7 +46,7 @@ export class SessionEntity extends SerializableModel implements SessionModel {
   metadata?: Record<string, unknown>;
 
   /**
-   * Validation constants for session fields
+   * Validation constants for conversation fields
    * Used by repositories for consistent validation
    */
   static readonly VALIDATION = {
@@ -71,20 +71,20 @@ export class SessionEntity extends SerializableModel implements SessionModel {
   } as const;
 
   /**
-   * Create a SessionEntity from plain data
+   * Create a ConversationEntity from plain data
    */
-  static fromData(data: Record<string, any>): SessionEntity {
+  static fromData(data: Record<string, any>): ConversationEntity {
     return this.fromDatabase(data);
   }
 
   /**
-   * Validate session data using BaseRepository validation patterns
+   * Validate conversation data using BaseRepository validation patterns
    * This method can be called by repositories before create/update operations
    */
-  static validateSessionData(data: any, operation: 'create' | 'update' = 'create'): void {
-    // This validation logic will be used by SessionRepository
+  static validateConversationData(data: any, operation: 'create' | 'update' = 'create'): void {
+    // This validation logic will be used by ConversationRepository
     // The actual validation will be done by BaseRepository methods
   }
 }
 
-export default SessionEntity;
+export default ConversationEntity;

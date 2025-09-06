@@ -1,6 +1,6 @@
-import { generateId } from '@/lib/utils'
 import SocketClient from '@/lib/socket-client'
-import type { SessionRequest, SessionStreamChunk, SessionError, SessionResponse, ChatTypingData } from '@starships/protocol'
+import { generateId } from '@/lib/utils'
+import type { ChatTypingData } from '@starships/protocol'
 
 export interface Message {
   id: string
@@ -29,7 +29,7 @@ export const agentSocketAPI = {
     agentId: string,
     request: { sessionId?: string; message: string },
     callbacks: {
-      onChunk: (chunk: SessionStreamChunk, accumulatedContent: string) => void
+      onChunk: (chunk: ConversationStreamChunk, accumulatedContent: string) => void
       onComplete: (message: Message) => void
       onError: (error: string) => void
       onTypingStart?: () => void
@@ -48,7 +48,7 @@ export const agentSocketAPI = {
     let accumulatedContent = ''
     let isAborted = false
 
-    const socketRequest: SessionRequest = {
+    const socketRequest: ConversationRequest = {
       source: 'agent',
       agentId: agentId,
       sessionId: request.sessionId,
@@ -72,7 +72,7 @@ export const agentSocketAPI = {
       }
     }
 
-    const handleStreamComplete = (chunk: SessionStreamChunk) => {
+    const handleStreamComplete = (chunk: ConversationStreamChunk) => {
       if (chunk.streamId === streamId && chunk.agentId === agentId && chunk.source === 'agent' && chunk.type === 'complete' && !isAborted) {
         // Extract sessionId from server's metadata or fallback to provided sessionId
         const serverSessionId = chunk.metadata?.sessionId as string
@@ -93,7 +93,7 @@ export const agentSocketAPI = {
       }
     }
 
-    const handleStreamError = (error: SessionError) => {
+    const handleStreamError = (error: ConversationError) => {
       if (error.streamId === streamId && error.agentId === agentId && !isAborted) {
         callbacks.onError(error.message)
         cleanup()

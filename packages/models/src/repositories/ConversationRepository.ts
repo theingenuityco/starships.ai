@@ -1,22 +1,24 @@
 import { getConnection, Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { SessionModel } from '@starships/protocol';
+import { ConversationModel } from '@starships/protocol';
 
-export class SessionRepository extends BaseRepository {
+export class ConversationRepository extends BaseRepository {
   private connection: Neo4jConnection;
 
   constructor(connection?: Neo4jConnection) {
-    super('SessionRepository');
+    super('ConversationRepository');
     this.connection = connection || getConnection();
   }
 
-  async findAll(): Promise<SessionModel[]> {
+  async findAll(): Promise<ConversationModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = getConnection();
-        const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) RETURN s ORDER BY s.lastActivityAt DESC');
+        const result = await connection.executeQuery<{ c: ConversationModel }>(
+          'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
+        );
         return result.map((record) =>
-          this.mapFromDatabaseRecord<SessionModel>(record.s, {
+          this.mapFromDatabaseRecord<ConversationModel>(record.c, {
             jsonFields: ['metadata'],
             defaultValues: {
               messageCount: 0,
@@ -27,17 +29,17 @@ export class SessionRepository extends BaseRepository {
         );
       },
       'findAll',
-      'Session'
+      'Conversation'
     );
   }
 
-  async findById(id: string): Promise<SessionModel | null> {
+  async findById(id: string): Promise<ConversationModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ s: SessionModel }>('MATCH (s:Session) WHERE s.id = $id RETURN s', { id });
+        const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
         return result.length > 0
-          ? this.mapFromDatabaseRecord<SessionModel>(result[0].s, {
+          ? this.mapFromDatabaseRecord<ConversationModel>(result[0].c, {
               jsonFields: ['metadata'],
               defaultValues: {
                 messageCount: 0,
@@ -48,12 +50,12 @@ export class SessionRepository extends BaseRepository {
           : null;
       },
       'findById',
-      'Session',
+      'Conversation',
       id
     );
   }
 
-  async create(entity: Omit<SessionModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<SessionModel> {
+  async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
         // Validate required fields using BaseRepository validation
@@ -92,8 +94,8 @@ export class SessionRepository extends BaseRepository {
         const connection = this.connection;
         const now = this.getCurrentTimestamp();
 
-        // Prepare session data with defaults and validation
-        const sessionData = {
+        // Prepare conversation data with defaults and validation
+        const conversationData = {
           createdAt: now,
           lastActivityAt: entity.lastActivityAt || now,
           messageCount: entity.messageCount || 0,
@@ -102,8 +104,8 @@ export class SessionRepository extends BaseRepository {
           metadata: this.safeJsonStringify(entity.metadata),
         };
 
-        // Use BaseRepository serialization (the sessionData is already properly prepared)
-        const result = await this.createEntityWithAutoId<SessionModel>('Session', sessionData, this.connection);
+        // Use BaseRepository serialization (the conversationData is already properly prepared)
+        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData, this.connection);
 
         // Create relationship with starship if starshipId is provided
         if (starshipId) {
@@ -111,7 +113,7 @@ export class SessionRepository extends BaseRepository {
         }
 
         // Use consistent mapping from database record
-        return this.mapFromDatabaseRecord<SessionModel>(result, {
+        return this.mapFromDatabaseRecord<ConversationModel>(result, {
           jsonFields: ['metadata'],
           defaultValues: {
             messageCount: 0,
@@ -121,11 +123,11 @@ export class SessionRepository extends BaseRepository {
         });
       },
       'create',
-      'Session'
+      'Conversation'
     );
   }
 
-  async update(id: string, updates: Partial<SessionModel>): Promise<SessionModel | null> {
+  async update(id: string, updates: Partial<ConversationModel>): Promise<ConversationModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         // Validate updates using BaseRepository validation
@@ -156,23 +158,23 @@ export class SessionRepository extends BaseRepository {
 
         // Handle updatable fields with proper serialization
         if (updates.lastActivityAt !== undefined) {
-          setFields.push('s.lastActivityAt = $lastActivityAt');
+          setFields.push('c.lastActivityAt = $lastActivityAt');
           params.lastActivityAt = updates.lastActivityAt;
         }
         if (updates.messageCount !== undefined) {
-          setFields.push('s.messageCount = $messageCount');
+          setFields.push('c.messageCount = $messageCount');
           params.messageCount = updates.messageCount;
         }
         if (updates.totalTokens !== undefined) {
-          setFields.push('s.totalTokens = $totalTokens');
+          setFields.push('c.totalTokens = $totalTokens');
           params.totalTokens = updates.totalTokens;
         }
         if (updates.status !== undefined) {
-          setFields.push('s.status = $status');
+          setFields.push('c.status = $status');
           params.status = updates.status;
         }
         if (updates.metadata !== undefined) {
-          setFields.push('s.metadata = $metadata');
+          setFields.push('c.metadata = $metadata');
           params.metadata = this.safeJsonStringify(updates.metadata);
         }
 
@@ -181,22 +183,22 @@ export class SessionRepository extends BaseRepository {
         }
 
         // Always update the updatedAt field
-        setFields.push('s.updatedAt = $updatedAt');
+        setFields.push('c.updatedAt = $updatedAt');
         params.updatedAt = this.getCurrentTimestamp();
 
-        const result = await connection.executeWrite<{ s: SessionModel }>(
-          `MATCH (s:Session) WHERE s.id = $id
+        const result = await connection.executeWrite<{ c: ConversationModel }>(
+          `MATCH (c:Conversation) WHERE c.id = $id
          SET ${setFields.join(', ')}
-         RETURN s`,
+         RETURN c`,
           params
         );
 
         if (result.length === 0) {
-          this.handleNotFound('Session', id, 'update');
+          this.handleNotFound('Conversation', id, 'update');
         }
 
         // Use consistent mapping from database record
-        return this.mapFromDatabaseRecord<SessionModel>(result[0].s, {
+        return this.mapFromDatabaseRecord<ConversationModel>(result[0].c, {
           jsonFields: ['metadata'],
           defaultValues: {
             messageCount: 0,
@@ -206,7 +208,7 @@ export class SessionRepository extends BaseRepository {
         });
       },
       'update',
-      'Session',
+      'Conversation',
       id
     );
   }
@@ -216,14 +218,14 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (s:Session) WHERE s.id = $id DETACH DELETE s RETURN count(s) as deletedCount',
+          'MATCH (c:Conversation) WHERE c.id = $id DETACH DELETE c RETURN count(c) as deletedCount',
           { id }
         );
 
         return result[0]?.deletedCount > 0;
       },
       'delete',
-      'Session',
+      'Conversation',
       id
     );
   }
@@ -232,13 +234,13 @@ export class SessionRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.lastActivityAt = $timestamp', {
+        await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.lastActivityAt = $timestamp', {
           id,
           timestamp: this.getCurrentTimestamp(),
         });
       },
       'updateActivity',
-      'Session',
+      'Conversation',
       id
     );
   }
@@ -248,12 +250,12 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.messageCount = s.messageCount + $increment, s.lastActivityAt = $timestamp',
+          'MATCH (c:Conversation) WHERE c.id = $id SET c.messageCount = c.messageCount + $increment, c.lastActivityAt = $timestamp',
           { id, increment, timestamp: this.getCurrentTimestamp() }
         );
       },
       'incrementMessageCount',
-      'Session',
+      'Conversation',
       id
     );
   }
@@ -263,12 +265,12 @@ export class SessionRepository extends BaseRepository {
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          'MATCH (s:Session) WHERE s.id = $id SET s.totalTokens = s.totalTokens + $tokens, s.lastActivityAt = $timestamp',
+          'MATCH (c:Conversation) WHERE c.id = $id SET c.totalTokens = c.totalTokens + $tokens, c.lastActivityAt = $timestamp',
           { id, tokens, timestamp: this.getCurrentTimestamp() }
         );
       },
       'updateTokenCount',
-      'Session',
+      'Conversation',
       id
     );
   }
@@ -277,43 +279,43 @@ export class SessionRepository extends BaseRepository {
     return this.updateStatus(id, 'completed', 'markAsCompleted');
   }
 
-  async archiveSession(id: string): Promise<void> {
-    return this.updateStatus(id, 'archived', 'archiveSession');
+  async archiveConversation(id: string): Promise<void> {
+    return this.updateStatus(id, 'archived', 'archiveConversation');
   }
 
   /**
-   * Common method to update session status and activity timestamp
+   * Common method to update conversation status and activity timestamp
    */
   private async updateStatus(id: string, status: string, methodName: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        await connection.executeWrite('MATCH (s:Session) WHERE s.id = $id SET s.status = $status, s.lastActivityAt = $timestamp', {
+        await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.status = $status, c.lastActivityAt = $timestamp', {
           id,
           status,
           timestamp: this.getCurrentTimestamp(),
         });
       },
       methodName,
-      'Session',
+      'Conversation',
       id
     );
   }
 
   /**
-   * Find all sessions for a specific starship using Neo4j relationships
+   * Find all conversations for a specific starship using Neo4j relationships
    */
-  async findByStarship(starshipId: string): Promise<SessionModel[]> {
+  async findByStarship(starshipId: string): Promise<ConversationModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
-        const result = await connection.executeQuery<{ s: SessionModel }>(
-          `MATCH (starship:Starship {id: $starshipId})-[:HAS_SESSION]->(s:Session)
-           RETURN s ORDER BY s.lastActivityAt DESC`,
+        const result = await connection.executeQuery<{ c: ConversationModel }>(
+          `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
+           RETURN c ORDER BY c.lastActivityAt DESC`,
           { starshipId }
         );
         return result.map((record) =>
-          this.mapFromDatabaseRecord<SessionModel>(record.s, {
+          this.mapFromDatabaseRecord<ConversationModel>(record.c, {
             jsonFields: ['metadata'],
             defaultValues: {
               messageCount: 0,
@@ -324,21 +326,21 @@ export class SessionRepository extends BaseRepository {
         );
       },
       'findByStarship',
-      'Session'
+      'Conversation'
     );
   }
 
   /**
-   * Get the starship associated with a session using Neo4j relationships
+   * Get the starship associated with a conversation using Neo4j relationships
    */
-  async getSessionStarship(sessionId: string): Promise<{ id: string; name: string; slug: string } | null> {
+  async getConversationStarship(conversationId: string): Promise<{ id: string; name: string; slug: string } | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
         const result = await connection.executeQuery<{ starship: { id: string; name: string; slug: string } }>(
-          `MATCH (starship:Starship)-[:HAS_SESSION]->(s:Session {id: $sessionId})
+          `MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})
            RETURN starship`,
-          { sessionId }
+          { conversationId }
         );
         return result.length > 0
           ? {
@@ -348,61 +350,50 @@ export class SessionRepository extends BaseRepository {
             }
           : null;
       },
-      'getSessionStarship',
-      'Session'
+      'getConversationStarship',
+      'Conversation'
     );
   }
 
   /**
-   * Create relationship between existing session and starship
+   * Create relationship between existing conversation and starship
    */
-  async linkToStarship(sessionId: string, starshipId: string): Promise<void> {
+  async linkToStarship(conversationId: string, starshipId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          `MATCH (s:Starship {id: $starshipId}), (session:Session {id: $sessionId})
-           CREATE (s)-[:HAS_SESSION {key: $key}]->(session)`,
+          `MATCH (s:Starship {id: $starshipId}), (conversation:Conversation {id: $conversationId})
+           CREATE (s)-[:HAS_CONVERSATION {key: $key}]->(conversation)`,
           {
             starshipId,
-            sessionId,
-            key: `${starshipId}_${sessionId}`,
+            conversationId,
+            key: `${starshipId}_${conversationId}`,
           }
         );
       },
       'linkToStarship',
-      'Session'
+      'Conversation'
     );
   }
 
   /**
-   * Remove relationship between session and starship
+   * Remove relationship between conversation and starship
    */
-  async unlinkFromStarship(sessionId: string): Promise<void> {
+  async unlinkFromStarship(conversationId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.connection;
         await connection.executeWrite(
-          `MATCH (s:Starship)-[r:HAS_SESSION]->(session:Session {id: $sessionId})
+          `MATCH (s:Starship)-[r:HAS_CONVERSATION]->(conversation:Conversation {id: $conversationId})
            DELETE r`,
-          { sessionId }
+          { conversationId }
         );
       },
       'unlinkFromStarship',
-      'Session'
+      'Conversation'
     );
   }
-
-  /**
-   * Legacy mapToSession method has been replaced with BaseRepository.mapFromDatabaseRecord()
-   * This provides consistent JSON parsing, default values, and type safety across all repositories.
-   *
-   * Usage example:
-   * this.mapFromDatabaseRecord<SessionModel>(record, {
-   *   jsonFields: ['metadata'],
-   *   defaultValues: { messageCount: 0, totalTokens: 0, status: 'active' }
-   * });
-   */
 
   /**
    * Get current timestamp in ISO format

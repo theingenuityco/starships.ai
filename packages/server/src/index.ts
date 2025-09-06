@@ -3,39 +3,40 @@
  * Main server entry point with enhanced repository pattern
  */
 
-import express from 'express';
-import cors from 'cors';
-import cookieParser from 'cookie-parser';
-import { createServer } from 'http';
 import { initializeSocketIO } from '@/socket';
+import { getEnvConfig } from '@starships/env';
 import {
   AgentRepository,
-  UserRepository,
-  StarshipRepository,
   createConnection,
   getConnection,
+  migrationRunner,
+  seedWaitlist,
+  StarshipRepository,
+  UserRepository,
   WaitlistRepository,
 } from '@starships/models';
-import { migrationRunner, seedWaitlist } from '@starships/models';
-import { getEnvConfig } from '@starships/env';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
+import express from 'express';
+import { createServer } from 'http';
 
 // Route imports
-import authRoutes from '@/routes/auth';
-import agentRoutes from '@/routes/agents';
-import sessionRoutes from '@/routes/sessions';
-import memoryRoutes from '@/routes/memory';
-import userRoutes from '@/routes/users';
-import starshipRoutes, { initializeStarshipRoutes } from '@/routes/starships';
 import agentTemplateRoutes from '@/routes/agent-templates';
+import agentRoutes from '@/routes/agents';
+import authRoutes from '@/routes/auth';
+import conversationRoutes from '@/routes/conversations';
+import memoryRoutes from '@/routes/memory';
+import starshipRoutes, { initializeStarshipRoutes } from '@/routes/starships';
+import userRoutes from '@/routes/users';
 // import expeditionRoutes from '@/routes/expeditions';
 import missionRoutes from '@/routes/missions';
 import nativeApiKeysRoutes from '@/routes/native-api-keys';
 import waitlistRoutes from '@/routes/waitlist';
-import { AgentTemplateService } from '@/services/AgentTemplateService';
 import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
+import { AgentTemplateService } from '@/services/AgentTemplateService';
 
 // Import new error handling and health check routes
-import { requestIdMiddleware, errorHandler, notFoundHandler } from '@/middleware/errorHandler';
+import { errorHandler, notFoundHandler, requestIdMiddleware } from '@/middleware/errorHandler';
 import healthRoutes from '@/routes/health';
 
 // Load server configuration
@@ -115,7 +116,7 @@ app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentTemplateRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', sessionRoutes); // Updated to OpenAPI standard with v1 prefix - now using session routes
+app.use('/api/v1', conversationRoutes); // Updated to OpenAPI standard with v1 prefix - conversation routes
 app.use('/api/v1', memoryRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix

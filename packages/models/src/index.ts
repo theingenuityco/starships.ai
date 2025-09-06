@@ -8,6 +8,7 @@ export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 export { AgentRepository } from './repositories/AgentRepository';
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
 export { BlueprintRepository } from './repositories/BlueprintRepository';
+export { ConversationRepository } from './repositories/ConversationRepository';
 export { EdgeRepository } from './repositories/EdgeRepository';
 export { MemoryRepository } from './repositories/MemoryRepository';
 export { MessageRepository } from './repositories/MessageRepository';
@@ -16,7 +17,6 @@ export { MissionMessageRepository } from './repositories/MissionMessageRepositor
 export { MissionRepository } from './repositories/MissionRepository';
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 export { NodeRepository } from './repositories/NodeRepository';
-export { SessionRepository } from './repositories/SessionRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';

@@ -1,8 +1,8 @@
 'use client'
 
-import { AgentSelector } from '@/components/session/AgentSelector'
-import { SessionMessageInput } from '@/components/session/SessionMessageInput'
-import { SessionMessageList } from '@/components/session/SessionMessageList'
+import { AgentSelector } from '@/components/conversation/AgentSelector'
+import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
+import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
 import type { Message } from '@/lib/agent-socket-api'
@@ -11,13 +11,13 @@ import { Sparkles, Users } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 
-interface SessionInterfaceProps {
+interface ConversationInterfaceProps {
   starshipId?: string
-  sessionId?: string | null
-  onSessionChange?: (sessionId: string | null) => void
+  conversationId?: string | null
+  onConversationChange?: (conversationId: string | null) => void
 }
 
-export function SessionInterface({ starshipId, sessionId: externalSessionId, onSessionChange }: SessionInterfaceProps) {
+export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { isConnected } = useSocketConnection()
 
@@ -27,28 +27,28 @@ export function SessionInterface({ starshipId, sessionId: externalSessionId, onS
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [refreshMessages, setRefreshMessages] = useState(0)
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
 
-  // Reset session when agent/starship changes - let server manage session IDs
+  // Reset conversation when agent/starship changes - let server manage conversation IDs
   useEffect(() => {
     if (userId && isAuthenticated) {
-      if (externalSessionId !== undefined) {
-        // Use external session ID when provided
-        setCurrentSessionId(externalSessionId)
-        setHasMessages(!!externalSessionId)
+      if (externalConversationId !== undefined) {
+        // Use external conversation ID when provided
+        setCurrentConversationId(externalConversationId)
+        setHasMessages(!!externalConversationId)
         setRefreshMessages(prev => prev + 1)
       } else if (selectedAgent) {
-        // Reset session for agent - server will provide actual session ID
-        setCurrentSessionId(null)
+        // Reset conversation for agent - server will provide actual conversation ID
+        setCurrentConversationId(null)
         setHasMessages(false)
         setRefreshMessages(prev => prev + 1)
       } else {
-        // No session without selected agent
-        setCurrentSessionId(null)
+        // No conversation without selected agent
+        setCurrentConversationId(null)
         setHasMessages(false)
       }
     }
-  }, [userId, isAuthenticated, selectedAgent, starshipId, externalSessionId])
+  }, [userId, isAuthenticated, selectedAgent, starshipId, externalConversationId])
 
   // Show loading state
   if (isLoading) {
@@ -58,7 +58,7 @@ export function SessionInterface({ starshipId, sessionId: externalSessionId, onS
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <Sparkles className="w-8 h-8 text-primary animate-pulse" />
           </div>
-          <p className="text-muted-foreground">Initializing session...</p>
+          <p className="text-muted-foreground">Initializing conversation...</p>
         </motion.div>
       </div>
     )
@@ -72,17 +72,17 @@ export function SessionInterface({ starshipId, sessionId: externalSessionId, onS
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
             <Users className="w-8 h-8 text-muted-foreground" />
           </div>
-          <p className="text-muted-foreground">Please sign in to start a session</p>
+          <p className="text-muted-foreground">Please sign in to start a conversation</p>
         </motion.div>
       </div>
     )
   }
 
-  // Handle session start - receive actual database session ID
-  const handleSessionStart = (sessionId: string) => {
-    console.log('[SessionInterface] Session started with ID:', sessionId)
-    setCurrentSessionId(sessionId)
-    onSessionChange?.(sessionId)
+  // Handle conversation start - receive actual database conversation ID
+  const handleConversationStart = (conversationId: string) => {
+    console.log('[ConversationInterface] Conversation started with ID:', conversationId)
+    setCurrentConversationId(conversationId)
+    onConversationChange?.(conversationId)
   }
 
   // Handle first message to trigger layout transition
@@ -93,8 +93,8 @@ export function SessionInterface({ starshipId, sessionId: externalSessionId, onS
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion: string) => {
-    if (typeof window !== 'undefined' && (window as any).sessionMessageInputRef) {
-      const inputRef = (window as any).sessionMessageInputRef
+    if (typeof window !== 'undefined' && (window as any).conversationMessageInputRef) {
+      const inputRef = (window as any).conversationMessageInputRef
       if (inputRef.current?.handleSuggestionSubmit) {
         inputRef.current.handleSuggestionSubmit(suggestion)
       }
@@ -105,9 +105,9 @@ export function SessionInterface({ starshipId, sessionId: externalSessionId, onS
     <div className="flex flex-col h-screen bg-background">
       {/* Messages Area - Only shown when there are messages */}
       <AnimatePresence>
-        {hasMessages && currentSessionId && (
+        {hasMessages && currentConversationId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0 overflow-hidden">
-            <SessionMessageList sessionId={currentSessionId} starshipId={starshipId} key={`${currentSessionId}-${refreshMessages}`} />
+            <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} key={`${currentConversationId}-${refreshMessages}`} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -160,11 +160,11 @@ export function SessionInterface({ starshipId, sessionId: externalSessionId, onS
               }}
               className="relative"
             >
-              <SessionMessageInput
+              <ConversationMessageInput
                 selectedAgent={selectedAgent}
                 starshipId={starshipId}
-                sessionId={currentSessionId}
-                onSessionStart={handleSessionStart}
+                conversationId={currentConversationId}
+                onConversationStart={handleConversationStart}
                 onMessageSent={handleFirstMessage}
                 onMessageReceived={(message: Message) => {
                   setRefreshMessages(prev => prev + 1)
@@ -174,7 +174,7 @@ export function SessionInterface({ starshipId, sessionId: externalSessionId, onS
               >
                 {/* Footer Content - Agent Selector */}
                 <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
-              </SessionMessageInput>
+              </ConversationMessageInput>
             </motion.div>
 
             {/* Suggestions - Only shown when no messages */}

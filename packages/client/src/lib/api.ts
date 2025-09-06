@@ -501,7 +501,7 @@ export const templateAPI = {
   },
 }
 
-// Note: chatAPI functionality has been moved to useSessions hooks for better integration with TanStack Query
+// Note: chatAPI functionality has been moved to useConversations hooks for better integration with TanStack Query
 
 // Starship types are now imported from protocol package above
 // Local Starship interface for backward compatibility

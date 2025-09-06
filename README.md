@@ -128,7 +128,7 @@ graph TD
     A[Vision Chamber] --> B[Mission Planning]
     B --> C[mission Launch]
     C --> D[Agent Coordination]
-    D --> E[Real-time Execution]
+    D --> E[Mission Execution]
     E --> F[Results & Insights]
 ```
 
@@ -145,12 +145,12 @@ graph TD
 - AI-powered vision statement refinement
 - Quality metrics (clarity, specificity, actionability)
 - Intelligent suggestions and improvements
-- Real-time collaboration features
+- HTTP-based collaboration features
 
 **Mission System**
 
 - Create and manage AI-driven missions
-- Real-time chat with mission orchestrator
+- HTTP-based chat with mission orchestrator
 - Multi-phase mission execution
 - Progress tracking and status updates
 
@@ -164,7 +164,7 @@ graph TD
 **Multi-Agent missions**
 
 - Complex mission orchestration
-- Real-time agent communication
+- HTTP-based agent communication
 - First Officer coordination system
 - mission status monitoring
 
@@ -175,10 +175,10 @@ graph TD
 - Agent assignment and configuration
 - Power management and mission limits
 
-**Real-time Features**
+**HTTP API Features**
 
-- mission status broadcasting
-- Vision refinement suggestions
+- Mission status updates via API polling
+- Vision refinement suggestions through API endpoints
 
 **Payment System**
 
@@ -286,7 +286,7 @@ kubectl logs -n starships-prod -l app=starships-ai --follow
 ### Monitoring & Health
 
 - **Health Endpoints**: `/health`, `/health/detailed`
-- **Real-time Metrics**: Memory, CPU, connection counts
+- **System Metrics**: Memory, CPU, server status
 - **Database Monitoring**: Neo4j connection and query performance
 - **Error Tracking**: Comprehensive error handling and logging
 

@@ -90,25 +90,25 @@ export function ConversationMessageInput({
         content: messageToSend,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentConversationId!,
+        conversationId: currentConversationId!,
         agentId: selectedAgent!.id,
       }
 
       // Emit user message
       onMessageSent?.(userMessage)
 
-      // Send to agent API with valid sessionId
+      // Send to agent API with valid conversationId
       currentStreamRef.current = agentSocketAPI.sendMessageStream(
         selectedAgent!.id,
-        { sessionId: currentConversationId!, message: messageToSend },
+        { conversationId: currentConversationId!, message: messageToSend },
         {
           onChunk: (chunk, accumulatedContent) => {
             // Handle streaming updates if needed
           },
           onComplete: assistantMessage => {
-            // Use the session ID from server response (sessionId represents conversationId)
-            if (assistantMessage.sessionId) {
-              onConversationStart?.(assistantMessage.sessionId)
+            // Use the conversation ID from server response
+            if (assistantMessage.conversationId) {
+              onConversationStart?.(assistantMessage.conversationId)
             }
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null
@@ -170,25 +170,25 @@ export function ConversationMessageInput({
         content: suggestionText,
         role: 'user',
         timestamp: new Date().toISOString(),
-        sessionId: currentConversationId!,
+        conversationId: currentConversationId!,
         agentId: selectedAgent!.id,
       }
 
       // Emit user message
       onMessageSent?.(userMessage)
 
-      // Send to agent API with valid sessionId
+      // Send to agent API with valid conversationId
       currentStreamRef.current = agentSocketAPI.sendMessageStream(
         selectedAgent!.id,
-        { sessionId: currentConversationId!, message: suggestionText },
+        { conversationId: currentConversationId!, message: suggestionText },
         {
           onChunk: (chunk, accumulatedContent) => {
             // Handle streaming updates if needed
           },
           onComplete: assistantMessage => {
-            // Use the session ID from server response (sessionId represents conversationId)
-            if (assistantMessage.sessionId) {
-              onConversationStart?.(assistantMessage.sessionId)
+            // Use the conversation ID from server response
+            if (assistantMessage.conversationId) {
+              onConversationStart?.(assistantMessage.conversationId)
             }
             onMessageReceived?.(assistantMessage)
             currentStreamRef.current = null

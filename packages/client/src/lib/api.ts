@@ -59,7 +59,7 @@ api.interceptors.request.use(
       config.url?.includes('/api/v1/starships') ||
       config.url?.includes('/api/v1/agents') ||
       config.url?.includes('/api/v1/users') ||
-      config.url?.includes('/api/v1/sessions') ||
+      config.url?.includes('/api/v1/conversations') ||
       config.url?.includes('/api/v1/missions')
 
     if (requiresAuth) {
@@ -165,7 +165,6 @@ import {
   AgentTemplateModel,
   CreateAgentRequest,
   CreateStarshipRequest,
-  Session,
   StarshipAgentsResponse,
   StarshipDetailsResponse,
   StarshipListResponse,
@@ -179,7 +178,6 @@ import {
 export type {
   CreateAgentRequest,
   CreateStarshipRequest,
-  Session,
   StarshipAgentsResponse,
   StarshipDetailsResponse,
   StarshipListResponse,
@@ -227,7 +225,7 @@ export interface Message {
   content: string
   role: 'user' | 'assistant'
   timestamp: string
-  sessionId: string
+  conversationId: string
   sending?: boolean // For loading states
 }
 
@@ -259,13 +257,13 @@ interface ChatBackendResponse {
   }
 }
 
-// Client-friendly request type (camelCase) - aligned with SessionRequest from protocol
+// Client-friendly request type (camelCase) - aligned with ConversationRequest from protocol
 export interface ChatRequest {
   source: 'agent' | 'user'
   agentId?: string
   userId?: string
   message: string
-  sessionId?: string
+  conversationId?: string
   stream?: boolean
   streamId?: string
   typingSpeed?: number

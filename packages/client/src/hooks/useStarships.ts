@@ -58,6 +58,41 @@ export function useUserStarships(userId: string, enabled: boolean = true) {
 }
 
 /**
+ * Get starship by slug
+ */
+export function useStarshipBySlug(slug: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', slug] as const,
+    queryFn: async () => {
+      const response = await api.get(`/api/v1/starships/slug/${slug}`)
+      return extractResponseData<StarshipModel>(response)
+    },
+    enabled: !!slug && enabled,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+/**
+ * Get all starships (for backward compatibility)
+ * @deprecated Use useUserStarships instead
+ */
+export function useStarships() {
+  // Since we don't have a user context here, we'll need to get it from auth
+  // For now, return a mock structure that matches the expected API
+  return useQuery({
+    queryKey: STARSHIP_QUERY_KEYS.lists(),
+    queryFn: async () => {
+      const response = await api.get('/api/v1/starships')
+      return { starships: extractResponseData<StarshipModel[]>(response) }
+    },
+    staleTime: 10 * 1000, // 10 seconds
+    gcTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: true,
+  })
+}
+
+/**
  * Get starship agents
  */
 export function useStarshipAgents(starshipId: string, enabled: boolean = true) {

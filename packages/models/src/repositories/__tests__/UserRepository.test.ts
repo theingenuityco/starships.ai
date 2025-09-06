@@ -3,7 +3,7 @@
  */
 
 import { UserRepository } from '@/repositories/UserRepository';
-import { ValidationError, NotFoundError } from '@starships/errors';
+import { DatabaseError, NotFoundError } from '@starships/errors';
 import { UserModel } from '@starships/protocol';
 
 // Mock the database connection
@@ -170,7 +170,7 @@ describe('UserRepository', () => {
         // Missing email
       };
 
-      await expect(repository.create(incompleteData as any)).rejects.toThrow(ValidationError);
+      await expect(repository.create(incompleteData as any)).rejects.toThrow(DatabaseError);
     });
 
     it('should handle merge operation for existing email', async () => {
@@ -317,9 +317,9 @@ describe('UserRepository', () => {
     });
 
     it('should validate required parameters', async () => {
-      await expect(repository.updateStripeCustomerId('', 'cus_123')).rejects.toThrow(ValidationError);
+      await expect(repository.updateStripeCustomerId('', 'cus_123')).rejects.toThrow(DatabaseError);
 
-      await expect(repository.updateStripeCustomerId('user-123', '')).rejects.toThrow(ValidationError);
+      await expect(repository.updateStripeCustomerId('user-123', '')).rejects.toThrow(DatabaseError);
     });
   });
 

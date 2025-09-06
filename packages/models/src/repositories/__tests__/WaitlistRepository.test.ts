@@ -2,9 +2,9 @@
  * WaitlistRepository Unit Tests
  */
 
-import { WaitlistRepository } from '@/repositories/WaitlistRepository';
 import { Neo4jConnection } from '@/helpers/database';
-import { ValidationError, DatabaseError, ConflictError } from '@starships/errors';
+import { WaitlistRepository } from '@/repositories/WaitlistRepository';
+import { ConflictError, DatabaseError, ValidationError } from '@starships/errors';
 import type { WaitlistEntryModel } from '@starships/protocol';
 
 // Mock dependencies

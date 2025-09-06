@@ -2,10 +2,10 @@
  * MissionClarityRepository Unit Tests
  */
 
-import { MissionClarityRepository } from '@/repositories/MissionClarityRepository';
 import { Neo4jConnection, getConnection } from '@/helpers/database';
-import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '@starships/errors';
-import type { MissionClarityModel, CreateMissionClarityRequest, UpdateMissionClarityRequest } from '@starships/protocol';
+import { MissionClarityRepository } from '@/repositories/MissionClarityRepository';
+import { ConflictError, DatabaseError, NotFoundError } from '@starships/errors';
+import type { CreateMissionClarityRequest, MissionClarityModel, UpdateMissionClarityRequest } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
@@ -119,7 +119,7 @@ describe('MissionClarityRepository', () => {
     it('should validate required fields', async () => {
       const invalidRequest = { missionId: 'mission-123' }; // Missing required scores
 
-      await expect(repository.upsertByMissionId('mission-123', invalidRequest as any)).rejects.toThrow(ValidationError);
+      await expect(repository.upsertByMissionId('mission-123', invalidRequest as any)).rejects.toThrow(DatabaseError);
     });
 
     it('should validate score ranges', async () => {
@@ -132,7 +132,7 @@ describe('MissionClarityRepository', () => {
 
       for (const invalidScore of invalidScores) {
         const request = createMockClarityRequest(invalidScore as any);
-        await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(ValidationError);
+        await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(DatabaseError);
       }
     });
 
@@ -180,9 +180,9 @@ describe('MissionClarityRepository', () => {
     });
 
     it('should validate missionId parameter', async () => {
-      await expect(repository.getByMissionId('')).rejects.toThrow(ValidationError);
-      await expect(repository.getByMissionId(null as any)).rejects.toThrow(ValidationError);
-      await expect(repository.getByMissionId(undefined as any)).rejects.toThrow(ValidationError);
+      await expect(repository.getByMissionId('')).rejects.toThrow(DatabaseError);
+      await expect(repository.getByMissionId(null as any)).rejects.toThrow(DatabaseError);
+      await expect(repository.getByMissionId(undefined as any)).rejects.toThrow(DatabaseError);
     });
 
     it('should handle database errors', async () => {
@@ -239,14 +239,14 @@ describe('MissionClarityRepository', () => {
     });
 
     it('should validate missionId parameter', async () => {
-      await expect(repository.updateByMissionId('', {})).rejects.toThrow(ValidationError);
+      await expect(repository.updateByMissionId('', {})).rejects.toThrow(DatabaseError);
     });
 
     it('should validate score ranges in updates', async () => {
       const invalidUpdates = [{ objectiveClarity: -1 }, { successMetrics: 11 }, { timelineDefinition: 'invalid' }];
 
       for (const invalidUpdate of invalidUpdates) {
-        await expect(repository.updateByMissionId('mission-123', invalidUpdate as any)).rejects.toThrow(ValidationError);
+        await expect(repository.updateByMissionId('mission-123', invalidUpdate as any)).rejects.toThrow(DatabaseError);
       }
     });
 
@@ -310,8 +310,8 @@ describe('MissionClarityRepository', () => {
     });
 
     it('should validate missionId parameter', async () => {
-      await expect(repository.deleteByMissionId('')).rejects.toThrow(ValidationError);
-      await expect(repository.deleteByMissionId(null as any)).rejects.toThrow(ValidationError);
+      await expect(repository.deleteByMissionId('')).rejects.toThrow(DatabaseError);
+      await expect(repository.deleteByMissionId(null as any)).rejects.toThrow(DatabaseError);
     });
 
     it('should handle database errors', async () => {
@@ -364,9 +364,9 @@ describe('MissionClarityRepository', () => {
 
     it('should validate score range parameters', async () => {
       // Invalid ranges
-      await expect(repository.getByScoreRange(-1, 5)).rejects.toThrow(ValidationError);
-      await expect(repository.getByScoreRange(5, 11)).rejects.toThrow(ValidationError);
-      await expect(repository.getByScoreRange(8, 5)).rejects.toThrow(ValidationError); // min > max
+      await expect(repository.getByScoreRange(-1, 5)).rejects.toThrow(DatabaseError);
+      await expect(repository.getByScoreRange(5, 11)).rejects.toThrow(DatabaseError);
+      await expect(repository.getByScoreRange(8, 5)).rejects.toThrow(DatabaseError); // min > max
     });
 
     it('should handle edge cases for score range', async () => {

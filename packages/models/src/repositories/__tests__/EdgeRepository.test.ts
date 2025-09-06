@@ -3,7 +3,7 @@
  */
 
 import { EdgeRepository } from '@/repositories/EdgeRepository';
-import { ValidationError, NotFoundError, DatabaseError } from '@starships/errors';
+import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import type { EdgeModel } from '@starships/protocol';
 
 // Mock the database connection

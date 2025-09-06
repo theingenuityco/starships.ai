@@ -1,11 +1,11 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { motion } from 'motion/react'
-import { Users, Command, Target, MessageSquare } from 'lucide-react'
 import { UserProfile } from '@/components/auth/UserProfile'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { Command, MessageSquare, Target, Users } from 'lucide-react'
+import { motion } from 'motion/react'
+import { usePathname } from 'next/navigation'
 
 interface NavigationProps {
   mode?: 'sidebar' | 'module'
@@ -18,8 +18,8 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
     title: 'Starship Systems',
     items: [
       {
-        href: `/ship/${starshipSlug}/session`,
-        label: 'Session',
+        href: `/ship/${starshipSlug}/conversation`,
+        label: 'Conversation',
         icon: MessageSquare,
         status: 'optimal',
       },

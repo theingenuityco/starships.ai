@@ -1,20 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Agent } from '@/lib/api'
-import api from '@/lib/api'
-import type { Message } from '@/lib/agent-socket-api'
-import { MessageBubble } from '@/components/session/MessageBubble'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Send, RotateCcw, Play, Trash2, Plus, Wifi, WifiOff, AlertCircle } from 'lucide-react'
-import { useToast } from '@/hooks/useToast'
-import { agentSocketAPI } from '@/lib/agent-socket-api'
+import { Textarea } from '@/components/ui/textarea'
 import { useSocketConnection } from '@/hooks/useSocketConnection'
+import { useToast } from '@/hooks/useToast'
 import { useTypewriter } from '@/hooks/useTypewriter'
+import type { Message } from '@/lib/agent-socket-api'
+import { agentSocketAPI } from '@/lib/agent-socket-api'
+import api, { Agent } from '@/lib/api'
+import { AlertCircle, Play, Plus, RotateCcw, Send, Trash2, Wifi, WifiOff } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface AgentTesterProps {
   agent: Agent
@@ -54,7 +52,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sessionId] = useState(`test-${agent.id}-${Date.now()}`)
+  const [conversationId] = useState(`test-${agent.id}-${Date.now()}`)
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [, setIsTyping] = useState(false)
@@ -119,7 +117,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
       content: messageContent.trim(),
       role: 'user',
       timestamp: new Date().toISOString(),
-      sessionId,
+      conversationId,
       sending: true,
     }
 
@@ -137,7 +135,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
       content: '',
       role: 'assistant',
       timestamp: new Date().toISOString(),
-      sessionId,
+      conversationId,
       streaming: true,
       agentId: agent.id,
     }
@@ -151,7 +149,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
     const { abort } = agentSocketAPI.sendMessageStream(
       agent.id,
       {
-        sessionId,
+        conversationId,
         message: messageContent,
       },
       {
@@ -231,7 +229,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
 
   const clearChat = async () => {
     try {
-      await api.delete(`/api/v1/sessions/${sessionId}/memory`)
+      await api.delete(`/api/v1/conversations/${conversationId}/memory`)
       setMessages([])
       toast({
         title: 'Success',
@@ -303,7 +301,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
       agentSocketAPI.sendMessageStream(
         agent.id,
         {
-          sessionId: `test-case-${testCase.id}-${Date.now()}`,
+          conversationId: `test-case-${testCase.id}-${Date.now()}`,
           message: testCase.input,
         },
         {
@@ -451,7 +449,18 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                 <p className="mb-4">Start a conversation to test this agent</p>
               </div>
             ) : (
-              messages.map(message => <MessageBubble key={message.id} message={message} streaming={message.id === streamingMessageId} />)
+              messages.map(message => (
+                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+                  <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-200 border border-zinc-700'}`}>
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-xs opacity-70 mt-1">
+                      {new Date(message.timestamp).toLocaleTimeString()}
+                      {message.streaming && <span className="ml-2 text-blue-400">●</span>}
+                      {message.sending && <span className="ml-2 text-yellow-400">⏳</span>}
+                    </p>
+                  </div>
+                </div>
+              ))
             )}
           </div>
 

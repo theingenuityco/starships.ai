@@ -1,20 +1,10 @@
-import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { ConversationModel } from '@starships/protocol';
 
 export class ConversationRepository extends BaseRepository {
-  private connection: Neo4jConnection | null = null;
-
   constructor(connection?: Neo4jConnection) {
-    super('ConversationRepository');
-    this.connection = connection || null;
-  }
-
-  private getConnection(): Neo4jConnection {
-    if (!this.connection) {
-      this.connection = getConnection();
-    }
-    return this.connection;
+    super('ConversationRepository', connection);
   }
 
   async findAll(): Promise<ConversationModel[]> {
@@ -112,7 +102,7 @@ export class ConversationRepository extends BaseRepository {
         };
 
         // Use BaseRepository serialization (the conversationData is already properly prepared)
-        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData, connection);
+        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
 
         // Create relationship with starship if starshipId is provided
         if (starshipId) {

@@ -1,16 +1,12 @@
-import type { AgentTemplateModel, AgentModel } from '@starships/protocol';
-import { Neo4jConnection, getConnection } from '@/helpers/database';
+import { Neo4jConnection, convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 import { AgentMemoryState } from '@starships/autopilot';
+import type { AgentModel, AgentTemplateModel } from '@starships/protocol';
+import { int } from 'neo4j-driver';
 
 export class AgentTemplateRepository extends BaseRepository {
-  private connection: Neo4jConnection;
-
   constructor(connection?: Neo4jConnection) {
-    super('AgentTemplateRepository');
-    this.connection = connection || getConnection();
+    super('AgentTemplateRepository', connection);
   }
 
   /**
@@ -56,7 +52,7 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY t.createdAt DESC
       `;
 
-        const results = await this.connection.executeQuery<{ t: any }>(query);
+        const results = await this.getConnection().executeQuery<{ t: any }>(query);
         return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
       },
       'findAll',
@@ -74,7 +70,7 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN t
       `;
 
-        const results = await this.connection.executeQuery<{ t: any }>(query, { id });
+        const results = await this.getConnection().executeQuery<{ t: any }>(query, { id });
         const template = results.length > 0 ? results[0].t : null;
         return template ? this.deserializeTemplate(convertNeo4jIntsInObject(template)) : null;
       },
@@ -133,7 +129,7 @@ export class AgentTemplateRepository extends BaseRepository {
           blueprintIsString: typeof templateData.blueprint === 'string',
         });
 
-        const created = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
+        const created = await this.createEntityWithAutoId<any>('AgentTemplate', templateData);
 
         console.log('[Repository] Created successfully, deserializing...');
 
@@ -168,7 +164,7 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN t
       `;
 
-        const results = await this.connection.executeWrite<{ t: any }>(query, {
+        const results = await this.getConnection().executeWrite<{ t: any }>(query, {
           id,
           updates: serializedUpdates,
           now: new Date().toISOString(),
@@ -194,7 +190,7 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN count(t) as deletedCount
       `;
 
-        const results = await this.connection.executeWrite<{ deletedCount: number }>(query, { id });
+        const results = await this.getConnection().executeWrite<{ deletedCount: number }>(query, { id });
         return results[0]?.deletedCount > 0;
       },
       'delete',
@@ -214,7 +210,7 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY t.createdAt DESC
       `;
 
-        const results = await this.connection.executeQuery<{ t: any }>(query, { authorId });
+        const results = await this.getConnection().executeQuery<{ t: any }>(query, { authorId });
         return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
       },
       'findByAuthor',
@@ -234,7 +230,7 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY t.usageCount DESC, t.rating DESC
       `;
 
-        const results = await this.connection.executeQuery<{ t: any }>(query, { category });
+        const results = await this.getConnection().executeQuery<{ t: any }>(query, { category });
         return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
       },
       'findByCategory',
@@ -267,7 +263,7 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY matchCount DESC, t.usageCount DESC, t.rating DESC
       `;
 
-        const results = await this.connection.executeQuery<{ t: any }>(query, { tags });
+        const results = await this.getConnection().executeQuery<{ t: any }>(query, { tags });
         return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
       },
       'findByTags',
@@ -312,7 +308,7 @@ export class AgentTemplateRepository extends BaseRepository {
         LIMIT $limit
       `;
 
-        const results = await this.connection.executeQuery<{ t: any }>(query, {
+        const results = await this.getConnection().executeQuery<{ t: any }>(query, {
           limit: int(limit),
           offset: int(offset),
         });
@@ -345,7 +341,7 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY relevance DESC, t.usageCount DESC, t.rating DESC
       `;
 
-        const results = await this.connection.executeQuery<{ t: any }>(searchQuery, {
+        const results = await this.getConnection().executeQuery<{ t: any }>(searchQuery, {
           query,
         });
         return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
@@ -365,7 +361,7 @@ export class AgentTemplateRepository extends BaseRepository {
         SET t.usageCount = t.usageCount + 1, t.updatedAt = $now
       `;
 
-        await this.connection.executeWrite(query, { id, now: new Date().toISOString() });
+        await this.getConnection().executeWrite(query, { id, now: new Date().toISOString() });
       },
       'incrementUsageCount',
       'AgentTemplate',
@@ -396,7 +392,7 @@ export class AgentTemplateRepository extends BaseRepository {
         SET t.rating = $rating, t.updatedAt = $now
       `;
 
-        await this.connection.executeWrite(query, { id, rating, now: new Date().toISOString() });
+        await this.getConnection().executeWrite(query, { id, rating, now: new Date().toISOString() });
       },
       'updateRating',
       'AgentTemplate',
@@ -439,10 +435,10 @@ export class AgentTemplateRepository extends BaseRepository {
     };
 
     // Create agent with auto-generated ID
-    const rawAgent = await this.createEntityWithAutoId<any>('Agent', agentData, this.connection);
+    const rawAgent = await this.createEntityWithAutoId<any>('Agent', agentData);
     // Create relationship with starship
     try {
-      await this.connection.executeWrite(
+      await this.getConnection().executeWrite(
         `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
          CREATE (a)-[:DEPLOYED_ON]->(s)`,
         { starshipId, agentId: rawAgent.id }
@@ -472,7 +468,7 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN a
       `;
 
-        const agentResults = await this.connection.executeQuery<{ a: AgentModel }>(query, {
+        const agentResults = await this.getConnection().executeQuery<{ a: AgentModel }>(query, {
           agentId,
         });
 
@@ -564,13 +560,13 @@ export class AgentTemplateRepository extends BaseRepository {
           previewPrompts: [],
         };
 
-        const rawCreated = await this.createEntityWithAutoId<any>('AgentTemplate', templateData, this.connection);
+        const rawCreated = await this.createEntityWithAutoId<any>('AgentTemplate', templateData);
         const created = this.deserializeTemplate(convertNeo4jIntsInObject(rawCreated));
 
         // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
         try {
           if (created.authorId && created.authorId !== 'system') {
-            await this.connection.executeWrite(
+            await this.getConnection().executeWrite(
               `MATCH (u:User {id: $authorId}), (t:AgentTemplate {id: $templateId})
              MERGE (u)-[r:CREATES]->(t)
              ON CREATE SET r.createdAt = $now`,

@@ -2,7 +2,7 @@
  * Base repository class with standardized error handling and validation utilities
  */
 
-import { getConnection } from '@/helpers/database';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
 import { ModelSerializer } from '@/helpers/serializer';
 import type { RepositoryErrorContext } from '@starships/errors';
 import { BaseError, ConflictError, DatabaseError, ErrorContextUtils, NotFoundError, ValidationError } from '@starships/errors';
@@ -12,8 +12,21 @@ import { BaseError, ConflictError, DatabaseError, ErrorContextUtils, NotFoundErr
  */
 export abstract class BaseRepository {
   protected serviceName: string;
-  constructor(serviceName: string) {
+  private connection: Neo4jConnection | null = null;
+
+  constructor(serviceName: string, connection?: Neo4jConnection) {
     this.serviceName = serviceName;
+    this.connection = connection || null;
+  }
+
+  /**
+   * Get database connection with lazy initialization and caching
+   */
+  protected getConnection(): Neo4jConnection {
+    if (!this.connection) {
+      this.connection = getConnection();
+    }
+    return this.connection;
   }
 
   /** Create error context for repository operations */
@@ -422,16 +435,8 @@ export abstract class BaseRepository {
    * @returns The created entity with generated ID
    */
   protected async createEntityWithAutoId<T>(nodeLabel: string, properties: Record<string, any>, connection?: any): Promise<T> {
-    // Use provided connection or get from module - this helps with testing
-    let conn = connection;
-    if (!conn) {
-      try {
-        conn = getConnection();
-      } catch (error) {
-        // Fallback for testing scenarios where import might fail
-        throw new Error('Database connection not available');
-      }
-    }
+    // Use provided connection or get from centralized getConnection method
+    const conn = connection || this.getConnection();
 
     // Remove any existing 'id' from properties - Neo4j will generate it
     const { id, ...propsWithoutId } = properties;
@@ -469,8 +474,8 @@ export abstract class BaseRepository {
     updateProperties: Record<string, any> = {},
     connection?: any
   ): Promise<T> {
-    // Use provided connection or get from module - this helps with testing
-    const conn = connection || getConnection();
+    // Use provided connection or get from centralized getConnection method
+    const conn = connection || this.getConnection();
 
     // Remove ID from all property sets - Neo4j will generate it
     const { id: _, ...matchProps } = matchProperties;

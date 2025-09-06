@@ -228,11 +228,6 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
                   <Wifi className="w-3 h-3" />
                   <span>Connected</span>
                 </>
-              ) : false ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full" />
-                  <span>Reconnecting</span>
-                </>
               ) : (
                 <>
                   <WifiOff className="w-3 h-3" />

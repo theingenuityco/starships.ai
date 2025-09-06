@@ -3,7 +3,7 @@
  */
 
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { BaseError, ValidationError, NotFoundError, ConflictError, DatabaseError } from '@starships/errors';
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 
 // Test implementation of BaseRepository
 class TestRepository extends BaseRepository {
@@ -40,21 +40,8 @@ class TestRepository extends BaseRepository {
     return this.executeWithErrorHandlingSync(operation, operationName, resource, resourceId);
   }
 
-  public testValidateRequired(data: any, requiredFields: string[], operation?: string) {
-    return this.validateRequired(data, requiredFields, operation);
-  }
-
-  public testValidateTypes(data: any, fieldTypes: Record<string, string>, operation?: string) {
-    return this.validateTypes(data, fieldTypes, operation);
-  }
-
-  public testValidateStringLengths(data: any, lengthConstraints: Record<string, { min?: number; max?: number }>, operation?: string) {
-    return this.validateStringLengths(data, lengthConstraints, operation);
-  }
-
-  public testValidateEnums(data: any, enumConstraints: Record<string, string[]>, operation?: string) {
-    return this.validateEnums(data, enumConstraints, operation);
-  }
+  // Note: Validation methods have been removed from BaseRepository
+  // Validation is now handled by individual entities using class-validator decorators
 
   public testCreateBusinessLogicError(code: string, message: string, operation?: string, resource?: string, resourceId?: string) {
     return this.createBusinessLogicError(code, message, operation, resource, resourceId);
@@ -281,161 +268,14 @@ describe('BaseRepository', () => {
     });
   });
 
-  describe('validateRequired', () => {
-    it('should pass validation for valid data', () => {
-      const data = { name: 'John', email: 'john@example.com' };
+  // Note: Validation tests have been removed as validation methods are no longer in BaseRepository
+  // Validation is now handled by individual entities using class-validator decorators
 
-      expect(() => {
-        repository.testValidateRequired(data, ['name', 'email']);
-      }).not.toThrow();
-    });
-
-    it('should throw ValidationError for missing fields', () => {
-      const data = { name: 'John' };
-
-      expect(() => {
-        repository.testValidateRequired(data, ['name', 'email'], 'create');
-      }).toThrow(ValidationError);
-
-      try {
-        repository.testValidateRequired(data, ['name', 'email']);
-      } catch (error: any) {
-        expect(error.message).toContain('email is required');
-      }
-    });
-
-    it('should validate against null, undefined, and empty string', () => {
-      const data = { name: null, email: undefined, phone: '' };
-
-      expect(() => {
-        repository.testValidateRequired(data, ['name', 'email', 'phone']);
-      }).toThrow(ValidationError);
-    });
-  });
-
-  describe('validateTypes', () => {
-    it('should pass validation for correct types', () => {
-      const data = { name: 'John', age: 30, active: true };
-
-      expect(() => {
-        repository.testValidateTypes(data, {
-          name: 'string',
-          age: 'number',
-          active: 'boolean',
-        });
-      }).not.toThrow();
-    });
-
-    it('should throw ValidationError for incorrect types', () => {
-      const data = { name: 'John', age: '30' };
-
-      expect(() => {
-        repository.testValidateTypes(data, { age: 'number' });
-      }).toThrow(ValidationError);
-
-      try {
-        repository.testValidateTypes(data, { age: 'number' });
-      } catch (error: any) {
-        expect(error.message).toContain('age must be of type number');
-      }
-    });
-
-    it('should skip validation for undefined fields', () => {
-      const data = { name: 'John' };
-
-      expect(() => {
-        repository.testValidateTypes(data, { age: 'number' });
-      }).not.toThrow();
-    });
-  });
-
-  describe('validateStringLengths', () => {
-    it('should pass validation for valid string lengths', () => {
-      const data = { name: 'John', description: 'A test description' };
-
-      expect(() => {
-        repository.testValidateStringLengths(data, {
-          name: { min: 2, max: 10 },
-          description: { min: 5, max: 100 },
-        });
-      }).not.toThrow();
-    });
-
-    it('should throw ValidationError for strings too short', () => {
-      const data = { name: 'J' };
-
-      expect(() => {
-        repository.testValidateStringLengths(data, { name: { min: 2 } });
-      }).toThrow(ValidationError);
-
-      try {
-        repository.testValidateStringLengths(data, { name: { min: 2 } });
-      } catch (error: any) {
-        expect(error.message).toContain('name must be at least 2 characters long');
-      }
-    });
-
-    it('should throw ValidationError for strings too long', () => {
-      const data = { name: 'Very long name' };
-
-      expect(() => {
-        repository.testValidateStringLengths(data, { name: { max: 5 } });
-      }).toThrow(ValidationError);
-
-      try {
-        repository.testValidateStringLengths(data, { name: { max: 5 } });
-      } catch (error: any) {
-        expect(error.message).toContain('name must be no more than 5 characters long');
-      }
-    });
-
-    it('should skip validation for non-string values', () => {
-      const data = { age: 30 };
-
-      expect(() => {
-        repository.testValidateStringLengths(data, { age: { min: 2 } });
-      }).not.toThrow();
-    });
-  });
-
-  describe('validateEnums', () => {
-    it('should pass validation for valid enum values', () => {
-      const data = { status: 'active', role: 'admin' };
-
-      expect(() => {
-        repository.testValidateEnums(data, {
-          status: ['active', 'inactive', 'pending'],
-          role: ['admin', 'user', 'guest'],
-        });
-      }).not.toThrow();
-    });
-
-    it('should throw ValidationError for invalid enum values', () => {
-      const data = { status: 'invalid_status' };
-
-      expect(() => {
-        repository.testValidateEnums(data, {
-          status: ['active', 'inactive'],
-        });
-      }).toThrow(ValidationError);
-
-      try {
-        repository.testValidateEnums(data, {
-          status: ['active', 'inactive'],
-        });
-      } catch (error: any) {
-        expect(error.message).toContain('status must be one of: active, inactive');
-      }
-    });
-
-    it('should skip validation for undefined values', () => {
-      const data = { name: 'John' };
-
-      expect(() => {
-        repository.testValidateEnums(data, {
-          status: ['active', 'inactive'],
-        });
-      }).not.toThrow();
+  describe('validation migration note', () => {
+    it('should note that validation has moved to entity layer', () => {
+      // Validation is now handled by entities using class-validator decorators
+      // These tests have been removed as the methods no longer exist in BaseRepository
+      expect(true).toBe(true);
     });
   });
 

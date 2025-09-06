@@ -10,8 +10,13 @@ export class NodeRepository extends BaseRepository {
   async createNode(blueprintId: string, nodeData: Omit<NodeModel, 'id'>): Promise<NodeModel> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'createNode');
-        this.validateRequired(nodeData, ['type', 'name'], 'createNode');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createNode');
+        }
+        if (!nodeData?.type || !nodeData?.name) {
+          this.handleValidationError([{ field: 'nodeData', message: 'type and name are required' }], 'createNode');
+        }
 
         const connection = this.getConnection();
 
@@ -60,7 +65,10 @@ export class NodeRepository extends BaseRepository {
   ): Promise<{ nodes: NodeModel[]; idMapping: Map<string, string> }> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'createNodes');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createNodes');
+        }
 
         if (!Array.isArray(nodesData) || nodesData.length === 0) {
           this.handleValidationError(
@@ -143,7 +151,10 @@ export class NodeRepository extends BaseRepository {
   async getNodesByBlueprintId(blueprintId: string): Promise<NodeModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'getNodesByBlueprintId');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'getNodesByBlueprintId');
+        }
 
         const connection = this.getConnection();
 
@@ -179,7 +190,10 @@ export class NodeRepository extends BaseRepository {
   async getNodeById(nodeId: string): Promise<NodeModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ nodeId }, ['nodeId'], 'getNodeById');
+        // Basic validation - entities handle detailed validation
+        if (!nodeId) {
+          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }], 'getNodeById');
+        }
 
         const connection = this.getConnection();
 
@@ -213,7 +227,10 @@ export class NodeRepository extends BaseRepository {
   async updateNode(nodeId: string, updates: Partial<NodeModel>): Promise<NodeModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ nodeId }, ['nodeId'], 'updateNode');
+        // Basic validation - entities handle detailed validation
+        if (!nodeId) {
+          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }], 'updateNode');
+        }
 
         if (!updates || Object.keys(updates).length === 0) {
           this.handleValidationError(
@@ -309,7 +326,10 @@ export class NodeRepository extends BaseRepository {
   async deleteNode(nodeId: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ nodeId }, ['nodeId'], 'deleteNode');
+        // Basic validation - entities handle detailed validation
+        if (!nodeId) {
+          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }], 'deleteNode');
+        }
 
         const connection = this.getConnection();
 
@@ -334,7 +354,10 @@ export class NodeRepository extends BaseRepository {
   async deleteNodesByBlueprintId(blueprintId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'deleteNodesByBlueprintId');
+        // Basic validation - entities handle detailed validation
+        if (!blueprintId) {
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'deleteNodesByBlueprintId');
+        }
 
         const connection = this.getConnection();
 

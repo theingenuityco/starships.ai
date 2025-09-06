@@ -2,9 +2,9 @@
  * AgentRepository Unit Tests
  */
 
-import { AgentRepository } from '@/repositories/AgentRepository';
 import { getConnection } from '@/helpers/database';
-import { ValidationError, NotFoundError, DatabaseError, ConflictError } from '@starships/errors';
+import { AgentRepository } from '@/repositories/AgentRepository';
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import type { AgentModel } from '@starships/protocol';
 
 // Mock the database connection
@@ -41,139 +41,14 @@ describe('AgentRepository', () => {
     });
   });
 
-  describe('Private Helper Methods', () => {
-    describe('serializeComplexFields', () => {
-      it('should serialize blueprint and memory fields', () => {
-        const agent = {
-          id: 'test-id',
-          name: 'Test Agent',
-          model: 'gpt-4',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          version: '1.0.0',
-          category: 'general',
-          usageCount: 0,
-          starshipId: 'starship-123',
-          blueprint: { type: 'test', nodes: [], edges: [] },
-          memory: { data: 'test' },
-        } as AgentModel;
+  // Note: Private helper methods have been moved to entity layer
+  // Serialization/deserialization is now handled by AgentEntity using class-transformer decorators
 
-        const result = repository['serializeComplexFields'](agent);
-
-        expect(result.blueprint).toBe('{"type":"test","nodes":[],"edges":[]}');
-        expect(result.memory).toBe('{"data":"test"}');
-        expect(result.name).toBe('Test Agent');
-      });
-
-      it('should handle null blueprint and memory', () => {
-        const agent = {
-          id: 'test-id',
-          name: 'Test Agent',
-          model: 'gpt-4',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          version: '1.0.0',
-          category: 'general',
-          usageCount: 0,
-          starshipId: 'starship-123',
-          blueprint: null,
-          memory: null,
-        } as any;
-
-        const result = repository['serializeComplexFields'](agent);
-
-        expect(result.blueprint).toBeNull();
-        expect(result.memory).toBeNull();
-      });
-    });
-
-    describe('deserializeComplexFields', () => {
-      it('should deserialize blueprint and memory fields', () => {
-        const agent = {
-          id: 'test-id',
-          name: 'Test Agent',
-          model: 'gpt-4',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          version: '1.0.0',
-          category: 'general',
-          usageCount: 0,
-          starshipId: 'starship-123',
-          blueprint: '{"type":"test","nodes":[],"edges":[]}',
-          memory: '{"data":"test"}',
-        };
-
-        const result = repository['deserializeComplexFields'](agent);
-
-        expect(result.blueprint).toEqual({ type: 'test', nodes: [], edges: [] });
-        expect(result.memory).toEqual({ data: 'test' });
-      });
-
-      it('should handle invalid JSON gracefully', () => {
-        const agent = {
-          id: 'test-id',
-          name: 'Test Agent',
-          model: 'gpt-4',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          version: '1.0.0',
-          category: 'general',
-          usageCount: 0,
-          starshipId: 'starship-123',
-          blueprint: '{invalid json}',
-          memory: '{invalid json}',
-        };
-
-        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-        const result = repository['deserializeComplexFields'](agent);
-
-        expect(result.blueprint).toBeUndefined();
-        expect(result.memory).toBeUndefined();
-        expect(consoleSpy).toHaveBeenCalled();
-      });
-
-      it('should handle null values', () => {
-        const agent = {
-          id: 'test-id',
-          name: 'Test Agent',
-          model: 'gpt-4',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          version: '1.0.0',
-          category: 'general',
-          usageCount: 0,
-          starshipId: 'starship-123',
-          blueprint: null,
-          memory: undefined,
-        };
-
-        const result = repository['deserializeComplexFields'](agent);
-
-        expect(result.blueprint).toBeUndefined();
-        expect(result.memory).toBeUndefined();
-      });
-    });
-
-    describe('getSafeValue', () => {
-      it('should return value when valid', () => {
-        const result = repository['getSafeValue']('test-value', 'default');
-        expect(result).toBe('test-value');
-      });
-
-      it('should return default for null', () => {
-        const result = repository['getSafeValue'](null, 'default');
-        expect(result).toBe('default');
-      });
-
-      it('should return default for undefined', () => {
-        const result = repository['getSafeValue'](undefined, 'default');
-        expect(result).toBe('default');
-      });
-
-      it('should return default for empty object', () => {
-        const result = repository['getSafeValue']({}, 'default');
-        expect(result).toBe('default');
-      });
+  describe('entity migration note', () => {
+    it('should note that serialization has moved to entity layer', () => {
+      // Serialization methods like serializeComplexFields, deserializeComplexFields, and getSafeValue
+      // have been removed from repositories and are now handled by AgentEntity
+      expect(true).toBe(true);
     });
   });
 

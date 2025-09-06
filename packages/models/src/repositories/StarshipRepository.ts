@@ -1,3 +1,4 @@
+import { StarshipEntity } from '@/entities/StarshipEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel } from '@starships/protocol';
@@ -6,18 +7,6 @@ import { StarshipModel } from '@starships/protocol';
 export class StarshipRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
     super('StarshipRepository', connection);
-  }
-
-  /** Validate UUID format */
-  private validateUUID(id: string, fieldName: string): void {
-    if (!id || typeof id !== 'string') {
-      this.handleValidationError([{ field: fieldName, message: `${fieldName} is required and must be a string` }]);
-    }
-
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(id)) {
-      this.handleValidationError([{ field: fieldName, message: `${fieldName} must be a valid UUID format` }]);
-    }
   }
 
   async findAll(): Promise<StarshipModel[]> {
@@ -47,8 +36,6 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async findBySlug(slug: string, ownerId: string): Promise<StarshipModel | null> {
-    this.validateRequired({ slug, ownerId }, ['slug', 'ownerId'], 'findBySlug');
-
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
@@ -56,7 +43,8 @@ export class StarshipRepository extends BaseRepository {
           'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId RETURN s',
           { slug, ownerId }
         );
-        return result[0]?.s || null;
+        const starship = result[0]?.s || null;
+        return starship ? StarshipEntity.deserialize(starship) : null;
       },
       'findBySlug',
       'Starship',
@@ -65,8 +53,6 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async findByOwner(ownerId: string): Promise<StarshipModel[]> {
-    this.validateRequired({ ownerId }, ['ownerId'], 'findByOwner');
-
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
@@ -74,7 +60,7 @@ export class StarshipRepository extends BaseRepository {
           'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
           { ownerId }
         );
-        return result.map((record) => record.s);
+        return result.map((record) => StarshipEntity.deserialize(record.s));
       },
       'findByOwner',
       'Starship'
@@ -136,10 +122,11 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async update(id: string, updates: Partial<StarshipModel>): Promise<StarshipModel | null> {
-    this.validateRequired({ id }, ['id'], 'update');
-
     return this.executeWithErrorHandling(
       async () => {
+        // Use lean validation from StarshipEntity for updates
+        await StarshipEntity.validate(updates, 'update');
+
         const connection = this.getConnection();
 
         // Handle slug updates
@@ -160,7 +147,8 @@ export class StarshipRepository extends BaseRepository {
           { id, updates: updateProps }
         );
 
-        return result[0]?.s || null;
+        const starship = result[0]?.s || null;
+        return starship ? StarshipEntity.deserialize(starship) : null;
       },
       'update',
       'Starship',
@@ -169,8 +157,6 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    this.validateRequired({ id }, ['id'], 'delete');
-
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();

@@ -1,3 +1,4 @@
+import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { Neo4jConnection, convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { AgentMemoryState } from '@starships/autopilot';
@@ -23,24 +24,15 @@ export class AgentTemplateRepository extends BaseRepository {
    * Helper to deserialize template from Neo4j format back to AgentTemplateModel
    */
   private deserializeTemplate(rawTemplate: any): AgentTemplateModel {
-    return {
-      ...rawTemplate,
-      memory: rawTemplate.memory ? JSON.parse(rawTemplate.memory) : undefined,
-      blueprint: rawTemplate.blueprint ? JSON.parse(rawTemplate.blueprint) : undefined,
-    };
+    return AgentTemplateEntity.deserialize(rawTemplate);
   }
 
   /**
    * Helper to serialize template for Neo4j storage
    */
   private serializeTemplate(template: any): any {
-    // Exclude complex objects first, then add serialized versions
-    const { memory, blueprint, ...primitiveFields } = template;
-    return {
-      ...primitiveFields,
-      memory: memory ? JSON.stringify(memory) : null,
-      blueprint: blueprint ? JSON.stringify(blueprint) : null,
-    };
+    const entity = AgentTemplateEntity.deserialize(template);
+    return entity.serialize();
   }
 
   async findAll(): Promise<AgentTemplateModel[]> {
@@ -63,7 +55,9 @@ export class AgentTemplateRepository extends BaseRepository {
   async findById(id: string): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ id }, ['id'], 'findById');
+        if (!id?.trim()) {
+          throw new Error('ID is required for findById operation');
+        }
 
         const query = `
         MATCH (t:AgentTemplate {id: $id})
@@ -91,7 +85,8 @@ export class AgentTemplateRepository extends BaseRepository {
         console.log('[Repository] Entity memory type:', typeof entity.memory);
         console.log('[Repository] Entity blueprint type:', typeof entity.blueprint);
 
-        this.validateRequired(entity, ['name', 'description'], 'create');
+        // Use entity validation instead of old validateRequired method
+        await AgentTemplateEntity.validate(entity, 'create');
 
         const now = new Date().toISOString();
 
@@ -144,7 +139,12 @@ export class AgentTemplateRepository extends BaseRepository {
   async update(id: string, updates: Partial<AgentTemplateModel>): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ id }, ['id'], 'update');
+        if (!id?.trim()) {
+          throw new Error('ID is required for update operation');
+        }
+
+        // Use entity validation for updates
+        await AgentTemplateEntity.validate(updates, 'update');
 
         // Serialize complex objects in updates
         const serializedUpdates = this.serializeTemplate(updates);
@@ -182,7 +182,9 @@ export class AgentTemplateRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ id }, ['id'], 'delete');
+        if (!id?.trim()) {
+          throw new Error('ID is required for delete operation');
+        }
 
         const query = `
         MATCH (t:AgentTemplate {id: $id})
@@ -202,7 +204,9 @@ export class AgentTemplateRepository extends BaseRepository {
   async findByAuthor(authorId: string): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ authorId }, ['authorId'], 'findByAuthor');
+        if (!authorId?.trim()) {
+          throw new Error('Author ID is required for findByAuthor operation');
+        }
 
         const query = `
         MATCH (t:AgentTemplate {authorId: $authorId})
@@ -221,7 +225,9 @@ export class AgentTemplateRepository extends BaseRepository {
   async findByCategory(category: string): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ category }, ['category'], 'findByCategory');
+        if (!category?.trim()) {
+          throw new Error('Category is required for findByCategory operation');
+        }
 
         const query = `
         MATCH (t:AgentTemplate {category: $category})
@@ -241,19 +247,8 @@ export class AgentTemplateRepository extends BaseRepository {
   async findByTags(tags: string[]): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ tags }, ['tags'], 'findByTags');
-
         if (!Array.isArray(tags) || tags.length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'tags',
-                message: 'Tags must be a non-empty array',
-                value: tags,
-              },
-            ],
-            'findByTags'
-          );
+          throw new Error('Tags must be a non-empty array');
         }
 
         const query = `
@@ -275,29 +270,11 @@ export class AgentTemplateRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         if (limit < 1 || limit > 100) {
-          this.handleValidationError(
-            [
-              {
-                field: 'limit',
-                message: 'Limit must be between 1 and 100',
-                value: limit,
-              },
-            ],
-            'findPublic'
-          );
+          throw new Error('Limit must be between 1 and 100');
         }
 
         if (offset < 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'offset',
-                message: 'Offset must be non-negative',
-                value: offset,
-              },
-            ],
-            'findPublic'
-          );
+          throw new Error('Offset must be non-negative');
         }
 
         const query = `
@@ -322,8 +299,13 @@ export class AgentTemplateRepository extends BaseRepository {
   async searchTemplates(query: string): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ query }, ['query'], 'searchTemplates');
-        this.validateStringLengths({ query }, { query: { min: 1, max: 200 } }, 'searchTemplates');
+        if (!query?.trim()) {
+          throw new Error('Search query is required');
+        }
+
+        if (query.length > 200) {
+          throw new Error('Search query cannot exceed 200 characters');
+        }
 
         const searchQuery = `
         MATCH (t:AgentTemplate)
@@ -354,7 +336,9 @@ export class AgentTemplateRepository extends BaseRepository {
   async incrementUsageCount(id: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ id }, ['id'], 'incrementUsageCount');
+        if (!id?.trim()) {
+          throw new Error('ID is required for incrementUsageCount operation');
+        }
 
         const query = `
         MATCH (t:AgentTemplate {id: $id})
@@ -372,19 +356,12 @@ export class AgentTemplateRepository extends BaseRepository {
   async updateRating(id: string, rating: number): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ id, rating }, ['id', 'rating'], 'updateRating');
+        if (!id?.trim()) {
+          throw new Error('ID is required for updateRating operation');
+        }
 
         if (typeof rating !== 'number' || rating < 0 || rating > 5) {
-          this.handleValidationError(
-            [
-              {
-                field: 'rating',
-                message: 'Rating must be a number between 0 and 5',
-                value: rating,
-              },
-            ],
-            'updateRating'
-          );
+          throw new Error('Rating must be a number between 0 and 5');
         }
 
         const query = `
@@ -459,7 +436,9 @@ export class AgentTemplateRepository extends BaseRepository {
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ agentId }, ['agentId'], 'createTemplateFromAgent');
+        if (!agentId?.trim()) {
+          throw new Error('Agent ID is required for createTemplateFromAgent operation');
+        }
 
         // First get the agent
         const query = `

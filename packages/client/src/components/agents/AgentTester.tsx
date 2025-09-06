@@ -38,10 +38,10 @@ interface TestResult {
 export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const { toast } = useToast()
 
-  // Socket.IO has been removed
+  // Real-time connection is not implemented
   const isConnected = false
   const connectionStatus = 'disconnected' as const
-  const connectionError = 'Socket.IO functionality has been removed'
+  const connectionError = 'Real-time communication is not yet implemented'
 
   // Typewriter effect
   const typewriter = useTypewriter({
@@ -101,11 +101,11 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const sendMessage = async (messageContent: string) => {
     if (!messageContent.trim() || loading) return
 
-    // Socket.IO has been removed - show placeholder
-    setError('Real-time agent testing is currently unavailable. Socket.IO functionality has been removed.')
+    // Real-time testing not yet implemented
+    setError('Real-time agent testing is currently unavailable.')
     toast({
       title: 'Feature Unavailable',
-      description: 'Real-time agent testing has been removed with Socket.IO.',
+      description: 'Real-time agent testing is not yet implemented.',
       variant: 'destructive',
     })
     return
@@ -176,7 +176,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
   const runTestCase = async (testCase: TestCase) => {
     toast({
       title: 'Feature Unavailable',
-      description: 'Test case execution has been removed with Socket.IO.',
+      description: 'Test case execution is not yet implemented.',
       variant: 'destructive',
     })
     return

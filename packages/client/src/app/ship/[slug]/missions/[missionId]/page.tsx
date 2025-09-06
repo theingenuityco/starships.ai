@@ -181,8 +181,7 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
     setMission((prev: ClientMissionModel | null) => (prev ? { ...prev, phase: MISSION_PHASES.CONVERSE } : null))
   }
 
-  // Socket.IO functionality has been removed
-  // Real-time updates are no longer available
+  // Real-time updates are not yet implemented
 
   // Fetch agent details
   const loadAgents = async (agentIds: string[]) => {

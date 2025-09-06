@@ -1,7 +1,8 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import type { AgentModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
+import { z, ZodError } from 'zod';
 import { AgentService } from '../services/AgentService';
 import {
   createPaginationMeta,
@@ -14,29 +15,104 @@ import {
 
 const router: Router = Router();
 
+// Zod schemas for validation
+const UuidSchema = z.string().uuid('Invalid UUID format');
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
+
+const CreateAgentSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
+  description: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  category: z.enum(['general', 'coding', 'creative', 'analysis', 'support']).optional(),
+  tags: z.array(z.string()).optional(),
+  isPublic: z.boolean().optional(),
+  model: z.string().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().min(1).optional(),
+  timeout: z.number().min(1000).optional(),
+  starshipId: z.string().uuid('Invalid starship ID'),
+});
+
+const UpdateAgentSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  description: z.string().optional(),
+  systemPrompt: z.string().optional(),
+  category: z.enum(['general', 'coding', 'creative', 'analysis', 'support']).optional(),
+  tags: z.array(z.string()).optional(),
+  isPublic: z.boolean().optional(),
+  model: z.string().optional(),
+  temperature: z.number().min(0).max(2).optional(),
+  maxTokens: z.number().min(1).optional(),
+  timeout: z.number().min(1000).optional(),
+  starshipId: z.string().uuid('Invalid starship ID').optional(),
+});
+
+const RatingSchema = z.object({
+  rating: z.number().int().min(1).max(5, 'Rating must be between 1 and 5'),
+});
+
+const StarshipAssignmentSchema = z.object({
+  starshipId: z.string().uuid('Invalid starship ID'),
+});
+
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
+
+// Helper function for authentication check
+const checkAuth = (req: Request, res: Response): boolean => {
+  const user = req.user;
+  if (!user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return false;
+  }
+  return true;
+};
+
 // POST /agents/:id/ratings - Rate agent (OpenAPI pattern)
 router.post('/agents/:id/ratings', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isValid, error } = validateUUID(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    const { rating } = req.body;
+    // Validate agent ID parameter
+    const paramValidation = validateData(z.object({ id: UuidSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
 
-    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-      sendError(res, 'VALIDATION_ERROR', 'Rating must be a number between 1 and 5', 400, {
-        field: 'rating',
-        constraint: 'range_1_to_5',
-        provided: rating,
-      });
-      return;
-    }
+    // Validate request body
+    const bodyValidation = validateData(RatingSchema, req.body, res, 'rating data');
+    if (!bodyValidation) return;
+
+    const { id } = paramValidation;
+    const { rating } = bodyValidation;
 
     // Delegate to service layer
     const agentService = new AgentService();
-    await agentService.rateAgent(req.params.id, rating);
+    await agentService.rateAgent(id, rating);
     sendSuccess(res, { message: 'Agent rated successfully' }, 201);
   } catch (error) {
     if (!handleCommonError(error, res, 'rating agent')) {
@@ -69,30 +145,19 @@ router.post('/agents/:id/usage', jwtAuthMiddleware, async (req: Request, res: Re
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
 router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id: agentId } = req.params;
-    const { starshipId } = req.body;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    // Validate agent ID
-    const { isValid: agentIdValid, error: agentIdError } = validateUUID(agentId, 'id');
-    if (!agentIdValid && agentIdError) {
-      sendError(res, agentIdError.code, agentIdError.message, 400, agentIdError.details);
-      return;
-    }
+    // Validate agent ID parameter
+    const paramValidation = validateData(z.object({ id: UuidSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
 
-    if (!starshipId) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'starshipId is required', 400, {
-        field: 'starshipId',
-        description: 'starshipId is required to update agent starship assignment',
-      });
-      return;
-    }
+    // Validate request body
+    const bodyValidation = validateData(StarshipAssignmentSchema, req.body, res, 'starship assignment data');
+    if (!bodyValidation) return;
 
-    // Validate starshipId format
-    const { isValid: starshipValid, error: starshipError } = validateUUID(starshipId, 'starshipId');
-    if (!starshipValid && starshipError) {
-      sendError(res, starshipError.code, starshipError.message, 400, starshipError.details);
-      return;
-    }
+    const { id: agentId } = paramValidation;
+    const { starshipId } = bodyValidation;
 
     // TODO: Add validation to ensure starshipId references valid, accessible starship
     // TODO: Add validation to ensure user owns the agent and/or has access to the starship
@@ -462,58 +527,31 @@ router.get('/agents/search', jwtAuthMiddleware, async (req: Request, res: Respon
 // POST /agents - Create new agent (OpenAPI pattern)
 router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id;
-    const createRequest = req.body as CreateAgentRequest & { starshipId: string };
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+    // Validate request body
+    const bodyValidation = validateData(CreateAgentSchema, req.body, res, 'agent creation data');
+    if (!bodyValidation) return;
 
-    // Validate required fields
-    if (!createRequest.starshipId) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'starshipId is required', 400, {
-        field: 'starshipId',
-        description: 'All agents must be assigned to a starship. Please provide a valid starshipId.',
-      });
-      return;
-    }
-
-    if (!createRequest.name) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'name is required', 400, {
-        field: 'name',
-      });
-      return;
-    }
-
-    // Validate starshipId format
-    const { isValid, error } = validateUUID(createRequest.starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const userId = req.user!.id;
 
     // TODO: Add validation to ensure starshipId references valid, accessible starship
 
-    // Add user ID from auth context
+    // Add user ID from auth context and provide defaults
     const agentData = {
-      ...createRequest,
+      ...bodyValidation,
       authorId: userId, // Override with authenticated user ID
-      starshipId: createRequest.starshipId,
+      category: bodyValidation.category || 'general', // Default category
+      model: bodyValidation.model || 'gpt-3.5-turbo', // Default model
+      timeout: bodyValidation.timeout || 30000,
+      version: '1.0.0', // Default version for all new agents
     };
 
     console.log(`[AGENTS] Creating agent with authorId: ${agentData.authorId}, starshipId: ${agentData.starshipId} for user: ${userId}`);
 
     const agentService = new AgentService();
-
-    // Provide defaults for core AgentNodeParameters fields
-    const agentDataWithDefaults = {
-      ...agentData,
-      timeout: agentData.timeout || 30000,
-      version: '1.0.0', // Default version for all new agents
-    };
-
-    const agent = await agentService.createAgentModel(agentDataWithDefaults);
+    const agent = await agentService.createAgentModel(agentData);
     console.log(`[AGENTS] Agent created successfully: ${agent.id}, authorId: ${agent.authorId}`);
 
     sendSuccess(res, agent, 201);
@@ -527,30 +565,30 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
 // PUT /agents/:id - Update agent (OpenAPI pattern)
 router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isValid, error } = validateUUID(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    const updates = req.body as UpdateAgentRequest & { starshipId?: string };
+    // Validate agent ID parameter
+    const paramValidation = validateData(z.object({ id: UuidSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
 
-    // Validate starshipId format if being updated
-    if (updates.starshipId !== undefined) {
-      const { isValid: starshipValid, error: starshipError } = validateUUID(updates.starshipId, 'starshipId');
-      if (!starshipValid && starshipError) {
-        sendError(res, starshipError.code, starshipError.message, 400, starshipError.details);
-        return;
-      }
-      console.log(`[AGENTS] Updating agent ${req.params.id} with new starshipId: ${updates.starshipId}`);
+    // Validate request body
+    const bodyValidation = validateData(UpdateAgentSchema, req.body, res, 'agent update data');
+    if (!bodyValidation) return;
+
+    const { id } = paramValidation;
+    const updates = bodyValidation;
+
+    if (updates.starshipId) {
+      console.log(`[AGENTS] Updating agent ${id} with new starshipId: ${updates.starshipId}`);
     }
 
     const agentService = new AgentService();
-    const agent = await agentService.updateAgentModel(req.params.id, updates);
+    const agent = await agentService.updateAgentModel(id, updates as any);
     if (!agent) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
         resource: 'agent',
-        id: req.params.id,
+        id: id,
       });
       return;
     }

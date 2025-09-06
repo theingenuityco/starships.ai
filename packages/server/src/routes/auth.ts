@@ -12,7 +12,8 @@ import { StarshipRepository } from '@starships/models';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { SignJWT, jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
+import { z, ZodError } from 'zod';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -22,24 +23,54 @@ const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-sec
 const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
 
+// Zod schemas for validation
+const RegisterSchema = z.object({
+  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(255, 'Password must be less than 255 characters'),
+  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').optional(),
+});
+
+const LoginSchema = z.object({
+  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+  password: z.string().min(1, 'Password is required').max(255, 'Password must be less than 255 characters'),
+});
+
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
+
 /**
  * Register new user
  * POST /auth/register
  */
 router.post('/auth/register', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password, name } = req.body;
+    // Validate request body
+    const bodyValidation = validateData(RegisterSchema, req.body, res, 'registration data');
+    if (!bodyValidation) return;
 
-    // Validation
-    if (!email || !password) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'Email and password are required', 400);
-      return;
-    }
-
-    if (password.length < 8) {
-      sendError(res, 'VALIDATION_ERROR', 'Password must be at least 8 characters', 400);
-      return;
-    }
+    const { email, password, name } = bodyValidation;
 
     // Check if user exists
     const existingUser = await UserService.getUserByEmail(email);
@@ -142,13 +173,11 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
  */
 router.post('/auth/login', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    // Validate request body
+    const bodyValidation = validateData(LoginSchema, req.body, res, 'login data');
+    if (!bodyValidation) return;
 
-    // Validation
-    if (!email || !password) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'Email and password are required', 400);
-      return;
-    }
+    const { email, password } = bodyValidation;
 
     // Get user with password
     const user = await UserService.getUserByEmailWithPassword(email);

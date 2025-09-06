@@ -41,6 +41,16 @@ export class MissionRepository extends BaseRepository {
         // Validate using Entity
         await MissionEntity.validate(missionData, 'create');
 
+        // Check if starship exists
+        const connection = getConnection();
+        const starshipResult = await connection.executeQuery('MATCH (s:Starship {id: $starshipId}) RETURN s.id as id', {
+          starshipId: request.starshipId,
+        });
+
+        if (!starshipResult || starshipResult.length === 0) {
+          this.handleNotFound('Starship', request.starshipId, 'createMission');
+        }
+
         // Transform using Entity
         const missionEntity = MissionEntity.deserialize(missionData);
 

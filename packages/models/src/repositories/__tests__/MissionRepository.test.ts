@@ -66,12 +66,15 @@ describe('MissionRepository', () => {
         phase: 'welcome',
         agentIds: ['agent-1', 'agent-2'],
         createdBy: 'user-123',
+        approvalStatus: 'pending',
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       };
 
-      mockConnection.executeQuery.mockResolvedValue([{ id: 'starship-123' }]); // Starship exists
-      mockConnection.executeWrite.mockResolvedValue([{ n: createdMission }]); // createEntityWithAutoId format
+      // Mock starship existence check
+      mockConnection.executeQuery.mockResolvedValue([{ id: 'starship-123' }]);
+      // Mock the actual creation
+      mockConnection.executeWrite.mockResolvedValue([{ n: createdMission }]);
 
       const result = await repository.createMission(validRequest, 'user-123');
 
@@ -94,6 +97,7 @@ describe('MissionRepository', () => {
     it('should validate field types', async () => {
       const invalidRequest = { ...validRequest, name: 123 } as any;
 
+      // Don't mock starship check since validation should fail first
       await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(DatabaseError);
     });
 
@@ -106,6 +110,7 @@ describe('MissionRepository', () => {
     it('should validate agentIds is array', async () => {
       const invalidRequest = { ...validRequest, agentIds: 'not-array' } as any;
 
+      // Don't mock starship check since validation should fail first
       await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(DatabaseError);
     });
 
@@ -317,8 +322,13 @@ describe('MissionRepository', () => {
     };
 
     it('should update mission successfully', async () => {
-      mockConnection.executeQuery.mockResolvedValue([{ m: mockMission }]); // Mission exists
-      mockConnection.executeWrite.mockResolvedValue([{ m: mockMission }]);
+      const updatedMission = {
+        ...mockMission,
+        name: 'Updated Mission',
+        status: 'active',
+      };
+
+      mockConnection.executeWrite.mockResolvedValue([{ m: updatedMission }]);
 
       const updates: UpdateMissionRequest = {
         name: 'Updated Mission',
@@ -349,11 +359,29 @@ describe('MissionRepository', () => {
 
     it('should require at least one update field', async () => {
       // The repository now handles empty updates by returning the existing mission
-      mockConnection.executeQuery.mockResolvedValue([{ m: { id: 'mission-123', name: 'Test' } }]);
-      jest.spyOn(repository, 'getMissionById').mockResolvedValue({ id: 'mission-123', name: 'Test' } as any);
+      const existingMission = {
+        id: 'mission-123',
+        name: 'Test Mission',
+        status: 'draft',
+        phase: 'welcome',
+        agentIds: ['agent-1'],
+        createdBy: 'user-123',
+        approvalStatus: 'pending',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+        starshipId: 'starship-123',
+        description: 'Test Description',
+      } as any;
+
+      mockConnection.executeQuery.mockResolvedValue([{ m: existingMission }]);
 
       const result = await repository.updateMission('mission-123', {});
-      expect(result).toEqual({ id: 'mission-123', name: 'Test' });
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'mission-123',
+          name: 'Test Mission',
+        })
+      );
     });
 
     it('should validate mission status', async () => {

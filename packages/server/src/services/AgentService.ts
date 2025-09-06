@@ -163,6 +163,172 @@ export class AgentService {
   }
 
   // ============================================================================
+  // AGENT DATA MANAGEMENT APIs (for Routes Layer)
+  // ============================================================================
+
+  /**
+   * Create a new agent and return as AgentModel (for routes layer)
+   */
+  async createAgentModel(request: CreateAgentRequest & { authorId: string }): Promise<AgentModel> {
+    // Create agent with default blueprint and memory if none provided
+    const agentData = {
+      ...request,
+      blueprint: request.blueprint || this.createDefaultBlueprint(request),
+      memory: request.memory || this.createDefaultMemoryConfig(request),
+      timeout: request.timeout || 30000,
+      version: '1.0.0', // Default version for all new agents
+    };
+
+    // Entity validation and transformation is now handled in the repository layer
+    return await this.agentRepository.create(agentData);
+  }
+
+  /**
+   * Get agent by ID as AgentModel (for routes layer)
+   */
+  async getAgentModel(agentId: string): Promise<AgentModel | null> {
+    return await this.agentRepository.findById(agentId);
+  }
+
+  /**
+   * Update agent and return as AgentModel (for routes layer)
+   */
+  async updateAgentModel(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
+    // Validate blueprint if being updated
+    if (updates.blueprint) {
+      const validation = this.validateBlueprint(updates.blueprint);
+      if (!validation.valid) {
+        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
+      }
+    }
+
+    return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
+  }
+
+  /**
+   * Get agents by starship as AgentModel array (for routes layer)
+   */
+  async getAgentModelsByStarship(starshipId: string): Promise<AgentModel[]> {
+    return await this.agentRepository.findByStarshipId(starshipId);
+  }
+
+  /**
+   * Get agents by user as AgentModel array (for routes layer)
+   */
+  async getAgentModelsByUser(userId: string): Promise<AgentModel[]> {
+    return await this.agentRepository.findByAuthor(userId);
+  }
+
+  /**
+   * Get agents by category as AgentModel array (for routes layer)
+   */
+  async getAgentModelsByCategory(category: string): Promise<AgentModel[]> {
+    return await this.agentRepository.findByCategory(category);
+  }
+
+  /**
+   * Get public agents as AgentModel array (for routes layer)
+   */
+  async getPublicAgentModels(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
+    return await this.agentRepository.findPublic(limit, offset);
+  }
+
+  /**
+   * Search agents and return as AgentModel array (for routes layer)
+   */
+  async searchAgentModels(query: string): Promise<AgentModel[]> {
+    return await this.agentRepository.searchAgents(query);
+  }
+
+  /**
+   * Get agents with filters as AgentModel array (for routes layer)
+   */
+  async getAgentModelsWithFilters(filters: {
+    category?: string;
+    tags?: string[];
+    isPublic?: boolean;
+    authorId?: string;
+    starshipClass?: 'scout' | 'cruiser';
+  }): Promise<AgentModel[]> {
+    return await this.agentRepository.findWithFilters(filters);
+  }
+
+  /**
+   * Rate an agent (for routes layer)
+   */
+  async rateAgent(agentId: string, rating: number): Promise<void> {
+    // Business validation
+    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
+      throw new ValidationError('Rating must be a number between 1 and 5', 'rating');
+    }
+
+    // Check if agent exists first
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+    }
+
+    await this.agentRepository.updateRating(agentId, rating);
+  }
+
+  /**
+   * Track agent usage (for routes layer)
+   */
+  async trackAgentUsage(agentId: string): Promise<void> {
+    // Check if agent exists first
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+    }
+
+    await this.agentRepository.incrementUsageCount(agentId);
+  }
+
+  /**
+   * Update agent starship assignment (for routes layer)
+   */
+  async updateAgentStarship(agentId: string, starshipId: string): Promise<AgentModel | null> {
+    // Check if agent exists first
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+    }
+
+    // TODO: Add business validation for starship existence and user access
+    return await this.agentRepository.update(agentId, { starshipId } as Partial<AgentModel>);
+  }
+
+  /**
+   * Get agent analytics (for routes layer)
+   */
+  async getAgentAnalytics(agentId: string): Promise<{
+    id: string;
+    name: string;
+    usageCount: number;
+    rating: number;
+    createdAt: string;
+    updatedAt: string;
+    category: string;
+    isPublic: boolean;
+  } | null> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      return null;
+    }
+
+    return {
+      id: agent.id,
+      name: agent.name,
+      usageCount: agent.usageCount || 0,
+      rating: (agent as any).rating || 0,
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+      category: agent.category,
+      isPublic: agent.isPublic || false,
+    };
+  }
+
+  // ============================================================================
   // AGENT EXECUTION APIs
   // ============================================================================
 

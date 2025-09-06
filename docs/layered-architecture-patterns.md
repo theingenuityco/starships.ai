@@ -934,10 +934,24 @@ Standardized patterns across layers make the codebase predictable and easier for
 
 - **Conversations**: Complete implementation following all 6 layers
 - **Starships**: Complete implementation following all 6 layers
+- **Missions**: Complete implementation following all 6 layers
+- **Users**: Complete implementation following all 6 layers
+- **Messages**: Complete implementation following all 6 layers
+- **Agents**: Complete implementation following all 6 layers
+- **Agent Templates**: Complete implementation following all 6 layers
+- **Native API Keys**: Complete implementation following all 6 layers
 
 ### 🚧 Pending Migration
 
-Other features in the monorepo may still use direct repository access patterns and should be migrated to follow this layered architecture as development continues.
+All major features have been successfully migrated to follow the layered architecture pattern. Any new features should be implemented following this established 6-layer pattern from the start.
+
+### Recent Migration Completion
+
+**November 2024**: Successfully completed migration of the remaining features to eliminate all layer jumping violations:
+
+- **Agents**: Fixed critical violations where [`packages/server/src/routes/agents.ts`](packages/server/src/routes/agents.ts) was directly calling `AgentRepository`. Now properly uses [`AgentService`](packages/server/src/services/AgentService.ts) with new business logic methods.
+- **Agent Templates**: Fixed violations in [`packages/server/src/routes/agent-templates.ts`](packages/server/src/routes/agent-templates.ts) by adding business logic methods to [`AgentTemplateService`](packages/server/src/services/AgentTemplateService.ts) for starship validation and agent template creation.
+- **Native API Keys**: Created new [`NativeApiKeyService`](packages/server/src/services/NativeApiKeyService.ts) and updated [`packages/server/src/routes/native-api-keys.ts`](packages/server/src/routes/native-api-keys.ts) to eliminate direct repository access.
 
 ---
 

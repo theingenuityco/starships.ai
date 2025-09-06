@@ -1,16 +1,14 @@
-import { Router } from 'express';
-import { StarshipRepository, AgentRepository } from '@starships/models';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { Request, Response } from 'express';
-import { getConnection } from '@starships/models';
 import { AgentTemplateService } from '@/services/AgentTemplateService';
+import { getConnection } from '@starships/models';
+import { Request, Response, Router } from 'express';
 import {
-  sendSuccess,
-  sendError,
-  handleCommonError,
-  validateUUID,
-  validatePagination,
   createPaginationMeta,
+  handleCommonError,
+  sendError,
+  sendSuccess,
+  validatePagination,
+  validateUUID,
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -144,11 +142,7 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     // If no starshipId provided, get user's first active starship as fallback
     if (!targetStarshipId) {
       try {
-        const starshipRepository = new StarshipRepository();
-        const userStarships = await starshipRepository.findByOwner(userId);
-
-        // Find the first active starship
-        const activeStarship = userStarships.find((ship) => ship.status === 'active');
+        const activeStarship = await templateService.findUserActiveStarship(userId);
 
         if (!activeStarship) {
           sendError(res, 'VALIDATION_ERROR', 'No starship specified and no active starships found', 400, {
@@ -174,32 +168,26 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
         return;
       }
 
-      // Validate provided starshipId exists and belongs to user
+      // Validate provided starshipId exists and belongs to user using service layer
       try {
-        const starshipRepository = new StarshipRepository();
-        const starship = await starshipRepository.findById(targetStarshipId);
-
-        if (!starship) {
+        const starship = await templateService.validateStarshipAccess(targetStarshipId, userId);
+        console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${targetStarshipId}) for agent creation`);
+      } catch (starshipError: any) {
+        console.error('[TEMPLATE] Error validating starship:', starshipError);
+        if (starshipError?.name === 'NotFoundError') {
           sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
             resource: 'starship',
             id: targetStarshipId,
           });
-          return;
-        }
-
-        if (starship.ownerId !== userId) {
+        } else if (starshipError?.name === 'ValidationError') {
           sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
             details: 'You do not have permission to create agents on this starship',
           });
-          return;
+        } else {
+          sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate starship', 500, {
+            details: 'Could not verify starship ownership and existence',
+          });
         }
-
-        console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${targetStarshipId}) for agent creation`);
-      } catch (starshipError) {
-        console.error('[TEMPLATE] Error validating starship:', starshipError);
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate starship', 500, {
-          details: 'Could not verify starship ownership and existence',
-        });
         return;
       }
     }
@@ -246,40 +234,33 @@ router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (r
       return;
     }
 
-    // Check if agent exists and is public
-    console.log('[TEMPLATE] Getting agent repository...');
-    const agentRepository = new AgentRepository();
-    console.log('[TEMPLATE] Finding agent by ID:', agentId);
-    const agent = await agentRepository.findById(agentId);
-
-    if (!agent) {
-      console.log('[TEMPLATE] Error: Agent not found:', agentId);
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        id: agentId,
-      });
-      return;
-    }
-
-    console.log('[TEMPLATE] Agent found:', agent.id, agent.name, 'isPublic:', agent.isPublic);
-
-    if (!agent.isPublic) {
-      console.log('[TEMPLATE] Error: Agent is not public');
-      sendError(res, 'VALIDATION_ERROR', 'Only public agents can be converted to templates', 400, {
-        field: 'isPublic',
-        constraint: 'must_be_public',
-        provided: agent.isPublic,
-      });
-      return;
-    }
-
-    // Check if user is the author of the agent
-    console.log('[TEMPLATE] Checking author:', agent.authorId, 'vs user:', userId);
-    if (agent.authorId !== userId) {
-      console.log('[TEMPLATE] Error: User is not the author of the agent');
-      sendError(res, 'ACCESS_DENIED', 'Access denied', 403, {
-        details: 'You can only convert your own agents to templates',
-      });
+    // Validate agent using service layer
+    console.log('[TEMPLATE] Validating agent for template conversion...');
+    let agent;
+    try {
+      agent = await templateService.validateAgentForTemplate(agentId, userId);
+      console.log('[TEMPLATE] Agent validated:', agent.id, agent.name, 'isPublic:', agent.isPublic);
+    } catch (agentError: any) {
+      console.error('[TEMPLATE] Agent validation failed:', agentError);
+      if (agentError?.name === 'NotFoundError') {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
+          resource: 'agent',
+          id: agentId,
+        });
+      } else if (agentError?.name === 'ValidationError') {
+        if (agentError?.message?.includes('public')) {
+          sendError(res, 'VALIDATION_ERROR', 'Only public agents can be converted to templates', 400, {
+            field: 'isPublic',
+            constraint: 'must_be_public',
+          });
+        } else {
+          sendError(res, 'ACCESS_DENIED', 'Access denied', 403, {
+            details: 'You can only convert your own agents to templates',
+          });
+        }
+      } else {
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate agent', 500);
+      }
       return;
     }
 

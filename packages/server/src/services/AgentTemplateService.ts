@@ -1,13 +1,17 @@
 import { AgentMemoryState, Blueprint } from '@starships/autopilot';
-import { ValidationError } from '@starships/errors';
-import { AgentTemplateRepository, Neo4jConnection } from '@starships/models';
-import { AgentModel, AgentTemplateModel } from '@starships/protocol';
+import { NotFoundError, ValidationError } from '@starships/errors';
+import { AgentRepository, AgentTemplateRepository, Neo4jConnection, StarshipRepository } from '@starships/models';
+import { AgentModel, AgentTemplateModel, StarshipModel } from '@starships/protocol';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
+  private starshipRepository: StarshipRepository;
+  private agentRepository: AgentRepository;
 
   constructor(connection: Neo4jConnection) {
     this.templateRepository = new AgentTemplateRepository(connection);
+    this.starshipRepository = new StarshipRepository(connection);
+    this.agentRepository = new AgentRepository(connection);
   }
 
   async getAllTemplates(): Promise<AgentTemplateModel[]> {
@@ -86,6 +90,57 @@ export class AgentTemplateService {
     const result = await this.templateRepository.createTemplateFromAgent(agentId);
     console.log('[AgentTemplateService] Template creation result:', result ? 'Success' : 'Failed');
     return result;
+  }
+
+  // ============================================================================
+  // BUSINESS LOGIC METHODS FOR ROUTES LAYER
+  // ============================================================================
+
+  /**
+   * Find user's active starship for agent template creation
+   */
+  async findUserActiveStarship(userId: string): Promise<StarshipModel | null> {
+    const userStarships = await this.starshipRepository.findByOwner(userId);
+    const activeStarship = userStarships.find((ship) => ship.status === 'active');
+    return activeStarship || null;
+  }
+
+  /**
+   * Validate starship exists and user has access
+   */
+  async validateStarshipAccess(starshipId: string, userId: string): Promise<StarshipModel> {
+    const starship = await this.starshipRepository.findById(starshipId);
+
+    if (!starship) {
+      throw new NotFoundError(`Starship not found`, 'Starship', starshipId);
+    }
+
+    if (starship.ownerId !== userId) {
+      throw new ValidationError('Access denied to this starship', 'starshipId');
+    }
+
+    return starship;
+  }
+
+  /**
+   * Validate agent for template creation (must be public and owned by user)
+   */
+  async validateAgentForTemplate(agentId: string, userId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+
+    if (!agent) {
+      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+    }
+
+    if (!agent.isPublic) {
+      throw new ValidationError('Only public agents can be converted to templates', 'isPublic');
+    }
+
+    if (agent.authorId !== userId) {
+      throw new ValidationError('You can only convert your own agents to templates', 'authorId');
+    }
+
+    return agent;
   }
 
   async rateTemplate(id: string, rating: number): Promise<void> {

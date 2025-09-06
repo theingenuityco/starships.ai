@@ -25,7 +25,7 @@ import agentRoutes from '@/routes/agents';
 import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
 import memoryRoutes from '@/routes/memory';
-import starshipRoutes, { initializeStarshipRoutes } from '@/routes/starships';
+import starshipRoutes from '@/routes/starships';
 import userRoutes from '@/routes/users';
 // import expeditionRoutes from '@/routes/expeditions';
 import missionRoutes from '@/routes/missions';
@@ -83,13 +83,7 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-// ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
-// Initialize starship routes with dependencies
-initializeStarshipRoutes({
-  starshipRepository,
-  agentRepository,
-  userRepository,
-});
+// Starship routes are now self-contained with internal service instantiation
 
 // Initialize webhook routes with dependencies
 initializeWebhookRoutes({
@@ -100,7 +94,7 @@ initializeWebhookRoutes({
 app.get('/api/v1/starships/pricing', async (req, res) => {
   try {
     const { SubscriptionService } = await import('./services/SubscriptionService');
-    const subscriptionService = new SubscriptionService(userRepository, starshipRepository);
+    const subscriptionService = new SubscriptionService();
     const pricing = await subscriptionService.getPricingData();
     res.json(pricing);
   } catch (error) {

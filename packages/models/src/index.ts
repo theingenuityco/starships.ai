@@ -6,9 +6,12 @@ export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 
 // Entity exports
 export { AgentEntity } from './entities/AgentEntity';
+export { BlueprintEntity } from './entities/BlueprintEntity';
 export { ConversationEntity } from './entities/ConversationEntity';
+export { ExecutionEntity } from './entities/ExecutionEntity';
 export { MessageEntity } from './entities/MessageEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
+export { WorkflowEntity } from './entities/WorkflowEntity';
 
 // Repository exports
 export { AgentRepository } from './repositories/AgentRepository';
@@ -16,6 +19,7 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 export { BlueprintRepository } from './repositories/BlueprintRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EdgeRepository } from './repositories/EdgeRepository';
+export { ExecutionRepository } from './repositories/ExecutionRepository';
 export { MemoryRepository } from './repositories/MemoryRepository';
 export { MessageRepository } from './repositories/MessageRepository';
 export { MissionClarityRepository } from './repositories/MissionClarityRepository';

@@ -1,69 +1,19 @@
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject, getConnection } from '@/helpers/database';
+import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { Blueprint } from '@starships/autopilot';
 import type { WorkflowModel } from '@starships/protocol';
+import { WorkflowEntity } from '../entities/WorkflowEntity';
 
-/**
- * WorkflowRepository - Database operations for workflows
- */
 export class WorkflowRepository extends BaseRepository {
-  constructor() {
-    super('WorkflowRepository');
-  }
-
-  /**
-   * Safe value getter with null/undefined/empty object handling
-   * Now using inherited method from BaseRepository
-   */
-  private getSafeValueLocal<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    return this.getValueWithDefault(value, defaultValue);
-  }
-
-  /**
-   * Serialize complex fields for Neo4j storage using new serialization utilities
-   */
-  private serializeComplexFields(workflow: WorkflowModel): any {
-    // For now, preserve the workflow as-is since serializeForDatabase handles the transformation
-    // This method is used for internal processing before final serialization
-    return workflow;
-  }
-
-  /**
-   * Deserialize complex fields from Neo4j using new serialization utilities
-   */
-  private deserializeComplexFields(workflow: any): WorkflowModel {
-    // Most query methods expect minimal objects, so only set essential defaults
-    const result = this.mapFromDatabaseRecord<WorkflowModel>(workflow, {
-      jsonFields: ['blueprint'],
-      arrayFields: ['tags', 'allowedStarshipClasses'],
-      dateFields: ['createdAt', 'updatedAt'],
-      defaultValues: {
-        tags: [],
-        allowedStarshipClasses: [],
-        // Only set blueprint to null if not provided - tests expect this
-        blueprint: workflow.blueprint === undefined ? null : workflow.blueprint,
-      },
-    });
-
-    // For the specific deserializeComplexFields test, add the expected defaults
-    // This is a bit of a hack, but necessary to pass both the method test and query tests
-    if (workflow.id === 'workflow-1' && workflow.name === 'Test Workflow') {
-      result.timeout = 30000;
-      result.usageCount = 0;
-      result.isPublic = false;
-      result.version = '1.0.0';
-      result.executionMode = 'workflow';
-    }
-
-    return result;
+  constructor(connection?: Neo4jConnection) {
+    super('WorkflowRepository', connection);
   }
 
   async findAll(): Promise<WorkflowModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC');
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
       },
       'findAll',
       'Workflow'
@@ -73,10 +23,9 @@ export class WorkflowRepository extends BaseRepository {
   async findById(id: string): Promise<WorkflowModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) WHERE w.id = $id RETURN w', { id });
-        const workflow = result[0]?.w || null;
-        return workflow ? convertNeo4jIntsInObject(workflow) : null;
+        return result.length > 0 ? WorkflowEntity.deserialize(result[0].w) : null;
       },
       'findById',
       'Workflow',
@@ -84,146 +33,49 @@ export class WorkflowRepository extends BaseRepository {
     );
   }
 
-  async findByUser(userId: string): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow)<-[:INTERACTS_WITH]-(u:User) WHERE u.id = $userId RETURN w',
-      { userId }
-    );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
-  }
-
-  async findByStarship(starshipId: string): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN w ORDER BY w.name',
-      { starshipId }
-    );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
-  }
-
-  // NEW: FK-based query methods for starshipId relationship
-  async findByStarshipId(starshipId: string): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow) WHERE w.starshipId = $starshipId RETURN w ORDER BY w.name',
-      { starshipId }
-    );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
-  }
-
-  /**
-   * Update workflow's starship assignment (FK field + Neo4j relationship)
-   */
-  async updateStarshipId(workflowId: string, starshipId: string): Promise<void> {
-    if (!workflowId) {
-      throw new Error('Workflow ID is required');
-    }
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-
-    const connection = getConnection();
-    const timestamp = new Date().toISOString();
-
-    // Update workflow's starshipId
-    const result = await connection.executeWrite<{ count: number }>(
-      `MATCH (w:Workflow) WHERE w.id = $workflowId
-       SET w.starshipId = $starshipId, w.updatedAt = $timestamp
-       RETURN count(w) as count`,
-      { workflowId, starshipId, timestamp }
-    );
-
-    if (!result[0] || result[0].count === 0) {
-      this.handleNotFound('Workflow', workflowId, 'updateStarshipId');
-    }
-
-    // Update Neo4j relationship for backward compatibility
-    try {
-      // Remove existing DEPLOYED_ON relationships
-      await connection.executeWrite('MATCH (w:Workflow {id: $workflowId})-[r:DEPLOYED_ON]->() DELETE r', { workflowId });
-
-      // Create new DEPLOYED_ON relationship
-      await connection.executeWrite(
-        `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
-         CREATE (w)-[:DEPLOYED_ON {
-           deployedAt: $timestamp,
-           deployedBy: 'system'
-         }]->(s)`,
-        { starshipId, workflowId, timestamp }
-      );
-    } catch (error) {
-      console.warn('Failed to update Neo4j relationship for workflow deployment:', error);
-    }
-  }
-
-  async findUndeployedWorkflows(): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow) WHERE w.starshipId IS NULL OR w.starshipId = "" RETURN w ORDER BY w.createdAt DESC',
-      {}
-    );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
-  }
-
   async create(entity: Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<WorkflowModel> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired(entity, ['name', 'authorId'], 'create');
+        // Use WorkflowEntity validation
+        await WorkflowEntity.validate(entity, 'create');
 
-        const connection = getConnection();
+        const connection = this.getConnection();
         const now = new Date().toISOString();
 
-        // Create default blueprint if none provided
-        const defaultBlueprint: Blueprint = {
-          nodes: [],
-          edges: [],
-          metadata: {},
-        };
-
-        // Create workflow data with only essential fields from WorkflowNodeParameters + database fields
-        const workflowData = {
-          // Core WorkflowNodeParameters fields
-          blueprint:
-            entity.blueprint && typeof entity.blueprint === 'object' && 'nodes' in entity.blueprint
-              ? (entity.blueprint as Blueprint)
-              : defaultBlueprint,
-          timeout: this.getValueWithDefault(entity.timeout, 30000) as number,
-
-          // Database fields
-          name: entity.name as string,
+        // Prepare workflow data with defaults and validation
+        const workflowEntity = WorkflowEntity.deserialize({
+          ...entity,
           createdAt: now,
           updatedAt: now,
-          authorId: entity.authorId as string,
-          starshipId: entity.starshipId as string | undefined,
-          version: this.getValueWithDefault(entity.version, '1.0.0') as string,
-          category: entity.category as WorkflowModel['category'],
           usageCount: 0,
-          isPublic: this.getValueWithDefault(entity.isPublic, false) as boolean,
-          tags: (entity.tags as string[]) || [],
-          rating: entity.rating as number | undefined,
-          executionMode: (entity.executionMode as 'simple' | 'workflow') || 'workflow',
-          allowedStarshipClasses: entity.allowedStarshipClasses as string[] | undefined,
-        };
+          version: entity.version || '1.0.0',
+          category: entity.category || 'general',
+          isPublic: entity.isPublic ?? false,
+          tags: entity.tags || [],
+          executionMode: entity.executionMode || 'workflow',
+          timeout: entity.timeout ?? 30000,
+          // Ensure blueprint has default structure
+          blueprint: entity.blueprint || {
+            nodes: [],
+            edges: [],
+            metadata: {},
+          },
+        });
 
-        const workflowForStorage = this.serializeComplexFields(workflowData as unknown as WorkflowModel);
+        const workflowData = workflowEntity.serialize();
+        // Remove id since it will be auto-generated
+        delete workflowData.id;
 
-        const workflow = await this.createEntityWithAutoId<WorkflowModel>('Workflow', workflowForStorage);
+        // Use BaseRepository serialization
+        const result = await this.createEntityWithAutoId<WorkflowModel>('Workflow', workflowData);
 
-        // For backward compatibility, also create Neo4j relationship during transition
-        if (workflow.starshipId) {
-          await connection.executeWrite(
-            `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
-           CREATE (w)-[:DEPLOYED_ON {
-             deployedAt: $timestamp,
-             deployedBy: 'system'
-           }]->(s)`,
-            { starshipId: workflow.starshipId, workflowId: workflow.id, timestamp: now }
-          );
+        // Create relationship with starship if starshipId is provided
+        if (result.starshipId) {
+          await this.linkToStarship(result.id, result.starshipId);
         }
 
-        // Deserialize complex fields before returning
-        return convertNeo4jIntsInObject(this.deserializeComplexFields(workflow));
+        // Use WorkflowEntity for consistent mapping
+        return WorkflowEntity.deserialize(result);
       },
       'create',
       'Workflow'
@@ -233,21 +85,87 @@ export class WorkflowRepository extends BaseRepository {
   async update(id: string, updates: Partial<WorkflowModel>): Promise<WorkflowModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ id }, ['id'], 'update');
+        // Use WorkflowEntity validation for updates
+        await WorkflowEntity.validate(updates, 'update');
 
-        const connection = getConnection();
-        const updateProps = {
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        };
+        const connection = this.getConnection();
+        const setFields = [];
+        const params: Record<string, unknown> = { id };
+
+        // Handle updatable fields with proper serialization
+        if (updates.name !== undefined) {
+          setFields.push('w.name = $name');
+          params.name = updates.name;
+        }
+        if (updates.description !== undefined) {
+          setFields.push('w.description = $description');
+          params.description = updates.description;
+        }
+        if (updates.category !== undefined) {
+          setFields.push('w.category = $category');
+          params.category = updates.category;
+        }
+        if (updates.version !== undefined) {
+          setFields.push('w.version = $version');
+          params.version = updates.version;
+        }
+        if (updates.isPublic !== undefined) {
+          setFields.push('w.isPublic = $isPublic');
+          params.isPublic = updates.isPublic;
+        }
+        if (updates.tags !== undefined) {
+          setFields.push('w.tags = $tags');
+          params.tags = updates.tags;
+        }
+        if (updates.rating !== undefined) {
+          setFields.push('w.rating = $rating');
+          params.rating = updates.rating;
+        }
+        if (updates.executionMode !== undefined) {
+          setFields.push('w.executionMode = $executionMode');
+          params.executionMode = updates.executionMode;
+        }
+        if (updates.allowedStarshipClasses !== undefined) {
+          setFields.push('w.allowedStarshipClasses = $allowedStarshipClasses');
+          params.allowedStarshipClasses = updates.allowedStarshipClasses;
+        }
+        if (updates.timeout !== undefined) {
+          setFields.push('w.timeout = $timeout');
+          params.timeout = updates.timeout;
+        }
+        if (updates.blueprint !== undefined) {
+          setFields.push('w.blueprint = $blueprint');
+          // Use WorkflowEntity to handle blueprint serialization
+          const tempEntity = WorkflowEntity.deserialize({ blueprint: updates.blueprint });
+          const serialized = tempEntity.serialize();
+          params.blueprint = serialized.blueprint;
+        }
+        if (updates.starshipId !== undefined) {
+          setFields.push('w.starshipId = $starshipId');
+          params.starshipId = updates.starshipId;
+        }
+
+        if (setFields.length === 0) {
+          return this.findById(id);
+        }
+
+        // Always update the updatedAt field
+        setFields.push('w.updatedAt = $updatedAt');
+        params.updatedAt = new Date().toISOString();
 
         const result = await connection.executeWrite<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) WHERE w.id = $id SET w += $updates RETURN w',
-          { id, updates: updateProps }
+          `MATCH (w:Workflow) WHERE w.id = $id
+           SET ${setFields.join(', ')}
+           RETURN w`,
+          params
         );
 
-        const workflow = result[0]?.w || null;
-        return workflow ? convertNeo4jIntsInObject(this.deserializeComplexFields(workflow)) : null;
+        if (result.length === 0) {
+          this.handleNotFound('Workflow', id, 'update');
+        }
+
+        // Use WorkflowEntity for consistent mapping
+        return WorkflowEntity.deserialize(result[0].w);
       },
       'update',
       'Workflow',
@@ -258,11 +176,12 @@ export class WorkflowRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (w:Workflow) WHERE w.id = $id DETACH DELETE w RETURN count(w) as deletedCount',
           { id }
         );
+
         return result[0]?.deletedCount > 0;
       },
       'delete',
@@ -271,70 +190,98 @@ export class WorkflowRepository extends BaseRepository {
     );
   }
 
-  // ADD: New enhanced query methods
   async findByAuthor(authorId: string): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
-      { authorId }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ w: WorkflowModel }>(
+          'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
+          { authorId }
+        );
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
+      },
+      'findByAuthor',
+      'Workflow'
     );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findByCategory(category: string): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
-      { category }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ w: WorkflowModel }>(
+          'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
+          { category }
+        );
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
+      },
+      'findByCategory',
+      'Workflow'
     );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
+  }
+
+  async findByStarshipId(starshipId: string): Promise<WorkflowModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ w: WorkflowModel }>(
+          'MATCH (w:Workflow) WHERE w.starshipId = $starshipId RETURN w ORDER BY w.name',
+          { starshipId }
+        );
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
+      },
+      'findByStarshipId',
+      'Workflow'
+    );
   }
 
   async findByTags(tags: string[]): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
-      { tags }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ w: WorkflowModel }>(
+          'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
+          { tags }
+        );
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
+      },
+      'findByTags',
+      'Workflow'
     );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async findPublic(limit: number = 50, offset: number = 0): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(
-      'MATCH (w:Workflow) WHERE w.isPublic = true RETURN w ORDER BY w.usageCount DESC, w.rating DESC SKIP $offset LIMIT $limit',
-      {
-        limit: limit,
-        offset: offset,
-      }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ w: WorkflowModel }>(
+          'MATCH (w:Workflow) WHERE w.isPublic = true RETURN w ORDER BY w.usageCount DESC, w.rating DESC SKIP $offset LIMIT $limit',
+          { limit, offset }
+        );
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
+      },
+      'findPublic',
+      'Workflow'
     );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
   }
 
   async searchWorkflows(query: string): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    const result = await connection.executeQuery<{ w: WorkflowModel; score: number }>(
-      'CALL db.index.fulltext.queryNodes("workflowSearch", $query) YIELD node as w, score RETURN w, score ORDER BY score DESC LIMIT 20',
-      { query }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        // Simple text search if full-text index is not available
+        const result = await connection.executeQuery<{ w: WorkflowModel }>(
+          `MATCH (w:Workflow) 
+           WHERE toLower(w.name) CONTAINS toLower($query) 
+              OR toLower(w.description) CONTAINS toLower($query)
+           RETURN w ORDER BY w.usageCount DESC LIMIT 20`,
+          { query }
+        );
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
+      },
+      'searchWorkflows',
+      'Workflow'
     );
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
-  }
-
-  async incrementUsageCount(id: string): Promise<void> {
-    const connection = getConnection();
-    await connection.executeWrite('MATCH (w:Workflow) WHERE w.id = $id SET w.usageCount = w.usageCount + 1, w.updatedAt = $timestamp', {
-      id,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
-  async updateRating(id: string, rating: number): Promise<void> {
-    const connection = getConnection();
-    await connection.executeWrite('MATCH (w:Workflow) WHERE w.id = $id SET w.rating = $rating, w.updatedAt = $timestamp', {
-      id,
-      rating,
-      timestamp: new Date().toISOString(),
-    });
   }
 
   async findWithFilters(filters: {
@@ -344,38 +291,142 @@ export class WorkflowRepository extends BaseRepository {
     tags?: string[];
     starshipClass?: 'scout' | 'cruiser';
   }): Promise<WorkflowModel[]> {
-    const connection = getConnection();
-    let query = 'MATCH (w:Workflow) WHERE 1=1';
-    const params: any = {};
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        let query = 'MATCH (w:Workflow) WHERE 1=1';
+        const params: any = {};
 
-    if (filters.category) {
-      query += ' AND w.category = $category';
-      params.category = filters.category;
-    }
+        if (filters.category) {
+          query += ' AND w.category = $category';
+          params.category = filters.category;
+        }
 
-    if (filters.authorId) {
-      query += ' AND w.authorId = $authorId';
-      params.authorId = filters.authorId;
-    }
+        if (filters.authorId) {
+          query += ' AND w.authorId = $authorId';
+          params.authorId = filters.authorId;
+        }
 
-    if (filters.isPublic !== undefined) {
-      query += ' AND w.isPublic = $isPublic';
-      params.isPublic = filters.isPublic;
-    }
+        if (filters.isPublic !== undefined) {
+          query += ' AND w.isPublic = $isPublic';
+          params.isPublic = filters.isPublic;
+        }
 
-    if (filters.tags && filters.tags.length > 0) {
-      query += ' AND ANY(tag IN $tags WHERE tag IN w.tags)';
-      params.tags = filters.tags;
-    }
+        if (filters.tags && filters.tags.length > 0) {
+          query += ' AND ANY(tag IN $tags WHERE tag IN w.tags)';
+          params.tags = filters.tags;
+        }
 
-    if (filters.starshipClass) {
-      query += ' AND $starshipClass IN w.allowedStarshipClasses';
-      params.starshipClass = filters.starshipClass;
-    }
+        if (filters.starshipClass) {
+          query += ' AND $starshipClass IN w.allowedStarshipClasses';
+          params.starshipClass = filters.starshipClass;
+        }
 
-    query += ' RETURN w ORDER BY w.usageCount DESC, w.rating DESC';
+        query += ' RETURN w ORDER BY w.usageCount DESC, w.rating DESC';
 
-    const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
-    return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.w)));
+        const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
+        return result.map((record) => WorkflowEntity.deserialize(record.w));
+      },
+      'findWithFilters',
+      'Workflow'
+    );
+  }
+
+  async incrementUsageCount(id: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (w:Workflow) WHERE w.id = $id 
+           SET w.usageCount = COALESCE(w.usageCount, 0) + 1,
+               w.updatedAt = $updatedAt`,
+          {
+            id,
+            updatedAt: new Date().toISOString(),
+          }
+        );
+      },
+      'incrementUsageCount',
+      'Workflow',
+      id
+    );
+  }
+
+  async updateRating(id: string, rating: number): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite('MATCH (w:Workflow) WHERE w.id = $id SET w.rating = $rating, w.updatedAt = $timestamp', {
+          id,
+          rating,
+          timestamp: new Date().toISOString(),
+        });
+      },
+      'updateRating',
+      'Workflow',
+      id
+    );
+  }
+
+  /**
+   * Create relationship between existing workflow and starship
+   */
+  async linkToStarship(workflowId: string, starshipId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
+           CREATE (w)-[:DEPLOYED_ON {
+             deployedAt: $timestamp,
+             deployedBy: 'system'
+           }]->(s)`,
+          {
+            starshipId,
+            workflowId,
+            timestamp: new Date().toISOString(),
+          }
+        );
+      },
+      'linkToStarship',
+      'Workflow'
+    );
+  }
+
+  /**
+   * Update workflow's starship assignment
+   */
+  async updateStarshipId(workflowId: string, starshipId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const timestamp = new Date().toISOString();
+
+        // Update workflow's starshipId
+        const result = await connection.executeWrite<{ count: number }>(
+          `MATCH (w:Workflow) WHERE w.id = $workflowId
+           SET w.starshipId = $starshipId, w.updatedAt = $timestamp
+           RETURN count(w) as count`,
+          { workflowId, starshipId, timestamp }
+        );
+
+        if (!result[0] || result[0].count === 0) {
+          this.handleNotFound('Workflow', workflowId, 'updateStarshipId');
+        }
+
+        // Update Neo4j relationship for backward compatibility
+        try {
+          // Remove existing DEPLOYED_ON relationships
+          await connection.executeWrite('MATCH (w:Workflow {id: $workflowId})-[r:DEPLOYED_ON]->() DELETE r', { workflowId });
+
+          // Create new DEPLOYED_ON relationship
+          await this.linkToStarship(workflowId, starshipId);
+        } catch (error) {
+          console.warn('Failed to update Neo4j relationship for workflow deployment:', error);
+        }
+      },
+      'updateStarshipId',
+      'Workflow'
+    );
   }
 }

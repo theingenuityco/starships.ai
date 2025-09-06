@@ -10,6 +10,7 @@ import { BaseRepository } from '@/repositories/BaseRepository';
 import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { NodeRepository } from '@/repositories/NodeRepository';
 import type { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
+import { BlueprintEntity } from '../entities/BlueprintEntity';
 
 export class BlueprintRepository extends BaseRepository {
   private nodeRepo: NodeRepository;
@@ -24,8 +25,8 @@ export class BlueprintRepository extends BaseRepository {
   async createBlueprint(request: CreateBlueprintRequest): Promise<BlueprintModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validation following BaseRepository pattern
-        this.validateRequired(request, ['name', 'nodes', 'edges'], 'createBlueprint');
+        // Use BlueprintEntity validation instead of validateRequired
+        await BlueprintEntity.validate(request, 'create');
 
         if (!Array.isArray(request.nodes) || request.nodes.length === 0) {
           this.handleValidationError(
@@ -55,18 +56,22 @@ export class BlueprintRepository extends BaseRepository {
 
         const now = new Date().toISOString();
 
-        // Create blueprint with auto-generated ID
-        const blueprintData = {
-          name: request.name,
-          description: request.description || '',
-          category: request.category || 'general',
-          usageCount: 0,
+        // Create blueprint entity with proper transformation
+        const blueprintEntity = BlueprintEntity.deserialize({
+          ...request,
           createdAt: now,
           updatedAt: now,
-          metadata: JSON.stringify(request.metadata || {}),
-        };
+          usageCount: 0,
+          nodes: request.nodes,
+          edges: request.edges,
+          metadata: request.metadata || {},
+        });
 
-        const blueprint = await this.createEntityWithAutoId<any>('Blueprint', blueprintData);
+        const blueprintData = blueprintEntity.serialize();
+        // Remove id since it will be auto-generated
+        delete blueprintData.id;
+
+        const blueprint = await this.createEntityWithAutoId<BlueprintModel>('Blueprint', blueprintData);
 
         // Create nodes using NodeRepository
         const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprint.id, request.nodes);
@@ -74,18 +79,12 @@ export class BlueprintRepository extends BaseRepository {
         // Create edges using EdgeRepository with ID mapping
         const edges = await this.edgeRepo.createEdges(blueprint.id, request.edges, idMapping);
 
-        return {
-          id: blueprint.id,
-          name: request.name,
-          description: request.description,
-          category: request.category,
+        return BlueprintEntity.deserialize({
+          ...blueprint,
           nodes,
           edges,
           metadata: request.metadata || {},
-          usageCount: 0,
-          createdAt: now,
-          updatedAt: now,
-        } as BlueprintModel;
+        });
       },
       'createBlueprint',
       'Blueprint'
@@ -95,7 +94,9 @@ export class BlueprintRepository extends BaseRepository {
   async getBlueprintById(blueprintId: string): Promise<BlueprintModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'getBlueprintById');
+        if (!blueprintId) {
+          throw new Error('Blueprint ID is required');
+        }
 
         const connection = this.getConnection();
 
@@ -112,22 +113,11 @@ export class BlueprintRepository extends BaseRepository {
         const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
         const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
-        // Deserialize metadata
-        let metadata = {};
-        if (blueprint.metadata && typeof blueprint.metadata === 'string') {
-          try {
-            metadata = JSON.parse(blueprint.metadata);
-          } catch (error) {
-            console.warn('Failed to parse blueprint metadata JSON:', blueprintId, error);
-          }
-        }
-
-        return {
+        return BlueprintEntity.deserialize({
           ...blueprint,
           nodes,
           edges,
-          metadata,
-        } as BlueprintModel;
+        });
       },
       'getBlueprintById',
       'Blueprint',
@@ -157,26 +147,13 @@ export class BlueprintRepository extends BaseRepository {
           const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
           const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
-          // Deserialize metadata
-          let metadata = {};
-          if (blueprint.metadata && typeof blueprint.metadata === 'string') {
-            try {
-              metadata = JSON.parse(blueprint.metadata);
-            } catch (error) {
-              console.warn('Failed to parse blueprint metadata JSON:', blueprintId, error);
-            }
-          } else if (blueprint.metadata === null || blueprint.metadata === undefined) {
-            metadata = {};
-          } else {
-            metadata = blueprint.metadata;
-          }
-
-          blueprints.push({
-            ...blueprint,
-            nodes,
-            edges,
-            metadata,
-          } as BlueprintModel);
+          blueprints.push(
+            BlueprintEntity.deserialize({
+              ...blueprint,
+              nodes,
+              edges,
+            })
+          );
         }
 
         return blueprints;
@@ -189,7 +166,12 @@ export class BlueprintRepository extends BaseRepository {
   async updateBlueprint(blueprintId: string, updates: UpdateBlueprintRequest): Promise<BlueprintModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'updateBlueprint');
+        if (!blueprintId) {
+          throw new Error('Blueprint ID is required');
+        }
+
+        // Use BlueprintEntity validation for updates
+        await BlueprintEntity.validate(updates, 'update');
 
         if (!updates || Object.keys(updates).length === 0) {
           this.handleValidationError(
@@ -259,7 +241,9 @@ export class BlueprintRepository extends BaseRepository {
   async incrementUsageCount(blueprintId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'incrementUsageCount');
+        if (!blueprintId) {
+          throw new Error('Blueprint ID is required');
+        }
 
         const connection = this.getConnection();
 
@@ -284,7 +268,9 @@ export class BlueprintRepository extends BaseRepository {
   async deleteBlueprint(blueprintId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ blueprintId }, ['blueprintId'], 'deleteBlueprint');
+        if (!blueprintId) {
+          throw new Error('Blueprint ID is required');
+        }
 
         // Delete nodes and edges using separate repositories
         await this.nodeRepo.deleteNodesByBlueprintId(blueprintId);
@@ -305,7 +291,9 @@ export class BlueprintRepository extends BaseRepository {
   async getBlueprintsByCategory(category: string): Promise<BlueprintModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ category }, ['category'], 'getBlueprintsByCategory');
+        if (!category) {
+          throw new Error('Category is required');
+        }
 
         const connection = this.getConnection();
 
@@ -327,26 +315,13 @@ export class BlueprintRepository extends BaseRepository {
           const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
           const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
-          // Deserialize metadata
-          let metadata = {};
-          if (blueprint.metadata && typeof blueprint.metadata === 'string') {
-            try {
-              metadata = JSON.parse(blueprint.metadata);
-            } catch (error) {
-              console.warn('Failed to parse blueprint metadata JSON:', blueprintId, error);
-            }
-          } else if (blueprint.metadata === null || blueprint.metadata === undefined) {
-            metadata = {};
-          } else {
-            metadata = blueprint.metadata;
-          }
-
-          blueprints.push({
-            ...blueprint,
-            nodes,
-            edges,
-            metadata,
-          } as BlueprintModel);
+          blueprints.push(
+            BlueprintEntity.deserialize({
+              ...blueprint,
+              nodes,
+              edges,
+            })
+          );
         }
 
         return blueprints;

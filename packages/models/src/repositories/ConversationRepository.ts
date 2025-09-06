@@ -39,7 +39,7 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         // Use lean validation from ConversationEntity
-        await ConversationEntity.validateConversationData(entity, 'create');
+        await ConversationEntity.validate(entity, 'create');
 
         const connection = this.getConnection();
         const now = new Date().toISOString();
@@ -78,7 +78,7 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         // Use lean validation from ConversationEntity for updates
-        await ConversationEntity.validateConversationData(updates, 'update');
+        await ConversationEntity.validate(updates, 'update');
 
         const connection = this.getConnection();
         const setFields = [];

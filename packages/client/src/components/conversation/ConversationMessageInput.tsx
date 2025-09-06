@@ -53,6 +53,17 @@ export function ConversationMessageInput({
     }
   }, [selectedAgent, disabled])
 
+  // Auto-focus on textarea when component mounts and when agent is selected
+  useEffect(() => {
+    if (textareaRef.current && selectedAgent && !disabled) {
+      // Small delay to ensure the component is fully rendered
+      const timer = setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [selectedAgent, disabled])
+
   const handleSubmit = async () => {
     const messageToSend = message.trim()
     if (!messageToSend || sending || disabled) return

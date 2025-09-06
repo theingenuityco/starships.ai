@@ -1,4 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { AgentService } from '@/services';
 import { createConversationService } from '@/services/ConversationService';
 import getStore from '@/store';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
@@ -79,7 +80,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
 
     const { conversationId } = paramValidation;
     const { agentId, message } = bodyValidation;
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
 
     // Verify conversation exists
     const conversation = await conversationService.getConversationById(conversationId);
@@ -92,8 +93,8 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     }
 
     // Execute agent chat (using the same agent service that expects sessionId for backward compatibility)
-    const AgentService = require('@/services/AgentService').AgentService;
     const response = await AgentService.executeChat({
+      source: 'user',
       agentId,
       userId,
       message,
@@ -258,7 +259,7 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
 
     const { userId: targetUserId } = paramValidation;
     const { page, limit } = paginationValidation;
-    const userId = (req as any).user!.id;
+    const userId = req.user!.id;
 
     // Users can only access their own conversations
     if (targetUserId !== userId) {

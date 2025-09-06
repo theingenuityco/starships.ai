@@ -1,6 +1,7 @@
+import { UserEntity } from '@/entities/UserEntity';
 import { getConnection } from '@/helpers/database';
-import { UserModel } from '@starships/protocol';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import type { UserModel } from '@starships/protocol';
 
 export class UserRepository extends BaseRepository {
   constructor() {
@@ -11,7 +12,7 @@ export class UserRepository extends BaseRepository {
       async () => {
         const connection = getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
-        return result.map((record) => record.u);
+        return result.map((record) => UserEntity.deserialize(record.u));
       },
       'findAll',
       'User'
@@ -23,7 +24,8 @@ export class UserRepository extends BaseRepository {
       async () => {
         const connection = getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.id = $id RETURN u', { id: id });
-        return result.length > 0 ? result[0].u : null;
+        const user = result[0]?.u || null;
+        return user ? UserEntity.deserialize(user) : null;
       },
       'findById',
       'User',
@@ -36,7 +38,8 @@ export class UserRepository extends BaseRepository {
       async () => {
         const connection = getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
-        return result.length > 0 ? result[0].u : null;
+        const user = result[0]?.u || null;
+        return user ? UserEntity.deserialize(user) : null;
       },
       'findByEmail',
       'User',
@@ -51,7 +54,8 @@ export class UserRepository extends BaseRepository {
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.username = $username RETURN u', {
           username: username,
         });
-        return result.length > 0 ? result[0].u : null;
+        const user = result[0]?.u || null;
+        return user ? UserEntity.deserialize(user) : null;
       },
       'findByUsername',
       'User',
@@ -62,22 +66,26 @@ export class UserRepository extends BaseRepository {
   async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // For new auth system, require email
-        this.validateRequired(entity, ['email'], 'create');
+        // Validate using Entity
+        await UserEntity.validate(entity, 'create');
 
-        const createdAt = new Date().toISOString();
+        const now = new Date().toISOString();
 
-        // Use email as unique identifier
+        // Transform using Entity
+        const userEntity = UserEntity.deserialize({
+          ...entity,
+          createdAt: now,
+        });
+
+        // Use email as unique identifier for merge operation
         const user = await this.mergeEntityWithAutoId<UserModel>(
           'User',
           { email: entity.email },
-          {
-            ...entity,
-            createdAt,
-          },
-          entity
+          userEntity.serialize(),
+          userEntity.serialize()
         );
-        return user;
+
+        return UserEntity.deserialize(user);
       },
       'create',
       'User'
@@ -87,10 +95,23 @@ export class UserRepository extends BaseRepository {
   async update(id: string, updates: Partial<UserModel>): Promise<UserModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        // Validate using Entity
+        if (Object.keys(updates).length > 0) {
+          await UserEntity.validate(updates, 'update');
+        }
 
-        const setClause = Object.keys(updates)
-          .filter((key) => key !== 'id' && key !== 'createdAt')
+        const connection = getConnection();
+        const now = new Date().toISOString();
+
+        // Transform using Entity
+        const updateEntity = UserEntity.deserialize({
+          ...updates,
+          updatedAt: now, // Add updatedAt timestamp
+        });
+
+        const updateData = updateEntity.serialize();
+        const setClause = Object.keys(updateData)
+          .filter((key) => key !== 'id' && key !== 'createdAt' && updateData[key] !== undefined)
           .map((key) => `u.${key} = $${key}`)
           .join(', ');
 
@@ -98,24 +119,23 @@ export class UserRepository extends BaseRepository {
           return this.findById(id);
         }
 
+        const params = {
+          id: id,
+          ...updateData,
+        };
+
         const result = await connection.executeWrite<{ u: UserModel }>(
           `MATCH (u:User) WHERE u.id = $id
          SET ${setClause}
          RETURN u`,
-          {
-            id: id,
-            username: updates.username,
-            email: updates.email,
-            displayName: updates.displayName,
-            avatar: updates.avatar,
-          }
+          params
         );
 
         if (result.length === 0) {
           this.handleNotFound('User', id, 'update');
         }
 
-        return result[0].u;
+        return UserEntity.deserialize(result[0].u);
       },
       'update',
       'User',
@@ -151,7 +171,8 @@ export class UserRepository extends BaseRepository {
           { stripeCustomerId }
         );
 
-        return result[0]?.user || null;
+        const user = result[0]?.user || null;
+        return user ? UserEntity.deserialize(user) : null;
       },
       'findByStripeCustomerId',
       'User',
@@ -162,7 +183,13 @@ export class UserRepository extends BaseRepository {
   async updateStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ userId, stripeCustomerId }, ['userId', 'stripeCustomerId'], 'updateStripeCustomerId');
+        // Validate required parameters
+        if (!userId) {
+          throw new Error('userId is required for updateStripeCustomerId');
+        }
+        if (!stripeCustomerId) {
+          throw new Error('stripeCustomerId is required for updateStripeCustomerId');
+        }
 
         const connection = getConnection();
         await connection.executeWrite(
@@ -183,7 +210,8 @@ export class UserRepository extends BaseRepository {
       async () => {
         const connection = getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
-        return result.length > 0 ? result[0].u : null;
+        const user = result[0]?.u || null;
+        return user ? UserEntity.deserialize(user) : null;
       },
       'findByEmailWithPassword',
       'User',
@@ -200,28 +228,31 @@ export class UserRepository extends BaseRepository {
   }): Promise<UserModel> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired(userData, ['email', 'password'], 'createWithPassword');
+        const now = new Date().toISOString();
+        const username = userData.username || UserEntity.generateUsernameFromEmail(userData.email);
 
-        const createdAt = new Date().toISOString();
-        const username = userData.username || userData.email.split('@')[0];
+        const entityData = {
+          username: username,
+          email: userData.email,
+          displayName: userData.displayName || userData.name,
+          password: userData.password,
+          createdAt: now,
+        };
+
+        // Validate using Entity
+        await UserEntity.validate(entityData, 'create');
+
+        // Transform using Entity
+        const userEntity = UserEntity.deserialize(entityData);
 
         const user = await this.mergeEntityWithAutoId<UserModel>(
           'User',
           { email: userData.email },
-          {
-            username: username,
-            email: userData.email,
-            displayName: userData.displayName || userData.name,
-            password: userData.password,
-            createdAt: createdAt,
-          },
-          {
-            displayName: userData.displayName || userData.name || undefined,
-            password: userData.password || undefined,
-          }
+          userEntity.serialize(),
+          userEntity.serialize()
         );
 
-        return user;
+        return UserEntity.deserialize(user);
       },
       'createWithPassword',
       'User'

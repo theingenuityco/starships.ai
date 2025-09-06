@@ -1,17 +1,29 @@
 /**
- * UserRepository Unit Tests
+ * UserRepository Unit Tests - Updated for Layered Architecture
  */
 
+import { UserEntity } from '@/entities/UserEntity';
 import { UserRepository } from '@/repositories/UserRepository';
-import { DatabaseError, NotFoundError } from '@starships/errors';
+import { ConflictError, DatabaseError, NotFoundError } from '@starships/errors';
 import { UserModel } from '@starships/protocol';
+
+// Mock nanoid for predictable IDs
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'generated-test-id-123'),
+}));
 
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
-  getConnection: jest.fn(() => ({
-    executeQuery: jest.fn(),
-    executeWrite: jest.fn(),
-  })),
+  getConnection: jest.fn(),
+}));
+
+// Mock UserEntity with proper static methods
+jest.mock('../../entities/UserEntity', () => ({
+  UserEntity: {
+    validate: jest.fn().mockResolvedValue(undefined),
+    deserialize: jest.fn().mockImplementation((data) => data),
+    generateUsernameFromEmail: jest.fn((email) => email.split('@')[0]),
+  },
 }));
 
 import { getConnection } from '@/helpers/database';
@@ -19,14 +31,28 @@ import { getConnection } from '@/helpers/database';
 describe('UserRepository', () => {
   let repository: UserRepository;
   let mockConnection: any;
+  let mockUserEntity: any;
 
   beforeEach(() => {
-    repository = new UserRepository();
+    // Create mock connection directly
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
+
+    repository = new UserRepository();
+
+    mockUserEntity = UserEntity as any;
+    mockUserEntity.validate.mockClear();
+    mockUserEntity.deserialize.mockClear();
+    mockUserEntity.generateUsernameFromEmail.mockClear();
+
+    // Reset default implementations
+    mockUserEntity.validate.mockResolvedValue(undefined);
+    mockUserEntity.deserialize.mockImplementation((data: any) => data);
+    mockUserEntity.generateUsernameFromEmail.mockImplementation((email: string) => email.split('@')[0]);
+
     jest.clearAllMocks();
   });
 
@@ -48,6 +74,7 @@ describe('UserRepository', () => {
       const result = await repository.findAll();
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
+      expect(mockUserEntity.deserialize).toHaveBeenCalledTimes(2);
       expect(result).toEqual(mockUsers);
     });
 
@@ -57,12 +84,13 @@ describe('UserRepository', () => {
       const result = await repository.findAll();
 
       expect(result).toEqual([]);
+      expect(mockUserEntity.deserialize).not.toHaveBeenCalled();
     });
 
     it('should handle database errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.findAll()).rejects.toThrow();
+      await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -74,6 +102,7 @@ describe('UserRepository', () => {
       const result = await repository.findById('user-123');
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.id = $id RETURN u', { id: 'user-123' });
+      expect(mockUserEntity.deserialize).toHaveBeenCalledWith(mockUser);
       expect(result).toEqual(mockUser);
     });
 
@@ -83,6 +112,7 @@ describe('UserRepository', () => {
       const result = await repository.findById('non-existent');
 
       expect(result).toBeNull();
+      expect(mockUserEntity.deserialize).not.toHaveBeenCalled();
     });
   });
 
@@ -96,6 +126,7 @@ describe('UserRepository', () => {
       expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.email = $email RETURN u', {
         email: 'test@example.com',
       });
+      expect(mockUserEntity.deserialize).toHaveBeenCalledWith(mockUser);
       expect(result).toEqual(mockUser);
     });
 
@@ -105,6 +136,7 @@ describe('UserRepository', () => {
       const result = await repository.findByEmail('notfound@example.com');
 
       expect(result).toBeNull();
+      expect(mockUserEntity.deserialize).not.toHaveBeenCalled();
     });
   });
 
@@ -118,6 +150,7 @@ describe('UserRepository', () => {
       expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.username = $username RETURN u', {
         username: 'testuser',
       });
+      expect(mockUserEntity.deserialize).toHaveBeenCalledWith(mockUser);
       expect(result).toEqual(mockUser);
     });
   });
@@ -133,31 +166,22 @@ describe('UserRepository', () => {
 
       const createdUser = {
         ...userData,
-        id: 'test-uuid-123',
+        id: 'generated-test-id-123',
         createdAt: expect.any(String),
       };
 
+      // Mock the executeWrite call that mergeEntityWithAutoId makes
       mockConnection.executeWrite.mockResolvedValue([{ n: createdUser }]);
 
       const result = await repository.create(userData);
 
+      expect(mockUserEntity.validate).toHaveBeenCalledWith(userData, 'create');
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MERGE (n:User'),
+        expect.stringContaining('MERGE'),
         expect.objectContaining({
-          match: expect.objectContaining({
-            email: 'test@example.com',
-          }),
+          match: expect.objectContaining({ email: 'test@example.com' }),
           create: expect.objectContaining({
-            email: 'test@example.com',
-            username: 'testuser',
-            displayName: 'Test User',
-            avatar: 'avatar-url',
-          }),
-          update: expect.objectContaining({
-            email: 'test@example.com',
-            username: 'testuser',
-            displayName: 'Test User',
-            avatar: 'avatar-url',
+            id: 'generated-test-id-123',
           }),
         })
       );
@@ -170,7 +194,10 @@ describe('UserRepository', () => {
         // Missing email
       };
 
+      mockUserEntity.validate.mockRejectedValueOnce(new Error('Email is required for user creation'));
+
       await expect(repository.create(incompleteData as any)).rejects.toThrow(DatabaseError);
+      expect(mockUserEntity.validate).toHaveBeenCalledWith(incompleteData, 'create');
     });
 
     it('should handle merge operation for existing email', async () => {
@@ -190,6 +217,7 @@ describe('UserRepository', () => {
 
       const result = await repository.create(userData);
 
+      expect(mockUserEntity.validate).toHaveBeenCalledWith(userData, 'create');
       expect(result.email).toBe('updated@example.com');
       expect(result.displayName).toBe('Updated Name');
     });
@@ -205,40 +233,45 @@ describe('UserRepository', () => {
       const updatedUser = global.createMockUser({
         id: 'user-123',
         ...updates,
+        updatedAt: expect.any(String),
       });
 
       mockConnection.executeWrite.mockResolvedValue([{ u: updatedUser }]);
 
       const result = await repository.update('user-123', updates);
 
+      expect(mockUserEntity.validate).toHaveBeenCalledWith(updates, 'update');
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET u.displayName = $displayName'),
+        expect.stringContaining('SET'),
         expect.objectContaining({
+          id: 'user-123',
           displayName: 'Updated Name',
+          avatar: 'new-avatar-url',
+          updatedAt: expect.any(String),
         })
       );
-      expect(result).toMatchObject({
-        id: 'user-123',
-        displayName: 'Updated Name',
-        email: 'test@example.com',
-        username: 'testuser',
-      });
+      expect(result).toEqual(updatedUser);
     });
 
     it('should return existing user when no updates provided', async () => {
       const existingUser = global.createMockUser({ id: 'user-123' });
-      jest.spyOn(repository, 'findById').mockResolvedValue(existingUser);
+
+      // Mock the findById call that happens when no updates
+      mockConnection.executeQuery.mockResolvedValue([{ u: existingUser }]);
 
       const result = await repository.update('user-123', {});
 
-      expect(repository.findById).toHaveBeenCalledWith('user-123');
+      expect(mockUserEntity.validate).not.toHaveBeenCalled();
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.id = $id RETURN u', { id: 'user-123' });
       expect(result).toEqual(existingUser);
     });
 
     it('should throw NotFoundError when user does not exist', async () => {
+      // Mock BaseRepository.handleNotFound behavior
       mockConnection.executeWrite.mockResolvedValue([]);
 
       await expect(repository.update('non-existent', { displayName: 'New Name' })).rejects.toThrow(NotFoundError);
+      expect(mockUserEntity.validate).toHaveBeenCalledWith({ displayName: 'New Name' }, 'update');
     });
 
     it('should filter out protected fields from updates', async () => {
@@ -248,17 +281,24 @@ describe('UserRepository', () => {
         displayName: 'Valid Update',
       };
 
-      const updatedUser = global.createMockUser();
+      const updatedUser = global.createMockUser({
+        id: 'user-123',
+        displayName: 'Valid Update',
+      });
       mockConnection.executeWrite.mockResolvedValue([{ u: updatedUser }]);
 
       await repository.update('user-123', updates);
 
       const query = mockConnection.executeWrite.mock.calls[0][0];
-      // Check that the SET clause doesn't include protected fields, but WHERE clause can contain u.id
+      const params = mockConnection.executeWrite.mock.calls[0][1];
+
       expect(query).toContain('SET u.displayName = $displayName');
       expect(query).not.toContain('SET u.id =');
       expect(query).not.toContain('SET u.createdAt =');
-      expect(query).not.toContain('u.id = $id, u.createdAt'); // Ensure SET clause doesn't include these
+
+      expect(params.displayName).toBe('Valid Update');
+      expect(params.updatedAt).toBeDefined();
+      expect(params.id).toBe('user-123');
     });
   });
 
@@ -295,6 +335,7 @@ describe('UserRepository', () => {
         expect.stringContaining('MATCH (user:User {stripeCustomerId: $stripeCustomerId})'),
         { stripeCustomerId: 'cus_123' }
       );
+      expect(mockUserEntity.deserialize).toHaveBeenCalledWith(mockUser);
       expect(result).toEqual(mockUser);
     });
 
@@ -304,6 +345,7 @@ describe('UserRepository', () => {
       const result = await repository.findByStripeCustomerId('cus_nonexistent');
 
       expect(result).toBeNull();
+      expect(mockUserEntity.deserialize).not.toHaveBeenCalled();
     });
   });
 
@@ -321,7 +363,6 @@ describe('UserRepository', () => {
 
     it('should validate required parameters', async () => {
       await expect(repository.updateStripeCustomerId('', 'cus_123')).rejects.toThrow(DatabaseError);
-
       await expect(repository.updateStripeCustomerId('user-123', '')).rejects.toThrow(DatabaseError);
     });
   });
@@ -330,11 +371,12 @@ describe('UserRepository', () => {
     it('should handle database connection errors', async () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Connection failed'));
 
-      await expect(repository.findById('user-123')).rejects.toThrow();
+      await expect(repository.findById('user-123')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle constraint violations during create', async () => {
-      const error = new Error('unique constraint violation');
+      // Create a constraint violation error that will be detected by BaseRepository
+      const error = new Error('constraint violation');
       mockConnection.executeWrite.mockRejectedValue(error);
 
       const userData = {
@@ -342,14 +384,14 @@ describe('UserRepository', () => {
         email: 'test@example.com',
       };
 
-      await expect(repository.create(userData)).rejects.toThrow();
+      await expect(repository.create(userData)).rejects.toThrow(ConflictError);
     });
 
     it('should handle query timeout errors', async () => {
       const timeoutError = new Error('Query timeout');
       mockConnection.executeQuery.mockRejectedValue(timeoutError);
 
-      await expect(repository.findAll()).rejects.toThrow();
+      await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -365,7 +407,10 @@ describe('UserRepository', () => {
       mockConnection.executeQuery.mockResolvedValueOnce([]);
 
       // Then create user
-      const createdUser = global.createMockUser(userData);
+      const createdUser = global.createMockUser({
+        ...userData,
+        id: 'generated-test-id-123',
+      });
       mockConnection.executeWrite.mockResolvedValue([{ n: createdUser }]);
 
       const existingUser = await repository.findByEmail(userData.email);

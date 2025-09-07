@@ -6,7 +6,7 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent, Blueprint } from '@starships/autopilot';
+import { Agent } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
@@ -412,14 +412,18 @@ export class AgentService {
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // Create enhanced error response using message service instead of generic fallback
+      // Create error message in conversation and then throw the error
+      // This ensures the error is handled properly by the message service
       const agentService = new AgentService();
-      return await agentService.createErrorResponse(error as Error, {
+      await agentService.createErrorResponse(error as Error, {
         agentId,
         userId,
         conversationId,
         starshipId: dbAgent.starshipId,
       });
+
+      // Throw the original error so it's handled as an actual error, not a success response
+      throw error;
     }
   }
 
@@ -524,36 +528,12 @@ export class AgentService {
 
       console.error(`[AGENT-SERVICE] Agent execution failed for ${context.agentId}:`, error);
 
-      // Analyze error and create detailed response using message service
-      const errorDetails = this.analyzeError(error as Error, context);
-      const enhancedResponse = this.formatErrorForUser(errorDetails);
-
-      // Create error message in conversation if conversationId exists
-      if (context.conversationId) {
-        try {
-          const dbAgent = await this.agentRepository.findById(context.agentId);
-          if (dbAgent?.starshipId) {
-            await this.messageService.createMessage({
-              role: 'system',
-              content: enhancedResponse,
-              starshipId: dbAgent.starshipId,
-              agentId: context.agentId,
-              conversationId: context.conversationId,
-              messageType: 'error',
-              importance: 'high',
-              processingStatus: 'completed',
-              metadata: {
-                errorDetails: errorDetails,
-              },
-            });
-          }
-        } catch (messageError) {
-          console.error(`[AGENT-SERVICE] Failed to create error message:`, messageError);
-        }
-      }
+      // Return raw error response
+      // Note: Error message creation is handled by createErrorResponse in executeChat
+      // to avoid duplicate messages. This method just returns the error response.
 
       return {
-        response: enhancedResponse,
+        response: errorMessage,
         usage: { totalTokens: 0, cost: 0, modelCalls: 0 },
         executionTime,
         status: 'error',
@@ -570,7 +550,7 @@ export class AgentService {
   }
 
   /**
-   * Create enhanced error response using message service
+   * Create error response using raw error message
    */
   async createErrorResponse(
     error: Error,
@@ -581,13 +561,14 @@ export class AgentService {
       starshipId: string;
     }
   ): Promise<ConversationResponse> {
-    const errorDetails = this.analyzeError(error, context);
+    const errorMessage = error.message;
+    const errorStack = error.stack;
 
-    // Create error message via message service
+    // Create raw error message via message service
     if (context.conversationId) {
       await this.messageService.createMessage({
         role: 'system',
-        content: this.formatErrorForUser(errorDetails),
+        content: errorMessage,
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId: context.conversationId,
@@ -595,140 +576,23 @@ export class AgentService {
         importance: 'high',
         processingStatus: 'completed',
         metadata: {
-          errorDetails: errorDetails,
+          errorMessage,
+          errorStack,
+          timestamp: new Date().toISOString(),
         },
       });
     }
 
-    // Return user-friendly error response
+    // Return raw error response
     return {
       source: 'agent',
-      content: this.formatErrorForUser(errorDetails),
+      content: errorMessage,
       agentId: context.agentId,
       usage: {
         promptTokens: 0,
         completionTokens: 0,
       },
     };
-  }
-
-  /**
-   * Analyze error to determine type and context
-   */
-  private analyzeError(error: Error, context: { agentId: string; userId?: string; conversationId?: string }) {
-    const errorMessage = error.message;
-    const timestamp = new Date().toISOString();
-
-    // Determine error type based on error message patterns
-    let errorType: 'agent_execution' | 'http_request' | 'llm_request' | 'workflow' | 'system' | 'validation' = 'system';
-    let errorCode: string | undefined;
-    let possibleCauses: string[] = [];
-    let suggestedActions: string[] = [];
-    let recoverable = true;
-    const errorContext: Record<string, unknown> = {
-      agentId: context.agentId,
-    };
-
-    if (errorMessage.includes('HTTP request execution failed') || errorMessage.includes('axios')) {
-      errorType = 'http_request';
-      errorCode = 'HTTP_REQUEST_FAILED';
-      possibleCauses = ['Network connectivity issues', 'API endpoint unavailable', 'Authentication credentials invalid', 'Request timeout'];
-      suggestedActions = [
-        'Check your internet connection',
-        'Verify API keys are valid',
-        'Try again in a few moments',
-        'Contact support if the issue persists',
-      ];
-    } else if (errorMessage.includes('LLM') || errorMessage.includes('OpenRouter')) {
-      errorType = 'llm_request';
-      errorCode = 'LLM_REQUEST_FAILED';
-      possibleCauses = [
-        'LLM service temporarily unavailable',
-        'Invalid API key or quota exceeded',
-        'Model overloaded or unavailable',
-        'Request format issues',
-      ];
-      suggestedActions = [
-        'Check API key configuration',
-        'Verify account has sufficient credits',
-        'Try a different model if available',
-        'Wait and retry the request',
-      ];
-    } else if (errorMessage.includes('Agent execution failed') || errorMessage.includes('workflow')) {
-      errorType = 'workflow';
-      errorCode = 'WORKFLOW_EXECUTION_FAILED';
-      possibleCauses = ['Invalid workflow configuration', 'Missing required parameters', 'Node execution failure', 'Workflow logic error'];
-      suggestedActions = [
-        'Review agent configuration',
-        'Check workflow blueprint',
-        'Verify all required inputs are provided',
-        'Contact your administrator',
-      ];
-    } else if (errorMessage.includes('Agent') && errorMessage.includes('not found')) {
-      errorType = 'agent_execution';
-      errorCode = 'AGENT_NOT_FOUND';
-      possibleCauses = ['Agent was deleted or moved', 'Incorrect agent ID', 'Permission denied'];
-      suggestedActions = ['Verify the agent still exists', 'Check agent permissions', 'Select a different agent'];
-      recoverable = false;
-    } else if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
-      errorType = 'validation';
-      errorCode = 'VALIDATION_ERROR';
-      possibleCauses = ['Invalid input format', 'Missing required fields', 'Data constraints violated'];
-      suggestedActions = ['Check input format and requirements', 'Ensure all required fields are provided', 'Review data constraints'];
-    }
-
-    return {
-      errorType,
-      errorCode,
-      originalError: errorMessage,
-      context: errorContext,
-      troubleshooting: {
-        possibleCauses,
-        suggestedActions,
-      },
-      timestamp,
-      recoverable,
-    };
-  }
-
-  /**
-   * Format error details for user-friendly display
-   */
-  private formatErrorForUser(errorDetails: any): string {
-    const friendlyErrorTypes = {
-      agent_execution: 'Agent Execution',
-      http_request: 'Network Request',
-      llm_request: 'AI Model',
-      workflow: 'Workflow Processing',
-      system: 'System',
-      validation: 'Input Validation',
-    };
-
-    let message = `I encountered a ${friendlyErrorTypes[errorDetails.errorType as keyof typeof friendlyErrorTypes]} error while processing your request.\n\n`;
-
-    if (errorDetails.troubleshooting?.possibleCauses.length) {
-      message += `**Possible causes:**\n`;
-      errorDetails.troubleshooting.possibleCauses.forEach((cause: string) => {
-        message += `• ${cause}\n`;
-      });
-      message += `\n`;
-    }
-
-    if (errorDetails.troubleshooting?.suggestedActions.length) {
-      message += `**What you can try:**\n`;
-      errorDetails.troubleshooting.suggestedActions.forEach((action: string) => {
-        message += `• ${action}\n`;
-      });
-      message += `\n`;
-    }
-
-    if (errorDetails.recoverable) {
-      message += `This appears to be a temporary issue. Please try your request again.`;
-    } else {
-      message += `This issue may require assistance. Please contact support if you continue to experience problems.`;
-    }
-
-    return message;
   }
 
   // ============================================================================
@@ -837,7 +701,7 @@ export class AgentService {
   /**
    * Create default blueprint for simple chat agents
    */
-  private createDefaultBlueprint(dbAgent: AgentModel | CreateAgentRequest): Blueprint {
+  private createDefaultBlueprint(dbAgent: AgentModel | CreateAgentRequest): any {
     return {
       nodes: [
         {
@@ -893,7 +757,7 @@ export class AgentService {
   /**
    * Validate blueprint structure
    */
-  private validateBlueprint(blueprint: Blueprint): { valid: boolean; errors: string[] } {
+  private validateBlueprint(blueprint: any): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!blueprint.nodes || !Array.isArray(blueprint.nodes)) {
@@ -907,19 +771,19 @@ export class AgentService {
     }
 
     // Check for start node
-    const hasStartNode = blueprint.nodes.some((node) => node.type === 'start');
+    const hasStartNode = blueprint.nodes.some((node: any) => node.type === 'start');
     if (!hasStartNode) {
       errors.push('Blueprint must have a start node');
     }
 
     // Check for end node
-    const hasEndNode = blueprint.nodes.some((node) => node.type === 'end');
+    const hasEndNode = blueprint.nodes.some((node: any) => node.type === 'end');
     if (!hasEndNode) {
       errors.push('Blueprint must have an end node');
     }
 
     // Validate edge references
-    const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));
+    const nodeRefs = new Set(blueprint.nodes.map((n: any) => n.ref));
     for (const edge of blueprint.edges) {
       if (!nodeRefs.has(edge.from)) {
         errors.push(`Edge references non-existent node: ${edge.from}`);

@@ -228,11 +228,19 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
         const starship = await templateService.validateStarshipAccess(targetStarshipId, userId);
         console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${targetStarshipId}) for agent creation`);
       } catch (starshipError: any) {
-        console.error('[TEMPLATE] Error validating starship:', starshipError);
+        console.error('[TEMPLATE] Error validating starship access:', {
+          starshipId: targetStarshipId,
+          userId,
+          errorName: starshipError?.name,
+          errorMessage: starshipError?.message,
+          fullError: starshipError,
+        });
+
         if (starshipError?.name === 'NotFoundError') {
-          sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
+          sendError(res, 'RESOURCE_NOT_FOUND', starshipError.message || 'Starship not found', 404, {
             resource: 'starship',
             id: targetStarshipId,
+            hint: 'Please ensure you have access to a starship before creating agents',
           });
         } else if (starshipError?.name === 'ValidationError') {
           sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {

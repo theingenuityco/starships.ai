@@ -1,16 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Agent, agentAPI } from '@/lib/api'
+import { AgentAnalytics } from '@/components/agents/AgentAnalytics'
 import { AgentCard } from '@/components/agents/AgentCard'
 import { AgentForm } from '@/components/agents/AgentForm'
-import { AgentTester } from '@/components/agents/AgentTester'
-import { AgentAnalytics } from '@/components/agents/AgentAnalytics'
 import { AgentTemplateSelector } from '@/components/agents/AgentTemplateSelector'
+import { AgentTester } from '@/components/agents/AgentTester'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Loader2, Plus, Sparkles, Bot } from 'lucide-react'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
+import { Agent, agentAPI } from '@/lib/api'
+import { Bot, Loader2, Plus, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 interface AgentSelectorProps {
   selectedAgent: Agent | null
@@ -70,6 +70,13 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
 
   // Shared function to handle agent creation from template
   const handleCreateFromTemplate = async (templateId: string, agentName: string) => {
+    // Validate that we have a valid starshipId
+    if (!starshipId || typeof starshipId !== 'string' || starshipId.trim() === '') {
+      console.error('Cannot create agent: Invalid or missing starshipId:', starshipId)
+      setError('Cannot create agent: No valid starship selected. Please ensure you have access to a starship first.')
+      return
+    }
+
     try {
       setLoading(true) // Prevent multiple submissions
       // Use the real API to create agent from template
@@ -83,7 +90,19 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       onAgentSelect(newAgent)
     } catch (error) {
       console.error('Failed to create agent from template:', error)
-      setError('Failed to create agent from template')
+      // Enhanced error handling with specific error messages
+      let errorMessage = 'Failed to create agent from template'
+
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as any
+        if (axiosError.response?.data?.error) {
+          errorMessage = axiosError.response.data.error
+        } else if (axiosError.response?.data?.message) {
+          errorMessage = axiosError.response.data.message
+        }
+      }
+
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -247,14 +266,23 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
                 <Button
                   variant="default"
                   size="sm"
-                  className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0"
+                  disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
+                  className="h-9 whitespace-nowrap bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary shadow-md hover:shadow-lg border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title={!starshipId ? 'No starship available for agent deployment' : undefined}
                 >
                   <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
                   <span>From Template</span>
                 </Button>
               }
             />
-            <Button onClick={handleCreateAgent} size="sm" variant="outline" className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80">
+            <Button
+              onClick={handleCreateAgent}
+              size="sm"
+              variant="outline"
+              disabled={!starshipId || typeof starshipId !== 'string' || starshipId.trim() === ''}
+              className="h-9 whitespace-nowrap border-primary/30 hover:border-primary/50 text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={!starshipId ? 'No starship available for agent deployment' : undefined}
+            >
               <Plus className="w-4 h-4 mr-2 flex-shrink-0" />
               <span>Create Agent</span>
             </Button>

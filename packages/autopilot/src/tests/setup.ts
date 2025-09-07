@@ -2,8 +2,14 @@
  * Jest setup file for autopilot package tests
  */
 
-import type { Blueprint, Execution, Node } from '@/types';
 import { AgentMemory } from '@/AgentMemory';
+import type { Blueprint, Execution, Node } from '@/types';
+
+// Mock nanoid for consistent ID generation in tests
+let nanoidCounter = 0;
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => `mock-nanoid-autopilot-${++nanoidCounter}`),
+}));
 
 // Mock console methods to reduce noise in tests
 global.console = {

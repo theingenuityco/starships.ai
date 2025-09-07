@@ -33,8 +33,10 @@ export class AgentTemplateTransformers {
       if (!value) return undefined;
       if (typeof value === 'string') {
         try {
-          return JSON.parse(value);
-        } catch {
+          const parsed = JSON.parse(value);
+          return parsed;
+        } catch (error) {
+          console.warn('JSONTransform: Failed to parse JSON string:', error);
           return undefined;
         }
       }
@@ -169,12 +171,36 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   timeout!: number;
 
   @Expose()
-  @AgentTemplateTransformers.JSONTransform()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        console.warn('Memory JSONTransform: Failed to parse JSON string:', error);
+        return undefined;
+      }
+    }
+    // If it's already an object, return as-is (don't lose the data)
+    return value;
+  })
   @IsObject()
   memory!: any; // AgentMemoryState - keeping flexible for now
 
   @Expose()
-  @AgentTemplateTransformers.JSONTransform()
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        console.warn('Blueprint JSONTransform: Failed to parse JSON string:', error);
+        return undefined;
+      }
+    }
+    // If it's already an object, return as-is (don't lose the data)
+    return value;
+  })
   @IsObject()
   blueprint!: any; // Blueprint - keeping flexible for now
 
@@ -263,12 +289,34 @@ export class AgentTemplateEntity implements AgentTemplateModel {
     }
 
     // Validate blueprint structure if provided
-    if (entity.blueprint && typeof entity.blueprint === 'object') {
-      if (!entity.blueprint.nodes || !Array.isArray(entity.blueprint.nodes)) {
-        throw new Error('Blueprint must have a nodes array');
+    if (entity.blueprint) {
+      console.log('[AgentTemplateEntity] Blueprint validation - type:', typeof entity.blueprint);
+      console.log(
+        '[AgentTemplateEntity] Blueprint validation - keys:',
+        entity.blueprint && typeof entity.blueprint === 'object' ? Object.keys(entity.blueprint) : 'N/A'
+      );
+
+      // Handle case where blueprint might be a JSON string that needs parsing
+      let blueprintObj = entity.blueprint;
+      if (typeof entity.blueprint === 'string') {
+        try {
+          blueprintObj = JSON.parse(entity.blueprint);
+        } catch (error) {
+          throw new Error('Blueprint must be a valid JSON object');
+        }
       }
-      if (!entity.blueprint.edges || !Array.isArray(entity.blueprint.edges)) {
-        throw new Error('Blueprint must have an edges array');
+
+      if (typeof blueprintObj === 'object' && blueprintObj !== null) {
+        console.log('[AgentTemplateEntity] Blueprint object keys:', Object.keys(blueprintObj));
+        console.log('[AgentTemplateEntity] Has nodes?', 'nodes' in blueprintObj);
+        console.log('[AgentTemplateEntity] Nodes is array?', Array.isArray(blueprintObj.nodes));
+
+        if (!blueprintObj.nodes || !Array.isArray(blueprintObj.nodes)) {
+          throw new Error('Blueprint must have a nodes array');
+        }
+        if (!blueprintObj.edges || !Array.isArray(blueprintObj.edges)) {
+          throw new Error('Blueprint must have an edges array');
+        }
       }
     }
 

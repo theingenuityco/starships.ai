@@ -132,6 +132,48 @@ export function validateId(
 }
 
 /**
+ * Flexible ID or slug validation helper
+ * Supports both new ID format and URL-safe slugs (for starships, etc.)
+ */
+export function validateIdOrSlug(
+  value: string,
+  fieldName: string
+): {
+  isValid: boolean;
+  error?: { code: StandardErrorCode; message: string; details?: any };
+} {
+  if (!value || typeof value !== 'string') {
+    return {
+      isValid: false,
+      error: {
+        code: 'MISSING_REQUIRED_FIELD',
+        message: `${fieldName} is required and must be a string`,
+        details: { field: fieldName },
+      },
+    };
+  }
+
+  // Accept either:
+  // 1. New ID format: base-36 encoded string (alphanumeric, 10-30 chars)
+  // 2. URL-safe slug format: lowercase letters, numbers, hyphens (1-100 chars)
+  const idRegex = /^[a-z0-9]{10,30}$/i;
+  const slugRegex = /^[a-z0-9-]{1,100}$/i;
+
+  if (!idRegex.test(value) && !slugRegex.test(value)) {
+    return {
+      isValid: false,
+      error: {
+        code: 'INVALID_FORMAT',
+        message: `${fieldName} must be a valid ID or slug format`,
+        details: { field: fieldName, provided: value },
+      },
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
  * @deprecated Use validateId instead. This function is kept for backward compatibility.
  * UUID validation helper - kept for legacy support
  */

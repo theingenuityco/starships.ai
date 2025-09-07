@@ -8,6 +8,7 @@ import {
   handleCommonError,
   sendError,
   sendSuccess,
+  validateIdOrSlug,
   validatePagination,
   validateUUID,
 } from '../utils/responseHelpers';
@@ -28,7 +29,7 @@ const CreateAgentFromTemplateSchema = z.object({
     .max(255, 'Agent name must be less than 255 characters'),
   starshipId: z
     .string()
-    .regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID')
+    .regex(/^([a-z0-9]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug')
     .optional(),
 });
 
@@ -215,8 +216,8 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
         return;
       }
     } else {
-      // Validate starshipId format
-      const starshipValidation = validateUUID(targetStarshipId, 'starshipId');
+      // Validate starshipId format (accepts both IDs and slugs)
+      const starshipValidation = validateIdOrSlug(targetStarshipId, 'starshipId');
       if (!starshipValidation.isValid && starshipValidation.error) {
         sendError(res, starshipValidation.error.code, starshipValidation.error.message, 400, starshipValidation.error.details);
         return;

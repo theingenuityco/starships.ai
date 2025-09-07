@@ -1,54 +1,23 @@
-import { getConnection } from '@/helpers/database';
-import type { MessageModel } from '@starships/protocol';
+import { MessageEntity } from '@/entities/MessageEntity';
+import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import type { MessageModel } from '@starships/protocol';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 
 /**
- * Neo4j-based message repository
+ * Neo4j-based message repository following layered architecture
  */
 export class MessageRepository extends BaseRepository {
-  constructor() {
-    super('MessageRepository');
-  }
-
-  /**
-   * Serialize complex objects for Neo4j storage
-   */
-  private serializeComplexFields(message: MessageModel): any {
-    return {
-      ...message,
-      metadata: message.metadata ? JSON.stringify(message.metadata) : null,
-      processingMetadata: message.processingMetadata ? JSON.stringify(message.processingMetadata) : null,
-    };
-  }
-
-  /**
-   * Deserialize complex objects from Neo4j storage
-   */
-  private deserializeComplexFields(message: any): MessageModel {
-    try {
-      return {
-        ...message,
-        metadata: message.metadata ? JSON.parse(message.metadata) : undefined,
-        processingMetadata: message.processingMetadata ? JSON.parse(message.processingMetadata) : undefined,
-      };
-    } catch (error) {
-      console.warn(`Failed to deserialize message ${message.id} complex fields:`, error);
-      return {
-        ...message,
-        metadata: undefined,
-        processingMetadata: undefined,
-      };
-    }
+  constructor(connection?: Neo4jConnection) {
+    super('MessageRepository', connection);
   }
 
   async findAll(): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) RETURN m ORDER BY m.timestamp DESC');
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'findAll',
       'Message'
@@ -58,10 +27,10 @@ export class MessageRepository extends BaseRepository {
   async findById(id: string): Promise<MessageModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id RETURN m', { id });
         const message = result[0]?.m || null;
-        return message ? convertNeo4jIntsInObject(this.deserializeComplexFields(message)) : null;
+        return message ? MessageEntity.deserialize(message) : null;
       },
       'findById',
       'Message',
@@ -72,12 +41,12 @@ export class MessageRepository extends BaseRepository {
   async findByStarshipId(starshipId: string): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>(
           'MATCH (m:Message) WHERE m.starshipId = $starshipId RETURN m ORDER BY m.timestamp DESC',
           { starshipId }
         );
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'findByStarshipId',
       'Message'
@@ -87,12 +56,12 @@ export class MessageRepository extends BaseRepository {
   async findByAgentId(agentId: string): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>(
           'MATCH (m:Message) WHERE m.agentId = $agentId RETURN m ORDER BY m.timestamp DESC',
           { agentId }
         );
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'findByAgentId',
       'Message'
@@ -102,12 +71,12 @@ export class MessageRepository extends BaseRepository {
   async findByMemoryId(memoryId: string): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>(
           'MATCH (m:Message) WHERE m.memoryId = $memoryId RETURN m ORDER BY m.timestamp ASC',
           { memoryId }
         );
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'findByMemoryId',
       'Message'
@@ -117,7 +86,7 @@ export class MessageRepository extends BaseRepository {
   async findByConversationId(conversationId: string, limit?: number, offset?: number): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE m.conversationId = $conversationId RETURN m ORDER BY m.timestamp ASC';
         const params: any = { conversationId };
 
@@ -128,7 +97,7 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'findByConversationId',
       'Message'
@@ -138,7 +107,7 @@ export class MessageRepository extends BaseRepository {
   async findByRole(role: 'system' | 'user' | 'assistant', starshipId?: string): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE m.role = $role';
         const params: any = { role };
 
@@ -150,7 +119,7 @@ export class MessageRepository extends BaseRepository {
         cypher += ' RETURN m ORDER BY m.timestamp DESC';
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'findByRole',
       'Message'
@@ -160,9 +129,8 @@ export class MessageRepository extends BaseRepository {
   async create(entity: Omit<MessageModel, 'id' | 'createdAt' | 'updatedAt' | 'contentLength'>): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate required fields
-        this.validateRequired(entity, ['role', 'content', 'starshipId'], 'create');
-        this.validateEnums(entity, { role: ['system', 'user', 'assistant'] }, 'create');
+        // Validate using Entity
+        await MessageEntity.validate(entity, 'create');
 
         const now = new Date().toISOString();
 
@@ -194,11 +162,13 @@ export class MessageRepository extends BaseRepository {
           processingTimeMs: entity.processingTimeMs,
         };
 
-        const messageForStorage = this.serializeComplexFields(messageData as MessageModel);
+        // Transform using Entity
+        const messageEntity = MessageEntity.deserialize(messageData);
 
-        const message = await this.createEntityWithAutoId<MessageModel>('Message', messageForStorage);
+        // Use base repository for database operation
+        const result = await this.createEntityWithAutoId<MessageModel>('Message', messageEntity.serialize());
 
-        return convertNeo4jIntsInObject(message);
+        return MessageEntity.deserialize(result);
       },
       'create',
       'Message'
@@ -208,7 +178,7 @@ export class MessageRepository extends BaseRepository {
   async update(id: string, updates: Partial<MessageModel>): Promise<MessageModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const updateProps = {
           ...updates,
           updatedAt: new Date().toISOString(),
@@ -219,16 +189,16 @@ export class MessageRepository extends BaseRepository {
           updateProps.contentLength = updates.content.length;
         }
 
-        // Serialize complex fields in updates
-        const serializedUpdates = this.serializeComplexFields(updateProps as any);
+        // Transform using Entity
+        const updateEntity = MessageEntity.deserialize(updateProps);
 
         const result = await connection.executeWrite<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id SET m += $updates RETURN m', {
           id,
-          updates: serializedUpdates,
+          updates: updateEntity.serialize(),
         });
 
         const message = result[0]?.m || null;
-        return message ? convertNeo4jIntsInObject(this.deserializeComplexFields(message)) : null;
+        return message ? MessageEntity.deserialize(message) : null;
       },
       'update',
       'Message',
@@ -239,7 +209,7 @@ export class MessageRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (m:Message) WHERE m.id = $id DETACH DELETE m RETURN count(m) as deletedCount',
           { id }
@@ -317,13 +287,13 @@ export class MessageRepository extends BaseRepository {
 
     visited.add(parentId);
 
-    const connection = getConnection();
+    const connection = this.getConnection();
     const result = await connection.executeQuery<{ m: MessageModel }>(
       'MATCH (m:Message) WHERE m.parentMessageId = $parentId RETURN m ORDER BY m.timestamp ASC',
       { parentId }
     );
 
-    const children = result.map((record) => this.deserializeComplexFields(record.m));
+    const children = result.map((record) => MessageEntity.deserialize(record.m));
     const allChildren: MessageModel[] = [];
     const seenIds = new Set<string>();
 
@@ -368,7 +338,7 @@ export class MessageRepository extends BaseRepository {
   ): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE m.content CONTAINS $query';
         const params: any = { query };
 
@@ -429,7 +399,7 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'searchMessages',
       'Message'
@@ -443,7 +413,7 @@ export class MessageRepository extends BaseRepository {
   ): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const orderField = orderBy === 'timestamp' ? 'm.timestamp' : 'm.createdAt';
         const direction = orderDirection.toUpperCase();
 
@@ -453,7 +423,7 @@ export class MessageRepository extends BaseRepository {
           { conversationId }
         );
 
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return result.map((record) => MessageEntity.deserialize(record.m));
       },
       'getConversationMessages',
       'Message'
@@ -467,7 +437,7 @@ export class MessageRepository extends BaseRepository {
   }> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (m:Message) WHERE m.id IN $messageIds DETACH DELETE m RETURN count(m) as deletedCount',
           { messageIds }
@@ -496,7 +466,7 @@ export class MessageRepository extends BaseRepository {
   }> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE 1=1';
         const params: any = {};
 
@@ -551,7 +521,7 @@ export class MessageRepository extends BaseRepository {
 
         // Count by role
         const byRole = { system: 0, user: 0, assistant: 0 };
-        record.roles.forEach((role) => {
+        record.roles.forEach((role: string) => {
           if (Object.prototype.hasOwnProperty.call(byRole, role)) {
             byRole[role as keyof typeof byRole]++;
           }
@@ -559,7 +529,7 @@ export class MessageRepository extends BaseRepository {
 
         // Count by type
         const byType: Record<string, number> = {};
-        record.messageTypes.forEach((type) => {
+        record.messageTypes.forEach((type: string) => {
           if (type) {
             byType[type] = (byType[type] || 0) + 1;
           }
@@ -567,7 +537,7 @@ export class MessageRepository extends BaseRepository {
 
         // Count by importance
         const byImportance: Record<string, number> = {};
-        record.importances.forEach((importance) => {
+        record.importances.forEach((importance: string) => {
           if (importance) {
             byImportance[importance] = (byImportance[importance] || 0) + 1;
           }

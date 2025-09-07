@@ -1,14 +1,11 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { ValidationError, DatabaseError } from '@starships/errors';
+import { DatabaseError, ValidationError } from '@starships/errors';
 import { WaitlistEntryModel } from '@starships/protocol';
 
 export class WaitlistRepository extends BaseRepository {
-  private connection: Neo4jConnection;
-
   constructor(connection: Neo4jConnection) {
-    super('WaitlistRepository');
-    this.connection = connection;
+    super('WaitlistRepository', connection);
   }
 
   /**
@@ -33,7 +30,7 @@ export class WaitlistRepository extends BaseRepository {
         RETURN w IS NOT NULL as isApproved
       `;
 
-      const result = await this.connection.executeQuery<{ isApproved: boolean }>(query, {
+      const result = await this.getConnection().executeQuery<{ isApproved: boolean }>(query, {
         email: normalizedEmail,
       });
 
@@ -55,7 +52,7 @@ export class WaitlistRepository extends BaseRepository {
         RETURN w {.email, .status, .createdAt, .notes} as entry
       `;
 
-      const result = await this.connection.executeQuery<{ entry: WaitlistEntryModel }>(query, {
+      const result = await this.getConnection().executeQuery<{ entry: WaitlistEntryModel }>(query, {
         email: normalizedEmail,
       });
 
@@ -92,7 +89,7 @@ export class WaitlistRepository extends BaseRepository {
         RETURN w {.email, .status, .createdAt, .notes} as entry
       `;
 
-      const result = await this.connection.executeWrite<{ entry: WaitlistEntryModel }>(query, {
+      const result = await this.getConnection().executeWrite<{ entry: WaitlistEntryModel }>(query, {
         email: normalizedEmail,
         notes: notes || null,
       });
@@ -125,7 +122,7 @@ export class WaitlistRepository extends BaseRepository {
         ORDER BY w.createdAt DESC
       `;
 
-      const result = await this.connection.executeQuery<{ entry: WaitlistEntryModel }>(query);
+      const result = await this.getConnection().executeQuery<{ entry: WaitlistEntryModel }>(query);
       return result.map((r) => r.entry);
     } catch (error) {
       this.handleDatabaseError(error, 'getAllApproved', 'Waitlist');
@@ -142,7 +139,7 @@ export class WaitlistRepository extends BaseRepository {
         RETURN count(w) as count
       `;
 
-      const result = await this.connection.executeQuery<{ count: number }>(query);
+      const result = await this.getConnection().executeQuery<{ count: number }>(query);
       return result.length > 0 ? result[0].count : 0;
     } catch (error) {
       this.handleDatabaseError(error, 'getApprovedCount', 'Waitlist');
@@ -155,13 +152,13 @@ export class WaitlistRepository extends BaseRepository {
   async initializeSchema(): Promise<void> {
     try {
       // Create unique constraint on email
-      await this.connection.executeWrite(
+      await this.getConnection().executeWrite(
         `CREATE CONSTRAINT waitlist_email_unique IF NOT EXISTS
          FOR (w:Waitlist) REQUIRE w.email IS UNIQUE`
       );
 
       // Create index on status for faster queries
-      await this.connection.executeWrite(
+      await this.getConnection().executeWrite(
         `CREATE INDEX waitlist_status IF NOT EXISTS
          FOR (w:Waitlist) ON (w.status)`
       );

@@ -1,8 +1,7 @@
-import { getConnection } from '@/helpers/database';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject, getConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
 import { MissionMessageModel, MissionMessageRole } from '@starships/protocol';
+import { int } from 'neo4j-driver';
 
 export class MissionMessageRepository extends BaseRepository {
   constructor() {
@@ -12,20 +11,23 @@ export class MissionMessageRepository extends BaseRepository {
   async saveMessage(message: Omit<MissionMessageModel, 'id'>): Promise<MissionMessageModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate required fields
-        this.validateRequired(message, ['missionId', 'role', 'content', 'timestamp'], 'saveMessage');
+        // Basic validation - entities handle detailed validation
+        if (!message.missionId || !message.role || !message.content || !message.timestamp) {
+          this.handleValidationError(
+            [{ field: 'message', message: 'missionId, role, content, and timestamp are required' }],
+            'saveMessage'
+          );
+        }
 
         // Validate field types
-        this.validateTypes(
-          message,
-          {
-            missionId: 'string',
-            role: 'string',
-            content: 'string',
-            timestamp: 'string',
-          },
-          'saveMessage'
-        );
+        if (
+          typeof message.missionId !== 'string' ||
+          typeof message.role !== 'string' ||
+          typeof message.content !== 'string' ||
+          typeof message.timestamp !== 'string'
+        ) {
+          this.handleValidationError([{ field: 'message', message: 'Invalid field types' }], 'saveMessage');
+        }
 
         // Validate role
         const validRoles: MissionMessageRole[] = ['user', 'orchestrator', 'system'];
@@ -43,14 +45,13 @@ export class MissionMessageRepository extends BaseRepository {
         }
 
         // Validate string lengths
-        this.validateStringLengths(
-          message,
-          {
-            content: { min: 1, max: 10000 }, // Allow up to 10k characters
-            ...(message.senderName && { senderName: { min: 1, max: 200 } }),
-          },
-          'saveMessage'
-        );
+        if (message.content.length < 1 || message.content.length > 10000) {
+          this.handleValidationError([{ field: 'content', message: 'Content must be between 1 and 10000 characters' }], 'saveMessage');
+        }
+
+        if (message.senderName && (message.senderName.length < 1 || message.senderName.length > 200)) {
+          this.handleValidationError([{ field: 'senderName', message: 'Sender name must be between 1 and 200 characters' }], 'saveMessage');
+        }
 
         const connection = getConnection();
 
@@ -93,7 +94,10 @@ export class MissionMessageRepository extends BaseRepository {
   async getMessagesByMission(missionId: string, limit?: number, offset?: number): Promise<MissionMessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ missionId }, ['missionId'], 'getMessagesByMission');
+        // Basic validation - entities handle detailed validation
+        if (!missionId) {
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'getMessagesByMission');
+        }
 
         const connection = getConnection();
 
@@ -127,7 +131,10 @@ export class MissionMessageRepository extends BaseRepository {
   async getMessageCount(missionId: string): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ missionId }, ['missionId'], 'getMessageCount');
+        // Basic validation - entities handle detailed validation
+        if (!missionId) {
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'getMessageCount');
+        }
 
         const connection = getConnection();
 
@@ -159,7 +166,10 @@ export class MissionMessageRepository extends BaseRepository {
   }> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ missionId }, ['missionId'], 'getMessagesByMissionWithPagination');
+        // Basic validation - entities handle detailed validation
+        if (!missionId) {
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'getMessagesByMissionWithPagination');
+        }
 
         // Validate pagination parameters
         if (page < 1) {
@@ -215,7 +225,10 @@ export class MissionMessageRepository extends BaseRepository {
   async deleteMessagesByMission(missionId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ missionId }, ['missionId'], 'deleteMessagesByMission');
+        // Basic validation - entities handle detailed validation
+        if (!missionId) {
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'deleteMessagesByMission');
+        }
 
         const connection = getConnection();
 
@@ -243,7 +256,10 @@ export class MissionMessageRepository extends BaseRepository {
   async deleteMessage(messageId: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ messageId }, ['messageId'], 'deleteMessage');
+        // Basic validation - entities handle detailed validation
+        if (!messageId) {
+          this.handleValidationError([{ field: 'messageId', message: 'messageId is required' }], 'deleteMessage');
+        }
 
         const connection = getConnection();
 
@@ -271,7 +287,10 @@ export class MissionMessageRepository extends BaseRepository {
   async findMessageById(messageId: string): Promise<MissionMessageModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        this.validateRequired({ messageId }, ['messageId'], 'findMessageById');
+        // Basic validation - entities handle detailed validation
+        if (!messageId) {
+          this.handleValidationError([{ field: 'messageId', message: 'messageId is required' }], 'findMessageById');
+        }
 
         const connection = getConnection();
 

@@ -1,29 +1,34 @@
-import Stripe from 'stripe';
-import { UserRepository, StarshipRepository } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
+import { StarshipRepository, UserRepository } from '@starships/models';
+import Stripe from 'stripe';
+import { StarshipService } from './StarshipService';
+import { UserService } from './UserService';
 
 export class SubscriptionService {
   private stripe: Stripe;
   private env = getEnvConfig();
+  private userRepository: UserRepository;
+  private starshipRepository: StarshipRepository;
 
-  constructor(
-    private userRepository: UserRepository,
-    private starshipRepository: StarshipRepository
-  ) {
+  constructor() {
     this.stripe = new Stripe(this.env.STRIPE_SECRET_KEY, {
       apiVersion: '2025-07-30.basil', // ✅ CONFIRMED: Matches your setup-stripe.ts (line 10)
     });
+    // Initialize repositories internally for Stripe operations that need direct access
+    this.userRepository = new UserRepository();
+    this.starshipRepository = new StarshipRepository();
   }
 
   // Check free starship limit
   async canCreateFreeStarship(userId: string): Promise<boolean> {
-    const count = await this.starshipRepository.countFreeStarships(userId);
+    const starshipService = new StarshipService();
+    const count = await starshipService.countFreeStarships(userId);
     return count < 3;
   }
 
   // Get or create Stripe customer
   async getOrCreateCustomer(userId: string): Promise<string> {
-    const user = await this.userRepository.findById(userId);
+    const user = await UserService.getUserById(userId);
     if (!user) throw new Error('User not found');
     if (!user.email) throw new Error('User email is required for billing operations');
 
@@ -182,7 +187,8 @@ export class SubscriptionService {
 
   // Create billing portal session
   async createPortalSession(starshipId: string, userId: string): Promise<string> {
-    const starship = await this.starshipRepository.findById(starshipId);
+    const starshipService = new StarshipService();
+    const starship = await starshipService.getStarship(starshipId);
     if (!starship || starship.ownerId !== userId) {
       throw new Error('Starship not found or access denied');
     }

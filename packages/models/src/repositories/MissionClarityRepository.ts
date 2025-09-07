@@ -5,9 +5,9 @@
  * Uses MERGE pattern for upsert operations following existing repository patterns.
  */
 
-import { BaseRepository } from '@/repositories/BaseRepository';
 import { getConnection } from '@/helpers/database';
-import { MissionClarityModel, CreateMissionClarityRequest, UpdateMissionClarityRequest } from '@starships/protocol';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import { CreateMissionClarityRequest, MissionClarityModel, UpdateMissionClarityRequest } from '@starships/protocol';
 
 export class MissionClarityRepository extends BaseRepository {
   constructor() {
@@ -21,12 +21,18 @@ export class MissionClarityRepository extends BaseRepository {
   async upsertByMissionId(missionId: string, request: CreateMissionClarityRequest): Promise<MissionClarityModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate required fields
-        this.validateRequired(
-          request,
-          ['missionId', 'objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries', 'reasoning', 'iteration'],
-          'upsert'
-        );
+        // Basic validation - entities handle detailed validation
+        if (
+          !request.missionId ||
+          request.objectiveClarity === undefined ||
+          request.successMetrics === undefined ||
+          request.timelineDefinition === undefined ||
+          request.scopeBoundaries === undefined ||
+          !request.reasoning ||
+          request.iteration === undefined
+        ) {
+          this.handleValidationError([{ field: 'request', message: 'All required fields must be provided' }], 'upsert');
+        }
 
         // Validate score ranges (0-10)
         const scoreFields = ['objectiveClarity', 'successMetrics', 'timelineDefinition', 'scopeBoundaries'];

@@ -1,57 +1,20 @@
-import { getConnection, Neo4jConnection } from '@/helpers/database';
-import type { AgentModel } from '@starships/protocol';
+import { AgentEntity } from '@/entities/AgentEntity';
+import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import type { AgentModel } from '@starships/protocol';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 
 export class AgentRepository extends BaseRepository {
-  private connection: Neo4jConnection;
-
   constructor(connection?: Neo4jConnection) {
-    super('AgentRepository');
-    this.connection = connection || getConnection();
+    super('AgentRepository', connection);
   }
 
-  /** Serialize complex objects for Neo4j storage */
-  private serializeComplexFields(agent: AgentModel | any): any {
-    return {
-      ...agent,
-      blueprint: agent.blueprint ? JSON.stringify(agent.blueprint) : null,
-      memory: agent.memory ? JSON.stringify(agent.memory) : null,
-    };
-  }
-
-  /** Get value or default, handling empty objects from Neo4j */
-  private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
-      return defaultValue;
-    }
-    return value as T;
-  }
-
-  /** Deserialize complex objects from Neo4j storage */
-  private deserializeComplexFields(agent: any): AgentModel {
-    try {
-      return {
-        ...agent,
-        blueprint: agent.blueprint ? JSON.parse(agent.blueprint) : undefined,
-        memory: agent.memory ? JSON.parse(agent.memory) : undefined,
-      };
-    } catch (error) {
-      console.warn(`Failed to deserialize agent ${agent.id} complex fields:`, error);
-      return {
-        ...agent,
-        blueprint: undefined,
-        memory: undefined,
-      };
-    }
-  }
   async findAll(): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
-        return convertNeo4jIntsInArray(result.map((record) => record.a));
+        return result.map((record) => AgentEntity.deserialize(record.a));
       },
       'findAll',
       'Agent'
@@ -61,10 +24,10 @@ export class AgentRepository extends BaseRepository {
   async findById(id: string): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id });
         const agent = result[0]?.a || null;
-        return agent ? convertNeo4jIntsInObject(agent) : null;
+        return agent ? AgentEntity.deserialize(agent) : null;
       },
       'findById',
       'Agent',
@@ -75,12 +38,12 @@ export class AgentRepository extends BaseRepository {
   async findByUser(userId: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent)<-[:INTERACTS_WITH]-(u:User) WHERE u.id = $userId RETURN a',
           { userId }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => this.deserializeComplexFields(record.a)) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findByUser',
       'Agent'
@@ -90,12 +53,12 @@ export class AgentRepository extends BaseRepository {
   async findByStarship(starshipId: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a ORDER BY a.name',
           { starshipId }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => this.deserializeComplexFields(record.a)) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findByStarship',
       'Agent'
@@ -105,12 +68,12 @@ export class AgentRepository extends BaseRepository {
   async findByStarshipId(starshipId: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent) WHERE a.starshipId = $starshipId RETURN a ORDER BY a.name',
           { starshipId }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => this.deserializeComplexFields(record.a)) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findByStarshipId',
       'Agent'
@@ -120,7 +83,7 @@ export class AgentRepository extends BaseRepository {
   async updateStarshipId(agentId: string, starshipId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
 
         // Validate starshipId exists
         const starshipCheck = await connection.executeQuery('MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count', {
@@ -179,12 +142,12 @@ export class AgentRepository extends BaseRepository {
   async findUndeployedAgents(): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent) WHERE a.starshipId IS NULL OR a.starshipId = "" RETURN a ORDER BY a.createdAt DESC',
           {}
         );
-        return convertNeo4jIntsInArray(result?.map((record) => record.a) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findUndeployedAgents',
       'Agent'
@@ -194,44 +157,44 @@ export class AgentRepository extends BaseRepository {
   async create(entity: Omit<AgentModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<AgentModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate required starshipId field
-        if (!entity.starshipId) {
-          this.handleValidationError([{ field: 'starshipId', message: 'starshipId is required when creating an agent' }], 'create');
-        }
+        // Validate using Entity
+        await AgentEntity.validate(entity, 'create');
 
-        const connection = this.connection;
         const now = new Date().toISOString();
 
         // Create agent properties without ID (Neo4j will generate it)
         const agentProps = {
           // Core AgentNodeParameters fields
-          name: entity.name as string,
-          description: entity.description as string | undefined,
-          model: entity.model as string,
-          temperature: entity.temperature as number | undefined,
-          maxTokens: entity.maxTokens as number | undefined,
-          timeout: this.getSafeValue(entity.timeout, 30000) as number,
-          memory: entity.memory as any, // AgentMemoryState
-          blueprint: entity.blueprint as any, // BaseBlueprint
+          name: entity.name,
+          description: entity.description,
+          model: entity.model,
+          temperature: entity.temperature,
+          maxTokens: entity.maxTokens,
+          timeout: entity.timeout || 30000,
+          memory: entity.memory,
+          blueprint: entity.blueprint,
 
           // Database-specific fields
           createdAt: now,
           updatedAt: now,
-          version: this.getSafeValue(entity.version, '1.0.0') as string,
-          category: entity.category as AgentModel['category'],
+          version: entity.version || '1.0.0',
+          category: entity.category,
           usageCount: 0,
-          templateId: entity.templateId as string | undefined,
-          starshipId: entity.starshipId as string,
+          isPublic: entity.isPublic,
+          authorId: entity.authorId,
+          templateId: entity.templateId,
+          starshipId: entity.starshipId,
         };
 
-        // Serialize complex objects for Neo4j storage
-        const agentForStorage = this.serializeComplexFields(agentProps);
+        // Transform using Entity
+        const agentEntity = AgentEntity.deserialize(agentProps);
 
-        // Use automatic ID generation
-        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', agentForStorage, this.connection);
+        // Use base repository for database operation
+        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', agentEntity.serialize());
 
         // For backward compatibility, also create Neo4j relationship during transition
         try {
+          const connection = this.getConnection();
           await connection.executeWrite(
             `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
            CREATE (a)-[:DEPLOYED_ON {
@@ -249,7 +212,7 @@ export class AgentRepository extends BaseRepository {
           console.warn('Failed to create Neo4j relationship for agent deployment:', error);
         }
 
-        return convertNeo4jIntsInObject(agent);
+        return AgentEntity.deserialize(agent);
       },
       'create',
       'Agent'
@@ -259,19 +222,22 @@ export class AgentRepository extends BaseRepository {
   async update(id: string, updates: Partial<AgentModel>): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const updateProps = {
           ...updates,
           updatedAt: new Date().toISOString(),
         };
 
+        // Transform using Entity
+        const updateEntity = AgentEntity.deserialize(updateProps);
+
         const result = await connection.executeWrite<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a', {
           id,
-          updates: updateProps,
+          updates: updateEntity.serialize(),
         });
 
         const agent = result[0]?.a || null;
-        return agent ? convertNeo4jIntsInObject(agent) : null;
+        return agent ? AgentEntity.deserialize(agent) : null;
       },
       'update',
       'Agent',
@@ -282,7 +248,7 @@ export class AgentRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (a:Agent) WHERE a.id = $id DETACH DELETE a RETURN count(a) as deletedCount',
           { id }
@@ -299,12 +265,12 @@ export class AgentRepository extends BaseRepository {
   async findByAuthor(authorId: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent) WHERE a.authorId = $authorId RETURN a ORDER BY a.updatedAt DESC',
           { authorId }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => record.a) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findByAuthor',
       'Agent'
@@ -314,12 +280,12 @@ export class AgentRepository extends BaseRepository {
   async findByCategory(category: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent) WHERE a.category = $category RETURN a ORDER BY a.name',
           { category }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => record.a) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findByCategory',
       'Agent'
@@ -329,12 +295,12 @@ export class AgentRepository extends BaseRepository {
   async findByTags(tags: string[]): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent) WHERE ANY(tag IN $tags WHERE tag IN a.tags) RETURN a ORDER BY a.name',
           { tags }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => record.a) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findByTags',
       'Agent'
@@ -344,7 +310,7 @@ export class AgentRepository extends BaseRepository {
   async findPublic(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>(
           'MATCH (a:Agent) WHERE a.isPublic = true RETURN a ORDER BY a.usageCount DESC, a.rating DESC SKIP $offset LIMIT $limit',
           {
@@ -352,7 +318,7 @@ export class AgentRepository extends BaseRepository {
             offset: int(offset),
           }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => record.a) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findPublic',
       'Agent'
@@ -362,12 +328,12 @@ export class AgentRepository extends BaseRepository {
   async searchAgents(query: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel; score: number }>(
           'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
           { query }
         );
-        return convertNeo4jIntsInArray(result?.map((record) => record.a) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'searchAgents',
       'Agent'
@@ -377,7 +343,7 @@ export class AgentRepository extends BaseRepository {
   async incrementUsageCount(id: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite('MATCH (a:Agent) WHERE a.id = $id SET a.usageCount = a.usageCount + 1, a.updatedAt = $timestamp', {
           id,
           timestamp: new Date().toISOString(),
@@ -392,7 +358,7 @@ export class AgentRepository extends BaseRepository {
   async updateRating(id: string, rating: number): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         await connection.executeWrite('MATCH (a:Agent) WHERE a.id = $id SET a.rating = $rating, a.updatedAt = $timestamp', {
           id,
           rating,
@@ -414,7 +380,7 @@ export class AgentRepository extends BaseRepository {
   }): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         let query = 'MATCH (a:Agent) WHERE 1=1';
         const params: any = {};
 
@@ -446,7 +412,7 @@ export class AgentRepository extends BaseRepository {
         query += ' RETURN a ORDER BY a.updatedAt DESC';
 
         const result = await connection.executeQuery<{ a: AgentModel }>(query, params);
-        return convertNeo4jIntsInArray(result?.map((record) => record.a) || []);
+        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
       },
       'findWithFilters',
       'Agent'

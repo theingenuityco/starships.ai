@@ -1,18 +1,14 @@
-import { getConnection, Neo4jConnection } from '@/helpers/database';
-import type { MemoryModel } from '@starships/protocol';
+import { convertNeo4jIntsInArray, convertNeo4jIntsInObject, Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import type { MemoryModel } from '@starships/protocol';
 import { int } from 'neo4j-driver';
-import { convertNeo4jIntsInObject, convertNeo4jIntsInArray } from '@/helpers/database';
 
 /**
  * Neo4j-based memory repository
  */
 export class MemoryRepository extends BaseRepository {
-  private connection: Neo4jConnection;
-
   constructor(connection?: Neo4jConnection) {
-    super('MemoryRepository');
-    this.connection = connection || getConnection();
+    super('MemoryRepository', connection);
   }
 
   /**
@@ -50,7 +46,7 @@ export class MemoryRepository extends BaseRepository {
   async findAll(): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>('MATCH (m:Memory) RETURN m ORDER BY m.createdAt DESC');
         return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
       },
@@ -62,7 +58,7 @@ export class MemoryRepository extends BaseRepository {
   async findById(id: string): Promise<MemoryModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>('MATCH (m:Memory) WHERE m.id = $id RETURN m', { id });
         const memory = result[0]?.m || null;
         return memory ? convertNeo4jIntsInObject(this.deserializeComplexFields(memory)) : null;
@@ -76,7 +72,7 @@ export class MemoryRepository extends BaseRepository {
   async findByStarshipId(starshipId: string): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>(
           'MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory) RETURN m ORDER BY m.updatedAt DESC',
           { starshipId }
@@ -91,7 +87,7 @@ export class MemoryRepository extends BaseRepository {
   async findByAgentId(agentId: string): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>(
           'MATCH (a:Agent {id: $agentId})-[:HAS_MEMORY]->(m:Memory) RETURN m ORDER BY m.updatedAt DESC',
           { agentId }
@@ -106,7 +102,7 @@ export class MemoryRepository extends BaseRepository {
   async findByTags(tags: string[]): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>(
           'MATCH (m:Memory) WHERE any(tag IN $tags WHERE tag IN m.tags) RETURN m ORDER BY m.updatedAt DESC',
           { tags }
@@ -125,7 +121,7 @@ export class MemoryRepository extends BaseRepository {
   ): Promise<MemoryModel> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const now = new Date().toISOString();
         const { starshipId, ...memoryData } = entity;
 
@@ -140,7 +136,7 @@ export class MemoryRepository extends BaseRepository {
         // Handle AgentMemory specific fields if they exist
         const memoryForStorage = this.serializeComplexFields(memoryCreateData as MemoryModel);
 
-        const memory = await this.createEntityWithAutoId<MemoryModel>('Memory', memoryForStorage, this.connection);
+        const memory = await this.createEntityWithAutoId<MemoryModel>('Memory', memoryForStorage);
 
         // Create relationship with starship
         await connection.executeWrite(
@@ -164,7 +160,7 @@ export class MemoryRepository extends BaseRepository {
   async update(id: string, updates: Partial<MemoryModel>): Promise<MemoryModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const updateProps = {
           ...updates,
           updatedAt: new Date().toISOString(),
@@ -190,7 +186,7 @@ export class MemoryRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (m:Memory) WHERE m.id = $id DETACH DELETE m RETURN count(m) as deletedCount',
           { id }
@@ -214,7 +210,7 @@ export class MemoryRepository extends BaseRepository {
   ): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         let cypher = 'MATCH (m:Memory) WHERE m.id IS NOT NULL';
         const params: any = {};
 
@@ -242,7 +238,7 @@ export class MemoryRepository extends BaseRepository {
   } | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>('MATCH (m:Memory) WHERE m.id = $id RETURN m', { id });
 
         if (!result[0]?.m) {
@@ -285,7 +281,7 @@ export class MemoryRepository extends BaseRepository {
   }): Promise<MemoryModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.connection;
+        const connection = this.getConnection();
         let cypher = 'MATCH (m:Memory) WHERE 1=1';
         const params: any = {};
 

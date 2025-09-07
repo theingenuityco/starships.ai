@@ -4,7 +4,7 @@
  * Clean agent template type definitions for model types.
  */
 
-import type { Blueprint, AgentMemoryState, AgentNodeParameters } from '@starships/autopilot';
+import type { AgentMemoryState, AgentNodeParameters, Blueprint } from '@starships/autopilot';
 
 // ============================================================================
 // AGENT TEMPLATE TYPES
@@ -21,6 +21,7 @@ export type AgentTemplateCategory = 'general' | 'coding' | 'creative' | 'analysi
 export interface AgentTemplateModel extends AgentNodeParameters {
   // Core template fields
   id: string;
+  slug: string;
   createdAt: string;
   updatedAt: string;
 
@@ -42,6 +43,7 @@ export interface AgentTemplateModel extends AgentNodeParameters {
  */
 export interface CreateAgentTemplateRequest {
   name: string;
+  slug?: string;
   description: string;
   category: AgentTemplateCategory;
   model: string;
@@ -59,6 +61,7 @@ export interface CreateAgentTemplateRequest {
  */
 export interface UpdateAgentTemplateRequest {
   name?: string;
+  slug?: string;
   description?: string;
   category?: AgentTemplateCategory;
   model?: string;

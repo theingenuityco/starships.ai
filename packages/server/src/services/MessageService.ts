@@ -61,6 +61,7 @@ export class MessageService {
       timestamp: new Date().toISOString(),
     });
 
+    // Entity validation and transformation is handled in the repository layer
     const message = await this.messageRepository.create({
       ...request,
       timestamp: (request.metadata?.timestamp as string) || new Date().toISOString(),

@@ -2,16 +2,16 @@
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation } from '@/hooks/useConversations'
-import type { Agent } from '@/lib/api'
+import { useCreateConversation, useSendMessage } from '@/hooks/useConversations'
 import { cn, generateId } from '@/lib/utils'
 import type { Message } from '@/types/chat'
+import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 interface ConversationMessageInputProps {
-  selectedAgent?: Agent | null
+  selectedAgent?: AgentModel | null
   starshipId?: string
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
@@ -39,6 +39,7 @@ export function ConversationMessageInput({
   const [isRecording, setIsRecording] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const createConversation = useCreateConversation()
+  const sendMessage = useSendMessage()
 
   // Auto-focus on textarea when component mounts and when agent is selected
   useEffect(() => {
@@ -74,7 +75,6 @@ export function ConversationMessageInput({
         console.log('Creating new conversation for agent chat...')
         const newConversation = await createConversation.mutateAsync({
           source: 'agent',
-          agentId: selectedAgent!.id,
           starshipId: starshipId,
         })
         currentConversationId = newConversation.id
@@ -82,38 +82,28 @@ export function ConversationMessageInput({
         console.log('Conversation created:', currentConversationId)
       }
 
-      // Create user message
-      const userMessage: Message = {
+      // Send message using proper API hook
+      await sendMessage.mutateAsync({
+        conversationId: currentConversationId!,
+        agentId: selectedAgent!.id,
+        message: messageToSend,
+      })
+
+      // Clear input and reset UI
+      setMessage('')
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+      }
+
+      // Notify parent about message activity (for UI state updates)
+      onMessageSent?.({
         id: generateId(),
         content: messageToSend,
         role: 'user',
         timestamp: new Date().toISOString(),
         conversationId: currentConversationId!,
         agentId: selectedAgent!.id,
-      }
-
-      // Emit user message
-      onMessageSent?.(userMessage)
-
-      // TODO: Implement actual HTTP API call for agent communication
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          id: generateId(),
-          content: 'Real-time agent communication is not yet implemented.',
-          role: 'assistant',
-          timestamp: new Date().toISOString(),
-          conversationId: currentConversationId!,
-          agentId: selectedAgent!.id,
-        }
-        onMessageReceived?.(assistantMessage)
-      }, 1000)
-
-      setMessage('')
-
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'
-      }
+      })
     } catch (error) {
       console.error('Failed to send message:', error)
     } finally {
@@ -144,7 +134,6 @@ export function ConversationMessageInput({
         console.log('Creating new conversation for agent chat suggestion...')
         const newConversation = await createConversation.mutateAsync({
           source: 'agent',
-          agentId: selectedAgent!.id,
           starshipId: starshipId,
         })
         currentConversationId = newConversation.id
@@ -152,31 +141,22 @@ export function ConversationMessageInput({
         console.log('Conversation created:', currentConversationId)
       }
 
-      // Create user message
-      const userMessage: Message = {
+      // Send message using proper API hook
+      await sendMessage.mutateAsync({
+        conversationId: currentConversationId!,
+        agentId: selectedAgent!.id,
+        message: suggestionText,
+      })
+
+      // Notify parent about message activity (for UI state updates)
+      onMessageSent?.({
         id: generateId(),
         content: suggestionText,
         role: 'user',
         timestamp: new Date().toISOString(),
         conversationId: currentConversationId!,
         agentId: selectedAgent!.id,
-      }
-
-      // Emit user message
-      onMessageSent?.(userMessage)
-
-      // TODO: Implement actual HTTP API call for agent communication
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          id: generateId(),
-          content: 'Real-time agent communication is not yet implemented.',
-          role: 'assistant',
-          timestamp: new Date().toISOString(),
-          conversationId: currentConversationId!,
-          agentId: selectedAgent!.id,
-        }
-        onMessageReceived?.(assistantMessage)
-      }, 1000)
+      })
     } catch (error) {
       console.error('Failed to send suggestion:', error)
     } finally {

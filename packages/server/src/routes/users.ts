@@ -1,28 +1,136 @@
-import { Router } from 'express';
-import { UserService } from '@/services/UserService';
-import type { Request, Response } from 'express';
+/**
+ * User management routes - Layer 5 (API Routes)
+ *
+ * Exposes user business functionality through REST API endpoints.
+ * Follows the layered architecture pattern established by conversations.ts and agents.ts.
+ */
+
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
+import { UserService } from '@/services/UserService';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
+import type { CreateUserRequest } from '@starships/protocol';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
+import { z } from 'zod';
 
 const router: Router = Router();
+
+// ============================================================================
+// VALIDATION SCHEMAS
+// ============================================================================
+
+const CreateUserSchema = z.object({
+  username: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
+  email: z.string().email().max(255).optional(),
+  displayName: z.string().min(1).max(100).optional(),
+  avatar: z.string().url().max(500).optional(),
+  stripeCustomerId: z
+    .string()
+    .regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format')
+    .optional(),
+});
+
+const UpdateUserSchema = z.object({
+  username: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
+    .optional(),
+  email: z.string().email().max(255).optional(),
+  displayName: z.string().min(1).max(100).optional(),
+  avatar: z.string().url().max(500).optional(),
+  stripeCustomerId: z
+    .string()
+    .regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format')
+    .optional(),
+});
+
+const UpdateUserProfileSchema = z.object({
+  username: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
+    .optional(),
+  email: z.string().email().max(255).optional(),
+  displayName: z.string().min(1).max(100).optional(),
+  avatar: z.string().url().max(500).optional(),
+  currentPassword: z.string().min(6).optional(),
+  newPassword: z.string().min(6).optional(),
+});
+
+const CreateUserWithPasswordSchema = z.object({
+  email: z.string().email().max(255),
+  password: z.string().min(6).max(255),
+  username: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
+    .optional(),
+  displayName: z.string().min(1).max(100).optional(),
+  name: z.string().min(1).max(100).optional(), // Legacy support
+});
+
+const LinkStripeSchema = z.object({
+  stripeCustomerId: z.string().regex(/^cus_[a-zA-Z0-9]+$/, 'Invalid Stripe Customer ID format'),
+});
+
+// Helper function to validate request data with Zod
+function validateData<T>(schema: z.ZodSchema<T>, data: unknown, res: Response, fieldName: string): T | null {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const issues = error.issues.map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+        code: issue.code,
+      }));
+      sendError(res, 'VALIDATION_ERROR', `Invalid ${fieldName}`, 400, { issues });
+    } else {
+      sendError(res, 'VALIDATION_ERROR', `Invalid ${fieldName}`, 400);
+    }
+    return null;
+  }
+}
+
+// Helper function to check authentication
+function checkAuth(req: Request, res: Response): boolean {
+  if (!req.user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return false;
+  }
+  return true;
+}
+
+// ============================================================================
+// USER MANAGEMENT ENDPOINTS
+// ============================================================================
 
 // GET /users/:id - Get user by ID (OpenAPI pattern)
 router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    if (!checkAuth(req, res)) return;
 
-    // Validate ID format
-    const { isValid, error } = validateUUID(id, 'id');
+    const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
     }
-    const user = await UserService.getUserById(id);
+
+    const userService = new UserService();
+    const user = await userService.getUserById(req.params.id);
 
     if (!user) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
         resource: 'user',
-        id: id,
+        id: req.params.id,
       });
       return;
     }
@@ -31,6 +139,361 @@ router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
+    }
+  }
+});
+
+// GET /users/email/:email - Get user by email (OpenAPI pattern)
+router.get('/users/email/:email', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { email } = req.params;
+
+    if (!email || !email.includes('@')) {
+      sendError(res, 'VALIDATION_ERROR', 'Invalid email format', 400, {
+        field: 'email',
+        provided: email,
+      });
+      return;
+    }
+
+    const userService = new UserService();
+    const user = await userService.getUserByEmail(email);
+
+    if (!user) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        email: email,
+      });
+      return;
+    }
+
+    sendSuccess(res, user);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching user by email')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
+    }
+  }
+});
+
+// GET /users/username/:username - Get user by username (OpenAPI pattern)
+router.get('/users/username/:username', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { username } = req.params;
+
+    if (!username || username.length < 1) {
+      sendError(res, 'VALIDATION_ERROR', 'Username is required', 400, {
+        field: 'username',
+        provided: username,
+      });
+      return;
+    }
+
+    const userService = new UserService();
+    const user = await userService.getUserByUsername(username);
+
+    if (!user) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        username: username,
+      });
+      return;
+    }
+
+    sendSuccess(res, user);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching user by username')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
+    }
+  }
+});
+
+// GET /users - List users with pagination (admin/internal endpoint)
+router.get('/users', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
+
+    if (paginationError) {
+      sendError(res, paginationError.code, paginationError.message, 400);
+      return;
+    }
+
+    const userService = new UserService();
+    const allUsers = await userService.getAllUsers();
+
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const paginatedUsers = allUsers.slice(startIndex, startIndex + limit);
+
+    const paginationMeta = createPaginationMeta(page, limit, allUsers.length);
+
+    sendSuccess(res, paginatedUsers, 200, paginationMeta);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'listing users')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to list users');
+    }
+  }
+});
+
+// POST /users - Create new user (OpenAPI pattern)
+router.post('/users', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const createRequest = validateData(CreateUserSchema, req.body, res, 'user data');
+    if (!createRequest) return;
+
+    const userService = new UserService();
+    const user = await userService.createUser(createRequest as CreateUserRequest);
+
+    sendSuccess(res, user, 201);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'creating user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create user');
+    }
+  }
+});
+
+// POST /users/register - Register user with password (OpenAPI pattern)
+router.post('/users/register', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const registrationRequest = validateData(CreateUserWithPasswordSchema, req.body, res, 'registration data');
+    if (!registrationRequest) return;
+
+    const userService = new UserService();
+    const user = await userService.createUserWithPassword(registrationRequest);
+
+    sendSuccess(res, user, 201);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'registering user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to register user');
+    }
+  }
+});
+
+// PUT /users/:id - Update user (OpenAPI pattern)
+router.put('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const updates = validateData(UpdateUserSchema, req.body, res, 'user updates');
+    if (!updates) return;
+
+    const userService = new UserService();
+    const user = await userService.updateUserProfile(req.params.id, updates);
+
+    sendSuccess(res, user);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'updating user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update user');
+    }
+  }
+});
+
+// PUT /users/:id/profile - Update user profile (includes password change)
+router.put('/users/:id/profile', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    // Authorization: Users can only update their own profile
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only update your own profile', 403);
+      return;
+    }
+
+    const updates = validateData(UpdateUserProfileSchema, req.body, res, 'profile updates');
+    if (!updates) return;
+
+    // Validation: If changing password, current password is required
+    if (updates.newPassword && !updates.currentPassword) {
+      sendError(res, 'VALIDATION_ERROR', 'Current password is required when changing password', 400, {
+        field: 'currentPassword',
+        message: 'Current password must be provided to change password',
+      });
+      return;
+    }
+
+    const userService = new UserService();
+    const user = await userService.updateUserProfile(req.params.id, updates);
+
+    sendSuccess(res, user);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'updating user profile')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update user profile');
+    }
+  }
+});
+
+// DELETE /users/:id - Delete user (OpenAPI pattern)
+router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    // Authorization: Users can only delete their own account (or admin in future)
+    if (req.params.id !== req.user?.id) {
+      sendError(res, 'ACCESS_DENIED', 'You can only delete your own account', 403);
+      return;
+    }
+
+    const userService = new UserService();
+    const deleted = await userService.deleteUser(req.params.id);
+
+    if (!deleted) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        id: req.params.id,
+      });
+      return;
+    }
+
+    sendSuccess(res, { message: 'User deleted successfully' }, 200);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'deleting user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete user');
+    }
+  }
+});
+
+// ============================================================================
+// STRIPE INTEGRATION ENDPOINTS
+// ============================================================================
+
+// POST /users/:id/stripe - Link user to Stripe customer (OpenAPI pattern)
+router.post('/users/:id/stripe', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const linkRequest = validateData(LinkStripeSchema, req.body, res, 'Stripe data');
+    if (!linkRequest) return;
+
+    const userService = new UserService();
+    await userService.linkStripeCustomer(req.params.id, linkRequest.stripeCustomerId);
+
+    sendSuccess(res, { message: 'Stripe customer linked successfully' });
+  } catch (error) {
+    if (!handleCommonError(error, res, 'linking Stripe customer')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to link Stripe customer');
+    }
+  }
+});
+
+// GET /users/stripe/:stripeCustomerId - Get user by Stripe customer ID (OpenAPI pattern)
+router.get('/users/stripe/:stripeCustomerId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { stripeCustomerId } = req.params;
+
+    if (!stripeCustomerId.startsWith('cus_')) {
+      sendError(res, 'VALIDATION_ERROR', 'Invalid Stripe Customer ID format', 400, {
+        field: 'stripeCustomerId',
+        expected: 'cus_xxxxxxxx',
+        provided: stripeCustomerId,
+      });
+      return;
+    }
+
+    const userService = new UserService();
+    const user = await userService.getUserByStripeCustomerId(stripeCustomerId);
+
+    if (!user) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
+        resource: 'user',
+        stripeCustomerId: stripeCustomerId,
+      });
+      return;
+    }
+
+    sendSuccess(res, user);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching user by Stripe ID')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
+    }
+  }
+});
+
+// ============================================================================
+// ANALYTICS AND STATISTICS ENDPOINTS
+// ============================================================================
+
+// GET /users/stats - Get user statistics (admin endpoint)
+router.get('/users/stats', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    // TODO: Add admin authorization check in the future
+    // For now, any authenticated user can view stats
+
+    const userService = new UserService();
+    const stats = await userService.getUserStats();
+
+    sendSuccess(res, stats);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching user statistics')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user statistics');
+    }
+  }
+});
+
+// ============================================================================
+// AUTHENTICATION ENDPOINTS (for internal use)
+// ============================================================================
+
+// POST /users/authenticate - Authenticate user (internal endpoint)
+router.post('/users/authenticate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const authRequest = validateData(
+      z.object({
+        email: z.string().email(),
+        password: z.string().min(1),
+      }),
+      req.body,
+      res,
+      'authentication data'
+    );
+    if (!authRequest) return;
+
+    const userService = new UserService();
+    const user = await userService.authenticateUser(authRequest.email, authRequest.password);
+
+    if (!user) {
+      sendError(res, 'AUTHENTICATION_FAILED', 'Invalid email or password', 401);
+      return;
+    }
+
+    sendSuccess(res, user);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'authenticating user')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to authenticate user');
     }
   }
 });

@@ -7,12 +7,11 @@ import { getEnvConfig } from '@starships/env';
 import {
   AgentRepository,
   createConnection,
-  getConnection,
   migrationRunner,
+  seedAgentTemplates,
   seedWaitlist,
   StarshipRepository,
   UserRepository,
-  WaitlistRepository,
 } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -25,14 +24,13 @@ import agentRoutes from '@/routes/agents';
 import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
 import memoryRoutes from '@/routes/memory';
-import starshipRoutes, { initializeStarshipRoutes } from '@/routes/starships';
+import starshipRoutes from '@/routes/starships';
 import userRoutes from '@/routes/users';
 // import expeditionRoutes from '@/routes/expeditions';
 import missionRoutes from '@/routes/missions';
 import nativeApiKeysRoutes from '@/routes/native-api-keys';
 import waitlistRoutes from '@/routes/waitlist';
 import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
-import { AgentTemplateService } from '@/services/AgentTemplateService';
 
 // Import new error handling and health check routes
 import { errorHandler, notFoundHandler, requestIdMiddleware } from '@/middleware/errorHandler';
@@ -83,13 +81,7 @@ app.use(cookieParser());
 // Add error handling middleware
 app.use(requestIdMiddleware);
 
-// ## !CONFLICT - TS ERROR FROM CONFLICT RESOLUTION
-// Initialize starship routes with dependencies
-initializeStarshipRoutes({
-  starshipRepository,
-  agentRepository,
-  userRepository,
-});
+// Starship routes are now self-contained with internal service instantiation
 
 // Initialize webhook routes with dependencies
 initializeWebhookRoutes({
@@ -100,7 +92,7 @@ initializeWebhookRoutes({
 app.get('/api/v1/starships/pricing', async (req, res) => {
   try {
     const { SubscriptionService } = await import('./services/SubscriptionService');
-    const subscriptionService = new SubscriptionService(userRepository, starshipRepository);
+    const subscriptionService = new SubscriptionService();
     const pricing = await subscriptionService.getPricingData();
     res.json(pricing);
   } catch (error) {
@@ -152,23 +144,13 @@ httpServer.listen(PORT, async () => {
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
 
-    // Initialize WaitlistRepository with database connection
+    // Initialize Agent Templates (seeds default templates)
     try {
-      const waitlistConnection = getConnection();
-      const waitlistRepo = new WaitlistRepository(waitlistConnection);
-      console.log('✅ WaitlistRepository initialized and ready');
+      await seedAgentTemplates();
+      console.log('✅ Agent templates initialized with default templates');
     } catch (error) {
-      console.error('❌ Failed to initialize WaitlistRepository:', error);
-      // Continue startup - waitlist is not critical for the application
-    }
-
-    // Initialize AgentTemplateService (seeds default templates)
-    try {
-      const templateService = new AgentTemplateService(dbConnection);
-      await templateService.seedDefaultTemplates();
-      console.log('✅ AgentTemplateService initialized with default templates');
-    } catch (error) {
-      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable:', error);
+      console.error('⚠️ Failed to seed agent templates:', error);
+      // Continue - seeding is not critical for startup
     }
 
     // Initialize Waitlist (seeds approved emails)

@@ -6,7 +6,6 @@
  */
 
 import { MissionEntity } from '@/entities/MissionEntity';
-import { getConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type {
   CreateMissionRequest,
@@ -42,7 +41,7 @@ export class MissionRepository extends BaseRepository {
         await MissionEntity.validate(missionData, 'create');
 
         // Check if starship exists
-        const connection = getConnection();
+        const connection = this.getConnection();
         const starshipResult = await connection.executeQuery('MATCH (s:Starship {id: $starshipId}) RETURN s.id as id', {
           starshipId: request.starshipId,
         });
@@ -67,7 +66,7 @@ export class MissionRepository extends BaseRepository {
   async getMissionById(id: string): Promise<MissionModel> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:Mission) WHERE m.id = $id RETURN m', { id });
 
         if (!result || result.length === 0) {
@@ -86,7 +85,7 @@ export class MissionRepository extends BaseRepository {
   async getMissionModelsByStarshipId(starshipId: string, filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
 
         // Build WHERE clause
         let whereClause = 'm.starshipId = $starshipId';
@@ -132,7 +131,7 @@ export class MissionRepository extends BaseRepository {
   async getAllMissions(filters?: MissionFilters, sort?: MissionSort): Promise<MissionListResponse> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
 
         // Build WHERE clause
         let whereClause = '';
@@ -194,7 +193,7 @@ export class MissionRepository extends BaseRepository {
           await MissionEntity.validate(updates, 'update');
         }
 
-        const connection = getConnection();
+        const connection = this.getConnection();
         const now = new Date().toISOString();
 
         // Transform using Entity
@@ -243,7 +242,7 @@ export class MissionRepository extends BaseRepository {
   async deleteMissionModel(id: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (m:Mission) WHERE m.id = $id DETACH DELETE m RETURN count(m) as deletedCount',
           { id }
@@ -264,7 +263,7 @@ export class MissionRepository extends BaseRepository {
   async findByStatus(status: MissionModel['status'], starshipId?: string): Promise<MissionModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         let query = 'MATCH (m:Mission) WHERE m.status = $status';
         const params: any = { status };
 
@@ -286,7 +285,7 @@ export class MissionRepository extends BaseRepository {
   async findByCreatedBy(userId: string): Promise<MissionModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MissionModel }>(
           'MATCH (m:Mission) WHERE m.createdBy = $userId RETURN m ORDER BY m.createdAt DESC',
           { userId }
@@ -313,7 +312,7 @@ export class MissionRepository extends BaseRepository {
   async countMissionsByStatus(starshipId: string): Promise<Record<MissionModel['status'], number>> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ status: string; count: number }>(
           `MATCH (m:Mission) WHERE m.starshipId = $starshipId 
            RETURN m.status as status, count(m) as count`,

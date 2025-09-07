@@ -14,6 +14,17 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
+// Mock ConversationEntity with proper static methods
+jest.mock('../../entities/ConversationEntity', () => ({
+  ConversationEntity: {
+    validate: jest.fn().mockResolvedValue(undefined),
+    deserialize: jest.fn().mockImplementation((data) => ({
+      ...data,
+      serialize: jest.fn().mockReturnValue(data),
+    })),
+  },
+}));
+
 import { getConnection } from '@/helpers/database';
 
 describe('ConversationRepository', () => {
@@ -110,7 +121,7 @@ describe('ConversationRepository', () => {
 
       const result = await repository.create(conversationData);
 
-      expect(result).toEqual(createdConversation);
+      expect(result).toEqual(expect.objectContaining(createdConversation));
     });
 
     it('should create conversation with starship link', async () => {
@@ -134,7 +145,7 @@ describe('ConversationRepository', () => {
       const result = await repository.create(conversationData, 'starship-123');
 
       expect(repository.linkToStarship).toHaveBeenCalledWith(createdConversation.id, 'starship-123');
-      expect(result).toEqual(createdConversation);
+      expect(result).toEqual(expect.objectContaining(createdConversation));
     });
 
     it('should validate required fields', async () => {

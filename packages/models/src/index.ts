@@ -39,4 +39,5 @@ export type { HealthStatus, LogContext, LogLevel, PerformanceMetrics } from './h
 
 // Management scripts
 export { migrationRunner } from './scripts/migration-runner';
+export { seedAgentTemplates } from './scripts/seed-agent-templates';
 export { seedWaitlist } from './scripts/seed-waitlist';

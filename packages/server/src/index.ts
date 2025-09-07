@@ -32,7 +32,6 @@ import missionRoutes from '@/routes/missions';
 import nativeApiKeysRoutes from '@/routes/native-api-keys';
 import waitlistRoutes from '@/routes/waitlist';
 import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
-import { AgentTemplateService } from '@/services/AgentTemplateService';
 
 // Import new error handling and health check routes
 import { errorHandler, notFoundHandler, requestIdMiddleware } from '@/middleware/errorHandler';
@@ -156,14 +155,9 @@ httpServer.listen(PORT, async () => {
       // Continue startup - waitlist is not critical for the application
     }
 
-    // Initialize AgentTemplateService (seeds default templates)
-    try {
-      const templateService = new AgentTemplateService(dbConnection);
-      await templateService.seedDefaultTemplates();
-      console.log('✅ AgentTemplateService initialized with default templates');
-    } catch (error) {
-      console.warn('⚠️ AgentTemplateService not available - database connection may be unavailable:', error);
-    }
+    // Note: AgentTemplateService seeding removed from startup to avoid redundant operations
+    // To seed agent templates manually, run: pnpm run seed:agent-templates (from packages/models)
+    console.log('ℹ️  Agent templates can be seeded manually with: pnpm run seed:agent-templates');
 
     // Initialize Waitlist (seeds approved emails)
     try {

@@ -7,6 +7,7 @@ import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useConfiguredToolsCount } from '@/hooks/useNativeApiKeys'
 import { useStarshipBySlug, useStarships } from '@/hooks/useStarships'
 import { useToast } from '@/hooks/useToast'
 import { MCPServerConnector, mcpServerAPI } from '@/lib/api'
@@ -49,8 +50,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   // State for info button animation
   const [animateInfoButton, setAnimateInfoButton] = useState(false)
 
-  // State for tools count
-  const [configuredToolsCount, setConfiguredToolsCount] = useState(0)
+  // Get configured tools count from TanStack Query hook
+  const configuredToolsCount = useConfiguredToolsCount(starship?.id || '')
 
   // Handle dismissing the floating message
   const handleDismissMessage = () => {
@@ -358,7 +359,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
               <TabsContent value="api-keys" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
                 <div key="api-keys-content" className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar">
                   {starship?.id ? (
-                    <NativeToolApiKeys starshipId={starship.id} onConfiguredCountChange={setConfiguredToolsCount} />
+                    <NativeToolApiKeys starshipId={starship.id} />
                   ) : (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">

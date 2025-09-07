@@ -1,14 +1,14 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { Eye, EyeOff, Save, ExternalLink, Zap, Shield, DollarSign, Trash2, Settings, Check, Key, Info, CheckCircle2 } from 'lucide-react'
-import api from '@/lib/api'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useConfiguredToolsCount, useDeleteNativeApiKey, useNativeApiKeys, useSaveNativeApiKey } from '@/hooks/useNativeApiKeys'
+import { Check, CheckCircle2, DollarSign, ExternalLink, Eye, EyeOff, Info, Key, Save, Settings, Shield, Trash2, Zap } from 'lucide-react'
+import React, { useEffect, useState } from 'react'
 
 interface ConfigField {
   name: string
@@ -67,10 +67,14 @@ interface NativeToolApiKeysProps {
 }
 
 export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: NativeToolApiKeysProps) {
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({})
+  // TanStack Query hooks
+  const { data: apiKeys = {}, isLoading: loadingApiKeys } = useNativeApiKeys(starshipId)
+  const saveApiKeyMutation = useSaveNativeApiKey()
+  const deleteApiKeyMutation = useDeleteNativeApiKey()
+  const configuredToolsCount = useConfiguredToolsCount(starshipId)
+
   const [toolConfigs, setToolConfigs] = useState<Record<string, Record<string, string>>>({})
   const [showKey, setShowKey] = useState(false)
-  const [deleting, setDeleting] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   // Modal state
@@ -79,37 +83,12 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
   const [tempApiKey, setTempApiKey] = useState('')
   const [tempConfigs, setTempConfigs] = useState<Record<string, string>>({})
 
+  // Update parent with configured tools count
   useEffect(() => {
-    loadApiKeys()
-  }, [starshipId])
-
-  useEffect(() => {
-    const configuredCount = getConfiguredTools().length
     if (onConfiguredCountChange) {
-      onConfiguredCountChange(configuredCount)
+      onConfiguredCountChange(configuredToolsCount)
     }
-  }, [apiKeys, onConfiguredCountChange])
-
-  const loadApiKeys = async () => {
-    try {
-      const response = await api.get(`/api/starships/${starshipId}/native-api-keys`)
-
-      if (response.data) {
-        const keys: Record<string, string> = {}
-        NATIVE_TOOLS.forEach(tool => {
-          keys[tool.name] = response.data[tool.name] || ''
-        })
-        setApiKeys(keys)
-      }
-    } catch (error) {
-      console.error('Failed to load API keys:', error)
-      const keys: Record<string, string> = {}
-      NATIVE_TOOLS.forEach(tool => {
-        keys[tool.name] = ''
-      })
-      setApiKeys(keys)
-    }
-  }
+  }, [configuredToolsCount, onConfiguredCountChange])
 
   const openConfigModal = (toolName?: string) => {
     if (toolName) {
@@ -141,20 +120,15 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
   const saveApiKey = async () => {
     if (!selectedTool) return
 
-    setDeleting(true)
     setMessage(null)
 
     try {
-      await api.post(`/api/starships/${starshipId}/native-api-keys`, {
+      await saveApiKeyMutation.mutateAsync({
+        starshipId,
         toolName: selectedTool,
         apiKey: tempApiKey,
         config: tempConfigs,
       })
-
-      setApiKeys(prev => ({
-        ...prev,
-        [selectedTool]: tempApiKey,
-      }))
 
       setToolConfigs(prev => ({
         ...prev,
@@ -169,24 +143,19 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to save configuration' })
       console.error('Error saving API key:', error)
-    } finally {
-      setDeleting(false)
     }
   }
 
   const deleteApiKey = async () => {
     if (!selectedTool) return
 
-    setDeleting(true)
     setMessage(null)
 
     try {
-      await api.delete(`/api/starships/${starshipId}/native-api-keys/${selectedTool}`)
-
-      setApiKeys(prev => ({
-        ...prev,
-        [selectedTool]: '',
-      }))
+      await deleteApiKeyMutation.mutateAsync({
+        starshipId,
+        toolName: selectedTool,
+      })
 
       setToolConfigs(prev => ({
         ...prev,
@@ -201,8 +170,6 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to delete API key' })
       console.error('Error deleting API key:', error)
-    } finally {
-      setDeleting(false)
     }
   }
 
@@ -211,6 +178,12 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
   const getConfiguredTools = () => {
     return NATIVE_TOOLS.filter(tool => apiKeys[tool.name] && apiKeys[tool.name].length > 0)
   }
+
+  // Loading and mutation states
+  const isLoading = loadingApiKeys
+  const isSaving = saveApiKeyMutation.isPending
+  const isDeleting = deleteApiKeyMutation.isPending
+  const isMutating = isSaving || isDeleting
 
   return (
     <>
@@ -424,8 +397,8 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
               <DialogFooter className="flex items-center justify-between sm:justify-between">
                 <div>
                   {apiKeys[selectedTool] && (
-                    <Button variant="ghost" size="sm" onClick={deleteApiKey} disabled={deleting} className="text-red-600 hover:text-red-700 hover:bg-red-500/10">
-                      {deleting ? (
+                    <Button variant="ghost" size="sm" onClick={deleteApiKey} disabled={isMutating} className="text-red-600 hover:text-red-700 hover:bg-red-500/10">
+                      {isDeleting ? (
                         <span className="flex items-center gap-2">
                           <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                           Deleting...
@@ -440,11 +413,11 @@ export function NativeToolApiKeys({ starshipId, onConfiguredCountChange }: Nativ
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={closeModal} disabled={deleting} className="border-border/50">
+                  <Button variant="outline" onClick={closeModal} disabled={isMutating} className="border-border/50">
                     Cancel
                   </Button>
-                  <Button onClick={saveApiKey} disabled={!tempApiKey || deleting} className="bg-primary hover:bg-primary/90">
-                    {deleting ? (
+                  <Button onClick={saveApiKey} disabled={!tempApiKey || isMutating} className="bg-primary hover:bg-primary/90">
+                    {isSaving ? (
                       <span className="flex items-center gap-2">
                         <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
                         Saving...

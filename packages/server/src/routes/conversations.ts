@@ -1,5 +1,4 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { AgentService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
 import { MemoryService } from '@/services/MemoryService';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
@@ -80,37 +79,16 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { agentId, message } = bodyValidation;
     const userId = req.user!.id;
 
-    // Verify conversation exists
+    // Use service layer to add message to conversation
     const conversationService = new ConversationService();
-    const conversation = await conversationService.getConversationById(conversationId);
-    if (!conversation) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
-        resource: 'conversation',
-        id: conversationId,
-      });
-      return;
-    }
-
-    // Execute agent chat (using the same agent service that expects sessionId for backward compatibility)
-    const response = await AgentService.executeChat({
-      source: 'user',
+    const result = await conversationService.addMessage({
+      conversationId,
       agentId,
       userId,
       message,
-      conversationId: conversationId,
-      stream: false,
     });
 
-    // Update conversation metrics
-    await Promise.all([
-      conversationService.updateConversationActivity(conversationId),
-      conversationService.incrementMessageCount(conversationId),
-    ]);
-
-    sendSuccess(res, {
-      reply: response.content,
-      usage: response.usage,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     if (!handleCommonError(error, res, 'processing conversation message')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to process conversation message');

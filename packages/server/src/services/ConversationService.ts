@@ -1,3 +1,4 @@
+import { AgentService } from '@/services';
 import { ConversationRepository, MessageRepository } from '@starships/models';
 import { ConversationModel } from '@starships/protocol';
 
@@ -9,6 +10,18 @@ export interface CreateConversationData {
 
 export interface ConversationWithMessages extends ConversationModel {
   messages: any[]; // Using any[] to match existing Message type from routes
+}
+
+export interface AddMessageData {
+  conversationId: string;
+  agentId: string;
+  userId: string;
+  message: string;
+}
+
+export interface AddMessageResponse {
+  reply: string;
+  usage?: any;
 }
 
 /**
@@ -157,6 +170,37 @@ export class ConversationService {
       status,
       lastActivityAt: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Add message to conversation and get agent response
+   */
+  async addMessage(data: AddMessageData): Promise<AddMessageResponse> {
+    const { conversationId, agentId, userId, message } = data;
+
+    // Verify conversation exists
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation) {
+      throw new Error(`Conversation not found: ${conversationId}`);
+    }
+
+    // Execute agent chat
+    const response = await AgentService.executeChat({
+      source: 'user',
+      agentId,
+      userId,
+      message,
+      conversationId,
+      stream: false,
+    });
+
+    // Update conversation metrics
+    await Promise.all([this.updateConversationActivity(conversationId), this.incrementMessageCount(conversationId)]);
+
+    return {
+      reply: response.content,
+      usage: response.usage,
+    };
   }
 
   /**

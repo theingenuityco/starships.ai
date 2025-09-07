@@ -7,12 +7,11 @@ import { getEnvConfig } from '@starships/env';
 import {
   AgentRepository,
   createConnection,
-  getConnection,
   migrationRunner,
+  seedAgentTemplates,
   seedWaitlist,
   StarshipRepository,
   UserRepository,
-  WaitlistRepository,
 } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -145,19 +144,14 @@ httpServer.listen(PORT, async () => {
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
 
-    // Initialize WaitlistRepository with database connection
+    // Initialize Agent Templates (seeds default templates)
     try {
-      const waitlistConnection = getConnection();
-      const waitlistRepo = new WaitlistRepository(waitlistConnection);
-      console.log('✅ WaitlistRepository initialized and ready');
+      await seedAgentTemplates();
+      console.log('✅ Agent templates initialized with default templates');
     } catch (error) {
-      console.error('❌ Failed to initialize WaitlistRepository:', error);
-      // Continue startup - waitlist is not critical for the application
+      console.error('⚠️ Failed to seed agent templates:', error);
+      // Continue - seeding is not critical for startup
     }
-
-    // Note: AgentTemplateService seeding removed from startup to avoid redundant operations
-    // To seed agent templates manually, run: pnpm run seed:agent-templates (from packages/models)
-    console.log('ℹ️  Agent templates can be seeded manually with: pnpm run seed:agent-templates');
 
     // Initialize Waitlist (seeds approved emails)
     try {

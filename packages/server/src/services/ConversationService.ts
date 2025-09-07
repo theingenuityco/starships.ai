@@ -166,9 +166,9 @@ export class ConversationService {
   }
 
   /**
-   * Common method to update conversation status and activity timestamp
+   * Update conversation status and activity timestamp
    */
-  private async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
+  async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
     await this.conversationRepository.update(conversationId, {
       status,
       lastActivityAt: new Date().toISOString(),

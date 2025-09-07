@@ -1,18 +1,9 @@
 import api from '@/lib/api'
+import type { Message } from '@/types/chat'
 import type { ApiResponse, ConversationModel, ConversationSourceType } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
-
-// Message interface for client compatibility
-export interface Message {
-  id: string
-  content: string
-  role: 'user' | 'assistant'
-  timestamp: string
-  conversationId: string
-  sending?: boolean
-}
 
 // Centralized query keys
 export const CONVERSATION_QUERY_KEYS = {
@@ -92,10 +83,28 @@ export function useConversationMessages(conversationId: string, enabled: boolean
       const formattedMessages = messages.map((dbMsg: any) => ({
         id: dbMsg.id,
         content: dbMsg.content,
-        role: dbMsg.role as 'user' | 'assistant',
+        role: dbMsg.role as 'user' | 'assistant' | 'system',
         timestamp: dbMsg.timestamp,
         conversationId: dbMsg.conversation_id || conversationId,
-        ...(dbMsg.structured_content && { structuredContent: dbMsg.structured_content }),
+        agentId: dbMsg.agentId,
+
+        // Enhanced backend properties
+        messageType: dbMsg.messageType,
+        importance: dbMsg.importance,
+        processingStatus: dbMsg.processingStatus,
+        processingTimeMs: dbMsg.processingTimeMs,
+        tokenCount: dbMsg.tokenCount,
+        hasAttachments: dbMsg.hasAttachments,
+        contentLength: dbMsg.contentLength,
+
+        // Threading support
+        parentMessageId: dbMsg.parentMessageId,
+        threadDepth: dbMsg.threadDepth || 0,
+
+        // Additional metadata
+        metadata: dbMsg.metadata,
+        processingMetadata: dbMsg.processingMetadata,
+        contentHash: dbMsg.contentHash,
       }))
 
       return { messages: formattedMessages }
@@ -329,6 +338,45 @@ export function useDeleteConversation() {
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(context.starshipId),
         })
       }
+    },
+  })
+}
+
+// Update conversation status
+export function useUpdateConversationStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: { conversationId: string; status: 'active' | 'paused' | 'completed' | 'archived' }) => {
+      const response: AxiosResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}/status`, {
+        status: data.status,
+      })
+      return response.data.data
+    },
+    onSuccess: (updatedConversation, variables) => {
+      // Update the conversation in cache
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.detail(variables.conversationId), (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          conversation: updatedConversation,
+        }
+      })
+
+      // Invalidate related queries to ensure consistency
+      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(variables.conversationId) })
+
+      if (updatedConversation.starshipId) {
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(updatedConversation.starshipId) })
+      }
+
+      toast.success(`Conversation ${variables.status} successfully!`)
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update conversation status'
+      toast.error('Failed to update status', {
+        description: errorMessage,
+      })
     },
   })
 }

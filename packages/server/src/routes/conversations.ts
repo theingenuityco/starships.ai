@@ -292,6 +292,65 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
 });
 
 /**
+ * PATCH /conversations/:conversationId/status - Update conversation status
+ */
+router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Authentication check
+    if (!checkAuth(req, res)) return;
+
+    // Validate conversationId parameter
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+
+    // Validate request body
+    const bodyValidation = validateData(
+      z.object({
+        status: z.enum(['active', 'paused', 'completed', 'archived']),
+      }),
+      req.body,
+      res,
+      'conversation status update'
+    );
+    if (!bodyValidation) return;
+
+    const { conversationId } = paramValidation;
+    const { status } = bodyValidation;
+
+    // Use service layer to update conversation status
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+        resource: 'conversation',
+        id: conversationId,
+      });
+      return;
+    }
+
+    // Update status using appropriate method
+    switch (status) {
+      case 'completed':
+        await conversationService.completeConversation(conversationId);
+        break;
+      case 'archived':
+        await conversationService.archiveConversation(conversationId);
+        break;
+      default:
+        await conversationService.updateConversationStatus(conversationId, status);
+        break;
+    }
+
+    const updatedConversation = await conversationService.getConversationById(conversationId);
+    sendSuccess(res, updatedConversation, 200);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'updating conversation status')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update conversation status');
+    }
+  }
+});
+
+/**
  * DELETE /conversations/:conversationId - Delete conversation
  */
 router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

@@ -29,7 +29,7 @@ export class NativeApiKeyService {
     const starship = await this.starshipRepository.findById(starshipId);
 
     if (!starship) {
-      throw new NotFoundError(`Starship not found`, 'Starship', starshipId);
+      throw new NotFoundError('Starship', starshipId);
     }
 
     if (starship.ownerId !== userId) {

@@ -2,7 +2,7 @@
  * Response helpers for consistent API responses following OpenAPI standards
  */
 
-import { ErrorUtils } from '@starships/errors';
+import { isAppError } from '@starships/errors';
 import type { ApiErrorResponse, ApiResponse, ApiResponseMeta, StandardErrorCode } from '@starships/protocol';
 import type { Response } from 'express';
 
@@ -196,14 +196,14 @@ export function handleCommonError(error: any, res: Response, context: string): b
   console.error(`Error in ${context}:`, error);
 
   // Check if it's already a structured error from @starships/errors
-  if (ErrorUtils.isApplicationError(error)) {
+  if (isAppError(error)) {
     const response = error.toResponse();
     sendError(
       res,
-      response.code as StandardErrorCode,
-      response.message,
-      response.statusCode,
-      response.details as Record<string, any> | undefined
+      response.error.code as StandardErrorCode,
+      response.error.message,
+      error.statusCode,
+      response.error.details as Record<string, any> | undefined
     );
     return true;
   }

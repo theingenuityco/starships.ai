@@ -5,14 +5,19 @@
  * Provides detailed system status, dependency health, and performance metrics.
  */
 
-import { Router } from 'express';
+import { handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { AgentRepository, getConnection, logger, StarshipRepository, UserRepository } from '@starships/models';
 import type { Request, Response } from 'express';
-import { getConnection, StarshipRepository, UserRepository, AgentRepository } from '@starships/models';
-import { logger } from '@starships/models';
-import { ErrorUtils } from '@starships/errors';
-import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
+import { Router } from 'express';
 
 const router: Router = Router();
+
+/**
+ * Generate request ID for health checks
+ */
+function generateRequestId(): string {
+  return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
 
 /**
  * Health check response interface
@@ -49,7 +54,7 @@ interface HealthCheckResponse {
 
 // GET /health - Basic health check endpoint (OpenAPI pattern)
 router.get('/health', async (req: Request, res: Response): Promise<void> => {
-  const requestId = ErrorUtils.generateRequestId();
+  const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {
@@ -168,7 +173,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
 
 // GET /health/detailed - Detailed health check endpoint (OpenAPI pattern)
 router.get('/health/detailed', async (req: Request, res: Response): Promise<void> => {
-  const requestId = ErrorUtils.generateRequestId();
+  const requestId = generateRequestId();
   const startTime = Date.now();
 
   try {

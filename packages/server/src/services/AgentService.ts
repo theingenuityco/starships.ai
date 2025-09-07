@@ -7,7 +7,7 @@
  */
 
 import { Agent, Blueprint } from '@starships/autopilot';
-import { InternalServerError, NotFoundError, ValidationError } from '@starships/errors';
+import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
@@ -268,7 +268,7 @@ export class AgentService {
     // Check if agent exists first
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
-      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     await this.agentRepository.updateRating(agentId, rating);
@@ -281,7 +281,7 @@ export class AgentService {
     // Check if agent exists first
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
-      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     await this.agentRepository.incrementUsageCount(agentId);
@@ -294,7 +294,7 @@ export class AgentService {
     // Check if agent exists first
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
-      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     // TODO: Add business validation for starship existence and user access
@@ -359,7 +359,7 @@ export class AgentService {
 
     if (!dbAgent) {
       console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
-      throw new NotFoundError(`Agent ${agentId} not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
@@ -487,7 +487,7 @@ export class AgentService {
       // Get database agent
       const dbAgent = await this.agentRepository.findById(context.agentId);
       if (!dbAgent) {
-        throw new NotFoundError(`Agent ${context.agentId} not found`, 'Agent', context.agentId);
+        throw new NotFoundError('Agent', context.agentId);
       }
 
       // Create agent instance
@@ -781,7 +781,7 @@ export class AgentService {
    */
   private extractResponse(executionResult: any): string {
     if (executionResult.status !== 'completed') {
-      throw new InternalServerError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`);
+      throw createError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`, 500);
     }
 
     // Look for LLM response in execution results

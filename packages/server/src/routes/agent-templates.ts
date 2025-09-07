@@ -15,7 +15,7 @@ import {
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -26,7 +26,10 @@ const CreateAgentFromTemplateSchema = z.object({
     .string()
     .min(1, 'Agent name is required and must be a non-empty string')
     .max(255, 'Agent name must be less than 255 characters'),
-  starshipId: z.string().uuid('Invalid starship ID').optional(),
+  starshipId: z
+    .string()
+    .regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID')
+    .optional(),
 });
 
 // Helper function for Zod validation

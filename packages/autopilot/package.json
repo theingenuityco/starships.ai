@@ -25,7 +25,7 @@
   "dependencies": {
     "axios": "^1.11.0",
     "jsonata": "^2.0.3",
-    "nanoid": "^5.0.0"
+    "nanoid": "^5.1.5"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

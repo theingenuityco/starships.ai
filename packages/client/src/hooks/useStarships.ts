@@ -64,7 +64,7 @@ export function useStarshipBySlug(slug: string, enabled: boolean = true) {
   return useQuery({
     queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', slug] as const,
     queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/slug/${slug}`)
+      const response = await api.get(`/api/v1/starships/${slug}`)
       return extractResponseData<StarshipModel>(response)
     },
     enabled: !!slug && enabled,

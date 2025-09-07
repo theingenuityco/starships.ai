@@ -16,7 +16,7 @@ import {
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -33,7 +33,7 @@ const CreateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
-  starshipId: z.string().uuid('Invalid starship ID'),
+  starshipId: z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID'),
 });
 
 const UpdateAgentSchema = z.object({
@@ -47,7 +47,10 @@ const UpdateAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
   timeout: z.number().min(1000).optional(),
-  starshipId: z.string().uuid('Invalid starship ID').optional(),
+  starshipId: z
+    .string()
+    .regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID')
+    .optional(),
 });
 
 const RatingSchema = z.object({
@@ -55,7 +58,7 @@ const RatingSchema = z.object({
 });
 
 const StarshipAssignmentSchema = z.object({
-  starshipId: z.string().uuid('Invalid starship ID'),
+  starshipId: z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID'),
 });
 
 // Helper function for Zod validation
@@ -100,7 +103,7 @@ router.post('/agents/:id/ratings', jwtAuthMiddleware, async (req: Request, res: 
     if (!checkAuth(req, res)) return;
 
     // Validate agent ID parameter
-    const paramValidation = validateData(z.object({ id: UuidSchema }), req.params, res, 'agent parameter');
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -149,7 +152,7 @@ router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: 
     if (!checkAuth(req, res)) return;
 
     // Validate agent ID parameter
-    const paramValidation = validateData(z.object({ id: UuidSchema }), req.params, res, 'agent parameter');
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -569,7 +572,7 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
     if (!checkAuth(req, res)) return;
 
     // Validate agent ID parameter
-    const paramValidation = validateData(z.object({ id: UuidSchema }), req.params, res, 'agent parameter');
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
     // Validate request body

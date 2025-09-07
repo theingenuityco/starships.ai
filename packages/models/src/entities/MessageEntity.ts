@@ -5,6 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity.
  */
 
+import { Transformers } from '@/helpers/serializer';
 import type { MessageModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
@@ -13,35 +14,6 @@ import { IsBoolean, IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString,
  * Custom transformers for the MessageEntity
  */
 export class MessageTransformers {
-  /**
-   * Transform date strings to ISO format, handling various input formats
-   */
-  static DateTransform() {
-    return Transform(({ value }) => {
-      if (!value) return new Date().toISOString();
-      if (typeof value === 'string') return value;
-      if (value instanceof Date) return value.toISOString();
-      return new Date(value).toISOString();
-    });
-  }
-
-  /**
-   * Transform JSON objects for safe storage/retrieval
-   */
-  static JSONTransform() {
-    return Transform(({ value }) => {
-      if (!value) return undefined;
-      if (typeof value === 'string') {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return undefined;
-        }
-      }
-      return value;
-    });
-  }
-
   /**
    * Transform content length calculation
    */
@@ -61,7 +33,7 @@ export class MessageEntity implements MessageModel {
 
   // Base Message interface fields
   @Expose()
-  @MessageTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   timestamp!: string;
 
@@ -76,18 +48,18 @@ export class MessageEntity implements MessageModel {
 
   @Expose()
   @IsOptional()
-  @MessageTransformers.JSONTransform()
+  @Transformers.JsonTransform()
   @IsObject()
   metadata?: Record<string, unknown>;
 
   // Additional database fields
   @Expose()
-  @MessageTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @MessageTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -139,7 +111,7 @@ export class MessageEntity implements MessageModel {
 
   @Expose()
   @IsOptional()
-  @MessageTransformers.JSONTransform()
+  @Transformers.JsonTransform()
   @IsObject()
   processingMetadata?: Record<string, unknown>;
 

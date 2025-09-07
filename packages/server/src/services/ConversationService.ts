@@ -1,4 +1,5 @@
 import { AgentService } from '@/services';
+import { MessageService } from '@/services/MessageService';
 import { ConversationRepository, MessageRepository } from '@starships/models';
 import { ConversationModel } from '@starships/protocol';
 
@@ -30,10 +31,12 @@ export interface AddMessageResponse {
 export class ConversationService {
   private conversationRepository: ConversationRepository;
   private messageRepository: MessageRepository;
+  private messageService: MessageService;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageRepository = new MessageRepository();
+    this.messageService = new MessageService();
   }
 
   /**
@@ -184,6 +187,19 @@ export class ConversationService {
       throw new Error(`Conversation not found: ${conversationId}`);
     }
 
+    // Get starship information for message context
+    const starshipInfo = await this.getConversationStarship(conversationId);
+    if (!starshipInfo) {
+      throw new Error(`Unable to get starship information for conversation: ${conversationId}`);
+    }
+
+    // Save user message to database
+    await this.messageService.addToConversation(conversationId, 'user', message, {
+      starshipId: starshipInfo.id,
+      agentId,
+      userId,
+    });
+
     // Execute agent chat
     const response = await AgentService.executeChat({
       source: 'user',
@@ -194,8 +210,27 @@ export class ConversationService {
       stream: false,
     });
 
+    // Save agent response to database
+    await this.messageService.addToConversation(
+      conversationId,
+      'assistant',
+      response.content,
+      {
+        starshipId: starshipInfo.id,
+        agentId,
+        userId,
+      },
+      {
+        usage: response.usage,
+        tokenCount: response.usage?.totalTokens,
+      }
+    );
+
     // Update conversation metrics
-    await Promise.all([this.updateConversationActivity(conversationId), this.incrementMessageCount(conversationId)]);
+    await Promise.all([
+      this.updateConversationActivity(conversationId),
+      this.incrementMessageCount(conversationId, 2), // User message + assistant response
+    ]);
 
     return {
       reply: response.content,

@@ -361,6 +361,7 @@ const DEFAULT_TEMPLATES: Array<
 > = [
   {
     name: 'General Assistant',
+    slug: 'general-assistant',
     description: 'A helpful general-purpose assistant powered by autopilot workflows for enhanced capabilities.',
     category: 'general',
     tags: ['general', 'helpful', 'assistant', 'versatile', 'autopilot'],
@@ -383,6 +384,7 @@ const DEFAULT_TEMPLATES: Array<
   },
   {
     name: 'Code Reviewer',
+    slug: 'code-reviewer',
     description: 'An expert code reviewer with advanced autopilot workflows for comprehensive code analysis and improvement suggestions.',
     category: 'coding',
     tags: ['programming', 'code-review', 'debugging', 'best-practices', 'autopilot'],
@@ -410,6 +412,7 @@ const DEFAULT_TEMPLATES: Array<
   },
   {
     name: 'Creative Writer',
+    slug: 'creative-writer',
     description: 'A creative writing assistant with structured autopilot workflows for ideation, planning, and content creation.',
     category: 'creative',
     tags: ['writing', 'storytelling', 'creative', 'content', 'fiction', 'autopilot'],
@@ -437,6 +440,7 @@ const DEFAULT_TEMPLATES: Array<
   },
   {
     name: 'Data Analyst',
+    slug: 'data-analyst',
     description: 'An analytical assistant powered by autopilot for data interpretation, visualization, and insights.',
     category: 'analysis',
     tags: ['data', 'analysis', 'statistics', 'insights', 'visualization', 'autopilot'],
@@ -460,6 +464,7 @@ const DEFAULT_TEMPLATES: Array<
   },
   {
     name: 'Customer Support',
+    slug: 'customer-support',
     description: 'A friendly customer support assistant with autopilot-powered workflows for issue resolution.',
     category: 'support',
     tags: ['customer-service', 'support', 'help', 'professional', 'problem-solving', 'autopilot'],
@@ -483,6 +488,7 @@ const DEFAULT_TEMPLATES: Array<
   },
   {
     name: 'Sibyl',
+    slug: 'sibyl',
     description:
       'Your expert starship navigator and first officer who helps new captains get started, configure their crew, and begin their journey.',
     category: 'general',
@@ -528,13 +534,12 @@ export async function seedAgentTemplates(): Promise<void> {
 
     for (const template of DEFAULT_TEMPLATES) {
       try {
-        // Check if template already exists by searching for exact name match with system author
-        const existing = await templateRepo.searchTemplates(template.name as string);
-        const alreadyExists = existing.some((t) => t.name === template.name && t.authorId === 'system');
+        // Check if template already exists by slug - more reliable than name search
+        const existingTemplate = await templateRepo.findBySlug(template.slug as string);
 
-        if (alreadyExists) {
+        if (existingTemplate) {
           existingCount++;
-          logger.debug(`Agent template already exists: ${template.name}`);
+          logger.debug(`Agent template already exists: ${template.name} (slug: ${template.slug})`);
         } else {
           // Create the template
           await templateRepo.create({
@@ -543,11 +548,13 @@ export async function seedAgentTemplates(): Promise<void> {
             updatedAt: new Date().toISOString(),
           });
           addedCount++;
-          logger.info(`Agent template created: ${template.name}`);
+          logger.info(`Agent template created: ${template.name} (slug: ${template.slug})`);
         }
       } catch (error) {
         errorCount++;
-        logger.warn(`Agent template error processing ${template.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        logger.warn(
+          `Agent template error processing ${template.name} (slug: ${template.slug}): ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     }
 

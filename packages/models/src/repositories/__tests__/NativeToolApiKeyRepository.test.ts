@@ -22,9 +22,9 @@ jest.mock('crypto', () => ({
   }),
 }));
 
-import { NativeToolApiKeyRepository } from '@/repositories/NativeToolApiKeyRepository';
 import { Neo4jConnection, getConnection } from '@/helpers/database';
-import { ValidationError, DatabaseError, ConflictError } from '@starships/errors';
+import { NativeToolApiKeyRepository } from '@/repositories/NativeToolApiKeyRepository';
+import { ConflictError, DatabaseError, ValidationError } from '@starships/errors';
 import crypto from 'crypto';
 
 describe('NativeToolApiKeyRepository', () => {

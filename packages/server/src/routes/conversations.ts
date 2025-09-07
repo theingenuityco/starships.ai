@@ -1,9 +1,8 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { AgentService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
-import getStore from '@/store';
+import { MemoryService } from '@/services/MemoryService';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
-import { MessageRepository } from '@starships/models';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
@@ -144,9 +143,9 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
       return;
     }
 
-    // Clear conversation memory
-    const store = getStore();
-    await store.clear(conversationId);
+    // Clear conversation memory using service layer
+    const memoryService = new MemoryService();
+    await memoryService.clearConversationSessionMemory(conversationId);
 
     sendSuccess(res, { message: 'Conversation memory cleared successfully' }, 200);
   } catch (error) {
@@ -175,10 +174,11 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     const { conversationId } = paramValidation;
     const { page, limit } = paginationValidation;
 
-    // Get conversation details
+    // Use service layer for consistent data access
     const conversationService = new ConversationService();
-    const conversation = await conversationService.getConversationById(conversationId);
-    if (!conversation) {
+    const conversationWithMessages = await conversationService.getConversationWithMessages(conversationId, limit, (page - 1) * limit);
+
+    if (!conversationWithMessages) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
         resource: 'conversation',
         id: conversationId,
@@ -186,22 +186,8 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
-    // Fetch conversation messages with pagination
-    const offset = (page - 1) * limit;
-    const messageRepository = new MessageRepository();
-    const messages = await messageRepository.findByConversationId(conversationId, limit, offset);
-
-    const paginationMeta = createPaginationMeta(page, limit, messages.length);
-
-    sendSuccess(
-      res,
-      {
-        ...conversation,
-        messages,
-      },
-      200,
-      paginationMeta
-    );
+    const paginationMeta = createPaginationMeta(page, limit, conversationWithMessages.messages.length);
+    sendSuccess(res, conversationWithMessages, 200, paginationMeta);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching conversation details')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch conversation details');
@@ -228,13 +214,15 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     const { starshipId } = paramValidation;
     const { page, limit } = paginationValidation;
 
-    // For now, return empty array since conversations don't have direct starship relationships
-    // In the future, you might implement starship-conversation relationships
-    const conversations: any[] = [];
-    const total = 0;
+    // Use service layer to get conversations by starship
+    const conversationService = new ConversationService();
+    const allConversations = await conversationService.getConversationsByStarship(starshipId);
 
-    // Create pagination metadata
-    const paginationMeta = createPaginationMeta(page, limit, total);
+    // Apply pagination
+    const offset = (page - 1) * limit;
+    const conversations = allConversations.slice(offset, offset + limit);
+
+    const paginationMeta = createPaginationMeta(page, limit, allConversations.length);
     sendSuccess(res, conversations, 200, paginationMeta);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship conversations')) {
@@ -269,12 +257,15 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
       return;
     }
 
-    // For now, return empty array since conversations don't have direct user relationships
-    // In the future, you might implement user-conversation relationships
-    const conversations: any[] = [];
-    const total = 0;
+    // Use service layer to get conversations by user
+    const conversationService = new ConversationService();
+    const allConversations = await conversationService.getConversationsByUser(targetUserId);
 
-    const paginationMeta = createPaginationMeta(page, limit, total);
+    // Apply pagination
+    const offset = (page - 1) * limit;
+    const conversations = allConversations.slice(offset, offset + limit);
+
+    const paginationMeta = createPaginationMeta(page, limit, allConversations.length);
     sendSuccess(res, conversations, 200, paginationMeta);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching user conversations')) {
@@ -296,6 +287,8 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       z.object({
         source: ConversationSourceSchema,
         metadata: z.object({}).passthrough().optional(),
+        starshipId: z.string().uuid().optional(),
+        userId: z.string().uuid().optional(),
       }),
       req.body,
       res,
@@ -303,10 +296,14 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     );
     if (!bodyValidation) return;
 
-    const { metadata } = bodyValidation;
+    const { metadata, starshipId, userId } = bodyValidation;
 
     const conversationService = new ConversationService();
-    const conversation = await conversationService.createConversation({ metadata });
+    const conversation = await conversationService.createConversation({
+      metadata,
+      starshipId,
+      userId,
+    });
 
     sendSuccess(res, conversation, 201);
   } catch (error) {

@@ -5,17 +5,18 @@
  * Orchestrates between database persistence (MemoryRepository) and business logic.
  */
 
+import getStore from '@/store';
+import { NotFoundError } from '@starships/errors';
 import { MemoryRepository } from '@starships/models';
 import type {
-  MemoryModel,
-  CreateMemoryRequest,
   CreateAgentMemoryRequest,
-  UpdateMemoryRequest,
+  CreateMemoryRequest,
+  MemoryFilters,
+  MemoryModel,
   SearchMemoriesRequest,
   SearchMemoriesResponse,
-  MemoryFilters,
+  UpdateMemoryRequest,
 } from '@starships/protocol';
-import { NotFoundError } from '@starships/errors';
 
 export interface MemoryServiceOptions {
   includeStats?: boolean;
@@ -265,6 +266,42 @@ export class MemoryService {
       messageCount: 0,
       updatedAt: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Clear agent session memory (in-memory store)
+   * Business logic for clearing session-based memory for agent-user pairs
+   */
+  async clearAgentSessionMemory(agentId: string, userId: string): Promise<void> {
+    console.log('🧹 [MEMORY-SERVICE] Clearing agent session memory:', {
+      agentId,
+      userId: userId.substring(0, 8) + '...',
+      timestamp: new Date().toISOString(),
+    });
+
+    // Use the store to clear session memory
+    const store = getStore();
+    const key = store.makeKey(agentId, userId);
+    await store.clear(key);
+
+    console.log('✅ [MEMORY-SERVICE] Agent session memory cleared successfully');
+  }
+
+  /**
+   * Clear conversation session memory (in-memory store)
+   * Business logic for clearing session-based memory for conversations
+   */
+  async clearConversationSessionMemory(conversationId: string): Promise<void> {
+    console.log('🧹 [MEMORY-SERVICE] Clearing conversation session memory:', {
+      conversationId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Use the store to clear conversation memory
+    const store = getStore();
+    await store.clear(conversationId);
+
+    console.log('✅ [MEMORY-SERVICE] Conversation session memory cleared successfully');
   }
 
   // ============================================================================

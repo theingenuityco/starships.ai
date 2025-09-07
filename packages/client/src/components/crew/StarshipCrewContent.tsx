@@ -10,7 +10,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useStarshipBySlug, useStarships } from '@/hooks/useStarships'
 import { useToast } from '@/hooks/useToast'
-import { Agent, MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import { MCPServerConnector, mcpServerAPI } from '@/lib/api'
+import type { AgentModel } from '@starships/protocol'
 import { Activity, ArrowLeft, Bot, Info, Loader2, MessageSquare, Plug, Shield, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
 
@@ -19,14 +20,14 @@ interface StarshipCrewContentProps {
 }
 
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
   const { data: starshipsResponse } = useStarships()
   const { data: starshipData, isLoading: starshipLoading, error: starshipError } = useStarshipBySlug(slug)
   const starships = starshipsResponse?.starships || []
-  const starship = starshipData?.starship || null
+  const starship = starshipData || null
 
   // Connector instance state management
   const [connectorInstances, setConnectorInstances] = useState<MCPServerConnector[]>([])
@@ -37,7 +38,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [isManualOpen, setIsManualOpen] = useState(false)
   const [currentTab, setCurrentTab] = useState('agents')
 
-  const handleAgentSelect = (agent: Agent) => {
+  const handleAgentSelect = (agent: AgentModel) => {
     setSelectedAgent(agent)
     setConversationId(null) // Reset conversation when agent changes
   }
@@ -80,12 +81,12 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   useEffect(() => {
     if (starshipError) {
       toast({
-        title: 'Error',
-        description: 'Failed to load starship data',
+        title: 'Starship Not Found',
+        description: `Could not find starship "${slug}". It may not exist or you may not have access to it.`,
         variant: 'destructive',
       })
     }
-  }, [starshipError, toast])
+  }, [starshipError, slug, toast])
 
   // Check if this is the user's first starship and show onboarding
   useEffect(() => {
@@ -280,13 +281,36 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                         <p className="text-sm text-muted-foreground font-medium">Discovering available agents...</p>
                       </div>
                     </div>
+                  ) : !starship ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="relative">
+                          <div className="absolute inset-0 bg-destructive/5 blur-sm" />
+                          <div className="relative bg-gradient-to-br from-destructive/15 to-destructive/10 p-12 rounded-xl shadow-sm border border-destructive/15">
+                            <svg className="h-16 w-16 text-destructive mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5l-6.928-12c-.77-.833-2.694-.833-3.464 0l-6.928 12c-.77.833.192 2.5 1.732 2.5z"
+                              />
+                            </svg>
+                            <h3 className="text-xl font-bold mb-2">Starship Not Found</h3>
+                            <p className="text-sm text-muted-foreground mb-4">The starship &quot;{slug}&quot; could not be found or you don&apos;t have access to it.</p>
+                            <Button asChild variant="outline">
+                              <Link href="/">Return Home</Link>
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <AgentSelector
                       selectedAgent={selectedAgent}
                       onAgentSelect={handleAgentSelect}
                       showCreateButton={true}
                       showFilters={true}
-                      starshipId={starship?.id}
+                      starshipId={starship.id}
                       onAgentsCountChange={setAgentsCount}
                     />
                   )}

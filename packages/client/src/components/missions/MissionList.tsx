@@ -1,21 +1,22 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'motion/react'
-import { useRouter } from 'next/navigation'
-import { Target, Plus, Edit, Trash2, Play, CheckCircle, XCircle, Clock, AlertCircle, SortAsc, SortDesc, Users } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { useStarshipAgents } from '@/hooks/useStarships'
 import { useToast } from '@/hooks/useToast'
 import { missionApi } from '@/lib/missionApi'
-import { useStarshipAgents } from '@/hooks/useStarships'
+import type { CreateMissionRequest, MissionFilters, MissionModel, MissionSort, MissionStatus, UpdateMissionRequest } from '@starships/protocol'
+import { AlertCircle, CheckCircle, Clock, Edit, Play, Plus, SortAsc, SortDesc, Target, Trash2, Users, XCircle } from 'lucide-react'
+import { AnimatePresence, motion } from 'motion/react'
+import { useRouter } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
 
 // Type for deployed agents - use the API response type directly
 type DeployedAgent = {
@@ -39,7 +40,6 @@ type DeployedAgent = {
   allowedStarshipClasses?: ('scout' | 'cruiser' | 'draught')[]
   requiredPermissions?: string[]
 }
-import type { MissionModel, MissionStatus, CreateMissionRequest, UpdateMissionRequest, MissionFilters, MissionSort } from '@starships/protocol'
 
 interface MissionListProps {
   starshipId?: string
@@ -448,13 +448,7 @@ function CreateMissionForm({ starshipId, onSubmit, onCancel }: { starshipId: str
 
   // Use TanStack Query hook for agents
   const { data: agentsData, isLoading: loadingAgents, error: agentsError } = useStarshipAgents(starshipId)
-  const agents =
-    agentsData?.deployedAgents?.map((agent: any) => ({
-      ...agent,
-      tags: agent.tags || [],
-      authorId: agent.authorId || '',
-      isPublic: agent.isPublic || false,
-    })) || []
+  const agents = agentsData || []
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -513,7 +507,7 @@ function CreateMissionForm({ starshipId, onSubmit, onCancel }: { starshipId: str
             <div className="text-sm text-muted-foreground py-2">No agents available. Deploy agents to your starship first.</div>
           ) : (
             <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-3">
-              {agents.map(agent => (
+              {agents.map((agent: DeployedAgent) => (
                 <div key={agent.id} className="flex items-center space-x-2">
                   <Checkbox id={`agent-${agent.id}`} checked={formData.agentIds.includes(agent.id)} onCheckedChange={checked => handleAgentToggle(agent.id, checked as boolean)} />
                   <label htmlFor={`agent-${agent.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1">
@@ -561,13 +555,7 @@ function EditMissionForm({ mission, onSubmit, onCancel }: { mission: MissionMode
 
   // Use TanStack Query hook for agents
   const { data: agentsData, isLoading: loadingAgents, error: agentsError } = useStarshipAgents(mission.starshipId)
-  const agents =
-    agentsData?.deployedAgents?.map((agent: any) => ({
-      ...agent,
-      tags: agent.tags || [],
-      authorId: agent.authorId || '',
-      isPublic: agent.isPublic || false,
-    })) || []
+  const agents = agentsData || []
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -627,7 +615,7 @@ function EditMissionForm({ mission, onSubmit, onCancel }: { mission: MissionMode
             <div className="text-sm text-muted-foreground py-2">No agents available.</div>
           ) : (
             <div className="space-y-2 max-h-40 overflow-y-auto border rounded p-3">
-              {agents.map(agent => (
+              {agents.map((agent: DeployedAgent) => (
                 <div key={agent.id} className="flex items-center space-x-2">
                   <Checkbox id={`edit-agent-${agent.id}`} checked={(formData.agentIds || []).includes(agent.id)} onCheckedChange={checked => handleAgentToggle(agent.id, checked as boolean)} />
                   <label htmlFor={`edit-agent-${agent.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1">

@@ -34,6 +34,7 @@ export function mockRepositoryQuery(mockConnection: any, data: any) {
         c: item, // for Conversation queries
         blueprint: item, // for Blueprint queries
         mc: item, // for MissionClarity queries
+        user: item, // for User queries with 'user' alias
       }))
     );
   } else if (data) {
@@ -47,6 +48,7 @@ export function mockRepositoryQuery(mockConnection: any, data: any) {
         c: data,
         blueprint: data,
         mc: data,
+        user: data,
       },
     ]);
   } else {
@@ -57,4 +59,28 @@ export function mockRepositoryQuery(mockConnection: any, data: any) {
 export function mockRepositoryError(mockConnection: any, errorMessage: string = 'Database error') {
   mockConnection.executeQuery.mockRejectedValue(new Error(errorMessage));
   mockConnection.executeWrite.mockRejectedValue(new Error(errorMessage));
+}
+
+export function mockConstraintViolationError(mockConnection: any) {
+  const constraintError = new Error('Neo.ClientError.Schema.ConstraintValidationFailed: constraint violation');
+  mockConnection.executeWrite.mockRejectedValue(constraintError);
+}
+
+export function mockMergeEntityWithAutoId(mockConnection: any, data: any) {
+  // Mock the mergeEntityWithAutoId pattern
+  mockConnection.executeWrite.mockResolvedValue([{ n: data }]);
+}
+
+export function mockUpdateEntity(mockConnection: any, data: any) {
+  // Mock update operations
+  if (data) {
+    mockConnection.executeWrite.mockResolvedValue([{ u: data }]);
+  } else {
+    mockConnection.executeWrite.mockResolvedValue([]);
+  }
+}
+
+export function mockDeleteEntity(mockConnection: any, deleted: boolean = true) {
+  // Mock delete operations
+  mockConnection.executeWrite.mockResolvedValue([{ deletedCount: deleted ? 1 : 0 }]);
 }

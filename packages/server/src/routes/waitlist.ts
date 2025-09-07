@@ -1,12 +1,43 @@
-import { Router } from 'express';
-import type { Request, Response } from 'express';
-import { WaitlistRepository, getConnection } from '@starships/models';
+import { asyncHandler } from '@/middleware/errorHandler';
 import { WaitlistService } from '@/services/WaitlistService';
 import { logger } from '@/utils/logger';
-import { asyncHandler } from '@/middleware/errorHandler';
-import { sendSuccess, sendError, handleCommonError } from '@/utils/responseHelpers';
+import { handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { getConnection, WaitlistRepository } from '@starships/models';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
+import { z, ZodError } from 'zod';
 
 const router: Router = Router();
+
+// Zod schemas for validation
+const WaitlistCheckSchema = z.object({
+  email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
+});
+
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
 
 // Initialize waitlist service with proper error handling
 const getWaitlistService = () => {
@@ -27,26 +58,11 @@ router.post(
   '/waitlist/check',
   asyncHandler(async (req: Request, res: Response): Promise<void> => {
     try {
-      const { email } = req.body;
+      // Validate request body
+      const bodyValidation = validateData(WaitlistCheckSchema, req.body, res, 'waitlist check data');
+      if (!bodyValidation) return;
 
-      // Validate input
-      if (!email || typeof email !== 'string') {
-        sendError(res, 'MISSING_REQUIRED_FIELD', 'Please provide a valid email address', 400, {
-          field: 'email',
-          provided: typeof email,
-        });
-        return;
-      }
-
-      // Basic email format validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        sendError(res, 'VALIDATION_ERROR', 'Please provide a valid email address', 400, {
-          field: 'email',
-          constraint: 'email_format',
-        });
-        return;
-      }
+      const { email } = bodyValidation;
 
       // Use service to check approval
       let waitlistService;

@@ -2,9 +2,9 @@
  * MissionMessageRepository Unit Tests
  */
 
-import { MissionMessageRepository } from '@/repositories/MissionMessageRepository';
 import { Neo4jConnection, getConnection } from '@/helpers/database';
-import { ValidationError, DatabaseError, NotFoundError, ConflictError } from '@starships/errors';
+import { MissionMessageRepository } from '@/repositories/MissionMessageRepository';
+import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import type { MissionMessageModel, MissionMessageRole } from '@starships/protocol';
 
 // Mock dependencies

@@ -24,7 +24,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
-  const [refreshMessages, setRefreshMessages] = useState(0)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
 
   // Reset conversation when agent/starship changes - let server manage conversation IDs
@@ -34,12 +33,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // Use external conversation ID when provided
         setCurrentConversationId(externalConversationId)
         setHasMessages(!!externalConversationId)
-        setRefreshMessages(prev => prev + 1)
       } else if (selectedAgent) {
         // Reset conversation for agent - server will provide actual conversation ID
         setCurrentConversationId(null)
         setHasMessages(false)
-        setRefreshMessages(prev => prev + 1)
       } else {
         // No conversation without selected agent
         setCurrentConversationId(null)
@@ -86,7 +83,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Handle first message to trigger layout transition
   const handleFirstMessage = (_message: Message) => {
     setHasMessages(true)
-    setRefreshMessages(prev => prev + 1)
   }
 
   // Handle suggestion click
@@ -105,7 +101,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <AnimatePresence>
         {hasMessages && currentConversationId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0 overflow-hidden">
-            <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} key={`${currentConversationId}-${refreshMessages}`} />
+            <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} key={currentConversationId} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -164,8 +160,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 conversationId={currentConversationId}
                 onConversationStart={handleConversationStart}
                 onMessageSent={handleFirstMessage}
-                onMessageReceived={(message: Message) => {
-                  setRefreshMessages(prev => prev + 1)
+                onMessageReceived={() => {
+                  // Message updates are now handled automatically by React Query
+                  // This callback is kept for compatibility but no longer needed for refresh
                 }}
                 disabled={!selectedAgent}
                 minimal={hasMessages}

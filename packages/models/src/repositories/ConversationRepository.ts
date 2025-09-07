@@ -1,20 +1,11 @@
-import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { ConversationModel } from '@starships/protocol';
+import { ConversationEntity } from '../entities/ConversationEntity';
 
 export class ConversationRepository extends BaseRepository {
-  private connection: Neo4jConnection | null = null;
-
   constructor(connection?: Neo4jConnection) {
-    super('ConversationRepository');
-    this.connection = connection || null;
-  }
-
-  private getConnection(): Neo4jConnection {
-    if (!this.connection) {
-      this.connection = getConnection();
-    }
-    return this.connection;
+    super('ConversationRepository', connection);
   }
 
   async findAll(): Promise<ConversationModel[]> {
@@ -24,16 +15,7 @@ export class ConversationRepository extends BaseRepository {
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
         );
-        return result.map((record) =>
-          this.mapFromDatabaseRecord<ConversationModel>(record.c, {
-            jsonFields: ['metadata'],
-            defaultValues: {
-              messageCount: 0,
-              totalTokens: 0,
-              status: 'active',
-            },
-          })
-        );
+        return result.map((record) => ConversationEntity.deserialize(record.c));
       },
       'findAll',
       'Conversation'
@@ -45,16 +27,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0
-          ? this.mapFromDatabaseRecord<ConversationModel>(result[0].c, {
-              jsonFields: ['metadata'],
-              defaultValues: {
-                messageCount: 0,
-                totalTokens: 0,
-                status: 'active',
-              },
-            })
-          : null;
+        return result.length > 0 ? ConversationEntity.deserialize(result[0].c) : null;
       },
       'findById',
       'Conversation',
@@ -65,69 +38,36 @@ export class ConversationRepository extends BaseRepository {
   async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate required fields using BaseRepository validation
-        this.validateRequired(entity, ['lastActivityAt', 'messageCount', 'status'], 'create');
-
-        // Validate field types
-        this.validateTypes(
-          entity,
-          {
-            lastActivityAt: 'string',
-            messageCount: 'number',
-            status: 'string',
-            totalTokens: 'number',
-          },
-          'create'
-        );
-
-        // Validate enum values (status)
-        this.validateEnums(
-          entity,
-          {
-            status: ['active', 'paused', 'completed', 'archived'],
-          },
-          'create'
-        );
-
-        // Validate string lengths
-        this.validateStringLengths(
-          entity,
-          {
-            status: { min: 1, max: 50 },
-          },
-          'create'
-        );
+        // Use lean validation from ConversationEntity
+        await ConversationEntity.validate(entity, 'create');
 
         const connection = this.getConnection();
-        const now = this.getCurrentTimestamp();
+        const now = new Date().toISOString();
 
         // Prepare conversation data with defaults and validation
-        const conversationData = {
+        const conversationEntity = ConversationEntity.deserialize({
+          ...entity,
           createdAt: now,
           lastActivityAt: entity.lastActivityAt || now,
           messageCount: entity.messageCount || 0,
           totalTokens: entity.totalTokens || 0,
           status: entity.status || 'active',
-          metadata: this.safeJsonStringify(entity.metadata),
-        };
+        });
+
+        const conversationData = conversationEntity.serialize();
+        // Remove id since it will be auto-generated
+        delete conversationData.id;
 
         // Use BaseRepository serialization (the conversationData is already properly prepared)
-        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData, connection);
+        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
 
         // Create relationship with starship if starshipId is provided
         if (starshipId) {
           await this.linkToStarship(result.id, starshipId);
         }
 
-        // Use consistent mapping from database record
-        return this.mapFromDatabaseRecord<ConversationModel>(result, {
-          jsonFields: ['metadata'],
-          defaultValues: {
-            messageCount: 0,
-            totalTokens: 0,
-            status: 'active',
-          },
-        });
+        // Use ConversationEntity for consistent mapping
+        return ConversationEntity.deserialize(result);
       },
       'create',
       'Conversation'
@@ -137,27 +77,8 @@ export class ConversationRepository extends BaseRepository {
   async update(id: string, updates: Partial<ConversationModel>): Promise<ConversationModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate updates using BaseRepository validation
-        if (updates.status !== undefined) {
-          this.validateEnums(
-            updates,
-            {
-              status: ['active', 'paused', 'completed', 'archived'],
-            },
-            'update'
-          );
-        }
-
-        if (updates.messageCount !== undefined || updates.totalTokens !== undefined) {
-          this.validateTypes(
-            updates,
-            {
-              messageCount: 'number',
-              totalTokens: 'number',
-            },
-            'update'
-          );
-        }
+        // Use lean validation from ConversationEntity for updates
+        await ConversationEntity.validate(updates, 'update');
 
         const connection = this.getConnection();
         const setFields = [];
@@ -182,7 +103,10 @@ export class ConversationRepository extends BaseRepository {
         }
         if (updates.metadata !== undefined) {
           setFields.push('c.metadata = $metadata');
-          params.metadata = this.safeJsonStringify(updates.metadata);
+          // Use ConversationEntity to handle metadata serialization
+          const tempEntity = ConversationEntity.deserialize({ metadata: updates.metadata });
+          const serialized = tempEntity.serialize();
+          params.metadata = serialized.metadata;
         }
 
         if (setFields.length === 0) {
@@ -191,7 +115,7 @@ export class ConversationRepository extends BaseRepository {
 
         // Always update the updatedAt field
         setFields.push('c.updatedAt = $updatedAt');
-        params.updatedAt = this.getCurrentTimestamp();
+        params.updatedAt = new Date().toISOString();
 
         const result = await connection.executeWrite<{ c: ConversationModel }>(
           `MATCH (c:Conversation) WHERE c.id = $id
@@ -204,15 +128,8 @@ export class ConversationRepository extends BaseRepository {
           this.handleNotFound('Conversation', id, 'update');
         }
 
-        // Use consistent mapping from database record
-        return this.mapFromDatabaseRecord<ConversationModel>(result[0].c, {
-          jsonFields: ['metadata'],
-          defaultValues: {
-            messageCount: 0,
-            totalTokens: 0,
-            status: 'active',
-          },
-        });
+        // Use ConversationEntity for consistent mapping
+        return ConversationEntity.deserialize(result[0].c);
       },
       'update',
       'Conversation',
@@ -237,78 +154,6 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
-  async updateActivity(id: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.lastActivityAt = $timestamp', {
-          id,
-          timestamp: this.getCurrentTimestamp(),
-        });
-      },
-      'updateActivity',
-      'Conversation',
-      id
-    );
-  }
-
-  async incrementMessageCount(id: string, increment: number = 1): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        await connection.executeWrite(
-          'MATCH (c:Conversation) WHERE c.id = $id SET c.messageCount = c.messageCount + $increment, c.lastActivityAt = $timestamp',
-          { id, increment, timestamp: this.getCurrentTimestamp() }
-        );
-      },
-      'incrementMessageCount',
-      'Conversation',
-      id
-    );
-  }
-
-  async updateTokenCount(id: string, tokens: number): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        await connection.executeWrite(
-          'MATCH (c:Conversation) WHERE c.id = $id SET c.totalTokens = c.totalTokens + $tokens, c.lastActivityAt = $timestamp',
-          { id, tokens, timestamp: this.getCurrentTimestamp() }
-        );
-      },
-      'updateTokenCount',
-      'Conversation',
-      id
-    );
-  }
-
-  async markAsCompleted(id: string): Promise<void> {
-    return this.updateStatus(id, 'completed', 'markAsCompleted');
-  }
-
-  async archiveConversation(id: string): Promise<void> {
-    return this.updateStatus(id, 'archived', 'archiveConversation');
-  }
-
-  /**
-   * Common method to update conversation status and activity timestamp
-   */
-  private async updateStatus(id: string, status: string, methodName: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        await connection.executeWrite('MATCH (c:Conversation) WHERE c.id = $id SET c.status = $status, c.lastActivityAt = $timestamp', {
-          id,
-          status,
-          timestamp: this.getCurrentTimestamp(),
-        });
-      },
-      methodName,
-      'Conversation',
-      id
-    );
-  }
-
   /**
    * Find all conversations for a specific starship using Neo4j relationships
    */
@@ -321,16 +166,7 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.lastActivityAt DESC`,
           { starshipId }
         );
-        return result.map((record) =>
-          this.mapFromDatabaseRecord<ConversationModel>(record.c, {
-            jsonFields: ['metadata'],
-            defaultValues: {
-              messageCount: 0,
-              totalTokens: 0,
-              status: 'active',
-            },
-          })
-        );
+        return result.map((record) => ConversationEntity.deserialize(record.c));
       },
       'findByStarship',
       'Conversation'
@@ -400,12 +236,5 @@ export class ConversationRepository extends BaseRepository {
       'unlinkFromStarship',
       'Conversation'
     );
-  }
-
-  /**
-   * Get current timestamp in ISO format
-   */
-  private getCurrentTimestamp(): string {
-    return new Date().toISOString();
   }
 }

@@ -1,14 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { usePathname } from 'next/navigation'
-import { ChevronDown, Plus, Rocket } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
-import { useStarships, useCreateStarship } from '@/hooks/useStarships'
-import { useStarshipUIStore } from '@/store/starship-ui-store'
+import { useCreateStarship, useStarships } from '@/hooks/useStarships'
 import { cn } from '@/lib/utils'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
+import { ChevronDown, Plus, Rocket } from 'lucide-react'
+import { usePathname } from 'next/navigation'
 
 interface StarshipSelectorProps {
   className?: string
@@ -40,8 +39,8 @@ export function StarshipSelector({ className }: StarshipSelectorProps) {
       })
 
       // Set the newly created starship as active
-      if (result.starship) {
-        setActiveStarship(result.starship.id)
+      if (result) {
+        setActiveStarship(result.id)
       }
     } catch (error) {
       // Error handling is already done in the mutation

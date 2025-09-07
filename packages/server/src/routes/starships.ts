@@ -2,43 +2,104 @@
  * Starship management routes for Aether Core
  */
 
-import { Router } from 'express';
-import type { Request, Response } from 'express';
-import type { StarshipRepository, AgentRepository, UserRepository } from '@starships/models';
-import type { StarshipModel } from '@starships/protocol';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { StarshipService } from '@/services/StarshipService';
 import { SubscriptionService } from '@/services/SubscriptionService';
-import { sendSuccess, sendError, handleCommonError, validateUUID, validatePagination, createPaginationMeta } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateUUID } from '@/utils/responseHelpers';
+import type { StarshipModel } from '@starships/protocol';
+import type { Request, Response } from 'express';
+import { Router } from 'express';
+import { z, ZodError } from 'zod';
 
 const router: Router = Router();
 
-// Repository dependencies
-let starshipRepo: StarshipRepository;
-let agentRepo: AgentRepository;
-let userRepo: UserRepository;
+// Zod schemas for validation
+const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
 
-export function initializeStarshipRoutes(deps: {
-  starshipRepository: StarshipRepository;
-  agentRepository: AgentRepository;
-  userRepository: UserRepository;
-}) {
-  starshipRepo = deps.starshipRepository;
-  agentRepo = deps.agentRepository;
-  userRepo = deps.userRepository;
-}
+const StarshipClassSchema = z.enum(['scout', 'cruiser', 'draught']);
+const StarshipStatusSchema = z.enum(['active', 'inactive', 'pending_payment', 'restricted', 'disabled']);
+const PlanSchema = z.enum(['scout', 'cruiser', 'draught']);
+const BillingPeriodSchema = z.enum(['monthly', 'yearly']);
+
+const CreateStarshipSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
+  class: StarshipClassSchema,
+  plan: PlanSchema.optional(),
+  billingPeriod: BillingPeriodSchema.optional(),
+});
+
+const CreatePaidStarshipSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
+  plan: z.enum(['cruiser', 'draught']),
+  billingPeriod: BillingPeriodSchema,
+});
+
+const UpdateStarshipSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  status: StarshipStatusSchema.optional(),
+  class: StarshipClassSchema.optional(),
+});
+
+const CreateCheckoutSessionSchema = z.object({
+  starshipName: z.string().min(1, 'Starship name is required').max(255, 'Starship name must be less than 255 characters'),
+  plan: z.enum(['cruiser', 'draught']),
+  billingPeriod: BillingPeriodSchema,
+});
+
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR', firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR', `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
+
+// Helper function for authentication check
+const checkAuth = (req: Request, res: Response): boolean => {
+  const user = (req as any).user;
+  if (!user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return false;
+  }
+  return true;
+};
 
 // GET /starships - Get user's starships (OpenAPI pattern)
 router.get('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Authentication check
+    if (!checkAuth(req, res)) return;
+
+    // Validate pagination query parameters
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
+
     const userId = (req as any).user!.id;
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
+    const { page, limit } = paginationValidation;
 
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
-
-    const starships = await starshipRepo.findByOwner(userId);
+    const starshipService = new StarshipService();
+    const starships = await starshipService.getStarshipsByOwner(userId);
 
     // Apply pagination
     const total = starships.length;
@@ -56,62 +117,33 @@ router.get('/starships', jwtAuthMiddleware, async (req: Request, res: Response):
 // POST /starships/create-paid - Create paid starship with pending payment status (OpenAPI pattern)
 router.post('/starships/create-paid', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Authentication check
+    if (!checkAuth(req, res)) return;
+
+    // Validate request body
+    const bodyValidation = validateData(CreatePaidStarshipSchema, req.body, res, 'paid starship creation data');
+    if (!bodyValidation) return;
+
     const userId = (req as any).user!.id;
-    const { name, plan, billingPeriod } = req.body;
+    const { name, plan, billingPeriod } = bodyValidation;
 
     console.log('[STARSHIP-CREATE-PAID] Starting paid starship creation for user:', userId);
 
-    // Validate required fields
-    if (!name || !plan || !billingPeriod) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'Missing required fields', 400, {
-        required_fields: ['name', 'plan', 'billingPeriod'],
-        provided: { name: !!name, plan: !!plan, billingPeriod: !!billingPeriod },
-      });
-      return;
-    }
-
-    if (typeof name !== 'string' || name.trim().length === 0) {
-      sendError(res, 'VALIDATION_ERROR', 'Name must be a non-empty string', 400, {
-        field: 'name',
-      });
-      return;
-    }
-
-    // Validate paid plan only
-    if (!['cruiser', 'draught'].includes(plan)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid paid plan', 400, {
-        field: 'plan',
-        allowed_values: ['cruiser', 'draught'],
-        provided: plan,
-      });
-      return;
-    }
-
-    // Validate billing period
-    if (!['monthly', 'yearly'].includes(billingPeriod)) {
-      sendError(res, 'INVALID_INPUT', 'Invalid billing period', 400, {
-        field: 'billingPeriod',
-        allowed_values: ['monthly', 'yearly'],
-        provided: billingPeriod,
-      });
-      return;
-    }
-
     console.log('[STARSHIP-CREATE-PAID] Creating paid starship...');
 
-    const slug = await starshipRepo.generateUniqueSlug(name.trim(), userId);
-    const starship = await starshipRepo.create({
+    const starshipService = new StarshipService();
+    const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
+    const starship = await starshipService.createPaidStarship({
       ownerId: userId,
       name: name.trim(),
       class: plan,
       slug,
-      status: 'pending_payment',
       plan,
       billingPeriod,
     });
 
     // Create Stripe checkout session
-    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    const subscriptionService = new SubscriptionService();
     const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
       userId,
       starshipId: starship.id,
@@ -194,19 +226,19 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
 
       console.log('[STARSHIP-CREATE-PAID] Creating paid starship...');
 
-      const slug = await starshipRepo.generateUniqueSlug(name.trim(), userId);
-      const starship = await starshipRepo.create({
+      const starshipService = new StarshipService();
+      const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
+      const starship = await starshipService.createPaidStarship({
         ownerId: userId,
         name: name.trim(),
         class: plan,
         slug,
-        status: 'pending_payment',
         plan,
         billingPeriod,
       });
 
       // Create Stripe checkout session
-      const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+      const subscriptionService = new SubscriptionService();
       const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
         userId,
         starshipId: starship.id,
@@ -227,36 +259,36 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       return;
     }
 
+    const starshipService = new StarshipService();
+
     // Check Scout plan limit (max 3 starships per user)
     if (starshipClass === 'scout') {
       console.log('[STARSHIP-CREATE] Checking Scout plan limit...');
-      const existingStarships = await starshipRepo.findByOwner(userId);
-      const scoutStarships = existingStarships.filter((s: any) => s.class === 'scout');
+      const canCreate = await starshipService.canCreateScoutStarship(userId);
 
-      if (scoutStarships.length >= 3) {
-        console.log('[STARSHIP-CREATE] Scout limit reached. User has', scoutStarships.length, 'Scout starships');
+      if (!canCreate) {
+        console.log('[STARSHIP-CREATE] Scout limit reached.');
         sendError(res, 'QUOTA_EXCEEDED', 'Scout plan limit reached', 403, {
           message: 'Scout plan allows a maximum of 3 starships. Please upgrade to Cruiser or Draught plan for more starships.',
-          current_count: scoutStarships.length,
+          current_count: 3,
           limit: 3,
           upgrade_options: ['cruiser', 'draught'],
         });
         return;
       }
-      console.log('[STARSHIP-CREATE] Scout limit check passed. User has', scoutStarships.length, 'Scout starships');
+      console.log('[STARSHIP-CREATE] Scout limit check passed.');
     }
 
     console.log('[STARSHIP-CREATE] Generating unique slug...');
-    const slug = await starshipRepo.generateUniqueSlug(name.trim(), userId);
+    const slug = await starshipService.generateUniqueSlug(name.trim(), userId);
     console.log('[STARSHIP-CREATE] Generated slug:', slug);
 
     console.log('[STARSHIP-CREATE] Creating starship in database...');
-    const starship = await starshipRepo.create({
+    const starship = await starshipService.createStarship({
       ownerId: userId,
       name: name.trim(),
       class: starshipClass,
       slug,
-      status: 'active',
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
@@ -281,13 +313,9 @@ router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: 
     const { idOrSlug } = req.params;
     const userId = (req as any).user!.id;
 
+    const starshipService = new StarshipService();
     // Try to find by ID first, then by slug
-    let starship = await starshipRepo.findById(idOrSlug);
-
-    if (!starship) {
-      // Try to find by slug
-      starship = await starshipRepo.findBySlug(idOrSlug, userId);
-    }
+    const starship = await starshipService.getStarship(idOrSlug, userId);
 
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
@@ -304,8 +332,9 @@ router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: 
     }
 
     // Get deployed agents and available slots
-    const agents = await starshipRepo.getDeployedAgents(starship.id);
-    const availableSlots = await starshipRepo.getAvailableSlots(starship.id);
+    const starshipDetails = await starshipService.getStarshipWithDetails(starship.id);
+    const agents = starshipDetails?.agents || [];
+    const availableSlots = starshipDetails?.availableSlots || 0;
 
     sendSuccess(res, {
       starship,
@@ -337,8 +366,10 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
       return;
     }
 
+    const starshipService = new StarshipService();
+
     // Verify starship exists and ownership
-    const starship = await starshipRepo.findById(starshipId);
+    const starship = await starshipService.getStarship(starshipId);
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
@@ -352,18 +383,8 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
       return;
     }
 
-    // Verify agent exists
-    const agent = await agentRepo.findById(agentId);
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        id: agentId,
-      });
-      return;
-    }
-
-    // Deploy agent
-    await starshipRepo.deployAgent(starshipId, agentId);
+    // Deploy agent (service will verify agent exists)
+    await starshipService.deployAgent(starshipId, agentId);
 
     sendSuccess(res, { message: 'Agent deployed successfully' }, 201);
   } catch (error) {
@@ -404,8 +425,10 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
       return;
     }
 
+    const starshipService = new StarshipService();
+
     // Verify starship exists and ownership
-    const starship = await starshipRepo.findById(starshipId);
+    const starship = await starshipService.getStarship(starshipId);
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
@@ -420,7 +443,7 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
     }
 
     // Remove agent
-    const removed = await starshipRepo.removeAgent(starshipId, agentId);
+    const removed = await starshipService.removeAgent(starshipId, agentId);
     if (!removed) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not deployed on this starship', 404, {
         resource: 'deployed_agent',
@@ -453,8 +476,10 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
       return;
     }
 
+    const starshipService = new StarshipService();
+
     // Verify starship exists and ownership
-    const starship = await starshipRepo.findById(starshipId);
+    const starship = await starshipService.getStarship(starshipId);
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
@@ -505,7 +530,7 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
 
       // Check if there are deployed agents that exceed new class limits
       if (starshipClass === 'scout') {
-        const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
+        const deployedAgents = await starshipService.getDeployedAgents(starshipId);
         if (deployedAgents.length > 3) {
           sendError(res, 'OPERATION_NOT_ALLOWED', 'Cannot change to scout class: too many deployed agents', 400, {
             message: 'Scout class allows maximum 3 deployed agents',
@@ -528,7 +553,7 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
       return;
     }
 
-    const updatedStarship = await starshipRepo.update(starshipId, allowedUpdates);
+    const updatedStarship = await starshipService.updateStarship(starshipId, allowedUpdates);
     if (!updatedStarship) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update starship in database');
       return;
@@ -557,8 +582,10 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
       return;
     }
 
+    const starshipService = new StarshipService();
+
     // Verify starship exists and ownership
-    const starship = await starshipRepo.findById(starshipId);
+    const starship = await starshipService.getStarship(starshipId);
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
@@ -579,7 +606,7 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
       console.log(`[STARSHIPS] Attempting to cancel subscription ${starship.subscriptionId} for starship ${starshipId}`);
       console.log(`[STARSHIPS] Starship plan: ${starship.plan}, billing: ${starship.billingPeriod}`);
 
-      const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+      const subscriptionService = new SubscriptionService();
       subscriptionCancelled = await subscriptionService.cancelSubscription(starship.subscriptionId);
 
       if (!subscriptionCancelled) {
@@ -601,7 +628,7 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
 
     // STEP 2: Only delete starship if subscription was cancelled (or doesn't exist)
     console.log(`[STARSHIPS] Proceeding to delete starship ${starshipId} after successful subscription handling`);
-    const deleted = await starshipRepo.delete(starshipId);
+    const deleted = await starshipService.deleteStarship(starshipId);
 
     if (!deleted) {
       // Starship deletion failed but subscription was already cancelled
@@ -646,8 +673,10 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
       return;
     }
 
+    const starshipService = new StarshipService();
+
     // Verify starship exists and ownership
-    const starship = await starshipRepo.findById(starshipId);
+    const starship = await starshipService.getStarship(starshipId);
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
         resource: 'starship',
@@ -662,8 +691,8 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
     }
 
     // Get deployed agents and available slots
-    const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
-    const availableSlots = await starshipRepo.getAvailableSlots(starshipId);
+    const deployedAgents = await starshipService.getDeployedAgents(starshipId);
+    const availableSlots = await starshipService.getAvailableSlots(starshipId);
 
     sendSuccess(res, {
       starshipId,
@@ -686,7 +715,7 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
 // GET /starships/pricing - Get pricing data (OpenAPI pattern)
 router.get('/starships/pricing', async (req: Request, res: Response): Promise<void> => {
   try {
-    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    const subscriptionService = new SubscriptionService();
     const pricing = await subscriptionService.getPricingData();
     sendSuccess(res, pricing);
   } catch (error) {
@@ -736,7 +765,7 @@ router.post('/starships/checkout-sessions', jwtAuthMiddleware, async (req: Reque
       return;
     }
 
-    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    const subscriptionService = new SubscriptionService();
     const checkoutUrl = await subscriptionService.createCheckoutSession({
       userId,
       starshipName,
@@ -770,7 +799,7 @@ router.post('/starships/:id/billing-portal', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
-    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    const subscriptionService = new SubscriptionService();
     const portalUrl = await subscriptionService.createPortalSession(starshipId, userId);
 
     sendSuccess(res, { url: portalUrl }, 201);
@@ -799,8 +828,10 @@ router.post('/starships/:id/retry-payment', jwtAuthMiddleware, async (req: Reque
       return;
     }
 
+    const starshipService = new StarshipService();
+
     // Get starship and verify ownership
-    const starship = await starshipRepo.findById(starshipId);
+    const starship = await starshipService.getStarship(starshipId);
 
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
@@ -840,7 +871,7 @@ router.post('/starships/:id/retry-payment', jwtAuthMiddleware, async (req: Reque
     console.log('[RETRY-PAYMENT] Creating new checkout session for starship:', starshipId);
 
     // Create new checkout session
-    const subscriptionService = new SubscriptionService(userRepo, starshipRepo);
+    const subscriptionService = new SubscriptionService();
     const checkoutUrl = await subscriptionService.createCheckoutSessionForStarship({
       userId,
       starshipId: starship.id,

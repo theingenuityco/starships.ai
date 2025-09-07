@@ -13,6 +13,7 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
     "migrate": "tsx src/scripts/migration-runner.ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
+    "seed:agent-templates": "tsx src/scripts/seed-agent-templates.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",
     "backup:validate": "tsx src/scripts/backup-cli.ts validate",
@@ -35,6 +36,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "fs-extra": "^11.3.0",
+    "nanoid": "^5.1.5",
     "neo4j-driver": "^5.28.1",
     "reflect-metadata": "^0.2.2",
     "uuid": "^11.1.0"

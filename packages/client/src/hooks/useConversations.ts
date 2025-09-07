@@ -35,6 +35,7 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
     queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
     queryFn: async () => {
       const response = await api.get(`/api/v1/starships/${starshipId}/conversations`)
+      // Server now returns conversations array directly with pagination meta
       const conversations = extractResponseData<ConversationModel[]>(response)
       return { conversations }
     },
@@ -51,10 +52,32 @@ export function useConversation(conversationId: string, enabled: boolean = true)
     queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId),
     queryFn: async () => {
       const response = await api.get(`/api/v1/conversations/${conversationId}`)
-      return extractResponseData<{
-        conversation: ConversationModel
-        messages: Message[]
-      }>(response)
+
+      // Server now returns ConversationWithMessages directly
+      const data = extractResponseData<ConversationModel & { messages: any[] }>(response)
+
+      return {
+        conversation: {
+          id: data.id,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+          lastActivityAt: data.lastActivityAt,
+          messageCount: data.messageCount,
+          totalTokens: data.totalTokens,
+          status: data.status,
+          metadata: data.metadata,
+          // Handle optional relationship fields safely
+          starshipId: (data as any).starshipId,
+          userId: (data as any).userId,
+        },
+        messages: data.messages.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          role: msg.role,
+          timestamp: msg.timestamp,
+          conversationId: msg.conversationId || conversationId,
+        })),
+      }
     },
     enabled: !!conversationId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -103,6 +126,7 @@ export function useUserConversations(userId: string, onlyActive: boolean = false
       const response = await api.get(`/api/v1/users/${userId}/conversations`, {
         params: { active: onlyActive ? 'true' : undefined },
       })
+      // Server now returns conversations array directly with pagination meta
       const conversations = extractResponseData<ConversationModel[]>(response)
       return { conversations }
     },
@@ -117,7 +141,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { source: ConversationSourceType; agentId?: string; starshipId?: string }) => {
+    mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string; userId?: string }) => {
       const response = await api.post('/api/v1/conversations', data)
       return extractResponseData<ConversationModel>(response)
     },
@@ -126,6 +150,12 @@ export function useCreateConversation() {
       if (variables.starshipId) {
         queryClient.invalidateQueries({
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId),
+        })
+      }
+
+      if (variables.userId) {
+        queryClient.invalidateQueries({
+          queryKey: CONVERSATION_QUERY_KEYS.byUser(variables.userId),
         })
       }
 
@@ -200,12 +230,12 @@ export function useSendMessage() {
         conversationId: variables.conversationId,
       }
 
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: Message[] | undefined) => {
-        const messages = old || []
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: { messages: Message[] } | undefined) => {
+        const messages = old?.messages || []
         // Remove the temporary sending user message and add both user + assistant messages
         const withoutTempMessage = messages.filter(m => m.id !== context?.userMessage.id)
         const finalUserMessage = { ...context!.userMessage, sending: false }
-        return [...withoutTempMessage, finalUserMessage, assistantMessage]
+        return { messages: [...withoutTempMessage, finalUserMessage, assistantMessage] }
       })
 
       // Update conversation activity

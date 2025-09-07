@@ -1,97 +1,138 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
-import { toast } from 'sonner'
 import api from '@/lib/api'
+import type { ApiResponse, CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
-import type { ApiResponse, StarshipModel, UpdateStarshipRequest, StarshipResponse, StarshipAgentsResponse, AgentModel } from '@starships/protocol'
+import { toast } from 'sonner'
 
 // Helper to extract data from ApiResponse<T> - enforces response contract
 const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
 
-// Centralized query keys
+// Extended Starship interface for client compatibility with optimistic updates
+export interface ClientStarship extends StarshipModel {
+  loading?: boolean
+  error?: boolean
+}
+
+// Centralized query keys following TanStack Query best practices
 export const STARSHIP_QUERY_KEYS = {
   all: ['starships'] as const,
   lists: () => [...STARSHIP_QUERY_KEYS.all, 'list'] as const,
   list: (filters?: any) => [...STARSHIP_QUERY_KEYS.lists(), { filters }] as const,
   details: () => [...STARSHIP_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...STARSHIP_QUERY_KEYS.details(), id] as const,
-  agents: (id: string) => [...STARSHIP_QUERY_KEYS.detail(id), 'agents'] as const,
-  bySlug: (slug: string) => [...STARSHIP_QUERY_KEYS.all, 'slug', slug] as const,
+  byOwner: (ownerId: string) => [...STARSHIP_QUERY_KEYS.all, 'owner', ownerId] as const,
+  agents: (starshipId: string) => [...STARSHIP_QUERY_KEYS.detail(starshipId), 'agents'] as const,
 } as const
 
-// Get all user starships
-export function useStarships() {
+/**
+ * Get starship by ID
+ */
+export function useStarship(starshipId: string, enabled: boolean = true) {
   return useQuery({
-    queryKey: STARSHIP_QUERY_KEYS.list(),
+    queryKey: STARSHIP_QUERY_KEYS.detail(starshipId),
     queryFn: async () => {
-      const response = await api.get('/api/v1/starships')
-      const starships = extractResponseData<StarshipModel[]>(response)
-      return { starships }
+      const response = await api.get(`/api/v1/starships/${starshipId}`)
+      return extractResponseData<StarshipModel>(response)
     },
+    enabled: !!starshipId && enabled,
     staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes (formerly cacheTime)
-    refetchOnWindowFocus: true,
-    refetchOnMount: 'always',
-  })
-}
-
-// Get starship by ID or slug
-export function useStarship(idOrSlug: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: STARSHIP_QUERY_KEYS.detail(idOrSlug),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${idOrSlug}`)
-      return extractResponseData<{
-        starship: StarshipModel
-        agents: AgentModel[]
-        availableSlots: number
-      }>(response)
-    },
-    enabled: !!idOrSlug && enabled,
-    staleTime: 1 * 60 * 1000, // 1 minute
     gcTime: 5 * 60 * 1000, // 5 minutes
   })
 }
 
-// Get starship agents
+/**
+ * Get starships by owner
+ */
+export function useUserStarships(userId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: STARSHIP_QUERY_KEYS.byOwner(userId),
+    queryFn: async () => {
+      const response = await api.get(`/api/v1/users/${userId}/starships`)
+      return extractResponseData<StarshipModel[]>(response)
+    },
+    enabled: !!userId && enabled,
+    staleTime: 10 * 1000, // 10 seconds
+    gcTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Get starship by slug
+ */
+export function useStarshipBySlug(slug: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', slug] as const,
+    queryFn: async () => {
+      const response = await api.get(`/api/v1/starships/${slug}`)
+      return extractResponseData<StarshipModel>(response)
+    },
+    enabled: !!slug && enabled,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+/**
+ * Get all starships (for backward compatibility)
+ * @deprecated Use useUserStarships instead
+ */
+export function useStarships() {
+  // Since we don't have a user context here, we'll need to get it from auth
+  // For now, return a mock structure that matches the expected API
+  return useQuery({
+    queryKey: STARSHIP_QUERY_KEYS.lists(),
+    queryFn: async () => {
+      const response = await api.get('/api/v1/starships')
+      return { starships: extractResponseData<StarshipModel[]>(response) }
+    },
+    staleTime: 10 * 1000, // 10 seconds
+    gcTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: true,
+  })
+}
+
+/**
+ * Get starship agents
+ */
 export function useStarshipAgents(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.agents(starshipId),
     queryFn: async () => {
       const response = await api.get(`/api/v1/starships/${starshipId}/agents`)
-      return extractResponseData<StarshipAgentsResponse>(response)
+      return extractResponseData<any[]>(response)
     },
     enabled: !!starshipId && enabled,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 10 * 1000, // 10 seconds
     gcTime: 2 * 60 * 1000, // 2 minutes
   })
 }
 
-// Create starship mutation
+/**
+ * Create a new starship
+ */
 export function useCreateStarship() {
   const queryClient = useQueryClient()
-  const router = useRouter()
 
   return useMutation({
-    mutationFn: async (data: { name: string; class: 'scout' | 'cruiser' | 'draught' }) => {
+    mutationFn: async (data: CreateStarshipRequest) => {
       const response = await api.post('/api/v1/starships', data)
-      return extractResponseData<{ starship: StarshipModel; checkoutUrl?: string }>(response)
+      return extractResponseData<StarshipModel>(response)
     },
-    onSuccess: data => {
-      // Invalidate and refetch starships list
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.lists() })
+    onSuccess: (starship, variables) => {
+      // Invalidate user's starship list
+      queryClient.invalidateQueries({
+        queryKey: STARSHIP_QUERY_KEYS.byOwner(starship.ownerId),
+      })
 
-      // Add new starship to cache optimistically
-      queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), (old: any) => {
-        if (!old) return { starships: [data.starship] }
-        return {
-          ...old,
-          starships: [...old.starships, data.starship],
-        }
+      // Add to cache optimistically
+      queryClient.setQueryData(STARSHIP_QUERY_KEYS.byOwner(starship.ownerId), (old: StarshipModel[] | undefined) => {
+        if (!old) return [starship]
+        return [starship, ...old]
       })
 
       toast.success('Starship created successfully!', {
-        description: `${data.starship.name} is ready for missions.`,
+        description: `${starship.name} is ready for deployment.`,
       })
     },
     onError: (error: any) => {
@@ -103,104 +144,87 @@ export function useCreateStarship() {
   })
 }
 
-// Update starship mutation
+/**
+ * Update starship
+ */
 export function useUpdateStarship() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: UpdateStarshipRequest }) => {
-      const response = await api.put(`/api/v1/starships/${id}`, updates)
-      return extractResponseData<StarshipResponse>(response)
+    mutationFn: async ({ starshipId, updates }: { starshipId: string; updates: UpdateStarshipRequest }) => {
+      const response = await api.put(`/api/v1/starships/${starshipId}`, updates)
+      return extractResponseData<StarshipModel>(response)
     },
-    onMutate: async ({ id, updates }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: STARSHIP_QUERY_KEYS.lists() })
-      await queryClient.cancelQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(id) })
+    onSuccess: (updatedStarship, variables) => {
+      // Update the specific starship in cache
+      queryClient.setQueryData(STARSHIP_QUERY_KEYS.detail(variables.starshipId), updatedStarship)
 
-      // Snapshot the previous values
-      const previousStarships = queryClient.getQueryData(STARSHIP_QUERY_KEYS.list())
-      const previousStarship = queryClient.getQueryData(STARSHIP_QUERY_KEYS.detail(id))
-
-      // Optimistically update the cache
-      queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), (old: any) => {
-        if (!old?.starships) return old
-        return {
-          ...old,
-          starships: old.starships.map((starship: StarshipModel) => (starship.id === id ? { ...starship, ...updates } : starship)),
-        }
+      // Update starship in owner's list
+      queryClient.setQueryData(STARSHIP_QUERY_KEYS.byOwner(updatedStarship.ownerId), (old: StarshipModel[] | undefined) => {
+        if (!old) return [updatedStarship]
+        return old.map(starship => (starship.id === variables.starshipId ? updatedStarship : starship))
       })
 
-      queryClient.setQueryData(STARSHIP_QUERY_KEYS.detail(id), (old: any) => {
-        if (!old?.starship) return old
-        return {
-          ...old,
-          starship: { ...old.starship, ...updates },
-        }
+      toast.success('Starship updated successfully!', {
+        description: `${updatedStarship.name} has been updated.`,
       })
-
-      return { previousStarships, previousStarship, id }
     },
-    onError: (error: any, variables, context) => {
-      // Rollback the optimistic updates
-      if (context?.previousStarships) {
-        queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), context.previousStarships)
-      }
-      if (context?.previousStarship) {
-        queryClient.setQueryData(STARSHIP_QUERY_KEYS.detail(context.id), context.previousStarship)
-      }
-
+    onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update starship'
       toast.error('Failed to update starship', {
         description: errorMessage,
       })
     },
-    onSuccess: data => {
-      toast.success('Starship updated successfully!')
-    },
-    onSettled: (data, error, variables) => {
-      // Always refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.lists() })
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(variables.id) })
-    },
   })
 }
 
-// Delete starship mutation
+/**
+ * Delete starship
+ */
 export function useDeleteStarship() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (id: string) => {
-      const response = await api.delete(`/api/v1/starships/${id}`)
-      return extractResponseData<{
-        message: string
-        starshipId: string
-        subscriptionCancelled: boolean
-        refundInfo: string | null
-      }>(response)
+    mutationFn: async (starshipId: string) => {
+      const response = await api.delete(`/api/v1/starships/${starshipId}`)
+      return response.data
     },
-    onMutate: async id => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: STARSHIP_QUERY_KEYS.lists() })
+    onMutate: async starshipId => {
+      // Get starship details to know which caches to update
+      const starship = queryClient.getQueryData(STARSHIP_QUERY_KEYS.detail(starshipId)) as StarshipModel | undefined
 
-      // Snapshot the previous value
-      const previousStarships = queryClient.getQueryData(STARSHIP_QUERY_KEYS.list())
+      if (starship?.ownerId) {
+        await queryClient.cancelQueries({
+          queryKey: STARSHIP_QUERY_KEYS.byOwner(starship.ownerId),
+        })
 
-      // Optimistically remove the starship
-      queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), (old: any) => {
-        if (!old?.starships) return old
-        return {
-          ...old,
-          starships: old.starships.filter((starship: StarshipModel) => starship.id !== id),
-        }
-      })
+        // Optimistically remove the starship
+        queryClient.setQueryData(STARSHIP_QUERY_KEYS.byOwner(starship.ownerId), (old: StarshipModel[] | undefined) => {
+          if (!old) return old
+          return old.filter(s => s.id !== starshipId)
+        })
+      }
 
-      return { previousStarships, id }
+      return { starship }
     },
-    onError: (error: any, id, context) => {
-      // Rollback the optimistic update
-      if (context?.previousStarships) {
-        queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), context.previousStarships)
+    onSuccess: (data, starshipId, context) => {
+      // Remove from detail cache
+      queryClient.removeQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
+
+      if (context?.starship) {
+        toast.success('Starship deleted successfully!', {
+          description: `${context.starship.name} has been decommissioned.`,
+        })
+      } else {
+        toast.success('Starship deleted successfully!')
+      }
+    },
+    onError: (error: any, starshipId, context) => {
+      // Rollback optimistic deletion
+      if (context?.starship) {
+        queryClient.invalidateQueries({
+          queryKey: STARSHIP_QUERY_KEYS.byOwner(context.starship.ownerId),
+        })
       }
 
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete starship'
@@ -208,174 +232,76 @@ export function useDeleteStarship() {
         description: errorMessage,
       })
     },
-    onSuccess: (data, id) => {
-      // Remove the specific starship from all caches
-      queryClient.removeQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(id) })
-      queryClient.removeQueries({ queryKey: STARSHIP_QUERY_KEYS.agents(id) })
-
-      toast.success('Starship deleted successfully!', {
-        description: data.subscriptionCancelled ? 'Subscription has been cancelled.' : undefined,
-      })
-    },
-    onSettled: () => {
-      // Always refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.lists() })
-    },
   })
 }
 
-// Update starship status mutation
-export function useUpdateStarshipStatus() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: 'active' | 'inactive' }) => {
-      const response = await api.patch(`/api/v1/starships/${id}/status`, { status })
-      return extractResponseData<StarshipResponse>(response)
-    },
-    onMutate: async ({ id, status }) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: STARSHIP_QUERY_KEYS.lists() })
-      await queryClient.cancelQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(id) })
-
-      // Snapshot the previous values
-      const previousStarships = queryClient.getQueryData(STARSHIP_QUERY_KEYS.list())
-      const previousStarship = queryClient.getQueryData(STARSHIP_QUERY_KEYS.detail(id))
-
-      // Optimistically update the status
-      queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), (old: any) => {
-        if (!old?.starships) return old
-        return {
-          ...old,
-          starships: old.starships.map((starship: StarshipModel) => (starship.id === id ? { ...starship, status } : starship)),
-        }
-      })
-
-      queryClient.setQueryData(STARSHIP_QUERY_KEYS.detail(id), (old: any) => {
-        if (!old?.starship) return old
-        return {
-          ...old,
-          starship: { ...old.starship, status },
-        }
-      })
-
-      return { previousStarships, previousStarship, id }
-    },
-    onError: (error: any, variables, context) => {
-      // Rollback the optimistic updates
-      if (context?.previousStarships) {
-        queryClient.setQueryData(STARSHIP_QUERY_KEYS.list(), context.previousStarships)
+/**
+ * Utility hook for managing selected starship with local storage
+ */
+export function useSelectedStarship() {
+  const setSelectedStarship = (starshipId: string | null) => {
+    if (typeof window !== 'undefined') {
+      if (starshipId) {
+        localStorage.setItem('selectedStarshipId', starshipId)
+      } else {
+        localStorage.removeItem('selectedStarshipId')
       }
-      if (context?.previousStarship) {
-        queryClient.setQueryData(STARSHIP_QUERY_KEYS.detail(context.id), context.previousStarship)
-      }
-
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update starship status'
-      toast.error('Failed to update starship status', {
-        description: errorMessage,
-      })
-    },
-    onSuccess: (data, variables) => {
-      toast.success(`Starship status updated to ${variables.status}!`)
-    },
-    onSettled: (data, error, variables) => {
-      // Always refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.lists() })
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(variables.id) })
-    },
-  })
-}
-
-// Deploy agent to starship mutation
-export function useDeployAgent() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ starshipId, agentId }: { starshipId: string; agentId: string }) => {
-      const response = await api.post(`/api/v1/starships/${starshipId}/agents/${agentId}`)
-      return extractResponseData<{ message: string }>(response)
-    },
-    onSuccess: (data, variables) => {
-      // Invalidate starship agents to refetch
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.agents(variables.starshipId) })
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(variables.starshipId) })
-
-      toast.success('Agent deployed successfully!')
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to deploy agent'
-      toast.error('Failed to deploy agent', {
-        description: errorMessage,
-      })
-    },
-  })
-}
-
-// Remove agent from starship mutation
-export function useRemoveAgent() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async ({ starshipId, agentId }: { starshipId: string; agentId: string }) => {
-      const response = await api.delete(`/api/v1/starships/${starshipId}/agents/${agentId}`)
-      return extractResponseData<{ message: string }>(response)
-    },
-    onSuccess: (data, variables) => {
-      // Invalidate starship agents to refetch
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.agents(variables.starshipId) })
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(variables.starshipId) })
-
-      toast.success('Agent removed successfully!')
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to remove agent'
-      toast.error('Failed to remove agent', {
-        description: errorMessage,
-      })
-    },
-  })
-}
-
-// Hook to get starship by slug with automatic loading
-export function useStarshipBySlug(slug: string) {
-  return useQuery({
-    queryKey: STARSHIP_QUERY_KEYS.bySlug(slug),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${slug}`)
-      return extractResponseData<{
-        starship: StarshipModel
-        agents: AgentModel[]
-        availableSlots: number
-      }>(response)
-    },
-    enabled: !!slug,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes
-  })
-}
-
-// Utility hook for managing active starship selection with local storage
-export function useActiveStarship() {
-  const queryClient = useQueryClient()
-
-  const setActiveStarship = (starshipId: string | null) => {
-    if (starshipId) {
-      localStorage.setItem('activeStarshipId', starshipId)
-    } else {
-      localStorage.removeItem('activeStarshipId')
     }
   }
 
-  const getActiveStarshipId = (): string | null => {
+  const getSelectedStarshipId = (): string | null => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('activeStarshipId')
+      return localStorage.getItem('selectedStarshipId')
     }
     return null
   }
 
+  const clearSelectedStarship = () => setSelectedStarship(null)
+
   return {
-    setActiveStarship,
-    getActiveStarshipId,
-    clearActiveStarship: () => setActiveStarship(null),
+    setSelectedStarship,
+    getSelectedStarshipId,
+    clearSelectedStarship,
+  }
+}
+
+/**
+ * Utility hook for starship classes
+ */
+export function useStarshipClasses() {
+  const classes = [
+    {
+      value: 'scout',
+      label: 'Scout Class',
+      description: 'Lightweight exploration vessel',
+      maxAgents: 3,
+      maxMissions: 3,
+      price: 'Free',
+    },
+    {
+      value: 'cruiser',
+      label: 'Cruiser Class',
+      description: 'Balanced multi-purpose starship',
+      maxAgents: 5,
+      maxMissions: 6,
+      price: '$29/month',
+    },
+    {
+      value: 'draught',
+      label: 'Draught Class',
+      description: 'Heavy-duty industrial vessel',
+      maxAgents: 10,
+      maxMissions: 10,
+      price: '$99/month',
+    },
+  ] as const
+
+  const getClassInfo = (starshipClass: string) => {
+    return classes.find(cls => cls.value === starshipClass)
+  }
+
+  return {
+    classes,
+    getClassInfo,
   }
 }

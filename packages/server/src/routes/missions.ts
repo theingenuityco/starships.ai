@@ -1,541 +1,481 @@
 /**
- * Mission management routes (OpenAPI pattern)
+ * Mission management routes - Layer 5 (API Routes)
+ *
+ * Exposes mission business functionality through REST API endpoints.
+ * Follows the layered architecture pattern established by conversations.ts and users.ts.
  */
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { MissionOrchestratorService } from '@/services/MissionOrchestratorService';
 import { MissionService } from '@/services/MissionService';
-import { WorkflowService } from '@/services/WorkflowService';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
-import { AgentRepository } from '@starships/models';
-import type {
-  CreateMissionRequest,
-  MissionFilters,
-  MissionSort,
-  SendMissionMessageRequest,
-  StandardErrorCode,
-  UpdateMissionRequest,
-} from '@starships/protocol';
+import type { CreateMissionRequest, MissionFilters, MissionSort, UpdateMissionRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
+import { z } from 'zod';
 
 const router: Router = Router();
 
-// Apply authentication to all mission routes
-router.use(jwtAuthMiddleware);
+// ============================================================================
+// VALIDATION SCHEMAS
+// ============================================================================
 
-/**
- * Safely extract error message from unknown error
- */
-const getErrorMessage = (error: unknown): string => {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-};
-
-// GET /missions - Get all missions with optional filters and sorting (OpenAPI pattern)
-router.get('/missions', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
-
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
-
-    // Parse query parameters
-    const filters: MissionFilters = {};
-    const sort: MissionSort = {
-      field: 'createdAt',
-      direction: 'desc',
-    };
-
-    // Apply filters with validation
-    if (req.query.status) {
-      const statusParam = Array.isArray(req.query.status) ? req.query.status : [req.query.status];
-      filters.status = statusParam.map((s) => String(s)) as any;
-    }
-
-    if (req.query.starshipId) {
-      const { isValid, error } = validateUUID(String(req.query.starshipId), 'starshipId');
-      if (!isValid && error) {
-        sendError(res, error.code, error.message, 400, error.details);
-        return;
-      }
-      filters.starshipId = String(req.query.starshipId);
-    }
-
-    if (req.query.createdBy) {
-      const { isValid, error } = validateUUID(String(req.query.createdBy), 'createdBy');
-      if (!isValid && error) {
-        sendError(res, error.code, error.message, 400, error.details);
-        return;
-      }
-      filters.createdBy = String(req.query.createdBy);
-    }
-
-    // Apply sorting
-    if (req.query.sortField) {
-      const validSortFields = ['createdAt', 'updatedAt', 'status', 'name'];
-      const sortField = String(req.query.sortField);
-      if (validSortFields.includes(sortField)) {
-        sort.field = sortField as any;
-      }
-    }
-
-    if (req.query.sortDirection) {
-      const sortDirection = String(req.query.sortDirection).toLowerCase();
-      if (sortDirection === 'asc' || sortDirection === 'desc') {
-        sort.direction = sortDirection;
-      }
-    }
-
-    const result = await MissionService.getAllMissions(filters, sort);
-
-    // Handle result structure - might be array or object with missions array
-    let missions: any[];
-    let total: number;
-
-    if (Array.isArray(result)) {
-      missions = result;
-      total = result.length;
-    } else {
-      missions = result.missions || [];
-      total = result.total || missions.length;
-    }
-
-    // Apply pagination to missions
-    const offset = (page - 1) * limit;
-    const paginatedMissions = missions.slice(offset, offset + limit);
-
-    sendSuccess(res, paginatedMissions, 200, createPaginationMeta(page, limit, total));
-  } catch (error) {
-    if (!handleCommonError(error, res, 'fetching missions')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch missions');
-    }
-  }
+const CreateMissionSchema = z.object({
+  starshipId: z.string().uuid('Invalid starship ID format'),
+  name: z.string().min(1).max(200, 'Mission name cannot exceed 200 characters'),
+  description: z.string().min(1).max(2000, 'Mission description cannot exceed 2000 characters'),
+  agentIds: z.array(z.string().uuid('Invalid agent ID format')).min(1, 'At least one agent must be assigned'),
 });
 
-// GET /missions/:id - Get a specific mission by ID (OpenAPI pattern)
-router.get('/missions/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
+const UpdateMissionSchema = z.object({
+  name: z.string().min(1).max(200, 'Mission name cannot exceed 200 characters').optional(),
+  description: z.string().min(1).max(2000, 'Mission description cannot exceed 2000 characters').optional(),
+  status: z.enum(['draft', 'active', 'completed', 'failed', 'cancelled']).optional(),
+  phase: z.enum(['welcome', 'analysis', 'plan', 'execute', 'converse']).optional(),
+  agentIds: z.array(z.string().uuid('Invalid agent ID format')).optional(),
+  blueprintId: z.string().uuid('Invalid blueprint ID format').optional(),
+  approvalStatus: z.enum(['pending', 'approved', 'rejected', 'modified']).optional(),
+});
 
-    const { isValid, error } = validateUUID(id, 'id');
+const MissionFiltersSchema = z.object({
+  status: z.array(z.enum(['draft', 'active', 'completed', 'failed', 'cancelled'])).optional(),
+  createdBy: z.string().uuid('Invalid user ID format').optional(),
+  starshipId: z.string().uuid('Invalid starship ID format').optional(),
+});
+
+const MissionSortSchema = z.object({
+  field: z.enum(['createdAt', 'updatedAt', 'status', 'name']).default('createdAt'),
+  direction: z.enum(['asc', 'desc']).default('desc'),
+});
+
+// Helper function to validate request data with Zod
+function validateData<T>(schema: z.ZodSchema<T>, data: unknown, res: Response, fieldName: string): T | null {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const issues = error.issues.map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+        code: issue.code,
+      }));
+      sendError(res, 'VALIDATION_ERROR', `Invalid ${fieldName}`, 400, { issues });
+    } else {
+      sendError(res, 'VALIDATION_ERROR', `Invalid ${fieldName}`, 400);
+    }
+    return null;
+  }
+}
+
+// Helper function to check authentication
+function checkAuth(req: Request, res: Response): boolean {
+  if (!req.user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return false;
+  }
+  return true;
+}
+
+// ============================================================================
+// MISSION MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// GET /missions/:id - Get mission by ID (OpenAPI pattern)
+router.get('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
-    const mission = await MissionService.getMissionById(id);
+    const mission = await MissionService.getMissionById(req.params.id);
+
     sendSuccess(res, mission);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch mission');
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission');
     }
   }
 });
 
-// POST /missions - Create a new mission (OpenAPI pattern)
-router.post('/missions', async (req: Request, res: Response): Promise<void> => {
+// GET /starships/:starshipId/missions - Get missions by starship (OpenAPI pattern)
+router.get('/starships/:starshipId/missions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id;
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
-      return;
-    }
-
-    const createRequest: CreateMissionRequest = req.body;
-
-    // Validate required fields
-    if (!createRequest.starshipId) {
-      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'starshipId is required', 400, {
-        field: 'starshipId',
-      });
-      return;
-    }
-
-    if (!createRequest.name) {
-      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'name is required', 400, {
-        field: 'name',
-      });
-      return;
-    }
-
-    if (!createRequest.description) {
-      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'description is required', 400, {
-        field: 'description',
-      });
-      return;
-    }
-
-    if (!createRequest.agentIds || !Array.isArray(createRequest.agentIds)) {
-      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'agentIds must be an array', 400, {
-        field: 'agentIds',
-        provided: typeof createRequest.agentIds,
-      });
-      return;
-    }
-
-    if (createRequest.agentIds.length === 0) {
-      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'At least one agent must be assigned to the mission', 400, {
-        field: 'agentIds',
-        constraint: 'min_length_1',
-      });
-      return;
-    }
-
-    // Validate starshipId format
-    const { isValid: starshipValid, error: starshipError } = validateUUID(createRequest.starshipId, 'starshipId');
-    if (!starshipValid && starshipError) {
-      sendError(res, starshipError.code, starshipError.message, 400, starshipError.details);
-      return;
-    }
-
-    // Validate each agent ID
-    for (let i = 0; i < createRequest.agentIds.length; i++) {
-      const agentId = createRequest.agentIds[i];
-      if (typeof agentId !== 'string') {
-        sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, `agentIds[${i}] must be a string`, 400, {
-          field: `agentIds[${i}]`,
-          provided: typeof agentId,
-        });
-        return;
-      }
-
-      const { isValid: agentValid, error: agentError } = validateUUID(agentId, `agentIds[${i}]`);
-      if (!agentValid && agentError) {
-        sendError(res, agentError.code, agentError.message, 400, agentError.details);
-        return;
-      }
-    }
-
-    const mission = await MissionService.createMission(createRequest, userId);
-    sendSuccess(res, mission, 201);
-  } catch (error) {
-    if (!handleCommonError(error, res, 'creating mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to create mission');
-    }
-  }
-});
-
-// PUT /missions/:id - Update an existing mission (OpenAPI pattern)
-router.put('/missions/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const updates: UpdateMissionRequest = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
-      return;
-    }
-
-    const { isValid, error } = validateUUID(id, 'id');
+    const { isValid, error } = validateUUID(req.params.starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
-    // Ensure at least one field is being updated
-    if (!updates || Object.keys(updates).length === 0) {
-      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'At least one field must be provided for update', 400, {
-        field: 'updates',
-        message: 'Request body must contain at least one field to update',
-      });
-      return;
-    }
-
-    const mission = await MissionService.updateMission(id, updates);
-    sendSuccess(res, mission);
-  } catch (error) {
-    if (!handleCommonError(error, res, 'updating mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to update mission');
-    }
-  }
-});
-
-// DELETE /missions/:id - Delete a mission (OpenAPI pattern)
-router.delete('/missions/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
-      return;
-    }
-
-    const { isValid, error } = validateUUID(id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    await MissionService.deleteMission(id);
-    res.status(204).send();
-  } catch (error) {
-    if (!handleCommonError(error, res, 'deleting mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to delete mission');
-    }
-  }
-});
-
-// POST /missions/:id/messages - Send message to mission orchestrator (OpenAPI pattern)
-router.post('/missions/:id/messages', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { content } = req.body as SendMissionMessageRequest;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
-      return;
-    }
-
-    const { isValid, error } = validateUUID(id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    if (!content || typeof content !== 'string') {
-      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'Message content is required', 400, {
-        field: 'content',
-      });
-      return;
-    }
-
-    const missionOrchestratorService = MissionOrchestratorService.getInstance();
-    const response = await missionOrchestratorService.handleUserMessage(id, userId, content);
-
-    sendSuccess(res, response, 201);
-  } catch (error) {
-    console.error('Error sending mission message:', error);
-
-    // Handle mission orchestrator specific errors
-    if (error instanceof Error && 'code' in error) {
-      const errorCode = (error as any).code;
-      let statusCode = 500;
-      let mappedErrorCode: StandardErrorCode = 'INTERNAL_SERVER_ERROR';
-      // Map error codes to appropriate HTTP status codes
-      if (errorCode === 'MISSION_MESSAGE_INVALID') {
-        statusCode = 400;
-        mappedErrorCode = 'VALIDATION_ERROR';
-      } else if (errorCode === 'MISSION_ORCHESTRATOR_NOT_FOUND') {
-        statusCode = 404;
-        mappedErrorCode = 'RESOURCE_NOT_FOUND';
-      } else if (errorCode === 'MISSION_MESSAGE_SEND_FAILED' || errorCode === 'MISSION_CHAT_FAILED') {
-        statusCode = 500;
-        mappedErrorCode = 'INTERNAL_SERVER_ERROR';
-      }
-
-      sendError(res, mappedErrorCode, error.message || 'Failed to send message', statusCode, {
-        originalErrorCode: errorCode,
-      });
-      return;
-    }
-
-    if (!handleCommonError(error, res, 'sending mission message')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to send message');
-    }
-  }
-});
-
-// GET /missions/:id/messages - Get message history for a mission with pagination (OpenAPI pattern)
-router.get('/missions/:id/messages', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-
-    const { isValid, error } = validateUUID(id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    const {
-      page,
-      limit: pageSize,
-      error: paginationError,
-    } = validatePagination(req.query.page as string, (req.query.pageSize as string) || (req.query.limit as string));
-
+    // Parse and validate pagination parameters
+    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
     if (paginationError) {
       sendError(res, paginationError.code, paginationError.message, 400);
       return;
     }
 
-    const missionOrchestratorService = MissionOrchestratorService.getInstance();
-    const result = await missionOrchestratorService.getMessageHistory(id, page, pageSize);
+    // Parse filters
+    const filters = validateData(MissionFiltersSchema, req.query, res, 'filters');
+    if (!filters) return;
 
-    sendSuccess(res, result);
+    // Parse sort options
+    const sort = validateData(MissionSortSchema, req.query, res, 'sort');
+    if (!sort) return;
+
+    const result = await MissionService.getMissionsByStarshipId(req.params.starshipId, filters as MissionFilters, sort as MissionSort);
+
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const paginatedMissions = result.missions.slice(startIndex, startIndex + limit);
+
+    const paginationMeta = createPaginationMeta(page, limit, result.total);
+
+    sendSuccess(res, paginatedMissions, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching message history')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch message history');
+    if (!handleCommonError(error, res, 'fetching starship missions')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship missions');
+    }
+  }
+});
+
+// GET /missions - List all missions with filtering and pagination (OpenAPI pattern)
+router.get('/missions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    // Parse and validate pagination parameters
+    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
+    if (paginationError) {
+      sendError(res, paginationError.code, paginationError.message, 400);
+      return;
+    }
+
+    // Parse filters
+    const filters = validateData(MissionFiltersSchema, req.query, res, 'filters');
+    if (!filters) return;
+
+    // Parse sort options
+    const sort = validateData(MissionSortSchema, req.query, res, 'sort');
+    if (!sort) return;
+
+    const result = await MissionService.getAllMissions(filters as MissionFilters, sort as MissionSort);
+
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const paginatedMissions = result.missions.slice(startIndex, startIndex + limit);
+
+    const paginationMeta = createPaginationMeta(page, limit, result.total);
+
+    sendSuccess(res, paginatedMissions, 200, paginationMeta);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'listing missions')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to list missions');
+    }
+  }
+});
+
+// POST /missions - Create new mission (OpenAPI pattern)
+router.post('/missions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const createRequest = validateData(CreateMissionSchema, req.body, res, 'mission data');
+    if (!createRequest) return;
+
+    const userId = req.user!.id;
+    const mission = await MissionService.createMission(createRequest as CreateMissionRequest, userId);
+
+    sendSuccess(res, mission, 201);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'creating mission')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create mission');
+    }
+  }
+});
+
+// PUT /missions/:id - Update mission (OpenAPI pattern)
+router.put('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const updates = validateData(UpdateMissionSchema, req.body, res, 'mission updates');
+    if (!updates) return;
+
+    const mission = await MissionService.updateMission(req.params.id, updates as UpdateMissionRequest);
+
+    sendSuccess(res, mission);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'updating mission')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update mission');
+    }
+  }
+});
+
+// DELETE /missions/:id - Delete mission (OpenAPI pattern)
+router.delete('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    await MissionService.deleteMission(req.params.id);
+
+    sendSuccess(res, { message: 'Mission deleted successfully' }, 200);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'deleting mission')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete mission');
+    }
+  }
+});
+
+// ============================================================================
+// MISSION LIFECYCLE ENDPOINTS
+// ============================================================================
+
+// POST /missions/:id/start - Start a mission (OpenAPI pattern)
+router.post('/missions/:id/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const mission = await MissionService.startMission(req.params.id);
+
+    sendSuccess(res, mission);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'starting mission')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to start mission');
+    }
+  }
+});
+
+// POST /missions/:id/complete - Complete a mission (OpenAPI pattern)
+router.post('/missions/:id/complete', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const mission = await MissionService.completeMission(req.params.id);
+
+    sendSuccess(res, mission);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'completing mission')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to complete mission');
+    }
+  }
+});
+
+// POST /missions/:id/fail - Fail a mission (OpenAPI pattern)
+router.post('/missions/:id/fail', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const mission = await MissionService.failMission(req.params.id);
+
+    sendSuccess(res, mission);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'failing mission')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fail mission');
+    }
+  }
+});
+
+// POST /missions/:id/cancel - Cancel a mission (OpenAPI pattern)
+router.post('/missions/:id/cancel', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const mission = await MissionService.cancelMission(req.params.id);
+
+    sendSuccess(res, mission);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'cancelling mission')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to cancel mission');
+    }
+  }
+});
+
+// PUT /missions/:id/phase - Update mission phase (OpenAPI pattern)
+router.put('/missions/:id/phase', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const phaseValidation = validateData(
+      z.object({
+        phase: z.enum(['welcome', 'analysis', 'plan', 'execute', 'converse']),
+      }),
+      req.body,
+      res,
+      'phase data'
+    );
+    if (!phaseValidation) return;
+
+    const mission = await MissionService.updateMissionPhase(req.params.id, phaseValidation.phase);
+
+    sendSuccess(res, mission);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'updating mission phase')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update mission phase');
+    }
+  }
+});
+
+// ============================================================================
+// MISSION ANALYTICS ENDPOINTS
+// ============================================================================
+
+// GET /starships/:starshipId/missions/stats - Get mission statistics (OpenAPI pattern)
+router.get('/starships/:starshipId/missions/stats', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.starshipId, 'starshipId');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
+      return;
+    }
+
+    const stats = await MissionService.getMissionStats(req.params.starshipId);
+
+    sendSuccess(res, stats);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'fetching mission statistics')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission statistics');
     }
   }
 });
 
 // GET /missions/:id/clarity - Get mission clarity assessment (OpenAPI pattern)
-router.get('/missions/:id/clarity', async (req: Request, res: Response): Promise<void> => {
+router.get('/missions/:id/clarity', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
+    if (!checkAuth(req, res)) return;
 
-    validateUUID(id, 'id');
-
-    const clarity = await MissionService.getMissionClarity(id);
-
-    sendSuccess(res, clarity);
-  } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission clarity')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch mission clarity');
-    }
-  }
-});
-
-// GET /missions/:id/workflow - Get mission workflow details (OpenAPI pattern)
-router.get('/missions/:id/workflow', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    validateUUID(id, 'id');
-
-    const workflow = await MissionService.getWorkflowByMissionId(id);
-
-    // Extract agent IDs from workflow nodes and fetch agent details
-    const agents: Record<string, any> = {};
-    if (workflow && workflow.nodes) {
-      const agentIds = workflow.nodes
-        .filter((node: any) => node.type === 'agent' && node.parameters?.agentId)
-        .map((node: any) => node.parameters.agentId)
-        .filter((id: any): id is string => typeof id === 'string') // Type guard to ensure string
-        .filter((id: string, index: number, array: string[]) => array.indexOf(id) === index); // Remove duplicates
-
-      // Fetch agent details for all unique agent IDs
-      const agentRepository = new AgentRepository();
-      for (const agentId of agentIds) {
-        try {
-          const agent = await agentRepository.findById(agentId);
-          if (agent) {
-            agents[agentId] = agent;
-          }
-        } catch (agentError) {
-          console.warn(`Failed to fetch agent ${agentId}:`, agentError);
-          // Continue processing other agents even if one fails
-        }
-      }
-    }
-
-    // Return null workflow when not found instead of 404 error
-    // This allows the UI to display "No workflow data available" gracefully
-    sendSuccess(res, { workflow, agents });
-  } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission workflow')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch mission workflow');
-    }
-  }
-});
-
-// PUT /missions/:id/workflow/approval - Approve or reject mission workflow (OpenAPI pattern)
-router.put('/missions/:id/workflow/approval', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const { approvalStatus, rejectionReason } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
-    validateUUID(id, 'id');
+    const clarity = await MissionService.getMissionClarity(req.params.id);
 
-    if (approvalStatus !== 'approved' && approvalStatus !== 'rejected') {
-      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, 'approvalStatus must be either "approved" or "rejected"', 400, {
-        field: 'approvalStatus',
-        allowed_values: ['approved', 'rejected'],
-        provided: approvalStatus,
+    if (!clarity) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Mission clarity assessment not found', 404, {
+        resource: 'mission_clarity',
+        missionId: req.params.id,
       });
       return;
     }
 
-    // Update workflow approval using service
-    await MissionService.updateWorkflowApproval(id, { approvalStatus, rejectionReason });
-
-    // Let orchestrator handle state transition (not manual database update)
-    const orchestrator = MissionOrchestratorService.getInstance();
-    const message =
-      approvalStatus === 'approved'
-        ? 'I approve this execution workflow. Please proceed.'
-        : `I need changes to this workflow. ${rejectionReason || 'Please revise and present an updated version.'}`;
-
-    // This will trigger the workflow state transition
-    await orchestrator.handleUserMessage(id, userId, message);
-
-    sendSuccess(res, {
-      approvalStatus,
-      message:
-        approvalStatus === 'approved'
-          ? 'Workflow approved, transitioning to execution phase'
-          : 'Workflow rejected, generating revised workflow',
-    });
+    sendSuccess(res, clarity);
   } catch (error) {
-    if (!handleCommonError(error, res, 'approving mission workflow')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to approve mission workflow');
+    if (!handleCommonError(error, res, 'fetching mission clarity')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission clarity');
     }
   }
 });
 
-// POST /missions/:id/regenerate-workflow - Regenerate mission workflow (OpenAPI pattern)
-router.post('/missions/:id/regenerate-workflow', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { id } = req.params;
-    const userId = req.user?.id;
+// ============================================================================
+// MISSION WORKFLOW ENDPOINTS
+// ============================================================================
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+// GET /missions/:id/workflow - Get mission workflow (OpenAPI pattern)
+router.get('/missions/:id/workflow', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
-    validateUUID(id, 'id');
+    const workflow = await MissionService.getWorkflowByMissionId(req.params.id);
 
-    // Delete existing workflow
-    await WorkflowService.deleteWorkflow(id);
+    if (!workflow) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Mission workflow not found', 404, {
+        resource: 'mission_workflow',
+        missionId: req.params.id,
+      });
+      return;
+    }
 
-    // Let orchestrator handle regeneration (not manual phase update)
-    const orchestrator = MissionOrchestratorService.getInstance();
-    await orchestrator.handleUserMessage(id, userId, 'Please generate a new execution workflow for this mission.');
-
-    sendSuccess(res, { message: 'Workflow regeneration initiated' });
+    sendSuccess(res, workflow);
   } catch (error) {
-    if (!handleCommonError(error, res, 'regenerating mission workflow')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to regenerate mission workflow');
+    if (!handleCommonError(error, res, 'fetching mission workflow')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission workflow');
     }
   }
 });
 
-// GET /missions/:id/execution-status - Get mission execution status (OpenAPI pattern)
-router.get('/missions/:id/execution-status', async (req: Request, res: Response): Promise<void> => {
+// PUT /missions/:id/workflow/approval - Update workflow approval (OpenAPI pattern)
+router.put('/missions/:id/workflow/approval', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id } = req.params;
-    const userId = req.user?.id;
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+    const { isValid, error } = validateUUID(req.params.id, 'id');
+    if (!isValid && error) {
+      sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
-    validateUUID(id, 'id');
+    const approvalValidation = validateData(
+      z.object({
+        approvalStatus: z.enum(['approved', 'rejected']),
+        rejectionReason: z.string().optional(),
+      }),
+      req.body,
+      res,
+      'approval data'
+    );
+    if (!approvalValidation) return;
 
-    const mission = await MissionService.getMissionById(id);
+    const result = await MissionService.updateWorkflowApproval(req.params.id, approvalValidation);
 
-    sendSuccess(res, {
-      executionState: null, // Execution state now managed by autopilot workflow system
-      phase: mission.phase,
-    });
+    sendSuccess(res, result);
   } catch (error) {
-    if (!handleCommonError(error, res, 'getting mission execution status')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to get mission execution status');
+    if (!handleCommonError(error, res, 'updating workflow approval')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update workflow approval');
     }
   }
 });

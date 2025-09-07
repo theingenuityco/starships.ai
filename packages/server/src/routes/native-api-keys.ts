@@ -1,56 +1,74 @@
-import { Router } from 'express';
-import type { Router as ExpressRouter } from 'express';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { StarshipRepository, NativeToolApiKeyRepository } from '@starships/models';
+import { handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { StandardErrorCode } from '@starships/protocol';
-import { sendSuccess, sendError, handleCommonError, validateUUID } from '@/utils/responseHelpers';
+import type { Router as ExpressRouter } from 'express';
+import { Router } from 'express';
+import { z, ZodError } from 'zod';
+import { NativeApiKeyService } from '../services/NativeApiKeyService';
 
 const router: ExpressRouter = Router();
+
+// Zod schemas for validation
+const UuidSchema = z.string().uuid('Invalid UUID format');
+
+const SaveApiKeySchema = z.object({
+  toolName: z.string().min(1, 'Tool name is required').max(100, 'Tool name must be less than 100 characters'),
+  apiKey: z.string().min(1, 'API key is required').max(500, 'API key must be less than 500 characters'),
+});
+
+// Helper function for Zod validation
+const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: any, context: string): T | null => {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      const firstError = error.issues[0];
+      const fieldName = firstError.path.join('.');
+
+      sendError(res, 'VALIDATION_ERROR' as StandardErrorCode, firstError.message, 400, {
+        field: fieldName,
+        context,
+        validationErrors: error.issues.map((err) => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      });
+    } else {
+      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, `${context} validation error`, 500);
+    }
+    return null;
+  }
+};
+
+// Helper function for authentication check
+const checkAuth = (req: any, res: any): boolean => {
+  const user = req.user;
+  if (!user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
+    return false;
+  }
+  return true;
+};
 
 /**
  * Get all native tool API keys for a starship
  */
 router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (req, res) => {
   try {
-    const { starshipId } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
-      return;
-    }
+    // Validate starshipId parameter
+    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
 
-    // Validate starshipId format
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const { starshipId } = paramValidation;
+    const userId = req.user!.id;
 
-    // Verify user owns this starship
-    const starshipRepo = new StarshipRepository();
-    const starship = await starshipRepo.findById(starshipId);
-
-    if (!starship || starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Get API keys (returns decrypted keys)
-    const apiKeyRepo = new NativeToolApiKeyRepository();
-    const apiKeys = await apiKeyRepo.getAllApiKeys(starshipId);
-
-    // Return keys with masked values for security
-    const maskedKeys: Record<string, string> = {};
-    for (const [tool, key] of Object.entries(apiKeys)) {
-      const keyStr = String(key || '');
-      if (keyStr && keyStr.length > 8) {
-        maskedKeys[tool] = `${keyStr.slice(0, 4)}${'*'.repeat(keyStr.length - 8)}${keyStr.slice(-4)}`;
-      } else {
-        maskedKeys[tool] = keyStr ? '*'.repeat(keyStr.length) : '';
-      }
-    }
-
+    // Delegate to service layer
+    const apiKeyService = new NativeApiKeyService();
+    const maskedKeys = await apiKeyService.getStarshipApiKeys(starshipId, userId);
     sendSuccess(res, maskedKeys);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching native API keys')) {
@@ -64,48 +82,24 @@ router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (r
  */
 router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (req, res) => {
   try {
-    const { starshipId } = req.params;
-    const { toolName, apiKey } = req.body;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
-      return;
-    }
+    // Validate starshipId parameter
+    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
 
-    // Validate starshipId format
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    // Validate request body
+    const bodyValidation = validateData(SaveApiKeySchema, req.body, res, 'API key data');
+    if (!bodyValidation) return;
 
-    if (!toolName || !apiKey) {
-      sendError(res, 'MISSING_REQUIRED_FIELD' as StandardErrorCode, 'Tool name and API key are required', 400, {
-        required_fields: ['toolName', 'apiKey'],
-        provided: { toolName: !!toolName, apiKey: !!apiKey },
-      });
-      return;
-    }
+    const { starshipId } = paramValidation;
+    const { toolName, apiKey } = bodyValidation;
+    const userId = req.user!.id;
 
-    // Verify user owns this starship
-    const starshipRepo = new StarshipRepository();
-    const starship = await starshipRepo.findById(starshipId);
-
-    if (!starship || starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Save the API key (it will be encrypted)
-    const apiKeyRepo = new NativeToolApiKeyRepository();
-    await apiKeyRepo.saveApiKey(starshipId, toolName, apiKey);
-
-    // Save additional config if provided - commented out since GitHub was removed
-    // if (config && Object.keys(config).length > 0) {
-    //   await apiKeyRepo.saveToolConfig(starshipId, toolName, config);
-    // }
-
+    // Delegate to service layer
+    const apiKeyService = new NativeApiKeyService();
+    await apiKeyService.saveApiKey(starshipId, userId, toolName, apiKey);
     sendSuccess(res, { message: 'API key saved successfully' }, 201);
   } catch (error) {
     if (!handleCommonError(error, res, 'saving native API key')) {
@@ -119,34 +113,27 @@ router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (
  */
 router.delete('/starships/:starshipId/native-api-keys/:toolName', jwtAuthMiddleware, async (req, res) => {
   try {
-    const { starshipId, toolName } = req.params;
-    const userId = req.user?.id;
+    // Authentication check
+    if (!checkAuth(req, res)) return;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED' as StandardErrorCode, 'User not authenticated', 401);
-      return;
-    }
+    // Validate parameters
+    const paramValidation = validateData(
+      z.object({
+        starshipId: UuidSchema,
+        toolName: z.string().min(1, 'Tool name is required'),
+      }),
+      req.params,
+      res,
+      'parameters'
+    );
+    if (!paramValidation) return;
 
-    // Validate starshipId format
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const { starshipId, toolName } = paramValidation;
+    const userId = req.user!.id;
 
-    // Verify user owns this starship
-    const starshipRepo = new StarshipRepository();
-    const starship = await starshipRepo.findById(starshipId);
-
-    if (!starship || starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED' as StandardErrorCode, 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Delete the API key
-    const apiKeyRepo = new NativeToolApiKeyRepository();
-    await apiKeyRepo.deleteApiKey(starshipId, toolName);
-
+    // Delegate to service layer
+    const apiKeyService = new NativeApiKeyService();
+    await apiKeyService.deleteApiKey(starshipId, userId, toolName);
     sendSuccess(res, { message: 'API key deleted successfully' });
   } catch (error) {
     if (!handleCommonError(error, res, 'deleting native API key')) {

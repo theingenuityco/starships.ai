@@ -2,18 +2,31 @@
  * Base repository class with standardized error handling and validation utilities
  */
 
-import { getConnection } from '@/helpers/database';
-import { ModelSerializer } from '@/helpers/serializer';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
 import type { RepositoryErrorContext } from '@starships/errors';
 import { BaseError, ConflictError, DatabaseError, ErrorContextUtils, NotFoundError, ValidationError } from '@starships/errors';
+import { nanoid } from 'nanoid';
 
 /**
  * Base repository with standardized error handling and validation
  */
 export abstract class BaseRepository {
   protected serviceName: string;
-  constructor(serviceName: string) {
+  private connection: Neo4jConnection | null = null;
+
+  constructor(serviceName: string, connection?: Neo4jConnection) {
     this.serviceName = serviceName;
+    this.connection = connection || null;
+  }
+
+  /**
+   * Get database connection with lazy initialization and caching
+   */
+  protected getConnection(): Neo4jConnection {
+    if (!this.connection) {
+      this.connection = getConnection();
+    }
+    return this.connection;
   }
 
   /** Create error context for repository operations */
@@ -261,7 +274,17 @@ export abstract class BaseRepository {
   private isConstraintViolationError(error: any): boolean {
     if (!error) return false;
 
-    const constraintPatterns = ['constraint', 'unique', 'duplicate', 'foreign key', 'check constraint', 'not null', 'primary key'];
+    const constraintPatterns = [
+      'constraint',
+      'unique',
+      'duplicate',
+      'foreign key',
+      'check constraint',
+      'not null',
+      'primary key',
+      'constraintvalidationfailed',
+      'neo.clienterror.schema.constraintvalidationfailed',
+    ];
 
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();
@@ -313,101 +336,9 @@ export abstract class BaseRepository {
   // ============================================================================
   // VALIDATION HELPERS
   // ============================================================================
-
-  /**
-   * Validate required fields
-   */
-  protected validateRequired(data: any, requiredFields: string[], operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const field of requiredFields) {
-      if (data[field] === undefined || data[field] === null || data[field] === '') {
-        errors.push({
-          field,
-          message: `${field} is required`,
-          value: data[field],
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
-
-  /**
-   * Validate field types
-   */
-  protected validateTypes(data: any, fieldTypes: Record<string, string>, operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const [field, expectedType] of Object.entries(fieldTypes)) {
-      if (data[field] !== undefined && typeof data[field] !== expectedType) {
-        errors.push({
-          field,
-          message: `${field} must be of type ${expectedType}`,
-          value: data[field],
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
-
-  /**
-   * Validate string lengths
-   */
-  protected validateStringLengths(data: any, lengthConstraints: Record<string, { min?: number; max?: number }>, operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const [field, constraints] of Object.entries(lengthConstraints)) {
-      const value = data[field];
-      if (typeof value === 'string') {
-        if (constraints.min !== undefined && value.length < constraints.min) {
-          errors.push({
-            field,
-            message: `${field} must be at least ${constraints.min} characters long`,
-            value: value.length,
-          });
-        }
-        if (constraints.max !== undefined && value.length > constraints.max) {
-          errors.push({
-            field,
-            message: `${field} must be no more than ${constraints.max} characters long`,
-            value: value.length,
-          });
-        }
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
-
-  /**
-   * Validate enum values
-   */
-  protected validateEnums(data: any, enumConstraints: Record<string, string[]>, operation?: string): void {
-    const errors: Array<{ field: string; message: string; value?: any }> = [];
-
-    for (const [field, allowedValues] of Object.entries(enumConstraints)) {
-      const value = data[field];
-      if (value !== undefined && !allowedValues.includes(value)) {
-        errors.push({
-          field,
-          message: `${field} must be one of: ${allowedValues.join(', ')}`,
-          value,
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      this.handleValidationError(errors, operation);
-    }
-  }
+  // Note: Entity-specific validation is now handled by individual entities
+  // using class-validator decorators. These methods are kept for backward compatibility
+  // with repositories that haven't migrated to the entity validation pattern.
 
   // ============================================================================
   // SIMPLIFIED ENTITY CREATION HELPERS
@@ -415,33 +346,28 @@ export abstract class BaseRepository {
 
   /**
    * Create a new entity with automatic ID generation
-   * This method automatically generates a UUID for the entity using Neo4j's randomUUID()
+   * This method automatically generates a nanoid for the entity using application logic
    *
    * @param nodeLabel - Neo4j node label (e.g., 'User', 'Starship')
    * @param properties - Object properties to set on the node (excluding id)
    * @returns The created entity with generated ID
    */
   protected async createEntityWithAutoId<T>(nodeLabel: string, properties: Record<string, any>, connection?: any): Promise<T> {
-    // Use provided connection or get from module - this helps with testing
-    let conn = connection;
-    if (!conn) {
-      try {
-        conn = getConnection();
-      } catch (error) {
-        // Fallback for testing scenarios where import might fail
-        throw new Error('Database connection not available');
-      }
-    }
+    // Use provided connection or get from centralized getConnection method
+    const conn = connection || this.getConnection();
 
-    // Remove any existing 'id' from properties - Neo4j will generate it
+    // Generate nanoid in application layer for consistent, compact IDs
+    const generatedId = nanoid();
+
+    // Remove any existing 'id' from properties and add the generated one
     const { id, ...propsWithoutId } = properties;
+    const propsWithGeneratedId = { ...propsWithoutId, id: generatedId };
 
     const result = await conn.executeWrite(
       `CREATE (n:${nodeLabel})
-       SET n.id = randomUUID(),
-           n += $props
+       SET n += $props
        RETURN n`,
-      { props: propsWithoutId }
+      { props: propsWithGeneratedId }
     );
 
     if (!result || result.length === 0) {
@@ -469,23 +395,25 @@ export abstract class BaseRepository {
     updateProperties: Record<string, any> = {},
     connection?: any
   ): Promise<T> {
-    // Use provided connection or get from module - this helps with testing
-    const conn = connection || getConnection();
+    // Use provided connection or get from centralized getConnection method
+    const conn = connection || this.getConnection();
 
-    // Remove ID from all property sets - Neo4j will generate it
+    // Generate nanoid in application layer
+    const generatedId = nanoid();
+
+    // Remove ID from all property sets and add generated ID to create properties
     const { id: _, ...matchProps } = matchProperties;
     const { id: __, ...createProps } = createProperties;
     const { id: ___, ...updateProps } = updateProperties;
+
+    // Add generated ID to create properties
+    const createPropsWithId = { ...createProps, id: generatedId };
 
     let cypher = `MERGE (n:${nodeLabel} {${Object.keys(matchProps)
       .map((key) => `${key}: $match.${key}`)
       .join(', ')}})`;
 
-    if (Object.keys(createProps).length > 0) {
-      cypher += `\nON CREATE SET n.id = randomUUID(), n += $create`;
-    } else {
-      cypher += `\nON CREATE SET n.id = randomUUID()`;
-    }
+    cypher += `\nON CREATE SET n += $create`;
 
     if (Object.keys(updateProps).length > 0) {
       cypher += `\nON MATCH SET n += $update`;
@@ -493,10 +421,11 @@ export abstract class BaseRepository {
 
     cypher += `\nRETURN n`;
 
-    const parameters: Record<string, any> = { match: matchProps };
-    if (Object.keys(createProps).length > 0) {
-      parameters.create = createProps;
-    }
+    const parameters: Record<string, any> = {
+      match: matchProps,
+      create: createPropsWithId,
+    };
+
     if (Object.keys(updateProps).length > 0) {
       parameters.update = updateProps;
     }
@@ -548,133 +477,6 @@ export abstract class BaseRepository {
       `${context.component}/${context.operation}`,
       context
     );
-  }
-
-  // ============================================================================
-  // SERIALIZATION HELPERS
-  // ============================================================================
-
-  /**
-   * Serialize model data for database storage
-   * Uses class-transformer for professional serialization
-   *
-   * @param data - The data to serialize
-   * @param modelClass - Optional model class with decorators
-   * @returns Serialized data ready for database storage
-   */
-  protected serializeForDatabase<T>(data: T, modelClass?: new (...args: any[]) => T): Record<string, any> {
-    try {
-      return ModelSerializer.serialize(data, modelClass);
-    } catch (error) {
-      this.log('warn', 'Serialization failed, using fallback', { error: error instanceof Error ? error.message : String(error) });
-      // Fallback to simple object spread for backward compatibility
-      return { ...(data as any) };
-    }
-  }
-
-  /**
-   * Deserialize model data from database storage
-   * Uses class-transformer for professional deserialization
-   *
-   * @param data - The data from database
-   * @param modelClass - Model class with decorators
-   * @returns Properly typed and transformed model instance
-   */
-  protected deserializeFromDatabase<T>(data: Record<string, any>, modelClass: new (...args: any[]) => T): T {
-    try {
-      return ModelSerializer.deserialize(data, modelClass);
-    } catch (error) {
-      this.log('warn', 'Deserialization failed, using plain object', { error: error instanceof Error ? error.message : String(error) });
-      // Fallback to plain object for backward compatibility
-      return data as T;
-    }
-  }
-
-  /**
-   * Safely parse JSON with fallback value
-   * Wrapper around ModelSerializer.safeJsonParse
-   */
-  protected safeJsonParse<T>(jsonString: string | null | undefined, fallback: T): T {
-    return ModelSerializer.safeJsonParse(jsonString, fallback);
-  }
-
-  /**
-   * Safely stringify JSON
-   * Wrapper around ModelSerializer.safeJsonStringify
-   */
-  protected safeJsonStringify(value: any): string | null {
-    return ModelSerializer.safeJsonStringify(value);
-  }
-
-  /**
-   * Get safe value with default fallback
-   * Wrapper around ModelSerializer.getSafeValue
-   */
-  protected getValueWithDefault<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    return ModelSerializer.getSafeValue(value, defaultValue);
-  }
-
-  /**
-   * Helper method for common mapping operations from database records
-   * Handles JSON parsing, date conversion, and type safety
-   *
-   * @param record - Database record
-   * @param jsonFields - Fields that should be parsed as JSON
-   * @param dateFields - Fields that should be converted to Date objects
-   * @param defaultValues - Default values for missing fields
-   * @returns Mapped and transformed object
-   */
-  protected mapFromDatabaseRecord<T>(
-    record: any,
-    options?: {
-      jsonFields?: string[];
-      dateFields?: string[];
-      arrayFields?: string[];
-      defaultValues?: Record<string, any>;
-    }
-  ): T {
-    if (!record) return record;
-
-    const mapped = { ...record };
-    const opts = options || {};
-
-    // Handle JSON fields
-    if (opts.jsonFields) {
-      for (const field of opts.jsonFields) {
-        if (mapped[field] && typeof mapped[field] === 'string') {
-          mapped[field] = this.safeJsonParse(mapped[field], null);
-        }
-      }
-    }
-
-    // Handle date fields
-    if (opts.dateFields) {
-      for (const field of opts.dateFields) {
-        if (mapped[field]) {
-          mapped[field] = new Date(mapped[field]);
-        }
-      }
-    }
-
-    // Handle array fields with defaults
-    if (opts.arrayFields) {
-      for (const field of opts.arrayFields) {
-        if (!Array.isArray(mapped[field])) {
-          mapped[field] = [];
-        }
-      }
-    }
-
-    // Apply default values
-    if (opts.defaultValues) {
-      for (const [field, defaultValue] of Object.entries(opts.defaultValues)) {
-        if (mapped[field] === undefined || mapped[field] === null) {
-          mapped[field] = defaultValue;
-        }
-      }
-    }
-
-    return mapped as T;
   }
 }
 

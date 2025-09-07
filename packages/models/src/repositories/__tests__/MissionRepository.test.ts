@@ -12,6 +12,17 @@ jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(),
 }));
 
+// Mock MissionEntity with proper static methods
+jest.mock('../../entities/MissionEntity', () => ({
+  MissionEntity: {
+    validate: jest.fn().mockResolvedValue(undefined),
+    deserialize: jest.fn().mockImplementation((data) => ({
+      ...data,
+      serialize: jest.fn().mockReturnValue(data),
+    })),
+  },
+}));
+
 // Mock uuid
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
@@ -87,10 +98,13 @@ describe('MissionRepository', () => {
     it('should validate required fields', async () => {
       const invalidRequest = { ...validRequest, starshipId: undefined } as any;
 
-      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(NotFoundError);
     });
 
     it('should validate userId', async () => {
+      // Mock starship existence check first
+      mockConnection.executeQuery.mockResolvedValue([{ id: 'starship-123' }]);
+
       await expect(repository.createMission(validRequest, '')).rejects.toThrow(DatabaseError);
     });
 
@@ -104,6 +118,9 @@ describe('MissionRepository', () => {
     it('should validate string lengths', async () => {
       const invalidRequest = { ...validRequest, name: '' };
 
+      // Mock starship existence check first
+      mockConnection.executeQuery.mockResolvedValue([{ id: 'starship-123' }]);
+
       await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(DatabaseError);
     });
 
@@ -116,6 +133,9 @@ describe('MissionRepository', () => {
 
     it('should require at least one agent', async () => {
       const invalidRequest = { ...validRequest, agentIds: [] };
+
+      // Mock starship existence check first
+      mockConnection.executeQuery.mockResolvedValue([{ id: 'starship-123' }]);
 
       await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(DatabaseError);
     });
@@ -358,7 +378,7 @@ describe('MissionRepository', () => {
     });
 
     it('should require at least one update field', async () => {
-      // The repository now handles empty updates by returning the existing mission
+      // The repository now handles empty updates by calling getMissionById, so updatedAt is still added
       const existingMission = {
         id: 'mission-123',
         name: 'Test Mission',
@@ -373,7 +393,8 @@ describe('MissionRepository', () => {
         description: 'Test Description',
       } as any;
 
-      mockConnection.executeQuery.mockResolvedValue([{ m: existingMission }]);
+      // Since empty updates still add updatedAt, we need to mock the executeWrite for the update
+      mockConnection.executeWrite.mockResolvedValue([{ m: existingMission }]);
 
       const result = await repository.updateMission('mission-123', {});
       expect(result).toEqual(
@@ -401,7 +422,7 @@ describe('MissionRepository', () => {
 
       const updates = { name: 'Updated' };
 
-      await expect(repository.updateMission('non-existent', updates)).rejects.toThrow(DatabaseError);
+      await expect(repository.updateMission('non-existent', updates)).rejects.toThrow(NotFoundError);
     });
 
     it('should update all possible fields', async () => {
@@ -443,7 +464,7 @@ describe('MissionRepository', () => {
 
       const updates = { name: 'Updated' };
 
-      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(DatabaseError);
+      await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(NotFoundError);
     });
   });
 

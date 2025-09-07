@@ -1,5 +1,4 @@
 import { UserEntity } from '@/entities/UserEntity';
-import { getConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { UserModel } from '@starships/protocol';
 
@@ -10,7 +9,7 @@ export class UserRepository extends BaseRepository {
   async findAll(): Promise<UserModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
         return result.map((record) => UserEntity.deserialize(record.u));
       },
@@ -22,7 +21,7 @@ export class UserRepository extends BaseRepository {
   async findById(id: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.id = $id RETURN u', { id: id });
         const user = result[0]?.u || null;
         return user ? UserEntity.deserialize(user) : null;
@@ -36,7 +35,7 @@ export class UserRepository extends BaseRepository {
   async findByEmail(email: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
         const user = result[0]?.u || null;
         return user ? UserEntity.deserialize(user) : null;
@@ -50,7 +49,7 @@ export class UserRepository extends BaseRepository {
   async findByUsername(username: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.username = $username RETURN u', {
           username: username,
         });
@@ -100,7 +99,7 @@ export class UserRepository extends BaseRepository {
           await UserEntity.validate(updates, 'update');
         }
 
-        const connection = getConnection();
+        const connection = this.getConnection();
         const now = new Date().toISOString();
 
         // Transform using Entity
@@ -119,9 +118,11 @@ export class UserRepository extends BaseRepository {
           return this.findById(id);
         }
 
+        // Filter out protected fields from params
+        const { id: _, createdAt: __, ...filteredUpdateData } = updateData;
         const params = {
-          id: id,
-          ...updateData,
+          id: id, // Use the actual user ID parameter
+          ...filteredUpdateData,
         };
 
         const result = await connection.executeWrite<{ u: UserModel }>(
@@ -146,7 +147,7 @@ export class UserRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (u:User) WHERE u.id = $id DETACH DELETE u RETURN count(u) as deletedCount',
           { id: id }
@@ -164,7 +165,7 @@ export class UserRepository extends BaseRepository {
   async findByStripeCustomerId(stripeCustomerId: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ user: UserModel }>(
           `MATCH (user:User {stripeCustomerId: $stripeCustomerId})
          RETURN user`,
@@ -191,7 +192,7 @@ export class UserRepository extends BaseRepository {
           throw new Error('stripeCustomerId is required for updateStripeCustomerId');
         }
 
-        const connection = getConnection();
+        const connection = this.getConnection();
         await connection.executeWrite(
           `MATCH (user:User {id: $userId})
          SET user.stripeCustomerId = $stripeCustomerId`,
@@ -208,7 +209,7 @@ export class UserRepository extends BaseRepository {
   async findByEmailWithPassword(email: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = getConnection();
+        const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
         const user = result[0]?.u || null;
         return user ? UserEntity.deserialize(user) : null;

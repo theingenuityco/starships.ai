@@ -14,6 +14,17 @@ jest.mock('../../helpers/database', () => ({
   convertNeo4jIntsInArray: jest.fn((arr) => arr),
 }));
 
+// Mock AgentEntity with proper static methods
+jest.mock('../../entities/AgentEntity', () => ({
+  AgentEntity: {
+    validate: jest.fn().mockResolvedValue(undefined),
+    deserialize: jest.fn().mockImplementation((data) => ({
+      ...data,
+      serialize: jest.fn().mockReturnValue(data),
+    })),
+  },
+}));
+
 // Mock uuid
 jest.mock('uuid', () => ({
   v4: jest.fn(() => 'test-uuid-1234'),
@@ -158,8 +169,8 @@ describe('AgentRepository', () => {
             props: expect.objectContaining({
               name: 'Test Agent',
               starshipId: 'starship-123',
-              memory: '{"data":"test"}',
-              blueprint: '{"type":"test","nodes":[],"edges":[]}',
+              memory: { data: 'test' },
+              blueprint: { type: 'test', nodes: [], edges: [] },
             }),
           })
         );

@@ -274,7 +274,17 @@ export abstract class BaseRepository {
   private isConstraintViolationError(error: any): boolean {
     if (!error) return false;
 
-    const constraintPatterns = ['constraint', 'unique', 'duplicate', 'foreign key', 'check constraint', 'not null', 'primary key'];
+    const constraintPatterns = [
+      'constraint',
+      'unique',
+      'duplicate',
+      'foreign key',
+      'check constraint',
+      'not null',
+      'primary key',
+      'constraintvalidationfailed',
+      'neo.clienterror.schema.constraintvalidationfailed',
+    ];
 
     const errorMessage = (error.message || '').toLowerCase();
     const errorCode = (error.code || '').toLowerCase();

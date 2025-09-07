@@ -121,6 +121,11 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   id!: string;
 
   @Expose()
+  @IsString()
+  @Length(1, 100)
+  slug!: string;
+
+  @Expose()
   @AgentTemplateTransformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
@@ -259,6 +264,9 @@ export class AgentTemplateEntity implements AgentTemplateModel {
       if (!entity.name) {
         throw new Error('Name is required for agent template creation');
       }
+      if (!entity.slug) {
+        throw new Error('Slug is required for agent template creation');
+      }
       if (!entity.model) {
         throw new Error('Model is required for agent template creation');
       }
@@ -270,6 +278,14 @@ export class AgentTemplateEntity implements AgentTemplateModel {
     // Business rule validations
     if (entity.name && entity.name.length > 100) {
       throw new Error('Agent template name cannot exceed 100 characters');
+    }
+
+    if (entity.slug && entity.slug.length > 100) {
+      throw new Error('Agent template slug cannot exceed 100 characters');
+    }
+
+    if (entity.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entity.slug)) {
+      throw new Error('Agent template slug must contain only lowercase letters, numbers, and hyphens');
     }
 
     if (entity.description && entity.description.length > 500) {

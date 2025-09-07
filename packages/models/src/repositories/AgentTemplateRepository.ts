@@ -1,5 +1,6 @@
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { Neo4jConnection, convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
+import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { AgentMemoryState } from '@starships/autopilot';
 import type { AgentModel, AgentTemplateModel } from '@starships/protocol';
@@ -74,6 +75,28 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
+  async findBySlug(slug: string): Promise<AgentTemplateModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!slug?.trim()) {
+          throw new Error('Slug is required for findBySlug operation');
+        }
+
+        const query = `
+        MATCH (t:AgentTemplate {slug: $slug})
+        RETURN t
+      `;
+
+        const results = await this.getConnection().executeQuery<{ t: any }>(query, { slug });
+        const template = results.length > 0 ? results[0].t : null;
+        return template ? this.deserializeTemplate(convertNeo4jIntsInObject(template)) : null;
+      },
+      'findBySlug',
+      'AgentTemplate',
+      slug
+    );
+  }
+
   async create(entity: Omit<AgentTemplateModel, 'id' | 'createdAt'>): Promise<AgentTemplateModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -84,10 +107,14 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const now = new Date().toISOString();
 
+        // Generate slug if not provided
+        const slug = (entity as any).slug || generateSlug((entity as any).name);
+
         // Build template data, ensuring no complex objects for Neo4j storage
         const templateData = {
           // Explicit primitive fields
           name: entity.name,
+          slug: slug,
           description: entity.description,
           category: entity.category,
           model: entity.model,

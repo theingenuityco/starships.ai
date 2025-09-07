@@ -64,6 +64,7 @@ describe('AgentTemplateRepository', () => {
 
   const createMockTemplate = (overrides: Partial<AgentTemplateModel> = {}): AgentTemplateModel => ({
     id: 'template-123',
+    slug: 'test-template',
     name: 'Test Template',
     description: 'A test agent template',
     category: 'general',
@@ -105,6 +106,7 @@ describe('AgentTemplateRepository', () => {
 
   const createMockCreateInput = (overrides: any = {}) => ({
     name: 'Test Template',
+    slug: 'test-template',
     description: 'A test agent template',
     category: 'general',
     model: 'gpt-4',
@@ -220,6 +222,50 @@ describe('AgentTemplateRepository', () => {
       mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.findById('template-123')).rejects.toThrow(DatabaseError);
+    });
+  });
+
+  describe('findBySlug', () => {
+    it('should return template when found by slug', async () => {
+      const mockRawTemplate = createMockRawTemplate();
+      mockConnection.executeQuery.mockResolvedValue([{ t: mockRawTemplate }]);
+
+      const result = await repository.findBySlug('test-template');
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'template-123',
+          slug: 'test-template',
+          name: 'Test Template',
+          memory: expect.objectContaining({
+            identity: expect.objectContaining({ name: 'Assistant' }),
+          }),
+          blueprint: expect.objectContaining({
+            nodes: expect.any(Array),
+          }),
+        })
+      );
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (t:AgentTemplate {slug: $slug})'), {
+        slug: 'test-template',
+      });
+    });
+
+    it('should return null when template not found by slug', async () => {
+      mockConnection.executeQuery.mockResolvedValue([]);
+
+      const result = await repository.findBySlug('non-existent-slug');
+
+      expect(result).toBeNull();
+    });
+
+    it('should throw DatabaseError for missing slug', async () => {
+      await expect(repository.findBySlug('')).rejects.toThrow(DatabaseError);
+    });
+
+    it('should handle database errors', async () => {
+      mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
+
+      await expect(repository.findBySlug('test-template')).rejects.toThrow(DatabaseError);
     });
   });
 

@@ -331,16 +331,9 @@ router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    // Get deployed agents and available slots
-    const starshipDetails = await starshipService.getStarshipWithDetails(starship.id);
-    const agents = starshipDetails?.agents || [];
-    const availableSlots = starshipDetails?.availableSlots || 0;
-
-    sendSuccess(res, {
-      starship,
-      agents,
-      availableSlots,
-    });
+    // Return just the starship model
+    // Note: For detailed agent info and available slots, use GET /starships/:id/agents endpoint
+    sendSuccess(res, starship);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship');

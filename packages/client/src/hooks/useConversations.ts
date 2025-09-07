@@ -1,11 +1,7 @@
 import api from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationSourceType } from '@starships/protocol'
+import type { ConversationModel, ConversationSourceType } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
-
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
 
 // Message interface for client compatibility
 export interface Message {
@@ -36,7 +32,7 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
     queryFn: async () => {
       const response = await api.get(`/api/v1/starships/${starshipId}/conversations`)
       // Server now returns conversations array directly with pagination meta
-      const conversations = extractResponseData<ConversationModel[]>(response)
+      const conversations = response.data.data as ConversationModel[]
       return { conversations }
     },
     enabled: !!starshipId && enabled,
@@ -54,7 +50,7 @@ export function useConversation(conversationId: string, enabled: boolean = true)
       const response = await api.get(`/api/v1/conversations/${conversationId}`)
 
       // Server now returns ConversationWithMessages directly
-      const data = extractResponseData<ConversationModel & { messages: any[] }>(response)
+      const data = response.data.data as ConversationModel & { messages: any[] }
 
       return {
         conversation: {
@@ -70,7 +66,7 @@ export function useConversation(conversationId: string, enabled: boolean = true)
           starshipId: (data as any).starshipId,
           userId: (data as any).userId,
         },
-        messages: data.messages.map(msg => ({
+        messages: data.messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
           role: msg.role,
@@ -94,12 +90,11 @@ export function useConversationMessages(conversationId: string, enabled: boolean
         params: { limit: 50, offset: 0 },
       })
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to fetch messages')
-      }
+      // Extract data using the proper ApiResponse<T> format
+      const data = response.data.data
 
       // Convert database messages to client Message format
-      const messages = response.data.messages || []
+      const messages = data.messages || []
       const formattedMessages = messages.map((dbMsg: any) => ({
         id: dbMsg.id,
         content: dbMsg.content,
@@ -127,7 +122,7 @@ export function useUserConversations(userId: string, onlyActive: boolean = false
         params: { active: onlyActive ? 'true' : undefined },
       })
       // Server now returns conversations array directly with pagination meta
-      const conversations = extractResponseData<ConversationModel[]>(response)
+      const conversations = response.data.data
       return { conversations }
     },
     enabled: !!userId && enabled,
@@ -143,7 +138,7 @@ export function useCreateConversation() {
   return useMutation({
     mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string; userId?: string }) => {
       const response = await api.post('/api/v1/conversations', data)
-      return extractResponseData<ConversationModel>(response)
+      return response.data.data as ConversationModel
     },
     onSuccess: (conversation, variables) => {
       // Invalidate and refetch relevant conversation lists
@@ -193,8 +188,8 @@ export function useSendMessage() {
         message: data.message,
       })
 
-      // Server returns the response message directly
-      return response.data
+      // Server returns the response message via ApiResponse<T>
+      return response.data.data
     },
     onMutate: async ({ conversationId, message }) => {
       // Cancel any outgoing refetches for conversation messages
@@ -266,7 +261,7 @@ export function useClearConversationMemory() {
   return useMutation({
     mutationFn: async (conversationId: string) => {
       const response = await api.delete(`/api/v1/conversations/${conversationId}/memory`)
-      return response.data
+      return response.data.data
     },
     onSuccess: (data, conversationId) => {
       // Invalidate conversation details and messages
@@ -291,7 +286,7 @@ export function useDeleteConversation() {
   return useMutation({
     mutationFn: async (conversationId: string) => {
       const response = await api.delete(`/api/v1/conversations/${conversationId}`)
-      return response.data
+      return response.data.data
     },
     onMutate: async conversationId => {
       // Get conversation details to know which starship it belongs to

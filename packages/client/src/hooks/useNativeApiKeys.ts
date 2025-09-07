@@ -1,11 +1,6 @@
 import api from '@/lib/api'
-import type { ApiResponse } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
-
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
 
 // Native API Key interface
 export interface NativeApiKey {
@@ -34,9 +29,9 @@ export function useNativeApiKeys(starshipId: string, enabled: boolean = true) {
     queryKey: NATIVE_API_KEY_QUERY_KEYS.byStarship(starshipId),
     queryFn: async () => {
       try {
-        const response = await api.get(`/api/starships/${starshipId}/native-api-keys`)
-        // The API returns a direct object with tool names as keys, not wrapped in ApiResponse
-        return response.data as Record<string, string>
+        const response = await api.get(`/api/v1/starships/${starshipId}/native-api-keys`)
+        // Use proper API response extraction
+        return response.data.data as Record<string, string>
       } catch (error) {
         console.error('Failed to load native API keys:', error)
         // Return empty object if failed to maintain compatibility
@@ -57,8 +52,8 @@ export function useNativeApiKey(starshipId: string, toolName: string, enabled: b
   return useQuery({
     queryKey: NATIVE_API_KEY_QUERY_KEYS.detail(starshipId, toolName),
     queryFn: async () => {
-      const response = await api.get(`/api/starships/${starshipId}/native-api-keys/${toolName}`)
-      return response.data as { apiKey: string; config?: Record<string, string> }
+      const response = await api.get(`/api/v1/starships/${starshipId}/native-api-keys/${toolName}`)
+      return response.data.data as { apiKey: string; config?: Record<string, string> }
     },
     enabled: !!starshipId && !!toolName && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -74,12 +69,12 @@ export function useSaveNativeApiKey() {
 
   return useMutation({
     mutationFn: async (data: { starshipId: string; toolName: string; apiKey: string; config?: Record<string, string> }) => {
-      const response = await api.post(`/api/starships/${data.starshipId}/native-api-keys`, {
+      const response = await api.post(`/api/v1/starships/${data.starshipId}/native-api-keys`, {
         toolName: data.toolName,
         apiKey: data.apiKey,
         config: data.config,
       })
-      return response.data
+      return response.data.data
     },
     onSuccess: (data, variables) => {
       // Update the specific API key in cache optimistically
@@ -117,8 +112,8 @@ export function useDeleteNativeApiKey() {
 
   return useMutation({
     mutationFn: async (data: { starshipId: string; toolName: string }) => {
-      const response = await api.delete(`/api/starships/${data.starshipId}/native-api-keys/${data.toolName}`)
-      return response.data
+      const response = await api.delete(`/api/v1/starships/${data.starshipId}/native-api-keys/${data.toolName}`)
+      return response.data.data
     },
     onMutate: async ({ starshipId, toolName }) => {
       // Cancel any ongoing refetches

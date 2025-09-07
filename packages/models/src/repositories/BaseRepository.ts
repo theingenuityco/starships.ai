@@ -3,8 +3,7 @@
  */
 
 import { getConnection, Neo4jConnection } from '@/helpers/database';
-import type { RepositoryErrorContext } from '@starships/errors';
-import { BaseError, ConflictError, DatabaseError, ErrorContextUtils, NotFoundError, ValidationError } from '@starships/errors';
+import { AppError, ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import { nanoid } from 'nanoid';
 
 /**
@@ -35,15 +34,18 @@ export abstract class BaseRepository {
     resource?: string,
     resourceId?: string,
     additionalMetadata?: Record<string, any>
-  ): RepositoryErrorContext {
-    return ErrorContextUtils.repository(this.serviceName, operation, {
+  ): Record<string, any> {
+    return {
+      component: this.serviceName,
+      operation,
       resource,
       resourceId,
+      requestId: nanoid(),
       metadata: {
         component: 'repository',
         ...additionalMetadata,
       },
-    });
+    };
   }
 
   /**
@@ -68,62 +70,23 @@ export abstract class BaseRepository {
 
     // Handle specific database error types
     if (this.isConstraintViolationError(error)) {
-      throw new ConflictError(
-        'Database constraint violation',
-        'database_constraint',
-        { resource: resource || 'Resource', originalError: error.message },
-        context.requestId,
-        `${context.component}/${context.operation}`,
-        context
-      );
+      throw new ConflictError('Database constraint violation', error instanceof Error ? error : undefined);
     }
 
     if (this.isConnectionError(error)) {
-      throw new DatabaseError(
-        'Database connection failed',
-        'connection',
-        undefined,
-        { originalError: error.message },
-        context.requestId,
-        `${context.component}/${context.operation}`,
-        context
-      );
+      throw new DatabaseError('connection', error instanceof Error ? error : undefined);
     }
 
     if (this.isTimeoutError(error)) {
-      throw new DatabaseError(
-        'Database operation timeout',
-        'timeout',
-        undefined,
-        { originalError: error.message },
-        context.requestId,
-        `${context.component}/${context.operation}`,
-        context
-      );
+      throw new DatabaseError('timeout', error instanceof Error ? error : undefined);
     }
 
     if (this.isQueryError(error)) {
-      throw new DatabaseError(
-        'Database query failed',
-        'query',
-        undefined,
-        { originalError: error.message },
-        context.requestId,
-        `${context.component}/${context.operation}`,
-        context
-      );
+      throw new DatabaseError('query', error instanceof Error ? error : undefined);
     }
 
     // Generic database error
-    throw new DatabaseError(
-      'Database operation failed',
-      context.operation,
-      undefined,
-      { originalError: error.message || 'Unknown database error' },
-      context.requestId,
-      `${context.component}/${context.operation}`,
-      context
-    );
+    throw new DatabaseError(context.operation, error instanceof Error ? error : undefined);
   }
 
   /**
@@ -137,17 +100,7 @@ export abstract class BaseRepository {
    * @protected
    */
   protected handleNotFound(resource: string, resourceId?: string, operation?: string): never {
-    const context = this.createContext(operation || 'find', resource, resourceId);
-
-    throw new NotFoundError(
-      `${resource} ${resourceId ? `with ID ${resourceId}` : ''} not found`,
-      resource,
-      resourceId || 'unknown',
-      undefined,
-      context.requestId,
-      `${context.component}/${context.operation}`,
-      context
-    );
+    throw new NotFoundError(resource, resourceId || 'unknown');
   }
 
   /**
@@ -160,19 +113,8 @@ export abstract class BaseRepository {
    * @protected
    */
   protected handleValidationError(fieldErrors: Array<{ field: string; message: string; value?: any }>, operation?: string): never {
-    const context = this.createContext(operation || 'validate', undefined, undefined, {
-      fieldErrors,
-    });
-
     const message = fieldErrors.map((e) => `${e.field}: ${e.message}`).join(', ');
-    throw new ValidationError(
-      message,
-      fieldErrors[0]?.field,
-      { fieldErrors },
-      context.requestId,
-      `${context.component}/${context.operation}`,
-      context
-    );
+    throw new ValidationError(message, fieldErrors[0]?.field, { fieldErrors });
   }
 
   /**
@@ -187,18 +129,7 @@ export abstract class BaseRepository {
    * @protected
    */
   protected handleConflict(resource: string, conflictReason: string, operation?: string, resourceId?: string): never {
-    const context = this.createContext(operation || 'create', resource, resourceId, {
-      conflictReason,
-    });
-
-    throw new ConflictError(
-      conflictReason,
-      'resource_conflict',
-      { resource, resourceId },
-      context.requestId,
-      `${context.component}/${context.operation}`,
-      context
-    );
+    throw new ConflictError(conflictReason);
   }
 
   /**
@@ -227,8 +158,8 @@ export abstract class BaseRepository {
     try {
       return await operation();
     } catch (error: any) {
-      // If it's already a BaseError, re-throw
-      if (error instanceof BaseError) {
+      // If it's already an AppError, re-throw
+      if (error instanceof AppError) {
         throw error;
       }
 
@@ -254,8 +185,8 @@ export abstract class BaseRepository {
     try {
       return operation();
     } catch (error: any) {
-      // If it's already a BaseError, re-throw
-      if (error instanceof BaseError) {
+      // If it's already an AppError, re-throw
+      if (error instanceof AppError) {
         throw error;
       }
 
@@ -464,19 +395,7 @@ export abstract class BaseRepository {
    * Create a standardized error for business logic violations
    */
   protected createBusinessLogicError(code: string, message: string, operation?: string, resource?: string, resourceId?: string): never {
-    const context = this.createContext(operation || 'unknown', resource, resourceId, {
-      businessLogicCode: code,
-    });
-
-    throw new DatabaseError(
-      message,
-      operation || 'unknown',
-      undefined,
-      { code, resource, resourceId },
-      context.requestId,
-      `${context.component}/${context.operation}`,
-      context
-    );
+    throw new DatabaseError(operation || 'unknown');
   }
 }
 

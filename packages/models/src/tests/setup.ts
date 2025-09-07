@@ -135,13 +135,11 @@ const mockDriver = {
 // Error creation helpers
 (global as any).createValidationError = (message = 'Validation failed', field = 'testField') => new ValidationError(message, field);
 
-(global as any).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') =>
-  new NotFoundError(`${entityType} not found`, entityType, entityId);
+(global as any).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') => new NotFoundError(entityType, entityId);
 
-(global as any).createDatabaseError = (message = 'Database operation failed', operation = 'test') => new DatabaseError(message, operation);
+(global as any).createDatabaseError = (message = 'Database operation failed', operation = 'test') => new DatabaseError(operation);
 
-(global as any).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') =>
-  new ConflictError(message, conflictType);
+(global as any).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') => new ConflictError(message);
 
 // Mock database session with common patterns
 (global as any).createMockDatabaseSession = () => {

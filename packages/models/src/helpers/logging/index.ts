@@ -1,6 +1,7 @@
 /** Structured logging and monitoring system */
 
-import { BaseError, ErrorUtils } from '@starships/errors';
+import { AppError, isAppError } from '@starships/errors';
+import { nanoid } from 'nanoid';
 
 /** Log levels in order of severity */
 export enum LogLevel {
@@ -130,7 +131,7 @@ export class Logger {
   }
 
   /** Format log message with context */
-  private formatMessage(level: LogLevel, message: string, context?: LogContext, error?: Error | BaseError): Record<string, any> {
+  private formatMessage(level: LogLevel, message: string, context?: LogContext, error?: Error | AppError): Record<string, any> {
     const logEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -139,8 +140,8 @@ export class Logger {
     };
 
     if (error) {
-      if (error instanceof BaseError) {
-        logEntry.error = ErrorUtils.extractLogDetails(error);
+      if (isAppError(error)) {
+        logEntry.error = error.toJSON();
       } else {
         logEntry.error = {
           name: error.name,
@@ -215,7 +216,7 @@ export class Logger {
   }
 
   /** Log warning message */
-  public warn(message: string, context?: LogContext, error?: Error | BaseError): void {
+  public warn(message: string, context?: LogContext, error?: Error | AppError): void {
     if (this.shouldLog(LogLevel.WARN)) {
       const logEntry = this.formatMessage(LogLevel.WARN, message, context, error);
       this.output(logEntry);
@@ -223,7 +224,7 @@ export class Logger {
   }
 
   /** Log error message */
-  public error(message: string, context?: LogContext, error?: Error | BaseError): void {
+  public error(message: string, context?: LogContext, error?: Error | AppError): void {
     if (this.shouldLog(LogLevel.ERROR)) {
       const logEntry = this.formatMessage(LogLevel.ERROR, message, context, error);
       this.output(logEntry);
@@ -231,7 +232,7 @@ export class Logger {
   }
 
   /** Log fatal error message */
-  public fatal(message: string, context?: LogContext, error?: Error | BaseError): void {
+  public fatal(message: string, context?: LogContext, error?: Error | AppError): void {
     if (this.shouldLog(LogLevel.FATAL)) {
       const logEntry = this.formatMessage(LogLevel.FATAL, message, context, error);
       this.output(logEntry);
@@ -320,7 +321,7 @@ class PerformanceMonitorClass {
 
   /** Measure async operation */
   public static async measure<T>(operation: string, fn: () => Promise<T>, metadata?: Record<string, any>): Promise<T> {
-    const operationId = ErrorUtils.generateRequestId();
+    const operationId = nanoid();
     this.start(operationId);
 
     try {
@@ -328,7 +329,7 @@ class PerformanceMonitorClass {
       this.end(operationId, operation, true, undefined, metadata);
       return result;
     } catch (error) {
-      const errorCode = error instanceof BaseError ? error.code : 'UNKNOWN_ERROR';
+      const errorCode = isAppError(error) ? error.code : 'UNKNOWN_ERROR';
       this.end(operationId, operation, false, errorCode, metadata);
       throw error;
     }
@@ -336,7 +337,7 @@ class PerformanceMonitorClass {
 
   /** Measure sync operation */
   public static measureSync<T>(operation: string, fn: () => T, metadata?: Record<string, any>): T {
-    const operationId = ErrorUtils.generateRequestId();
+    const operationId = nanoid();
     this.start(operationId);
 
     try {
@@ -344,7 +345,7 @@ class PerformanceMonitorClass {
       this.end(operationId, operation, true, undefined, metadata);
       return result;
     } catch (error) {
-      const errorCode = error instanceof BaseError ? error.code : 'UNKNOWN_ERROR';
+      const errorCode = isAppError(error) ? error.code : 'UNKNOWN_ERROR';
       this.end(operationId, operation, false, errorCode, metadata);
       throw error;
     }

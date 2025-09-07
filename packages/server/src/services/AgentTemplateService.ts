@@ -109,10 +109,22 @@ export class AgentTemplateService {
    * Validate starship exists and user has access
    */
   async validateStarshipAccess(starshipId: string, userId: string): Promise<StarshipModel> {
-    const starship = await this.starshipRepository.findById(starshipId);
+    // First try to find by ID
+    let starship = await this.starshipRepository.findById(starshipId);
+    let searchMethod = 'ID';
+
+    // If not found by ID, try to find by slug
+    if (!starship) {
+      starship = await this.starshipRepository.findBySlug(starshipId, userId);
+      searchMethod = 'slug';
+    }
 
     if (!starship) {
-      throw new NotFoundError(`Starship not found`, 'Starship', starshipId);
+      throw new NotFoundError(
+        `Starship with ${searchMethod.toLowerCase()} "${starshipId}" not found or you don't have access to it`,
+        'Starship',
+        starshipId
+      );
     }
 
     if (starship.ownerId !== userId) {

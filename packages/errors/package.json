@@ -23,8 +23,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
-    "@starships/protocol": "workspace:*",
-    "uuid": "^10.0.0"
+    "@starships/protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

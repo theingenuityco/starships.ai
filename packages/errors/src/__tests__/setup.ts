@@ -2,20 +2,19 @@
  * Jest setup file for errors package tests
  */
 
+import { ErrorCategory } from '@starships/protocol';
 import {
-  BaseError,
-  ValidationError,
-  NotFoundError,
   AuthenticationError,
   AuthorizationError,
   ConflictError,
   DatabaseError,
-  NetworkError,
   InternalServerError,
+  NetworkError,
+  NotFoundError,
   RateLimitError,
   ServiceUnavailableError,
+  ValidationError,
 } from '../index';
-import { ErrorCategory } from '@starships/protocol';
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -85,7 +84,7 @@ global.console = {
   REQUEST_ID: 'test-req-123',
   PATH: '/api/test',
   TIMESTAMP_REGEX: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
-  UUID_REGEX: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  NANOID_REGEX: /^[A-Za-z0-9_-]{21}$/,
 };
 
 // Helper to validate error response structure
@@ -125,9 +124,9 @@ jest.setTimeout(10000);
 // Mock environment variables for testing
 process.env.NODE_ENV = 'test';
 
-// Mock UUID generation for predictable testing
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+// Mock nanoid generation for predictable testing
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'a1b2c3d4e5f67890abcdef1234567890'),
 }));
 
 // Mock Date.now for consistent timestamp testing

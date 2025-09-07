@@ -296,7 +296,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                               />
                             </svg>
                             <h3 className="text-xl font-bold mb-2">Starship Not Found</h3>
-                            <p className="text-sm text-muted-foreground mb-4">The starship "{slug}" could not be found or you don't have access to it.</p>
+                            <p className="text-sm text-muted-foreground mb-4">The starship &quot;{slug}&quot; could not be found or you don&apos;t have access to it.</p>
                             <Button asChild variant="outline">
                               <Link href="/">Return Home</Link>
                             </Button>

@@ -713,7 +713,7 @@ describe('NodeRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([{ n: { id: nodeId } }]);
       mockConnection.executeWrite.mockResolvedValue([]); // Update failed
 
-      await expect(repository.updateNode(nodeId, { name: 'Test' })).rejects.toThrow('Database operation failed');
+      await expect(repository.updateNode(nodeId, { name: 'Test' })).rejects.toThrow('Database updateNode failed');
     });
 
     it('should serialize complex parameters correctly', async () => {

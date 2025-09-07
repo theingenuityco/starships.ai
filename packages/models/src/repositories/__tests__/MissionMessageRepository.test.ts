@@ -166,7 +166,7 @@ describe('MissionMessageRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([{ id: 'mission-123' }]);
       mockConnection.executeWrite.mockResolvedValue([]); // No results
 
-      await expect(repository.saveMessage(messageInput)).rejects.toThrow('Database operation failed');
+      await expect(repository.saveMessage(messageInput)).rejects.toThrow('Database saveMessage failed');
     });
   });
 

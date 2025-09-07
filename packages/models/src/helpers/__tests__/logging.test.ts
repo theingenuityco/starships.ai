@@ -2,18 +2,18 @@
  * Logging and Monitoring System Unit Tests
  */
 
+import { ValidationError } from '@starships/errors';
 import {
-  Logger,
-  LogLevel,
-  LogContext,
-  PerformanceMetrics,
-  HealthStatus,
-  logger,
-  PerformanceMonitor,
   HealthMonitor,
+  HealthStatus,
+  LogContext,
+  Logger,
+  logger,
+  LogLevel,
+  PerformanceMetrics,
+  PerformanceMonitor,
   RequestContext,
 } from '../logging';
-import { ValidationError } from '@starships/errors';
 
 describe('Logging and Monitoring System', () => {
   beforeEach(() => {
@@ -141,8 +141,8 @@ describe('Logging and Monitoring System', () => {
         expect.objectContaining({
           operation: 'validate',
           error: expect.objectContaining({
-            errorCode: 'VALIDATION_ERROR',
-            category: 'validation',
+            code: 'VALIDATION_ERROR',
+            category: 'client',
           }),
         })
       );

@@ -5,8 +5,8 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import axios, { AxiosResponse, AxiosRequestConfig, AxiosError } from 'axios';
 import { HttpRequestNodeParameters } from '@/types';
+import axios, { AxiosRequestConfig } from 'axios';
 
 export class HttpRequest {
   private params: HttpRequestNodeParameters;
@@ -79,7 +79,6 @@ export class HttpRequest {
         },
         timeout: this.params.timeout || 30000,
         maxRedirects: this.params.followRedirects !== false ? 5 : 0,
-        validateStatus: () => true, // Don't throw on any status code
       };
 
       // Add authentication if provided
@@ -92,49 +91,19 @@ export class HttpRequest {
         requestConfig.data = this.params.body;
       }
 
-      // Execute request with retries
-      const maxRetries = this.params.retries || 0;
-      let lastError: Error | null = null;
-      let response: AxiosResponse | null = null;
+      // Execute request
+      const response = await axios(requestConfig);
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        try {
-          response = await axios(requestConfig);
-          break; // Success, exit retry loop
-        } catch (error) {
-          lastError = error as AxiosError;
-
-          // Don't retry on certain errors
-          if (axios.isCancel(error) || (error as AxiosError).code === 'ECONNABORTED') {
-            break;
-          }
-
-          // Wait before retry (exponential backoff)
-          if (attempt < maxRetries) {
-            await new Promise((resolve) => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-          }
-        }
-      }
-
-      if (response) {
-        return {
-          status: 'completed',
-          data: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: response.headers,
-            body: response.data,
-            url: response.config.url,
-          },
-        };
-      } else {
-        // If we get here, all retries failed
-        const errorMessage = lastError?.message || 'HTTP request failed';
-        return {
-          status: 'failed',
-          error: new Error(`HTTP request failed: ${errorMessage}`),
-        };
-      }
+      return {
+        status: 'completed',
+        data: {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          body: response.data,
+          url: response.config.url,
+        },
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       return {
@@ -227,11 +196,6 @@ export class HttpRequest {
     // Timeout validation
     if (this.params.timeout !== undefined && this.params.timeout < 1000) {
       errors.push('Timeout should be at least 1000ms');
-    }
-
-    // Retries validation
-    if (this.params.retries !== undefined && this.params.retries < 0) {
-      errors.push('Retries must be non-negative');
     }
 
     return {

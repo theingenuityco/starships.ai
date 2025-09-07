@@ -8,7 +8,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -66,7 +66,7 @@ router.get('/executions', jwtAuthMiddleware, async (req: Request, res: Response)
     const queryValidation = validateData(
       z.object({
         status: ExecutionStatusSchema.optional(),
-        workflowId: UuidSchema.optional(),
+        workflowId: NanoidSchema.optional(),
       }),
       req.query,
       res,
@@ -110,7 +110,7 @@ router.get('/executions/:executionId', jwtAuthMiddleware, async (req: Request, r
     if (!checkAuth(req, res)) return;
 
     // Validate executionId parameter
-    const paramValidation = validateData(z.object({ executionId: UuidSchema }), req.params, res, 'execution parameter');
+    const paramValidation = validateData(z.object({ executionId: NanoidSchema }), req.params, res, 'execution parameter');
     if (!paramValidation) return;
 
     const { executionId } = paramValidation;
@@ -144,7 +144,7 @@ router.post('/executions', jwtAuthMiddleware, async (req: Request, res: Response
     // Validate request body
     const bodyValidation = validateData(
       z.object({
-        workflowId: UuidSchema,
+        workflowId: NanoidSchema,
         executionData: z.object({}).passthrough().optional(),
       }),
       req.body,
@@ -172,7 +172,7 @@ router.put('/executions/:executionId', jwtAuthMiddleware, async (req: Request, r
     if (!checkAuth(req, res)) return;
 
     // Validate executionId parameter
-    const paramValidation = validateData(z.object({ executionId: UuidSchema }), req.params, res, 'execution parameter');
+    const paramValidation = validateData(z.object({ executionId: NanoidSchema }), req.params, res, 'execution parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -219,7 +219,7 @@ router.delete('/executions/:executionId', jwtAuthMiddleware, async (req: Request
     if (!checkAuth(req, res)) return;
 
     // Validate executionId parameter
-    const paramValidation = validateData(z.object({ executionId: UuidSchema }), req.params, res, 'execution parameter');
+    const paramValidation = validateData(z.object({ executionId: NanoidSchema }), req.params, res, 'execution parameter');
     if (!paramValidation) return;
 
     const { executionId } = paramValidation;
@@ -256,7 +256,7 @@ router.post('/executions/:executionId/start', jwtAuthMiddleware, async (req: Req
     if (!checkAuth(req, res)) return;
 
     // Validate executionId parameter
-    const paramValidation = validateData(z.object({ executionId: UuidSchema }), req.params, res, 'execution parameter');
+    const paramValidation = validateData(z.object({ executionId: NanoidSchema }), req.params, res, 'execution parameter');
     if (!paramValidation) return;
 
     const { executionId } = paramValidation;
@@ -280,7 +280,7 @@ router.post('/executions/:executionId/pause', jwtAuthMiddleware, async (req: Req
     if (!checkAuth(req, res)) return;
 
     // Validate executionId parameter
-    const paramValidation = validateData(z.object({ executionId: UuidSchema }), req.params, res, 'execution parameter');
+    const paramValidation = validateData(z.object({ executionId: NanoidSchema }), req.params, res, 'execution parameter');
     if (!paramValidation) return;
 
     const { executionId } = paramValidation;
@@ -304,7 +304,7 @@ router.post('/executions/:executionId/resume', jwtAuthMiddleware, async (req: Re
     if (!checkAuth(req, res)) return;
 
     // Validate executionId parameter
-    const paramValidation = validateData(z.object({ executionId: UuidSchema }), req.params, res, 'execution parameter');
+    const paramValidation = validateData(z.object({ executionId: NanoidSchema }), req.params, res, 'execution parameter');
     if (!paramValidation) return;
 
     const { executionId } = paramValidation;
@@ -328,7 +328,7 @@ router.post('/executions/:executionId/cancel', jwtAuthMiddleware, async (req: Re
     if (!checkAuth(req, res)) return;
 
     // Validate executionId parameter
-    const paramValidation = validateData(z.object({ executionId: UuidSchema }), req.params, res, 'execution parameter');
+    const paramValidation = validateData(z.object({ executionId: NanoidSchema }), req.params, res, 'execution parameter');
     if (!paramValidation) return;
 
     // Validate optional reason
@@ -364,7 +364,7 @@ router.get('/workflows/:workflowId/executions', jwtAuthMiddleware, async (req: R
     if (!checkAuth(req, res)) return;
 
     // Validate workflowId parameter
-    const paramValidation = validateData(z.object({ workflowId: UuidSchema }), req.params, res, 'workflow parameter');
+    const paramValidation = validateData(z.object({ workflowId: NanoidSchema }), req.params, res, 'workflow parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -398,7 +398,7 @@ router.get('/workflows/:workflowId/executions/stats', jwtAuthMiddleware, async (
     if (!checkAuth(req, res)) return;
 
     // Validate workflowId parameter
-    const paramValidation = validateData(z.object({ workflowId: UuidSchema }), req.params, res, 'workflow parameter');
+    const paramValidation = validateData(z.object({ workflowId: NanoidSchema }), req.params, res, 'workflow parameter');
     if (!paramValidation) return;
 
     const { workflowId } = paramValidation;

@@ -4,14 +4,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { AgentService } from '../services/AgentService';
-import {
-  createPaginationMeta,
-  handleCommonError,
-  sendError,
-  sendSuccess,
-  validatePagination,
-  validateUUID,
-} from '../utils/responseHelpers';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId, validatePagination } from '../utils/responseHelpers';
 
 const router: Router = Router();
 
@@ -127,7 +120,7 @@ router.post('/agents/:id/ratings', jwtAuthMiddleware, async (req: Request, res: 
 // POST /agents/:id/usage - Track agent usage (OpenAPI pattern)
 router.post('/agents/:id/usage', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -201,7 +194,7 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
     }
 
     // Validate starshipId format
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    const { isValid, error } = validateId(starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -253,7 +246,7 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
 // GET /agents/:id - Get specific agent (OpenAPI pattern)
 router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -281,7 +274,7 @@ router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
 // GET /agents/:id/analytics - Get agent analytics (OpenAPI pattern)
 router.get('/agents/:id/analytics', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -325,7 +318,7 @@ router.get('/users/:userId/agents', jwtAuthMiddleware, async (req: Request, res:
     }
 
     // Validate userId format
-    const { isValid, error } = validateUUID(targetUserId, 'userId');
+    const { isValid, error } = validateId(targetUserId, 'userId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -376,7 +369,7 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
 
     // Validate UUIDs if provided
     if (authorId && typeof authorId === 'string') {
-      const { isValid, error } = validateUUID(authorId, 'authorId');
+      const { isValid, error } = validateId(authorId, 'authorId');
       if (!isValid && error) {
         sendError(res, error.code, error.message, 400, error.details);
         return;
@@ -384,7 +377,7 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
     }
 
     if (starshipId && typeof starshipId === 'string') {
-      const { isValid, error } = validateUUID(starshipId, 'starshipId');
+      const { isValid, error } = validateId(starshipId, 'starshipId');
       if (!isValid && error) {
         sendError(res, error.code, error.message, 400, error.details);
         return;
@@ -607,7 +600,7 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
 // DELETE /agents/:id - Delete agent (OpenAPI pattern)
 router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;

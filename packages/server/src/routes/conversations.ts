@@ -10,7 +10,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -61,7 +61,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -127,7 +127,7 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;
@@ -164,7 +164,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -204,7 +204,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     if (!checkAuth(req, res)) return;
 
     // Validate starshipId parameter
-    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -240,7 +240,7 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
     if (!checkAuth(req, res)) return;
 
     // Validate userId parameter
-    const paramValidation = validateData(z.object({ userId: UuidSchema }), req.params, res, 'user parameter');
+    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -287,8 +287,8 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       z.object({
         source: ConversationSourceSchema,
         metadata: z.object({}).passthrough().optional(),
-        starshipId: z.string().uuid().optional(),
-        userId: z.string().uuid().optional(),
+        starshipId: NanoidSchema.optional(),
+        userId: NanoidSchema.optional(),
       }),
       req.body,
       res,
@@ -322,7 +322,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;

@@ -8,7 +8,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -17,11 +17,11 @@ const PaginationSchema = z.object({
 const CreateMessageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']),
   content: z.string().min(1, 'Content is required').max(50000, 'Content too long'),
-  starshipId: z.string().uuid('Invalid starship ID'),
-  agentId: z.string().uuid('Invalid agent ID').optional(),
-  memoryId: z.string().uuid('Invalid memory ID').optional(),
-  conversationId: z.string().uuid('Invalid conversation ID').optional(),
-  parentMessageId: z.string().uuid('Invalid parent message ID').optional(),
+  starshipId: NanoidSchema,
+  agentId: NanoidSchema.optional(),
+  memoryId: NanoidSchema.optional(),
+  conversationId: NanoidSchema.optional(),
+  parentMessageId: NanoidSchema.optional(),
   threadDepth: z.number().min(0).max(100).optional(),
   processingStatus: z.enum(['pending', 'processing', 'completed', 'failed']).optional(),
   messageType: z.enum(['user_input', 'agent_response', 'system_message', 'workflow_output']).optional(),
@@ -35,10 +35,10 @@ const CreateMessageSchema = z.object({
 const UpdateMessageSchema = CreateMessageSchema.partial().omit({ starshipId: true });
 
 const MessageFiltersSchema = z.object({
-  starshipId: z.string().uuid().optional(),
-  agentId: z.string().uuid().optional(),
-  memoryId: z.string().uuid().optional(),
-  conversationId: z.string().uuid().optional(),
+  starshipId: NanoidSchema.optional(),
+  agentId: NanoidSchema.optional(),
+  memoryId: NanoidSchema.optional(),
+  conversationId: NanoidSchema.optional(),
   role: z.enum(['system', 'user', 'assistant']).optional(),
   messageType: z.enum(['user_input', 'agent_response', 'system_message', 'workflow_output']).optional(),
   importance: z.enum(['low', 'medium', 'high', 'critical']).optional(),
@@ -51,7 +51,7 @@ const SearchMessagesSchema = MessageFiltersSchema.extend({
 });
 
 const BulkMessageSchema = z.object({
-  messageIds: z.array(z.string().uuid()).min(1, 'At least one message ID is required'),
+  messageIds: z.array(NanoidSchema).min(1, 'At least one message ID is required'),
   operation: z.enum(['delete', 'archive', 'update_status', 'assign_conversation']),
   operationData: z.object({}).passthrough().optional(),
 });
@@ -128,7 +128,7 @@ router.get('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     if (!checkAuth(req, res)) return;
 
     // Validate messageId parameter
-    const paramValidation = validateData(z.object({ messageId: UuidSchema }), req.params, res, 'message parameter');
+    const paramValidation = validateData(z.object({ messageId: NanoidSchema }), req.params, res, 'message parameter');
     if (!paramValidation) return;
 
     const { messageId } = paramValidation;
@@ -160,7 +160,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
     if (!checkAuth(req, res)) return;
 
     // Validate messageId parameter
-    const paramValidation = validateData(z.object({ messageId: UuidSchema }), req.params, res, 'message parameter');
+    const paramValidation = validateData(z.object({ messageId: NanoidSchema }), req.params, res, 'message parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -196,7 +196,7 @@ router.delete('/messages/:messageId', jwtAuthMiddleware, async (req: Request, re
     if (!checkAuth(req, res)) return;
 
     // Validate messageId parameter
-    const paramValidation = validateData(z.object({ messageId: UuidSchema }), req.params, res, 'message parameter');
+    const paramValidation = validateData(z.object({ messageId: NanoidSchema }), req.params, res, 'message parameter');
     if (!paramValidation) return;
 
     const { messageId } = paramValidation;
@@ -261,7 +261,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Validate pagination parameters
@@ -317,7 +317,7 @@ router.get('/starships/:starshipId/messages', jwtAuthMiddleware, async (req: Req
     if (!checkAuth(req, res)) return;
 
     // Validate starshipId parameter
-    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
     // Validate pagination parameters
@@ -347,7 +347,7 @@ router.get('/agents/:agentId/messages', jwtAuthMiddleware, async (req: Request, 
     if (!checkAuth(req, res)) return;
 
     // Validate agentId parameter
-    const paramValidation = validateData(z.object({ agentId: UuidSchema }), req.params, res, 'agent parameter');
+    const paramValidation = validateData(z.object({ agentId: NanoidSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
     // Validate pagination parameters
@@ -377,7 +377,7 @@ router.get('/messages/:messageId/thread', jwtAuthMiddleware, async (req: Request
     if (!checkAuth(req, res)) return;
 
     // Validate messageId parameter
-    const paramValidation = validateData(z.object({ messageId: UuidSchema }), req.params, res, 'message parameter');
+    const paramValidation = validateData(z.object({ messageId: NanoidSchema }), req.params, res, 'message parameter');
     if (!paramValidation) return;
 
     // Validate thread parameters
@@ -434,8 +434,8 @@ router.get('/messages/stats', jwtAuthMiddleware, async (req: Request, res: Respo
     // Validate filter parameters
     const filtersValidation = validateData(
       z.object({
-        starshipId: z.string().uuid().optional(),
-        agentId: z.string().uuid().optional(),
+        starshipId: NanoidSchema.optional(),
+        agentId: NanoidSchema.optional(),
         dateFrom: z.string().datetime().optional(),
         dateTo: z.string().datetime().optional(),
       }),
@@ -464,7 +464,7 @@ router.get('/conversations/:conversationId/analytics', jwtAuthMiddleware, async 
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;

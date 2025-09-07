@@ -9,7 +9,7 @@ import { NativeApiKeyService } from '../services/NativeApiKeyService';
 const router: ExpressRouter = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 
 const SaveApiKeySchema = z.object({
   toolName: z.string().min(1, 'Tool name is required').max(100, 'Tool name must be less than 100 characters'),
@@ -60,7 +60,7 @@ router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (r
     if (!checkAuth(req, res)) return;
 
     // Validate starshipId parameter
-    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
     const { starshipId } = paramValidation;
@@ -86,7 +86,7 @@ router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (
     if (!checkAuth(req, res)) return;
 
     // Validate starshipId parameter
-    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -119,7 +119,7 @@ router.delete('/starships/:starshipId/native-api-keys/:toolName', jwtAuthMiddlew
     // Validate parameters
     const paramValidation = validateData(
       z.object({
-        starshipId: UuidSchema,
+        starshipId: NanoidSchema,
         toolName: z.string().min(1, 'Tool name is required'),
       }),
       req.params,

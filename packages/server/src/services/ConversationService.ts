@@ -1,5 +1,6 @@
 import { AgentService } from '@/services';
 import { MessageService } from '@/services/MessageService';
+import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, MessageRepository } from '@starships/models';
 import { ConversationModel } from '@starships/protocol';
 
@@ -127,7 +128,7 @@ export class ConversationService {
   async incrementMessageCount(conversationId: string, increment: number = 1): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
     if (!conversation) {
-      throw new Error(`Conversation not found: ${conversationId}`);
+      throw new NotFoundError('Conversation', conversationId);
     }
 
     await this.conversationRepository.update(conversationId, {
@@ -142,7 +143,7 @@ export class ConversationService {
   async updateTokenCount(conversationId: string, tokens: number): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
     if (!conversation) {
-      throw new Error(`Conversation not found: ${conversationId}`);
+      throw new NotFoundError('Conversation', conversationId);
     }
 
     await this.conversationRepository.update(conversationId, {
@@ -184,13 +185,13 @@ export class ConversationService {
     // Verify conversation exists
     const conversation = await this.conversationRepository.findById(conversationId);
     if (!conversation) {
-      throw new Error(`Conversation not found: ${conversationId}`);
+      throw new NotFoundError('Conversation', conversationId);
     }
 
     // Get starship information for message context
     const starshipInfo = await this.getConversationStarship(conversationId);
     if (!starshipInfo) {
-      throw new Error(`Unable to get starship information for conversation: ${conversationId}`);
+      throw new NotFoundError('Starship', `for conversation ${conversationId}`);
     }
 
     // Save user message to database

@@ -1,3 +1,4 @@
+import { NotFoundError, ValidationError } from '@starships/errors';
 import { ExecutionRepository } from '@starships/models';
 import { CreateExecutionRequest, ExecutionModel, UpdateExecutionRequest } from '@starships/protocol';
 
@@ -66,11 +67,11 @@ export class ExecutionService {
   async startExecution(executionId: string): Promise<ExecutionModel | null> {
     const execution = await this.executionRepository.findById(executionId);
     if (!execution) {
-      throw new Error(`Execution not found: ${executionId}`);
+      throw new NotFoundError('Execution', executionId);
     }
 
     if (execution.status !== 'not_started') {
-      throw new Error(`Cannot start execution in ${execution.status} status`);
+      throw new ValidationError(`Cannot start execution in ${execution.status} status`, 'status');
     }
 
     return this.executionRepository.update(executionId, {
@@ -85,11 +86,11 @@ export class ExecutionService {
   async pauseExecution(executionId: string): Promise<ExecutionModel | null> {
     const execution = await this.executionRepository.findById(executionId);
     if (!execution) {
-      throw new Error(`Execution not found: ${executionId}`);
+      throw new NotFoundError('Execution', executionId);
     }
 
     if (execution.status !== 'running') {
-      throw new Error(`Cannot pause execution in ${execution.status} status`);
+      throw new ValidationError(`Cannot pause execution in ${execution.status} status`, 'status');
     }
 
     return this.executionRepository.update(executionId, {
@@ -104,11 +105,11 @@ export class ExecutionService {
   async resumeExecution(executionId: string): Promise<ExecutionModel | null> {
     const execution = await this.executionRepository.findById(executionId);
     if (!execution) {
-      throw new Error(`Execution not found: ${executionId}`);
+      throw new NotFoundError('Execution', executionId);
     }
 
     if (execution.status !== 'paused') {
-      throw new Error(`Cannot resume execution in ${execution.status} status`);
+      throw new ValidationError(`Cannot resume execution in ${execution.status} status`, 'status');
     }
 
     return this.executionRepository.update(executionId, {
@@ -123,11 +124,11 @@ export class ExecutionService {
   async completeExecution(executionId: string, result?: Record<string, unknown>): Promise<ExecutionModel | null> {
     const execution = await this.executionRepository.findById(executionId);
     if (!execution) {
-      throw new Error(`Execution not found: ${executionId}`);
+      throw new NotFoundError('Execution', executionId);
     }
 
     if (execution.status !== 'running') {
-      throw new Error(`Cannot complete execution in ${execution.status} status`);
+      throw new ValidationError(`Cannot complete execution in ${execution.status} status`, 'status');
     }
 
     return this.executionRepository.update(executionId, {
@@ -143,11 +144,11 @@ export class ExecutionService {
   async failExecution(executionId: string, errorMessage: string): Promise<ExecutionModel | null> {
     const execution = await this.executionRepository.findById(executionId);
     if (!execution) {
-      throw new Error(`Execution not found: ${executionId}`);
+      throw new NotFoundError('Execution', executionId);
     }
 
     if (!['not_started', 'running', 'paused'].includes(execution.status)) {
-      throw new Error(`Cannot fail execution in ${execution.status} status`);
+      throw new ValidationError(`Cannot fail execution in ${execution.status} status`, 'status');
     }
 
     const executionError = {
@@ -181,11 +182,11 @@ export class ExecutionService {
   ): Promise<ExecutionModel | null> {
     const execution = await this.executionRepository.findById(executionId);
     if (!execution) {
-      throw new Error(`Execution not found: ${executionId}`);
+      throw new NotFoundError('Execution', executionId);
     }
 
     if (execution.status !== 'running') {
-      throw new Error(`Cannot update progress for execution in ${execution.status} status`);
+      throw new ValidationError(`Cannot update progress for execution in ${execution.status} status`, 'status');
     }
 
     return this.executionRepository.update(executionId, {

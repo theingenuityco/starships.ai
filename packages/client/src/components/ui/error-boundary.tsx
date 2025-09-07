@@ -1,11 +1,11 @@
 'use client'
 
-import React, { Component, ErrorInfo, ReactNode } from 'react'
-import { AlertTriangle, RefreshCw, Bug } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { EnhancedError, ErrorRecoveryManager } from '@/lib/error-recovery'
+import { AlertTriangle, Bug, RefreshCw } from 'lucide-react'
+import React, { Component, ErrorInfo, ReactNode } from 'react'
 
 interface Props {
   children: ReactNode
@@ -155,14 +155,14 @@ export class ErrorBoundary extends Component<Props, State> {
                     <div>
                       <strong>Error:</strong> {error.message}
                     </div>
-                    {error.context?.timestamp && (
+                    {error.context?.metadata?.timestamp && (
                       <div>
-                        <strong>Time:</strong> {error.context.timestamp.toLocaleString()}
+                        <strong>Time:</strong> {error.context.metadata.timestamp.toLocaleString()}
                       </div>
                     )}
-                    {error.context?.component && (
+                    {error.context?.location && (
                       <div>
-                        <strong>Component:</strong> {error.context.component}
+                        <strong>Location:</strong> {error.context.location}
                       </div>
                     )}
                     {this.state.retryCount > 0 && (

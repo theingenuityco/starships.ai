@@ -3,8 +3,16 @@
  * Provides retry mechanisms and user guidance using unified error system
  */
 
-import { BaseError, ErrorContextUtils, ErrorLayer, type ErrorContext } from '@starships/errors'
 import { ErrorCategory } from '@starships/protocol'
+
+// Simple error context interface for client use
+interface ErrorContext {
+  location?: string
+  operation?: string
+  userId?: string
+  requestId?: string
+  metadata?: Record<string, any>
+}
 
 export interface ErrorRecoveryOptions {
   maxRetries?: number
@@ -138,7 +146,7 @@ export class ErrorRecoveryManager {
 
     switch (category) {
       case ErrorCategory.NETWORK:
-        return context.operation.includes('save') || context.operation.includes('submit') ? 'high' : 'medium'
+        return context.operation?.includes('save') || context.operation?.includes('submit') ? 'high' : 'medium'
       case ErrorCategory.VALIDATION:
         return 'low'
       case ErrorCategory.AUTHENTICATION:
@@ -333,12 +341,14 @@ export class ErrorRecoveryManager {
   }
 
   /**
-   * Create error context using unified ErrorContextUtils
+   * Create error context for client-side error handling
    */
   static createContext(operation: string, component: string, additionalData?: Record<string, any>): ErrorContext {
-    return ErrorContextUtils.client(component, operation, {
+    return {
+      location: component,
+      operation,
       metadata: additionalData,
-    })
+    }
   }
 
   /**

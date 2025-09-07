@@ -174,22 +174,6 @@ export function validateIdOrSlug(
 }
 
 /**
- * @deprecated Use validateId instead. This function is kept for backward compatibility.
- * UUID validation helper - kept for legacy support
- */
-export function validateUUID(
-  id: string,
-  fieldName: string
-): {
-  isValid: boolean;
-  error?: { code: StandardErrorCode; message: string; details?: any };
-} {
-  // For now, delegate to the new validateId function
-  // This maintains backward compatibility while supporting the new ID format
-  return validateId(id, fieldName);
-}
-
-/**
  * Handle common errors and convert to standardized responses
  */
 export function handleCommonError(error: any, res: Response, context: string): boolean {
@@ -205,29 +189,6 @@ export function handleCommonError(error: any, res: Response, context: string): b
       error.statusCode,
       response.error.details as Record<string, any> | undefined
     );
-    return true;
-  }
-
-  // Handle known error types by name for backward compatibility
-  if (error.name === 'ValidationError' || error.constructor.name === 'ValidationError') {
-    sendError(res, 'VALIDATION_ERROR', error.message, 400, {
-      field: error.field,
-    });
-    return true;
-  }
-
-  if (error.name === 'NotFoundError' || error.constructor.name === 'NotFoundError') {
-    sendError(res, 'RESOURCE_NOT_FOUND', error.message, 404, {
-      entityType: error.entityType,
-      entityId: error.entityId,
-    });
-    return true;
-  }
-
-  if (error.name === 'ConflictError' || error.constructor.name === 'ConflictError') {
-    sendError(res, 'RESOURCE_CONFLICT', error.message, 409, {
-      conflictType: error.conflictType,
-    });
     return true;
   }
 

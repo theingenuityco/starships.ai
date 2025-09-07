@@ -306,16 +306,3 @@ export function fromApiResponse(response: any): AppError {
     details: errorData?.details,
   });
 }
-
-// Legacy compatibility exports - maintain imports but mark as deprecated
-/** @deprecated Use AppError instead */
-export const BaseError = AppError;
-
-/** @deprecated Use wrapError instead */
-export class ErrorUtils {
-  /** @deprecated Use isAppError instead */
-  static isApplicationError = isAppError;
-
-  /** @deprecated Use wrapError instead */
-  static normalize = wrapError;
-}

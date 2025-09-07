@@ -105,10 +105,18 @@ export class HttpRequest {
         },
       };
     } catch (error) {
+      // Create more descriptive error message with context
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const contextualError = new Error(`HTTP ${this.params.method} request to ${this.params.url} failed: ${errorMessage}`);
+
+      // Preserve original error as cause if possible
+      if (error instanceof Error) {
+        (contextualError as any).cause = error;
+      }
+
       return {
         status: 'failed',
-        error: new Error(`HTTP request execution failed: ${errorMessage}`),
+        error: contextualError,
       };
     }
   }

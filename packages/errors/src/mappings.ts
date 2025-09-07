@@ -1,317 +1,45 @@
 /**
- * Error Mapping System for Starships.ai
+ * Lean Error Mappings for Starships.ai
  *
- * HTTP status code mappings and error categorization logic
- * for standardized error handling across all packages.
+ * Simple utility functions for error handling - no complex mappings needed.
+ * The lean error system automatically infers categories from HTTP status codes.
  */
-
-// Import types from protocol package
-import { ErrorCategory } from '@starships/protocol';
-import type { StandardErrorCode } from '@starships/protocol';
 
 /**
- * HTTP status code mapping for error codes
+ * Check if HTTP status indicates a retryable error
  */
-export const ERROR_HTTP_STATUS_MAP: Record<StandardErrorCode, number> = {
-  // 400 Bad Request
-  VALIDATION_ERROR: 400,
-  INVALID_INPUT: 400,
-  MISSING_REQUIRED_FIELD: 400,
-  INVALID_FORMAT: 400,
-  INVALID_RANGE: 400,
-  INVALID_TYPE: 400,
-  EXPEDITION_CANNOT_MODIFY: 400,
-  EXPEDITION_CANNOT_DELETE: 400,
-  EXPEDITION_INVALID_STATUS: 400,
-  TASK_CANNOT_ASSIGN: 400,
-  TASK_CANNOT_COMPLETE: 400,
-  TASK_CANNOT_DELETE: 400,
-  TASK_DEPENDENCY_NOT_MET: 400,
-  MISSION_MESSAGE_INVALID: 400,
-  INVALID_STATUS_TRANSITION: 400,
-  OPERATION_NOT_ALLOWED: 400,
-  MESSAGE_INVALID_TYPE: 400,
-  RESULT_VALIDATION_FAILED: 400,
+export function isRetryableStatus(statusCode: number): boolean {
+  // Network errors, timeouts, and server errors (5xx) are generally retryable
+  return statusCode >= 500 || statusCode === 408 || statusCode === 429;
+}
 
-  // 401 Unauthorized
-  AUTHENTICATION_REQUIRED: 401,
-  AUTHENTICATION_FAILED: 401,
-  TOKEN_EXPIRED: 401,
-  TOKEN_INVALID: 401,
+/**
+ * Check if error should be logged (server errors only)
+ */
+export function shouldLogError(statusCode: number): boolean {
+  return statusCode >= 500;
+}
 
-  // 403 Forbidden
-  ACCESS_DENIED: 403,
-  INSUFFICIENT_PERMISSIONS: 403,
-  FORBIDDEN_OPERATION: 403,
-  EXPEDITION_ACCESS_DENIED: 403,
-  STARSHIP_ACCESS_DENIED: 403,
+/**
+ * Get error category from HTTP status code
+ */
+export function getCategoryFromStatus(statusCode: number): string {
+  if (statusCode >= 400 && statusCode < 500) return 'client';
+  if (statusCode >= 500) return 'server';
+  return 'unknown';
+}
 
-  // 404 Not Found
-  RESOURCE_NOT_FOUND: 404,
-  EXPEDITION_NOT_FOUND: 404,
-  STARSHIP_NOT_FOUND: 404,
-  TASK_NOT_FOUND: 404,
-  AGENT_NOT_FOUND: 404,
-  MESSAGE_NOT_FOUND: 404,
-  MISSION_ORCHESTRATOR_NOT_FOUND: 404,
-  RESULT_NOT_FOUND: 404,
-
-  // 409 Conflict
-  RESOURCE_ALREADY_EXISTS: 409,
-  RESOURCE_CONFLICT: 409,
-  EXPEDITION_ALREADY_STARTED: 409,
-  TASK_ALREADY_ASSIGNED: 409,
-  AGENT_ALREADY_DEPLOYED: 409,
-
-  // 423 Locked
-  RESOURCE_LOCKED: 423,
-  STARSHIP_MAINTENANCE: 423,
-
-  // 429 Too Many Requests
-  RATE_LIMIT_EXCEEDED: 429,
-  QUOTA_EXCEEDED: 429,
-  CONCURRENT_LIMIT_EXCEEDED: 429,
-
-  // 500 Internal Server Error
-  UNKNOWN_ERROR: 500,
-  INTERNAL_SERVER_ERROR: 500,
-  DATABASE_ERROR: 500,
-  DATABASE_CONNECTION_FAILED: 500,
-  DATABASE_QUERY_FAILED: 500,
-  DATABASE_CONSTRAINT_VIOLATION: 500,
-  DATABASE_TRANSACTION_FAILED: 500,
-  EXPEDITION_WORKFLOW_FAILED: 500,
-  EXPEDITION_4PHASE_START_FAILED: 500,
-  EXPEDITION_PHASE_PROGRESSION_FAILED: 500,
-  EXPEDITION_PLAN_APPROVAL_FAILED: 500,
-  EXPEDITION_EXECUTION_START_FAILED: 500,
-  STARSHIP_VALIDATION_FAILED: 500,
-  AGENT_DEPLOYMENT_FAILED: 500,
-  MESSAGE_SEND_FAILED: 500,
-  MISSION_ORCHESTRATOR_FAILED: 500,
-  MISSION_ORCHESTRATOR_INITIALIZATION_FAILED: 500,
-  MISSION_MESSAGE_SEND_FAILED: 500,
-  MISSION_CHAT_FAILED: 500,
-  RESULT_QUALITY_ASSESSMENT_FAILED: 500,
-  CREATE_FAILED: 500,
-  UPDATE_FAILED: 500,
-  DELETE_FAILED: 500,
-  STATUS_UPDATE_FAILED: 500,
-  CONFIGURATION_ERROR: 500,
-
-  // 502 Bad Gateway
-  NETWORK_ERROR: 502,
-  CONNECTION_FAILED: 502,
-  SERVICE_UNREACHABLE: 502,
-
-  // 503 Service Unavailable
-  SERVICE_UNAVAILABLE: 503,
-  AGENT_NOT_AVAILABLE: 503,
-
-  // 504 Gateway Timeout
-  TIMEOUT_ERROR: 504,
-  REQUEST_TIMEOUT: 504,
-  DATABASE_TIMEOUT: 504,
-  OPERATION_TIMEOUT: 504,
-
-  // 507 Insufficient Storage
-  RESOURCE_LIMIT_EXCEEDED: 507,
-  STARSHIP_CAPACITY_EXCEEDED: 507,
-
-  // 410 Gone
-  RESOURCE_EXPIRED: 410,
-
-  // 422 Unprocessable Entity
-  AGENT_NOT_QUALIFIED: 422,
-
-  // Additional error codes
-  REQUIRED_FIELD_MISSING: 400,
-  INVALID_VALUE: 400,
+/**
+ * Common HTTP status codes for reference
+ */
+export const HTTP_STATUS = {
+  BAD_REQUEST: 400,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
-  INVALID_TOKEN: 401,
-  RESOURCE_CONSTRAINT_VIOLATION: 409,
-  BUSINESS_RULE_VIOLATION: 400,
-};
-
-/**
- * Error category mapping for error codes
- */
-export const ERROR_CATEGORY_MAP: Record<StandardErrorCode, ErrorCategory> = {
-  // Validation errors
-  VALIDATION_ERROR: ErrorCategory.VALIDATION,
-  INVALID_INPUT: ErrorCategory.VALIDATION,
-  MISSING_REQUIRED_FIELD: ErrorCategory.VALIDATION,
-  INVALID_FORMAT: ErrorCategory.VALIDATION,
-  INVALID_RANGE: ErrorCategory.VALIDATION,
-  INVALID_TYPE: ErrorCategory.VALIDATION,
-  MESSAGE_INVALID_TYPE: ErrorCategory.VALIDATION,
-  MISSION_MESSAGE_INVALID: ErrorCategory.VALIDATION,
-  RESULT_VALIDATION_FAILED: ErrorCategory.VALIDATION,
-
-  // Authentication errors
-  AUTHENTICATION_REQUIRED: ErrorCategory.AUTHENTICATION,
-  AUTHENTICATION_FAILED: ErrorCategory.AUTHENTICATION,
-  TOKEN_EXPIRED: ErrorCategory.AUTHENTICATION,
-  TOKEN_INVALID: ErrorCategory.AUTHENTICATION,
-
-  // Authorization errors
-  ACCESS_DENIED: ErrorCategory.AUTHORIZATION,
-  INSUFFICIENT_PERMISSIONS: ErrorCategory.AUTHORIZATION,
-  FORBIDDEN_OPERATION: ErrorCategory.AUTHORIZATION,
-  EXPEDITION_ACCESS_DENIED: ErrorCategory.AUTHORIZATION,
-  STARSHIP_ACCESS_DENIED: ErrorCategory.AUTHORIZATION,
-
-  // Not found errors
-  RESOURCE_NOT_FOUND: ErrorCategory.NOT_FOUND,
-  EXPEDITION_NOT_FOUND: ErrorCategory.NOT_FOUND,
-  STARSHIP_NOT_FOUND: ErrorCategory.NOT_FOUND,
-  TASK_NOT_FOUND: ErrorCategory.NOT_FOUND,
-  AGENT_NOT_FOUND: ErrorCategory.NOT_FOUND,
-  MESSAGE_NOT_FOUND: ErrorCategory.NOT_FOUND,
-  MISSION_ORCHESTRATOR_NOT_FOUND: ErrorCategory.NOT_FOUND,
-  RESULT_NOT_FOUND: ErrorCategory.NOT_FOUND,
-
-  // Conflict errors
-  RESOURCE_ALREADY_EXISTS: ErrorCategory.CONFLICT,
-  RESOURCE_CONFLICT: ErrorCategory.CONFLICT,
-  EXPEDITION_ALREADY_STARTED: ErrorCategory.CONFLICT,
-  TASK_ALREADY_ASSIGNED: ErrorCategory.CONFLICT,
-  AGENT_ALREADY_DEPLOYED: ErrorCategory.CONFLICT,
-  RESOURCE_LOCKED: ErrorCategory.CONFLICT,
-  STARSHIP_MAINTENANCE: ErrorCategory.CONFLICT,
-
-  // Rate limit errors
-  RATE_LIMIT_EXCEEDED: ErrorCategory.RATE_LIMIT,
-  QUOTA_EXCEEDED: ErrorCategory.RATE_LIMIT,
-  CONCURRENT_LIMIT_EXCEEDED: ErrorCategory.RATE_LIMIT,
-
-  // Database errors
-  DATABASE_ERROR: ErrorCategory.DATABASE,
-  DATABASE_CONNECTION_FAILED: ErrorCategory.DATABASE,
-  DATABASE_QUERY_FAILED: ErrorCategory.DATABASE,
-  DATABASE_CONSTRAINT_VIOLATION: ErrorCategory.DATABASE,
-  DATABASE_TRANSACTION_FAILED: ErrorCategory.DATABASE,
-  DATABASE_TIMEOUT: ErrorCategory.DATABASE,
-
-  // Network errors
-  NETWORK_ERROR: ErrorCategory.NETWORK,
-  CONNECTION_FAILED: ErrorCategory.NETWORK,
-  REQUEST_TIMEOUT: ErrorCategory.NETWORK,
-  SERVICE_UNREACHABLE: ErrorCategory.NETWORK,
-  TIMEOUT_ERROR: ErrorCategory.NETWORK,
-  OPERATION_TIMEOUT: ErrorCategory.NETWORK,
-
-  // Internal/System errors
-  UNKNOWN_ERROR: ErrorCategory.INTERNAL,
-  INTERNAL_SERVER_ERROR: ErrorCategory.INTERNAL,
-  SERVICE_UNAVAILABLE: ErrorCategory.SERVICE_UNAVAILABLE,
-  CONFIGURATION_ERROR: ErrorCategory.INTERNAL,
-
-  // Business logic errors (mapped to appropriate categories)
-  EXPEDITION_CANNOT_MODIFY: ErrorCategory.CONFLICT,
-  EXPEDITION_CANNOT_DELETE: ErrorCategory.CONFLICT,
-  EXPEDITION_INVALID_STATUS: ErrorCategory.VALIDATION,
-  EXPEDITION_WORKFLOW_FAILED: ErrorCategory.INTERNAL,
-  EXPEDITION_4PHASE_START_FAILED: ErrorCategory.INTERNAL,
-  EXPEDITION_PHASE_PROGRESSION_FAILED: ErrorCategory.INTERNAL,
-  EXPEDITION_PLAN_APPROVAL_FAILED: ErrorCategory.INTERNAL,
-  EXPEDITION_EXECUTION_START_FAILED: ErrorCategory.INTERNAL,
-  TASK_CANNOT_ASSIGN: ErrorCategory.CONFLICT,
-  TASK_CANNOT_COMPLETE: ErrorCategory.CONFLICT,
-  TASK_CANNOT_DELETE: ErrorCategory.CONFLICT,
-  TASK_DEPENDENCY_NOT_MET: ErrorCategory.VALIDATION,
-  AGENT_NOT_QUALIFIED: ErrorCategory.VALIDATION,
-  INVALID_STATUS_TRANSITION: ErrorCategory.VALIDATION,
-  OPERATION_NOT_ALLOWED: ErrorCategory.AUTHORIZATION,
-  RESOURCE_LIMIT_EXCEEDED: ErrorCategory.CONFLICT,
-  STARSHIP_CAPACITY_EXCEEDED: ErrorCategory.CONFLICT,
-  RESOURCE_EXPIRED: ErrorCategory.NOT_FOUND,
-  STARSHIP_VALIDATION_FAILED: ErrorCategory.VALIDATION,
-  AGENT_DEPLOYMENT_FAILED: ErrorCategory.INTERNAL,
-  MESSAGE_SEND_FAILED: ErrorCategory.INTERNAL,
-  MISSION_ORCHESTRATOR_FAILED: ErrorCategory.INTERNAL,
-  MISSION_ORCHESTRATOR_INITIALIZATION_FAILED: ErrorCategory.INTERNAL,
-  MISSION_MESSAGE_SEND_FAILED: ErrorCategory.INTERNAL,
-  MISSION_CHAT_FAILED: ErrorCategory.INTERNAL,
-  RESULT_QUALITY_ASSESSMENT_FAILED: ErrorCategory.VALIDATION,
-  CREATE_FAILED: ErrorCategory.INTERNAL,
-  UPDATE_FAILED: ErrorCategory.INTERNAL,
-  DELETE_FAILED: ErrorCategory.INTERNAL,
-  STATUS_UPDATE_FAILED: ErrorCategory.INTERNAL,
-  AGENT_NOT_AVAILABLE: ErrorCategory.SERVICE_UNAVAILABLE,
-
-  // Additional error codes
-  REQUIRED_FIELD_MISSING: ErrorCategory.VALIDATION,
-  INVALID_VALUE: ErrorCategory.VALIDATION,
-  UNAUTHORIZED: ErrorCategory.AUTHENTICATION,
-  FORBIDDEN: ErrorCategory.AUTHORIZATION,
-  INVALID_TOKEN: ErrorCategory.AUTHENTICATION,
-  RESOURCE_CONSTRAINT_VIOLATION: ErrorCategory.CONFLICT,
-  BUSINESS_RULE_VIOLATION: ErrorCategory.VALIDATION,
-};
-
-/**
- * Error mapping utilities
- */
-export class ErrorMappingUtils {
-  /**
-   * Get HTTP status code for an error code
-   */
-  static getHttpStatusCode(errorCode: StandardErrorCode): number {
-    return ERROR_HTTP_STATUS_MAP[errorCode] || 500;
-  }
-
-  /**
-   * Get error category for an error code
-   */
-  static getErrorCategory(errorCode: StandardErrorCode): ErrorCategory {
-    return ERROR_CATEGORY_MAP[errorCode] || ErrorCategory.INTERNAL;
-  }
-
-  /**
-   * Check if an error is retryable based on its category and code
-   */
-  static isRetryableError(errorCode: StandardErrorCode): boolean {
-    const retryableErrors: StandardErrorCode[] = [
-      'TIMEOUT_ERROR',
-      'REQUEST_TIMEOUT',
-      'OPERATION_TIMEOUT',
-      'DATABASE_TIMEOUT',
-      'NETWORK_ERROR',
-      'CONNECTION_FAILED',
-      'SERVICE_UNREACHABLE',
-      'SERVICE_UNAVAILABLE',
-      'RATE_LIMIT_EXCEEDED',
-      'DATABASE_CONNECTION_FAILED',
-      'INTERNAL_SERVER_ERROR',
-    ];
-
-    return retryableErrors.includes(errorCode);
-  }
-
-  /**
-   * Check if an error should be logged based on its status code
-   */
-  static shouldLogError(statusCode: number): boolean {
-    return statusCode >= 500;
-  }
-
-  /**
-   * Get all error codes for a specific category
-   */
-  static getErrorCodesByCategory(category: ErrorCategory): StandardErrorCode[] {
-    return Object.entries(ERROR_CATEGORY_MAP)
-      .filter(([, errorCategory]) => errorCategory === category)
-      .map(([code]) => code as StandardErrorCode);
-  }
-
-  /**
-   * Get all error codes for a specific HTTP status code
-   */
-  static getErrorCodesByStatusCode(statusCode: number): StandardErrorCode[] {
-    return Object.entries(ERROR_HTTP_STATUS_MAP)
-      .filter(([, httpStatus]) => httpStatus === statusCode)
-      .map(([code]) => code as StandardErrorCode);
-  }
-}
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  RATE_LIMITED: 429,
+  INTERNAL_ERROR: 500,
+  BAD_GATEWAY: 502,
+  SERVICE_UNAVAILABLE: 503,
+} as const;

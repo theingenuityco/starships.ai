@@ -13,6 +13,7 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.cjs",
     "migrate": "tsx src/scripts/migration-runner.ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
+    "seed:agent-templates": "tsx src/scripts/seed-agent-templates.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",
     "backup:validate": "tsx src/scripts/backup-cli.ts validate",

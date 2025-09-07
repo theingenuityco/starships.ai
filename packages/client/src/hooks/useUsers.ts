@@ -11,9 +11,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
 // Extended User interface for client compatibility with optimistic updates
 export interface ClientUser extends UserModel {
   loading?: boolean
@@ -81,9 +78,9 @@ export const USER_QUERY_KEYS = {
 export function useUser(userId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.detail(userId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/users/${userId}`)
-      return extractResponseData<UserModel>(response)
+    queryFn: async (): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/${userId}`)
+      return response.data.data
     },
     enabled: !!userId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -98,9 +95,9 @@ export function useUser(userId: string, enabled: boolean = true) {
 export function useUserByEmail(email: string, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.byEmail(email),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/users/email/${encodeURIComponent(email)}`)
-      return extractResponseData<UserModel>(response)
+    queryFn: async (): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/email/${encodeURIComponent(email)}`)
+      return response.data.data
     },
     enabled: !!email && email.includes('@') && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -115,9 +112,9 @@ export function useUserByEmail(email: string, enabled: boolean = true) {
 export function useUserByUsername(username: string, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.byUsername(username),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/users/username/${encodeURIComponent(username)}`)
-      return extractResponseData<UserModel>(response)
+    queryFn: async (): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/username/${encodeURIComponent(username)}`)
+      return response.data.data
     },
     enabled: !!username && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -132,9 +129,9 @@ export function useUserByUsername(username: string, enabled: boolean = true) {
 export function useUserByStripeId(stripeCustomerId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.byStripe(stripeCustomerId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/users/stripe/${stripeCustomerId}`)
-      return extractResponseData<UserModel>(response)
+    queryFn: async (): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/stripe/${stripeCustomerId}`)
+      return response.data.data
     },
     enabled: !!stripeCustomerId && stripeCustomerId.startsWith('cus_') && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -149,11 +146,11 @@ export function useUserByStripeId(stripeCustomerId: string, enabled: boolean = t
 export function useUsers(filters?: UserFilters, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.list(filters),
-    queryFn: async () => {
-      const response = await api.get('/api/v1/users', {
+    queryFn: async (): Promise<UserModel[]> => {
+      const response: AxiosResponse<ApiResponse<UserModel[]>> = await api.get('/api/v1/users', {
         params: filters,
       })
-      return extractResponseData<UserModel[]>(response)
+      return response.data.data
     },
     enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -168,9 +165,9 @@ export function useUsers(filters?: UserFilters, enabled: boolean = true) {
 export function useUserStats(enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.stats(),
-    queryFn: async () => {
-      const response = await api.get('/api/v1/users/stats')
-      return extractResponseData<UserStats>(response)
+    queryFn: async (): Promise<UserStats> => {
+      const response: AxiosResponse<ApiResponse<UserStats>> = await api.get('/api/v1/users/stats')
+      return response.data.data
     },
     enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -185,10 +182,10 @@ export function useUserStats(enabled: boolean = true) {
 export function useCurrentUser(userId: string | null, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.currentUser(),
-    queryFn: async () => {
+    queryFn: async (): Promise<UserModel> => {
       if (!userId) throw new Error('No user ID provided')
-      const response = await api.get(`/api/v1/users/${userId}`)
-      return extractResponseData<UserModel>(response)
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/${userId}`)
+      return response.data.data
     },
     enabled: !!userId && enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -204,9 +201,9 @@ export function useRegisterUser() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: RegisterUserRequest) => {
-      const response = await api.post('/api/v1/users/register', data)
-      return extractResponseData<UserModel>(response)
+    mutationFn: async (data: RegisterUserRequest): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users/register', data)
+      return response.data.data
     },
     onSuccess: user => {
       // Add user to cache
@@ -242,9 +239,9 @@ export function useCreateUser() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateUserRequest) => {
-      const response = await api.post('/api/v1/users', data)
-      return extractResponseData<UserModel>(response)
+    mutationFn: async (data: CreateUserRequest): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users', data)
+      return response.data.data
     },
     onSuccess: user => {
       // Add user to cache
@@ -280,9 +277,9 @@ export function useUpdateUserProfile() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, updates }: { userId: string; updates: UpdateUserProfileRequest }) => {
-      const response = await api.put(`/api/v1/users/${userId}/profile`, updates)
-      return extractResponseData<UserModel>(response)
+    mutationFn: async ({ userId, updates }: { userId: string; updates: UpdateUserProfileRequest }): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.put(`/api/v1/users/${userId}/profile`, updates)
+      return response.data.data
     },
     onMutate: async ({ userId, updates }) => {
       // Cancel any outgoing refetches
@@ -353,9 +350,9 @@ export function useUpdateUser() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ userId, updates }: { userId: string; updates: UpdateUserRequest }) => {
-      const response = await api.put(`/api/v1/users/${userId}`, updates)
-      return extractResponseData<UserModel>(response)
+    mutationFn: async ({ userId, updates }: { userId: string; updates: UpdateUserRequest }): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.put(`/api/v1/users/${userId}`, updates)
+      return response.data.data
     },
     onSuccess: (updatedUser, variables) => {
       // Update all relevant caches
@@ -387,8 +384,8 @@ export function useDeleteUser() {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      const response = await api.delete(`/api/v1/users/${userId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/users/${userId}`)
+      return response.data.data
     },
     onMutate: async userId => {
       // Get user details for toast
@@ -438,8 +435,8 @@ export function useLinkStripeCustomer() {
 
   return useMutation({
     mutationFn: async ({ userId, stripeCustomerId }: { userId: string; stripeCustomerId: string }) => {
-      const response = await api.post(`/api/v1/users/${userId}/stripe`, { stripeCustomerId })
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/users/${userId}/stripe`, { stripeCustomerId })
+      return response.data.data
     },
     onSuccess: (data, variables) => {
       // Invalidate user data to refetch with Stripe info
@@ -467,9 +464,9 @@ export function useAuthenticateUser() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (credentials: { email: string; password: string }) => {
-      const response = await api.post('/api/v1/users/authenticate', credentials)
-      return extractResponseData<UserModel>(response)
+    mutationFn: async (credentials: { email: string; password: string }): Promise<UserModel> => {
+      const response: AxiosResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users/authenticate', credentials)
+      return response.data.data
     },
     onSuccess: user => {
       // Cache the authenticated user

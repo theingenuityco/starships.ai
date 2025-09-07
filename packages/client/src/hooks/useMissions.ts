@@ -11,9 +11,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
 // Extended Mission interface for client compatibility with optimistic updates
 export interface ClientMission extends MissionModel {
   loading?: boolean
@@ -62,9 +59,9 @@ export const MISSION_QUERY_KEYS = {
 export function useMission(missionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.detail(missionId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/missions/${missionId}`)
-      return extractResponseData<MissionModel>(response)
+    queryFn: async (): Promise<MissionModel> => {
+      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.get(`/api/v1/missions/${missionId}`)
+      return response.data.data
     },
     enabled: !!missionId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -79,11 +76,11 @@ export function useMission(missionId: string, enabled: boolean = true) {
 export function useStarshipMissions(starshipId: string, filters?: MissionFilters, sort?: MissionSort, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.byStarship(starshipId, filters, sort),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${starshipId}/missions`, {
+    queryFn: async (): Promise<MissionModel[]> => {
+      const response: AxiosResponse<ApiResponse<MissionModel[]>> = await api.get(`/api/v1/starships/${starshipId}/missions`, {
         params: { ...filters, ...sort },
       })
-      return extractResponseData<MissionModel[]>(response)
+      return response.data.data
     },
     enabled: !!starshipId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -98,11 +95,11 @@ export function useStarshipMissions(starshipId: string, filters?: MissionFilters
 export function useMissions(filters?: MissionFilters, sort?: MissionSort, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.list(filters, sort),
-    queryFn: async () => {
-      const response = await api.get('/api/v1/missions', {
+    queryFn: async (): Promise<MissionModel[]> => {
+      const response: AxiosResponse<ApiResponse<MissionModel[]>> = await api.get('/api/v1/missions', {
         params: { ...filters, ...sort },
       })
-      return extractResponseData<MissionModel[]>(response)
+      return response.data.data
     },
     enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -117,9 +114,9 @@ export function useMissions(filters?: MissionFilters, sort?: MissionSort, enable
 export function useMissionStats(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.stats(starshipId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${starshipId}/missions/stats`)
-      return extractResponseData<MissionStats>(response)
+    queryFn: async (): Promise<MissionStats> => {
+      const response: AxiosResponse<ApiResponse<MissionStats>> = await api.get(`/api/v1/starships/${starshipId}/missions/stats`)
+      return response.data.data
     },
     enabled: !!starshipId && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -134,9 +131,9 @@ export function useMissionStats(starshipId: string, enabled: boolean = true) {
 export function useMissionClarity(missionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.clarity(missionId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/missions/${missionId}/clarity`)
-      return extractResponseData<MissionClarity>(response)
+    queryFn: async (): Promise<MissionClarity> => {
+      const response: AxiosResponse<ApiResponse<MissionClarity>> = await api.get(`/api/v1/missions/${missionId}/clarity`)
+      return response.data.data
     },
     enabled: !!missionId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -151,9 +148,9 @@ export function useMissionClarity(missionId: string, enabled: boolean = true) {
 export function useMissionWorkflow(missionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.workflow(missionId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/missions/${missionId}/workflow`)
-      return extractResponseData<any>(response)
+    queryFn: async (): Promise<any> => {
+      const response: AxiosResponse<ApiResponse<any>> = await api.get(`/api/v1/missions/${missionId}/workflow`)
+      return response.data.data
     },
     enabled: !!missionId && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -169,9 +166,9 @@ export function useCreateMission() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateMissionRequest) => {
-      const response = await api.post('/api/v1/missions', data)
-      return extractResponseData<MissionModel>(response)
+    mutationFn: async (data: CreateMissionRequest): Promise<MissionModel> => {
+      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post('/api/v1/missions', data)
+      return response.data.data
     },
     onSuccess: (mission, variables) => {
       // Add mission to starship cache
@@ -209,9 +206,9 @@ export function useUpdateMission() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ missionId, updates }: { missionId: string; updates: UpdateMissionRequest }) => {
-      const response = await api.put(`/api/v1/missions/${missionId}`, updates)
-      return extractResponseData<MissionModel>(response)
+    mutationFn: async ({ missionId, updates }: { missionId: string; updates: UpdateMissionRequest }): Promise<MissionModel> => {
+      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.put(`/api/v1/missions/${missionId}`, updates)
+      return response.data.data
     },
     onMutate: async ({ missionId, updates }) => {
       // Cancel outgoing refetches
@@ -284,8 +281,8 @@ export function useDeleteMission() {
 
   return useMutation({
     mutationFn: async (missionId: string) => {
-      const response = await api.delete(`/api/v1/missions/${missionId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/missions/${missionId}`)
+      return response.data.data
     },
     onMutate: async missionId => {
       // Get mission details for cleanup
@@ -350,9 +347,9 @@ export function useStartMission() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (missionId: string) => {
-      const response = await api.post(`/api/v1/missions/${missionId}/start`)
-      return extractResponseData<MissionModel>(response)
+    mutationFn: async (missionId: string): Promise<MissionModel> => {
+      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/start`)
+      return response.data.data
     },
     onSuccess: (updatedMission, missionId) => {
       // Update caches
@@ -389,9 +386,9 @@ export function useCompleteMission() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (missionId: string) => {
-      const response = await api.post(`/api/v1/missions/${missionId}/complete`)
-      return extractResponseData<MissionModel>(response)
+    mutationFn: async (missionId: string): Promise<MissionModel> => {
+      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/complete`)
+      return response.data.data
     },
     onSuccess: (updatedMission, missionId) => {
       // Update caches
@@ -428,9 +425,9 @@ export function useCancelMission() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (missionId: string) => {
-      const response = await api.post(`/api/v1/missions/${missionId}/cancel`)
-      return extractResponseData<MissionModel>(response)
+    mutationFn: async (missionId: string): Promise<MissionModel> => {
+      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/cancel`)
+      return response.data.data
     },
     onSuccess: (updatedMission, missionId) => {
       // Update caches
@@ -467,9 +464,9 @@ export function useUpdateMissionPhase() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ missionId, phase }: { missionId: string; phase: 'welcome' | 'analysis' | 'plan' | 'execute' | 'converse' }) => {
-      const response = await api.put(`/api/v1/missions/${missionId}/phase`, { phase })
-      return extractResponseData<MissionModel>(response)
+    mutationFn: async ({ missionId, phase }: { missionId: string; phase: 'welcome' | 'analysis' | 'plan' | 'execute' | 'converse' }): Promise<MissionModel> => {
+      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.put(`/api/v1/missions/${missionId}/phase`, { phase })
+      return response.data.data
     },
     onSuccess: (updatedMission, variables) => {
       // Update caches
@@ -501,12 +498,12 @@ export function useUpdateWorkflowApproval() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ missionId, approvalStatus, rejectionReason }: { missionId: string; approvalStatus: 'approved' | 'rejected'; rejectionReason?: string }) => {
-      const response = await api.put(`/api/v1/missions/${missionId}/workflow/approval`, {
+    mutationFn: async ({ missionId, approvalStatus, rejectionReason }: { missionId: string; approvalStatus: 'approved' | 'rejected'; rejectionReason?: string }): Promise<any> => {
+      const response: AxiosResponse<ApiResponse<any>> = await api.put(`/api/v1/missions/${missionId}/workflow/approval`, {
         approvalStatus,
         rejectionReason,
       })
-      return extractResponseData<any>(response)
+      return response.data.data
     },
     onSuccess: (result, variables) => {
       // Invalidate mission and workflow caches

@@ -5,6 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and UserEntity.
  */
 
+import { Transformers } from '@/helpers/serializer';
 import type { MissionModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsArray, IsEnum, IsISO8601, IsOptional, IsString, Length } from 'class-validator';
@@ -13,18 +14,6 @@ import { IsArray, IsEnum, IsISO8601, IsOptional, IsString, Length } from 'class-
  * Custom transformers for the MissionEntity
  */
 export class MissionTransformers {
-  /**
-   * Transform date strings to ISO format, handling various input formats
-   */
-  static DateTransform() {
-    return Transform(({ value }) => {
-      if (!value) return new Date().toISOString();
-      if (typeof value === 'string') return value;
-      if (value instanceof Date) return value.toISOString();
-      return new Date(value).toISOString();
-    });
-  }
-
   /**
    * Transform agent IDs array to ensure consistency
    */
@@ -74,12 +63,12 @@ export class MissionEntity implements MissionModel {
   id!: string;
 
   @Expose()
-  @MissionTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @MissionTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -131,7 +120,7 @@ export class MissionEntity implements MissionModel {
 
   @Expose()
   @IsOptional()
-  @MissionTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   approvedAt?: string;
 

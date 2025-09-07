@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConversationMessages } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
-import type { Message } from '@/types/chat'
+import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, Paperclip, Timer, User, XCircle } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect } from 'react'
@@ -12,7 +12,7 @@ import { useEffect } from 'react'
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
-  onMessageAdded?: (message: Message) => void
+  onMessageAdded?: (message: MessageModel) => void
 }
 
 export function ConversationMessageList({ conversationId, starshipId, onMessageAdded }: ConversationMessageListProps) {
@@ -23,7 +23,7 @@ export function ConversationMessageList({ conversationId, starshipId, onMessageA
   const error = queryError ? 'Failed to load conversation history' : null
 
   // Add new message to the list (for real-time updates)
-  const addMessage = (newMessage: Message) => {
+  const addMessage = (newMessage: MessageModel) => {
     // Note: With TanStack Query, real-time updates should be handled
     // by invalidating queries or using optimistic updates in mutations
     onMessageAdded?.(newMessage)
@@ -65,7 +65,7 @@ export function ConversationMessageList({ conversationId, starshipId, onMessageA
   return (
     <AnimatePresence mode="wait">
       <motion.div key={conversationId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full overflow-auto p-4 space-y-4">
-        {messages.map((message: Message) => (
+        {messages.map((message: MessageModel) => (
           <MessageBubble key={message.id} message={message} />
         ))}
       </motion.div>
@@ -74,7 +74,7 @@ export function ConversationMessageList({ conversationId, starshipId, onMessageA
 }
 
 // Enhanced Message Bubble Component
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({ message }: { message: MessageModel & { sending?: boolean; streaming?: boolean } }) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
 

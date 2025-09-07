@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/useToast'
 import { useTypewriter } from '@/hooks/useTypewriter'
 import api, { Agent } from '@/lib/api'
-import type { Message } from '@/types/chat'
+import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Play, Plus, RotateCcw, Send, Trash2, Wifi, WifiOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -48,8 +48,8 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
     onComplete: () => setLoading(false),
   })
 
-  // Chat state
-  const [messages, setMessages] = useState<Message[]>([])
+  // Chat state - using extended interface for UI states
+  const [messages, setMessages] = useState<(MessageModel & { streaming?: boolean; sending?: boolean })[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [conversationId] = useState(`test-${agent.id}-${Date.now()}`)

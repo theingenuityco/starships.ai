@@ -1,9 +1,14 @@
 import api from '@/lib/api'
-import type { Message } from '@/types/chat'
-import type { ApiResponse, ConversationModel, ConversationSourceType } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
+
+// Client-specific message extension for UI states
+interface ClientMessage extends MessageModel {
+  sending?: boolean
+  streaming?: boolean
+}
 
 // Centralized query keys
 export const CONVERSATION_QUERY_KEYS = {
@@ -73,41 +78,13 @@ export function useConversation(conversationId: string, enabled: boolean = true)
 export function useConversationMessages(conversationId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId),
-    queryFn: async (): Promise<{ messages: Message[] }> => {
-      const response: AxiosResponse<ApiResponse<{ messages: any[] }>> = await api.get(`/api/v1/conversations/${conversationId}`, {
-        params: { limit: 50, offset: 0 },
+    queryFn: async (): Promise<{ messages: MessageModel[] }> => {
+      const response: AxiosResponse<ApiResponse<{ messages: MessageModel[] }>> = await api.get(`/api/v1/conversations/${conversationId}`, {
+        params: { includeMessages: true },
       })
 
       const data = response.data.data
-      const messages = data.messages || []
-      const formattedMessages = messages.map((dbMsg: any) => ({
-        id: dbMsg.id,
-        content: dbMsg.content,
-        role: dbMsg.role as 'user' | 'assistant' | 'system',
-        timestamp: dbMsg.timestamp,
-        conversationId: dbMsg.conversation_id || conversationId,
-        agentId: dbMsg.agentId,
-
-        // Enhanced backend properties
-        messageType: dbMsg.messageType,
-        importance: dbMsg.importance,
-        processingStatus: dbMsg.processingStatus,
-        processingTimeMs: dbMsg.processingTimeMs,
-        tokenCount: dbMsg.tokenCount,
-        hasAttachments: dbMsg.hasAttachments,
-        contentLength: dbMsg.contentLength,
-
-        // Threading support
-        parentMessageId: dbMsg.parentMessageId,
-        threadDepth: dbMsg.threadDepth || 0,
-
-        // Additional metadata
-        metadata: dbMsg.metadata,
-        processingMetadata: dbMsg.processingMetadata,
-        contentHash: dbMsg.contentHash,
-      }))
-
-      return { messages: formattedMessages }
+      return { messages: data.messages || [] }
     },
     enabled: !!conversationId && enabled,
     staleTime: 5 * 1000, // 5 seconds - messages change frequently
@@ -198,16 +175,26 @@ export function useSendMessage() {
       const previousMessages = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId))
 
       // Optimistically add user message
-      const userMessage: Message = {
+      const userMessage: ClientMessage = {
         id: `temp-${Date.now()}`,
         content: message,
-        role: 'user',
+        role: 'user' as const,
         timestamp: new Date().toISOString(),
         conversationId,
+        starshipId: '', // Will be set by server
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'pending',
+        messageType: 'user_input',
+        importance: 'medium',
+        contentLength: message.length,
+        hasAttachments: false,
         sending: true,
       }
 
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: { messages: Message[] } | undefined) => {
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: { messages: MessageModel[] } | undefined) => {
         const messages = old?.messages || []
         return { messages: [...messages, userMessage] }
       })
@@ -215,16 +202,26 @@ export function useSendMessage() {
       return { previousMessages, userMessage, conversationId }
     },
     onSuccess: (response, variables, context) => {
-      // Convert server response to Message format
-      const assistantMessage: Message = {
+      // Convert server response to MessageModel format
+      const assistantMessage: MessageModel = {
         id: `response-${Date.now()}`,
         content: response.reply || response.content || 'No response',
-        role: 'assistant',
+        role: 'assistant' as const,
         timestamp: new Date().toISOString(),
         conversationId: variables.conversationId,
+        starshipId: '', // Will be set by server
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'completed',
+        messageType: 'agent_response',
+        importance: 'medium',
+        contentLength: (response.reply || response.content || '').length,
+        hasAttachments: false,
       }
 
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: { messages: Message[] } | undefined) => {
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: { messages: MessageModel[] } | undefined) => {
         const messages = old?.messages || []
         // Remove the temporary sending user message and add both user + assistant messages
         const withoutTempMessage = messages.filter(m => m.id !== context?.userMessage.id)

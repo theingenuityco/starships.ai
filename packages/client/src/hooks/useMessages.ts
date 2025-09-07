@@ -6,7 +6,9 @@ import { toast } from 'sonner'
 
 // Extended Message interface for client compatibility with optimistic updates
 export interface ClientMessage extends MessageModel {
+  // UI-only states
   sending?: boolean
+  streaming?: boolean
   error?: boolean
 }
 

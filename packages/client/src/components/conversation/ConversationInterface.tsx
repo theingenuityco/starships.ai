@@ -7,7 +7,7 @@ import { ConversationMessageList } from '@/components/conversation/ConversationM
 import { useAuth } from '@/hooks/useAuth'
 import { useConversation, useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
-import type { ConversationMetadata, Message } from '@/types/chat'
+import type { ConversationModel } from '@starships/protocol'
 import { Sparkles, Users } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
@@ -89,7 +89,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   // Handle first message to trigger layout transition
-  const handleFirstMessage = (_message: Message) => {
+  const handleFirstMessage = (_message: any) => {
     setHasMessages(true)
   }
 
@@ -104,7 +104,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   // Conversation management handlers
-  const handleStatusChange = async (status: ConversationMetadata['status']) => {
+  const handleStatusChange = async (status: ConversationModel['status']) => {
     if (!currentConversationId) return
 
     try {
@@ -146,7 +146,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <AnimatePresence>
         {hasMessages && currentConversationId && conversationData?.conversation && (
           <ConversationHeader
-            conversation={conversationData.conversation as ConversationMetadata}
+            conversation={conversationData.conversation as ConversationModel}
             onStatusChange={handleStatusChange}
             onArchive={handleArchive}
             onDelete={handleDelete}

@@ -2,14 +2,14 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import type { ConversationMetadata } from '@/types/chat'
+import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { Archive, Clock, MessageSquare, Pause, Play, Settings, Trash2, Zap } from 'lucide-react'
 import { motion } from 'motion/react'
 
 interface ConversationHeaderProps {
-  conversation: ConversationMetadata
-  onStatusChange?: (status: ConversationMetadata['status']) => void
+  conversation: ConversationModel
+  onStatusChange?: (status: ConversationModel['status']) => void
   onArchive?: () => void
   onDelete?: () => void
   onSettings?: () => void

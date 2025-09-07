@@ -625,7 +625,7 @@ export class AgentService {
     let possibleCauses: string[] = [];
     let suggestedActions: string[] = [];
     let recoverable = true;
-    let errorContext: Record<string, unknown> = {
+    const errorContext: Record<string, unknown> = {
       agentId: context.agentId,
     };
 

@@ -168,6 +168,11 @@ export class MessageRepository extends BaseRepository {
         // Use base repository for database operation
         const result = await this.createEntityWithAutoId<MessageModel>('Message', serializedMessage);
 
+        // Create explicit Neo4j relationship with conversation if conversationId is provided
+        if (entity.conversationId) {
+          await this.linkToConversation(result.id, entity.conversationId);
+        }
+
         return MessageEntity.deserialize(result);
       },
       'create',
@@ -491,7 +496,7 @@ export class MessageRepository extends BaseRepository {
           params.dateTo = filters.dateTo;
         }
 
-        cypher += ` RETURN 
+        cypher += ` RETURN
         count(m) as total,
         collect(m.role) as roles,
         collect(m.messageType) as messageTypes,
@@ -553,6 +558,97 @@ export class MessageRepository extends BaseRepository {
         };
       },
       'getMessageStats',
+      'Message'
+    );
+  }
+
+  /**
+   * Create explicit Neo4j relationship between message and conversation
+   */
+  async linkToConversation(messageId: string, conversationId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (c:Conversation {id: $conversationId}), (m:Message {id: $messageId})
+           CREATE (c)-[:HAS_MESSAGE {key: $key, createdAt: $createdAt}]->(m)`,
+          {
+            conversationId,
+            messageId,
+            key: `${conversationId}_${messageId}`,
+            createdAt: new Date().toISOString(),
+          }
+        );
+      },
+      'linkToConversation',
+      'Message'
+    );
+  }
+
+  /**
+   * Remove explicit Neo4j relationship between message and conversation
+   */
+  async unlinkFromConversation(messageId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (c:Conversation)-[r:HAS_MESSAGE]->(m:Message {id: $messageId})
+           DELETE r`,
+          { messageId }
+        );
+      },
+      'unlinkFromConversation',
+      'Message'
+    );
+  }
+
+  /**
+   * Find messages by conversation using Neo4j relationship (alternative to property-based lookup)
+   */
+  async findByConversationIdViaRelationship(conversationId: string, limit?: number, offset?: number): Promise<MessageModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        let cypher = `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
+                      RETURN m ORDER BY m.timestamp ASC`;
+        const params: any = { conversationId };
+
+        if (limit) {
+          cypher += ' SKIP $offset LIMIT $limit';
+          params.offset = int(offset || 0);
+          params.limit = int(limit);
+        }
+
+        const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
+        return result.map((record) => MessageEntity.deserialize(record.m));
+      },
+      'findByConversationIdViaRelationship',
+      'Message'
+    );
+  }
+
+  /**
+   * Get conversation associated with a message using Neo4j relationship
+   */
+  async getMessageConversation(messageId: string): Promise<{ id: string; lastActivityAt: string; messageCount: number } | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ c: { id: string; lastActivityAt: string; messageCount: number } }>(
+          `MATCH (c:Conversation)-[:HAS_MESSAGE]->(m:Message {id: $messageId})
+           RETURN c`,
+          { messageId }
+        );
+        return result.length > 0
+          ? {
+              id: result[0].c.id,
+              lastActivityAt: result[0].c.lastActivityAt,
+              messageCount: result[0].c.messageCount,
+            }
+          : null;
+      },
+      'getMessageConversation',
       'Message'
     );
   }

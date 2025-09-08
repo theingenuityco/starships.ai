@@ -32,7 +32,7 @@ export class MissionService {
       await starshipRepo.findById(request.starshipId);
     } catch (error) {
       if (error instanceof NotFoundError) {
-        throw new NotFoundError('Starship not found', 'Starship', request.starshipId);
+        throw new NotFoundError('Starship', request.starshipId);
       }
       throw error;
     }
@@ -43,7 +43,7 @@ export class MissionService {
       try {
         const agent = await agentRepo.findById(agentId);
         if (!agent) {
-          throw new NotFoundError('Agent not found', 'Agent', agentId);
+          throw new NotFoundError('Agent', agentId);
         }
         if (agent.starshipId !== request.starshipId) {
           throw new ValidationError(`Agent ${agentId} does not belong to starship ${request.starshipId}`, 'agentIds');
@@ -51,7 +51,7 @@ export class MissionService {
         assignedAgents.push(agent);
       } catch (error) {
         if (error instanceof NotFoundError) {
-          throw new NotFoundError('Agent not found', 'Agent', agentId);
+          throw new NotFoundError('Agent', agentId);
         }
         throw error;
       }
@@ -124,7 +124,7 @@ export class MissionService {
       await starshipRepo.findById(starshipId);
     } catch (error) {
       if (error instanceof NotFoundError) {
-        throw new NotFoundError('Starship not found', 'Starship', starshipId);
+        throw new NotFoundError('Starship', starshipId);
       }
       throw error;
     }
@@ -153,14 +153,14 @@ export class MissionService {
         try {
           const agent = await agentRepo.findById(agentId);
           if (!agent) {
-            throw new NotFoundError('Agent not found', 'Agent', agentId);
+            throw new NotFoundError('Agent', agentId);
           }
           if (agent.starshipId !== existingMission.starshipId) {
             throw new ValidationError(`Agent ${agentId} does not belong to mission's starship ${existingMission.starshipId}`, 'agentIds');
           }
         } catch (error) {
           if (error instanceof NotFoundError) {
-            throw new NotFoundError('Agent not found', 'Agent', agentId);
+            throw new NotFoundError('Agent', agentId);
           }
           throw error;
         }
@@ -313,7 +313,7 @@ export class MissionService {
       await missionRepo.getMissionById(missionId);
     } catch (error) {
       if (error instanceof NotFoundError) {
-        throw new NotFoundError('Mission not found', 'Mission', missionId);
+        throw new NotFoundError('Mission', missionId);
       }
       throw error;
     }
@@ -332,7 +332,7 @@ export class MissionService {
       await missionRepo.getMissionById(missionId);
     } catch (error) {
       if (error instanceof NotFoundError) {
-        throw new NotFoundError('Mission not found', 'Mission', missionId);
+        throw new NotFoundError('Mission', missionId);
       }
       throw error;
     }
@@ -366,7 +366,7 @@ export class MissionService {
       return updatedMission;
     } catch (error) {
       if (error instanceof NotFoundError) {
-        throw new NotFoundError('Mission not found', 'Mission', missionId);
+        throw new NotFoundError('Mission', missionId);
       }
       throw error;
     }

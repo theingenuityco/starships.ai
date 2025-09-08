@@ -8,7 +8,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -68,8 +68,8 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
     const queryValidation = validateData(
       z.object({
         category: CategorySchema.optional(),
-        authorId: UuidSchema.optional(),
-        starshipId: UuidSchema.optional(),
+        authorId: NanoidSchema.optional(),
+        starshipId: NanoidSchema.optional(),
         isPublic: z.coerce.boolean().optional(),
         tags: z
           .string()
@@ -142,7 +142,7 @@ router.get('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, res
     if (!checkAuth(req, res)) return;
 
     // Validate workflowId parameter
-    const paramValidation = validateData(z.object({ workflowId: UuidSchema }), req.params, res, 'workflow parameter');
+    const paramValidation = validateData(z.object({ workflowId: NanoidSchema }), req.params, res, 'workflow parameter');
     if (!paramValidation) return;
 
     const { workflowId } = paramValidation;
@@ -178,7 +178,7 @@ router.post('/workflows', jwtAuthMiddleware, async (req: Request, res: Response)
         name: z.string().min(1, 'Name is required').max(255, 'Name must be less than 255 characters'),
         description: z.string().optional(),
         category: CategorySchema,
-        starshipId: UuidSchema.optional(),
+        starshipId: NanoidSchema.optional(),
         isPublic: z.boolean().optional(),
         tags: z.array(z.string()).optional(),
         executionMode: ExecutionModeSchema.optional(),
@@ -214,7 +214,7 @@ router.put('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, res
     if (!checkAuth(req, res)) return;
 
     // Validate workflowId parameter
-    const paramValidation = validateData(z.object({ workflowId: UuidSchema }), req.params, res, 'workflow parameter');
+    const paramValidation = validateData(z.object({ workflowId: NanoidSchema }), req.params, res, 'workflow parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -281,7 +281,7 @@ router.delete('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, 
     if (!checkAuth(req, res)) return;
 
     // Validate workflowId parameter
-    const paramValidation = validateData(z.object({ workflowId: UuidSchema }), req.params, res, 'workflow parameter');
+    const paramValidation = validateData(z.object({ workflowId: NanoidSchema }), req.params, res, 'workflow parameter');
     if (!paramValidation) return;
 
     const { workflowId } = paramValidation;
@@ -358,7 +358,7 @@ router.get('/workflows/author/:authorId', jwtAuthMiddleware, async (req: Request
     if (!checkAuth(req, res)) return;
 
     // Validate authorId parameter
-    const paramValidation = validateData(z.object({ authorId: UuidSchema }), req.params, res, 'author parameter');
+    const paramValidation = validateData(z.object({ authorId: NanoidSchema }), req.params, res, 'author parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -423,13 +423,13 @@ router.post('/workflows/:workflowId/deploy', jwtAuthMiddleware, async (req: Requ
     if (!checkAuth(req, res)) return;
 
     // Validate workflowId parameter
-    const paramValidation = validateData(z.object({ workflowId: UuidSchema }), req.params, res, 'workflow parameter');
+    const paramValidation = validateData(z.object({ workflowId: NanoidSchema }), req.params, res, 'workflow parameter');
     if (!paramValidation) return;
 
     // Validate request body
     const bodyValidation = validateData(
       z.object({
-        starshipId: UuidSchema,
+        starshipId: NanoidSchema,
       }),
       req.body,
       res,
@@ -484,7 +484,7 @@ router.post('/workflows/:workflowId/track-usage', jwtAuthMiddleware, async (req:
     if (!checkAuth(req, res)) return;
 
     // Validate workflowId parameter
-    const paramValidation = validateData(z.object({ workflowId: UuidSchema }), req.params, res, 'workflow parameter');
+    const paramValidation = validateData(z.object({ workflowId: NanoidSchema }), req.params, res, 'workflow parameter');
     if (!paramValidation) return;
 
     const { workflowId } = paramValidation;

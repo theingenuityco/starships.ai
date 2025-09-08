@@ -5,9 +5,9 @@
  * Uses an internal Engine for execution that manages all node handlers automatically.
  */
 
-import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '@/types';
 import { Engine } from '@/engine/Engine';
-import { v4 as uuidv4 } from 'uuid';
+import { Blueprint, Edge, Execution, Node, WorkflowNodeParameters } from '@/types';
+import { nanoid } from 'nanoid';
 
 export class Workflow {
   private params: WorkflowNodeParameters;
@@ -44,7 +44,7 @@ export class Workflow {
    */
   addNode(nodeConfig: Omit<Node, 'ref'> & { ref?: string }): Workflow {
     const node: Node = {
-      ref: nodeConfig.ref || uuidv4(),
+      ref: nodeConfig.ref || nanoid(),
       type: nodeConfig.type,
       name: nodeConfig.name,
       description: nodeConfig.description,
@@ -61,7 +61,7 @@ export class Workflow {
    */
   addEdge(from: string, to: string, condition?: string, label?: string): Workflow {
     const edge: Edge = {
-      ref: uuidv4(),
+      ref: nanoid(),
       from,
       to,
       condition,

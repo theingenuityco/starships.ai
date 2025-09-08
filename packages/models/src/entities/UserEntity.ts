@@ -5,6 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
  */
 
+import { Transformers } from '@/helpers/serializer';
 import type { UserModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches } from 'class-validator';
@@ -13,18 +14,6 @@ import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches } from 'class
  * Custom transformers for the UserEntity
  */
 export class UserTransformers {
-  /**
-   * Transform date strings to ISO format, handling various input formats
-   */
-  static DateTransform() {
-    return Transform(({ value }) => {
-      if (!value) return new Date().toISOString();
-      if (typeof value === 'string') return value;
-      if (value instanceof Date) return value.toISOString();
-      return new Date(value).toISOString();
-    });
-  }
-
   /**
    * Transform username to ensure consistency (lowercase, no spaces)
    */
@@ -98,7 +87,7 @@ export class UserEntity implements UserModel {
   id!: string;
 
   @Expose()
-  @UserTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 

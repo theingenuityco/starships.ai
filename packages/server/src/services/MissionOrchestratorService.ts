@@ -8,7 +8,7 @@ import { SYSTEM_INSTRUCTIONS } from '@/prompts/MissionPromptBuilder';
 import { MissionOrchestratorAgent, type MissionChatState } from '@/services/MissionOrchestratorAgent';
 import { MissionService } from '@/services/MissionService';
 import { Logger } from '@/utils/logger';
-import { InternalServerError, ValidationError } from '@starships/errors';
+import { createError, ValidationError } from '@starships/errors';
 import { MissionMessageRepository, MissionRepository } from '@starships/models';
 import type { MissionChatResponse, MissionMessageModel, MissionPhase } from '@starships/protocol';
 
@@ -118,7 +118,7 @@ export class MissionOrchestratorService {
         throw error;
       }
 
-      throw new InternalServerError('Failed to process user message', {
+      throw createError('Failed to process user message', 500, {
         missionId,
         error: error instanceof Error ? error.message : 'Unknown error',
         code: 'MISSION_MESSAGE_SEND_FAILED',

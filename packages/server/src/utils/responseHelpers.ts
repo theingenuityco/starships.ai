@@ -2,7 +2,7 @@
  * Response helpers for consistent API responses following OpenAPI standards
  */
 
-import { ErrorUtils } from '@starships/errors';
+import { isAppError } from '@starships/errors';
 import type { ApiErrorResponse, ApiResponse, ApiResponseMeta, StandardErrorCode } from '@starships/protocol';
 import type { Response } from 'express';
 
@@ -174,60 +174,21 @@ export function validateIdOrSlug(
 }
 
 /**
- * @deprecated Use validateId instead. This function is kept for backward compatibility.
- * UUID validation helper - kept for legacy support
- */
-export function validateUUID(
-  id: string,
-  fieldName: string
-): {
-  isValid: boolean;
-  error?: { code: StandardErrorCode; message: string; details?: any };
-} {
-  // For now, delegate to the new validateId function
-  // This maintains backward compatibility while supporting the new ID format
-  return validateId(id, fieldName);
-}
-
-/**
  * Handle common errors and convert to standardized responses
  */
 export function handleCommonError(error: any, res: Response, context: string): boolean {
   console.error(`Error in ${context}:`, error);
 
   // Check if it's already a structured error from @starships/errors
-  if (ErrorUtils.isApplicationError(error)) {
+  if (isAppError(error)) {
     const response = error.toResponse();
     sendError(
       res,
-      response.code as StandardErrorCode,
-      response.message,
-      response.statusCode,
-      response.details as Record<string, any> | undefined
+      response.error.code as StandardErrorCode,
+      response.error.message,
+      error.statusCode,
+      response.error.details as Record<string, any> | undefined
     );
-    return true;
-  }
-
-  // Handle known error types by name for backward compatibility
-  if (error.name === 'ValidationError' || error.constructor.name === 'ValidationError') {
-    sendError(res, 'VALIDATION_ERROR', error.message, 400, {
-      field: error.field,
-    });
-    return true;
-  }
-
-  if (error.name === 'NotFoundError' || error.constructor.name === 'NotFoundError') {
-    sendError(res, 'RESOURCE_NOT_FOUND', error.message, 404, {
-      entityType: error.entityType,
-      entityId: error.entityId,
-    });
-    return true;
-  }
-
-  if (error.name === 'ConflictError' || error.constructor.name === 'ConflictError') {
-    sendError(res, 'RESOURCE_CONFLICT', error.message, 409, {
-      conflictType: error.conflictType,
-    });
     return true;
   }
 

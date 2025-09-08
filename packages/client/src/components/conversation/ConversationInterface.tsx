@@ -1,14 +1,17 @@
 'use client'
 
 import { AgentSelector } from '@/components/conversation/AgentSelector'
+import { ConversationHeader } from '@/components/conversation/ConversationHeader'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
+import { useConversation, useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
-import type { Message } from '@/types/chat'
+import type { ConversationModel } from '@starships/protocol'
 import { Sparkles, Users } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 interface ConversationInterfaceProps {
   starshipId?: string
@@ -25,6 +28,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+
+  // Conversation data and mutations
+  const { data: conversationData } = useConversation(currentConversationId || '', !!currentConversationId)
+  const deleteConversation = useDeleteConversation()
+  const updateConversationStatus = useUpdateConversationStatus()
 
   // Reset conversation when agent/starship changes - let server manage conversation IDs
   useEffect(() => {
@@ -81,7 +89,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   // Handle first message to trigger layout transition
-  const handleFirstMessage = (_message: Message) => {
+  const handleFirstMessage = (_message: any) => {
     setHasMessages(true)
   }
 
@@ -95,8 +103,58 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }
 
+  // Conversation management handlers
+  const handleStatusChange = async (status: ConversationModel['status']) => {
+    if (!currentConversationId) return
+
+    try {
+      await updateConversationStatus.mutateAsync({
+        conversationId: currentConversationId,
+        status,
+      })
+    } catch (error) {
+      console.error('Failed to update conversation status:', error)
+    }
+  }
+
+  const handleArchive = async () => {
+    await handleStatusChange('archived')
+  }
+
+  const handleDelete = async () => {
+    if (!currentConversationId) return
+
+    if (confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
+      try {
+        await deleteConversation.mutateAsync(currentConversationId)
+        setCurrentConversationId(null)
+        setHasMessages(false)
+        onConversationChange?.(null)
+      } catch (error) {
+        console.error('Failed to delete conversation:', error)
+      }
+    }
+  }
+
+  const handleSettings = () => {
+    toast.info('Conversation settings - Feature coming soon!')
+  }
+
   return (
     <div className="flex flex-col h-screen bg-background">
+      {/* Conversation Header - Only shown when there's an active conversation */}
+      <AnimatePresence>
+        {hasMessages && currentConversationId && conversationData?.conversation && (
+          <ConversationHeader
+            conversation={conversationData.conversation as ConversationModel}
+            onStatusChange={handleStatusChange}
+            onArchive={handleArchive}
+            onDelete={handleDelete}
+            onSettings={handleSettings}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Messages Area - Only shown when there are messages */}
       <AnimatePresence>
         {hasMessages && currentConversationId && (

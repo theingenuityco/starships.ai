@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Next.js Client",
+      "name": "Debug Next.js Server",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/packages/client/node_modules/next/dist/bin/next",
@@ -13,11 +13,33 @@
       },
       "console": "integratedTerminal",
       "skipFiles": ["<node_internals>/**"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/packages/client/**",
+        "${workspaceFolder}/packages/models/**",
+        "${workspaceFolder}/packages/protocol/**",
+        "${workspaceFolder}/packages/errors/**",
+        "!**/node_modules/**"
+      ],
       "serverReadyAction": {
         "pattern": "ready - started server on .+, url: (https?://\\S+)",
         "uriFormat": "%s",
-        "action": "debugWithChrome"
+        "action": "openExternally"
       }
+    },
+    {
+      "name": "Debug Next.js Client (Browser)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/packages/client",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./*": "${workspaceFolder}/packages/client/*",
+        "webpack:///packages/client/*": "${workspaceFolder}/packages/client/*",
+        "webpack:///*": "${workspaceFolder}/*"
+      },
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
     },
     {
       "name": "Debug Express Server",
@@ -47,12 +69,22 @@
   ],
   "compounds": [
     {
-      "name": "Debug Application",
-      "configurations": ["Debug Express Server", "Debug Next.js Client"],
+      "name": "Debug Client (Full Stack)",
+      "configurations": ["Debug Next.js Server", "Debug Next.js Client (Browser)"],
+      "presentation": {
+        "hidden": false,
+        "group": "client",
+        "order": 1
+      },
+      "stopAll": true
+    },
+    {
+      "name": "Debug Application (Full Stack)",
+      "configurations": ["Debug Express Server", "Debug Next.js Server", "Debug Next.js Client (Browser)"],
       "presentation": {
         "hidden": false,
         "group": "starships",
-        "order": 1
+        "order": 2
       },
       "stopAll": true
     }

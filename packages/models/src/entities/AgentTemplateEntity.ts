@@ -5,6 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
  */
 
+import { Transformers } from '@/helpers/serializer';
 import type { AgentTemplateModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
@@ -13,37 +14,6 @@ import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Ma
  * Custom transformers for the AgentTemplateEntity
  */
 export class AgentTemplateTransformers {
-  /**
-   * Transform date strings to ISO format, handling various input formats
-   */
-  static DateTransform() {
-    return Transform(({ value }) => {
-      if (!value) return new Date().toISOString();
-      if (typeof value === 'string') return value;
-      if (value instanceof Date) return value.toISOString();
-      return new Date(value).toISOString();
-    });
-  }
-
-  /**
-   * Transform JSON objects for safe storage/retrieval (Blueprint, Memory, etc.)
-   */
-  static JSONTransform() {
-    return Transform(({ value }) => {
-      if (!value) return undefined;
-      if (typeof value === 'string') {
-        try {
-          const parsed = JSON.parse(value);
-          return parsed;
-        } catch (error) {
-          console.warn('JSONTransform: Failed to parse JSON string:', error);
-          return undefined;
-        }
-      }
-      return value;
-    });
-  }
-
   /**
    * Transform usage count to ensure it's always a number
    */
@@ -126,12 +96,12 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   slug!: string;
 
   @Expose()
-  @AgentTemplateTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @AgentTemplateTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -176,36 +146,12 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   timeout!: number;
 
   @Expose()
-  @Transform(({ value }) => {
-    if (!value) return undefined;
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch (error) {
-        console.warn('Memory JSONTransform: Failed to parse JSON string:', error);
-        return undefined;
-      }
-    }
-    // If it's already an object, return as-is (don't lose the data)
-    return value;
-  })
+  @Transformers.JsonTransform()
   @IsObject()
   memory!: any; // AgentMemoryState - keeping flexible for now
 
   @Expose()
-  @Transform(({ value }) => {
-    if (!value) return undefined;
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch (error) {
-        console.warn('Blueprint JSONTransform: Failed to parse JSON string:', error);
-        return undefined;
-      }
-    }
-    // If it's already an object, return as-is (don't lose the data)
-    return value;
-  })
+  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: any; // Blueprint - keeping flexible for now
 

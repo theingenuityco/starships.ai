@@ -1,3 +1,6 @@
+import { AgentService } from '@/services';
+import { MessageService } from '@/services/MessageService';
+import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, MessageRepository } from '@starships/models';
 import { ConversationModel } from '@starships/protocol';
 
@@ -11,16 +14,30 @@ export interface ConversationWithMessages extends ConversationModel {
   messages: any[]; // Using any[] to match existing Message type from routes
 }
 
+export interface AddMessageData {
+  conversationId: string;
+  agentId: string;
+  userId: string;
+  message: string;
+}
+
+export interface AddMessageResponse {
+  reply: string;
+  usage?: any;
+}
+
 /**
  * Clean conversation service with proper error handling
  */
 export class ConversationService {
   private conversationRepository: ConversationRepository;
   private messageRepository: MessageRepository;
+  private messageService: MessageService;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageRepository = new MessageRepository();
+    this.messageService = new MessageService();
   }
 
   /**
@@ -111,7 +128,7 @@ export class ConversationService {
   async incrementMessageCount(conversationId: string, increment: number = 1): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
     if (!conversation) {
-      throw new Error(`Conversation not found: ${conversationId}`);
+      throw new NotFoundError('Conversation', conversationId);
     }
 
     await this.conversationRepository.update(conversationId, {
@@ -126,7 +143,7 @@ export class ConversationService {
   async updateTokenCount(conversationId: string, tokens: number): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
     if (!conversation) {
-      throw new Error(`Conversation not found: ${conversationId}`);
+      throw new NotFoundError('Conversation', conversationId);
     }
 
     await this.conversationRepository.update(conversationId, {
@@ -150,13 +167,76 @@ export class ConversationService {
   }
 
   /**
-   * Common method to update conversation status and activity timestamp
+   * Update conversation status and activity timestamp
    */
-  private async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
+  async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
     await this.conversationRepository.update(conversationId, {
       status,
       lastActivityAt: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Add message to conversation and get agent response
+   */
+  async addMessage(data: AddMessageData): Promise<AddMessageResponse> {
+    const { conversationId, agentId, userId, message } = data;
+
+    // Verify conversation exists
+    const conversation = await this.conversationRepository.findById(conversationId);
+    if (!conversation) {
+      throw new NotFoundError('Conversation', conversationId);
+    }
+
+    // Get starship information for message context
+    const starshipInfo = await this.getConversationStarship(conversationId);
+    if (!starshipInfo) {
+      throw new NotFoundError('Starship', `for conversation ${conversationId}`);
+    }
+
+    // Save user message to database
+    await this.messageService.addToConversation(conversationId, 'user', message, {
+      starshipId: starshipInfo.id,
+      agentId,
+      userId,
+    });
+
+    // Execute agent chat
+    const response = await AgentService.executeChat({
+      source: 'user',
+      agentId,
+      userId,
+      message,
+      conversationId,
+      stream: false,
+    });
+
+    // Save agent response to database
+    await this.messageService.addToConversation(
+      conversationId,
+      'assistant',
+      response.content,
+      {
+        starshipId: starshipInfo.id,
+        agentId,
+        userId,
+      },
+      {
+        usage: response.usage,
+        tokenCount: response.usage?.totalTokens,
+      }
+    );
+
+    // Update conversation metrics
+    await Promise.all([
+      this.updateConversationActivity(conversationId),
+      this.incrementMessageCount(conversationId, 2), // User message + assistant response
+    ]);
+
+    return {
+      reply: response.content,
+      usage: response.usage,
+    };
   }
 
   /**

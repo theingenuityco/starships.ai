@@ -4,8 +4,8 @@
  * Simplified error handling using @starships/errors package
  */
 
-import { Request, Response, NextFunction } from 'express';
-import { BaseError, ErrorUtils, NotFoundError, InternalServerError } from '@starships/errors';
+import { AppError, NotFoundError, wrapError } from '@starships/errors';
+import { NextFunction, Request, Response } from 'express';
 
 /**
  * Error handler configuration
@@ -57,7 +57,7 @@ function generateRequestId(): string {
 /**
  * Simple error logging
  */
-function logError(error: BaseError, req: Request): void {
+function logError(error: AppError, req: Request): void {
   const logEntry = {
     timestamp: new Date().toISOString(),
     error: {
@@ -71,7 +71,7 @@ function logError(error: BaseError, req: Request): void {
       method: req.method,
       url: req.url,
       path: req.path,
-      requestId: error.requestId || req.get('X-Request-ID'),
+      requestId: req.get('X-Request-ID'),
       userAgent: req.get('User-Agent'),
       ip: req.ip,
       userId: (req as any).user?.id,
@@ -93,25 +93,25 @@ export function errorHandler(config: ErrorHandlerConfig = {}) {
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
 
   return (error: any, req: Request, res: Response, next: NextFunction): void => {
-    // Use ErrorUtils.normalize from @starships/errors to convert error
-    const standardError = ErrorUtils.normalize(error, req.get('X-Request-ID'), req.path);
+    // Use wrapError from @starships/errors to convert error
+    const standardError = wrapError(error, req.path || 'unknown route');
 
     // Log server errors
     if (standardError.statusCode >= 500) {
       logError(standardError, req);
     }
 
-    // Create standardized response using BaseError.toResponse()
+    // Create standardized response using AppError.toResponse()
     const baseResponse = standardError.toResponse();
     const errorResponse: ErrorResponse = {
       success: false,
       error: {
-        code: baseResponse.code,
-        message: baseResponse.message,
-        category: baseResponse.category,
-        details: baseResponse.details,
-        timestamp: baseResponse.timestamp,
-        requestId: baseResponse.requestId,
+        code: baseResponse.error.code,
+        message: baseResponse.error.message,
+        category: standardError.category,
+        details: baseResponse.error.details,
+        timestamp: new Date().toISOString(),
+        requestId: req.get('X-Request-ID'),
         ...(finalConfig.includeStackTrace && standardError.stack && { stack: standardError.stack }),
       },
       meta: {
@@ -138,14 +138,7 @@ export function asyncHandler<T extends Request, U extends Response>(fn: (req: T,
  * Not found handler middleware
  */
 export function notFoundHandler(req: Request, res: Response, next: NextFunction): void {
-  const error = new NotFoundError(
-    `${req.method} ${req.path} not found`,
-    'Endpoint',
-    `${req.method} ${req.path}`,
-    undefined,
-    req.get('X-Request-ID'),
-    req.path
-  );
+  const error = new NotFoundError('Endpoint', `${req.method} ${req.path}`);
 
   next(error);
 }

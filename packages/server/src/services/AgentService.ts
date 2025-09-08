@@ -6,10 +6,11 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent, Blueprint } from '@starships/autopilot';
-import { InternalServerError, NotFoundError, ValidationError } from '@starships/errors';
+import { Agent } from '@starships/autopilot';
+import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import { MessageService } from './MessageService';
 
 export interface AgentOptions {
   includeMemory?: boolean;
@@ -42,9 +43,11 @@ export interface AgentExecutionContext {
  */
 export class AgentService {
   private agentRepository: AgentRepository;
+  private messageService: MessageService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
+    this.messageService = new MessageService();
   }
 
   // ============================================================================
@@ -265,7 +268,7 @@ export class AgentService {
     // Check if agent exists first
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
-      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     await this.agentRepository.updateRating(agentId, rating);
@@ -278,7 +281,7 @@ export class AgentService {
     // Check if agent exists first
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
-      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     await this.agentRepository.incrementUsageCount(agentId);
@@ -291,7 +294,7 @@ export class AgentService {
     // Check if agent exists first
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
-      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     // TODO: Add business validation for starship existence and user access
@@ -333,7 +336,7 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Execute agent chat using ConversationRequest format (replaces AgentExecutionService.executeChat)
+   * Execute agent chat using ConversationRequest format with enhanced error handling
    */
   static async executeChat(request: ConversationRequest): Promise<ConversationResponse> {
     const { agentId, userId, message, conversationId } = request;
@@ -356,7 +359,7 @@ export class AgentService {
 
     if (!dbAgent) {
       console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
-      throw new NotFoundError(`Agent ${agentId} not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
@@ -409,7 +412,17 @@ export class AgentService {
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // Just throw the error instead of providing fallback response
+      // Create error message in conversation and then throw the error
+      // This ensures the error is handled properly by the message service
+      const agentService = new AgentService();
+      await agentService.createErrorResponse(error as Error, {
+        agentId,
+        userId,
+        conversationId,
+        starshipId: dbAgent.starshipId,
+      });
+
+      // Throw the original error so it's handled as an actual error, not a success response
       throw error;
     }
   }
@@ -478,7 +491,7 @@ export class AgentService {
       // Get database agent
       const dbAgent = await this.agentRepository.findById(context.agentId);
       if (!dbAgent) {
-        throw new NotFoundError(`Agent ${context.agentId} not found`, 'Agent', context.agentId);
+        throw new NotFoundError('Agent', context.agentId);
       }
 
       // Create agent instance
@@ -515,8 +528,12 @@ export class AgentService {
 
       console.error(`[AGENT-SERVICE] Agent execution failed for ${context.agentId}:`, error);
 
+      // Return raw error response
+      // Note: Error message creation is handled by createErrorResponse in executeChat
+      // to avoid duplicate messages. This method just returns the error response.
+
       return {
-        response: 'I apologize, but I encountered an error processing your request.',
+        response: errorMessage,
         usage: { totalTokens: 0, cost: 0, modelCalls: 0 },
         executionTime,
         status: 'error',
@@ -530,6 +547,52 @@ export class AgentService {
    */
   async testAgent(agentId: string, testMessage: string): Promise<ExecuteAgentResponse> {
     return this.executeAgent({ agentId, userMessage: testMessage }, { includeMemory: false, loadConversationHistory: false });
+  }
+
+  /**
+   * Create error response using raw error message
+   */
+  async createErrorResponse(
+    error: Error,
+    context: {
+      agentId: string;
+      userId?: string;
+      conversationId?: string;
+      starshipId: string;
+    }
+  ): Promise<ConversationResponse> {
+    const errorMessage = error.message;
+    const errorStack = error.stack;
+
+    // Create raw error message via message service
+    if (context.conversationId) {
+      await this.messageService.createMessage({
+        role: 'system',
+        content: errorMessage,
+        starshipId: context.starshipId,
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        messageType: 'error',
+        importance: 'high',
+        processingStatus: 'completed',
+        metadata: {
+          errorMessage,
+          errorStack,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Return raw error response
+    return {
+      source: 'agent',
+      content: errorMessage,
+      agentId: context.agentId,
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+      },
+    };
   }
 
   // ============================================================================
@@ -582,7 +645,7 @@ export class AgentService {
    */
   private extractResponse(executionResult: any): string {
     if (executionResult.status !== 'completed') {
-      throw new InternalServerError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`);
+      throw createError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`, 500);
     }
 
     // Look for LLM response in execution results
@@ -638,7 +701,7 @@ export class AgentService {
   /**
    * Create default blueprint for simple chat agents
    */
-  private createDefaultBlueprint(dbAgent: AgentModel | CreateAgentRequest): Blueprint {
+  private createDefaultBlueprint(dbAgent: AgentModel | CreateAgentRequest): any {
     return {
       nodes: [
         {
@@ -694,7 +757,7 @@ export class AgentService {
   /**
    * Validate blueprint structure
    */
-  private validateBlueprint(blueprint: Blueprint): { valid: boolean; errors: string[] } {
+  private validateBlueprint(blueprint: any): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     if (!blueprint.nodes || !Array.isArray(blueprint.nodes)) {
@@ -708,19 +771,19 @@ export class AgentService {
     }
 
     // Check for start node
-    const hasStartNode = blueprint.nodes.some((node) => node.type === 'start');
+    const hasStartNode = blueprint.nodes.some((node: any) => node.type === 'start');
     if (!hasStartNode) {
       errors.push('Blueprint must have a start node');
     }
 
     // Check for end node
-    const hasEndNode = blueprint.nodes.some((node) => node.type === 'end');
+    const hasEndNode = blueprint.nodes.some((node: any) => node.type === 'end');
     if (!hasEndNode) {
       errors.push('Blueprint must have an end node');
     }
 
     // Validate edge references
-    const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));
+    const nodeRefs = new Set(blueprint.nodes.map((n: any) => n.ref));
     for (const edge of blueprint.edges) {
       if (!nodeRefs.has(edge.from)) {
         errors.push(`Edge references non-existent node: ${edge.from}`);

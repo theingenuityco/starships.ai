@@ -1,4 +1,5 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
+import { ConflictError, NotFoundError } from '@starships/errors';
 import { AgentRepository, getConnection, StarshipRepository } from '@starships/models';
 import { CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
@@ -127,13 +128,13 @@ export class StarshipService {
     // Verify agent exists before deployment
     const agent = await this.agentRepository.findById(agentId);
     if (!agent) {
-      throw new Error(`Agent not found: ${agentId}`);
+      throw new NotFoundError('Agent', agentId);
     }
 
     // Check starship capacity
     const availableSlots = await this.starshipRepository.getAvailableSlots(starshipId);
     if (availableSlots <= 0) {
-      throw new Error('No available slots on this starship');
+      throw new ConflictError('No available slots on this starship');
     }
 
     return this.starshipRepository.deployAgent(starshipId, agentId);

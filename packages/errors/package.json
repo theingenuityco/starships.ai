@@ -23,12 +23,10 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
-    "@starships/protocol": "workspace:*",
-    "uuid": "^10.0.0"
+    "@starships/protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/uuid": "^10.0.0",
     "jest": "^30.1.1",
     "ts-jest": "^29.4.1",
     "tsc-alias": "^1.8.16",

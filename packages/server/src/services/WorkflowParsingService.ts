@@ -5,9 +5,10 @@
  * Separated from orchestrator agent to follow separation of concerns pattern.
  */
 
-import type { CreateWorkflowRequest, AgentModel } from '@starships/protocol';
-import type { Blueprint } from '@starships/autopilot';
 import { Logger } from '@/utils/logger';
+import type { Blueprint } from '@starships/autopilot';
+import { ValidationError } from '@starships/errors';
+import type { AgentModel, CreateWorkflowRequest } from '@starships/protocol';
 
 export class WorkflowParsingService {
   private static logger = Logger.getInstance();
@@ -20,16 +21,16 @@ export class WorkflowParsingService {
     try {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('No JSON found in AI response');
+        throw new ValidationError('No JSON found in AI response', 'aiResponse');
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
       if (!parsed.nodes || !Array.isArray(parsed.nodes)) {
-        throw new Error('Invalid nodes structure in AI response');
+        throw new ValidationError('Invalid nodes structure in AI response', 'nodes');
       }
 
       if (!parsed.edges || !Array.isArray(parsed.edges)) {
-        throw new Error('Invalid edges structure in AI response');
+        throw new ValidationError('Invalid edges structure in AI response', 'edges');
       }
 
       // Validate agent assignments
@@ -37,7 +38,7 @@ export class WorkflowParsingService {
       for (const node of parsed.nodes) {
         if (node.type === 'agent' && node.parameters?.agentId) {
           if (!agentIds.includes(node.parameters.agentId)) {
-            throw new Error(`Invalid agent assignment: ${node.parameters.agentId}`);
+            throw new ValidationError(`Invalid agent assignment: ${node.parameters.agentId}`, 'agentId');
           }
         }
       }
@@ -47,11 +48,11 @@ export class WorkflowParsingService {
       const hasEnd = parsed.nodes.some((node: any) => node.type === 'end');
 
       if (!hasStart) {
-        throw new Error('Workflow must have a start node');
+        throw new ValidationError('Workflow must have a start node', 'nodes');
       }
 
       if (!hasEnd) {
-        throw new Error('Workflow must have an end node');
+        throw new ValidationError('Workflow must have an end node', 'nodes');
       }
 
       // Process nodes for Blueprint format
@@ -89,7 +90,7 @@ export class WorkflowParsingService {
       };
     } catch (error) {
       this.logger.error('Error parsing AI workflow response', { error });
-      throw new Error(`Failed to parse workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new ValidationError(`Failed to parse workflow: ${error instanceof Error ? error.message : 'Unknown error'}`, 'workflow');
     }
   }
 
@@ -100,11 +101,11 @@ export class WorkflowParsingService {
     try {
       // Check basic structure
       if (!workflow.blueprint?.nodes || workflow.blueprint.nodes.length === 0) {
-        throw new Error('Workflow must have nodes');
+        throw new ValidationError('Workflow must have nodes', 'nodes');
       }
 
       if (!workflow.blueprint?.edges || workflow.blueprint.edges.length === 0) {
-        throw new Error('Workflow must have edges');
+        throw new ValidationError('Workflow must have edges', 'edges');
       }
 
       // Check for required node types
@@ -112,11 +113,11 @@ export class WorkflowParsingService {
       const hasEnd = workflow.blueprint.nodes.some((node: any) => node.type === 'end');
 
       if (!hasStart) {
-        throw new Error('Workflow must have a start node');
+        throw new ValidationError('Workflow must have a start node', 'nodes');
       }
 
       if (!hasEnd) {
-        throw new Error('Workflow must have an end node');
+        throw new ValidationError('Workflow must have an end node', 'nodes');
       }
 
       return true;

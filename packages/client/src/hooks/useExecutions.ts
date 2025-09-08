@@ -4,9 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
 // Execution status type for filtering
 export type ExecutionStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled'
 
@@ -39,14 +36,13 @@ export const EXECUTION_QUERY_KEYS = {
 export function useExecutions(filters?: { status?: ExecutionStatus; workflowId?: string }, enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.list(filters),
-    queryFn: async () => {
+    queryFn: async (): Promise<{ executions: ExecutionModel[] }> => {
       const params = new URLSearchParams()
       if (filters?.status) params.append('status', filters.status)
       if (filters?.workflowId) params.append('workflowId', filters.workflowId)
 
-      const response = await api.get(`/api/v1/executions?${params.toString()}`)
-      const executions = extractResponseData<ExecutionModel[]>(response)
-      return { executions }
+      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/executions?${params.toString()}`)
+      return { executions: response.data.data }
     },
     enabled,
     staleTime: 5 * 1000, // 5 seconds - executions change frequently
@@ -59,10 +55,9 @@ export function useExecutions(filters?: { status?: ExecutionStatus; workflowId?:
 export function useExecution(executionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.detail(executionId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/executions/${executionId}`)
-      const execution = extractResponseData<ExecutionModel>(response)
-      return execution
+    queryFn: async (): Promise<ExecutionModel> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.get(`/api/v1/executions/${executionId}`)
+      return response.data.data
     },
     enabled: !!executionId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -74,10 +69,9 @@ export function useExecution(executionId: string, enabled: boolean = true) {
 export function useExecutionsByStatus(status: ExecutionStatus, enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.byStatus(status),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/executions?status=${status}`)
-      const executions = extractResponseData<ExecutionModel[]>(response)
-      return { executions }
+    queryFn: async (): Promise<{ executions: ExecutionModel[] }> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/executions?status=${status}`)
+      return { executions: response.data.data }
     },
     enabled: !!status && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -89,10 +83,9 @@ export function useExecutionsByStatus(status: ExecutionStatus, enabled: boolean 
 export function useExecutionsByWorkflow(workflowId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.byWorkflow(workflowId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/workflows/${workflowId}/executions`)
-      const executions = extractResponseData<ExecutionModel[]>(response)
-      return { executions }
+    queryFn: async (): Promise<{ executions: ExecutionModel[] }> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/workflows/${workflowId}/executions`)
+      return { executions: response.data.data }
     },
     enabled: !!workflowId && enabled,
     staleTime: 15 * 1000, // 15 seconds
@@ -104,10 +97,9 @@ export function useExecutionsByWorkflow(workflowId: string, enabled: boolean = t
 export function useActiveExecutions(enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.active(),
-    queryFn: async () => {
-      const response = await api.get('/api/v1/executions') // Default returns active executions
-      const executions = extractResponseData<ExecutionModel[]>(response)
-      return { executions }
+    queryFn: async (): Promise<{ executions: ExecutionModel[] }> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get('/api/v1/executions') // Default returns active executions
+      return { executions: response.data.data }
     },
     enabled,
     staleTime: 5 * 1000, // 5 seconds - very dynamic data
@@ -121,11 +113,10 @@ export function useActiveExecutions(enabled: boolean = true) {
 export function useExecutionStats(workflowId?: string, enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.stats(workflowId),
-    queryFn: async () => {
+    queryFn: async (): Promise<ExecutionStats> => {
       const url = workflowId ? `/api/v1/workflows/${workflowId}/executions/stats` : '/api/v1/executions/stats'
-      const response = await api.get(url)
-      const stats = extractResponseData<ExecutionStats>(response)
-      return stats
+      const response: AxiosResponse<ApiResponse<ExecutionStats>> = await api.get(url)
+      return response.data.data
     },
     enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -138,9 +129,9 @@ export function useCreateExecution() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateExecutionRequest) => {
-      const response = await api.post('/api/v1/executions', data)
-      return extractResponseData<ExecutionModel>(response)
+    mutationFn: async (data: CreateExecutionRequest): Promise<ExecutionModel> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post('/api/v1/executions', data)
+      return response.data.data
     },
     onMutate: async newExecution => {
       // Cancel any outgoing refetches for execution lists
@@ -212,9 +203,15 @@ export function useUpdateExecution() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ executionId, updates }: { executionId: string; updates: Partial<ExecutionModel & { executionData?: Record<string, unknown>; result?: Record<string, unknown> }> }) => {
-      const response = await api.put(`/api/v1/executions/${executionId}`, updates)
-      return extractResponseData<ExecutionModel>(response)
+    mutationFn: async ({
+      executionId,
+      updates,
+    }: {
+      executionId: string
+      updates: Partial<ExecutionModel & { executionData?: Record<string, unknown>; result?: Record<string, unknown> }>
+    }): Promise<ExecutionModel> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.put(`/api/v1/executions/${executionId}`, updates)
+      return response.data.data
     },
     onMutate: async ({ executionId, updates }) => {
       // Cancel outgoing refetches
@@ -265,9 +262,9 @@ export function useStartExecution() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (executionId: string) => {
-      const response = await api.post(`/api/v1/executions/${executionId}/start`)
-      return extractResponseData<ExecutionModel>(response)
+    mutationFn: async (executionId: string): Promise<ExecutionModel> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/start`)
+      return response.data.data
     },
     onSuccess: (execution, executionId) => {
       // Update execution in cache
@@ -291,9 +288,9 @@ export function usePauseExecution() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (executionId: string) => {
-      const response = await api.post(`/api/v1/executions/${executionId}/pause`)
-      return extractResponseData<ExecutionModel>(response)
+    mutationFn: async (executionId: string): Promise<ExecutionModel> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/pause`)
+      return response.data.data
     },
     onSuccess: (execution, executionId) => {
       queryClient.setQueryData(EXECUTION_QUERY_KEYS.detail(executionId), execution)
@@ -316,9 +313,9 @@ export function useResumeExecution() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (executionId: string) => {
-      const response = await api.post(`/api/v1/executions/${executionId}/resume`)
-      return extractResponseData<ExecutionModel>(response)
+    mutationFn: async (executionId: string): Promise<ExecutionModel> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/resume`)
+      return response.data.data
     },
     onSuccess: (execution, executionId) => {
       queryClient.setQueryData(EXECUTION_QUERY_KEYS.detail(executionId), execution)
@@ -341,9 +338,9 @@ export function useCancelExecution() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ executionId, reason }: { executionId: string; reason?: string }) => {
-      const response = await api.post(`/api/v1/executions/${executionId}/cancel`, { reason })
-      return extractResponseData<ExecutionModel>(response)
+    mutationFn: async ({ executionId, reason }: { executionId: string; reason?: string }): Promise<ExecutionModel> => {
+      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/cancel`, { reason })
+      return response.data.data
     },
     onSuccess: (execution, variables) => {
       queryClient.setQueryData(EXECUTION_QUERY_KEYS.detail(variables.executionId), execution)
@@ -367,8 +364,8 @@ export function useDeleteExecution() {
 
   return useMutation({
     mutationFn: async (executionId: string) => {
-      const response = await api.delete(`/api/v1/executions/${executionId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/executions/${executionId}`)
+      return response.data.data
     },
     onMutate: async executionId => {
       // Get execution details before deletion for rollback

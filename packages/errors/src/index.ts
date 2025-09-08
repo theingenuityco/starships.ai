@@ -1,488 +1,308 @@
 /**
  * Lean Error Handling System for Starships.ai
  *
- * Contains only the core error classes that are actually needed.
+ * A simple, dev-friendly error system focused on practical usage.
+ * Eliminates ceremonious constructors and complex mappings in favor of
+ * clear messages and easy-to-use patterns developers actually adopt.
  */
-
-// Import types from protocol package
-import { ErrorCategory } from '@starships/protocol';
-import type { ErrorDetails, StandardErrorCode } from '@starships/protocol';
-import type { ErrorContext } from '@/context';
 
 /**
- * Base application error class with unified ErrorContext support
+ * Base application error with only essential properties
  */
-export abstract class BaseError extends Error {
-  public readonly code: StandardErrorCode;
-  public readonly statusCode: number;
-  public readonly category: ErrorCategory;
-  public readonly timestamp: string;
-  public readonly requestId?: string;
-  public readonly path?: string;
-  public readonly details?: any;
-  public readonly context?: ErrorContext;
+export class AppError extends Error {
+  readonly code: string;
+  readonly statusCode: number;
+  readonly category: string;
+  readonly details?: any;
+  readonly cause?: Error;
 
   constructor(
     message: string,
-    code: StandardErrorCode,
+    code: string,
     statusCode: number,
-    category: ErrorCategory,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
+    options?: {
+      details?: any;
+      cause?: Error;
+    }
   ) {
     super(message);
     this.name = this.constructor.name;
     this.code = code;
     this.statusCode = statusCode;
-    this.category = category;
-    this.timestamp = new Date().toISOString();
-    this.requestId = requestId || context?.requestId;
-    this.path = path || context?.metadata?.path;
-    this.details = details;
-    this.context = context;
+    this.category = this.inferCategory(statusCode);
+    this.details = options?.details;
+    this.cause = options?.cause;
 
     // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, new.target.prototype);
   }
 
   /**
-   * Convert error to standardized response format
+   * Automatically categorize errors based on HTTP status code
    */
-  toResponse(): ErrorDetails {
-    return {
-      code: this.code,
-      message: this.message,
-      details: this.details,
-      timestamp: this.timestamp,
-      requestId: this.requestId,
-      path: this.path,
-      statusCode: this.statusCode,
-      category: this.category,
-    };
+  private inferCategory(statusCode: number): string {
+    if (statusCode >= 400 && statusCode < 500) return 'client';
+    if (statusCode >= 500) return 'server';
+    return 'unknown';
   }
 
   /**
-   * Get the error context if available
-   */
-  getContext(): ErrorContext | undefined {
-    return this.context;
-  }
-
-  /**
-   * Check if error has context from specific layer
-   */
-  hasContextFromLayer(layer: string): boolean {
-    return this.context?.layer === layer;
-  }
-
-  /**
-   * Convert error to JSON for logging
+   * Convert to JSON for API responses and logging
    */
   toJSON(): Record<string, any> {
     return {
       name: this.name,
-      code: this.code,
       message: this.message,
+      code: this.code,
       statusCode: this.statusCode,
       category: this.category,
-      timestamp: this.timestamp,
-      requestId: this.requestId,
-      path: this.path,
       details: this.details,
       stack: this.stack,
-      context: this.context
-        ? {
-            layer: this.context.layer,
-            component: this.context.component,
-            operation: this.context.operation,
-            resource: this.context.resource,
-            resourceId: this.context.resourceId,
-            userId: this.context.userId,
-            timestamp: this.context.timestamp.toISOString(),
-            metadata: this.context.metadata,
-          }
-        : undefined,
+      cause: this.cause?.message,
+    };
+  }
+
+  /**
+   * Convert to API response format
+   */
+  toResponse(): { error: { code: string; message: string; details?: any } } {
+    return {
+      error: {
+        code: this.code,
+        message: this.message,
+        details: this.details,
+      },
     };
   }
 }
 
-/**
- * Validation Error (400)
- */
-export class ValidationError extends BaseError {
-  public readonly field?: string;
+// =============================================================================
+// COMMON ERROR TYPES - Simple constructors with dev-friendly defaults
+// =============================================================================
 
-  constructor(message: string, field?: string, details?: any, requestId?: string, path?: string, context?: ErrorContext) {
-    super(message, 'VALIDATION_ERROR', 400, ErrorCategory.VALIDATION, details, requestId, path, context);
+/**
+ * Validation Error (400) - For input validation failures
+ */
+export class ValidationError extends AppError {
+  readonly field?: string;
+
+  constructor(message: string, field?: string, details?: any, cause?: Error) {
+    super(message, 'VALIDATION_ERROR', 400, { details, cause });
     this.field = field;
   }
 
-  toResponse(): ErrorDetails {
+  toResponse() {
     return {
-      ...super.toResponse(),
-      field: this.field,
-    };
-  }
-}
-
-/**
- * Not Found Error (404)
- */
-export class NotFoundError extends BaseError {
-  public readonly entityType: string;
-  public readonly entityId: string;
-
-  constructor(
-    message: string,
-    entityType: string,
-    entityId: string,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(message, 'RESOURCE_NOT_FOUND', 404, ErrorCategory.NOT_FOUND, details, requestId, path, context);
-    this.entityType = entityType;
-    this.entityId = entityId;
-  }
-
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      entityType: this.entityType,
-      entityId: this.entityId,
-    };
-  }
-}
-
-/**
- * Authentication Error (401)
- */
-export class AuthenticationError extends BaseError {
-  constructor(message: string = 'Authentication required', details?: any, requestId?: string, path?: string, context?: ErrorContext) {
-    super(message, 'AUTHENTICATION_REQUIRED', 401, ErrorCategory.AUTHENTICATION, details, requestId, path, context);
-  }
-}
-
-/**
- * Authorization Error (403)
- */
-export class AuthorizationError extends BaseError {
-  public readonly requiredPermission?: string;
-  public readonly userRole?: string;
-
-  constructor(
-    message: string = 'Access denied',
-    requiredPermission?: string,
-    userRole?: string,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(message, 'ACCESS_DENIED', 403, ErrorCategory.AUTHORIZATION, details, requestId, path, context);
-    this.requiredPermission = requiredPermission;
-    this.userRole = userRole;
-  }
-
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      details: {
-        ...this.details,
-        requiredPermission: this.requiredPermission,
-        userRole: this.userRole,
+      error: {
+        code: this.code,
+        message: this.message,
+        field: this.field,
+        details: this.details,
       },
     };
   }
 }
 
 /**
- * Conflict Error (409)
+ * Not Found Error (404) - For missing resources
  */
-export class ConflictError extends BaseError {
-  public readonly conflictType?: string;
+export class NotFoundError extends AppError {
+  readonly resource: string;
+  readonly id: string;
 
-  constructor(message: string, conflictType?: string, details?: any, requestId?: string, path?: string, context?: ErrorContext) {
-    super(message, 'RESOURCE_CONFLICT', 409, ErrorCategory.CONFLICT, details, requestId, path, context);
-    this.conflictType = conflictType;
+  constructor(resource: string, id: string, cause?: Error) {
+    super(`${resource} not found: ${id}`, 'NOT_FOUND', 404, { cause });
+    this.resource = resource;
+    this.id = id;
   }
 
-  toResponse(): ErrorDetails {
+  toResponse() {
     return {
-      ...super.toResponse(),
-      details: {
-        ...this.details,
-        conflictType: this.conflictType,
+      error: {
+        code: this.code,
+        message: this.message,
+        resource: this.resource,
+        id: this.id,
       },
     };
   }
 }
 
 /**
- * Database Error (500)
+ * Authentication Error (401) - For auth failures
  */
-export class DatabaseError extends BaseError {
-  public readonly operation?: string;
-  public readonly query?: string;
+export class AuthError extends AppError {
+  constructor(message: string = 'Authentication failed', cause?: Error) {
+    super(message, 'AUTH_ERROR', 401, { cause });
+  }
+}
 
-  constructor(
-    message: string,
-    operation?: string,
-    query?: string,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(message, 'DATABASE_ERROR', 500, ErrorCategory.DATABASE, details, requestId, path, context);
+/**
+ * Authorization Error (403) - For permission failures
+ */
+export class ForbiddenError extends AppError {
+  constructor(message: string = 'Access denied', cause?: Error) {
+    super(message, 'FORBIDDEN', 403, { cause });
+  }
+}
+
+/**
+ * Conflict Error (409) - For resource conflicts
+ */
+export class ConflictError extends AppError {
+  constructor(message: string, cause?: Error) {
+    super(message, 'CONFLICT', 409, { cause });
+  }
+}
+
+/**
+ * Rate Limit Error (429) - For rate limiting
+ */
+export class RateLimitError extends AppError {
+  readonly retryAfter?: number;
+
+  constructor(message: string = 'Rate limit exceeded', retryAfter?: number, cause?: Error) {
+    super(message, 'RATE_LIMIT', 429, { details: { retryAfter }, cause });
+    this.retryAfter = retryAfter;
+  }
+
+  toResponse() {
+    return {
+      error: {
+        code: this.code,
+        message: this.message,
+        retryAfter: this.retryAfter,
+      },
+    };
+  }
+}
+
+/**
+ * Database Error (500) - For database failures
+ */
+export class DatabaseError extends AppError {
+  readonly operation: string;
+
+  constructor(operation: string, cause?: Error) {
+    super(`Database ${operation} failed`, 'DATABASE_ERROR', 500, {
+      details: { operation },
+      cause,
+    });
     this.operation = operation;
-    this.query = query;
-  }
-
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      details: {
-        ...this.details,
-        operation: this.operation,
-        // Don't expose query in production for security
-        ...(process.env.NODE_ENV !== 'production' && { query: this.query }),
-      },
-    };
   }
 }
 
 /**
- * Network Error (503)
+ * Network Error (502) - For external service failures
  */
-export class NetworkError extends BaseError {
-  public readonly service?: string;
-  public readonly endpoint?: string;
+export class NetworkError extends AppError {
+  readonly service?: string;
+  readonly endpoint?: string;
 
-  constructor(
-    message: string,
-    service?: string,
-    endpoint?: string,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(message, 'NETWORK_ERROR', 503, ErrorCategory.NETWORK, details, requestId, path, context);
+  constructor(service?: string, endpoint?: string, cause?: Error) {
+    const message = service ? `Network error connecting to ${service}${endpoint ? ` at ${endpoint}` : ''}` : 'Network error occurred';
+
+    super(message, 'NETWORK_ERROR', 502, {
+      details: { service, endpoint },
+      cause,
+    });
     this.service = service;
     this.endpoint = endpoint;
   }
-
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      details: {
-        ...this.details,
-        service: this.service,
-        endpoint: this.endpoint,
-      },
-    };
-  }
 }
 
 /**
- * Internal Server Error (500)
+ * Service Error (503) - For temporary service issues
  */
-export class InternalServerError extends BaseError {
-  constructor(message: string = 'Internal server error', details?: any, requestId?: string, path?: string, context?: ErrorContext) {
-    super(message, 'INTERNAL_SERVER_ERROR', 500, ErrorCategory.INTERNAL, details, requestId, path, context);
+export class ServiceError extends AppError {
+  constructor(message: string = 'Service temporarily unavailable', cause?: Error) {
+    super(message, 'SERVICE_ERROR', 503, { cause });
   }
 }
 
+// =============================================================================
+// UTILITY FUNCTIONS - Simple patterns developers will actually use
+// =============================================================================
+
 /**
- * Rate Limit Error (429)
+ * Create a generic error with automatic categorization
  */
-export class RateLimitError extends BaseError {
-  public readonly limit?: number;
-  public readonly retryAfter?: number;
-  public readonly remainingAttempts?: number;
-
-  constructor(
-    message: string = 'Rate limit exceeded',
-    limit?: number,
-    retryAfter?: number,
-    remainingAttempts?: number,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(message, 'RATE_LIMIT_EXCEEDED', 429, ErrorCategory.RATE_LIMIT, details, requestId, path, context);
-    this.limit = limit;
-    this.retryAfter = retryAfter;
-    this.remainingAttempts = remainingAttempts;
-  }
-
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      details: {
-        ...this.details,
-        limit: this.limit,
-        retryAfter: this.retryAfter,
-        remainingAttempts: this.remainingAttempts,
-      },
-    };
-  }
+export function createError(message: string, statusCode = 500, details?: any): AppError {
+  const code = statusCode < 500 ? 'CLIENT_ERROR' : 'SERVER_ERROR';
+  return new AppError(message, code, statusCode, { details });
 }
 
 /**
- * Service Unavailable Error (503)
+ * Wrap unknown errors into our error system
  */
-export class ServiceUnavailableError extends BaseError {
-  public readonly service?: string;
-  public readonly retryAfter?: number;
+export function wrapError(error: unknown, context?: string): AppError {
+  if (error instanceof AppError) return error;
 
-  constructor(
-    message: string = 'Service temporarily unavailable',
-    service?: string,
-    retryAfter?: number,
-    details?: any,
-    requestId?: string,
-    path?: string,
-    context?: ErrorContext
-  ) {
-    super(message, 'SERVICE_UNAVAILABLE', 503, ErrorCategory.SERVICE_UNAVAILABLE, details, requestId, path, context);
-    this.service = service;
-    this.retryAfter = retryAfter;
-  }
+  const message = getErrorMessage(error);
+  const contextMessage = context ? `${context}: ${message}` : message;
 
-  toResponse(): ErrorDetails {
-    return {
-      ...super.toResponse(),
-      details: {
-        ...this.details,
-        service: this.service,
-        retryAfter: this.retryAfter,
-      },
-    };
-  }
+  return new AppError(contextMessage, 'WRAPPED_ERROR', 500, {
+    cause: error instanceof Error ? error : undefined,
+  });
 }
 
-// Export error mapping utilities
-export * from './mappings';
-
-// Export error context utilities
-export * from './context';
+/**
+ * Create validation error from field issues
+ */
+export function validationError(field: string, message: string): ValidationError {
+  return new ValidationError(`Invalid ${field}: ${message}`, field);
+}
 
 /**
- * Error utilities for common operations
+ * Create not found error for resources
  */
-export class ErrorUtils {
-  /**
-   * Check if error is a known application error
-   */
-  static isApplicationError(error: any): error is BaseError {
-    return error instanceof BaseError;
+export function notFound(resource: string, id: string): NotFoundError {
+  return new NotFoundError(resource, id);
+}
+
+/**
+ * Extract safe error message from unknown error
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'Unknown error occurred';
+}
+
+/**
+ * Check if error is an application error
+ */
+export function isAppError(error: any): error is AppError {
+  return error instanceof AppError;
+}
+
+/**
+ * Extract error for API response
+ */
+export function toApiError(error: unknown): { error: { code: string; message: string; details?: any } } {
+  if (error instanceof AppError) {
+    return error.toResponse();
   }
 
-  /**
-   * Convert unknown error to application error
-   */
-  static normalize(error: any, requestId?: string, path?: string): BaseError {
-    if (ErrorUtils.isApplicationError(error)) {
-      return error;
-    }
+  const message = getErrorMessage(error);
+  return {
+    error: {
+      code: 'UNKNOWN_ERROR',
+      message,
+    },
+  };
+}
 
-    // Handle specific error types
-    if (error?.name === 'ValidationError' || error?.type === 'validation') {
-      return new ValidationError(error.message || 'Validation failed', error.field, { originalError: error }, requestId, path);
-    }
+/**
+ * Create error from HTTP response
+ */
+export function fromApiResponse(response: any): AppError {
+  const errorData = response?.data?.error || response?.error;
+  const message = errorData?.message || 'API request failed';
+  const statusCode = response?.status || 500;
+  const code = errorData?.code || 'API_ERROR';
 
-    if (error?.name === 'UnauthorizedError' || error?.status === 401) {
-      return new AuthenticationError(error.message || 'Authentication failed', { originalError: error }, requestId, path);
-    }
-
-    if (error?.name === 'ForbiddenError' || error?.status === 403) {
-      return new AuthorizationError(
-        error.message || 'Access denied',
-        undefined, // requiredPermission
-        undefined, // userRole
-        { originalError: error },
-        requestId,
-        path
-      );
-    }
-
-    if (error?.name === 'NotFoundError' || error?.status === 404) {
-      return new NotFoundError(error.message || 'Resource not found', 'Resource', 'unknown', { originalError: error }, requestId, path);
-    }
-
-    if (error?.name === 'ConflictError' || error?.status === 409) {
-      return new ConflictError(error.message || 'Conflict occurred', undefined, { originalError: error }, requestId, path);
-    }
-
-    // Handle database errors
-    if (error?.name === 'DatabaseError' || error?.code?.startsWith('ER_') || error?.code?.startsWith('SQLITE_')) {
-      return new DatabaseError(
-        error.message || 'Database operation failed',
-        'database_operation',
-        undefined,
-        { originalError: error },
-        requestId,
-        path
-      );
-    }
-
-    // Handle network/HTTP errors
-    if (error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' || error?.code === 'ETIMEDOUT') {
-      return new NetworkError(
-        error.message || 'Network operation failed',
-        'external_service',
-        undefined,
-        { originalError: error },
-        requestId,
-        path
-      );
-    }
-
-    // Handle rate limit errors
-    if (error?.status === 429 || error?.name === 'TooManyRequestsError') {
-      return new RateLimitError(
-        error.message || 'Rate limit exceeded',
-        error.limit,
-        error.retryAfter,
-        error.remainingAttempts,
-        { originalError: error },
-        requestId,
-        path
-      );
-    }
-
-    // Default to internal server error
-    return new InternalServerError(error?.message || 'An unexpected error occurred', { originalError: error }, requestId, path);
-  }
-
-  /**
-   * Generate correlation ID for request tracking
-   */
-  static generateRequestId(): string {
-    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * Extract error details for logging
-   */
-  static extractLogDetails(error: BaseError): Record<string, any> {
-    return {
-      errorName: error.name,
-      errorCode: error.code,
-      errorMessage: error.message,
-      statusCode: error.statusCode,
-      category: error.category,
-      timestamp: error.timestamp,
-      requestId: error.requestId,
-      path: error.path,
-      details: error.details,
-      stack: error.stack,
-    };
-  }
+  return new AppError(message, code, statusCode, {
+    details: errorData?.details,
+  });
 }

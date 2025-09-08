@@ -1,3 +1,4 @@
+import { NotFoundError } from '@starships/errors';
 import { BlueprintRepository, EdgeRepository, NodeRepository } from '@starships/models';
 import { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 
@@ -64,7 +65,7 @@ export class BlueprintService {
     // Business logic: Check if blueprint exists before incrementing
     const blueprint = await this.blueprintRepository.getBlueprintById(blueprintId);
     if (!blueprint) {
-      throw new Error(`Blueprint not found: ${blueprintId}`);
+      throw new NotFoundError('Blueprint', blueprintId);
     }
 
     await this.blueprintRepository.incrementUsageCount(blueprintId);
@@ -81,7 +82,7 @@ export class BlueprintService {
     // Business logic: Get source blueprint
     const sourceBlueprint = await this.blueprintRepository.getBlueprintById(sourceBlueprintId);
     if (!sourceBlueprint) {
-      throw new Error(`Source blueprint not found: ${sourceBlueprintId}`);
+      throw new NotFoundError('Blueprint', sourceBlueprintId);
     }
 
     // Create clone data

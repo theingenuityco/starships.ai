@@ -7,7 +7,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
 import type { CreateUserRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -118,7 +118,7 @@ router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -281,7 +281,7 @@ router.put('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -306,7 +306,7 @@ router.put('/users/:id/profile', jwtAuthMiddleware, async (req: Request, res: Re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -346,7 +346,7 @@ router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Respons
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -386,7 +386,7 @@ router.post('/users/:id/stripe', jwtAuthMiddleware, async (req: Request, res: Re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;

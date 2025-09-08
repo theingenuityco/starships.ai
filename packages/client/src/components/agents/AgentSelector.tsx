@@ -8,13 +8,14 @@ import { AgentTester } from '@/components/agents/AgentTester'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
-import { Agent, agentAPI } from '@/lib/api'
+import { useDeleteAgent, useStarshipAgents } from '@/hooks/useAgents'
+import type { AgentModel } from '@starships/protocol'
 import { Bot, Loader2, Plus, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface AgentSelectorProps {
-  selectedAgent: Agent | null
-  onAgentSelect: (agent: Agent) => void
+  selectedAgent: AgentModel | null
+  onAgentSelect: (agent: AgentModel) => void
   showCreateButton?: boolean
   showFilters?: boolean
   starshipId?: string
@@ -22,44 +23,53 @@ interface AgentSelectorProps {
 }
 
 interface FilterState {
-  category?: Agent['category']
+  category?: AgentModel['category']
   searchQuery: string
 }
 
 export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton = true, showFilters = true, starshipId, onAgentsCountChange }: AgentSelectorProps) {
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([])
-  const [loading, setLoading] = useState(true)
+  // TanStack Query hooks
+  const { data, isLoading: loading, error: agentsError } = useStarshipAgents(starshipId || '', !!starshipId)
+  const agents = useMemo(() => data ?? [], [data])
+  const deleteAgentMutation = useDeleteAgent()
+
+  const [filteredAgents, setFilteredAgents] = useState<AgentModel[]>([])
   const [error, setError] = useState<string | null>(null)
 
   // Form state
   const [showForm, setShowForm] = useState(false)
-  const [editingAgent, setEditingAgent] = useState<Agent | null>(null)
+  const [editingAgent, setEditingAgent] = useState<AgentModel | null>(null)
 
   // Test state
   const [showTester, setShowTester] = useState(false)
-  const [testingAgent, setTestingAgent] = useState<Agent | null>(null)
+  const [testingAgent, setTestingAgent] = useState<AgentModel | null>(null)
 
   // Analytics state
   const [showAnalytics, setShowAnalytics] = useState(false)
-  const [analyticsAgent, setAnalyticsAgent] = useState<Agent | null>(null)
+  const [analyticsAgent, setAnalyticsAgent] = useState<AgentModel | null>(null)
 
   // Filter state
   const [filters] = useState<FilterState>({
     searchQuery: '',
   })
 
+  // Apply filters when agents change
   useEffect(() => {
-    // Fetch agents when:
-    // 1. starshipId is provided (specific starship context)
-    // 2. starshipId is explicitly null/undefined AND not loading (no starship context - backward compatibility)
-    // Don't fetch if starshipId is undefined but expected (loading state)
-    fetchAgents()
-  }, [starshipId])
+    let filtered = [...agents]
 
-  useEffect(() => {
-    applyFilters()
-  }, [agents, filters])
+    // Category filter
+    if (filters.category) {
+      filtered = filtered.filter(agent => agent.category === filters.category)
+    }
+
+    // Search filter
+    if (filters.searchQuery) {
+      const query = filters.searchQuery.toLowerCase()
+      filtered = filtered.filter(agent => agent.name.toLowerCase().includes(query) || agent.description?.toLowerCase().includes(query))
+    }
+
+    setFilteredAgents(filtered)
+  }, [agents, filters.category, filters.searchQuery])
 
   // Notify parent of agents count change
   useEffect(() => {
@@ -67,6 +77,15 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       onAgentsCountChange(agents.length)
     }
   }, [agents.length, onAgentsCountChange])
+
+  // Handle query errors
+  useEffect(() => {
+    if (agentsError) {
+      setError(ERROR_TEXT.FAILED_TO_LOAD_AGENTS)
+    } else {
+      setError(null)
+    }
+  }, [agentsError])
 
   // Shared function to handle agent creation from template
   const handleCreateFromTemplate = async (templateId: string, agentName: string) => {
@@ -78,13 +97,9 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     }
 
     try {
-      setLoading(true) // Prevent multiple submissions
       // Use the real API to create agent from template
       const { templateAPI } = await import('@/lib/api')
       const newAgent = await templateAPI.createAgentFromTemplate(templateId, agentName, starshipId)
-
-      // Refresh the agents list
-      await fetchAgents()
 
       // Select the newly created agent
       onAgentSelect(newAgent)
@@ -103,45 +118,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       }
 
       setError(errorMessage)
-    } finally {
-      setLoading(false)
     }
-  }
-
-  const fetchAgents = async () => {
-    try {
-      setLoading(true)
-      // Clear any existing agents to prevent flash of wrong data
-      setAgents([])
-
-      // If starshipId is provided, fetch agents for that specific starship
-      // Otherwise, fetch all agents (for backward compatibility)
-      const fetchedAgents = starshipId ? await agentAPI.getByStarshipId(starshipId) : await agentAPI.getAll()
-      setAgents(fetchedAgents)
-      setError(null)
-    } catch (err) {
-      console.error('Failed to fetch agents:', err)
-      setError(ERROR_TEXT.FAILED_TO_LOAD_AGENTS)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const applyFilters = () => {
-    let filtered = [...agents]
-
-    // Category filter
-    if (filters.category) {
-      filtered = filtered.filter(agent => agent.category === filters.category)
-    }
-
-    // Search filter
-    if (filters.searchQuery) {
-      const query = filters.searchQuery.toLowerCase()
-      filtered = filtered.filter(agent => agent.name.toLowerCase().includes(query) || agent.description?.toLowerCase().includes(query))
-    }
-
-    setFilteredAgents(filtered)
   }
 
   const handleCreateAgent = () => {
@@ -149,19 +126,18 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     setShowForm(true)
   }
 
-  const handleEditAgent = (agent: Agent) => {
+  const handleEditAgent = (agent: AgentModel) => {
     setEditingAgent(agent)
     setShowForm(true)
   }
 
-  const handleDeleteAgent = async (agent: Agent) => {
-    if (!confirm(`Are you sure you want to delete &ldquo;${agent.name}&rdquo;?`)) {
+  const handleDeleteAgent = async (agent: AgentModel) => {
+    if (!confirm(`Are you sure you want to delete "${agent.name}"?`)) {
       return
     }
 
     try {
-      await agentAPI.delete(agent.id)
-      await fetchAgents() // Refresh the list
+      await deleteAgentMutation.mutateAsync(agent.id)
 
       // If the deleted agent was selected, clear selection
       if (selectedAgent?.id === agent.id) {
@@ -173,10 +149,9 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     }
   }
 
-  const handleFormSave = async (savedAgent: Agent) => {
+  const handleFormSave = async (savedAgent: AgentModel) => {
     setShowForm(false)
     setEditingAgent(null)
-    await fetchAgents() // Refresh the list
 
     // If this was the selected agent, update the selection
     if (selectedAgent?.id === savedAgent.id) {
@@ -189,7 +164,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     setEditingAgent(null)
   }
 
-  const handleTestAgent = (agent: Agent) => {
+  const handleTestAgent = (agent: AgentModel) => {
     setTestingAgent(agent)
     setShowTester(true)
   }
@@ -199,7 +174,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     setTestingAgent(null)
   }
 
-  const handleAnalyticsAgent = (agent: Agent) => {
+  const handleAnalyticsAgent = (agent: AgentModel) => {
     setAnalyticsAgent(agent)
     setShowAnalytics(true)
   }
@@ -233,9 +208,6 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
             </svg>
           </div>
           <p className="text-sm text-destructive">{error}</p>
-          <Button onClick={fetchAgents} className="mt-2" size="sm">
-            Try Again
-          </Button>
         </div>
       </div>
     )

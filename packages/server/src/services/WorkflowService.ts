@@ -6,9 +6,10 @@
  * stateless execution engine (autopilot Workflow).
  */
 
+import { AgentMemory, Blueprint, Execution, Workflow } from '@starships/autopilot';
+import { NotFoundError, ValidationError } from '@starships/errors';
 import { WorkflowRepository } from '@starships/models';
-import type { WorkflowModel, CreateWorkflowRequest, UpdateWorkflowRequest } from '@starships/protocol';
-import { Workflow, Blueprint, Execution, AgentMemory } from '@starships/autopilot';
+import type { CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowModel } from '@starships/protocol';
 
 export interface WorkflowOptions {
   includeMemory?: boolean;
@@ -168,7 +169,7 @@ export class WorkflowService {
     const workflow = await repository.findById(workflowId);
 
     if (!workflow) {
-      throw new Error(`Workflow ${workflowId} not found`);
+      throw new NotFoundError('Workflow', workflowId);
     }
 
     return {
@@ -195,7 +196,7 @@ export class WorkflowService {
     if (request.blueprint) {
       const validation = this.validateBlueprint(request.blueprint);
       if (!validation.valid) {
-        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
       }
     }
 
@@ -254,7 +255,7 @@ export class WorkflowService {
     if (updates.blueprint) {
       const validation = this.validateBlueprint(updates.blueprint);
       if (!validation.valid) {
-        throw new Error(`Invalid blueprint: ${validation.errors.join(', ')}`);
+        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
       }
     }
 
@@ -318,7 +319,7 @@ export class WorkflowService {
       // Get database workflow
       const dbWorkflow = await this.workflowRepository.findById(context.workflowId);
       if (!dbWorkflow) {
-        throw new Error(`Workflow ${context.workflowId} not found`);
+        throw new NotFoundError('Workflow', context.workflowId);
       }
 
       // Create workflow instance

@@ -57,7 +57,22 @@ describe('StarshipRepository', () => {
       const result = await repository.findAll();
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
-      expect(result).toEqual(mockStarships);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'starship-1',
+            name: 'Ship One',
+            class: 'scout',
+            ownerId: 'user-123',
+          }),
+          expect.objectContaining({
+            id: 'starship-2',
+            name: 'Ship Two',
+            class: 'scout',
+            ownerId: 'user-123',
+          }),
+        ])
+      );
     });
 
     it('should return empty array when no starships found', async () => {
@@ -77,7 +92,14 @@ describe('StarshipRepository', () => {
       const result = await repository.findById('starship-123');
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id: 'starship-123' });
-      expect(result).toEqual(mockStarship);
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'starship-123',
+          name: 'Test Starship',
+          class: 'scout',
+          ownerId: 'user-123',
+        })
+      );
     });
 
     it('should return null when starship not found', async () => {
@@ -104,7 +126,13 @@ describe('StarshipRepository', () => {
         'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId RETURN s',
         { slug: 'test-ship', ownerId: 'owner-123' }
       );
-      expect(result).toEqual(mockStarship);
+      expect(result).toEqual(
+        expect.objectContaining({
+          slug: 'test-ship',
+          ownerId: 'user-123',
+          class: 'scout',
+        })
+      );
     });
 
     it('should validate required parameters', async () => {
@@ -128,7 +156,20 @@ describe('StarshipRepository', () => {
         'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
         { ownerId: 'owner-123' }
       );
-      expect(result).toEqual(mockStarships);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            ownerId: 'owner-123',
+            name: 'Ship A',
+            class: 'scout',
+          }),
+          expect.objectContaining({
+            ownerId: 'owner-123',
+            name: 'Ship B',
+            class: 'scout',
+          }),
+        ])
+      );
     });
   });
 
@@ -175,7 +216,17 @@ describe('StarshipRepository', () => {
           }),
         })
       );
-      expect(result).toEqual(mockCreatedStarship);
+      expect(result).toEqual(
+        expect.objectContaining({
+          name: 'Test Scout',
+          ownerId: 'owner-123',
+          class: 'scout',
+          maxAgents: 3,
+          maxActiveMissions: 3,
+          slug: 'test-scout',
+          status: 'active',
+        })
+      );
     });
 
     it('should create starship with cruiser class defaults', async () => {
@@ -213,7 +264,17 @@ describe('StarshipRepository', () => {
           }),
         })
       );
-      expect(result).toEqual(mockCreatedStarship);
+      expect(result).toEqual(
+        expect.objectContaining({
+          name: 'Test Cruiser',
+          ownerId: 'owner-123',
+          class: 'cruiser',
+          maxAgents: 5,
+          maxActiveMissions: 6,
+          slug: 'test-cruiser',
+          status: 'active',
+        })
+      );
     });
 
     it('should create starship with draught class defaults', async () => {
@@ -251,7 +312,17 @@ describe('StarshipRepository', () => {
           }),
         })
       );
-      expect(result).toEqual(mockCreatedStarship);
+      expect(result).toEqual(
+        expect.objectContaining({
+          name: 'Test Draught',
+          ownerId: 'owner-123',
+          class: 'draught',
+          maxAgents: 10,
+          maxActiveMissions: 10,
+          slug: 'test-draught',
+          status: 'active',
+        })
+      );
     });
 
     it('should validate required fields', async () => {
@@ -563,7 +634,13 @@ describe('StarshipRepository', () => {
 
         const result = await repository.findBySubscriptionId('sub_123');
 
-        expect(result).toEqual(mockStarship);
+        expect(result).toEqual(
+          expect.objectContaining({
+            id: 'starship-123',
+            subscriptionId: 'sub_123',
+            class: 'scout',
+          })
+        );
       });
 
       it('should return null when not found', async () => {

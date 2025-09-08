@@ -15,13 +15,7 @@ export class WaitlistRepository extends BaseRepository {
     const normalizedEmail = this.normalizeEmail(email);
 
     if (!this.isValidEmail(normalizedEmail)) {
-      throw new ValidationError(
-        'Invalid email format',
-        'email_format',
-        { field: 'email', value: email },
-        'checkApproval',
-        'WaitlistRepository/checkApproval'
-      );
+      throw new ValidationError('Invalid email format', 'email', { field: 'email', value: email });
     }
 
     try {
@@ -69,13 +63,7 @@ export class WaitlistRepository extends BaseRepository {
     const normalizedEmail = this.normalizeEmail(email);
 
     if (!this.isValidEmail(normalizedEmail)) {
-      throw new ValidationError(
-        'Invalid email format',
-        'email_format',
-        { field: 'email', value: email },
-        'addApprovedEmail',
-        'WaitlistRepository/addApprovedEmail'
-      );
+      throw new ValidationError('Invalid email format', 'email', { field: 'email', value: email });
     }
 
     try {
@@ -95,14 +83,7 @@ export class WaitlistRepository extends BaseRepository {
       });
 
       if (result.length === 0) {
-        throw new DatabaseError(
-          'Failed to create waitlist entry',
-          'creation_failed',
-          undefined,
-          { email: normalizedEmail },
-          'addApprovedEmail',
-          'WaitlistRepository/addApprovedEmail'
-        );
+        throw new DatabaseError('addApprovedEmail');
       }
 
       return result[0].entry;

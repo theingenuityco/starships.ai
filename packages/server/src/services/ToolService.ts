@@ -1,3 +1,4 @@
+import { NotFoundError } from '@starships/errors';
 import { NativeToolApiKeyRepository } from '@starships/models';
 // Note: LLMToolDefinition type needs to be defined based on the actual interface needed
 // For now, creating a local interface until the proper type is available
@@ -113,7 +114,7 @@ export class ToolService {
   async executeTool(tools: AgentTool[], toolName: string, args: Record<string, unknown>): Promise<string> {
     const tool = tools.find((t) => t.name === toolName);
     if (!tool) {
-      throw new Error(`Tool not found: ${toolName}`);
+      throw new NotFoundError('Tool', toolName);
     }
 
     // Convert args to input string (most tools expect string input)

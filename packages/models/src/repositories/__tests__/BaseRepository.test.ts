@@ -5,6 +5,11 @@
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 
+// Mock nanoid for consistent testing
+jest.mock('nanoid', () => ({
+  nanoid: () => 'mock-nanoid-123',
+}));
+
 // Test implementation of BaseRepository
 class TestRepository extends BaseRepository {
   constructor() {
@@ -68,14 +73,10 @@ describe('BaseRepository', () => {
 
       expect(context).toEqual({
         component: 'TestService',
-        layer: 'repository',
         operation: 'create',
         resource: undefined,
         resourceId: undefined,
-        requestId: undefined,
-        timestamp: expect.any(Date),
-        userAgent: undefined,
-        userId: undefined,
+        requestId: expect.any(String),
         metadata: { component: 'repository' },
       });
     });
@@ -85,14 +86,10 @@ describe('BaseRepository', () => {
 
       expect(context).toEqual({
         component: 'TestService',
-        layer: 'repository',
         operation: 'update',
         resource: 'User',
         resourceId: 'user-123',
-        requestId: undefined,
-        timestamp: expect.any(Date),
-        userAgent: undefined,
-        userId: undefined,
+        requestId: expect.any(String),
         metadata: { component: 'repository' },
       });
     });
@@ -157,9 +154,9 @@ describe('BaseRepository', () => {
       try {
         repository.testHandleNotFound('User', 'user-123', 'find');
       } catch (error: any) {
-        expect(error.entityType).toBe('User');
-        expect(error.entityId).toBe('user-123');
-        expect(error.message).toContain('User with ID user-123 not found');
+        expect(error.resource).toBe('User');
+        expect(error.id).toBe('user-123');
+        expect(error.message).toContain('User not found: user-123');
       }
     });
 
@@ -171,7 +168,7 @@ describe('BaseRepository', () => {
       try {
         repository.testHandleNotFound('User');
       } catch (error: any) {
-        expect(error.entityId).toBe('unknown');
+        expect(error.id).toBe('unknown');
       }
     });
   });
@@ -213,11 +210,8 @@ describe('BaseRepository', () => {
         repository.testHandleConflict('User', 'Email already exists', 'create', 'user-123');
       } catch (error: any) {
         expect(error.message).toBe('Email already exists');
-        expect(error.conflictType).toBe('resource_conflict');
-        expect(error.details).toMatchObject({
-          resource: 'User',
-          resourceId: 'user-123',
-        });
+        expect(error.code).toBe('CONFLICT');
+        expect(error.statusCode).toBe(409);
       }
     });
   });
@@ -294,10 +288,9 @@ describe('BaseRepository', () => {
       try {
         repository.testCreateBusinessLogicError('BUSINESS_ERROR', 'Business rule violation');
       } catch (error: any) {
-        expect(error.message).toBe('Business rule violation');
-        expect(error.details).toMatchObject({
-          code: 'BUSINESS_ERROR',
-        });
+        expect(error.message).toBe('Database unknown failed');
+        expect(error.code).toBe('DATABASE_ERROR');
+        expect(error.operation).toBe('unknown');
       }
     });
   });

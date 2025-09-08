@@ -1,138 +1,198 @@
 # @starships/errors
 
-Lean error handling system for Starships.ai providing standardized error classes, utilities, and error mappings.
+Lean error handling system for Starships.ai - focused on dev-friendly messages and simple patterns developers actually use.
 
 ## Overview
 
-This package contains the core error handling system used across all Starships.ai packages. It provides:
+This package provides a **lean error system** designed around practical usage patterns. It eliminates the ceremonious constructors and complex mappings found in many error systems in favor of:
 
-- **BaseError**: Abstract base class for all application errors
-- **Specific Error Classes**: ValidationError, NotFoundError, InternalServerError, etc.
-- **Error Utilities**: ErrorUtils for creating and handling errors
-- **Error Categories**: Enum for error classification
-- **Error Mappings**: Standardized error codes with HTTP status and category mappings
+- **Clear, actionable error messages**
+- **Simple constructors with sensible defaults**
+- **Essential properties only** - no bloat
+- **Automatic categorization** - no complex mapping files
+- **Easy factory functions** - quick error creation
 
-## Usage
+## Quick Start
 
-### Basic Error Handling
-
-```typescript
-import { ValidationError, ErrorUtils } from '@starships/errors';
-
-// Create errors directly
-throw new ValidationError('Invalid input', 'email');
-
-// Handle unknown errors
-const normalizedError = ErrorUtils.normalize(someError);
-```
-
-### Error Mappings
+### Basic Usage
 
 ```typescript
-import { StandardErrorCode, ErrorMappingUtils, getHttpStatusCode, getErrorCategory, isRetryableError } from '@starships/errors';
+import { AppError, ValidationError, NotFoundError, wrapError, toApiError } from '@starships/errors';
 
-// Get HTTP status code for an error
-const status = getHttpStatusCode('VALIDATION_ERROR'); // 400
-const status2 = ErrorMappingUtils.getHttpStatusCode('VALIDATION_ERROR'); // 400
+// Simple error creation
+throw new ValidationError('Email is required', 'email');
+throw new NotFoundError('User', userId);
+throw new AppError('Something went wrong', 'CUSTOM_ERROR', 500);
 
-// Get error category
-const category = getErrorCategory('DATABASE_ERROR'); // ErrorCategory.DATABASE
+// Wrap unknown errors
+try {
+  await riskyOperation();
+} catch (error) {
+  throw wrapError(error, 'User creation failed');
+}
 
-// Check if error is retryable
-const canRetry = isRetryableError('TIMEOUT_ERROR'); // true
-
-// Get all error codes for a category
-const validationErrors = ErrorMappingUtils.getErrorCodesByCategory(ErrorCategory.VALIDATION);
-
-// Get all error codes for a status code
-const clientErrors = ErrorMappingUtils.getErrorCodesByStatusCode(400);
+// Convert for API responses
+app.use((error, req, res, next) => {
+  res.status(error.statusCode || 500).json(toApiError(error));
+});
 ```
 
-## Error Classes
+### Common Patterns
+
+```typescript
+// Input validation
+if (!email) throw new ValidationError('Email is required', 'email');
+
+// Resource not found
+const user = await findUser(id);
+if (!user) throw new NotFoundError('User', id);
+
+// Database operations
+try {
+  return await db.user.create(data);
+} catch (error) {
+  throw new DatabaseError('create', error);
+}
+
+// External API calls
+try {
+  return await fetch(url);
+} catch (error) {
+  throw new NetworkError('external-api', url, error);
+}
+```
+
+## Error Types
+
+### AppError (Base Class)
+
+The foundation error class with automatic categorization:
+
+```typescript
+const error = new AppError('Database connection failed', 'DB_ERROR', 500);
+// Automatically categorizes as 'server' based on 500 status code
+```
 
 ### ValidationError (400)
 
-For input validation failures and malformed requests.
+For input validation failures:
 
-### AuthenticationError (401)
-
-For authentication failures and unauthorized access.
-
-### AuthorizationError (403)
-
-For authorization failures and forbidden operations.
+```typescript
+new ValidationError('Invalid email format', 'email');
+new ValidationError('Password too short', 'password', { minLength: 8 });
+```
 
 ### NotFoundError (404)
 
-For when requested resources don't exist.
+For missing resources:
 
-### ConflictError (409)
+```typescript
+new NotFoundError('User', userId);
+new NotFoundError('Starship', starshipId);
+```
 
-For resource conflicts and business rule violations.
+### AuthError (401) & ForbiddenError (403)
 
-### DatabaseError (500)
+For authentication and authorization:
 
-For database operation failures.
+```typescript
+new AuthError('Invalid credentials');
+new ForbiddenError('Admin access required');
+```
 
-### NetworkError (502/503)
+### DatabaseError (500) & NetworkError (502)
 
-For network and external service failures.
+For infrastructure failures:
 
-### InternalServerError (500)
+```typescript
+new DatabaseError('create', originalError);
+new NetworkError('stripe-api', '/v1/customers', originalError);
+```
 
-For unexpected internal errors.
+## Utility Functions
 
-### RateLimitError (429)
+### Quick Error Creation
 
-For rate limiting and quota exceeded scenarios.
+```typescript
+import { createError, validationError, notFound } from '@starships/errors';
 
-### ServiceUnavailableError (503)
+// Generic errors
+throw createError('Custom error message', 400);
 
-For temporary service unavailability.
+// Specific types
+throw validationError('email', 'Invalid format');
+throw notFound('User', '123');
+```
 
-## Error Mappings
+### Error Wrapping
 
-The package provides comprehensive error code mappings:
+```typescript
+import { wrapError, getErrorMessage } from '@starships/errors';
 
-### StandardErrorCode
+try {
+  await externalService.call();
+} catch (error) {
+  // Wraps unknown errors into our system
+  throw wrapError(error, 'External service failed');
+}
 
-A union type containing all standardized error codes used across the platform:
+// Safe message extraction
+const message = getErrorMessage(unknownError);
+```
 
-- Validation errors: `VALIDATION_ERROR`, `INVALID_INPUT`, etc.
-- Authentication: `AUTHENTICATION_REQUIRED`, `TOKEN_EXPIRED`, etc.
-- Authorization: `ACCESS_DENIED`, `INSUFFICIENT_PERMISSIONS`, etc.
-- Not Found: `RESOURCE_NOT_FOUND`, `EXPEDITION_NOT_FOUND`, etc.
-- Conflicts: `RESOURCE_ALREADY_EXISTS`, `EXPEDITION_ALREADY_STARTED`, etc.
-- Database: `DATABASE_ERROR`, `DATABASE_CONNECTION_FAILED`, etc.
-- Network: `NETWORK_ERROR`, `SERVICE_UNREACHABLE`, etc.
-- Internal: `INTERNAL_SERVER_ERROR`, `CONFIGURATION_ERROR`, etc.
+### API Response Handling
 
-### HTTP Status Mapping
+```typescript
+import { toApiError, fromApiResponse, isAppError } from '@starships/errors';
 
-Each error code is mapped to appropriate HTTP status codes (400, 401, 403, 404, 409, 429, 500, etc.)
+// Convert errors to API responses
+app.use((error, req, res, next) => {
+  const response = toApiError(error);
+  const statusCode = isAppError(error) ? error.statusCode : 500;
+  res.status(statusCode).json(response);
+});
 
-### Category Mapping
+// Handle API client errors
+try {
+  const response = await apiClient.post('/users', data);
+} catch (apiError) {
+  throw fromApiResponse(apiError.response);
+}
+```
 
-Each error code is categorized using the `ErrorCategory` enum for consistent error classification.
+## Migration from Complex Error System
 
-### Utility Functions
+If you're migrating from a complex error system:
 
-- `getHttpStatusCode(code)`: Get HTTP status for error code
-- `getErrorCategory(code)`: Get category for error code
-- `isRetryableError(code)`: Check if error should be retried
-- `shouldLogError(statusCode)`: Check if error should be logged
+```typescript
+// Old: Ceremonious constructor
+throw new ValidationError('Email is required', 'email', { validation: 'email' }, requestId, path, context);
 
-### ErrorMappingUtils Class
+// New: Simple and clean
+throw new ValidationError('Email is required', 'email');
 
-Advanced utilities for working with error mappings:
+// Old: Complex error normalization
+const normalized = ErrorUtils.normalize(error, requestId, path);
 
-- `getErrorCodesByCategory(category)`: Get all codes for a category
-- `getErrorCodesByStatusCode(status)`: Get all codes for a status code
+// New: Simple wrapping
+const wrapped = wrapError(error, 'Operation failed');
+```
 
-## Design Principles
+## Design Philosophy
 
-- **Lean**: Contains only the essential error classes actually used
-- **Consistent**: Standardized error structure across all packages
-- **Type-safe**: Full TypeScript support with proper inheritance
-- **Structured**: Includes metadata for logging and debugging
-- **Comprehensive**: Complete error code mappings for all scenarios
+**Less is More**: This error system eliminates:
+
+- ❌ Ceremonious constructors with 8+ parameters
+- ❌ Complex error code mappings (100+ codes)
+- ❌ Overengineered context systems
+- ❌ Properties developers never use
+
+**Developer Experience First**: Instead focusing on:
+
+- ✅ Clear, actionable error messages
+- ✅ Simple constructors developers will actually use
+- ✅ Essential properties only
+- ✅ Automatic categorization and inference
+- ✅ Easy patterns for common scenarios
+
+The result: **Developers actually use the error system** instead of falling back to `new Error()`.

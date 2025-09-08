@@ -218,7 +218,7 @@ export class MemoryService {
     // Get current memory
     const memory = await this.memoryRepository.findById(memoryId);
     if (!memory) {
-      throw new NotFoundError(`Memory ${memoryId} not found`, 'Memory', memoryId);
+      throw new NotFoundError('Memory', memoryId);
     }
 
     // Add message to existing messages
@@ -255,7 +255,7 @@ export class MemoryService {
     // Get current memory
     const memory = await this.memoryRepository.findById(memoryId);
     if (!memory) {
-      throw new NotFoundError(`Memory ${memoryId} not found`, 'Memory', memoryId);
+      throw new NotFoundError('Memory', memoryId);
     }
 
     return await this.memoryRepository.update(memoryId, {
@@ -492,7 +492,7 @@ export class MemoryService {
     // Get source memory
     const sourceMemory = await this.memoryRepository.findById(sourceMemoryId);
     if (!sourceMemory) {
-      throw new NotFoundError(`Source memory ${sourceMemoryId} not found`, 'Memory', sourceMemoryId);
+      throw new NotFoundError('Memory', sourceMemoryId);
     }
 
     // Create cloned memory
@@ -536,7 +536,7 @@ export class MemoryService {
     // Get all memories
     const targetMemory = await this.memoryRepository.findById(targetMemoryId);
     if (!targetMemory) {
-      throw new NotFoundError(`Target memory ${targetMemoryId} not found`, 'Memory', targetMemoryId);
+      throw new NotFoundError('Memory', targetMemoryId);
     }
 
     const sourceMemories = await Promise.all(sourceMemoryIds.map((id) => this.memoryRepository.findById(id)));
@@ -544,7 +544,7 @@ export class MemoryService {
     // Check for missing source memories
     const missingMemories = sourceMemoryIds.filter((id, index) => !sourceMemories[index]);
     if (missingMemories.length > 0) {
-      throw new NotFoundError(`Source memories not found: ${missingMemories.join(', ')}`, 'Memory', missingMemories[0]);
+      throw new NotFoundError('Memory', missingMemories[0]);
     }
 
     // Merge messages and metadata

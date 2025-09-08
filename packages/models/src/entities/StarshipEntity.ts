@@ -5,6 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
+import { Transformers } from '@/helpers/serializer';
 import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min } from 'class-validator';
@@ -13,18 +14,6 @@ import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min } f
  * Custom transformers for the StarshipEntity
  */
 export class StarshipTransformers {
-  /**
-   * Transform date strings to ISO format, handling various input formats
-   */
-  static DateTransform() {
-    return Transform(({ value }) => {
-      if (!value) return new Date().toISOString();
-      if (typeof value === 'string') return value;
-      if (value instanceof Date) return value.toISOString();
-      return new Date(value).toISOString();
-    });
-  }
-
   /**
    * Transform slug to ensure it's URL-safe
    */
@@ -127,12 +116,12 @@ export class StarshipEntity implements StarshipModel {
   status!: StarshipStatus;
 
   @Expose()
-  @StarshipTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @StarshipTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 

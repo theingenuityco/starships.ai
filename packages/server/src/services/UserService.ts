@@ -169,7 +169,7 @@ export class UserService {
     // Get existing user
     const existingUser = await this.userRepository.findById(userId);
     if (!existingUser) {
-      throw new NotFoundError(`User not found`, 'User', userId);
+      throw new NotFoundError('User', userId);
     }
 
     // Business validation: Username uniqueness (if changing)
@@ -208,7 +208,7 @@ export class UserService {
 
     const updatedUser = await this.userRepository.update(userId, cleanUpdates);
     if (!updatedUser) {
-      throw new NotFoundError(`User not found`, 'User', userId);
+      throw new NotFoundError('User', userId);
     }
 
     return this.transformUserForResponse(updatedUser, { includePassword: false });
@@ -221,7 +221,7 @@ export class UserService {
     // Business rule: Check if user exists
     const existingUser = await this.userRepository.findById(userId);
     if (!existingUser) {
-      throw new NotFoundError(`User not found`, 'User', userId);
+      throw new NotFoundError('User', userId);
     }
 
     // Future business rule: Check dependencies (starships, conversations, etc.)
@@ -259,7 +259,7 @@ export class UserService {
     // Business validation: User exists
     const user = await this.userRepository.findById(userId);
     if (!user) {
-      throw new NotFoundError(`User not found`, 'User', userId);
+      throw new NotFoundError('User', userId);
     }
 
     // Business validation: Stripe customer ID format

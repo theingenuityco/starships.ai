@@ -1,7 +1,5 @@
 import { setTokenProvider, type SyncedUser } from '@/lib/api'
-import type { ApiResponse } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect } from 'react'
 import { toast } from 'sonner'
@@ -28,9 +26,6 @@ interface AuthRegisterResponse {
     slug: string
   }
 }
-
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
 
 // Centralized query keys
 export const AUTH_QUERY_KEYS = {

@@ -1,5 +1,4 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { AgentService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
 import { MemoryService } from '@/services/MemoryService';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
@@ -10,7 +9,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -61,7 +60,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -80,37 +79,16 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { agentId, message } = bodyValidation;
     const userId = req.user!.id;
 
-    // Verify conversation exists
+    // Use service layer to add message to conversation
     const conversationService = new ConversationService();
-    const conversation = await conversationService.getConversationById(conversationId);
-    if (!conversation) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
-        resource: 'conversation',
-        id: conversationId,
-      });
-      return;
-    }
-
-    // Execute agent chat (using the same agent service that expects sessionId for backward compatibility)
-    const response = await AgentService.executeChat({
-      source: 'user',
+    const result = await conversationService.addMessage({
+      conversationId,
       agentId,
       userId,
       message,
-      conversationId: conversationId,
-      stream: false,
     });
 
-    // Update conversation metrics
-    await Promise.all([
-      conversationService.updateConversationActivity(conversationId),
-      conversationService.incrementMessageCount(conversationId),
-    ]);
-
-    sendSuccess(res, {
-      reply: response.content,
-      usage: response.usage,
-    });
+    sendSuccess(res, result);
   } catch (error) {
     if (!handleCommonError(error, res, 'processing conversation message')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to process conversation message');
@@ -127,7 +105,7 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;
@@ -164,7 +142,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -204,7 +182,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     if (!checkAuth(req, res)) return;
 
     // Validate starshipId parameter
-    const paramValidation = validateData(z.object({ starshipId: UuidSchema }), req.params, res, 'starship parameter');
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -240,7 +218,7 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
     if (!checkAuth(req, res)) return;
 
     // Validate userId parameter
-    const paramValidation = validateData(z.object({ userId: UuidSchema }), req.params, res, 'user parameter');
+    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
     if (!paramValidation) return;
 
     // Validate pagination query parameters
@@ -287,8 +265,8 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
       z.object({
         source: ConversationSourceSchema,
         metadata: z.object({}).passthrough().optional(),
-        starshipId: z.string().uuid().optional(),
-        userId: z.string().uuid().optional(),
+        starshipId: NanoidSchema.optional(),
+        userId: NanoidSchema.optional(),
       }),
       req.body,
       res,
@@ -314,6 +292,65 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
 });
 
 /**
+ * PATCH /conversations/:conversationId/status - Update conversation status
+ */
+router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Authentication check
+    if (!checkAuth(req, res)) return;
+
+    // Validate conversationId parameter
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+
+    // Validate request body
+    const bodyValidation = validateData(
+      z.object({
+        status: z.enum(['active', 'paused', 'completed', 'archived']),
+      }),
+      req.body,
+      res,
+      'conversation status update'
+    );
+    if (!bodyValidation) return;
+
+    const { conversationId } = paramValidation;
+    const { status } = bodyValidation;
+
+    // Use service layer to update conversation status
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+        resource: 'conversation',
+        id: conversationId,
+      });
+      return;
+    }
+
+    // Update status using appropriate method
+    switch (status) {
+      case 'completed':
+        await conversationService.completeConversation(conversationId);
+        break;
+      case 'archived':
+        await conversationService.archiveConversation(conversationId);
+        break;
+      default:
+        await conversationService.updateConversationStatus(conversationId, status);
+        break;
+    }
+
+    const updatedConversation = await conversationService.getConversationById(conversationId);
+    sendSuccess(res, updatedConversation, 200);
+  } catch (error) {
+    if (!handleCommonError(error, res, 'updating conversation status')) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update conversation status');
+    }
+  }
+});
+
+/**
  * DELETE /conversations/:conversationId - Delete conversation
  */
 router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -322,7 +359,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
     if (!checkAuth(req, res)) return;
 
     // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;

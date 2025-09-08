@@ -12,6 +12,17 @@ import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 
+// LLM response data structure from autopilot LLM class
+interface LlmResponseData {
+  status?: number;
+  statusText?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  url?: string;
+  llmResponse?: string;
+  model?: string;
+}
+
 export interface AgentOptions {
   includeMemory?: boolean;
   conversationId?: string;
@@ -608,20 +619,50 @@ export class AgentService {
       // Get the node result from execution
       const nodeResult = event.execution.executionResults.get(event.execution.currentNodeRef || '');
       const nodeResultData = nodeResult?.data || {};
+      const currentNodeRef = event.execution.currentNodeRef || '';
 
-      // Create a message with node completion details
+      // Check if nodeResult exists and has no error, then create assistant message with LLM response
+      if (nodeResult && !nodeResult.error && nodeResult.data) {
+        // Type the data as LLM response structure from autopilot LLM class
+        const llmData = nodeResult.data as LlmResponseData;
+
+        // Extract the actual LLM response content from the proper field
+        const llmResponseContent = llmData.llmResponse;
+
+        // Create assistant message with LLM response if we have content
+        if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
+          await context.messageService.createMessage({
+            role: 'assistant',
+            content: llmResponseContent.trim(),
+            starshipId: context.starshipId,
+            agentId: context.agentId,
+            conversationId: context.conversationId,
+            messageType: 'agent_response',
+            importance: 'high',
+            processingStatus: 'completed',
+            metadata: {
+              event: 'llm_response',
+              nodeRef: currentNodeRef,
+              model: llmData.model,
+              timestamp: event.timestamp,
+            },
+          });
+        }
+      }
+
+      // Create system message for node completion tracking (for all nodes)
       await context.messageService.createMessage({
         role: 'system',
-        content: `✅ Completed node: ${event.execution.currentNodeRef}${nodeResultData && typeof nodeResultData === 'object' && 'content' in nodeResultData ? '\n' + (nodeResultData.content as string).substring(0, 200) + (((nodeResultData.content as string) || '').length > 200 ? '...' : '') : ''}`,
+        content: `✅ Completed node: ${currentNodeRef}`,
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId: context.conversationId,
         messageType: 'system_message',
-        importance: 'medium',
+        importance: 'low',
         processingStatus: 'completed',
         metadata: {
           event: 'node_completed',
-          nodeRef: event.execution.currentNodeRef,
+          nodeRef: currentNodeRef,
           nodeResult: nodeResultData,
           timestamp: event.timestamp,
         },

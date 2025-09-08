@@ -6,7 +6,7 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent } from '@starships/autopilot';
+import { Agent, EventCallback, ExecutionEvent } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
@@ -17,6 +17,7 @@ export interface AgentOptions {
   conversationId?: string;
   userId?: string;
   loadConversationHistory?: boolean;
+  eventCallback?: EventCallback;
 }
 
 export interface ExecuteAgentResponse {
@@ -29,6 +30,7 @@ export interface ExecuteAgentResponse {
   executionTime: number;
   status: 'success' | 'error';
   error?: string;
+  executionEvents?: ExecutionEvent[];
 }
 
 export interface AgentExecutionContext {
@@ -36,6 +38,7 @@ export interface AgentExecutionContext {
   userId?: string;
   conversationId?: string;
   userMessage: string;
+  eventCallback?: EventCallback;
 }
 
 /**
@@ -486,6 +489,7 @@ export class AgentService {
    */
   async executeAgent(context: AgentExecutionContext, options: AgentOptions = {}): Promise<ExecuteAgentResponse> {
     const startTime = Date.now();
+    const executionEvents: ExecutionEvent[] = [];
 
     try {
       // Get database agent
@@ -500,8 +504,20 @@ export class AgentService {
       // Add user message to memory
       agent.addToMemory('user', context.userMessage);
 
-      // Execute the agent
-      const execution = await agent.execute();
+      // Execute with event handling if callback provided
+      let execution;
+      const eventCallback = context.eventCallback || options.eventCallback;
+
+      if (eventCallback) {
+        // Create a wrapper callback that collects events and calls user callback
+        const wrappedCallback: EventCallback = async (event: ExecutionEvent) => {
+          executionEvents.push(event);
+          await eventCallback(event);
+        };
+        execution = await agent.execute(undefined, wrappedCallback);
+      } else {
+        execution = await agent.execute();
+      }
 
       // Extract response from execution result
       const response = this.extractResponse(execution);
@@ -516,12 +532,19 @@ export class AgentService {
 
       const executionTime = Date.now() - startTime;
 
-      return {
+      const result: ExecuteAgentResponse = {
         response,
         usage,
         executionTime,
         status: 'success',
       };
+
+      // Add execution events if they were collected
+      if (executionEvents.length > 0) {
+        result.executionEvents = executionEvents;
+      }
+
+      return result;
     } catch (error) {
       const executionTime = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -532,21 +555,58 @@ export class AgentService {
       // Note: Error message creation is handled by createErrorResponse in executeChat
       // to avoid duplicate messages. This method just returns the error response.
 
-      return {
+      const result: ExecuteAgentResponse = {
         response: errorMessage,
         usage: { totalTokens: 0, cost: 0, modelCalls: 0 },
         executionTime,
         status: 'error',
         error: errorMessage,
       };
+
+      // Add execution events if they were collected (even on error)
+      if (executionEvents.length > 0) {
+        result.executionEvents = executionEvents;
+      }
+
+      return result;
     }
   }
 
   /**
-   * Test agent execution (dry run without saving to memory)
+   * Register event callback for agent execution monitoring
    */
-  async testAgent(agentId: string, testMessage: string): Promise<ExecuteAgentResponse> {
-    return this.executeAgent({ agentId, userMessage: testMessage }, { includeMemory: false, loadConversationHistory: false });
+  static createEventHandler(context: { agentId: string; conversationId?: string; userId?: string }): EventCallback {
+    return async (event: ExecutionEvent) => {
+      console.log(`[AGENT-SERVICE] Event: ${event.type}`, {
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        userId: context.userId,
+        currentNode: event.execution.currentNodeRef,
+        status: event.execution.status,
+        timestamp: event.timestamp,
+      });
+
+      // Add custom event handling logic here based on event type
+      switch (event.type) {
+        case 'workflow_started':
+          console.log(`[AGENT-SERVICE] Workflow started for agent ${context.agentId}`);
+          break;
+        case 'node_started':
+          console.log(`[AGENT-SERVICE] Node ${event.execution.currentNodeRef} started`);
+          break;
+        case 'node_completed':
+          console.log(`[AGENT-SERVICE] Node ${event.execution.currentNodeRef} completed`);
+          break;
+        case 'workflow_completed':
+          console.log(`[AGENT-SERVICE] Workflow completed for agent ${context.agentId}`);
+          break;
+        case 'workflow_failed':
+          console.error(`[AGENT-SERVICE] Workflow failed for agent ${context.agentId}:`, event.execution.error);
+          break;
+        default:
+          break;
+      }
+    };
   }
 
   /**

@@ -12,6 +12,11 @@ export { Workflow } from './Workflow';
 // Core agent class for agent execution
 export { Agent } from './Agent';
 
+// ===== ENGINE SYSTEM =====
+// Engine class and event types
+export { Engine } from './engine/Engine';
+export type { EventCallback, ExecutionEvent } from './engine/Engine';
+
 // Memory system
 export { Memory } from './Memory';
 export type { MemoryParams, MemoryState, Message } from './Memory';

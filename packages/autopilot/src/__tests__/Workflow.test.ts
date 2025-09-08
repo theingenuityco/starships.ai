@@ -3,7 +3,7 @@
  */
 
 import { Workflow } from '@/Workflow';
-import { Blueprint, Node, Edge, Execution, WorkflowNodeParameters } from '@/types';
+import { Blueprint, Execution, WorkflowNodeParameters } from '@/types';
 
 describe('Workflow', () => {
   let mockExecution: Execution;

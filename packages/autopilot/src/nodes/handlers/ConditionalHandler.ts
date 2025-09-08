@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, NodeResult, ValidationResult, ConditionalNodeParameters, ValidationError, ValidationWarning } from '@/types';
+import { ConditionalNodeParameters, Execution, NodeResult, ValidationError, ValidationResult } from '@/types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {

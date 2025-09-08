@@ -31,9 +31,10 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
       return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes - conversations list doesn't change often
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false, // Don't refetch when switching between conversations
+    refetchOnMount: false, // Use cached data if available
   })
 }
 

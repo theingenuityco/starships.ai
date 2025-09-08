@@ -155,7 +155,7 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
       {/* Messages List */}
       <div className="flex-1 relative">
         {enableVirtualization && messages.length > 50 ? (
-          <VirtualizedMessageList messages={messages} renderMessage={renderMessage} className="h-full" />
+          <VirtualizedMessageList messages={messages} renderMessage={renderMessage} className="h-full message-scroll-area" />
         ) : (
           <AnimatePresence mode="wait">
             <motion.div
@@ -163,7 +163,7 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="h-full overflow-auto p-2 sm:p-4 space-y-3 sm:space-y-4 message-scroll-area"
+              className="h-full overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 message-scroll-area"
             >
               {messages.map((message, index) => renderMessage(message, index))}
             </motion.div>

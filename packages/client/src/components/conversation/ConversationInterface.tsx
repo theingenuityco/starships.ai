@@ -159,7 +159,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area - Only shown when there are messages */}
       <AnimatePresence>
         {hasMessages && currentConversationId && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0 overflow-hidden">
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0">
             <ConversationMessageList
               conversationId={currentConversationId}
               starshipId={starshipId}

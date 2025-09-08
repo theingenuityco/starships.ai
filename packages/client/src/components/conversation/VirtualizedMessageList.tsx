@@ -28,7 +28,7 @@ export function VirtualizedMessageList({ messages, renderMessage, className, est
   return (
     <div
       ref={parentRef}
-      className={cn('h-full overflow-auto message-scroll-area', className)}
+      className={cn('h-full overflow-y-auto message-scroll-area', className)}
       style={{
         contain: 'strict',
       }}

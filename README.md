@@ -68,14 +68,14 @@ pnpm lint         # Run ESLint
 
 ## 📦 Package Architecture
 
-| Package                                                  | Description                                                                                   |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with mission control UI and Vision Chamber                                |
-| [`@starships/server`](./packages/server/README.md)       | Express.js API server with authentication, missions, and Stripe webhooks                      |
-| [`@starships/autopilot`](./packages/autopilot/README.md) | Workflow execution engine with DAG-based flows, conditional routing, and AI model integration |
-| [`@starships/models`](./packages/models/)                | Neo4j database models, repositories, migration system, and data access patterns               |
-| [`@starships/protocol`](./packages/protocol/)            | Shared TypeScript types and interfaces                                                        |
-| [`@starships/env-config`](./packages/env-config/)        | Centralized environment configuration with validation and type safety                         |
+| Package                                                  | Description                                                                                  |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with starship management, mission control, and conversation interfaces   |
+| [`@starships/server`](./packages/server/README.md)       | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints   |
+| [`@starships/autopilot`](./packages/autopilot/README.md) | Workflow execution engine with DAG-based flows, agent system, and AI model integration       |
+| [`@starships/models`](./packages/models/README.md)       | Neo4j database models, repositories, migration system, and comprehensive data access layer   |
+| [`@starships/protocol`](./packages/protocol/README.md)   | Shared TypeScript types, domain models, and API contracts                                    |
+| [`@starships/errors`](./packages/errors/README.md)       | Comprehensive error handling system with automatic categorization and developer-friendly API |
 
 ---
 
@@ -136,84 +136,92 @@ graph TD
 
 **Authentication & Access**
 
-- Kinde OAuth integration with JWT tokens
+- JWT-based authentication system
 - Waitlist system for controlled early access
-- User session management with persistence
-
-**Vision Chamber**
-
-- AI-powered vision statement refinement
-- Quality metrics (clarity, specificity, actionability)
-- Intelligent suggestions and improvements
-- HTTP-based collaboration features
-
-**Mission System**
-
-- Create and manage AI-driven missions
-- HTTP-based chat with mission orchestrator
-- Multi-phase mission execution
-- Progress tracking and status updates
-
-**Autopilot Workflows**
-
-- DAG-based workflow execution engine
-- Conditional routing with JSONata expressions
-- Interactive user prompts and approvals
-- Extensible node system (HTTP, LLM, Agent, etc.)
-
-**Multi-Agent missions**
-
-- Complex mission orchestration
-- HTTP-based agent communication
-- First Officer coordination system
-- mission status monitoring
+- User session management with secure token validation
 
 **Starship Management**
 
-- Enhanced starship creation with vision integration
-- Subscription-based class system (Scout, Cruiser, Dreadnought)
-- Agent assignment and configuration
-- Power management and mission limits
+- Complete starship lifecycle (create, update, delete)
+- Subscription-based class system (Scout, Cruiser, Draught)
+- Agent deployment and slot management
+- Billing integration with automatic status updates
 
-**HTTP API Features**
+**Agent System**
 
-- Mission status updates via API polling
-- Vision refinement suggestions through API endpoints
+- Agent marketplace with templates and custom agents
+- Template-based agent creation for rapid deployment
+- Agent deployment to starships with capacity management
+- Comprehensive agent analytics and performance tracking
 
-**Payment System**
+**Mission Orchestration**
 
-- Stripe subscription management
-- Multiple pricing tiers with feature gates
-- Webhook handling with idempotency
-- Billing portal integration
+- Mission creation and lifecycle management
+- AI-powered mission orchestrators with chat interfaces
+- Mission-specific communication and progress tracking
+- Integration with autopilot workflow system
+
+**Conversation System**
+
+- Structured conversation management with metadata
+- Message history and context preservation
+- Agent-human communication interfaces
+- Real-time chat with AI orchestrators
+
+**Autopilot Workflow Engine**
+
+- DAG-based workflow execution with conditional routing
+- Extensible node system (HTTP, LLM, Agent, Conditional, etc.)
+- Advanced memory management (Memory and AgentMemory classes)
+- JSON-based workflow definitions with validation
+
+**Payment & Billing System**
+
+- Stripe subscription management with webhook handling
+- Multiple pricing tiers (Scout free, Cruiser/Draught paid)
+- Billing portal integration and payment retry flows
+- Idempotent webhook processing with comprehensive error handling
+
+**Database & Data Management**
+
+- Neo4j graph database with automated migrations
+- Comprehensive repository pattern with 15+ repositories
+- Entity serialization with class-transformer integration
+- Performance monitoring and health checks
 
 ### API Examples
 
-#### Create Enhanced Starship with Vision
+#### Create Starship
 
 ```bash
-curl -X POST http://localhost:4000/api/starships/enhanced \
+curl -X POST http://localhost:4000/api/v1/starships \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Enterprise",
-    "class": "cruiser",
-    "vision": "To revolutionize AI-powered productivity through intelligent automation"
+    "class": "cruiser"
   }'
 ```
 
-#### Start Multi-Agent mission
+#### Create Mission
 
 ```bash
-curl -X POST http://localhost:4000/api/starships/:starshipId/missions \
+curl -X POST http://localhost:4000/api/v1/missions \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Competitive Analysis",
-    "objective": "Analyze top 10 AI productivity tools",
-    "selectedAgents": ["research-agent", "analysis-agent"],
-    "approvalRequired": true
+    "starshipId": "starship-123",
+    "title": "Market Research",
+    "objective": "Analyze competitive landscape",
+    "phase": "init"
   }'
+```
+
+#### Deploy Agent to Starship
+
+```bash
+curl -X POST http://localhost:4000/api/v1/starships/:starshipId/agents/:agentId \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 #### Execute Autopilot Workflow
@@ -362,32 +370,34 @@ Simple and efficient debug configurations for development:
 
 ### ✅ Completed (v3.14.3)
 
-- ✅ Core authentication with Kinde OAuth
-- ✅ Waitlist system with controlled access
-- ✅ Vision Chamber with AI refinement
-- ✅ Mission orchestration system
-- ✅ Multi-agent mission framework
-- ✅ Autopilot workflow execution engine
-- ✅ Stripe payment processing
-- ✅ Production Kubernetes deployment
-- ✅ Docker containerization
-- ✅ Neo4j graph database integration
+- ✅ JWT authentication with secure token validation
+- ✅ Waitlist system with controlled early access
+- ✅ Comprehensive starship management with billing
+- ✅ Mission orchestration with AI-powered orchestrators
+- ✅ Agent marketplace with templates and custom agents
+- ✅ Conversation system with structured chat interfaces
+- ✅ Autopilot workflow execution engine with advanced memory
+- ✅ Stripe subscription management with webhook handling
+- ✅ Neo4j database with automated migrations
+- ✅ Production-ready error handling and monitoring
+- ✅ Docker containerization and health checks
 
 ### 🚧 Active Development
 
-- Enhanced MCP tool integration
-- Advanced workflow DSL capabilities
-- Agent marketplace expansion
-- Mobile-responsive optimizations
-- Performance monitoring dashboard
+- Advanced workflow node types and conditional logic
+- Enhanced agent analytics and performance metrics
+- Mission progress tracking and status updates
+- Mobile-responsive interface optimizations
+- Advanced conversation features and AI interactions
 
 ### 📋 Planned Features
 
-- Enterprise SSO integration
-- Team collaboration features
-- Advanced analytics and reporting
+- Team collaboration and shared starships
+- Advanced workflow templates and marketplace
+- Enterprise authentication integration
+- Advanced analytics and reporting dashboard
 - Mobile application (React Native)
-- Workflow template marketplace
+- API rate limiting and advanced security features
 
 ---
 

@@ -6,7 +6,7 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, ValidationResult, WorkflowNodeParameters, Node as WorkflowNode, ValidationError, ValidationWarning } from '@/types';
+import { Execution, ValidationError, ValidationResult, ValidationWarning, WorkflowNodeParameters } from '@/types';
 import { Workflow } from '@/Workflow';
 
 export class WorkflowHandler extends BaseHandler {

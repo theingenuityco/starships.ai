@@ -26,6 +26,7 @@ import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
 import memoryRoutes from '@/routes/memory';
 import starshipRoutes from '@/routes/starships';
+import streamingRoutes from '@/routes/streaming';
 import userRoutes from '@/routes/users';
 // import expeditionRoutes from '@/routes/expeditions';
 import missionRoutes from '@/routes/missions';
@@ -109,6 +110,7 @@ app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefi
 app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', agentTemplateRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', conversationRoutes); // Updated to OpenAPI standard with v1 prefix - conversation routes
+app.use('/api/v1', streamingRoutes); // Streaming routes for SSE support
 app.use('/api/v1', memoryRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
 app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix

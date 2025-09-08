@@ -1,12 +1,17 @@
 # @starships/autopilot
 
-Workflow execution engine and agent development framework for starships.ai.
+Advanced workflow execution engine and agent development framework for starships.ai, providing DAG-based workflow orchestration with AI model integration.
 
 ## Overview
 
-Autopilot provides a powerful workflow execution system:
+Autopilot provides a comprehensive workflow execution system with:
 
-**Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing, interactive user prompts, and AI model integration
+- **Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing, interactive user prompts, and AI model integration
+- **Agent System** - Sophisticated agent framework with structured memory management
+- **Memory Management** - Multi-layered memory system (Memory and AgentMemory) for context-aware AI interactions
+- **Node System** - Extensible node types including LLM, HTTP, conditional, and agent nodes
+- **Credential Management** - Secure API key handling for external services
+- **Lean Streaming Architecture** - Minimal streaming interface for external systems to provide real-time updates
 
 ## Credential Configuration
 
@@ -652,6 +657,53 @@ Example execution result:
 }
 ```
 
+## Streaming Integration
+
+Autopilot provides a **lean streaming architecture** that allows external systems (like servers) to inject streaming capabilities without bloating the core package.
+
+### Key Features
+
+- **Minimal Interface** - Only exports `StreamingEmitter` interface (~20 lines)
+- **External Control** - Server handles all streaming logic and formats
+- **Zero Performance Impact** - Direct injection with no latency
+- **Multiple Formats** - Support SSE, WebSocket, GraphQL subscriptions
+
+### Basic Usage
+
+```typescript
+import { StreamingEmitter } from '@starships/autopilot';
+
+// External system implements streaming
+class MyStreamingEmitter implements StreamingEmitter {
+  async emitExecutionEvent(event: ExecutionEvent): Promise<void> {
+    // Convert and broadcast event
+  }
+
+  isEnabled(): boolean {
+    return true;
+  }
+}
+
+// Inject into agent's engine
+const agent = new Agent(params);
+const streamingEmitter = new MyStreamingEmitter();
+agent.getEngine().setStreamingEmitter(streamingEmitter);
+
+// Execute normally - streaming happens automatically
+const result = await agent.execute(execution);
+```
+
+### Architecture
+
+```
+┌─────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Client    │◄──►│ External System  │    │ Autopilot       │
+│             │    │ StreamingEmitter │◄──►│ (lean)          │
+└─────────────┘    └──────────────────┘    └─────────────────┘
+```
+
+For detailed streaming integration, see [`README-STREAMING.md`](./README-STREAMING.md).
+
 ## Development
 
 ```bash
@@ -669,8 +721,50 @@ pnpm run test
 
 # Run tests with coverage
 pnpm run test:coverage
+
+# Development mode with watch
+pnpm run dev
 ```
+
+## Dependencies
+
+### Core Dependencies
+
+- **axios** - HTTP client for external API requests
+- **jsonata** - JSONPath expressions for conditional routing
+- **nanoid** - Unique identifier generation
+
+### Peer Dependencies
+
+- **@starships/protocol** - Shared TypeScript types and interfaces
+
+## Architecture
+
+```
+src/
+├── index.ts                 # Main exports and public API
+├── Workflow.ts              # Core workflow execution class
+├── Agent.ts                 # Agent system implementation
+├── Memory.ts                # Base memory management
+├── AgentMemory.ts           # Advanced structured memory
+├── LLM.ts                   # Language model integrations
+├── HttpRequest.ts           # HTTP request handling
+├── Autopilot.ts             # Configuration management
+├── engine/                  # Workflow execution engine
+├── nodes/                   # Node type implementations
+├── validation/              # Workflow validation system
+├── types/                   # TypeScript type definitions
+└── constants/               # Configuration constants
+```
+
+## Related Packages
+
+This package is part of the starships.ai monorepo:
+
+- [`@starships/protocol`](../protocol/) - Shared types and contracts
+- [`@starships/server`](../server/) - API server implementation
+- [`@starships/models`](../models/) - Database models and repositories
 
 ## License
 
-MIT
+Private package - Part of the starships.ai project

@@ -7,7 +7,20 @@
 import type { AgentMemory } from '@/AgentMemory';
 
 /**
+ * Streaming options for workflow execution
+ */
+export interface StreamingOptions {
+  enabled?: boolean;
+  streamId?: string;
+  conversationId?: string;
+  agentId?: string;
+}
+
+/**
  * Workflow execution state
+ *
+ * This interface is serializable and contains no callback functions.
+ * Streaming is handled by the Engine's injected StreamingEmitter.
  */
 export interface Execution {
   currentNodeRef?: string;
@@ -15,6 +28,8 @@ export interface Execution {
   executionResults: Map<string, NodeResult>;
   error?: ExecutionError;
   agentMemory: AgentMemory;
+  // Streaming configuration (serializable)
+  streaming?: StreamingOptions;
 }
 
 /**

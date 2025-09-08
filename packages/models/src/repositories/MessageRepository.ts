@@ -160,6 +160,11 @@ export class MessageRepository extends BaseRepository {
           hasAttachments: entity.hasAttachments || false,
           tokenCount: entity.tokenCount,
           processingTimeMs: entity.processingTimeMs,
+
+          // Streaming support fields
+          streamId: entity.streamId,
+          isStreaming: entity.isStreaming || false,
+          streamCompleted: entity.streamCompleted || false,
         };
 
         // Transform using Entity
@@ -649,6 +654,95 @@ export class MessageRepository extends BaseRepository {
           : null;
       },
       'getMessageConversation',
+      'Message'
+    );
+  }
+
+  // ============================================================================
+  // STREAMING METHODS
+  // ============================================================================
+
+  /**
+   * Append content to streaming message
+   */
+  async appendStreamingContent(messageId: string, additionalContent: string): Promise<MessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        // Get current message
+        const currentMessage = await this.findById(messageId);
+        if (!currentMessage || !currentMessage.isStreaming) {
+          return null;
+        }
+
+        // Append content
+        const newContent = currentMessage.content + additionalContent;
+        const updatedAt = new Date().toISOString();
+
+        const result = await connection.executeWrite<{ m: MessageModel }>(
+          'MATCH (m:Message) WHERE m.id = $id SET m.content = $content, m.updatedAt = $updatedAt, m.contentLength = $contentLength RETURN m',
+          {
+            id: messageId,
+            content: newContent,
+            updatedAt,
+            contentLength: newContent.length,
+          }
+        );
+
+        return result[0]?.m ? MessageEntity.deserialize(result[0].m) : null;
+      },
+      'appendStreamingContent',
+      'Message',
+      messageId
+    );
+  }
+
+  /**
+   * Complete streaming message
+   */
+  async completeStreaming(messageId: string, finalContent: string): Promise<MessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const updates = {
+          content: finalContent,
+          contentLength: finalContent.length,
+          isStreaming: false,
+          streamCompleted: true,
+          processingStatus: 'completed' as const,
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Use existing update logic
+        return this.update(messageId, updates);
+      },
+      'completeStreaming',
+      'Message',
+      messageId
+    );
+  }
+
+  /**
+   * Find active streaming messages
+   */
+  async findActiveStreamingMessages(conversationId?: string): Promise<MessageModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        let cypher = 'MATCH (m:Message) WHERE m.isStreaming = true AND m.streamCompleted = false';
+        const params: any = {};
+
+        if (conversationId) {
+          cypher += ' AND m.conversationId = $conversationId';
+          params.conversationId = conversationId;
+        }
+
+        cypher += ' RETURN m ORDER BY m.createdAt ASC';
+
+        const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
+        return result.map((record) => MessageEntity.deserialize(record.m));
+      },
+      'findActiveStreamingMessages',
       'Message'
     );
   }

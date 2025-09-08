@@ -29,6 +29,22 @@ export const setTokenProvider = (tokenProvider: () => Promise<string | null>) =>
   tokenProviderPromises.length = 0
 }
 
+// Export function to get current token (for SSE authentication)
+export const getCurrentToken = async (): Promise<string | null> => {
+  if (!getTokenFunction) {
+    console.warn('[API] No token provider configured')
+    return null
+  }
+
+  try {
+    await waitForTokenProvider()
+    return await getTokenFunction()
+  } catch (error) {
+    console.error('[API] Failed to get current token:', error)
+    return null
+  }
+}
+
 // Wait for token provider to be ready
 const waitForTokenProvider = (): Promise<void> => {
   if (tokenProviderReady) {
@@ -242,43 +258,7 @@ export interface SyncedUser {
 // Export Starship type for backward compatibility
 export type Starship = StarshipResponse['starship']
 
-// Backend request/response types (snake_case)
-interface ChatBackendRequest {
-  agent_id: string
-  message: string
-  stream?: boolean
-}
-
-interface ChatBackendResponse {
-  reply: string
-  usage?: {
-    prompt_tokens: number
-    completion_tokens: number
-  }
-}
-
-// Client-friendly request type (camelCase) - aligned with ConversationRequest from protocol
-export interface ChatRequest {
-  source: 'agent' | 'user'
-  agentId?: string
-  userId?: string
-  message: string
-  conversationId?: string
-  stream?: boolean
-  streamId?: string
-  typingSpeed?: number
-  typewriterEnabled?: boolean
-  context?: Record<string, unknown>
-}
-
-// Utility to convert camelCase to snake_case for backend
-function toBackendRequest(req: ChatRequest): ChatBackendRequest {
-  return {
-    agent_id: req.agentId || '',
-    message: req.message,
-    stream: req.stream || false,
-  }
-}
+// Legacy chat interfaces removed - use ConversationRequest/Response from protocol package
 
 // API functions with caching
 export const agentAPI = {

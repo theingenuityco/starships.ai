@@ -1,6 +1,6 @@
 # @starships/errors
 
-Lean error handling system for Starships.ai - focused on dev-friendly messages and simple patterns developers actually use.
+Comprehensive yet lean error handling system for starships.ai, providing developer-friendly error classes with automatic categorization and simplified constructors.
 
 ## Overview
 
@@ -196,3 +196,75 @@ const wrapped = wrapError(error, 'Operation failed');
 - ✅ Easy patterns for common scenarios
 
 The result: **Developers actually use the error system** instead of falling back to `new Error()`.
+
+## Development
+
+```bash
+# Build the package
+pnpm run build
+
+# Type check
+pnpm run type-check
+
+# Run tests
+pnpm run test
+
+# Run tests with coverage
+pnpm run test:coverage
+
+# Development mode with watch
+pnpm run dev
+```
+
+## Dependencies
+
+### Core Dependencies
+
+- **@starships/protocol** - Shared TypeScript types and interfaces
+
+## Architecture
+
+```
+src/
+├── index.ts                 # Main exports with all error classes and utilities
+```
+
+## API Reference
+
+### Error Classes
+
+All error classes extend the base `AppError` class and include automatic HTTP status code categorization:
+
+- **AppError** - Base error class with automatic categorization
+- **ValidationError** (400) - Input validation failures
+- **NotFoundError** (404) - Missing resources
+- **AuthError** (401) - Authentication failures
+- **ForbiddenError** (403) - Authorization failures
+- **ConflictError** (409) - Resource conflicts
+- **RateLimitError** (429) - Rate limiting
+- **DatabaseError** (500) - Database operation failures
+- **NetworkError** (502) - External service failures
+- **ServiceError** (503) - Temporary service issues
+
+### Utility Functions
+
+- `createError()` - Generic error creation with automatic categorization
+- `wrapError()` - Wrap unknown errors into the error system
+- `validationError()` - Quick validation error creation
+- `notFound()` - Quick not found error creation
+- `getErrorMessage()` - Safe message extraction from unknown errors
+- `isAppError()` - Type guard for application errors
+- `toApiError()` - Convert errors to API responses
+- `fromApiResponse()` - Create errors from API responses
+
+## Related Packages
+
+This package is part of the starships.ai monorepo:
+
+- [`@starships/protocol`](../protocol/) - Shared types and contracts
+- [`@starships/server`](../server/) - API server implementation
+- [`@starships/models`](../models/) - Database models and repositories
+
+## License
+
+Private package - Part of the starships.ai project

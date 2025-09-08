@@ -6,18 +6,18 @@
 
 // ===== MAIN API TYPES =====
 // Primary types for external usage (Node, Blueprint)
-export type { Node, Blueprint } from './blueprint';
+export type { Blueprint, Node } from './blueprint';
 
 // ===== BASE TYPES =====
 // Shared base types (Edge, NodeType, BaseNodeParameters)
-export type { Edge, NodeType, BaseNodeParameters } from './base';
+export type { BaseNodeParameters, Edge, NodeType } from './base';
 
 // ===== NODE PARAMETER TYPES =====
 // Node-specific parameter definitions
 export * from './node-parameters';
 
 // ===== EXECUTION TYPES =====
-// Runtime execution state and context
+// Runtime execution state and context (includes streaming types)
 export * from './execution';
 
 // ===== VALIDATION TYPES =====
@@ -29,8 +29,8 @@ export * from './validation';
 export type { Message } from '@/Memory';
 
 // Agent memory types only (no classes)
-export type { AgentIdentity, AgentPurpose, AgentSpace, AgentMemoryState } from '@/AgentMemory';
+export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from '@/AgentMemory';
 
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)
-export type { BaseNode, BaseBlueprint } from './base';
+export type { BaseBlueprint, BaseNode } from './base';

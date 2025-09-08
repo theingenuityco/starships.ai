@@ -1,6 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { ConversationService } from '@/services/ConversationService';
 import { MemoryService } from '@/services/MemoryService';
+import { StreamingService } from '@/services/StreamingService';
 import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -52,7 +53,7 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 };
 
 /**
- * POST /conversations/:conversationId/messages - Send message to agent
+ * POST /conversations/:conversationId/messages - Send message to agent (supports streaming)
  */
 router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -63,11 +64,12 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
-    // Validate request body
+    // Validate request body with streaming support
     const bodyValidation = validateData(
       z.object({
         agentId: z.string().min(1, 'agentId is required'),
         message: z.string().min(1, 'message is required'),
+        stream: z.boolean().optional().default(false),
       }),
       req.body,
       res,
@@ -76,19 +78,42 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     if (!bodyValidation) return;
 
     const { conversationId } = paramValidation;
-    const { agentId, message } = bodyValidation;
+    const { agentId, message, stream } = bodyValidation;
     const userId = req.user!.id;
 
-    // Use service layer to add message to conversation
     const conversationService = new ConversationService();
-    const result = await conversationService.addMessage({
-      conversationId,
-      agentId,
-      userId,
-      message,
-    });
 
-    sendSuccess(res, result);
+    if (stream) {
+      // Handle streaming request - return streamId immediately, process in background
+      const streamId = StreamingService.generateStreamId();
+
+      // Return streamId immediately so client can connect to SSE endpoint
+      sendSuccess(res, { streamId, status: 'streaming_started' }, 200);
+
+      // Process message with streaming in background (don't await)
+      conversationService
+        .addMessageWithStreaming({
+          conversationId,
+          agentId,
+          userId,
+          message,
+          streamId,
+        })
+        .catch((error) => {
+          console.error('❌ [STREAMING] Background streaming failed:', error);
+          // Error will be handled by the streaming service
+        });
+    } else {
+      // Handle regular (non-streaming) request
+      const result = await conversationService.addMessage({
+        conversationId,
+        agentId,
+        userId,
+        message,
+      });
+
+      sendSuccess(res, result);
+    }
   } catch (error) {
     if (!handleCommonError(error, res, 'processing conversation message')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to process conversation message');

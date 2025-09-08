@@ -87,6 +87,5 @@ export { autopilot, AutopilotManager } from './Autopilot';
 export type { AutopilotConfig, AutopilotCredentials } from './Autopilot';
 
 // ===== STREAMING SYSTEM =====
-// Streaming adapter and utilities
-export { streamingAdapter, StreamingAdapter } from './streaming/StreamingAdapter';
-export type { IStreamingService, StreamingAdapterConfig } from './streaming/StreamingAdapter';
+// Minimal streaming interface for external implementations
+export type { StreamingEmitter } from './types/streamingEmitter';

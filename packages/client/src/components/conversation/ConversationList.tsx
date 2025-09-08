@@ -14,15 +14,17 @@ import { Skeleton } from '../ui/skeleton'
 
 interface ConversationListProps {
   starshipId: string
-  currentConversationId?: string | null
   onConversationDelete?: (conversationId: string) => void
   onConversationArchive?: (conversationId: string) => void
 }
 
-export function ConversationList({ starshipId, currentConversationId, onConversationDelete, onConversationArchive }: ConversationListProps) {
+export function ConversationList({ starshipId, onConversationDelete, onConversationArchive }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
+  // Get conversationId directly from params - no prop needed
+  const currentConversationId = params.conversationId as string | undefined
+
   const { data, isLoading, error } = useStarshipConversations(starshipId)
   const [searchQuery, setSearchQuery] = useState('')
 

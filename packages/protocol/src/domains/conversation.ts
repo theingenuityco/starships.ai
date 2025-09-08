@@ -22,10 +22,9 @@ export interface ConversationRequest {
   userId?: string;
   message: string;
   conversationId?: string;
+  // Streaming support - core properties only
   stream?: boolean;
   streamId?: string;
-  typingSpeed?: number;
-  typewriterEnabled?: boolean;
   context?: Record<string, unknown>;
 }
 
@@ -45,6 +44,10 @@ export interface ConversationResponse {
   };
   timestamp?: string;
   metadata?: Record<string, unknown>;
+  // Streaming support
+  streaming?: boolean;
+  streamId?: string;
+  websocketUrl?: string;
 }
 
 // ============================================================================

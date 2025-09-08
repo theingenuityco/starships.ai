@@ -40,9 +40,11 @@ export interface ConversationContext {
  */
 export class MessageService {
   private messageRepository: MessageRepository;
+  private streamingService?: any; // StreamingService - optional dependency
 
-  constructor() {
+  constructor(streamingService?: any) {
     this.messageRepository = new MessageRepository();
+    this.streamingService = streamingService;
   }
 
   // ============================================================================
@@ -50,15 +52,23 @@ export class MessageService {
   // ============================================================================
 
   /**
-   * Create a new message
+   * Create a new message with streaming support
    */
-  async createMessage(request: CreateMessageRequest, options: MessageServiceOptions = {}): Promise<MessageModel> {
+  async createMessage(
+    request: CreateMessageRequest,
+    options?: {
+      streaming?: boolean;
+      streamId?: string;
+    }
+  ): Promise<MessageModel> {
     console.log('📝 [MESSAGE-SERVICE] Creating message:', {
       role: request.role,
       starshipId: request.starshipId,
       agentId: request.agentId,
       conversationId: request.conversationId,
       contentLength: request.content.length,
+      streaming: options?.streaming || false,
+      streamId: options?.streamId,
       timestamp: new Date().toISOString(),
     });
 
@@ -69,11 +79,25 @@ export class MessageService {
       version: '1.0.0',
       // Provide defaults for required fields
       threadDepth: request.threadDepth ?? 0,
-      processingStatus: request.processingStatus || 'pending',
+      processingStatus: request.processingStatus || (options?.streaming ? 'processing' : 'pending'),
       messageType: request.messageType || 'user_input',
       importance: request.importance || 'medium',
       hasAttachments: request.hasAttachments || false,
+      // Set streaming fields from options if provided, otherwise use request values
+      streamId: request.streamId || options?.streamId,
+      isStreaming: request.isStreaming ?? options?.streaming ?? false,
+      streamCompleted: request.streamCompleted ?? false,
     });
+
+    // Handle streaming at the service level if streaming is enabled and streamingService is available
+    if (message.isStreaming && message.streamId && this.streamingService) {
+      // Stream the message creation event if needed
+      // This is where streaming logic would be implemented using the streamingService
+      console.log('📡 [MESSAGE-SERVICE] Streaming message creation:', {
+        messageId: message.id,
+        streamId: message.streamId,
+      });
+    }
 
     console.log('✅ [MESSAGE-SERVICE] Message created:', message.id);
     return message;

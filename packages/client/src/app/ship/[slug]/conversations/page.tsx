@@ -7,14 +7,14 @@ import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useC
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { cn } from '@/lib/utils'
 import { Menu, Plus, X } from 'lucide-react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
 export default function ConversationsPage() {
   const params = useParams()
+  const router = useRouter()
   const slug = params.slug as string
-  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false)
 
@@ -46,24 +46,11 @@ export default function ConversationsPage() {
     )
   }
 
-  // Handle conversation selection
-  const handleConversationSelect = (conversationId: string) => {
-    setSelectedConversationId(conversationId)
-    // Close mobile sidebar when conversation is selected
-    setIsMobileSidebarOpen(false)
-  }
-
   // Handle conversation deletion
   const handleConversationDelete = async (conversationId: string) => {
     if (confirm('Are you sure you want to delete this conversation? This action cannot be undone.')) {
       try {
         await deleteConversation.mutateAsync(conversationId)
-
-        // If we deleted the currently selected conversation, clear selection
-        if (conversationId === selectedConversationId) {
-          setSelectedConversationId(null)
-        }
-
         toast.success('Conversation deleted successfully')
       } catch (error) {
         console.error('Failed to delete conversation:', error)
@@ -88,13 +75,16 @@ export default function ConversationsPage() {
 
   // Handle new conversation
   const handleNewConversation = () => {
-    setSelectedConversationId(null)
+    // Stay on the same page for new conversation
     setIsMobileSidebarOpen(false)
   }
 
-  // Handle conversation change from ConversationInterface
+  // Handle conversation change from ConversationInterface (when a new conversation starts)
   const handleConversationChange = (conversationId: string | null) => {
-    setSelectedConversationId(conversationId)
+    if (conversationId) {
+      // Navigate to the new conversation route
+      router.push(`/ship/${slug}/conversations/${conversationId}`)
+    }
   }
 
   return (
@@ -135,13 +125,7 @@ export default function ConversationsPage() {
 
           {/* Conversation List */}
           <div className="flex-1 overflow-hidden">
-            <ConversationList
-              starshipId={starshipData.id}
-              currentConversationId={selectedConversationId}
-              onConversationSelect={handleConversationSelect}
-              onConversationDelete={handleConversationDelete}
-              onConversationArchive={handleConversationArchive}
-            />
+            <ConversationList starshipId={starshipData.id} currentConversationId={null} onConversationDelete={handleConversationDelete} onConversationArchive={handleConversationArchive} />
           </div>
         </div>
       </aside>
@@ -163,7 +147,8 @@ export default function ConversationsPage() {
           )}
         </div>
 
-        <ConversationInterface starshipId={starshipData.id} conversationId={selectedConversationId} onConversationChange={handleConversationChange} />
+        {/* Show interface without conversationId - will show welcome screen */}
+        <ConversationInterface starshipId={starshipData.id} conversationId={null} onConversationChange={handleConversationChange} />
       </main>
     </div>
   )

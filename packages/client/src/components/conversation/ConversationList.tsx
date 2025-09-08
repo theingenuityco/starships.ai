@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { Archive, MessageSquare, MoreVertical, Trash2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu'
@@ -15,13 +15,14 @@ import { Skeleton } from '../ui/skeleton'
 interface ConversationListProps {
   starshipId: string
   currentConversationId?: string | null
-  onConversationSelect?: (conversationId: string) => void
   onConversationDelete?: (conversationId: string) => void
   onConversationArchive?: (conversationId: string) => void
 }
 
-export function ConversationList({ starshipId, currentConversationId, onConversationSelect, onConversationDelete, onConversationArchive }: ConversationListProps) {
+export function ConversationList({ starshipId, currentConversationId, onConversationDelete, onConversationArchive }: ConversationListProps) {
   const router = useRouter()
+  const params = useParams()
+  const slug = params.slug as string
   const { data, isLoading, error } = useStarshipConversations(starshipId)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -63,12 +64,7 @@ export function ConversationList({ starshipId, currentConversationId, onConversa
   )
 
   const handleConversationClick = (conversationId: string) => {
-    if (onConversationSelect) {
-      onConversationSelect(conversationId)
-    } else {
-      // Default navigation behavior
-      router.push(`/ship/${starshipId}/conversations/${conversationId}`)
-    }
+    router.push(`/ship/${slug}/conversations/${conversationId}`)
   }
 
   if (isLoading) {

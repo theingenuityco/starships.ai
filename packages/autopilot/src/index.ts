@@ -85,3 +85,8 @@ export { config } from './constants';
 // Autopilot configuration manager
 export { autopilot, AutopilotManager } from './Autopilot';
 export type { AutopilotConfig, AutopilotCredentials } from './Autopilot';
+
+// ===== STREAMING SYSTEM =====
+// Streaming adapter and utilities
+export { streamingAdapter, StreamingAdapter } from './streaming/StreamingAdapter';
+export type { IStreamingService, StreamingAdapterConfig } from './streaming/StreamingAdapter';

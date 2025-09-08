@@ -4,10 +4,13 @@
  * Executable LLM (Large Language Model) that handles AI model interactions via OpenRouter.
  * Uses HttpRequest under the hood for HTTP communication, similar to how Agent uses Workflow.
  * Follows the same pattern as Workflow and Agent classes for consistency.
+ * Supports streaming for real-time response generation.
  */
 
 import { HttpRequest } from '@/HttpRequest';
+import { streamingAdapter } from '@/streaming/StreamingAdapter';
 import { Execution, HttpRequestNodeParameters, LlmNodeParameters } from '@/types';
+import type { AutopilotStreamChunk } from '@/types/streaming';
 import { autopilot } from './Autopilot';
 
 export class LLM {
@@ -49,50 +52,183 @@ export class LLM {
   }
 
   /**
-   * Execute the LLM request (delegates to HttpRequest)
+   * Execute the LLM request with streaming support
    */
   async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
     try {
-      console.log(`Executing LLM: ${this.params.model}`);
+      console.log(`Executing LLM: ${this.params.model}${this.params.stream ? ' (streaming)' : ''}`);
 
-      // Create HttpRequest instance with current execution context (for memory integration)
-      const httpRequest = new HttpRequest(this.buildHttpRequestParams(execution));
+      // Check if streaming is enabled and supported
+      const isStreamingEnabled = this.params.stream && execution?.streaming?.enabled && streamingAdapter.isStreamingEnabled();
 
-      // Delegate to HttpRequest for execution
-      const httpResult = await httpRequest.execute();
-
-      // Check if HTTP request execution was successful
-      if (httpResult.status === 'completed' && httpResult.data) {
-        const llmResponse = this.extractLlmResponse(httpResult.data.body);
-
-        // Add LLM response to agent memory if execution context is provided
-        if (execution?.agentMemory) {
-          execution.agentMemory.addMessage('assistant', llmResponse, {
-            model: this.params.model,
-          });
-        }
-
-        return {
-          status: 'completed',
-          data: {
-            ...httpResult.data,
-            llmResponse,
-            model: this.params.model,
-          },
-        };
+      if (isStreamingEnabled) {
+        return await this.executeWithStreaming(execution);
       } else {
-        // HTTP request execution failed
-        const errorMessage = httpResult.error?.message || 'LLM request failed';
-        return {
-          status: 'failed',
-          error: new Error(`LLM request failed: ${errorMessage}`),
-        };
+        return await this.executeWithoutStreaming(execution);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Emit streaming error if streaming is enabled
+      if (this.params.stream && execution?.streaming?.enabled) {
+        await streamingAdapter.emitError({
+          code: 'LLM_EXECUTION_ERROR',
+          message: errorMessage,
+          recoverable: false,
+          context: { model: this.params.model },
+        });
+      }
+
       return {
         status: 'failed',
         error: new Error(`LLM execution failed: ${errorMessage}`),
+      };
+    }
+  }
+
+  /**
+   * Execute LLM with streaming support
+   */
+  private async executeWithStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+    const httpParams = this.buildHttpRequestParams(execution);
+
+    // Ensure streaming is enabled in request body
+    if (httpParams.body && typeof httpParams.body === 'object') {
+      (httpParams.body as any).stream = true;
+    }
+
+    let fullResponse = '';
+    let usage: any = null;
+
+    try {
+      // Use fetch for streaming instead of HttpRequest
+      const response = await fetch(httpParams.url, {
+        method: httpParams.method,
+        headers: httpParams.headers as Record<string, string>,
+        body: JSON.stringify(httpParams.body),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n').filter((line) => line.trim());
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+
+            if (data === '[DONE]') {
+              continue;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content || '';
+
+              if (content) {
+                fullResponse += content;
+
+                // Emit streaming chunk
+                const streamChunk: AutopilotStreamChunk = {
+                  type: 'content',
+                  content,
+                  metadata: {
+                    model: this.params.model,
+                    tokenCount: parsed.usage?.total_tokens,
+                  },
+                };
+
+                await streamingAdapter.emitChunk(streamChunk);
+
+                // Call execution streaming callback if provided
+                if (execution?.onStreamChunk) {
+                  await execution.onStreamChunk(streamChunk);
+                }
+              }
+
+              // Capture usage information if available
+              if (parsed.usage) {
+                usage = parsed.usage;
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse streaming chunk:', parseError);
+            }
+          }
+        }
+      }
+
+      // Add LLM response to agent memory if execution context is provided
+      if (execution?.agentMemory && fullResponse) {
+        execution.agentMemory.addMessage('assistant', fullResponse, {
+          model: this.params.model,
+          streaming: true,
+        });
+      }
+
+      return {
+        status: 'completed',
+        data: {
+          llmResponse: fullResponse,
+          model: this.params.model,
+          usage,
+          streaming: true,
+        },
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
+      throw new Error(`LLM streaming execution failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Execute LLM without streaming (original logic)
+   */
+  private async executeWithoutStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+    // Create HttpRequest instance with current execution context (for memory integration)
+    const httpRequest = new HttpRequest(this.buildHttpRequestParams(execution));
+
+    // Delegate to HttpRequest for execution
+    const httpResult = await httpRequest.execute();
+
+    // Check if HTTP request execution was successful
+    if (httpResult.status === 'completed' && httpResult.data) {
+      const llmResponse = this.extractLlmResponse(httpResult.data.body);
+
+      // Add LLM response to agent memory if execution context is provided
+      if (execution?.agentMemory) {
+        execution.agentMemory.addMessage('assistant', llmResponse, {
+          model: this.params.model,
+        });
+      }
+
+      return {
+        status: 'completed',
+        data: {
+          ...httpResult.data,
+          llmResponse,
+          model: this.params.model,
+        },
+      };
+    } else {
+      // HTTP request execution failed
+      const errorMessage = httpResult.error?.message || 'LLM request failed';
+      return {
+        status: 'failed',
+        error: new Error(`LLM request failed: ${errorMessage}`),
       };
     }
   }

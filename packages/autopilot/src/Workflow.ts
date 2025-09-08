@@ -6,7 +6,9 @@
  */
 
 import { Engine } from '@/engine/Engine';
+import { streamingAdapter } from '@/streaming/StreamingAdapter';
 import { Blueprint, Edge, Execution, Node, WorkflowNodeParameters } from '@/types';
+import type { StreamingCallback, StreamingOptions } from '@/types/streaming';
 import { nanoid } from 'nanoid';
 
 export class Workflow {
@@ -130,10 +132,139 @@ export class Workflow {
   }
 
   /**
-   * Execute the workflow (delegates to internal Engine)
+   * Execute the workflow with streaming support
    */
   async execute(initialExecution?: Execution): Promise<Execution> {
-    return this.engine.execute(this.params.blueprint, initialExecution);
+    try {
+      console.log(
+        `Executing Workflow: ${this.params.blueprint.nodes.length} nodes${initialExecution?.streaming?.enabled ? ' (streaming)' : ''}`
+      );
+
+      // Check if streaming is enabled and supported
+      const isStreamingEnabled = initialExecution?.streaming?.enabled && streamingAdapter.isStreamingEnabled();
+
+      if (isStreamingEnabled) {
+        return await this.executeWithStreaming(initialExecution);
+      } else {
+        return await this.executeWithoutStreaming(initialExecution);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Emit streaming error if streaming is enabled
+      if (initialExecution?.streaming?.enabled) {
+        await streamingAdapter.emitError({
+          code: 'WORKFLOW_EXECUTION_ERROR',
+          message: errorMessage,
+          recoverable: false,
+          context: {
+            workflowType: 'workflow',
+            nodeCount: this.params.blueprint.nodes.length,
+          },
+        });
+      }
+
+      throw new Error(`Workflow execution failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Execute workflow with streaming support
+   */
+  private async executeWithStreaming(initialExecution?: Execution): Promise<Execution> {
+    // Add streaming configuration to execution
+    const executionWithStreaming: Execution = {
+      currentNodeRef: undefined,
+      status: 'not_started',
+      executionResults: new Map(),
+      agentMemory: initialExecution?.agentMemory!,
+      ...initialExecution,
+      streaming: initialExecution?.streaming,
+    };
+
+    const streamingOptions = initialExecution?.streaming;
+
+    // Configure streaming adapter
+    streamingAdapter.configure({
+      enabled: true,
+      streamId: streamingOptions?.streamId,
+      conversationId: streamingOptions?.conversationId,
+      agentId: streamingOptions?.agentId,
+    });
+
+    // Emit workflow start event
+    await streamingAdapter.emitChunk({
+      type: 'node_start',
+      content: 'Starting workflow execution',
+      metadata: {
+        workflowType: 'workflow',
+        nodeCount: this.params.blueprint.nodes.length,
+      },
+    });
+
+    try {
+      const result = await this.engine.execute(this.params.blueprint, executionWithStreaming);
+
+      // Emit completion
+      await streamingAdapter.emitComplete({
+        workflowType: 'workflow',
+        status: result.status,
+        nodeCount: this.params.blueprint.nodes.length,
+      });
+
+      return result;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
+      throw new Error(`Workflow streaming execution failed: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Execute workflow without streaming (original logic)
+   */
+  private async executeWithoutStreaming(initialExecution?: Execution): Promise<Execution> {
+    // Create execution without streaming configuration
+    const execution: Execution = {
+      currentNodeRef: undefined,
+      status: 'not_started',
+      executionResults: new Map(),
+      agentMemory: initialExecution?.agentMemory!,
+      ...initialExecution,
+    };
+
+    // Execute workflow through engine
+    return await this.engine.execute(this.params.blueprint, execution);
+  }
+
+  /**
+   * Execute workflow with streaming (convenient method)
+   */
+  async executeWithStreamingOptions(streamingOptions: StreamingOptions, initialExecution?: Execution): Promise<Execution> {
+    // Create execution with streaming options
+    const executionWithStreaming: Execution = {
+      currentNodeRef: undefined,
+      status: 'not_started',
+      executionResults: new Map(),
+      agentMemory: initialExecution?.agentMemory!,
+      ...initialExecution,
+      streaming: streamingOptions,
+    };
+
+    return this.execute(executionWithStreaming);
+  }
+
+  /**
+   * Add streaming callback for workflow execution
+   */
+  onStreamChunk(callback: StreamingCallback): void {
+    streamingAdapter.onChunk(callback);
+  }
+
+  /**
+   * Remove streaming callback
+   */
+  offStreamChunk(callback: StreamingCallback): void {
+    streamingAdapter.offChunk(callback);
   }
 
   /**

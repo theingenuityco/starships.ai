@@ -5,6 +5,7 @@
  */
 
 import type { AgentMemory } from '@/AgentMemory';
+import type { StreamingCallback, StreamingOptions } from './streaming';
 
 /**
  * Workflow execution state
@@ -15,6 +16,9 @@ export interface Execution {
   executionResults: Map<string, NodeResult>;
   error?: ExecutionError;
   agentMemory: AgentMemory;
+  // Streaming support
+  streaming?: StreamingOptions;
+  onStreamChunk?: StreamingCallback;
 }
 
 /**

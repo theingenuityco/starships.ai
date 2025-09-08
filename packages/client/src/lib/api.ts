@@ -29,6 +29,22 @@ export const setTokenProvider = (tokenProvider: () => Promise<string | null>) =>
   tokenProviderPromises.length = 0
 }
 
+// Export function to get current token (for SSE authentication)
+export const getCurrentToken = async (): Promise<string | null> => {
+  if (!getTokenFunction) {
+    console.warn('[API] No token provider configured')
+    return null
+  }
+
+  try {
+    await waitForTokenProvider()
+    return await getTokenFunction()
+  } catch (error) {
+    console.error('[API] Failed to get current token:', error)
+    return null
+  }
+}
+
 // Wait for token provider to be ready
 const waitForTokenProvider = (): Promise<void> => {
   if (tokenProviderReady) {

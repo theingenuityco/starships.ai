@@ -6,6 +6,7 @@
  */
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { sseJwtAuthMiddleware } from '@/middleware/sse-jwt-auth';
 import { StreamingService } from '@/services/StreamingService';
 import type { Request, Response, Router } from 'express';
 import { Router as createRouter } from 'express';
@@ -15,7 +16,7 @@ const router: Router = createRouter();
 /**
  * GET /conversations/:conversationId/messages/stream - SSE streaming endpoint
  */
-router.get('/conversations/:conversationId/messages/stream', jwtAuthMiddleware, (req: Request, res: Response): void => {
+router.get('/conversations/:conversationId/messages/stream', sseJwtAuthMiddleware, (req: Request, res: Response): void => {
   const { conversationId } = req.params;
   const { streamId } = req.query;
 

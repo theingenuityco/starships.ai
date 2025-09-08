@@ -5,6 +5,7 @@ export interface EnvironmentConfig {
   // Server Configuration
   SERVER_PORT: number;
   CLIENT_PORT: number;
+  PROXY_PORT: number;
   NODE_ENV: string;
   LOG_LEVEL: string;
 

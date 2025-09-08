@@ -23,6 +23,11 @@
       "cache": false,
       "persistent": true
     },
+    "@starships/reverse-proxy#dev": {
+      "cache": false,
+      "persistent": true,
+      "dependsOn": ["@starships/env#build"]
+    },
     "start": {
       "dependsOn": ["build"],
       "cache": false,
@@ -51,6 +56,10 @@
       "dependsOn": ["@starships/autopilot#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
+    },
+    "@starships/env#build": {
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+      "outputs": ["dist/**"]
     },
     "@starships/env#type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],

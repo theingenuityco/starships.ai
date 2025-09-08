@@ -19,11 +19,13 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
 export function getEnvConfig(): EnvironmentConfig {
   const DEFAULT_CLIENT_PORT = 3000;
   const DEFAULT_SERVER_PORT = 4000;
+  const DEFAULT_PROXY_PORT = 8080;
 
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
     CLIENT_PORT: parseInt(process.env.CLIENT_PORT || `${DEFAULT_CLIENT_PORT}`, 10),
+    PROXY_PORT: parseInt(process.env.PROXY_PORT || `${DEFAULT_PROXY_PORT}`, 10),
     NODE_ENV: process.env.NODE_ENV || 'development',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 

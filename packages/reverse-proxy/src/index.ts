@@ -1,12 +1,16 @@
+import { getEnvConfig } from '@starships/env';
 import express from 'express';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
 
 const app = express();
 
+// Get environment configuration
+const envConfig = getEnvConfig();
+
 // Configuration
-const PORT = process.env.PROXY_PORT || 8080;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+const PORT = envConfig.PROXY_PORT;
+const FRONTEND_URL = envConfig.CLIENT_URL;
+const BACKEND_URL = envConfig.SERVER_URL;
 
 // Proxy options for backend API routes
 const apiProxyOptions: Options = {

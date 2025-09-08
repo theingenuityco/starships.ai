@@ -1,0 +1,176 @@
+# @starships/reverse-proxy
+
+A lean development reverse proxy for the starships.ai monorepo. This proxy routes requests between the Next.js frontend and Express backend during development, providing a single entry point for all traffic.
+
+## Purpose
+
+In development, this reverse proxy:
+
+- Provides a single entry point at `http://localhost:8080`
+- Routes `/api/*` requests to the backend server (port 4000)
+- Routes all other requests to the Next.js frontend (port 3000)
+- Enables WebSocket support for Next.js HMR (Hot Module Replacement)
+- Provides consistent routing behavior between development and production
+
+## Usage
+
+### Start with Proxy (Recommended for Development)
+
+```bash
+# Start the proxy along with all services
+pnpm run dev:with-proxy
+```
+
+This will:
+
+1. Start the reverse proxy at `http://localhost:8080`
+2. Start the Next.js frontend at `http://localhost:3000`
+3. Start the Express backend at `http://localhost:4000`
+
+Then access your application at: **`http://localhost:8080`**
+
+### Start Proxy Independently
+
+```bash
+# Start only the reverse proxy
+pnpm run dev:proxy
+```
+
+### Manual Setup
+
+```bash
+# Install dependencies
+cd packages/reverse-proxy
+pnpm install
+
+# Start in development mode (with auto-reload)
+pnpm run dev
+
+# Or build and run in production mode
+pnpm run build
+pnpm run start
+```
+
+## Configuration
+
+The proxy can be configured via environment variables:
+
+| Variable       | Default                 | Description               |
+| -------------- | ----------------------- | ------------------------- |
+| `PROXY_PORT`   | `8080`                  | Port the proxy listens on |
+| `FRONTEND_URL` | `http://localhost:3000` | Next.js frontend URL      |
+| `BACKEND_URL`  | `http://localhost:4000` | Express backend URL       |
+
+### Example with Custom Ports
+
+```bash
+PROXY_PORT=9000 BACKEND_URL=http://localhost:5000 pnpm run dev:proxy
+```
+
+## Routing Rules
+
+| Path Pattern     | Target          | Description                            |
+| ---------------- | --------------- | -------------------------------------- |
+| `/api/*`         | Backend (4000)  | All API endpoints                      |
+| `/_proxy/health` | Proxy           | Health check endpoint                  |
+| `/*`             | Frontend (3000) | All other routes (pages, assets, etc.) |
+
+## Health Check
+
+The proxy provides a health check endpoint:
+
+```bash
+curl http://localhost:8080/_proxy/health
+```
+
+Response:
+
+```json
+{
+  "status": "healthy",
+  "uptime": 123.456,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "routes": {
+    "frontend": "http://localhost:3000",
+    "backend": "http://localhost:4000"
+  }
+}
+```
+
+## Development Workflow
+
+1. **Without Proxy** (traditional setup):
+   - Access frontend: `http://localhost:3000`
+   - Frontend uses Next.js rewrites to proxy `/api/*` to backend
+   - Two separate URLs for frontend and backend
+
+2. **With Proxy** (recommended):
+   - Access everything via: `http://localhost:8080`
+   - Consistent routing with production
+   - Single entry point for all traffic
+   - Better mimics production environment
+
+## Architecture
+
+```
+Browser
+   ↓
+[Reverse Proxy :8080]
+   ├── /api/* → [Backend :4000]
+   └── /*     → [Frontend :3000]
+```
+
+## Logging
+
+The proxy logs all requests (except Next.js HMR requests to reduce noise):
+
+```
+[API] GET /api/users -> http://localhost:4000/api/users
+[Frontend] GET /dashboard -> http://localhost:3000/dashboard
+```
+
+## Error Handling
+
+If a backend service is unavailable, the proxy returns:
+
+- Status: `502 Bad Gateway`
+- Message: `Bad Gateway: [Backend|Frontend] server is unavailable`
+
+## Production Note
+
+This reverse proxy is **intended for development use only**. In production:
+
+- Nginx handles routing at the ingress level
+- Next.js rewrites handle API routing
+- The proxy is not deployed or used
+
+## Troubleshooting
+
+### Port Already in Use
+
+If port 8080 is already in use:
+
+```bash
+PROXY_PORT=9090 pnpm run dev:proxy
+```
+
+### Backend/Frontend Not Accessible
+
+Ensure both services are running:
+
+```bash
+# In separate terminals
+pnpm --filter @starships/client dev
+pnpm --filter @starships/server dev
+```
+
+### WebSocket Issues
+
+The proxy supports WebSocket connections for Next.js HMR. If you experience issues:
+
+1. Ensure you're accessing the app via the proxy URL (`http://localhost:8080`)
+2. Check that no firewall is blocking WebSocket connections
+
+## License
+
+Part of the starships.ai monorepo. See root LICENSE file.

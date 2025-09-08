@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "concurrently \"pnpm run dev:proxy\" \"turbo run dev --filter='!@starships/reverse-proxy'\"",
+    "dev:proxy": "pnpm --filter @starships/reverse-proxy dev",
+    "dev:without-proxy": "turbo run dev",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@semantic-release/commit-analyzer": "^13.0.1",
+    "concurrently": "^8.2.2",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.4",
     "@semantic-release/npm": "^12.0.2",

@@ -84,36 +84,25 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const conversationService = new ConversationService();
 
     if (stream) {
-      // Handle streaming request
-      const streamingService = new StreamingService();
+      // Handle streaming request - return streamId immediately, process in background
       const streamId = StreamingService.generateStreamId();
 
-      // Set up SSE connection
-      streamingService.addConnection(streamId, res);
+      // Return streamId immediately so client can connect to SSE endpoint
+      sendSuccess(res, { streamId, status: 'streaming_started' }, 200);
 
-      try {
-        // Process message with streaming
-        const result = await conversationService.addMessageWithStreaming({
+      // Process message with streaming in background (don't await)
+      conversationService
+        .addMessageWithStreaming({
           conversationId,
           agentId,
           userId,
           message,
           streamId,
+        })
+        .catch((error) => {
+          console.error('❌ [STREAMING] Background streaming failed:', error);
+          // Error will be handled by the streaming service
         });
-
-        // Final response will be sent via SSE, connection will close automatically
-        console.log(`✅ [STREAMING] Conversation message processed with streaming: ${streamId}`);
-      } catch (error) {
-        // Send error via SSE
-        await streamingService.broadcastError(streamId, {
-          streamId,
-          errorCode: 'MESSAGE_PROCESSING_FAILED',
-          message: error instanceof Error ? error.message : 'Failed to process message',
-          timestamp: new Date().toISOString(),
-          recoverable: false,
-          context: { conversationId, agentId },
-        });
-      }
     } else {
       // Handle regular (non-streaming) request
       const result = await conversationService.addMessage({

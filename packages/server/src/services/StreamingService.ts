@@ -4,13 +4,25 @@ import type { Response } from 'express';
 /**
  * Streaming Service using Server-Sent Events (SSE)
  * Manages SSE streaming connections for real-time communication
+ * Uses singleton pattern to share connections across requests
  */
 export class StreamingService {
+  private static instance: StreamingService;
   private connections = new Map<string, Response>();
   private heartbeatIntervals = new Map<string, NodeJS.Timeout>();
 
   constructor() {
     // Public constructor following service pattern
+  }
+
+  /**
+   * Get singleton instance
+   */
+  static getInstance(): StreamingService {
+    if (!StreamingService.instance) {
+      StreamingService.instance = new StreamingService();
+    }
+    return StreamingService.instance;
   }
 
   /**

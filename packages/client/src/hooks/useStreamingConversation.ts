@@ -53,19 +53,23 @@ export function useStreamingConversation() {
           isStreaming: true,
         }))
 
-        // Generate stream ID
-        const streamId = `stream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        setStreamingState((prev: StreamingState) => ({ ...prev, streamId }))
-
-        // Send POST request with stream=true
+        // Send POST request with stream=true to get streamId
         api
           .post(`/api/v1/conversations/${data.conversationId}/messages`, {
             agentId: data.agentId,
             message: data.message,
             stream: true,
           })
-          .then(() => {
-            // Connect to streaming endpoint
+          .then(response => {
+            // Extract streamId from server response
+            const streamId = response.data.data?.streamId
+            if (!streamId) {
+              throw new Error('No streamId received from server')
+            }
+
+            setStreamingState((prev: StreamingState) => ({ ...prev, streamId }))
+
+            // Connect to streaming endpoint with received streamId
             const eventSource = new EventSource(`/api/v1/conversations/${data.conversationId}/messages/stream?streamId=${streamId}`)
             eventSourceRef.current = eventSource
 
@@ -135,7 +139,7 @@ export function useStreamingConversation() {
             eventSource.onerror = (event: Event) => {
               console.error('[STREAMING] EventSource error:', event)
               const error: StreamingError = {
-                streamId,
+                streamId: streamId || 'unknown',
                 errorCode: 'CONNECTION_ERROR',
                 message: 'Lost connection to streaming server',
                 timestamp: new Date().toISOString(),
@@ -154,7 +158,7 @@ export function useStreamingConversation() {
           .catch(error => {
             console.error('[STREAMING] Failed to initiate streaming:', error)
             const streamingError: StreamingError = {
-              streamId,
+              streamId: streamingState.streamId || 'unknown',
               errorCode: 'REQUEST_FAILED',
               message: error.response?.data?.error || error.message || 'Failed to start streaming',
               timestamp: new Date().toISOString(),

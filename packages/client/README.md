@@ -1,6 +1,6 @@
-# Starships AI - Client
+# @starships/client
 
-A modern React-based starship mission control interface with clean navigation architecture and sophisticated consciousness planning tools, built with Next.js 15, TypeScript, and shadcn/ui.
+Modern Next.js frontend application for starships.ai platform providing mission control interface, starship management, and AI agent interaction, built with Next.js 15, TypeScript, and shadcn/ui.
 
 ## 🚀 Quick Start
 
@@ -44,26 +44,34 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 src/
 ├── app/                          # Next.js App Router
 │   ├── client-layout.tsx        # Main layout with navigation sidebar
-│   ├── command-deck/page.tsx    # Command Deck dashboard page
-│   ├── crew/page.tsx            # Crew management page
-│   ├── expeditions/page.tsx     # Expeditions management page
-│   └── sibil/page.tsx           # AI assistant page
+│   ├── page.tsx                 # Home/landing page
+│   ├── login/page.tsx           # Authentication page
+│   ├── ship/[slug]/             # Individual starship interface
+│   │   ├── layout.tsx           # Ship-specific layout
+│   │   ├── conversations/       # Chat and communication
+│   │   ├── crew/                # Agent management
+│   │   └── missions/            # Mission orchestration
+│   ├── starships/create/        # Starship creation flow
+│   ├── waitlist/page.tsx        # Waitlist management
+│   └── api/                     # API route handlers
 ├── components/
-│   ├── navigation/              # Clean navigation system
-│   │   ├── Navigation.tsx       # Main navigation component
-│   │   ├── NavigationSection.tsx # Section groupings component
-│   │   ├── NavigationItem.tsx   # Individual nav items component
-│   │   └── StarshipSelector.tsx # Starship selection dropdown
-│   ├── command-deck/            # Command Deck functionality
-│   │   ├── dashboard/           # Dashboard modules
-│   │   └── modules/             # Quick action modules
+│   ├── agents/                  # Agent-related components
 │   ├── auth/                    # Authentication components
+│   ├── conversation/            # Chat and messaging interface
+│   ├── crew/                    # Agent deployment and management
+│   ├── layout/                  # Layout components
+│   ├── missions/                # Mission management interface
+│   ├── navigation/              # Navigation system
+│   ├── starships/               # Starship creation and management
 │   ├── ui/                      # shadcn/ui components
-│   └── theme-provider.tsx       # Theme system provider
-├── store/
-│   └── starship-ui-store.ts     # Zustand UI state store
-├── hooks/                       # Custom React hooks (including TanStack Query hooks)
-└── lib/                         # Utilities and configurations
+│   └── workflow/                # Workflow visualization
+├── constants/                   # Application constants
+├── hooks/                       # Custom React hooks with TanStack Query
+├── lib/                         # Utilities and configurations
+├── providers/                   # React context providers
+├── store/                       # Zustand state management
+├── styles/                      # CSS and styling
+└── types/                       # TypeScript type definitions
 ```
 
 ## 🔧 Development
@@ -85,6 +93,12 @@ pnpm type-check   # TypeScript compilation check
 ```env
 # Backend API URL (automatically configured via SERVER_URL)
 SERVER_URL=http://localhost:4000
+
+# Next.js Configuration
+NEXT_PUBLIC_API_URL=http://localhost:4000
+
+# Authentication
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
 ## 🎨 UI Components
@@ -131,9 +145,17 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 
 ### Route Structure
 
-- **Command Deck**: `/command-deck` - Mission control dashboard
-- **Core Systems**: `/crew` - Starship management
-- **Operations**: `/expeditions`, `/sibil` - Mission operations
+- **Home/Waitlist**: `/` - Landing page and waitlist management
+- **Authentication**: `/login` - User authentication
+- **Ship Interface**: `/ship/[slug]` - Individual starship control panel
+  - `/ship/[slug]/conversations` - Chat and communication interface
+  - `/ship/[slug]/crew` - Agent deployment and management
+  - `/ship/[slug]/missions` - Mission orchestration and tracking
+  - `/ship/[slug]/missions/[missionId]` - Individual mission details
+- **Starship Creation**: `/starships/create` - New starship creation flow
+  - `/starships/create/success` - Post-creation success page
+  - `/starships/create/cancel` - Creation cancellation handling
+- **Waitlist**: `/waitlist` - Early access management
 
 ## 💾 Data Management
 

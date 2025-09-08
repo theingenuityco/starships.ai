@@ -11,6 +11,11 @@ import { HttpRequest } from '@/HttpRequest';
 import { Execution, HttpRequestNodeParameters, LlmNodeParameters } from '@/types';
 import { autopilot } from './Autopilot';
 
+export interface StreamingCallbacks {
+  onChunk?: (content: string, accumulated: string) => Promise<void>;
+  onComplete?: (finalContent: string) => Promise<void>;
+}
+
 export class LLM {
   private params: LlmNodeParameters;
 
@@ -52,7 +57,10 @@ export class LLM {
   /**
    * Execute the LLM request with streaming support
    */
-  async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
+  async execute(
+    execution?: Execution,
+    streamingCallbacks?: StreamingCallbacks
+  ): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     try {
       console.log(`Executing LLM: ${this.params.model}${this.params.stream ? ' (streaming)' : ''}`);
 
@@ -60,7 +68,7 @@ export class LLM {
       const isStreamingEnabled = this.params.stream && execution?.streaming?.enabled;
 
       if (isStreamingEnabled) {
-        return await this.executeWithStreaming(execution);
+        return await this.executeWithStreaming(execution, streamingCallbacks);
       } else {
         return await this.executeWithoutStreaming(execution);
       }
@@ -77,7 +85,10 @@ export class LLM {
   /**
    * Execute LLM with streaming support
    */
-  private async executeWithStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
+  private async executeWithStreaming(
+    execution?: Execution,
+    streamingCallbacks?: StreamingCallbacks
+  ): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     const httpParams = this.buildHttpRequestParams(execution);
 
     // Ensure streaming is enabled in request body
@@ -129,8 +140,11 @@ export class LLM {
 
               if (content) {
                 fullResponse += content;
-                // Note: Streaming is handled by the Engine's injected StreamingEmitter
-                // LLM nodes don't need to emit streaming chunks directly
+
+                // Emit streaming chunk via callbacks if available
+                if (streamingCallbacks?.onChunk) {
+                  await streamingCallbacks.onChunk(content, fullResponse);
+                }
               }
 
               // Capture usage information if available
@@ -142,6 +156,11 @@ export class LLM {
             }
           }
         }
+      }
+
+      // Emit completion callback if available
+      if (streamingCallbacks?.onComplete) {
+        await streamingCallbacks.onComplete(fullResponse);
       }
 
       // Add LLM response to agent memory if execution context is provided

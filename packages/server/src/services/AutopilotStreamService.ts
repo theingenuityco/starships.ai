@@ -179,6 +179,34 @@ export class AutopilotStreamService implements StreamingEmitter {
           },
         };
 
+      case 'content_chunk':
+        return {
+          ...baseChunk,
+          type: 'content',
+          content: event.content || '',
+          metadata: {
+            ...baseChunk.metadata,
+            nodeRef: event.contentMetadata?.nodeRef,
+            model: event.contentMetadata?.model,
+            accumulated: event.contentMetadata?.accumulated,
+            isComplete: false,
+          },
+        };
+
+      case 'content_complete':
+        return {
+          ...baseChunk,
+          type: 'content',
+          content: event.content || '',
+          metadata: {
+            ...baseChunk.metadata,
+            nodeRef: event.contentMetadata?.nodeRef,
+            model: event.contentMetadata?.model,
+            accumulated: event.contentMetadata?.accumulated,
+            isComplete: true,
+          },
+        };
+
       default:
         return {
           ...baseChunk,

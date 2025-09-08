@@ -9,6 +9,16 @@ import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { forwardRef, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
+// Simplified message interface for UI callbacks
+interface MessageNotification {
+  id: string
+  content: string
+  role: 'user' | 'assistant' | 'system'
+  timestamp: string
+  conversationId: string
+  agentId?: string
+}
+
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
   starshipId?: string

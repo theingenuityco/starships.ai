@@ -7,7 +7,6 @@
  */
 
 import { Agent } from '@starships/autopilot';
-import { getEnvConfig } from '@starships/env';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
@@ -720,7 +719,6 @@ export class AgentService {
           parameters: {
             model: dbAgent.model,
             prompt: 'Respond to the user based on the conversation context and your system instructions.',
-            openrouterApiKey: getEnvConfig().OPENROUTER_API_KEY || '',
             temperature: dbAgent.temperature || 0.7,
             maxTokens: dbAgent.maxTokens || 2000,
             timeout: 30000,

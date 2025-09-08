@@ -11,7 +11,6 @@ import { WorkflowParsingService } from '@/services/WorkflowParsingService';
 import { Logger } from '@/utils/logger';
 import type { LlmNodeParameters } from '@starships/autopilot';
 import { AgentMemory, LLM, Workflow } from '@starships/autopilot';
-import { getEnvConfig } from '@starships/env';
 import { AgentRepository, MissionClarityRepository, MissionRepository, StarshipRepository } from '@starships/models';
 import type {
   AgentModel,
@@ -32,7 +31,6 @@ export interface MissionOrchestratorAgentConfig {
   maxTokens?: number;
   provider?: 'openai' | 'anthropic';
   model?: string;
-  openrouterApiKey?: string;
 }
 
 /**
@@ -109,7 +107,6 @@ export class MissionOrchestratorAgent {
     maxTokens: 1000,
     provider: 'openai',
     model: 'gpt-4o',
-    openrouterApiKey: getEnvConfig().OPENROUTER_API_KEY || '',
   };
 
   constructor(config?: Partial<MissionOrchestratorAgentConfig>) {
@@ -602,7 +599,6 @@ export class MissionOrchestratorAgent {
         prompt: promptContent,
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
-        openrouterApiKey: this.config.openrouterApiKey,
       };
 
       const llm = new LLM(llmConfig);

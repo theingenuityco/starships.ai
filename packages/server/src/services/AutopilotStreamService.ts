@@ -6,27 +6,8 @@
  */
 
 import type { ExecutionEvent, StreamingEmitter } from '@starships/autopilot';
+import type { StreamingChunk } from '@starships/protocol';
 import type { StreamingService } from './StreamingService';
-
-/**
- * Server chunk format for broadcasting
- */
-interface ServerStreamChunk {
-  id: string;
-  streamId: string;
-  conversationId: string;
-  agentId: string;
-  type: 'content' | 'thinking' | 'node_start' | 'node_complete' | 'error' | 'complete';
-  content: string;
-  timestamp: string;
-  metadata?: {
-    nodeRef?: string;
-    eventType?: string;
-    status?: string;
-    errorCode?: string;
-    [key: string]: unknown;
-  };
-}
 
 /**
  * Server-side streaming service that converts autopilot events to streaming format
@@ -94,8 +75,8 @@ export class AutopilotStreamService implements StreamingEmitter {
   /**
    * Convert autopilot ExecutionEvent to server streaming chunk
    */
-  private convertEventToServerChunk(event: ExecutionEvent): ServerStreamChunk {
-    const baseChunk: ServerStreamChunk = {
+  private convertEventToServerChunk(event: ExecutionEvent): StreamingChunk {
+    const baseChunk: StreamingChunk = {
       id: this.generateChunkId(),
       streamId: this.streamId,
       conversationId: this.conversationId,

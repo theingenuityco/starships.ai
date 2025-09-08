@@ -1,31 +1,5 @@
-import type { ConversationResponse } from '@starships/protocol';
+import type { ConversationResponse, StreamingChunk, StreamingError } from '@starships/protocol';
 import type { Response } from 'express';
-
-// Streaming chunk interface
-export interface StreamingChunk {
-  id: string;
-  streamId: string;
-  conversationId: string;
-  agentId: string;
-  type: 'content' | 'thinking' | 'node_start' | 'node_complete' | 'error' | 'complete';
-  content: string;
-  timestamp: string;
-  metadata?: {
-    nodeRef?: string;
-    tokenCount?: number;
-    model?: string;
-    processingTimeMs?: number;
-  };
-}
-
-export interface StreamingError {
-  streamId: string;
-  errorCode: string;
-  message: string;
-  timestamp: string;
-  recoverable: boolean;
-  context?: Record<string, unknown>;
-}
 
 /**
  * Streaming Service using Server-Sent Events (SSE)

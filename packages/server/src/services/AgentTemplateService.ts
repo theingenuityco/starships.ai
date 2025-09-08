@@ -182,6 +182,7 @@ export class AgentTemplateService {
             prompt: 'Respond helpfully to the user based on the conversation context and your system instructions.',
             temperature,
             maxTokens,
+            stream: true, // Enable streaming for template LLM nodes
           },
         },
         {
@@ -227,6 +228,7 @@ export class AgentTemplateService {
             prompt: 'Analyze the code structure, architecture, and organization. Identify any structural issues.',
             temperature: 0.2,
             maxTokens: 1000,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -239,6 +241,7 @@ export class AgentTemplateService {
             prompt: 'Review the code for adherence to best practices, naming conventions, and code quality standards.',
             temperature: 0.1,
             maxTokens: 1200,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -251,6 +254,7 @@ export class AgentTemplateService {
             prompt: 'Based on all analysis, provide specific, actionable recommendations for code improvement.',
             temperature: 0.3,
             maxTokens: 1500,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -300,6 +304,7 @@ export class AgentTemplateService {
               'As an experienced starship navigator, assess what the captain needs help with regarding their starship operations, setup, or journey.',
             temperature: 0.3,
             maxTokens: 800,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -313,6 +318,7 @@ export class AgentTemplateService {
               'Provide clear, actionable guidance on starship operations, crew management, or system configuration. Include specific next steps.',
             temperature: 0.4,
             maxTokens: 1200,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -325,6 +331,7 @@ export class AgentTemplateService {
             prompt: 'Suggest additional resources, features, or assistance that might help the captain with their starship journey.',
             temperature: 0.5,
             maxTokens: 1000,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -373,6 +380,7 @@ export class AgentTemplateService {
             prompt: "Based on the user's request, brainstorm creative ideas, themes, and approaches for this writing project.",
             temperature: 0.9,
             maxTokens: 800,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -385,6 +393,7 @@ export class AgentTemplateService {
             prompt: 'Create a detailed outline that structures the best ideas from the brainstorming session.',
             temperature: 0.6,
             maxTokens: 1000,
+            stream: true, // Enable streaming
           },
         },
         {
@@ -397,6 +406,7 @@ export class AgentTemplateService {
             prompt: 'Write the creative content following the outline, focusing on engaging storytelling and vivid details.',
             temperature: 0.8,
             maxTokens: 2500,
+            stream: true, // Enable streaming
           },
         },
         {

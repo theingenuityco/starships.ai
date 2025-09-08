@@ -134,6 +134,22 @@ export class StreamingService {
 
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+      // Force flush to prevent buffering and ensure real-time streaming
+      // In Node.js, we need to call flushHeaders() and access the underlying socket
+      try {
+        if (!res.headersSent) {
+          res.flushHeaders();
+        }
+        // Force the underlying socket to flush if available
+        const socket = (res as any).socket;
+        if (socket && typeof socket.flush === 'function') {
+          socket.flush();
+        }
+      } catch (flushError) {
+        // Ignore flush errors to prevent breaking the stream
+        console.debug('[StreamingService] Flush failed:', flushError);
+      }
     } catch (error) {
       console.error('[StreamingService] Failed to send event:', error);
     }

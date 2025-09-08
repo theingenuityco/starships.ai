@@ -25,4 +25,8 @@ export { WorkflowService } from './WorkflowService';
 // Agent execution services (replacing agents/ directory)
 export { ToolService } from './ToolService';
 
+// Streaming services
+export { StreamingService } from './StreamingService';
+export { WebSocketService } from './WebSocketService';
+
 // Note: Workflow execution engine has been moved to @starships/autopilot package

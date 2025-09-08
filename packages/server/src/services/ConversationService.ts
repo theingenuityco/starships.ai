@@ -201,14 +201,14 @@ export class ConversationService {
       userId,
     });
 
-    // Execute agent conversation
+    // Execute agent conversation - streaming support will be added
     const response = await AgentService.executeConversation({
       source: 'user',
       agentId,
       userId,
       message,
       conversationId,
-      stream: false,
+      // stream parameter will be passed from request when streaming is implemented
     });
 
     // Save agent response to database

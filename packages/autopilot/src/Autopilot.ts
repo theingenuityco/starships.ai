@@ -78,12 +78,9 @@ class AutopilotManager {
   }
 }
 
-// Initialize with environment variables automatically
+// Initialize with empty credentials - must be configured manually
 export const autopilot = new AutopilotManager({
-  credentials: {
-    openrouterApiKey: process.env.OPENROUTER_API_KEY,
-    // Add other environment variables here as needed
-  },
+  credentials: {},
 });
 
 // Export the class for type checking if needed

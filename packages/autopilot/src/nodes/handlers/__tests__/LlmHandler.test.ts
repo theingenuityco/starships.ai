@@ -399,10 +399,17 @@ describe('LlmHandler', () => {
       const nodeWithoutModel: Node = {
         ...mockNode,
         parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
+          // Remove model field
           prompt: 'Hello, how are you?',
         } as LlmNodeParameters,
       };
+
+      // Mock validation to return the expected error for missing model
+      MockedLLM.prototype.validate = jest.fn().mockReturnValue({
+        valid: false,
+        errors: ['Model is required'],
+      });
+
       const handlerWithoutModel = new LlmHandler(nodeWithoutModel);
 
       const result = handlerWithoutModel.validate();
@@ -422,9 +429,16 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Test prompt',
+          // Remove prompt field
         } as LlmNodeParameters,
       };
+
+      // Mock validation to return the expected error for missing prompt
+      MockedLLM.prototype.validate = jest.fn().mockReturnValue({
+        valid: false,
+        errors: ['Prompt is required'],
+      });
+
       const handlerWithoutPrompt = new LlmHandler(nodeWithoutPrompt);
 
       const result = handlerWithoutPrompt.validate();

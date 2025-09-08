@@ -20,27 +20,6 @@ export interface AgentOptions {
   eventCallback?: EventCallback;
 }
 
-export interface ExecuteAgentResponse {
-  response: string;
-  usage: {
-    totalTokens: number;
-    cost: number;
-    modelCalls: number;
-  };
-  executionTime: number;
-  status: 'success' | 'error';
-  error?: string;
-  executionEvents?: ExecutionEvent[];
-}
-
-export interface AgentExecutionContext {
-  agentId: string;
-  userId?: string;
-  conversationId?: string;
-  userMessage: string;
-  eventCallback?: EventCallback;
-}
-
 /**
  * Service class for managing agents and their execution
  */
@@ -339,16 +318,17 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Execute agent chat using ConversationRequest format with enhanced error handling
+   * Execute conversation with agent using ConversationRequest format
+   * Handles complete conversation lifecycle with event monitoring and message creation
    */
-  static async executeChat(request: ConversationRequest): Promise<ConversationResponse> {
+  static async executeConversation(request: ConversationRequest): Promise<ConversationResponse> {
     const { agentId, userId, message, conversationId } = request;
 
     if (!agentId) {
-      throw new ValidationError('agentId is required for agent chat', 'agentId');
+      throw new ValidationError('agentId is required for conversation execution', 'agentId');
     }
 
-    console.log('🚀 [AGENT-SERVICE] Starting agent chat:', {
+    console.log('🚀 [AGENT-SERVICE] Starting conversation execution:', {
       agentId,
       userId,
       message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
@@ -374,10 +354,10 @@ export class AgentService {
       starshipId: dbAgent.starshipId,
     });
 
-    try {
-      // Execute agent using AgentService instance
-      const agentService = new AgentService();
+    const startTime = Date.now();
+    const agentService = new AgentService();
 
+    try {
       // Create event handler with MessageService to add messages on each node completion
       const eventHandler = AgentService.createEventHandler({
         agentId: agentId,
@@ -387,48 +367,56 @@ export class AgentService {
         messageService: agentService.messageService,
       });
 
-      const executionResult = await agentService.executeAgent(
-        {
-          agentId: agentId,
-          userId: userId,
-          conversationId: conversationId,
-          userMessage: message,
-          eventCallback: eventHandler,
-        },
-        {
-          includeMemory: true,
-          userId: userId,
-          conversationId: conversationId,
-          loadConversationHistory: true,
-        }
-      );
+      // Create agent instance with enhanced options
+      const agent = await agentService.createAgentInstance(dbAgent, {
+        includeMemory: true,
+        userId: userId,
+        conversationId: conversationId,
+        loadConversationHistory: true,
+        eventCallback: eventHandler,
+      });
 
-      console.log('✅ [AGENT-SERVICE] Chat execution completed successfully:', {
-        responseLength: executionResult.response.length,
-        executionTime: executionResult.executionTime,
-        usageStats: executionResult.usage,
+      // Add user message to memory
+      agent.addToMemory('user', message);
+
+      // Execute agent with event monitoring
+      const execution = await agent.execute(undefined, eventHandler);
+
+      // Extract response from execution result
+      const response = agentService.extractResponse(execution);
+
+      // Calculate usage statistics
+      const usage = agentService.calculateUsage(execution);
+
+      // Update agent usage count
+      await agentRepo.incrementUsageCount(agentId);
+
+      const executionTime = Date.now() - startTime;
+
+      console.log('✅ [AGENT-SERVICE] Conversation execution completed successfully:', {
+        responseLength: response.length,
+        executionTime,
+        usageStats: usage,
       });
 
       return {
         source: 'agent',
-        content: executionResult.response,
+        content: response,
         agentId: agentId,
         usage: {
-          promptTokens: Math.floor(executionResult.usage.totalTokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(executionResult.usage.totalTokens * 0.3), // Estimate completion tokens
+          promptTokens: Math.floor(usage.totalTokens * 0.7), // Estimate prompt tokens
+          completionTokens: Math.floor(usage.totalTokens * 0.3), // Estimate completion tokens
         },
       };
     } catch (error) {
-      console.error('❌ [AGENT-SERVICE] Agent execution failed:', {
+      console.error('❌ [AGENT-SERVICE] Conversation execution failed:', {
         agentId,
         userId,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // Create error message in conversation and then throw the error
-      // This ensures the error is handled properly by the message service
-      const agentService = new AgentService();
+      // Create error message in conversation
       await agentService.createErrorResponse(error as Error, {
         agentId,
         userId,
@@ -436,7 +424,6 @@ export class AgentService {
         starshipId: dbAgent.starshipId,
       });
 
-      // Throw the original error so it's handled as an actual error, not a success response
       throw error;
     }
   }
@@ -492,94 +479,6 @@ export class AgentService {
         errors: [error instanceof Error ? error.message : 'Unknown validation error'],
         warnings: [],
       };
-    }
-  }
-
-  /**
-   * Execute an agent with user input
-   */
-  async executeAgent(context: AgentExecutionContext, options: AgentOptions = {}): Promise<ExecuteAgentResponse> {
-    const startTime = Date.now();
-    const executionEvents: ExecutionEvent[] = [];
-
-    try {
-      // Get database agent
-      const dbAgent = await this.agentRepository.findById(context.agentId);
-      if (!dbAgent) {
-        throw new NotFoundError('Agent', context.agentId);
-      }
-
-      // Create agent instance
-      const agent = await this.createAgentInstance(dbAgent, options);
-
-      // Add user message to memory
-      agent.addToMemory('user', context.userMessage);
-
-      // Execute with event handling if callback provided
-      let execution;
-      const eventCallback = context.eventCallback || options.eventCallback;
-
-      if (eventCallback) {
-        // Create a wrapper callback that collects events and calls user callback
-        const wrappedCallback: EventCallback = async (event: ExecutionEvent) => {
-          executionEvents.push(event);
-          await eventCallback(event);
-        };
-        execution = await agent.execute(undefined, wrappedCallback);
-      } else {
-        execution = await agent.execute();
-      }
-
-      // Extract response from execution result
-      const response = this.extractResponse(execution);
-
-      // Calculate usage statistics
-      const usage = this.calculateUsage(execution);
-
-      // Note: Conversation history persistence removed
-
-      // Update agent usage count
-      await this.agentRepository.incrementUsageCount(context.agentId);
-
-      const executionTime = Date.now() - startTime;
-
-      const result: ExecuteAgentResponse = {
-        response,
-        usage,
-        executionTime,
-        status: 'success',
-      };
-
-      // Add execution events if they were collected
-      if (executionEvents.length > 0) {
-        result.executionEvents = executionEvents;
-      }
-
-      return result;
-    } catch (error) {
-      const executionTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      console.error(`[AGENT-SERVICE] Agent execution failed for ${context.agentId}:`, error);
-
-      // Return raw error response
-      // Note: Error message creation is handled by createErrorResponse in executeChat
-      // to avoid duplicate messages. This method just returns the error response.
-
-      const result: ExecuteAgentResponse = {
-        response: errorMessage,
-        usage: { totalTokens: 0, cost: 0, modelCalls: 0 },
-        executionTime,
-        status: 'error',
-        error: errorMessage,
-      };
-
-      // Add execution events if they were collected (even on error)
-      if (executionEvents.length > 0) {
-        result.executionEvents = executionEvents;
-      }
-
-      return result;
     }
   }
 

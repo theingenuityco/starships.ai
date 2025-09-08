@@ -416,7 +416,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     if (!checkAuth(req, res)) return;
 
     // Parameter validation
-    const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
     // Pagination validation
@@ -717,9 +717,9 @@ The API Routes layer implements **HTTP-specific validation** using Zod schemas t
 **Request Parameter Validation:**
 
 ```typescript
-// UUID format validation for path parameters
-const UuidSchema = z.string().uuid('Invalid UUID format');
-const paramValidation = validateData(z.object({ conversationId: UuidSchema }), req.params, res, 'conversation parameter');
+// Nanoid format validation for path parameters
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
+const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
 ```
 
 **Query Parameter Validation with Coercion:**
@@ -820,7 +820,7 @@ async getConversationWithMessages(conversationId: string): Promise<ConversationW
 
 // Layer 5: API Routes - HTTP transformation
 router.get('/conversations/:conversationId', async (req, res) => {
-  const { conversationId } = validateData(UuidSchema, req.params); // HTTP → validated data
+  const { conversationId } = validateData(NanoidSchema, req.params); // HTTP → validated data
   const result = await conversationService.getConversationWithMessages(conversationId);
 
   // Business object → HTTP response

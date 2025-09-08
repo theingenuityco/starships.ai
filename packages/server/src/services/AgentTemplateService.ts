@@ -120,11 +120,7 @@ export class AgentTemplateService {
     }
 
     if (!starship) {
-      throw new NotFoundError(
-        `Starship with ${searchMethod.toLowerCase()} "${starshipId}" not found or you don't have access to it`,
-        'Starship',
-        starshipId
-      );
+      throw new NotFoundError('Starship', starshipId);
     }
 
     if (starship.ownerId !== userId) {
@@ -141,7 +137,7 @@ export class AgentTemplateService {
     const agent = await this.agentRepository.findById(agentId);
 
     if (!agent) {
-      throw new NotFoundError(`Agent not found`, 'Agent', agentId);
+      throw new NotFoundError('Agent', agentId);
     }
 
     if (!agent.isPublic) {

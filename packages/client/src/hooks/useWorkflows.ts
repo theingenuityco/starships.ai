@@ -4,9 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
 // Workflow category type for filtering
 export type WorkflowCategory = 'general' | 'data-processing' | 'automation' | 'integration' | 'analysis'
 export type ExecutionMode = 'simple' | 'workflow'
@@ -54,7 +51,7 @@ export const WORKFLOW_QUERY_KEYS = {
 export function useWorkflows(filters?: WorkflowFilters, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.list(filters),
-    queryFn: async () => {
+    queryFn: async (): Promise<{ workflows: WorkflowModel[] }> => {
       const params = new URLSearchParams()
       if (filters?.category) params.append('category', filters.category)
       if (filters?.authorId) params.append('authorId', filters.authorId)
@@ -63,9 +60,8 @@ export function useWorkflows(filters?: WorkflowFilters, enabled: boolean = true)
       if (filters?.tags) params.append('tags', filters.tags.join(','))
       if (filters?.starshipClass) params.append('starshipClass', filters.starshipClass)
 
-      const response = await api.get(`/api/v1/workflows?${params.toString()}`)
-      const workflows = extractResponseData<WorkflowModel[]>(response)
-      return { workflows }
+      const response: AxiosResponse<ApiResponse<WorkflowModel[]>> = await api.get(`/api/v1/workflows?${params.toString()}`)
+      return { workflows: response.data.data }
     },
     enabled,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -78,10 +74,9 @@ export function useWorkflows(filters?: WorkflowFilters, enabled: boolean = true)
 export function useWorkflow(workflowId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.detail(workflowId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/workflows/${workflowId}`)
-      const workflow = extractResponseData<WorkflowModel>(response)
-      return workflow
+    queryFn: async (): Promise<WorkflowModel> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel>> = await api.get(`/api/v1/workflows/${workflowId}`)
+      return response.data.data
     },
     enabled: !!workflowId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -93,10 +88,9 @@ export function useWorkflow(workflowId: string, enabled: boolean = true) {
 export function useWorkflowsByCategory(category: WorkflowCategory, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.byCategory(category),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/workflows/category/${category}`)
-      const workflows = extractResponseData<WorkflowModel[]>(response)
-      return { workflows }
+    queryFn: async (): Promise<{ workflows: WorkflowModel[] }> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel[]>> = await api.get(`/api/v1/workflows/category/${category}`)
+      return { workflows: response.data.data }
     },
     enabled: !!category && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -108,10 +102,9 @@ export function useWorkflowsByCategory(category: WorkflowCategory, enabled: bool
 export function useWorkflowsByAuthor(authorId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.byAuthor(authorId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/workflows/author/${authorId}`)
-      const workflows = extractResponseData<WorkflowModel[]>(response)
-      return { workflows }
+    queryFn: async (): Promise<{ workflows: WorkflowModel[] }> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel[]>> = await api.get(`/api/v1/workflows/author/${authorId}`)
+      return { workflows: response.data.data }
     },
     enabled: !!authorId && enabled,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -123,10 +116,9 @@ export function useWorkflowsByAuthor(authorId: string, enabled: boolean = true) 
 export function useWorkflowsByStarship(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${starshipId}/workflows`)
-      const workflows = extractResponseData<WorkflowModel[]>(response)
-      return { workflows }
+    queryFn: async (): Promise<{ workflows: WorkflowModel[] }> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel[]>> = await api.get(`/api/v1/starships/${starshipId}/workflows`)
+      return { workflows: response.data.data }
     },
     enabled: !!starshipId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -138,10 +130,9 @@ export function useWorkflowsByStarship(starshipId: string, enabled: boolean = tr
 export function usePublicWorkflows(limit: number = 50, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.public(limit),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/workflows/public?limit=${limit}`)
-      const workflows = extractResponseData<WorkflowModel[]>(response)
-      return { workflows }
+    queryFn: async (): Promise<{ workflows: WorkflowModel[] }> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel[]>> = await api.get(`/api/v1/workflows/public?limit=${limit}`)
+      return { workflows: response.data.data }
     },
     enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -153,10 +144,9 @@ export function usePublicWorkflows(limit: number = 50, enabled: boolean = true) 
 export function useSearchWorkflows(query: string, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.search(query),
-    queryFn: async () => {
-      const response = await api.post('/api/v1/workflows/search', { query })
-      const workflows = extractResponseData<WorkflowModel[]>(response)
-      return { workflows }
+    queryFn: async (): Promise<{ workflows: WorkflowModel[] }> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel[]>> = await api.post('/api/v1/workflows/search', { query })
+      return { workflows: response.data.data }
     },
     enabled: !!query && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -168,10 +158,9 @@ export function useSearchWorkflows(query: string, enabled: boolean = true) {
 export function useWorkflowAnalytics(workflowId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: WORKFLOW_QUERY_KEYS.analytics(workflowId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/workflows/${workflowId}/analytics`)
-      const analytics = extractResponseData<WorkflowAnalytics>(response)
-      return analytics
+    queryFn: async (): Promise<WorkflowAnalytics> => {
+      const response: AxiosResponse<ApiResponse<WorkflowAnalytics>> = await api.get(`/api/v1/workflows/${workflowId}/analytics`)
+      return response.data.data
     },
     enabled: !!workflowId && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -184,9 +173,9 @@ export function useCreateWorkflow() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateWorkflowRequest) => {
-      const response = await api.post('/api/v1/workflows', data)
-      return extractResponseData<WorkflowModel>(response)
+    mutationFn: async (data: CreateWorkflowRequest): Promise<WorkflowModel> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel>> = await api.post('/api/v1/workflows', data)
+      return response.data.data
     },
     onMutate: async newWorkflow => {
       // Cancel any outgoing refetches for workflow lists
@@ -268,9 +257,9 @@ export function useUpdateWorkflow() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ workflowId, updates }: { workflowId: string; updates: UpdateWorkflowRequest }) => {
-      const response = await api.put(`/api/v1/workflows/${workflowId}`, updates)
-      return extractResponseData<WorkflowModel>(response)
+    mutationFn: async ({ workflowId, updates }: { workflowId: string; updates: UpdateWorkflowRequest }): Promise<WorkflowModel> => {
+      const response: AxiosResponse<ApiResponse<WorkflowModel>> = await api.put(`/api/v1/workflows/${workflowId}`, updates)
+      return response.data.data
     },
     onMutate: async ({ workflowId, updates }) => {
       // Cancel outgoing refetches
@@ -322,8 +311,8 @@ export function useDeleteWorkflow() {
 
   return useMutation({
     mutationFn: async (workflowId: string) => {
-      const response = await api.delete(`/api/v1/workflows/${workflowId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/workflows/${workflowId}`)
+      return response.data.data
     },
     onMutate: async workflowId => {
       // Get workflow details before deletion for rollback
@@ -406,8 +395,8 @@ export function useDeployWorkflow() {
 
   return useMutation({
     mutationFn: async ({ workflowId, starshipId }: { workflowId: string; starshipId: string }) => {
-      const response = await api.post(`/api/v1/workflows/${workflowId}/deploy`, { starshipId })
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/workflows/${workflowId}/deploy`, { starshipId })
+      return response.data.data
     },
     onSuccess: (data, variables) => {
       // Invalidate workflow details to show updated deployment status
@@ -431,8 +420,8 @@ export function useTrackWorkflowUsage() {
 
   return useMutation({
     mutationFn: async (workflowId: string) => {
-      const response = await api.post(`/api/v1/workflows/${workflowId}/track-usage`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/workflows/${workflowId}/track-usage`)
+      return response.data.data
     },
     onSuccess: (data, workflowId) => {
       // Invalidate related queries to show updated usage

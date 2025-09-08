@@ -5,6 +5,7 @@
  * Orchestrates between database persistence (MessageRepository) and business logic.
  */
 
+import { NotFoundError, ValidationError } from '@starships/errors';
 import { MessageRepository } from '@starships/models';
 import type {
   BulkMessageRequest,
@@ -256,7 +257,7 @@ export class MessageService {
     // Find the root message (the one that was requested)
     const rootMessage = thread.find((m: MessageModel) => m.id === request.messageId);
     if (!rootMessage) {
-      throw new Error(`Root message not found in thread: ${request.messageId}`);
+      throw new NotFoundError('RootMessage', request.messageId);
     }
 
     // Calculate total depth
@@ -359,7 +360,7 @@ export class MessageService {
 
         case 'update_status': {
           if (!request.operationData?.processingStatus) {
-            throw new Error('processingStatus required for update_status operation');
+            throw new ValidationError('processingStatus required for update_status operation', 'processingStatus');
           }
 
           const results = await Promise.allSettled(
@@ -385,7 +386,7 @@ export class MessageService {
 
         case 'assign_conversation': {
           if (!request.operationData?.conversationId) {
-            throw new Error('conversationId required for assign_conversation operation');
+            throw new ValidationError('conversationId required for assign_conversation operation', 'conversationId');
           }
 
           const assignResults = await Promise.allSettled(
@@ -410,7 +411,7 @@ export class MessageService {
         }
 
         default:
-          throw new Error(`Unsupported bulk operation: ${request.operation}`);
+          throw new ValidationError(`Unsupported bulk operation: ${request.operation}`, 'operation');
       }
     } catch (error) {
       console.error('❌ [MESSAGE-SERVICE] Bulk operation failed:', error);

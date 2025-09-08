@@ -4,19 +4,28 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useSendMessage } from '@/hooks/useConversations'
 import { cn, generateId } from '@/lib/utils'
-import type { Message } from '@/types/chat'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { KeyboardEvent, useEffect, useRef, useState } from 'react'
+
+// Simplified message interface for UI callbacks
+interface MessageNotification {
+  id: string
+  content: string
+  role: 'user' | 'assistant' | 'system'
+  timestamp: string
+  conversationId: string
+  agentId?: string
+}
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
   starshipId?: string
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
-  onMessageSent?: (message: Message) => void
-  onMessageReceived?: (message: Message) => void
+  onMessageSent?: (message: MessageNotification) => void
+  onMessageReceived?: (message: MessageNotification) => void
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content

@@ -4,9 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
 // Extended Starship interface for client compatibility with optimistic updates
 export interface ClientStarship extends StarshipModel {
   loading?: boolean
@@ -30,9 +27,9 @@ export const STARSHIP_QUERY_KEYS = {
 export function useStarship(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.detail(starshipId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${starshipId}`)
-      return extractResponseData<StarshipModel>(response)
+    queryFn: async (): Promise<StarshipModel> => {
+      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.get(`/api/v1/starships/${starshipId}`)
+      return response.data.data
     },
     enabled: !!starshipId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -46,9 +43,9 @@ export function useStarship(starshipId: string, enabled: boolean = true) {
 export function useUserStarships(userId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.byOwner(userId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/users/${userId}/starships`)
-      return extractResponseData<StarshipModel[]>(response)
+    queryFn: async (): Promise<StarshipModel[]> => {
+      const response: AxiosResponse<ApiResponse<StarshipModel[]>> = await api.get(`/api/v1/users/${userId}/starships`)
+      return response.data.data
     },
     enabled: !!userId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -63,9 +60,9 @@ export function useUserStarships(userId: string, enabled: boolean = true) {
 export function useStarshipBySlug(slug: string, enabled: boolean = true) {
   return useQuery({
     queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', slug] as const,
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${slug}`)
-      return extractResponseData<StarshipModel>(response)
+    queryFn: async (): Promise<StarshipModel> => {
+      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.get(`/api/v1/starships/${slug}`)
+      return response.data.data
     },
     enabled: !!slug && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -83,8 +80,8 @@ export function useStarships() {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.lists(),
     queryFn: async () => {
-      const response = await api.get('/api/v1/starships')
-      return { starships: extractResponseData<StarshipModel[]>(response) }
+      const response: AxiosResponse<ApiResponse<StarshipModel[]>> = await api.get('/api/v1/starships')
+      return { starships: response.data.data }
     },
     staleTime: 10 * 1000, // 10 seconds
     gcTime: 2 * 60 * 1000, // 2 minutes
@@ -99,8 +96,8 @@ export function useStarshipAgents(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.agents(starshipId),
     queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${starshipId}/agents`)
-      return extractResponseData<any[]>(response)
+      const response: AxiosResponse<ApiResponse<any[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`)
+      return response.data.data
     },
     enabled: !!starshipId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -115,9 +112,9 @@ export function useCreateStarship() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateStarshipRequest) => {
-      const response = await api.post('/api/v1/starships', data)
-      return extractResponseData<StarshipModel>(response)
+    mutationFn: async (data: CreateStarshipRequest): Promise<StarshipModel> => {
+      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.post('/api/v1/starships', data)
+      return response.data.data
     },
     onSuccess: (starship, variables) => {
       // Invalidate user's starship list
@@ -151,9 +148,9 @@ export function useUpdateStarship() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ starshipId, updates }: { starshipId: string; updates: UpdateStarshipRequest }) => {
-      const response = await api.put(`/api/v1/starships/${starshipId}`, updates)
-      return extractResponseData<StarshipModel>(response)
+    mutationFn: async ({ starshipId, updates }: { starshipId: string; updates: UpdateStarshipRequest }): Promise<StarshipModel> => {
+      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.put(`/api/v1/starships/${starshipId}`, updates)
+      return response.data.data
     },
     onSuccess: (updatedStarship, variables) => {
       // Update the specific starship in cache
@@ -186,8 +183,8 @@ export function useDeleteStarship() {
 
   return useMutation({
     mutationFn: async (starshipId: string) => {
-      const response = await api.delete(`/api/v1/starships/${starshipId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/starships/${starshipId}`)
+      return response.data.data
     },
     onMutate: async starshipId => {
       // Get starship details to know which caches to update

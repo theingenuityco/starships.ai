@@ -8,9 +8,9 @@ import {
   handleCommonError,
   sendError,
   sendSuccess,
+  validateId,
   validateIdOrSlug,
   validatePagination,
-  validateUUID,
 } from '../utils/responseHelpers';
 
 const router: Router = Router();
@@ -117,7 +117,7 @@ router.get('/agent-templates/:id', jwtAuthMiddleware, async (req: Request, res: 
     const { id } = req.params;
 
     // Validate template ID format
-    const { isValid, error } = validateUUID(id, 'id');
+    const { isValid, error } = validateId(id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -160,7 +160,7 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     }
 
     // Validate templateId format
-    const { isValid, error } = validateUUID(templateId, 'templateId');
+    const { isValid, error } = validateId(templateId, 'templateId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -284,7 +284,7 @@ router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (r
     }
 
     // Validate agentId format
-    const { isValid, error } = validateUUID(agentId, 'agentId');
+    const { isValid, error } = validateId(agentId, 'agentId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;

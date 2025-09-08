@@ -323,22 +323,29 @@ Simple and efficient debug configurations for development:
 
 #### Debug Configurations
 
-- **Next.js Client** - Debug the Next.js frontend with browser integration
-- **Express Server** - Debug the Express.js backend with hot reloading
-- **Full Stack** - Launch client and server simultaneously
+- **Debug Next.js Server** - Debug the Next.js server-side code with TypeScript support
+- **Debug Next.js Client (Browser)** - Debug React components in Chrome with source maps
+- **Debug Express Server** - Debug the Express.js backend with hot reloading
+- **Debug Client (Full Stack)** - Launch Next.js server and browser debugging simultaneously
+- **Debug Application (Full Stack)** - Launch all services (Express, Next.js server, and browser)
 - **Attach Process** - Attach to any running Node.js process
 
 #### Quick Start Debugging
 
-1. **Full Stack Development**:
-   - Press `F5` and choose **"Full Stack"**
-   - Debugs frontend and backend with breakpoints
+1. **Client Development**:
+   - Press `F5` and choose **"Debug Client (Full Stack)"**
+   - Debugs both Next.js server and React browser code with breakpoints
 
-2. **Individual Services**:
-   - Choose **"Next.js Client"** for frontend-only debugging
-   - Choose **"Express Server"** for backend-only debugging
+2. **Full Application Development**:
+   - Choose **"Debug Application (Full Stack)"** to debug all services
+   - Includes Express backend, Next.js server, and browser client
 
-3. **Auto-Attach from Terminal**:
+3. **Individual Services**:
+   - Choose **"Debug Next.js Server"** for server-side Next.js debugging
+   - Choose **"Debug Next.js Client (Browser)"** for React component debugging
+   - Choose **"Debug Express Server"** for backend-only debugging
+
+4. **Auto-Attach from Terminal**:
    - Run `pnpm dev` in terminal - debugger auto-attaches
    - Or choose **"Attach Process"** to pick a running process
 

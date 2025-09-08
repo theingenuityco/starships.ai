@@ -5,7 +5,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
 import { SubscriptionService } from '@/services/SubscriptionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateUUID } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId } from '@/utils/responseHelpers';
 import type { StarshipModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -331,16 +331,9 @@ router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    // Get deployed agents and available slots
-    const starshipDetails = await starshipService.getStarshipWithDetails(starship.id);
-    const agents = starshipDetails?.agents || [];
-    const availableSlots = starshipDetails?.availableSlots || 0;
-
-    sendSuccess(res, {
-      starship,
-      agents,
-      availableSlots,
-    });
+    // Return just the starship model
+    // Note: For detailed agent info and available slots, use GET /starships/:id/agents endpoint
+    sendSuccess(res, starship);
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship');
@@ -354,13 +347,13 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
     const { id: starshipId, agentId } = req.params;
 
     // Validate UUIDs
-    const { isValid: starshipValid, error: starshipError } = validateUUID(starshipId, 'starshipId');
+    const { isValid: starshipValid, error: starshipError } = validateId(starshipId, 'starshipId');
     if (!starshipValid && starshipError) {
       sendError(res, starshipError.code, starshipError.message, 400, starshipError.details);
       return;
     }
 
-    const { isValid: agentValid, error: agentError } = validateUUID(agentId, 'agentId');
+    const { isValid: agentValid, error: agentError } = validateId(agentId, 'agentId');
     if (!agentValid && agentError) {
       sendError(res, agentError.code, agentError.message, 400, agentError.details);
       return;
@@ -413,13 +406,13 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
     const { id: starshipId, agentId } = req.params;
 
     // Validate UUIDs
-    const { isValid: starshipValid, error: starshipError } = validateUUID(starshipId, 'starshipId');
+    const { isValid: starshipValid, error: starshipError } = validateId(starshipId, 'starshipId');
     if (!starshipValid && starshipError) {
       sendError(res, starshipError.code, starshipError.message, 400, starshipError.details);
       return;
     }
 
-    const { isValid: agentValid, error: agentError } = validateUUID(agentId, 'agentId');
+    const { isValid: agentValid, error: agentError } = validateId(agentId, 'agentId');
     if (!agentValid && agentError) {
       sendError(res, agentError.code, agentError.message, 400, agentError.details);
       return;
@@ -470,7 +463,7 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     const { name, status, class: starshipClass } = req.body;
 
     // Validate starship ID
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    const { isValid, error } = validateId(starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -576,7 +569,7 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
     console.log(`[STARSHIPS] Delete request for starship ${starshipId} by user ${userId}`);
 
     // Validate starship ID
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    const { isValid, error } = validateId(starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -667,7 +660,7 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
     const userId = (req as any).user!.id;
 
     // Validate starship ID
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    const { isValid, error } = validateId(starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -793,7 +786,7 @@ router.post('/starships/:id/billing-portal', jwtAuthMiddleware, async (req: Requ
     }
 
     // Validate starship ID
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    const { isValid, error } = validateId(starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -822,7 +815,7 @@ router.post('/starships/:id/retry-payment', jwtAuthMiddleware, async (req: Reque
     }
 
     // Validate starship ID
-    const { isValid, error } = validateUUID(starshipId, 'starshipId');
+    const { isValid, error } = validateId(starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;

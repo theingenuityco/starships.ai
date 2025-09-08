@@ -5,6 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and other entities.
  */
 
+import { Transformers } from '@/helpers/serializer';
 import type { NativeToolApiKeyModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsISO8601, IsString, Length } from 'class-validator';
@@ -13,18 +14,6 @@ import { IsISO8601, IsString, Length } from 'class-validator';
  * Custom transformers for the NativeToolApiKeyEntity
  */
 export class NativeToolApiKeyTransformers {
-  /**
-   * Transform date strings to ISO format, handling various input formats
-   */
-  static DateTransform() {
-    return Transform(({ value }) => {
-      if (!value) return new Date().toISOString();
-      if (typeof value === 'string') return value;
-      if (value instanceof Date) return value.toISOString();
-      return new Date(value).toISOString();
-    });
-  }
-
   /**
    * Transform tool name to ensure consistency (lowercase, no special chars)
    */
@@ -96,12 +85,12 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
   encryptedApiKey!: string;
 
   @Expose()
-  @NativeToolApiKeyTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @NativeToolApiKeyTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 

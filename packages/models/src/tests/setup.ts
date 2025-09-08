@@ -135,13 +135,11 @@ const mockDriver = {
 // Error creation helpers
 (global as any).createValidationError = (message = 'Validation failed', field = 'testField') => new ValidationError(message, field);
 
-(global as any).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') =>
-  new NotFoundError(`${entityType} not found`, entityType, entityId);
+(global as any).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') => new NotFoundError(entityType, entityId);
 
-(global as any).createDatabaseError = (message = 'Database operation failed', operation = 'test') => new DatabaseError(message, operation);
+(global as any).createDatabaseError = (message = 'Database operation failed', operation = 'test') => new DatabaseError(operation);
 
-(global as any).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') =>
-  new ConflictError(message, conflictType);
+(global as any).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') => new ConflictError(message);
 
 // Mock database session with common patterns
 (global as any).createMockDatabaseSession = () => {
@@ -200,11 +198,6 @@ jest.setTimeout(10000);
 // Mock environment variables for testing
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'error'; // Reduce log noise in tests
-
-// Mock UUID generation for predictable testing
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
-}));
 
 // Mock nanoid generation for predictable testing
 jest.mock('nanoid', () => ({

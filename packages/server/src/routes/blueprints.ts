@@ -8,7 +8,7 @@ import { z, ZodError } from 'zod';
 const router: Router = Router();
 
 // Zod schemas for validation
-const UuidSchema = z.string().uuid('Invalid UUID format');
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -109,7 +109,7 @@ router.get('/blueprints/:blueprintId', jwtAuthMiddleware, async (req: Request, r
     if (!checkAuth(req, res)) return;
 
     // Validate blueprintId parameter
-    const paramValidation = validateData(z.object({ blueprintId: UuidSchema }), req.params, res, 'blueprint parameter');
+    const paramValidation = validateData(z.object({ blueprintId: NanoidSchema }), req.params, res, 'blueprint parameter');
     if (!paramValidation) return;
 
     const { blueprintId } = paramValidation;
@@ -175,7 +175,7 @@ router.put('/blueprints/:blueprintId', jwtAuthMiddleware, async (req: Request, r
     if (!checkAuth(req, res)) return;
 
     // Validate blueprintId parameter
-    const paramValidation = validateData(z.object({ blueprintId: UuidSchema }), req.params, res, 'blueprint parameter');
+    const paramValidation = validateData(z.object({ blueprintId: NanoidSchema }), req.params, res, 'blueprint parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -222,7 +222,7 @@ router.delete('/blueprints/:blueprintId', jwtAuthMiddleware, async (req: Request
     if (!checkAuth(req, res)) return;
 
     // Validate blueprintId parameter
-    const paramValidation = validateData(z.object({ blueprintId: UuidSchema }), req.params, res, 'blueprint parameter');
+    const paramValidation = validateData(z.object({ blueprintId: NanoidSchema }), req.params, res, 'blueprint parameter');
     if (!paramValidation) return;
 
     const { blueprintId } = paramValidation;
@@ -289,7 +289,7 @@ router.post('/blueprints/:blueprintId/clone', jwtAuthMiddleware, async (req: Req
     if (!checkAuth(req, res)) return;
 
     // Validate blueprintId parameter
-    const paramValidation = validateData(z.object({ blueprintId: UuidSchema }), req.params, res, 'blueprint parameter');
+    const paramValidation = validateData(z.object({ blueprintId: NanoidSchema }), req.params, res, 'blueprint parameter');
     if (!paramValidation) return;
 
     // Validate request body
@@ -362,7 +362,7 @@ router.post('/blueprints/:blueprintId/track-usage', jwtAuthMiddleware, async (re
     if (!checkAuth(req, res)) return;
 
     // Validate blueprintId parameter
-    const paramValidation = validateData(z.object({ blueprintId: UuidSchema }), req.params, res, 'blueprint parameter');
+    const paramValidation = validateData(z.object({ blueprintId: NanoidSchema }), req.params, res, 'blueprint parameter');
     if (!paramValidation) return;
 
     const { blueprintId } = paramValidation;
@@ -386,7 +386,7 @@ router.get('/blueprints/:blueprintId/stats', jwtAuthMiddleware, async (req: Requ
     if (!checkAuth(req, res)) return;
 
     // Validate blueprintId parameter
-    const paramValidation = validateData(z.object({ blueprintId: UuidSchema }), req.params, res, 'blueprint parameter');
+    const paramValidation = validateData(z.object({ blueprintId: NanoidSchema }), req.params, res, 'blueprint parameter');
     if (!paramValidation) return;
 
     const { blueprintId } = paramValidation;
@@ -418,7 +418,7 @@ router.post('/blueprints/:blueprintId/validate', jwtAuthMiddleware, async (req: 
     if (!checkAuth(req, res)) return;
 
     // Validate blueprintId parameter
-    const paramValidation = validateData(z.object({ blueprintId: UuidSchema }), req.params, res, 'blueprint parameter');
+    const paramValidation = validateData(z.object({ blueprintId: NanoidSchema }), req.params, res, 'blueprint parameter');
     if (!paramValidation) return;
 
     const { blueprintId } = paramValidation;

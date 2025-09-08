@@ -7,7 +7,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MissionService } from '@/services/MissionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validatePagination, validateUUID } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
 import type { CreateMissionRequest, MissionFilters, MissionSort, UpdateMissionRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -19,11 +19,13 @@ const router: Router = Router();
 // VALIDATION SCHEMAS
 // ============================================================================
 
+const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
+
 const CreateMissionSchema = z.object({
-  starshipId: z.string().uuid('Invalid starship ID format'),
+  starshipId: NanoidSchema,
   name: z.string().min(1).max(200, 'Mission name cannot exceed 200 characters'),
   description: z.string().min(1).max(2000, 'Mission description cannot exceed 2000 characters'),
-  agentIds: z.array(z.string().uuid('Invalid agent ID format')).min(1, 'At least one agent must be assigned'),
+  agentIds: z.array(NanoidSchema).min(1, 'At least one agent must be assigned'),
 });
 
 const UpdateMissionSchema = z.object({
@@ -31,15 +33,15 @@ const UpdateMissionSchema = z.object({
   description: z.string().min(1).max(2000, 'Mission description cannot exceed 2000 characters').optional(),
   status: z.enum(['draft', 'active', 'completed', 'failed', 'cancelled']).optional(),
   phase: z.enum(['welcome', 'analysis', 'plan', 'execute', 'converse']).optional(),
-  agentIds: z.array(z.string().uuid('Invalid agent ID format')).optional(),
-  blueprintId: z.string().uuid('Invalid blueprint ID format').optional(),
+  agentIds: z.array(NanoidSchema).optional(),
+  blueprintId: NanoidSchema.optional(),
   approvalStatus: z.enum(['pending', 'approved', 'rejected', 'modified']).optional(),
 });
 
 const MissionFiltersSchema = z.object({
   status: z.array(z.enum(['draft', 'active', 'completed', 'failed', 'cancelled'])).optional(),
-  createdBy: z.string().uuid('Invalid user ID format').optional(),
-  starshipId: z.string().uuid('Invalid starship ID format').optional(),
+  createdBy: NanoidSchema.optional(),
+  starshipId: NanoidSchema.optional(),
 });
 
 const MissionSortSchema = z.object({
@@ -84,7 +86,7 @@ router.get('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Respons
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -105,7 +107,7 @@ router.get('/starships/:starshipId/missions', jwtAuthMiddleware, async (req: Req
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.starshipId, 'starshipId');
+    const { isValid, error } = validateId(req.params.starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -202,7 +204,7 @@ router.put('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Respons
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -226,7 +228,7 @@ router.delete('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Resp
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -251,7 +253,7 @@ router.post('/missions/:id/start', jwtAuthMiddleware, async (req: Request, res: 
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -272,7 +274,7 @@ router.post('/missions/:id/complete', jwtAuthMiddleware, async (req: Request, re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -293,7 +295,7 @@ router.post('/missions/:id/fail', jwtAuthMiddleware, async (req: Request, res: R
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -314,7 +316,7 @@ router.post('/missions/:id/cancel', jwtAuthMiddleware, async (req: Request, res:
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -335,7 +337,7 @@ router.put('/missions/:id/phase', jwtAuthMiddleware, async (req: Request, res: R
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -370,7 +372,7 @@ router.get('/starships/:starshipId/missions/stats', jwtAuthMiddleware, async (re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.starshipId, 'starshipId');
+    const { isValid, error } = validateId(req.params.starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -391,7 +393,7 @@ router.get('/missions/:id/clarity', jwtAuthMiddleware, async (req: Request, res:
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -424,7 +426,7 @@ router.get('/missions/:id/workflow', jwtAuthMiddleware, async (req: Request, res
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
@@ -453,7 +455,7 @@ router.put('/missions/:id/workflow/approval', jwtAuthMiddleware, async (req: Req
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateUUID(req.params.id, 'id');
+    const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;

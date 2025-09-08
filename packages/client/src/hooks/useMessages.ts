@@ -4,12 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
 // Extended Message interface for client compatibility with optimistic updates
 export interface ClientMessage extends MessageModel {
+  // UI-only states
   sending?: boolean
+  streaming?: boolean
   error?: boolean
 }
 
@@ -49,9 +48,9 @@ export const MESSAGE_QUERY_KEYS = {
 export function useMessage(messageId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.detail(messageId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/messages/${messageId}`)
-      return extractResponseData<MessageModel>(response)
+    queryFn: async (): Promise<MessageModel> => {
+      const response: AxiosResponse<ApiResponse<MessageModel>> = await api.get(`/api/v1/messages/${messageId}`)
+      return response.data.data
     },
     enabled: !!messageId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -65,12 +64,11 @@ export function useMessage(messageId: string, enabled: boolean = true) {
 export function useStarshipMessages(starshipId: string, limit: number = 50, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${starshipId}/messages`, {
+    queryFn: async (): Promise<{ messages: MessageModel[] }> => {
+      const response: AxiosResponse<ApiResponse<{ messages: MessageModel[] }>> = await api.get(`/api/v1/starships/${starshipId}/messages`, {
         params: { limit, page: 1 },
       })
-      const data = extractResponseData<{ messages: MessageModel[] }>(response)
-      return data
+      return response.data.data
     },
     enabled: !!starshipId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -85,12 +83,11 @@ export function useStarshipMessages(starshipId: string, limit: number = 50, enab
 export function useAgentMessages(agentId: string, limit: number = 50, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.byAgent(agentId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/agents/${agentId}/messages`, {
+    queryFn: async (): Promise<{ messages: MessageModel[] }> => {
+      const response: AxiosResponse<ApiResponse<{ messages: MessageModel[] }>> = await api.get(`/api/v1/agents/${agentId}/messages`, {
         params: { limit, page: 1 },
       })
-      const data = extractResponseData<{ messages: MessageModel[] }>(response)
-      return data
+      return response.data.data
     },
     enabled: !!agentId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -105,19 +102,27 @@ export function useAgentMessages(agentId: string, limit: number = 50, enabled: b
 export function useConversationMessages(conversationId: string, limit: number = 100, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.byConversation(conversationId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
+    queryFn: async (): Promise<{
+      conversationId: string
+      messages: MessageModel[]
+      total: number
+      participants: string[]
+      startedAt: string
+      lastActivityAt: string
+    }> => {
+      const response: AxiosResponse<
+        ApiResponse<{
+          conversationId: string
+          messages: MessageModel[]
+          total: number
+          participants: string[]
+          startedAt: string
+          lastActivityAt: string
+        }>
+      > = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
         params: { limit, page: 1, orderBy: 'timestamp', orderDirection: 'asc' },
       })
-      const data = extractResponseData<{
-        conversationId: string
-        messages: MessageModel[]
-        total: number
-        participants: string[]
-        startedAt: string
-        lastActivityAt: string
-      }>(response)
-      return data
+      return response.data.data
     },
     enabled: !!conversationId && enabled,
     staleTime: 5 * 1000, // 5 seconds - messages change frequently
@@ -132,16 +137,21 @@ export function useConversationMessages(conversationId: string, limit: number = 
 export function useSearchMessages(query: string, filters?: MessageFilters, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.search(query, filters),
-    queryFn: async () => {
-      const response = await api.get('/api/v1/messages/search', {
+    queryFn: async (): Promise<{
+      messages: MessageModel[]
+      total: number
+      searchQuery: string
+    }> => {
+      const response: AxiosResponse<
+        ApiResponse<{
+          messages: MessageModel[]
+          total: number
+          searchQuery: string
+        }>
+      > = await api.get('/api/v1/messages/search', {
         params: { query, ...filters, limit: 50, page: 1 },
       })
-      const data = extractResponseData<{
-        messages: MessageModel[]
-        total: number
-        searchQuery: string
-      }>(response)
-      return data
+      return response.data.data
     },
     enabled: !!query && query.trim().length > 0 && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -155,16 +165,21 @@ export function useSearchMessages(query: string, filters?: MessageFilters, enabl
 export function useMessageThread(messageId: string, includeParents: boolean = true, includeChildren: boolean = true, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.thread(messageId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/messages/${messageId}/thread`, {
+    queryFn: async (): Promise<{
+      rootMessage: MessageModel
+      thread: MessageModel[]
+      totalDepth: number
+    }> => {
+      const response: AxiosResponse<
+        ApiResponse<{
+          rootMessage: MessageModel
+          thread: MessageModel[]
+          totalDepth: number
+        }>
+      > = await api.get(`/api/v1/messages/${messageId}/thread`, {
         params: { includeParents, includeChildren, maxDepth: 20 },
       })
-      const data = extractResponseData<{
-        rootMessage: MessageModel
-        thread: MessageModel[]
-        totalDepth: number
-      }>(response)
-      return data
+      return response.data.data
     },
     enabled: !!messageId && enabled,
     staleTime: 60 * 1000, // 1 minute - threads don't change frequently
@@ -179,9 +194,9 @@ export function useCreateMessage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateMessageRequest) => {
-      const response = await api.post('/api/v1/messages', data)
-      return extractResponseData<MessageModel>(response)
+    mutationFn: async (data: CreateMessageRequest): Promise<MessageModel> => {
+      const response: AxiosResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
+      return response.data.data
     },
     onSuccess: (message, variables) => {
       // Invalidate relevant message lists
@@ -238,9 +253,9 @@ export function useSendMessage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateMessageRequest & { expectResponse?: boolean }) => {
-      const response = await api.post('/api/v1/messages', data)
-      return extractResponseData<MessageModel>(response)
+    mutationFn: async (data: CreateMessageRequest & { expectResponse?: boolean }): Promise<MessageModel> => {
+      const response: AxiosResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
+      return response.data.data
     },
     onMutate: async variables => {
       if (!variables.conversationId) return
@@ -331,9 +346,9 @@ export function useUpdateMessage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ messageId, updates }: { messageId: string; updates: UpdateMessageRequest }) => {
-      const response = await api.put(`/api/v1/messages/${messageId}`, updates)
-      return extractResponseData<MessageModel>(response)
+    mutationFn: async ({ messageId, updates }: { messageId: string; updates: UpdateMessageRequest }): Promise<MessageModel> => {
+      const response: AxiosResponse<ApiResponse<MessageModel>> = await api.put(`/api/v1/messages/${messageId}`, updates)
+      return response.data.data
     },
     onSuccess: (updatedMessage, variables) => {
       // Update the specific message in cache
@@ -376,8 +391,8 @@ export function useDeleteMessage() {
 
   return useMutation({
     mutationFn: async (messageId: string) => {
-      const response = await api.delete(`/api/v1/messages/${messageId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/messages/${messageId}`)
+      return response.data.data
     },
     onMutate: async messageId => {
       // Get message details to know which caches to update
@@ -439,13 +454,21 @@ export function useBulkMessageOperation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: BulkMessageRequest) => {
-      const response = await api.post('/api/v1/messages/bulk', data)
-      return extractResponseData<{
-        processed: number
-        failed: number
-        errors: Array<{ messageId: string; error: string }>
-      }>(response)
+    mutationFn: async (
+      data: BulkMessageRequest
+    ): Promise<{
+      processed: number
+      failed: number
+      errors: Array<{ messageId: string; error: string }>
+    }> => {
+      const response: AxiosResponse<
+        ApiResponse<{
+          processed: number
+          failed: number
+          errors: Array<{ messageId: string; error: string }>
+        }>
+      > = await api.post('/api/v1/messages/bulk', data)
+      return response.data.data
     },
     onSuccess: (result, variables) => {
       // Invalidate all message caches since we don't know which ones were affected
@@ -473,18 +496,27 @@ export function useBulkMessageOperation() {
 export function useMessageStats(filters?: Omit<MessageFilters, 'role' | 'messageType' | 'importance'>, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.stats(filters),
-    queryFn: async () => {
-      const response = await api.get('/api/v1/messages/stats', {
+    queryFn: async (): Promise<{
+      total: number
+      byRole: { system: number; user: number; assistant: number }
+      byType: Record<string, number>
+      byImportance: Record<string, number>
+      averageContentLength: number
+      averageProcessingTime?: number
+    }> => {
+      const response: AxiosResponse<
+        ApiResponse<{
+          total: number
+          byRole: { system: number; user: number; assistant: number }
+          byType: Record<string, number>
+          byImportance: Record<string, number>
+          averageContentLength: number
+          averageProcessingTime?: number
+        }>
+      > = await api.get('/api/v1/messages/stats', {
         params: filters,
       })
-      return extractResponseData<{
-        total: number
-        byRole: { system: number; user: number; assistant: number }
-        byType: Record<string, number>
-        byImportance: Record<string, number>
-        averageContentLength: number
-        averageProcessingTime?: number
-      }>(response)
+      return response.data.data
     },
     enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -498,23 +530,39 @@ export function useMessageStats(filters?: Omit<MessageFilters, 'role' | 'message
 export function useConversationAnalytics(conversationId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MESSAGE_QUERY_KEYS.conversationAnalytics(conversationId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/conversations/${conversationId}/analytics`)
-      return extractResponseData<{
-        conversationId: string
-        totalMessages: number
-        messagesByRole: { system: number; user: number; assistant: number }
-        averageMessageLength: number
-        totalTokens: number
-        averageTokensPerMessage: number
-        totalProcessingTime: number
-        averageProcessingTime: number
-        participantCount: number
-        participants: string[]
-        startedAt: string
-        lastActivityAt: string
-        duration: number
-      }>(response)
+    queryFn: async (): Promise<{
+      conversationId: string
+      totalMessages: number
+      messagesByRole: { system: number; user: number; assistant: number }
+      averageMessageLength: number
+      totalTokens: number
+      averageTokensPerMessage: number
+      totalProcessingTime: number
+      averageProcessingTime: number
+      participantCount: number
+      participants: string[]
+      startedAt: string
+      lastActivityAt: string
+      duration: number
+    }> => {
+      const response: AxiosResponse<
+        ApiResponse<{
+          conversationId: string
+          totalMessages: number
+          messagesByRole: { system: number; user: number; assistant: number }
+          averageMessageLength: number
+          totalTokens: number
+          averageTokensPerMessage: number
+          totalProcessingTime: number
+          averageProcessingTime: number
+          participantCount: number
+          participants: string[]
+          startedAt: string
+          lastActivityAt: string
+          duration: number
+        }>
+      > = await api.get(`/api/v1/conversations/${conversationId}/analytics`)
+      return response.data.data
     },
     enabled: !!conversationId && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes

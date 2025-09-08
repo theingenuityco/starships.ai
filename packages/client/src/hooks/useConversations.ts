@@ -1,20 +1,13 @@
 import api from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationSourceType } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
-// Message interface for client compatibility
-export interface Message {
-  id: string
-  content: string
-  role: 'user' | 'assistant'
-  timestamp: string
-  conversationId: string
+// Client-specific message extension for UI states
+interface ClientMessage extends MessageModel {
   sending?: boolean
+  streaming?: boolean
 }
 
 // Centralized query keys
@@ -33,11 +26,9 @@ export const CONVERSATION_QUERY_KEYS = {
 export function useStarshipConversations(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/starships/${starshipId}/conversations`)
-      // Server now returns conversations array directly with pagination meta
-      const conversations = extractResponseData<ConversationModel[]>(response)
-      return { conversations }
+    queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
+      const response: AxiosResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
+      return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -51,10 +42,8 @@ export function useConversation(conversationId: string, enabled: boolean = true)
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId),
     queryFn: async () => {
-      const response = await api.get(`/api/v1/conversations/${conversationId}`)
-
-      // Server now returns ConversationWithMessages directly
-      const data = extractResponseData<ConversationModel & { messages: any[] }>(response)
+      const response: AxiosResponse<ApiResponse<ConversationModel & { messages: any[] }>> = await api.get(`/api/v1/conversations/${conversationId}`)
+      const data = response.data.data
 
       return {
         conversation: {
@@ -70,7 +59,7 @@ export function useConversation(conversationId: string, enabled: boolean = true)
           starshipId: (data as any).starshipId,
           userId: (data as any).userId,
         },
-        messages: data.messages.map(msg => ({
+        messages: data.messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
           role: msg.role,
@@ -89,27 +78,13 @@ export function useConversation(conversationId: string, enabled: boolean = true)
 export function useConversationMessages(conversationId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/conversations/${conversationId}`, {
-        params: { limit: 50, offset: 0 },
+    queryFn: async (): Promise<{ messages: MessageModel[] }> => {
+      const response: AxiosResponse<ApiResponse<{ messages: MessageModel[] }>> = await api.get(`/api/v1/conversations/${conversationId}`, {
+        params: { includeMessages: true },
       })
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to fetch messages')
-      }
-
-      // Convert database messages to client Message format
-      const messages = response.data.messages || []
-      const formattedMessages = messages.map((dbMsg: any) => ({
-        id: dbMsg.id,
-        content: dbMsg.content,
-        role: dbMsg.role as 'user' | 'assistant',
-        timestamp: dbMsg.timestamp,
-        conversationId: dbMsg.conversation_id || conversationId,
-        ...(dbMsg.structured_content && { structuredContent: dbMsg.structured_content }),
-      }))
-
-      return { messages: formattedMessages }
+      const data = response.data.data
+      return { messages: data.messages || [] }
     },
     enabled: !!conversationId && enabled,
     staleTime: 5 * 1000, // 5 seconds - messages change frequently
@@ -122,13 +97,11 @@ export function useConversationMessages(conversationId: string, enabled: boolean
 export function useUserConversations(userId: string, onlyActive: boolean = false, enabled: boolean = true) {
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.byUser(userId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/users/${userId}/conversations`, {
+    queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
+      const response: AxiosResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/users/${userId}/conversations`, {
         params: { active: onlyActive ? 'true' : undefined },
       })
-      // Server now returns conversations array directly with pagination meta
-      const conversations = extractResponseData<ConversationModel[]>(response)
-      return { conversations }
+      return { conversations: response.data.data }
     },
     enabled: !!userId && enabled,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -141,9 +114,9 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string; userId?: string }) => {
-      const response = await api.post('/api/v1/conversations', data)
-      return extractResponseData<ConversationModel>(response)
+    mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string; userId?: string }): Promise<ConversationModel> => {
+      const response: AxiosResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
+      return response.data.data
     },
     onSuccess: (conversation, variables) => {
       // Invalidate and refetch relevant conversation lists
@@ -188,13 +161,11 @@ export function useSendMessage() {
 
   return useMutation({
     mutationFn: async (data: { conversationId: string; agentId: string; message: string }) => {
-      const response = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
+      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
         agentId: data.agentId,
         message: data.message,
       })
-
-      // Server returns the response message directly
-      return response.data
+      return response.data.data
     },
     onMutate: async ({ conversationId, message }) => {
       // Cancel any outgoing refetches for conversation messages
@@ -204,16 +175,26 @@ export function useSendMessage() {
       const previousMessages = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId))
 
       // Optimistically add user message
-      const userMessage: Message = {
+      const userMessage: ClientMessage = {
         id: `temp-${Date.now()}`,
         content: message,
-        role: 'user',
+        role: 'user' as const,
         timestamp: new Date().toISOString(),
         conversationId,
+        starshipId: '', // Will be set by server
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'pending',
+        messageType: 'user_input',
+        importance: 'medium',
+        contentLength: message.length,
+        hasAttachments: false,
         sending: true,
       }
 
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: { messages: Message[] } | undefined) => {
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: { messages: MessageModel[] } | undefined) => {
         const messages = old?.messages || []
         return { messages: [...messages, userMessage] }
       })
@@ -221,16 +202,26 @@ export function useSendMessage() {
       return { previousMessages, userMessage, conversationId }
     },
     onSuccess: (response, variables, context) => {
-      // Convert server response to Message format
-      const assistantMessage: Message = {
+      // Convert server response to MessageModel format
+      const assistantMessage: MessageModel = {
         id: `response-${Date.now()}`,
         content: response.reply || response.content || 'No response',
-        role: 'assistant',
+        role: 'assistant' as const,
         timestamp: new Date().toISOString(),
         conversationId: variables.conversationId,
+        starshipId: '', // Will be set by server
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'completed',
+        messageType: 'agent_response',
+        importance: 'medium',
+        contentLength: (response.reply || response.content || '').length,
+        hasAttachments: false,
       }
 
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: { messages: Message[] } | undefined) => {
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: { messages: MessageModel[] } | undefined) => {
         const messages = old?.messages || []
         // Remove the temporary sending user message and add both user + assistant messages
         const withoutTempMessage = messages.filter(m => m.id !== context?.userMessage.id)
@@ -265,8 +256,8 @@ export function useClearConversationMemory() {
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
-      const response = await api.delete(`/api/v1/conversations/${conversationId}/memory`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/conversations/${conversationId}/memory`)
+      return response.data.data
     },
     onSuccess: (data, conversationId) => {
       // Invalidate conversation details and messages
@@ -290,8 +281,8 @@ export function useDeleteConversation() {
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
-      const response = await api.delete(`/api/v1/conversations/${conversationId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/conversations/${conversationId}`)
+      return response.data.data
     },
     onMutate: async conversationId => {
       // Get conversation details to know which starship it belongs to
@@ -344,6 +335,45 @@ export function useDeleteConversation() {
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(context.starshipId),
         })
       }
+    },
+  })
+}
+
+// Update conversation status
+export function useUpdateConversationStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (data: { conversationId: string; status: 'active' | 'paused' | 'completed' | 'archived' }) => {
+      const response: AxiosResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}/status`, {
+        status: data.status,
+      })
+      return response.data.data
+    },
+    onSuccess: (updatedConversation, variables) => {
+      // Update the conversation in cache
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.detail(variables.conversationId), (old: any) => {
+        if (!old) return old
+        return {
+          ...old,
+          conversation: updatedConversation,
+        }
+      })
+
+      // Invalidate related queries to ensure consistency
+      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(variables.conversationId) })
+
+      if (updatedConversation.starshipId) {
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(updatedConversation.starshipId) })
+      }
+
+      toast.success(`Conversation ${variables.status} successfully!`)
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to update conversation status'
+      toast.error('Failed to update status', {
+        description: errorMessage,
+      })
     },
   })
 }

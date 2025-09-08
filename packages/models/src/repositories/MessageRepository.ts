@@ -164,9 +164,9 @@ export class MessageRepository extends BaseRepository {
 
         // Transform using Entity
         const messageEntity = MessageEntity.deserialize(messageData);
-
+        const serializedMessage = messageEntity.serialize();
         // Use base repository for database operation
-        const result = await this.createEntityWithAutoId<MessageModel>('Message', messageEntity.serialize());
+        const result = await this.createEntityWithAutoId<MessageModel>('Message', serializedMessage);
 
         return MessageEntity.deserialize(result);
       },

@@ -4,9 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
-// Helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
-
 // Blueprint category type for filtering
 export type BlueprintCategory = 'general' | 'workflow' | 'automation' | 'integration' | 'analysis'
 
@@ -41,14 +38,13 @@ export const BLUEPRINT_QUERY_KEYS = {
 export function useBlueprints(filters?: { category?: BlueprintCategory; search?: string }, enabled: boolean = true) {
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.list(filters),
-    queryFn: async () => {
+    queryFn: async (): Promise<{ blueprints: BlueprintModel[] }> => {
       const params = new URLSearchParams()
       if (filters?.category) params.append('category', filters.category)
       if (filters?.search) params.append('search', filters.search)
 
-      const response = await api.get(`/api/v1/blueprints?${params.toString()}`)
-      const blueprints = extractResponseData<BlueprintModel[]>(response)
-      return { blueprints }
+      const response: AxiosResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints?${params.toString()}`)
+      return { blueprints: response.data.data }
     },
     enabled,
     staleTime: 1 * 60 * 1000, // 1 minute
@@ -61,10 +57,9 @@ export function useBlueprints(filters?: { category?: BlueprintCategory; search?:
 export function useBlueprint(blueprintId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.detail(blueprintId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/blueprints/${blueprintId}`)
-      const blueprint = extractResponseData<BlueprintModel>(response)
-      return blueprint
+    queryFn: async (): Promise<BlueprintModel> => {
+      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.get(`/api/v1/blueprints/${blueprintId}`)
+      return response.data.data
     },
     enabled: !!blueprintId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -76,10 +71,9 @@ export function useBlueprint(blueprintId: string, enabled: boolean = true) {
 export function useBlueprintsByCategory(category: BlueprintCategory, enabled: boolean = true) {
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.byCategory(category),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/blueprints/category/${category}`)
-      const blueprints = extractResponseData<BlueprintModel[]>(response)
-      return { blueprints }
+    queryFn: async (): Promise<{ blueprints: BlueprintModel[] }> => {
+      const response: AxiosResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints/category/${category}`)
+      return { blueprints: response.data.data }
     },
     enabled: !!category && enabled,
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -91,10 +85,9 @@ export function useBlueprintsByCategory(category: BlueprintCategory, enabled: bo
 export function usePopularBlueprints(limit: number = 10, enabled: boolean = true) {
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.popular(limit),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/blueprints/popular?limit=${limit}`)
-      const blueprints = extractResponseData<BlueprintModel[]>(response)
-      return { blueprints }
+    queryFn: async (): Promise<{ blueprints: BlueprintModel[] }> => {
+      const response: AxiosResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints/popular?limit=${limit}`)
+      return { blueprints: response.data.data }
     },
     enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -106,10 +99,9 @@ export function usePopularBlueprints(limit: number = 10, enabled: boolean = true
 export function useBlueprintStats(blueprintId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.stats(blueprintId),
-    queryFn: async () => {
-      const response = await api.get(`/api/v1/blueprints/${blueprintId}/stats`)
-      const stats = extractResponseData<BlueprintStats>(response)
-      return stats
+    queryFn: async (): Promise<BlueprintStats> => {
+      const response: AxiosResponse<ApiResponse<BlueprintStats>> = await api.get(`/api/v1/blueprints/${blueprintId}/stats`)
+      return response.data.data
     },
     enabled: !!blueprintId && enabled,
     staleTime: 30 * 1000, // 30 seconds
@@ -121,10 +113,9 @@ export function useBlueprintStats(blueprintId: string, enabled: boolean = true) 
 export function useBlueprintValidation(blueprintId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.validation(blueprintId),
-    queryFn: async () => {
-      const response = await api.post(`/api/v1/blueprints/${blueprintId}/validate`)
-      const validation = extractResponseData<BlueprintValidation>(response)
-      return validation
+    queryFn: async (): Promise<BlueprintValidation> => {
+      const response: AxiosResponse<ApiResponse<BlueprintValidation>> = await api.post(`/api/v1/blueprints/${blueprintId}/validate`)
+      return response.data.data
     },
     enabled: !!blueprintId && enabled,
     staleTime: 10 * 1000, // 10 seconds
@@ -137,9 +128,9 @@ export function useCreateBlueprint() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateBlueprintRequest) => {
-      const response = await api.post('/api/v1/blueprints', data)
-      return extractResponseData<BlueprintModel>(response)
+    mutationFn: async (data: CreateBlueprintRequest): Promise<BlueprintModel> => {
+      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.post('/api/v1/blueprints', data)
+      return response.data.data
     },
     onMutate: async newBlueprint => {
       // Cancel any outgoing refetches for blueprint lists
@@ -205,9 +196,9 @@ export function useUpdateBlueprint() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ blueprintId, updates }: { blueprintId: string; updates: UpdateBlueprintRequest }) => {
-      const response = await api.put(`/api/v1/blueprints/${blueprintId}`, updates)
-      return extractResponseData<BlueprintModel>(response)
+    mutationFn: async ({ blueprintId, updates }: { blueprintId: string; updates: UpdateBlueprintRequest }): Promise<BlueprintModel> => {
+      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.put(`/api/v1/blueprints/${blueprintId}`, updates)
+      return response.data.data
     },
     onMutate: async ({ blueprintId, updates }) => {
       // Cancel outgoing refetches
@@ -258,8 +249,8 @@ export function useDeleteBlueprint() {
 
   return useMutation({
     mutationFn: async (blueprintId: string) => {
-      const response = await api.delete(`/api/v1/blueprints/${blueprintId}`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/blueprints/${blueprintId}`)
+      return response.data.data
     },
     onMutate: async blueprintId => {
       // Get blueprint details before deletion for rollback
@@ -339,9 +330,9 @@ export function useCloneBlueprint() {
         category?: BlueprintCategory
         metadata?: Record<string, unknown>
       }
-    }) => {
-      const response = await api.post(`/api/v1/blueprints/${blueprintId}/clone`, cloneData)
-      return extractResponseData<BlueprintModel>(response)
+    }): Promise<BlueprintModel> => {
+      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.post(`/api/v1/blueprints/${blueprintId}/clone`, cloneData)
+      return response.data.data
     },
     onSuccess: (clonedBlueprint, variables) => {
       // Add cloned blueprint to lists
@@ -382,8 +373,8 @@ export function useTrackBlueprintUsage() {
 
   return useMutation({
     mutationFn: async (blueprintId: string) => {
-      const response = await api.post(`/api/v1/blueprints/${blueprintId}/track-usage`)
-      return response.data
+      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/blueprints/${blueprintId}/track-usage`)
+      return response.data.data
     },
     onSuccess: (data, blueprintId) => {
       // Invalidate related queries to show updated usage

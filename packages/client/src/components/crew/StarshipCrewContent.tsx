@@ -3,16 +3,16 @@
 import { useEffect, useState } from 'react'
 // import { motion, AnimatePresence } from 'motion/react'
 import { AgentSelector } from '@/components/agents/AgentSelector'
-import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useConfiguredToolsCount } from '@/hooks/useNativeApiKeys'
 import { useStarshipBySlug, useStarships } from '@/hooks/useStarships'
 import { useToast } from '@/hooks/useToast'
 import { MCPServerConnector, mcpServerAPI } from '@/lib/api'
 import type { AgentModel } from '@starships/protocol'
-import { Activity, ArrowLeft, Bot, Info, Loader2, MessageSquare, Plug, Shield, Users, Zap } from 'lucide-react'
+import { Activity, ArrowLeft, Bot, Info, Loader2, Plug, Settings, Users, Zap } from 'lucide-react'
 import Link from 'next/link'
 
 interface StarshipCrewContentProps {
@@ -21,7 +21,6 @@ interface StarshipCrewContentProps {
 
 export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
-  const [conversationId, setConversationId] = useState<string | null>(null)
   const [agentsCount, setAgentsCount] = useState(0)
   const { toast } = useToast()
   const { data: starshipsResponse } = useStarships()
@@ -40,11 +39,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
 
   const handleAgentSelect = (agent: AgentModel) => {
     setSelectedAgent(agent)
-    setConversationId(null) // Reset conversation when agent changes
-  }
-
-  const handleConversationCreated = (newConversationId: string | null) => {
-    setConversationId(newConversationId)
   }
 
   // Function to manually show the info modal
@@ -56,8 +50,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   // State for info button animation
   const [animateInfoButton, setAnimateInfoButton] = useState(false)
 
-  // State for tools count
-  const [configuredToolsCount, setConfiguredToolsCount] = useState(0)
+  // Get configured tools count from TanStack Query hook
+  const configuredToolsCount = useConfiguredToolsCount(starship?.id || '')
 
   // Handle dismissing the floating message
   const handleDismissMessage = () => {
@@ -166,7 +160,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                       {animateInfoButton && <span className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping-slow" />}
                     </button>
                   </div>
-                  <p className="text-sm text-muted-foreground">Manage your AI agents and connectors</p>
+                  <p className="text-sm text-muted-foreground">Manage your AI agents and tools</p>
                 </div>
               </div>
 
@@ -365,7 +359,7 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
               <TabsContent value="api-keys" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
                 <div key="api-keys-content" className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar">
                   {starship?.id ? (
-                    <NativeToolApiKeys starshipId={starship.id} onConfiguredCountChange={setConfiguredToolsCount} />
+                    <NativeToolApiKeys starshipId={starship.id} />
                   ) : (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">
@@ -383,22 +377,93 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         {/* Enhanced Right Content Area */}
         <div className="bg-gradient-to-br from-background via-background to-muted/5 overflow-hidden h-full">
           {selectedAgent ? (
-            <ConversationInterface starshipId={slug} conversationId={conversationId} onConversationChange={handleConversationCreated} />
+            <div className="flex flex-col h-full">
+              {/* Agent Details Header */}
+              <div className="border-b border-border/40 bg-gradient-to-r from-card/60 to-card/40 backdrop-blur-sm">
+                <div className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-primary/5 blur-sm" />
+                      <div className="relative bg-gradient-to-br from-primary/15 to-primary/10 p-3 rounded-xl shadow-sm border border-primary/15">
+                        <Bot className="h-6 w-6 text-primary" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <h2 className="text-xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">{selectedAgent.name}</h2>
+                      <p className="text-sm text-muted-foreground">{selectedAgent.description || 'AI Agent Configuration'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agent Management Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-4xl mx-auto space-y-6">
+                  {/* Agent Configuration Card */}
+                  <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Settings className="h-5 w-5 text-primary" />
+                        <h3 className="text-lg font-semibold">Agent Configuration</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Agent Name</label>
+                          <p className="text-sm bg-muted/50 rounded p-2">{selectedAgent.name}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Model</label>
+                          <p className="text-sm bg-muted/50 rounded p-2">{selectedAgent.model || 'Default Model'}</p>
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="text-sm font-medium text-muted-foreground">Description</label>
+                          <p className="text-sm bg-muted/50 rounded p-3">{selectedAgent.description || 'No description available'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Agent Actions Card */}
+                  <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3 mb-4">
+                        <Zap className="h-5 w-5 text-yellow-500" />
+                        <h3 className="text-lg font-semibold">Agent Management</h3>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <Button variant="outline" className="flex items-center gap-2">
+                          <Settings className="h-4 w-4" />
+                          Edit Configuration
+                        </Button>
+                        <Button variant="outline" className="flex items-center gap-2">
+                          <Activity className="h-4 w-4" />
+                          View Analytics
+                        </Button>
+                        <Button variant="outline" className="flex items-center gap-2">
+                          <Plug className="h-4 w-4" />
+                          Manage Tools
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full">
               <div className="bg-gradient-to-br from-card via-card/95 to-primary/5 p-10 rounded-2xl text-center max-w-lg shadow-xl border border-primary/20">
                 <div className="mb-8">
-                  <MessageSquare className="h-16 w-16 text-primary mx-auto" />
+                  <Settings className="h-16 w-16 text-primary mx-auto" />
                 </div>
 
-                <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Ready to Chat</h3>
+                <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">Agent Management</h3>
 
-                <p className="text-muted-foreground mb-8 leading-relaxed">Select an AI agent from the sidebar to begin your conversation. Each agent has unique capabilities and specializations.</p>
+                <p className="text-muted-foreground mb-8 leading-relaxed">Select an AI agent from the sidebar to view and manage its configuration, settings, and connected tools.</p>
 
                 <div className="space-y-4">
                   <div className="bg-gradient-to-r from-primary/10 to-cyan-500/10 rounded-lg p-4 text-sm text-muted-foreground flex items-center justify-center gap-2 border border-border/40">
-                    <Shield className="h-4 w-4 text-primary flex-shrink-0" />
-                    <span>Your conversations are secure and private</span>
+                    <Bot className="h-4 w-4 text-primary flex-shrink-0" />
+                    <span>Manage agents and tools from one central location</span>
                   </div>
                 </div>
               </div>

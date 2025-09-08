@@ -35,7 +35,7 @@ export interface MessageModel extends Message {
   processingMetadata?: Record<string, unknown>;
 
   // Message classification
-  messageType: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  messageType: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';
   importance: 'low' | 'medium' | 'high' | 'critical';
 
   // Content analysis
@@ -73,7 +73,7 @@ export interface CreateMessageRequest {
   processingMetadata?: Record<string, unknown>;
 
   // Message classification (optional)
-  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';
   importance?: 'low' | 'medium' | 'high' | 'critical';
 
   // Content analysis (optional)
@@ -122,7 +122,7 @@ export interface SearchMessagesRequest {
   memoryId?: string;
   conversationId?: string;
   role?: 'system' | 'user' | 'assistant';
-  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';
   importance?: 'low' | 'medium' | 'high' | 'critical';
   dateFrom?: string;
   dateTo?: string;
@@ -148,7 +148,7 @@ export interface MessageFilters {
   memoryId?: string;
   conversationId?: string;
   role?: 'system' | 'user' | 'assistant';
-  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output';
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';
   importance?: 'low' | 'medium' | 'high' | 'critical';
   dateFrom?: string;
   dateTo?: string;
@@ -239,4 +239,40 @@ export interface BulkMessageResponse {
     messageId: string;
     error: string;
   }>;
+}
+
+// ============================================================================
+// ERROR MESSAGE TYPES
+// ============================================================================
+
+/**
+ * Error details for error messages
+ */
+export interface ErrorMessageDetails {
+  errorType: 'agent_execution' | 'http_request' | 'llm_request' | 'workflow' | 'system' | 'validation';
+  errorCode?: string;
+  originalError: string;
+  context?: {
+    agentId?: string;
+    nodeRef?: string;
+    stepName?: string;
+    url?: string;
+    model?: string;
+    [key: string]: unknown;
+  };
+  troubleshooting?: {
+    possibleCauses: string[];
+    suggestedActions: string[];
+  };
+  timestamp: string;
+  recoverable: boolean;
+}
+
+/**
+ * Request to create an error message with enhanced details
+ */
+export interface CreateErrorMessageRequest extends CreateMessageRequest {
+  messageType: 'error';
+  role: 'system';
+  errorDetails: ErrorMessageDetails;
 }

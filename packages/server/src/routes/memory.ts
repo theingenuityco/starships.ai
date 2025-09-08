@@ -1,6 +1,6 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MemoryService } from '@/services/MemoryService';
-import { handleCommonError, sendError, sendSuccess, validateUUID } from '@/utils/responseHelpers';
+import { handleCommonError, sendError, sendSuccess, validateId } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 
@@ -28,7 +28,7 @@ router.post('/memory/reset', jwtAuthMiddleware, async (req: Request, res: Respon
     }
 
     // Validate agentId format
-    const { isValid, error } = validateUUID(agentId, 'agentId');
+    const { isValid, error } = validateId(agentId, 'agentId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;

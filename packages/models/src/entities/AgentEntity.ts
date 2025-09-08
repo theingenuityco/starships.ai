@@ -5,6 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
+import { Transformers } from '@/helpers/serializer';
 import type { AgentModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
@@ -13,35 +14,6 @@ import { IsBoolean, IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString,
  * Custom transformers for the AgentEntity
  */
 export class AgentTransformers {
-  /**
-   * Transform date strings to ISO format, handling various input formats
-   */
-  static DateTransform() {
-    return Transform(({ value }) => {
-      if (!value) return new Date().toISOString();
-      if (typeof value === 'string') return value;
-      if (value instanceof Date) return value.toISOString();
-      return new Date(value).toISOString();
-    });
-  }
-
-  /**
-   * Transform JSON objects for safe storage/retrieval (Blueprint, Memory, etc.)
-   */
-  static JSONTransform() {
-    return Transform(({ value }) => {
-      if (!value) return undefined;
-      if (typeof value === 'string') {
-        try {
-          return JSON.parse(value);
-        } catch {
-          return undefined;
-        }
-      }
-      return value;
-    });
-  }
-
   /**
    * Transform usage count to ensure it's always a number
    */
@@ -99,12 +71,12 @@ export class AgentEntity implements AgentModel {
   id!: string;
 
   @Expose()
-  @AgentTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @AgentTransformers.DateTransform()
+  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -154,12 +126,12 @@ export class AgentEntity implements AgentModel {
   timeout!: number;
 
   @Expose()
-  @AgentTransformers.JSONTransform()
+  @Transformers.JsonTransform()
   @IsObject()
   memory!: any; // AgentMemoryState - keeping flexible for now
 
   @Expose()
-  @AgentTransformers.JSONTransform()
+  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: any; // Blueprint - keeping flexible for now
 

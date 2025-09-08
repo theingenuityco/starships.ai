@@ -50,7 +50,7 @@ export function getEnvConfig(): EnvironmentConfig {
     DEFAULT_CHAT_MODEL: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
 
     // JWT Authentication Configuration
-    JWT_SECRET: process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-at-least-32-characters-long',
+    JWT_SECRET: process.env.JWT_SECRET || '',
 
     // Stripe Configuration
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',

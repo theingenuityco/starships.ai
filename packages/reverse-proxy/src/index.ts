@@ -1,12 +1,6 @@
 import { getEnvConfig } from '@starships/env';
 import express from 'express';
-import { IncomingMessage } from 'http';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
-
-// Extended type for Express request with http-proxy-middleware
-interface ProxyRequest extends IncomingMessage {
-  originalUrl?: string;
-}
 
 const app = express();
 

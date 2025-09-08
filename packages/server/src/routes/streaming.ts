@@ -49,8 +49,8 @@ router.get('/conversations/:conversationId/messages/stream', jwtAuthMiddleware, 
   }
 
   try {
-    // Initialize streaming service and add connection
-    const streamingService = new StreamingService();
+    // Get singleton streaming service instance
+    const streamingService = StreamingService.getInstance();
 
     // Set up the SSE connection
     streamingService.addConnection(streamId, res);
@@ -86,7 +86,7 @@ router.get('/conversations/:conversationId/messages/stream', jwtAuthMiddleware, 
  */
 router.get('/streaming/status', jwtAuthMiddleware, (req: Request, res: Response): void => {
   try {
-    const streamingService = new StreamingService();
+    const streamingService = StreamingService.getInstance();
 
     const status = {
       activeConnections: streamingService.getActiveConnectionsCount(),
@@ -115,7 +115,7 @@ router.delete('/streaming/:streamId', jwtAuthMiddleware, (req: Request, res: Res
   const { streamId } = req.params;
 
   try {
-    const streamingService = new StreamingService();
+    const streamingService = StreamingService.getInstance();
     streamingService.closeStream(streamId);
 
     res.json({

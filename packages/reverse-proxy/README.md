@@ -17,8 +17,8 @@ In development, this reverse proxy:
 ### Start with Proxy (Recommended for Development)
 
 ```bash
-# Start the proxy along with all services
-pnpm run dev:with-proxy
+# Start all services including the reverse proxy with Turbo
+pnpm run dev
 ```
 
 This will:
@@ -33,7 +33,7 @@ Then access your application at: **`http://localhost:8080`**
 
 ```bash
 # Start only the reverse proxy
-pnpm run dev:proxy
+pnpm --filter @starships/reverse-proxy dev
 ```
 
 ### Manual Setup
@@ -53,18 +53,35 @@ pnpm run start
 
 ## Configuration
 
-The proxy can be configured via environment variables:
+The proxy uses the `@starships/env` package for configuration, which reads from the root `.env` file:
 
-| Variable       | Default                 | Description               |
-| -------------- | ----------------------- | ------------------------- |
-| `PROXY_PORT`   | `8080`                  | Port the proxy listens on |
-| `FRONTEND_URL` | `http://localhost:3000` | Next.js frontend URL      |
-| `BACKEND_URL`  | `http://localhost:4000` | Express backend URL       |
+| Variable     | Default                 | Description               |
+| ------------ | ----------------------- | ------------------------- |
+| `PROXY_PORT` | `8080`                  | Port the proxy listens on |
+| `CLIENT_URL` | `http://localhost:3000` | Next.js frontend URL      |
+| `SERVER_URL` | `http://localhost:4000` | Express backend URL       |
 
-### Example with Custom Ports
+All configuration is centrally managed through the `@starships/env` package:
+
+- `PROXY_PORT` - The port the proxy listens on
+- `CLIENT_URL` - Frontend routing destination
+- `SERVER_URL` - Backend API routing destination
+
+### Example Configuration
+
+The default configuration uses port 8080. To customize, update your `.env` file:
+
+```env
+# .env
+PROXY_PORT=8080
+CLIENT_URL=http://localhost:3000
+SERVER_URL=http://localhost:4000
+```
+
+Then start the proxy:
 
 ```bash
-PROXY_PORT=9000 BACKEND_URL=http://localhost:5000 pnpm run dev:proxy
+pnpm --filter @starships/reverse-proxy dev
 ```
 
 ## Routing Rules
@@ -148,10 +165,17 @@ This reverse proxy is **intended for development use only**. In production:
 
 ### Port Already in Use
 
-If port 8080 is already in use:
+If port 8080 is already in use, update your `.env` file to use a different port:
+
+```env
+# .env
+PROXY_PORT=8081
+```
+
+Then restart the proxy:
 
 ```bash
-PROXY_PORT=9090 pnpm run dev:proxy
+pnpm --filter @starships/reverse-proxy dev
 ```
 
 ### Backend/Frontend Not Accessible

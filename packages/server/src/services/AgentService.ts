@@ -1053,6 +1053,7 @@ export class AgentService {
             temperature: dbAgent.temperature || 0.7,
             maxTokens: dbAgent.maxTokens || 2000,
             timeout: 30000,
+            stream: true, // Enable streaming for all LLM nodes
           },
         },
         {

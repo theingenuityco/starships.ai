@@ -3,11 +3,16 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConversationMessages } from '@/hooks/useConversations'
+import { useDeleteMessage } from '@/hooks/useMessages'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, Paperclip, Timer, User, XCircle } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+import { MessageContent } from './MessageContent'
+import { useMessageReactions } from './MessageReactions'
+import { MessageSelection } from './MessageSelection'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -18,15 +23,67 @@ interface ConversationMessageListProps {
 export function ConversationMessageList({ conversationId, starshipId, onMessageAdded }: ConversationMessageListProps) {
   // Use TanStack Query to fetch messages
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
+  const deleteMessage = useDeleteMessage()
 
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
+
+  // Message selection state
+  const [selectedMessages, setSelectedMessages] = useState<string[]>([])
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+
+  // Message reactions
+  const { addReaction, removeReaction, getMessageReactions } = useMessageReactions()
 
   // Add new message to the list (for real-time updates)
   const addMessage = (newMessage: MessageModel) => {
     // Note: With TanStack Query, real-time updates should be handled
     // by invalidating queries or using optimistic updates in mutations
     onMessageAdded?.(newMessage)
+  }
+
+  // Selection handlers
+  const handleSelectionChange = (messageIds: string[]) => {
+    setSelectedMessages(messageIds)
+    setIsSelectionMode(messageIds.length > 0)
+  }
+
+  const handleMessageToggle = (messageId: string, selected: boolean) => {
+    if (selected) {
+      setSelectedMessages(prev => [...prev, messageId])
+      setIsSelectionMode(true)
+    } else {
+      setSelectedMessages(prev => prev.filter(id => id !== messageId))
+    }
+  }
+
+  const handleBulkCopy = async (messagesToCopy: MessageModel[]) => {
+    try {
+      const content = messagesToCopy.map(msg => `${msg.role === 'user' ? 'You' : 'Assistant'}: ${msg.content}`).join('\n\n')
+
+      await navigator.clipboard.writeText(content)
+      toast.success(`Copied ${messagesToCopy.length} message${messagesToCopy.length > 1 ? 's' : ''}`)
+      setSelectedMessages([])
+      setIsSelectionMode(false)
+    } catch (error) {
+      toast.error('Failed to copy messages')
+    }
+  }
+
+  const handleBulkDelete = async (messageIds: string[]) => {
+    try {
+      await Promise.all(messageIds.map(id => deleteMessage.mutateAsync(id)))
+      toast.success(`Deleted ${messageIds.length} message${messageIds.length > 1 ? 's' : ''}`)
+      setSelectedMessages([])
+      setIsSelectionMode(false)
+    } catch (error) {
+      toast.error('Failed to delete messages')
+    }
+  }
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedMessages([])
   }
 
   // Expose method to parent component for compatibility
@@ -40,6 +97,12 @@ export function ConversationMessageList({ conversationId, starshipId, onMessageA
         delete (window as any).addMessage
       }
     }
+  }, [conversationId])
+
+  // Reset selection when conversation changes
+  useEffect(() => {
+    setSelectedMessages([])
+    setIsSelectionMode(false)
   }, [conversationId])
 
   if (!conversationId) {
@@ -63,20 +126,58 @@ export function ConversationMessageList({ conversationId, starshipId, onMessageA
   }
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div key={conversationId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="h-full overflow-auto p-4 space-y-4">
-        {messages.map((message: MessageModel) => (
-          <MessageBubble key={message.id} message={message} />
-        ))}
-      </motion.div>
-    </AnimatePresence>
+    <div className="h-full flex flex-col">
+      {/* Message Selection Bar */}
+      <MessageSelection selectedMessages={selectedMessages} messages={messages} onSelectionChange={handleSelectionChange} onBulkCopy={handleBulkCopy} onBulkDelete={handleBulkDelete} />
+
+      {/* Messages List */}
+      <AnimatePresence mode="wait">
+        <motion.div key={conversationId} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex-1 overflow-auto p-4 space-y-4">
+          {messages.map((message: MessageModel) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isSelected={selectedMessages.includes(message.id)}
+              isSelecting={isSelectionMode}
+              onToggleSelection={handleMessageToggle}
+              onStartSelection={toggleSelectionMode}
+              reactions={getMessageReactions(message.id)}
+              onAddReaction={addReaction}
+              onRemoveReaction={removeReaction}
+            />
+          ))}
+        </motion.div>
+      </AnimatePresence>
+    </div>
   )
 }
 
 // Enhanced Message Bubble Component
-function MessageBubble({ message }: { message: MessageModel & { sending?: boolean; streaming?: boolean } }) {
+function MessageBubble({
+  message,
+  isSelected = false,
+  isSelecting = false,
+  onToggleSelection,
+  onStartSelection,
+  reactions = [],
+  onAddReaction,
+  onRemoveReaction,
+}: {
+  message: MessageModel & { sending?: boolean; streaming?: boolean }
+  isSelected?: boolean
+  isSelecting?: boolean
+  onToggleSelection?: (messageId: string, selected: boolean) => void
+  onStartSelection?: () => void
+  reactions?: Array<{ emoji: string; count: number; userReacted: boolean }>
+  onAddReaction?: (messageId: string, emoji: string) => void
+  onRemoveReaction?: (messageId: string, emoji: string) => void
+}) {
   const isUser = message.role === 'user'
   const isSystem = message.role === 'system'
+
+  const handleLongPress = () => {
+    onStartSelection?.()
+  }
 
   const getImportanceBadge = () => {
     if (!message.importance || message.importance === 'low') return null
@@ -147,9 +248,9 @@ function MessageBubble({ message }: { message: MessageModel & { sending?: boolea
       animate={{ opacity: 1, y: 0 }}
       className={cn('flex gap-3', isUser ? 'justify-end' : 'justify-start', message.threadDepth ? `ml-${Math.min(message.threadDepth * 4, 16)}` : '')}
     >
-      {!isUser && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center">{getRoleIcon()}</div>}
+      {!isUser && <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-muted flex items-center justify-center">{getRoleIcon()}</div>}
 
-      <div className="flex-1 max-w-xs lg:max-w-md">
+      <div className="flex-1 max-w-[280px] sm:max-w-xs lg:max-w-md">
         <div
           className={cn(
             'rounded-lg px-4 py-3 relative',
@@ -157,24 +258,24 @@ function MessageBubble({ message }: { message: MessageModel & { sending?: boolea
           )}
         >
           {/* Message header with importance and status */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
             {getImportanceBadge()}
             {getProcessingStatus()}
-            {message.hasAttachments && <Paperclip className="w-3 h-3 text-muted-foreground" />}
+            {message.hasAttachments && <Paperclip className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-muted-foreground" />}
           </div>
 
           {/* Message content */}
-          <div className="text-sm leading-relaxed">{message.content}</div>
+          <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} />
 
           {/* Message footer */}
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-current/10">
-            <div className="text-xs opacity-70">{new Date(message.timestamp).toLocaleTimeString()}</div>
+          <div className="flex items-center justify-between mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-current/10">
+            <div className="text-xs opacity-70 message-timestamp">{new Date(message.timestamp).toLocaleTimeString()}</div>
 
             {/* Metadata */}
             {getMetadata() && (
-              <div className="text-xs opacity-60 flex items-center gap-1">
+              <div className="text-xs opacity-60 flex items-center gap-1 hidden sm:flex">
                 <Timer className="w-3 h-3" />
-                {getMetadata()}
+                <span className="truncate max-w-[120px]">{getMetadata()}</span>
               </div>
             )}
           </div>
@@ -185,14 +286,15 @@ function MessageBubble({ message }: { message: MessageModel & { sending?: boolea
 
         {/* Thread replies indicator */}
         {message.threadDepth === 0 && message.parentMessageId && (
-          <Button variant="ghost" size="sm" className="mt-1 h-6 px-2 text-xs text-muted-foreground">
-            <MessageSquare className="w-3 h-3 mr-1" />
-            View thread
+          <Button variant="ghost" size="sm" className="mt-1 h-5 sm:h-6 px-2 text-xs text-muted-foreground focus-visible-ring">
+            <MessageSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
+            <span className="hidden sm:inline">View thread</span>
+            <span className="sm:hidden">Thread</span>
           </Button>
         )}
       </div>
 
-      {isUser && <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">{getRoleIcon()}</div>}
+      {isUser && <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center">{getRoleIcon()}</div>}
     </motion.div>
   )
 }

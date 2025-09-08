@@ -87,6 +87,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           console.log('Conversation created:', currentConversationId)
         }
 
+        // Notify parent about message activity immediately (for UI state updates)
+        onMessageSent?.()
+
         // Send message using streaming API hook
         await sendMessageWithStreaming.mutateAsync({
           conversationId: currentConversationId!,
@@ -99,9 +102,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
         }
-
-        // Notify parent about message activity (for UI state updates)
-        onMessageSent?.()
       } catch (error) {
         console.error('Failed to send message:', error)
       } finally {
@@ -139,15 +139,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           console.log('Conversation created:', currentConversationId)
         }
 
+        // Notify parent about message activity immediately (for UI state updates)
+        onMessageSent?.()
+
         // Send message using streaming API hook
         await sendMessageWithStreaming.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           message: suggestionText,
         })
-
-        // Notify parent about message activity (for UI state updates)
-        onMessageSent?.()
       } catch (error) {
         console.error('Failed to send suggestion:', error)
       } finally {

@@ -34,9 +34,18 @@ export interface ExecutionEvent {
     | 'workflow_paused'
     | 'workflow_resumed'
     | 'workflow_completed'
-    | 'workflow_failed';
+    | 'workflow_failed'
+    | 'content_chunk'
+    | 'content_complete';
   execution: Execution;
   timestamp: string;
+  content?: string; // For streaming content chunks
+  contentMetadata?: {
+    accumulated?: string;
+    isComplete?: boolean;
+    nodeRef?: string;
+    model?: string;
+  };
 }
 
 /**
@@ -235,6 +244,11 @@ export class Engine {
     // Create handler instance with parameters (now async)
     const handler = await this.createHandler(node);
 
+    // Pass streaming emitter to handler if it supports streaming
+    if ('setStreamingEmitter' in handler && typeof handler.setStreamingEmitter === 'function') {
+      (handler as any).setStreamingEmitter(this.streamingEmitter);
+    }
+
     // Execute the node - this returns execution with result stored
     const updatedExecution = await handler.execute(execution);
 
@@ -409,5 +423,53 @@ export class Engine {
         console.error('Error in external streaming emitter:', error);
       }
     }
+  }
+
+  /**
+   * Emit content chunk for streaming (public method for LLM and other components)
+   */
+  async emitContentChunk(content: string, accumulated: string, nodeRef?: string, model?: string): Promise<void> {
+    if (!this.execution) {
+      return;
+    }
+
+    const event: ExecutionEvent = {
+      type: 'content_chunk',
+      execution: this.execution,
+      timestamp: new Date().toISOString(),
+      content,
+      contentMetadata: {
+        accumulated,
+        isComplete: false,
+        nodeRef: nodeRef || this.execution.currentNodeRef,
+        model,
+      },
+    };
+
+    await this.emitEvent(event);
+  }
+
+  /**
+   * Emit content completion for streaming
+   */
+  async emitContentComplete(finalContent: string, nodeRef?: string, model?: string): Promise<void> {
+    if (!this.execution) {
+      return;
+    }
+
+    const event: ExecutionEvent = {
+      type: 'content_complete',
+      execution: this.execution,
+      timestamp: new Date().toISOString(),
+      content: finalContent,
+      contentMetadata: {
+        accumulated: finalContent,
+        isComplete: true,
+        nodeRef: nodeRef || this.execution.currentNodeRef,
+        model,
+      },
+    };
+
+    await this.emitEvent(event);
   }
 }

@@ -22,6 +22,7 @@ export interface EnvironmentConfig {
   // LLM Provider Configuration
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
+  OPENROUTER_API_KEY?: string;
 
   // Default Model Configuration
   DEFAULT_LLM_PROVIDER: 'openai' | 'anthropic' | '';

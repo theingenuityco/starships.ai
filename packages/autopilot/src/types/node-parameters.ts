@@ -5,8 +5,8 @@
  * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-import type { BaseNodeParameters, BaseBlueprint } from '@/types/base';
 import type { AgentMemoryState } from '@/AgentMemory';
+import type { BaseBlueprint, BaseNodeParameters } from '@/types/base';
 
 /**
  * Agent-specific node parameters
@@ -111,11 +111,11 @@ export interface HttpAuthentication {
 
 /**
  * LLM node parameters for AI model interactions via OpenRouter
+ * Note: API key is now managed by the Autopilot singleton
  */
 export interface LlmNodeParameters extends BaseNodeParameters {
   model: string;
   prompt: string;
-  openrouterApiKey: string;
   temperature?: number;
   maxTokens?: number;
   timeout?: number;

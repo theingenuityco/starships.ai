@@ -52,6 +52,7 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 
 - `OPENAI_API_KEY` (string, optional) - OpenAI API key
 - `ANTHROPIC_API_KEY` (string, optional) - Anthropic API key
+- `OPENROUTER_API_KEY` (string, optional) - OpenRouter API key for accessing multiple LLM models
 - `DEFAULT_LLM_PROVIDER` ('openai' | 'anthropic' | '') - Default provider, defaults to 'openai'
 - `DEFAULT_CHAT_MODEL` (string) - Default model name, defaults to 'gpt-4o'
 

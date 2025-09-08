@@ -12,13 +12,18 @@ export { Workflow } from './Workflow';
 // Core agent class for agent execution
 export { Agent } from './Agent';
 
+// ===== ENGINE SYSTEM =====
+// Engine class and event types
+export { Engine } from './engine/Engine';
+export type { EventCallback, ExecutionEvent } from './engine/Engine';
+
 // Memory system
 export { Memory } from './Memory';
-export type { Message, MemoryState, MemoryParams } from './Memory';
+export type { MemoryParams, MemoryState, Message } from './Memory';
 
 // Agent memory system
 export { AgentMemory } from './AgentMemory';
-export type { AgentIdentity, AgentPurpose, AgentSpace, AgentMemoryState, AgentMemoryParams } from './AgentMemory';
+export type { AgentIdentity, AgentMemoryParams, AgentMemoryState, AgentPurpose, AgentSpace } from './AgentMemory';
 
 // ===== LLM SYSTEM =====
 // Core LLM class for AI model interactions
@@ -33,14 +38,14 @@ export { Handler } from './nodes/Handler';
 
 // Individual handlers
 export {
-  StartHandler,
-  EndHandler,
   AgentHandler,
   ConditionalHandler,
-  PromptHandler,
-  OutputHandler,
+  EndHandler,
   HttpRequestHandler,
   LlmHandler,
+  OutputHandler,
+  PromptHandler,
+  StartHandler,
   WorkflowHandler,
 } from './nodes/handlers';
 
@@ -49,33 +54,34 @@ export { Validator } from './validation/Validator';
 
 // Workflow Types - clean exports
 export type {
-  // Core workflow types
-  Blueprint,
-  Node,
-  Edge,
-  NodeType,
-  NodeParameters,
-
-  // Execution types
-  Execution,
-  NodeResult,
-  ExecutionStatus,
-
   // Node parameter types
   AgentNodeParameters,
+  // Core workflow types
+  Blueprint,
   ConditionalNodeParameters,
-  UserPromptNodeParameters,
-  OutputNodeParameters,
+  Edge,
+  // Execution types
+  Execution,
+  ExecutionStatus,
   HttpRequestNodeParameters,
   LlmNodeParameters,
-  WorkflowNodeParameters,
-
+  Node,
+  NodeParameters,
+  NodeResult,
+  NodeType,
+  OutputNodeParameters,
+  UserPromptNodeParameters,
+  ValidationError,
   // Validation types
   ValidationResult,
-  ValidationError,
-  ValidationWarning,
   ValidationSuggestion,
+  ValidationWarning,
+  WorkflowNodeParameters,
 } from './types';
 
 // Configuration
 export { config } from './constants';
+
+// Autopilot configuration manager
+export { autopilot, AutopilotManager } from './Autopilot';
+export type { AutopilotConfig, AutopilotCredentials } from './Autopilot';

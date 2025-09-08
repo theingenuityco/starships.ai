@@ -51,6 +51,62 @@ pnpm run build
 pnpm run start
 ```
 
+## Using a Local Domain
+
+You can use a custom local domain like `local.starships.ai` instead of `localhost:8080`:
+
+### Step 1: Update Your Hosts File
+
+Add the following line to your hosts file:
+
+**macOS/Linux:** Edit `/etc/hosts`
+
+```bash
+sudo nano /etc/hosts
+```
+
+**Windows:** Edit `C:\Windows\System32\drivers\etc\hosts` (as Administrator)
+
+Add this line:
+
+```
+127.0.0.1   local.starships.ai
+```
+
+### Step 2: Configure the Proxy Port
+
+Make sure your proxy is running on port 80 (standard HTTP) or 8080:
+
+```env
+# .env
+PROXY_PORT=80  # Use port 80 for http://local.starships.ai
+# or
+PROXY_PORT=8080  # Use port 8080 for http://local.starships.ai:8080
+```
+
+**Note:** Port 80 may require elevated privileges:
+
+```bash
+# macOS/Linux (if using port 80)
+sudo pnpm --filter @starships/reverse-proxy dev
+
+# Or use port 8080 without sudo
+pnpm --filter @starships/reverse-proxy dev
+# Then access via http://local.starships.ai:8080
+```
+
+### Step 3: Access Your Application
+
+- If using port 80: `http://local.starships.ai`
+- If using port 8080: `http://local.starships.ai:8080`
+
+### Benefits of Using a Local Domain
+
+- **Production-like URLs**: Better mimics production environment
+- **Cookie handling**: Some authentication flows work better with proper domains
+- **Service workers**: Can test PWA features that require specific origins
+- **SSL testing**: Can set up local SSL certificates with domains
+
 ## Configuration
 
 The proxy uses the `@starships/env` package for configuration, which reads from the root `.env` file:

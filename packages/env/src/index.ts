@@ -19,11 +19,13 @@ if (typeof window === 'undefined' && typeof process !== 'undefined') {
 export function getEnvConfig(): EnvironmentConfig {
   const DEFAULT_CLIENT_PORT = 3000;
   const DEFAULT_SERVER_PORT = 4000;
+  const DEFAULT_PROXY_PORT = 8080;
 
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
     CLIENT_PORT: parseInt(process.env.CLIENT_PORT || `${DEFAULT_CLIENT_PORT}`, 10),
+    PROXY_PORT: parseInt(process.env.PROXY_PORT || `${DEFAULT_PROXY_PORT}`, 10),
     NODE_ENV: process.env.NODE_ENV || 'development',
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 
@@ -48,7 +50,7 @@ export function getEnvConfig(): EnvironmentConfig {
     DEFAULT_CHAT_MODEL: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
 
     // JWT Authentication Configuration
-    JWT_SECRET: process.env.JWT_SECRET || 'your-super-secure-jwt-secret-key-at-least-32-characters-long',
+    JWT_SECRET: process.env.JWT_SECRET || '',
 
     // Stripe Configuration
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',

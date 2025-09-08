@@ -1,0 +1,21 @@
+{
+  "name": "@starships/reverse-proxy",
+  "version": "1.0.0",
+  "description": "Development reverse proxy for starships.ai",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@starships/env": "workspace:*",
+    "http-proxy-middleware": "^3.0.5",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^20.14.10",
+    "tsx": "^4.15.7",
+    "typescript": "^5.5.3"
+  }
+}

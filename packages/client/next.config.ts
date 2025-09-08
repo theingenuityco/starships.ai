@@ -1,5 +1,4 @@
 import type { NextConfig } from 'next'
-import { getEnvConfig } from '@starships/env'
 
 const nextConfig: NextConfig = {
   eslint: {
@@ -13,15 +12,6 @@ const nextConfig: NextConfig = {
     // Dangerously allow production builds to successfully complete even if
     // your project has type errors.
     ignoreBuildErrors: true,
-  },
-  async rewrites() {
-    return [
-      {
-        // rewrite /api/* requests to backend /api/* endpoints
-        source: '/api/:path*',
-        destination: `${getEnvConfig().SERVER_URL}/api/:path*`,
-      },
-    ]
   },
   webpack: (config, { isServer }) => {
     // Prevent Node.js modules from being bundled in the browser

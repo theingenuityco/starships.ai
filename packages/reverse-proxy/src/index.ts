@@ -1,6 +1,12 @@
 import { getEnvConfig } from '@starships/env';
 import express from 'express';
+import { IncomingMessage } from 'http';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
+
+// Extended type for Express request with http-proxy-middleware
+interface ProxyRequest extends IncomingMessage {
+  originalUrl?: string;
+}
 
 const app = express();
 
@@ -17,15 +23,7 @@ const apiProxyOptions: Options = {
   target: BACKEND_URL,
   changeOrigin: true,
   ws: true, // Enable WebSocket support
-  logger: console,
-  on: {
-    proxyReq: (proxyReq, req) => {
-      console.log(`[API] ${req.method} ${req.url} -> ${BACKEND_URL}${req.url}`);
-    },
-    error: (err, req) => {
-      console.error(`[API Error] ${req.method} ${req.url}:`, err.message);
-    },
-  },
+  pathFilter: '/api', // Match paths starting with /api
 };
 
 // Proxy options for frontend routes
@@ -33,18 +31,7 @@ const frontendProxyOptions: Options = {
   target: FRONTEND_URL,
   changeOrigin: true,
   ws: true, // Enable WebSocket support for Next.js HMR
-  logger: console,
-  on: {
-    proxyReq: (proxyReq, req) => {
-      // Don't log Next.js HMR requests to reduce noise
-      if (!req.url?.includes('_next/webpack-hmr')) {
-        console.log(`[Frontend] ${req.method} ${req.url} -> ${FRONTEND_URL}${req.url}`);
-      }
-    },
-    error: (err, req) => {
-      console.error(`[Frontend Error] ${req.method} ${req.url}:`, err.message);
-    },
-  },
+  pathFilter: (path: string) => !path.startsWith('/api'), // Everything except /api
 };
 
 // Health check endpoint for the proxy itself
@@ -60,11 +47,13 @@ app.get('/_proxy/health', (req, res) => {
   });
 });
 
-// Route /api/* requests to backend
-app.use('/api', createProxyMiddleware(apiProxyOptions));
+// Create proxy middlewares
+const apiProxy = createProxyMiddleware(apiProxyOptions);
+const frontendProxy = createProxyMiddleware(frontendProxyOptions);
 
-// Route everything else to frontend
-app.use('/', createProxyMiddleware(frontendProxyOptions));
+// Apply proxies - order matters!
+app.use(apiProxy); // Will only proxy requests matching pathFilter: '/api'
+app.use(frontendProxy); // Will proxy everything else
 
 // Start the proxy server
 const server = app.listen(PORT, () => {
@@ -77,7 +66,7 @@ Backend URL:   ${BACKEND_URL}
 Health Check:  http://localhost:${PORT}/_proxy/health
 
 Routes:
-  /api/*  →  ${BACKEND_URL}
+  /api/*  →  ${BACKEND_URL}/api/*
   /*      →  ${FRONTEND_URL}
 ================================
   `);

@@ -6,8 +6,9 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import { LlmNodeParameters, HttpRequestNodeParameters, Execution } from '@/types';
 import { HttpRequest } from '@/HttpRequest';
+import { Execution, HttpRequestNodeParameters, LlmNodeParameters } from '@/types';
+import { autopilot } from './Autopilot';
 
 export class LLM {
   private params: LlmNodeParameters;
@@ -102,6 +103,9 @@ export class LLM {
   private buildHttpRequestParams(execution?: Execution): HttpRequestNodeParameters {
     const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
 
+    // Get API key from Autopilot singleton, fallback to parameters for backward compatibility
+    const apiKey = autopilot.getOpenRouterApiKey();
+
     // Build messages array
     const messages: Array<{ role: string; content: string }> = [];
 
@@ -142,7 +146,7 @@ export class LLM {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.params.openrouterApiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body,
       timeout: this.params.timeout || 60000,
@@ -186,8 +190,11 @@ export class LLM {
       errors.push('Prompt is required');
     }
 
-    if (!this.params.openrouterApiKey) {
-      errors.push('OpenRouter API key is required');
+    // Check if API key is available from Autopilot singleton
+    const hasApiKey = !!autopilot.getOpenRouterApiKey();
+
+    if (!hasApiKey) {
+      errors.push('OpenRouter API key is required. Configure it via autopilot.setCredentials().');
     }
 
     // LLM-specific parameter range validation
@@ -216,12 +223,18 @@ export class LLM {
       errors.push('Timeout should be at least 1000ms');
     }
 
-    // Delegate to HttpRequest validation for HTTP-specific validation
-    if (errors.length === 0) {
-      const httpRequest = new HttpRequest(this.buildHttpRequestParams());
-      const httpValidation = httpRequest.validate();
-      if (!httpValidation.valid) {
-        errors.push(...httpValidation.errors);
+    // Only validate HTTP params if basic validation passes and we have an API key
+    if (errors.length === 0 && hasApiKey) {
+      try {
+        const httpRequest = new HttpRequest(this.buildHttpRequestParams());
+        const httpValidation = httpRequest.validate();
+        if (!httpValidation.valid) {
+          errors.push(...httpValidation.errors);
+        }
+      } catch (error) {
+        // If buildHttpRequestParams fails (e.g., missing API key), we already caught that above
+        const errorMessage = error instanceof Error ? error.message : 'HTTP request validation failed';
+        errors.push(errorMessage);
       }
     }
 

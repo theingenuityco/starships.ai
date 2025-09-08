@@ -141,6 +141,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: ANTHROPIC_API_KEY
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: OPENROUTER_API_KEY
             - name: DEFAULT_LLM_PROVIDER
               valueFrom:
                 secretKeyRef:

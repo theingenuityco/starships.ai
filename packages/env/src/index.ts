@@ -1,7 +1,7 @@
+import { EnvironmentConfig } from '@/types';
 import * as dotenv from 'dotenv';
 import dotenvExpand from 'dotenv-expand';
 import * as path from 'path';
-import { EnvironmentConfig } from '@/types';
 
 // Load environment variables from the root .env file
 const rootEnvPath = path.resolve(__dirname, '../../../.env');
@@ -41,6 +41,7 @@ export function getEnvConfig(): EnvironmentConfig {
     // LLM Provider Configuration
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 
     // Default Model Configuration
     DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || 'openai',

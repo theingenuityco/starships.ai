@@ -6,36 +6,29 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent } from '@starships/autopilot';
+import { Agent, EventCallback, ExecutionEvent } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
+
+// LLM response data structure from autopilot LLM class
+interface LlmResponseData {
+  status?: number;
+  statusText?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+  url?: string;
+  llmResponse?: string;
+  model?: string;
+}
 
 export interface AgentOptions {
   includeMemory?: boolean;
   conversationId?: string;
   userId?: string;
   loadConversationHistory?: boolean;
-}
-
-export interface ExecuteAgentResponse {
-  response: string;
-  usage: {
-    totalTokens: number;
-    cost: number;
-    modelCalls: number;
-  };
-  executionTime: number;
-  status: 'success' | 'error';
-  error?: string;
-}
-
-export interface AgentExecutionContext {
-  agentId: string;
-  userId?: string;
-  conversationId?: string;
-  userMessage: string;
+  eventCallback?: EventCallback;
 }
 
 /**
@@ -336,16 +329,17 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Execute agent chat using ConversationRequest format with enhanced error handling
+   * Execute conversation with agent using ConversationRequest format
+   * Handles complete conversation lifecycle with event monitoring and message creation
    */
-  static async executeChat(request: ConversationRequest): Promise<ConversationResponse> {
+  static async executeConversation(request: ConversationRequest): Promise<ConversationResponse> {
     const { agentId, userId, message, conversationId } = request;
 
     if (!agentId) {
-      throw new ValidationError('agentId is required for agent chat', 'agentId');
+      throw new ValidationError('agentId is required for conversation execution', 'agentId');
     }
 
-    console.log('🚀 [AGENT-SERVICE] Starting agent chat:', {
+    console.log('🚀 [AGENT-SERVICE] Starting conversation execution:', {
       agentId,
       userId,
       message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
@@ -371,50 +365,69 @@ export class AgentService {
       starshipId: dbAgent.starshipId,
     });
 
-    try {
-      // Execute agent using AgentService instance
-      const agentService = new AgentService();
-      const executionResult = await agentService.executeAgent(
-        {
-          agentId: agentId,
-          userId: userId,
-          conversationId: conversationId,
-          userMessage: message,
-        },
-        {
-          includeMemory: true,
-          userId: userId,
-          conversationId: conversationId,
-          loadConversationHistory: true,
-        }
-      );
+    const startTime = Date.now();
+    const agentService = new AgentService();
 
-      console.log('✅ [AGENT-SERVICE] Chat execution completed successfully:', {
-        responseLength: executionResult.response.length,
-        executionTime: executionResult.executionTime,
-        usageStats: executionResult.usage,
+    try {
+      // Create event handler with MessageService to add messages on each node completion
+      const eventHandler = AgentService.createEventHandler({
+        agentId: agentId,
+        conversationId: conversationId,
+        userId: userId,
+        starshipId: dbAgent.starshipId,
+        messageService: agentService.messageService,
+      });
+
+      // Create agent instance with enhanced options
+      const agent = await agentService.createAgentInstance(dbAgent, {
+        includeMemory: true,
+        userId: userId,
+        conversationId: conversationId,
+        loadConversationHistory: true,
+        eventCallback: eventHandler,
+      });
+
+      // Add user message to memory
+      agent.addToMemory('user', message);
+
+      // Execute agent with event monitoring
+      const execution = await agent.execute(undefined, eventHandler);
+
+      // Extract response from execution result
+      const response = agentService.extractResponse(execution);
+
+      // Calculate usage statistics
+      const usage = agentService.calculateUsage(execution);
+
+      // Update agent usage count
+      await agentRepo.incrementUsageCount(agentId);
+
+      const executionTime = Date.now() - startTime;
+
+      console.log('✅ [AGENT-SERVICE] Conversation execution completed successfully:', {
+        responseLength: response.length,
+        executionTime,
+        usageStats: usage,
       });
 
       return {
         source: 'agent',
-        content: executionResult.response,
+        content: response,
         agentId: agentId,
         usage: {
-          promptTokens: Math.floor(executionResult.usage.totalTokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(executionResult.usage.totalTokens * 0.3), // Estimate completion tokens
+          promptTokens: Math.floor(usage.totalTokens * 0.7), // Estimate prompt tokens
+          completionTokens: Math.floor(usage.totalTokens * 0.3), // Estimate completion tokens
         },
       };
     } catch (error) {
-      console.error('❌ [AGENT-SERVICE] Agent execution failed:', {
+      console.error('❌ [AGENT-SERVICE] Conversation execution failed:', {
         agentId,
         userId,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // Create error message in conversation and then throw the error
-      // This ensures the error is handled properly by the message service
-      const agentService = new AgentService();
+      // Create error message in conversation
       await agentService.createErrorResponse(error as Error, {
         agentId,
         userId,
@@ -422,7 +435,6 @@ export class AgentService {
         starshipId: dbAgent.starshipId,
       });
 
-      // Throw the original error so it's handled as an actual error, not a success response
       throw error;
     }
   }
@@ -482,71 +494,246 @@ export class AgentService {
   }
 
   /**
-   * Execute an agent with user input
+   * Register event callback for agent execution monitoring with message creation
    */
-  async executeAgent(context: AgentExecutionContext, options: AgentOptions = {}): Promise<ExecuteAgentResponse> {
-    const startTime = Date.now();
+  static createEventHandler(context: {
+    agentId: string;
+    conversationId?: string;
+    userId?: string;
+    starshipId?: string;
+    messageService?: MessageService;
+  }): EventCallback {
+    return async (event: ExecutionEvent) => {
+      console.log(`[AGENT-SERVICE] Event: ${event.type}`, {
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        userId: context.userId,
+        currentNode: event.execution.currentNodeRef,
+        status: event.execution.status,
+        timestamp: event.timestamp,
+      });
+
+      // Add custom event handling logic here based on event type
+      switch (event.type) {
+        case 'workflow_started':
+          console.log(`[AGENT-SERVICE] Workflow started for agent ${context.agentId}`);
+          await AgentService.handleWorkflowStarted(event, context);
+          break;
+        case 'node_started':
+          console.log(`[AGENT-SERVICE] Node ${event.execution.currentNodeRef} started`);
+          await AgentService.handleNodeStarted(event, context);
+          break;
+        case 'node_completed':
+          console.log(`[AGENT-SERVICE] Node ${event.execution.currentNodeRef} completed`);
+          await AgentService.handleNodeCompleted(event, context);
+          break;
+        case 'workflow_completed':
+          console.log(`[AGENT-SERVICE] Workflow completed for agent ${context.agentId}`);
+          await AgentService.handleWorkflowCompleted(event, context);
+          break;
+        case 'workflow_failed':
+          console.error(`[AGENT-SERVICE] Workflow failed for agent ${context.agentId}:`, event.execution.error);
+          await AgentService.handleWorkflowFailed(event, context);
+          break;
+        default:
+          break;
+      }
+    };
+  }
+
+  /**
+   * Handle workflow started event
+   */
+  private static async handleWorkflowStarted(
+    event: ExecutionEvent,
+    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+  ): Promise<void> {
+    if (!context.conversationId || !context.starshipId || !context.messageService) {
+      return;
+    }
 
     try {
-      // Get database agent
-      const dbAgent = await this.agentRepository.findById(context.agentId);
-      if (!dbAgent) {
-        throw new NotFoundError('Agent', context.agentId);
-      }
-
-      // Create agent instance
-      const agent = await this.createAgentInstance(dbAgent, options);
-
-      // Add user message to memory
-      agent.addToMemory('user', context.userMessage);
-
-      // Execute the agent
-      const execution = await agent.execute();
-
-      // Extract response from execution result
-      const response = this.extractResponse(execution);
-
-      // Calculate usage statistics
-      const usage = this.calculateUsage(execution);
-
-      // Note: Conversation history persistence removed
-
-      // Update agent usage count
-      await this.agentRepository.incrementUsageCount(context.agentId);
-
-      const executionTime = Date.now() - startTime;
-
-      return {
-        response,
-        usage,
-        executionTime,
-        status: 'success',
-      };
+      await context.messageService.createMessage({
+        role: 'system',
+        content: `🚀 Agent workflow started`,
+        starshipId: context.starshipId,
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        messageType: 'system_message',
+        importance: 'low',
+        processingStatus: 'completed',
+        metadata: {
+          event: 'workflow_started',
+          timestamp: event.timestamp,
+        },
+      });
     } catch (error) {
-      const executionTime = Date.now() - startTime;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      console.error(`[AGENT-SERVICE] Agent execution failed for ${context.agentId}:`, error);
-
-      // Return raw error response
-      // Note: Error message creation is handled by createErrorResponse in executeChat
-      // to avoid duplicate messages. This method just returns the error response.
-
-      return {
-        response: errorMessage,
-        usage: { totalTokens: 0, cost: 0, modelCalls: 0 },
-        executionTime,
-        status: 'error',
-        error: errorMessage,
-      };
+      console.error(`[AGENT-SERVICE] Failed to create workflow_started message:`, error);
     }
   }
 
   /**
-   * Test agent execution (dry run without saving to memory)
+   * Handle node started event
    */
-  async testAgent(agentId: string, testMessage: string): Promise<ExecuteAgentResponse> {
-    return this.executeAgent({ agentId, userMessage: testMessage }, { includeMemory: false, loadConversationHistory: false });
+  private static async handleNodeStarted(
+    event: ExecutionEvent,
+    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+  ): Promise<void> {
+    if (!context.conversationId || !context.starshipId || !context.messageService) {
+      return;
+    }
+
+    try {
+      await context.messageService.createMessage({
+        role: 'system',
+        content: `⏳ Starting node: ${event.execution.currentNodeRef}`,
+        starshipId: context.starshipId,
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        messageType: 'system_message',
+        importance: 'low',
+        processingStatus: 'completed',
+        metadata: {
+          event: 'node_started',
+          nodeRef: event.execution.currentNodeRef,
+          timestamp: event.timestamp,
+        },
+      });
+    } catch (error) {
+      console.error(`[AGENT-SERVICE] Failed to create node_started message:`, error);
+    }
+  }
+
+  /**
+   * Handle node completed event - This is where each node completion creates a message
+   */
+  private static async handleNodeCompleted(
+    event: ExecutionEvent,
+    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+  ): Promise<void> {
+    if (!context.conversationId || !context.starshipId || !context.messageService) {
+      return;
+    }
+
+    try {
+      // Get the node result from execution
+      const nodeResult = event.execution.executionResults.get(event.execution.currentNodeRef || '');
+      const nodeResultData = nodeResult?.data || {};
+      const currentNodeRef = event.execution.currentNodeRef || '';
+
+      // Check if nodeResult exists and has no error, then create assistant message with LLM response
+      if (nodeResult && !nodeResult.error && nodeResult.data) {
+        // Type the data as LLM response structure from autopilot LLM class
+        const llmData = nodeResult.data as LlmResponseData;
+
+        // Extract the actual LLM response content from the proper field
+        const llmResponseContent = llmData.llmResponse;
+
+        // Create assistant message with LLM response if we have content
+        if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
+          await context.messageService.createMessage({
+            role: 'assistant',
+            content: llmResponseContent.trim(),
+            starshipId: context.starshipId,
+            agentId: context.agentId,
+            conversationId: context.conversationId,
+            messageType: 'agent_response',
+            importance: 'high',
+            processingStatus: 'completed',
+            metadata: {
+              event: 'llm_response',
+              nodeRef: currentNodeRef,
+              model: llmData.model,
+              timestamp: event.timestamp,
+            },
+          });
+        }
+      }
+
+      // Create system message for node completion tracking (for all nodes)
+      await context.messageService.createMessage({
+        role: 'system',
+        content: `✅ Completed node: ${currentNodeRef}`,
+        starshipId: context.starshipId,
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        messageType: 'system_message',
+        importance: 'low',
+        processingStatus: 'completed',
+        metadata: {
+          event: 'node_completed',
+          nodeRef: currentNodeRef,
+          nodeResult: nodeResultData,
+          timestamp: event.timestamp,
+        },
+      });
+    } catch (error) {
+      console.error(`[AGENT-SERVICE] Failed to create node_completed message:`, error);
+    }
+  }
+
+  /**
+   * Handle workflow completed event
+   */
+  private static async handleWorkflowCompleted(
+    event: ExecutionEvent,
+    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+  ): Promise<void> {
+    if (!context.conversationId || !context.starshipId || !context.messageService) {
+      return;
+    }
+
+    try {
+      await context.messageService.createMessage({
+        role: 'system',
+        content: `🎉 Agent workflow completed successfully`,
+        starshipId: context.starshipId,
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        messageType: 'system_message',
+        importance: 'medium',
+        processingStatus: 'completed',
+        metadata: {
+          event: 'workflow_completed',
+          timestamp: event.timestamp,
+          executionResults: Array.from(event.execution.executionResults.keys()),
+        },
+      });
+    } catch (error) {
+      console.error(`[AGENT-SERVICE] Failed to create workflow_completed message:`, error);
+    }
+  }
+
+  /**
+   * Handle workflow failed event
+   */
+  private static async handleWorkflowFailed(
+    event: ExecutionEvent,
+    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+  ): Promise<void> {
+    if (!context.conversationId || !context.starshipId || !context.messageService) {
+      return;
+    }
+
+    try {
+      await context.messageService.createMessage({
+        role: 'system',
+        content: `❌ Agent workflow failed: ${event.execution.error?.message || 'Unknown error'}`,
+        starshipId: context.starshipId,
+        agentId: context.agentId,
+        conversationId: context.conversationId,
+        messageType: 'error',
+        importance: 'high',
+        processingStatus: 'completed',
+        metadata: {
+          event: 'workflow_failed',
+          error: event.execution.error,
+          timestamp: event.timestamp,
+        },
+      });
+    } catch (error) {
+      console.error(`[AGENT-SERVICE] Failed to create workflow_failed message:`, error);
+    }
   }
 
   /**

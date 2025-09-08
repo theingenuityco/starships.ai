@@ -3,7 +3,7 @@
  */
 
 import { LlmHandler } from '@/nodes/handlers/LlmHandler';
-import { Node, Execution, LlmNodeParameters, NodeResult } from '@/types';
+import { Execution, LlmNodeParameters, Node } from '@/types';
 
 // Type definitions for test data structures
 interface LlmResponseData {
@@ -44,7 +44,6 @@ describe('LlmHandler', () => {
       parameters: {
         model: 'anthropic/claude-3.5-sonnet',
         prompt: 'Hello, how are you?',
-        openrouterApiKey: 'test-api-key',
       } as LlmNodeParameters,
     };
 
@@ -118,7 +117,6 @@ describe('LlmHandler', () => {
           presencePenalty: 0.2,
           timeout: 30000,
           stream: false,
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
 
@@ -164,7 +162,6 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'What is AI?',
           systemMessage: 'You are an expert AI researcher',
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
 
@@ -363,7 +360,6 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Hello, how are you?',
           systemMessage: 'You are a helpful assistant',
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
       const handlerWithSystemMessage = new LlmHandler(nodeWithSystemMessage);
@@ -389,7 +385,6 @@ describe('LlmHandler', () => {
           presencePenalty: 0.2,
           timeout: 30000,
           stream: false,
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
 
@@ -404,10 +399,17 @@ describe('LlmHandler', () => {
       const nodeWithoutModel: Node = {
         ...mockNode,
         parameters: {
+          // Remove model field
           prompt: 'Hello, how are you?',
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
+
+      // Mock validation to return the expected error for missing model
+      MockedLLM.prototype.validate = jest.fn().mockReturnValue({
+        valid: false,
+        errors: ['Model is required'],
+      });
+
       const handlerWithoutModel = new LlmHandler(nodeWithoutModel);
 
       const result = handlerWithoutModel.validate();
@@ -427,9 +429,16 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          openrouterApiKey: 'test-api-key',
+          // Remove prompt field
         } as LlmNodeParameters,
       };
+
+      // Mock validation to return the expected error for missing prompt
+      MockedLLM.prototype.validate = jest.fn().mockReturnValue({
+        valid: false,
+        errors: ['Prompt is required'],
+      });
+
       const handlerWithoutPrompt = new LlmHandler(nodeWithoutPrompt);
 
       const result = handlerWithoutPrompt.validate();
@@ -451,7 +460,6 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           temperature: 3.0, // Invalid: > 2
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
 
@@ -481,7 +489,6 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           maxTokens: 0, // Invalid: < 1
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
 
@@ -511,7 +518,6 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           topP: 1.5, // Invalid: > 1
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
 
@@ -541,7 +547,6 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           maxTokens: 5000, // High token count
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
       const handlerWithHighTokens = new LlmHandler(nodeWithHighTokens);
@@ -597,7 +602,6 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           temperature: 0.7,
-          openrouterApiKey: 'test-api-key',
         } as LlmNodeParameters,
       };
       const handlerWithMissingFields = new LlmHandler(nodeWithMissingFields);

@@ -31,7 +31,6 @@ export interface MissionOrchestratorAgentConfig {
   maxTokens?: number;
   provider?: 'openai' | 'anthropic';
   model?: string;
-  openrouterApiKey?: string;
 }
 
 /**
@@ -108,7 +107,6 @@ export class MissionOrchestratorAgent {
     maxTokens: 1000,
     provider: 'openai',
     model: 'gpt-4o',
-    openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
   };
 
   constructor(config?: Partial<MissionOrchestratorAgentConfig>) {
@@ -601,7 +599,6 @@ export class MissionOrchestratorAgent {
         prompt: promptContent,
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
-        openrouterApiKey: this.config.openrouterApiKey,
       };
 
       const llm = new LLM(llmConfig);

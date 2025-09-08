@@ -201,8 +201,8 @@ export class ConversationService {
       userId,
     });
 
-    // Execute agent chat
-    const response = await AgentService.executeChat({
+    // Execute agent conversation
+    const response = await AgentService.executeConversation({
       source: 'user',
       agentId,
       userId,

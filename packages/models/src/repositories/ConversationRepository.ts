@@ -237,4 +237,138 @@ export class ConversationRepository extends BaseRepository {
       'Conversation'
     );
   }
+
+  /**
+   * Get messages for a conversation using Neo4j relationship
+   */
+  async getConversationMessages(
+    conversationId: string,
+    orderBy: 'timestamp' | 'created_at' = 'timestamp',
+    orderDirection: 'asc' | 'desc' = 'asc'
+  ): Promise<any[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const orderField = orderBy === 'timestamp' ? 'm.timestamp' : 'm.createdAt';
+        const direction = orderDirection.toUpperCase();
+
+        const result = await connection.executeQuery<{ m: any }>(
+          `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
+           RETURN m ORDER BY ${orderField} ${direction}`,
+          { conversationId }
+        );
+
+        return result.map((record) => record.m);
+      },
+      'getConversationMessages',
+      'Conversation'
+    );
+  }
+
+  /**
+   * Update conversation statistics when messages are added/removed
+   */
+  async updateMessageStats(conversationId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
+           WITH c, count(m) as messageCount, sum(m.tokenCount) as totalTokens, max(m.timestamp) as lastActivity
+           SET c.messageCount = messageCount,
+               c.totalTokens = COALESCE(totalTokens, 0),
+               c.lastActivityAt = COALESCE(lastActivity, c.lastActivityAt),
+               c.updatedAt = $updatedAt`,
+          {
+            conversationId,
+            updatedAt: new Date().toISOString(),
+          }
+        );
+      },
+      'updateMessageStats',
+      'Conversation'
+    );
+  }
+
+  /**
+   * Delete all messages in a conversation via relationships
+   */
+  async deleteAllMessages(conversationId: string): Promise<{ deletedCount: number }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeWrite<{ deletedCount: number }>(
+          `MATCH (c:Conversation {id: $conversationId})-[r:HAS_MESSAGE]->(m:Message)
+           DETACH DELETE m, r
+           RETURN count(m) as deletedCount`,
+          { conversationId }
+        );
+
+        // Update conversation stats after deleting messages
+        await this.updateMessageStats(conversationId);
+
+        return {
+          deletedCount: result[0]?.deletedCount || 0,
+        };
+      },
+      'deleteAllMessages',
+      'Conversation'
+    );
+  }
+
+  /**
+   * Get conversation statistics using Neo4j relationships
+   */
+  async getConversationStats(conversationId: string): Promise<{
+    messageCount: number;
+    totalTokens: number;
+    byRole: { system: number; user: number; assistant: number };
+    lastMessageAt: string | null;
+  }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{
+          messageCount: number;
+          totalTokens: number;
+          roles: string[];
+          lastMessageAt: string;
+        }>(
+          `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
+           RETURN count(m) as messageCount,
+                  sum(m.tokenCount) as totalTokens,
+                  collect(m.role) as roles,
+                  max(m.timestamp) as lastMessageAt`,
+          { conversationId }
+        );
+
+        const record = result[0];
+        if (!record || record.messageCount === 0) {
+          return {
+            messageCount: 0,
+            totalTokens: 0,
+            byRole: { system: 0, user: 0, assistant: 0 },
+            lastMessageAt: null,
+          };
+        }
+
+        // Count by role
+        const byRole = { system: 0, user: 0, assistant: 0 };
+        record.roles.forEach((role: string) => {
+          if (Object.prototype.hasOwnProperty.call(byRole, role)) {
+            byRole[role as keyof typeof byRole]++;
+          }
+        });
+
+        return {
+          messageCount: Number(record.messageCount),
+          totalTokens: Number(record.totalTokens) || 0,
+          byRole,
+          lastMessageAt: record.lastMessageAt,
+        };
+      },
+      'getConversationStats',
+      'Conversation'
+    );
+  }
 }

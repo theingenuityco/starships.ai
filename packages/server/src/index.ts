@@ -3,6 +3,7 @@
  * Main server entry point with enhanced repository pattern
  */
 
+import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import {
   AgentRepository,
@@ -135,6 +136,12 @@ const httpServer = createServer(app);
 httpServer.listen(PORT, async () => {
   try {
     console.log('🚀 Starting Aether Core Server...');
+
+    // Configure autopilot credentials
+    autopilot.setCredentials({
+      openrouterApiKey: config.OPENROUTER_API_KEY,
+    });
+    console.log('✅ Autopilot credentials configured');
 
     // Initialize database connection FIRST
     await dbConnection.connect();

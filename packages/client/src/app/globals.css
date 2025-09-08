@@ -209,23 +209,97 @@
   --ring: 220 70% 50%;
 }
 
-/* 
- * ACCESSIBILITY UTILITIES - FUTURE ENHANCEMENT
- * ===========================================
- * TODO: Implement these classes for improved accessibility:
- * 
- * .focus-visible-ring {
- *   @apply focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none;
- * }
- * 
- * .sr-only-focusable {
- *   @apply sr-only focus:not-sr-only focus:absolute focus:z-50;
- * }
- * 
- * .high-contrast-mode {
- *   // High contrast mode overrides for accessibility
- * }
+/*
+ * MESSAGE CONVERSATION ENHANCEMENTS
+ * ================================
+ * Enhanced styling for message rendering
  */
+.message-bubble {
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.message-bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.1);
+}
+
+.message-content {
+  line-height: 1.6;
+  font-feature-settings:
+    'kern' 1,
+    'liga' 1,
+    'onum' 1;
+}
+
+.message-timestamp {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.025em;
+}
+
+.code-block-enhanced {
+  font-variant-ligatures: common-ligatures;
+  font-feature-settings:
+    'calt' 1,
+    'liga' 1;
+}
+
+.selection-highlight {
+  background: linear-gradient(90deg, hsl(var(--primary) / 0.1) 0%, hsl(var(--primary) / 0.05) 100%);
+  border-left: 2px solid hsl(var(--primary));
+}
+
+/* Enhanced scrollbars for message areas */
+.message-scroll-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.message-scroll-area::-webkit-scrollbar-track {
+  background: hsl(var(--muted) / 0.1);
+  border-radius: 4px;
+}
+
+.message-scroll-area::-webkit-scrollbar-thumb {
+  background: hsl(var(--primary) / 0.3);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.message-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary) / 0.5);
+}
+
+/*
+ * ACCESSIBILITY UTILITIES - IMPLEMENTED
+ * ====================================
+ */
+.focus-visible-ring {
+  @apply focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none;
+}
+
+.sr-only-focusable {
+  @apply sr-only focus:not-sr-only focus:absolute focus:z-50;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .message-bubble {
+    border: 2px solid hsl(var(--border));
+  }
+
+  .selection-highlight {
+    border-left-width: 4px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .message-bubble,
+  .message-bubble:hover {
+    transition: none;
+    transform: none;
+  }
+}
 
 /* Shadcn UI Animation Keyframes */
 @keyframes animate-in {

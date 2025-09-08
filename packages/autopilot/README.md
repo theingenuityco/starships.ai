@@ -8,6 +8,44 @@ Autopilot provides a powerful workflow execution system:
 
 **Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing, interactive user prompts, and AI model integration
 
+## Credential Configuration
+
+Autopilot requires manual credential configuration for API access (LLM models, HTTP requests with authentication, etc.). Credentials must be configured before using nodes that require them.
+
+### Setting Up Credentials
+
+```typescript
+import { autopilot } from '@starships/autopilot';
+
+// Configure OpenRouter API key for LLM nodes
+autopilot.setCredentials({
+  openrouterApiKey: 'sk-or-v1-your-api-key-here',
+});
+
+// Verify credentials are set
+if (!autopilot.hasOpenRouterApiKey()) {
+  throw new Error('OpenRouter API key is required for LLM functionality');
+}
+```
+
+### Server Integration
+
+For server applications, configure credentials during startup:
+
+```typescript
+import { autopilot } from '@starships/autopilot';
+import { getEnvConfig } from '@starships/env';
+
+const config = getEnvConfig();
+
+// Configure credentials from environment
+autopilot.setCredentials({
+  openrouterApiKey: config.OPENROUTER_API_KEY,
+});
+```
+
+**Note**: Autopilot does not automatically read environment variables. Credentials must be explicitly configured using `autopilot.setCredentials()`.
+
 ## Workflow System
 
 ### Features

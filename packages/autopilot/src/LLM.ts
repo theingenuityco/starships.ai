@@ -117,6 +117,7 @@ export class LLM {
       }
 
       const decoder = new TextDecoder();
+      let buffer = ''; // Buffer to accumulate partial data
 
       while (true) {
         const { done, value } = await reader.read();
@@ -124,11 +125,17 @@ export class LLM {
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n').filter((line) => line.trim());
+        buffer += chunk;
+
+        // Process complete lines from the buffer
+        const lines = buffer.split('\n');
+        // Keep the last potentially incomplete line in the buffer
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim();
+          const trimmedLine = line.trim();
+          if (trimmedLine.startsWith('data: ')) {
+            const data = trimmedLine.slice(6).trim();
 
             if (data === '[DONE]') {
               continue;
@@ -152,7 +159,37 @@ export class LLM {
                 usage = parsed.usage;
               }
             } catch (parseError) {
-              console.warn('Failed to parse streaming chunk:', parseError);
+              console.error('Failed to parse streaming chunk:', parseError, 'Data:', data);
+            }
+          }
+        }
+      }
+
+      // Process any remaining data in the buffer
+      if (buffer.trim()) {
+        const trimmedLine = buffer.trim();
+        if (trimmedLine.startsWith('data: ')) {
+          const data = trimmedLine.slice(6).trim();
+          if (data !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(data);
+              const content = parsed.choices?.[0]?.delta?.content || '';
+
+              if (content) {
+                fullResponse += content;
+
+                // Emit streaming chunk via callbacks if available
+                if (streamingCallbacks?.onChunk) {
+                  await streamingCallbacks.onChunk(content, fullResponse);
+                }
+              }
+
+              // Capture usage information if available
+              if (parsed.usage) {
+                usage = parsed.usage;
+              }
+            } catch (parseError) {
+              console.error('Failed to parse final streaming chunk:', parseError, 'Data:', data);
             }
           }
         }

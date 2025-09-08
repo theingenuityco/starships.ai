@@ -604,11 +604,14 @@ export class MissionOrchestratorAgent {
       const llm = new LLM(llmConfig);
       const result = await llm.execute();
 
-      if (result.status === 'completed' && result.data?.llmResponse) {
-        return result.data.llmResponse;
-      } else {
-        throw new Error(`LLM execution failed: ${result.error?.message || 'Unknown error'}`);
+      if (result.status === 'completed' && result.data && typeof result.data === 'object' && result.data !== null) {
+        const data = result.data as { llmResponse?: string };
+        if (data.llmResponse) {
+          return data.llmResponse;
+        }
       }
+
+      throw new Error(`LLM execution failed: ${result.error?.message || 'Unknown error'}`);
     } catch (error) {
       this.logger.error('Failed to call LLM', error as Error);
       throw error;

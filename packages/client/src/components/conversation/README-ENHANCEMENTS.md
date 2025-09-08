@@ -122,7 +122,7 @@ This document outlines the comprehensive enhancements made to the conversation m
 
 ### Core Components
 
-1. **[`EnhancedConversationMessageList.tsx`](./EnhancedConversationMessageList.tsx)** - Main enhanced component
+1. **[`ConversationMessageList.tsx`](./ConversationMessageList.tsx)** - Main enhanced component
 2. **[`MessageContent.tsx`](./MessageContent.tsx)** - Markdown and content rendering
 3. **[`MessageSelection.tsx`](./MessageSelection.tsx)** - Selection and bulk operations
 4. **[`MessageReactions.tsx`](./MessageReactions.tsx)** - Emoji reactions system
@@ -184,16 +184,8 @@ This document outlines the comprehensive enhancements made to the conversation m
 ### Basic Enhanced Usage
 
 ```tsx
-import { EnhancedConversationMessageList } from '@/components/conversation/EnhancedConversationMessageList'
-
-;<EnhancedConversationMessageList
-  conversationId={conversationId}
-  starshipId={starshipId}
-  onMessageAdded={handleMessageAdded}
-  enableVirtualization={true}
-  enableSearch={true}
-  enableAccessibility={true}
-/>
+import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+;<ConversationMessageList conversationId={conversationId} starshipId={starshipId} onMessageAdded={handleMessageAdded} enableVirtualization={true} enableSearch={true} enableAccessibility={true} />
 ```
 
 ### Individual Component Usage
@@ -209,7 +201,7 @@ import { MessageSearch } from '@/components/conversation/MessageSearch'
 
 ## 🔧 Configuration Options
 
-### EnhancedConversationMessageList Props
+### ConversationMessageList Props
 
 - `enableVirtualization?: boolean` - Enable virtual scrolling for performance
 - `enableSearch?: boolean` - Enable search functionality
@@ -243,7 +235,7 @@ import { MessageSearch } from '@/components/conversation/MessageSearch'
 
 ### From Original to Enhanced
 
-1. Replace `ConversationMessageList` imports with `EnhancedConversationMessageList`
+1. Use the enhanced `ConversationMessageList` component (previously `EnhancedConversationMessageList`)
 2. Add new optional props for desired features
 3. Update CSS imports if using custom styles
 4. Test accessibility and performance

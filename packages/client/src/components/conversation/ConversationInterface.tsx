@@ -3,7 +3,7 @@
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationHeader } from '@/components/conversation/ConversationHeader'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
-import { EnhancedConversationMessageList } from '@/components/conversation/EnhancedConversationMessageList'
+import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useConversation, useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
@@ -160,7 +160,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <AnimatePresence>
         {hasMessages && currentConversationId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0 overflow-hidden">
-            <EnhancedConversationMessageList
+            <ConversationMessageList
               conversationId={currentConversationId}
               starshipId={starshipId}
               key={currentConversationId}

@@ -17,7 +17,7 @@ import { MessageHighlight, MessageSearch, useMessageSearch } from './MessageSear
 import { MessageCheckbox, MessageSelection } from './MessageSelection'
 import { VirtualizedMessageList } from './VirtualizedMessageList'
 
-interface EnhancedConversationMessageListProps {
+interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
   enableVirtualization?: boolean
@@ -25,7 +25,7 @@ interface EnhancedConversationMessageListProps {
   enableAccessibility?: boolean
 }
 
-export function EnhancedConversationMessageList({ conversationId, starshipId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: EnhancedConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: ConversationMessageListProps) {
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
   const deleteMessage = useDeleteMessage()

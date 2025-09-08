@@ -1,4 +1,4 @@
-import api from '@/lib/api'
+import api, { getCurrentToken } from '@/lib/api'
 import type { StreamingChunk, StreamingConnection, StreamingError, StreamingHeartbeat, StreamingResponse, StreamingState } from '@starships/protocol'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -60,7 +60,7 @@ export function useStreamingConversation() {
             message: data.message,
             stream: true,
           })
-          .then(response => {
+          .then(async response => {
             // Extract streamId from server response
             const streamId = response.data.data?.streamId
             if (!streamId) {
@@ -69,8 +69,16 @@ export function useStreamingConversation() {
 
             setStreamingState((prev: StreamingState) => ({ ...prev, streamId }))
 
-            // Connect to streaming endpoint with received streamId
-            const eventSource = new EventSource(`/api/v1/conversations/${data.conversationId}/messages/stream?streamId=${streamId}`)
+            // Get JWT token for SSE authentication
+            const token = await getCurrentToken()
+
+            // Connect to streaming endpoint with received streamId and token
+            let sseUrl = `/api/v1/conversations/${data.conversationId}/messages/stream?streamId=${streamId}`
+            if (token) {
+              sseUrl += `&token=${encodeURIComponent(token)}`
+            }
+
+            const eventSource = new EventSource(sseUrl)
             eventSourceRef.current = eventSource
 
             let finalResponse: StreamingResponse | null = null

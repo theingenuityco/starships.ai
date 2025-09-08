@@ -31,6 +31,7 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 
 ### Key Features
 
+- ✅ **Real-time Streaming**: Server-Sent Events (SSE) for live AI agent responses with visual streaming indicators
 - ✅ **Clean Navigation Architecture**: Extracted from command-deck spaghetti into dedicated components
 - ✅ **Command Deck**: Mission control dashboard with comprehensive controls
 - ✅ **Responsive Design**: Mobile-first with adaptive layouts
@@ -162,8 +163,16 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 ### Architecture
 
 - **TanStack Query**: Server state management with optimistic updates, caching, and background refetching
+- **Real-time Streaming**: Server-Sent Events (SSE) integration for live AI agent responses
 - **UI State**: Zustand store for client-side UI state (active starship selection, navigation)
 - **Persistence**: localStorage integration for UI preferences
+
+### Streaming Communication
+
+- **Real-time Responses**: Live AI agent responses via Server-Sent Events (SSE)
+- **Visual Indicators**: Streaming cursors and progress indicators during message generation
+- **Optimistic Updates**: Immediate UI feedback with streaming content integration
+- **Error Recovery**: Automatic reconnection and fallback handling for streaming failures
 
 ### Starship Management
 
@@ -275,6 +284,7 @@ CMD ["npm", "start"]
 ## 📖 Documentation
 
 - [Client Implementation Guide](../../docs/client-implementation.md) - Detailed technical documentation
+- [Streaming Architecture](../autopilot/README-STREAMING.md) - Real-time streaming implementation
 - [API Design](../../docs/api-design.md) - Backend API reference
 - [Architecture Overview](../../docs/architecture.md) - System design
 

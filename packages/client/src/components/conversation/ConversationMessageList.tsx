@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConversationMessages } from '@/hooks/useConversations'
 import { useDeleteMessage } from '@/hooks/useMessages'
+import { useStreamingConversation } from '@/hooks/useStreamingConversation'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Search, Timer, User, XCircle } from 'lucide-react'
@@ -30,8 +31,37 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
   const deleteMessage = useDeleteMessage()
 
+  // Streaming state
+  const { streamingState, isStreaming, streamingContent } = useStreamingConversation()
+
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
+
+  // Create streaming message for display
+  const streamingMessage =
+    isStreaming && streamingState.status !== 'idle'
+      ? {
+          id: 'streaming-message',
+          content: streamingContent || '',
+          role: 'assistant' as const,
+          timestamp: new Date().toISOString(),
+          conversationId: conversationId || '',
+          starshipId: starshipId || '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: '1.0.0',
+          threadDepth: 0,
+          processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
+          messageType: 'agent_response' as const,
+          importance: 'medium' as const,
+          contentLength: streamingContent?.length || 0,
+          hasAttachments: false,
+          streaming: true,
+        }
+      : null
+
+  // Combine regular messages with streaming message
+  const displayMessages = streamingMessage ? [...messages, streamingMessage] : messages
 
   // Message selection state
   const [selectedMessages, setSelectedMessages] = useState<string[]>([])
@@ -101,12 +131,12 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
     setIsSelectionMode(false)
   }, [conversationId])
 
-  const renderMessage = (message: MessageModel, index: number) => (
+  const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => (
     <MessageBubble
       key={message.id}
       message={message}
       index={index}
-      totalMessages={messages.length}
+      totalMessages={displayMessages.length}
       isSelected={selectedMessages.includes(message.id)}
       isSelecting={isSelectionMode}
       isHighlighted={highlightedMessageId === message.id}
@@ -154,8 +184,8 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
 
       {/* Messages List */}
       <div className="flex-1 relative">
-        {enableVirtualization && messages.length > 50 ? (
-          <VirtualizedMessageList messages={messages} renderMessage={renderMessage} className="h-full message-scroll-area" />
+        {enableVirtualization && displayMessages.length > 50 ? (
+          <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" />
         ) : (
           <AnimatePresence mode="wait">
             <motion.div
@@ -165,7 +195,7 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
               exit={{ opacity: 0, y: -20 }}
               className="h-full overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 message-scroll-area"
             >
-              {messages.map((message, index) => renderMessage(message, index))}
+              {displayMessages.map((message, index) => renderMessage(message, index))}
             </motion.div>
           </AnimatePresence>
         )}
@@ -356,7 +386,7 @@ function MessageBubble({
           {searchTerm ? (
             <MessageHighlight content={message.content} searchTerm={searchTerm} className="message-content" />
           ) : (
-            <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} />
+            <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} isStreaming={message.streaming} />
           )}
 
           {/* Message footer */}

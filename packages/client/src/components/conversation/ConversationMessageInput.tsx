@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useSendMessage } from '@/hooks/useConversations'
+import { useStreamingConversation } from '@/hooks/useStreamingConversation'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
@@ -43,6 +44,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
     const sendMessage = useSendMessage()
+    const { sendMessageWithStreaming, isStreaming } = useStreamingConversation()
 
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
@@ -85,8 +87,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           console.log('Conversation created:', currentConversationId)
         }
 
-        // Send message using proper API hook
-        await sendMessage.mutateAsync({
+        // Send message using streaming API hook
+        await sendMessageWithStreaming.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           message: messageToSend,
@@ -137,8 +139,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           console.log('Conversation created:', currentConversationId)
         }
 
-        // Send message using proper API hook
-        await sendMessage.mutateAsync({
+        // Send message using streaming API hook
+        await sendMessageWithStreaming.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           message: suggestionText,
@@ -178,7 +180,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
-    const canSend = message.trim() && !disabled && !sending && selectedAgent
+    const canSend = message.trim() && !disabled && !sending && !isStreaming && selectedAgent
 
     // Expose methods to parent component via ref
     useImperativeHandle(
@@ -212,7 +214,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 onChange={handleTextareaChange}
                 onKeyPress={handleKeyPress}
                 placeholder={getPlaceholder()}
-                disabled={disabled || sending}
+                disabled={disabled || sending || isStreaming}
                 className={cn(
                   'w-full bg-transparent resize-none',
                   minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
@@ -246,7 +248,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     size="icon"
                     onClick={handleVoiceToggle}
                     className={cn('h-8 w-8 rounded-full shrink-0 transition-colors', isRecording ? 'text-red-500 hover:text-red-600 bg-red-500/10' : 'text-muted-foreground hover:text-foreground')}
-                    disabled={disabled}
+                    disabled={disabled || isStreaming}
                   >
                     {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                   </Button>
@@ -267,7 +269,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                         canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                       )}
                     >
-                      {sending ? (
+                      {sending || isStreaming ? (
                         <motion.div
                           className="h-4 w-4 border-2 border-current border-t-transparent rounded-full"
                           animate={{ rotate: 360 }}

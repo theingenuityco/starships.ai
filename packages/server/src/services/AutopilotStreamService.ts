@@ -1,5 +1,5 @@
 /**
- * Autopilot Streaming Emitter
+ * Autopilot Stream Service
  *
  * Server-side implementation of the StreamingEmitter interface.
  * Converts autopilot ExecutionEvents to server streaming format and broadcasts them.
@@ -29,9 +29,9 @@ interface ServerStreamChunk {
 }
 
 /**
- * Server-side streaming emitter that converts autopilot events to streaming format
+ * Server-side streaming service that converts autopilot events to streaming format
  */
-export class AutopilotStreamingEmitter implements StreamingEmitter {
+export class AutopilotStreamService implements StreamingEmitter {
   private streamingService: StreamingService;
   private streamId: string;
   private conversationId: string;
@@ -87,7 +87,7 @@ export class AutopilotStreamingEmitter implements StreamingEmitter {
         await this.streamingService.broadcastChunk(this.streamId, serverChunk);
       }
     } catch (error) {
-      console.error('[AutopilotStreamingEmitter] Failed to emit event:', error);
+      console.error('[AutopilotStreamService] Failed to emit event:', error);
     }
   }
 

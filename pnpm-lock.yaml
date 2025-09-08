@@ -31,9 +31,6 @@ importers:
       '@types/node':
         specifier: ^24.0.10
         version: 24.0.10
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.36.0
         version: 8.36.0(@typescript-eslint/parser@8.36.0(eslint@9.30.1(jiti@2.4.2))(typescript@5.8.3))(eslint@9.30.1(jiti@2.4.2))(typescript@5.8.3)
@@ -476,6 +473,9 @@ importers:
       '@types/node':
         specifier: ^22.10.6
         version: 22.16.0
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
       tsc-alias:
         specifier: ^1.8.16
         version: 1.8.16

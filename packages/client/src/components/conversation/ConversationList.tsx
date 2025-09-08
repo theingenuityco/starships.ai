@@ -25,7 +25,8 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   // Get conversationId directly from params - no prop needed
   const currentConversationId = params.conversationId as string | undefined
 
-  const { data, isLoading, error } = useStarshipConversations(starshipId)
+  // Override default query options to prevent refetching on route changes
+  const { data, isLoading, error } = useStarshipConversations(starshipId, true)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Filter conversations based on search

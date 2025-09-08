@@ -6,8 +6,8 @@
  */
 
 import { Handler, HandlerConstructor } from '@/nodes/Handler';
-import { streamingAdapter } from '@/streaming/StreamingAdapter';
 import { Blueprint, Execution, NodeResult, Node as WorkflowNode } from '@/types';
+import type { StreamingEmitter } from '@/types/streamingEmitter';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
@@ -50,9 +50,17 @@ export type EventCallback = (event: ExecutionEvent) => Promise<void>;
 export class Engine {
   private eventCallbacks: EventCallback[] = [];
   private execution!: Execution;
+  private streamingEmitter?: StreamingEmitter;
 
   constructor() {
     // Engine is completely stateless for handlers - pure dynamic loading
+  }
+
+  /**
+   * Set streaming emitter (injected by external systems like server)
+   */
+  setStreamingEmitter(emitter: StreamingEmitter): void {
+    this.streamingEmitter = emitter;
   }
 
   /**
@@ -379,7 +387,7 @@ export class Engine {
   }
 
   /**
-   * Emit workflow execution event with streaming support
+   * Emit workflow execution event with optional streaming support
    */
   private async emitEvent(event: ExecutionEvent): Promise<void> {
     // Call all registered callbacks first
@@ -392,119 +400,14 @@ export class Engine {
       }
     }
 
-    // Emit streaming events if streaming is enabled
-    if (event.execution.streaming?.enabled && streamingAdapter.isStreamingEnabled()) {
-      await this.emitStreamingEvent(event);
-    }
-  }
-
-  /**
-   * Convert engine events to streaming chunks
-   */
-  private async emitStreamingEvent(event: ExecutionEvent): Promise<void> {
-    try {
-      switch (event.type) {
-        case 'workflow_started':
-          await streamingAdapter.emitChunk({
-            type: 'node_start',
-            content: 'Workflow execution started',
-            metadata: {
-              eventType: 'workflow_started',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
-
-        case 'node_started':
-          await streamingAdapter.emitChunk({
-            type: 'node_start',
-            content: `Starting node: ${event.execution.currentNodeRef}`,
-            metadata: {
-              nodeRef: event.execution.currentNodeRef,
-              eventType: 'node_started',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
-
-        case 'node_completed':
-          await streamingAdapter.emitChunk({
-            type: 'node_complete',
-            content: `Completed node: ${event.execution.currentNodeRef}`,
-            metadata: {
-              nodeRef: event.execution.currentNodeRef,
-              eventType: 'node_completed',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
-
-        case 'node_failed':
-          await streamingAdapter.emitChunk({
-            type: 'error',
-            content: `Node failed: ${event.execution.error?.message || 'Unknown error'}`,
-            metadata: {
-              nodeRef: event.execution.currentNodeRef,
-              errorCode: event.execution.error?.code,
-              eventType: 'node_failed',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
-
-        case 'workflow_completed':
-          await streamingAdapter.emitChunk({
-            type: 'complete',
-            content: 'Workflow execution completed',
-            metadata: {
-              status: event.execution.status,
-              eventType: 'workflow_completed',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
-
-        case 'workflow_failed':
-          await streamingAdapter.emitError({
-            code: 'WORKFLOW_EXECUTION_FAILED',
-            message: event.execution.error?.message || 'Workflow execution failed',
-            recoverable: event.execution.error?.recoverable ?? false,
-            context: {
-              errorCode: event.execution.error?.code,
-              nodeRef: event.execution.currentNodeRef,
-              eventType: 'workflow_failed',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
-
-        case 'workflow_paused':
-          await streamingAdapter.emitChunk({
-            type: 'thinking',
-            content: 'Workflow execution paused',
-            metadata: {
-              status: 'paused',
-              eventType: 'workflow_paused',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
-
-        case 'workflow_resumed':
-          await streamingAdapter.emitChunk({
-            type: 'thinking',
-            content: 'Workflow execution resumed',
-            metadata: {
-              status: 'running',
-              eventType: 'workflow_resumed',
-              timestamp: event.timestamp,
-            },
-          });
-          break;
+    // Delegate streaming to injected emitter if available and enabled
+    if (this.streamingEmitter?.isEnabled() && event.execution.streaming?.enabled) {
+      try {
+        await this.streamingEmitter.emitExecutionEvent(event);
+      } catch (error) {
+        // Silent fail for streaming events to not interrupt execution
+        console.error('Error in external streaming emitter:', error);
       }
-    } catch (error) {
-      // Silent fail for streaming events to not interrupt execution
-      console.error('Error in streaming event emission:', error);
     }
   }
 }

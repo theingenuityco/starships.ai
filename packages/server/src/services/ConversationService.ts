@@ -272,18 +272,18 @@ export class ConversationService {
         userId,
       });
 
-      // Configure autopilot streaming - integration point ready
+      // Configure autopilot streaming
       console.log(`📡 [STREAMING] Configuring autopilot streaming for stream ${streamId}`);
 
-      // Execute agent conversation with streaming
-      const response = await AgentService.executeConversation({
+      // Execute agent conversation with streaming - updated to use new architecture
+      const response = await AgentService.executeConversationWithStreaming({
         source: 'user',
         agentId,
         userId,
         message,
         conversationId,
-        stream: true, // Enable streaming
         streamId,
+        streamingService: this.streamingService,
       });
 
       // Save agent response to database

@@ -8,9 +8,7 @@
 
 import { AgentMemory, AgentMemoryState } from '@/AgentMemory';
 import { Engine, EventCallback } from '@/engine/Engine';
-import { streamingAdapter } from '@/streaming/StreamingAdapter';
 import { AgentNodeParameters, Blueprint, Edge, Execution, Node } from '@/types';
-import type { StreamingCallback, StreamingOptions } from '@/types/streaming';
 
 export class Agent {
   private params: AgentNodeParameters;
@@ -56,6 +54,13 @@ export class Agent {
    */
   getMemory(): AgentMemory {
     return this.memory;
+  }
+
+  /**
+   * Get agent engine (for external configuration like streaming)
+   */
+  getEngine(): Engine {
+    return this.engine;
   }
 
   /**
@@ -108,7 +113,7 @@ export class Agent {
   }
 
   /**
-   * Execute the agent with optional event monitoring and streaming support
+   * Execute the agent with optional event monitoring
    */
   async execute(initialExecution?: Execution, eventCallback?: EventCallback): Promise<Execution> {
     try {
@@ -116,199 +121,32 @@ export class Agent {
         `Executing Agent: ${this.params.name} (${this.params.model})${initialExecution?.streaming?.enabled ? ' (streaming)' : ''}`
       );
 
-      // Check if streaming is enabled and supported
-      const isStreamingEnabled = initialExecution?.streaming?.enabled && streamingAdapter.isStreamingEnabled();
+      const executionWithMemory: Execution = {
+        currentNodeRef: undefined,
+        status: 'not_started',
+        executionResults: new Map(),
+        agentMemory: this.memory,
+        ...initialExecution,
+      };
 
-      if (isStreamingEnabled) {
-        return await this.executeWithStreaming(initialExecution, eventCallback);
-      } else {
-        return await this.executeWithoutStreaming(initialExecution, eventCallback);
+      // Register event callback if provided
+      if (eventCallback) {
+        this.onEvent(eventCallback);
+      }
+
+      try {
+        const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
+        return result;
+      } finally {
+        // Clean up event callback
+        if (eventCallback) {
+          this.offEvent(eventCallback);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Emit streaming error if streaming is enabled
-      if (initialExecution?.streaming?.enabled) {
-        await streamingAdapter.emitError({
-          code: 'AGENT_EXECUTION_ERROR',
-          message: errorMessage,
-          recoverable: false,
-          context: {
-            agentName: this.params.name,
-            model: this.params.model,
-          },
-        });
-      }
-
       throw new Error(`Agent execution failed: ${errorMessage}`);
     }
-  }
-
-  /**
-   * Execute agent with streaming support
-   */
-  private async executeWithStreaming(initialExecution?: Execution, eventCallback?: EventCallback): Promise<Execution> {
-    const executionWithMemory: Execution = {
-      currentNodeRef: undefined,
-      status: 'not_started',
-      executionResults: new Map(),
-      agentMemory: this.memory,
-      ...initialExecution,
-      streaming: initialExecution?.streaming,
-    };
-
-    const streamingOptions = initialExecution?.streaming;
-
-    // Configure streaming adapter
-    streamingAdapter.configure({
-      enabled: true,
-      streamId: streamingOptions?.streamId,
-      conversationId: streamingOptions?.conversationId,
-      agentId: streamingOptions?.agentId || this.params.name,
-    });
-
-    // Emit thinking chunk at start of agent execution
-    await streamingAdapter.emitChunk({
-      type: 'thinking',
-      content: `Starting agent execution: ${this.params.name}`,
-      metadata: {
-        model: this.params.model,
-        agentName: this.params.name,
-      },
-    });
-
-    // Create streaming event callback to bridge engine events to streaming
-    const streamingEventCallback: EventCallback = async (event) => {
-      if (streamingAdapter.isStreamingEnabled()) {
-        switch (event.type) {
-          case 'node_started':
-            await streamingAdapter.emitChunk({
-              type: 'node_start',
-              content: `Starting node execution`,
-              metadata: {
-                nodeRef: event.execution.currentNodeRef,
-                agentName: this.params.name,
-              },
-            });
-            break;
-
-          case 'node_completed':
-            await streamingAdapter.emitChunk({
-              type: 'node_complete',
-              content: `Node execution completed`,
-              metadata: {
-                nodeRef: event.execution.currentNodeRef,
-                agentName: this.params.name,
-              },
-            });
-            break;
-
-          case 'workflow_completed':
-            await streamingAdapter.emitComplete({
-              agentName: this.params.name,
-              status: 'completed',
-            });
-            break;
-
-          case 'workflow_failed':
-            await streamingAdapter.emitError({
-              code: 'AGENT_EXECUTION_FAILED',
-              message: `Agent execution failed: ${event.execution.error?.message || 'Unknown error'}`,
-              recoverable: false,
-              context: {
-                agentName: this.params.name,
-                nodeRef: event.execution.currentNodeRef,
-              },
-            });
-            break;
-        }
-      }
-
-      // Call original event callback if provided
-      if (eventCallback) {
-        await eventCallback(event);
-      }
-    };
-
-    // Register streaming event callback
-    this.onEvent(streamingEventCallback);
-
-    try {
-      const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
-      return result;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
-      throw new Error(`Agent streaming execution failed: ${errorMessage}`);
-    } finally {
-      // Clean up event callbacks
-      this.offEvent(streamingEventCallback);
-      if (eventCallback) {
-        this.offEvent(eventCallback);
-      }
-    }
-  }
-
-  /**
-   * Execute agent without streaming (original logic)
-   */
-  private async executeWithoutStreaming(initialExecution?: Execution, eventCallback?: EventCallback): Promise<Execution> {
-    const executionWithMemory: Execution = {
-      currentNodeRef: undefined,
-      status: 'not_started',
-      executionResults: new Map(),
-      agentMemory: this.memory,
-      ...initialExecution,
-    };
-
-    // Register event callback if provided
-    if (eventCallback) {
-      this.onEvent(eventCallback);
-    }
-
-    try {
-      const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
-      return result;
-    } finally {
-      // Clean up event callback
-      if (eventCallback) {
-        this.offEvent(eventCallback);
-      }
-    }
-  }
-
-  /**
-   * Execute agent with streaming support (convenient method)
-   */
-  async executeWithStreamingOptions(
-    streamingOptions: StreamingOptions,
-    initialExecution?: Execution,
-    eventCallback?: EventCallback
-  ): Promise<Execution> {
-    // Create execution with streaming options
-    const executionWithStreaming: Execution = {
-      currentNodeRef: undefined,
-      status: 'not_started',
-      executionResults: new Map(),
-      agentMemory: this.memory,
-      ...initialExecution,
-      streaming: streamingOptions,
-    };
-
-    return this.execute(executionWithStreaming, eventCallback);
-  }
-
-  /**
-   * Add streaming callback for agent execution
-   */
-  onStreamChunk(callback: StreamingCallback): void {
-    streamingAdapter.onChunk(callback);
-  }
-
-  /**
-   * Remove streaming callback
-   */
-  offStreamChunk(callback: StreamingCallback): void {
-    streamingAdapter.offChunk(callback);
   }
 
   /**

@@ -17,12 +17,8 @@ export type { BaseNodeParameters, Edge, NodeType } from './base';
 export * from './node-parameters';
 
 // ===== EXECUTION TYPES =====
-// Runtime execution state and context
+// Runtime execution state and context (includes streaming types)
 export * from './execution';
-
-// ===== STREAMING TYPES =====
-// Streaming support and event handling
-export * from './streaming';
 
 // ===== VALIDATION TYPES =====
 // Validation and error reporting

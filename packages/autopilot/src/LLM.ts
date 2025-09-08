@@ -4,13 +4,11 @@
  * Executable LLM (Large Language Model) that handles AI model interactions via OpenRouter.
  * Uses HttpRequest under the hood for HTTP communication, similar to how Agent uses Workflow.
  * Follows the same pattern as Workflow and Agent classes for consistency.
- * Supports streaming for real-time response generation.
+ * Supports streaming through the injection-based architecture.
  */
 
 import { HttpRequest } from '@/HttpRequest';
-import { streamingAdapter } from '@/streaming/StreamingAdapter';
 import { Execution, HttpRequestNodeParameters, LlmNodeParameters } from '@/types';
-import type { AutopilotStreamChunk } from '@/types/streaming';
 import { autopilot } from './Autopilot';
 
 export class LLM {
@@ -58,8 +56,8 @@ export class LLM {
     try {
       console.log(`Executing LLM: ${this.params.model}${this.params.stream ? ' (streaming)' : ''}`);
 
-      // Check if streaming is enabled and supported
-      const isStreamingEnabled = this.params.stream && execution?.streaming?.enabled && streamingAdapter.isStreamingEnabled();
+      // Check if streaming is enabled - rely on execution context for streaming decisions
+      const isStreamingEnabled = this.params.stream && execution?.streaming?.enabled;
 
       if (isStreamingEnabled) {
         return await this.executeWithStreaming(execution);
@@ -68,16 +66,6 @@ export class LLM {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Emit streaming error if streaming is enabled
-      if (this.params.stream && execution?.streaming?.enabled) {
-        await streamingAdapter.emitError({
-          code: 'LLM_EXECUTION_ERROR',
-          message: errorMessage,
-          recoverable: false,
-          context: { model: this.params.model },
-        });
-      }
 
       return {
         status: 'failed',
@@ -141,23 +129,8 @@ export class LLM {
 
               if (content) {
                 fullResponse += content;
-
-                // Emit streaming chunk
-                const streamChunk: AutopilotStreamChunk = {
-                  type: 'content',
-                  content,
-                  metadata: {
-                    model: this.params.model,
-                    tokenCount: parsed.usage?.total_tokens,
-                  },
-                };
-
-                await streamingAdapter.emitChunk(streamChunk);
-
-                // Call execution streaming callback if provided
-                if (execution?.onStreamChunk) {
-                  await execution.onStreamChunk(streamChunk);
-                }
+                // Note: Streaming is handled by the Engine's injected StreamingEmitter
+                // LLM nodes don't need to emit streaming chunks directly
               }
 
               // Capture usage information if available

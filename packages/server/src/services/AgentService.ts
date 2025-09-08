@@ -10,7 +10,7 @@ import { Agent, EventCallback, ExecutionEvent } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { AutopilotStreamingEmitter } from './AutopilotStreamingEmitter';
+import { AutopilotStreamService } from './AutopilotStreamService';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 
@@ -399,11 +399,11 @@ export class AgentService {
         eventCallback: eventHandler,
       });
 
-      // Create and inject streaming emitter
-      const streamingEmitter = new AutopilotStreamingEmitter(streamingService, streamId, conversationId || 'unknown', agentId);
+      // Create and inject streaming service
+      const autopilotStreamService = new AutopilotStreamService(streamingService, streamId, conversationId || 'unknown', agentId);
 
-      // Inject streaming emitter into agent's engine
-      agent.getEngine().setStreamingEmitter(streamingEmitter);
+      // Inject streaming service into agent's engine
+      agent.getEngine().setStreamingEmitter(autopilotStreamService);
 
       // Add user message to memory
       agent.addToMemory('user', message);

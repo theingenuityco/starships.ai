@@ -1,12 +1,16 @@
 # @starships/autopilot
 
-Workflow execution engine and agent development framework for starships.ai.
+Advanced workflow execution engine and agent development framework for starships.ai, providing DAG-based workflow orchestration with AI model integration.
 
 ## Overview
 
-Autopilot provides a powerful workflow execution system:
+Autopilot provides a comprehensive workflow execution system with:
 
-**Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing, interactive user prompts, and AI model integration
+- **Workflow Execution Engine** - Execute complex DAG-based workflows with conditional routing, interactive user prompts, and AI model integration
+- **Agent System** - Sophisticated agent framework with structured memory management
+- **Memory Management** - Multi-layered memory system (Memory and AgentMemory) for context-aware AI interactions
+- **Node System** - Extensible node types including LLM, HTTP, conditional, and agent nodes
+- **Credential Management** - Secure API key handling for external services
 
 ## Credential Configuration
 
@@ -669,8 +673,50 @@ pnpm run test
 
 # Run tests with coverage
 pnpm run test:coverage
+
+# Development mode with watch
+pnpm run dev
 ```
+
+## Dependencies
+
+### Core Dependencies
+
+- **axios** - HTTP client for external API requests
+- **jsonata** - JSONPath expressions for conditional routing
+- **nanoid** - Unique identifier generation
+
+### Peer Dependencies
+
+- **@starships/protocol** - Shared TypeScript types and interfaces
+
+## Architecture
+
+```
+src/
+├── index.ts                 # Main exports and public API
+├── Workflow.ts              # Core workflow execution class
+├── Agent.ts                 # Agent system implementation
+├── Memory.ts                # Base memory management
+├── AgentMemory.ts           # Advanced structured memory
+├── LLM.ts                   # Language model integrations
+├── HttpRequest.ts           # HTTP request handling
+├── Autopilot.ts             # Configuration management
+├── engine/                  # Workflow execution engine
+├── nodes/                   # Node type implementations
+├── validation/              # Workflow validation system
+├── types/                   # TypeScript type definitions
+└── constants/               # Configuration constants
+```
+
+## Related Packages
+
+This package is part of the starships.ai monorepo:
+
+- [`@starships/protocol`](../protocol/) - Shared types and contracts
+- [`@starships/server`](../server/) - API server implementation
+- [`@starships/models`](../models/) - Database models and repositories
 
 ## License
 
-MIT
+Private package - Part of the starships.ai project

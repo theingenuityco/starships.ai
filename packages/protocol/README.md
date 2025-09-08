@@ -19,50 +19,86 @@ pnpm add @starships/protocol
 
 ## Core Exports
 
-### Collection Types
+### Domain Types
 
 ```typescript
-import { Starship, Mission, Agent, User, Workflow, NativeToolApiKey } from '@starships/protocol';
+import {
+  Starship,
+  Mission,
+  Agent,
+  AgentTemplate,
+  User,
+  Workflow,
+  Blueprint,
+  Node,
+  Edge,
+  Execution,
+  Conversation,
+  Message,
+  Memory,
+  NativeToolApiKey,
+  Waitlist,
+} from '@starships/protocol';
 ```
 
 **Key domain types:**
 
 - [`Agent`](src/domains/agent.ts) - AI agent configurations and deployment management
+- [`AgentTemplate`](src/domains/agent-template.ts) - Reusable agent configurations
 - [`Starship`](src/domains/starship.ts) - Starship management with billing integration
 - [`Mission`](src/domains/mission.ts) - Mission orchestration with workflow execution
 - [`User`](src/domains/user.ts) - User management and authentication
 - [`Workflow`](src/domains/workflow.ts) - Workflow execution definitions
+- [`Blueprint`](src/domains/blueprint.ts) - Workflow blueprint specifications
+- [`Node`](src/domains/node.ts) - Workflow node definitions and parameters
+- [`Edge`](src/domains/edge.ts) - Workflow edge connections and routing
+- [`Execution`](src/domains/execution.ts) - Workflow execution tracking and results
+- [`Conversation`](src/domains/conversation.ts) - Chat and communication logs
+- [`Message`](src/domains/message.ts) - Individual message storage and retrieval
+- [`Memory`](src/domains/memory.ts) - Agent memory and conversation context
 - [`NativeToolApiKey`](src/domains/native-tool.ts) - Encrypted API key storage for native tools
+- [`Waitlist`](src/domains/waitlist.ts) - Early access user management
 
 ### API Contracts
 
 ```typescript
-import { ChatRequest, ChatResponse, SibilRequest, SibilResponse } from '@starships/protocol';
+import { ApiResponse, ApiError } from '@starships/protocol';
 ```
 
 **Contract interfaces:**
 
-- [`Agent contracts`](src/contracts/agent.ts) - Agent creation and management APIs
-- [`Chat contracts`](src/contracts/chat.ts) - Chat system interfaces
-- [`LLM contracts`](src/contracts/llm.ts) - Language model provider APIs
-- [`Sibil contracts`](src/contracts/sibil.ts) - AI assistant communication protocols
+- [`API Response`](src/contracts/api-response.ts) - Standardized API response format
+- [`Errors`](src/contracts/errors.ts) - Error response structures
 
 ## Usage Examples
 
-### Creating API Endpoints
+### Type Usage Examples
 
 ```typescript
-import { CreateMissionRequest, MissionResponse, UpdateMissionRequest } from '@starships/protocol';
+import { Starship, Agent, Mission } from '@starships/protocol';
 
-export async function createMission(req: CreateMissionRequest): Promise<MissionResponse> {
-  // Implementation
-}
-```
+// Using domain types for data modeling
+const starship: Starship = {
+  id: 'starship-123',
+  slug: 'enterprise',
+  ownerId: 'user-456',
+  name: 'Enterprise',
+  class: 'cruiser',
+  status: 'active',
+  maxAgents: 6,
+  maxActiveExpeditions: 5,
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
 
-### Communication Types
+// API Response formatting
+import { ApiResponse } from '@starships/protocol';
 
-```typescript
-import { ConversationRequest, ConversationResponse } from '@starships/protocol';
+const response: ApiResponse<Starship> = {
+  success: true,
+  data: starship,
+  message: 'Starship retrieved successfully',
+};
 ```
 
 ## Package Structure

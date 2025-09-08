@@ -142,7 +142,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="relative flex flex-col h-screen bg-background">
       {/* Conversation Header - Only shown when there's an active conversation */}
       <AnimatePresence>
         {hasMessages && currentConversationId && conversationData?.conversation && (
@@ -156,122 +156,89 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         )}
       </AnimatePresence>
 
-      {/* Messages Area - Only shown when there are messages */}
-      <AnimatePresence>
-        {hasMessages && currentConversationId && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0">
-            <ConversationMessageList
-              conversationId={currentConversationId}
-              starshipId={starshipId}
-              key={currentConversationId}
-              enableVirtualization={true}
-              enableSearch={true}
-              enableAccessibility={true}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main Content Area */}
-      <div className="relative flex-1 flex flex-col">
-        {/* Centered Content Container */}
-        <motion.div
-          className="flex-1 flex flex-col"
-          animate={{
-            justifyContent: hasMessages ? 'flex-end' : 'center',
-            alignItems: 'center',
-          }}
-          transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-        >
-          <motion.div
-            className="w-full max-w-2xl mx-auto px-6"
-            animate={{
-              paddingBottom: hasMessages ? '2rem' : '0',
-            }}
-            transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
-          >
-            {/* Welcome Section - Only shown when no messages */}
-            <AnimatePresence>
-              {!hasMessages && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20, transition: { duration: 0.3 } }} className="text-center mb-8">
-                  <motion.h1
-                    className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
-                  >
-                    Meet Your AI Agents
-                  </motion.h1>
-                  <motion.p className="text-muted-foreground text-lg font-light" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                    Connect with specialized agents for focused assistance
-                  </motion.p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Main Input Section with Footer Selectors */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
+      {/* Messages Area or Welcome Screen */}
+      {hasMessages && currentConversationId ? (
+        <div className="flex-1 min-h-0 overflow-y-auto pb-28">
+          <ConversationMessageList
+            conversationId={currentConversationId}
+            starshipId={starshipId}
+            key={currentConversationId}
+            enableVirtualization={true}
+            enableSearch={true}
+            enableAccessibility={true}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
+          {/* Welcome Section */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8 max-w-2xl">
+            <motion.h1
+              className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent"
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: hasMessages ? 0 : 0.35,
-                duration: 0.5,
-                ease: [0.4, 0, 0.2, 1],
-              }}
-              className="relative"
+              transition={{ delay: 0.1 }}
             >
-              <ConversationMessageInput
-                ref={messageInputRef}
-                selectedAgent={selectedAgent}
-                starshipId={starshipId}
-                conversationId={currentConversationId}
-                onConversationStart={handleConversationStart}
-                onMessageSent={handleFirstMessage}
-                disabled={!selectedAgent}
-                minimal={hasMessages}
-              >
-                {/* Footer Content - Agent Selector */}
-                <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
-              </ConversationMessageInput>
-            </motion.div>
-
-            {/* Suggestions - Only shown when no messages */}
-            <AnimatePresence>
-              {!hasMessages && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
-                  transition={{ delay: 0.45, duration: 0.4 }}
-                  className="mt-8 space-y-3"
-                >
-                  {AGENT_SUGGESTIONS.map((suggestion, index) => (
-                    <motion.button
-                      key={suggestion}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{
-                        delay: 0.5 + index * 0.1,
-                        duration: 0.3,
-                      }}
-                      whileHover={{
-                        scale: 1.01,
-                        backgroundColor: 'hsl(var(--muted) / 0.6)',
-                      }}
-                      whileTap={{ scale: 0.99 }}
-                      className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                    >
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                        <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
-                      </div>
-                      <span className="flex-1">{suggestion}</span>
-                    </motion.button>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+              Meet Your AI Agents
+            </motion.h1>
+            <motion.p className="text-muted-foreground text-lg font-light" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              Connect with specialized agents for focused assistance
+            </motion.p>
           </motion.div>
+
+          {/* Suggestions */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.4 }} className="space-y-3 max-w-2xl w-full">
+            {AGENT_SUGGESTIONS.map((suggestion, index) => (
+              <motion.button
+                key={suggestion}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{
+                  delay: 0.5 + index * 0.1,
+                  duration: 0.3,
+                }}
+                whileHover={{
+                  scale: 1.01,
+                  backgroundColor: 'hsl(var(--muted) / 0.6)',
+                }}
+                whileTap={{ scale: 0.99 }}
+                className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group"
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                  <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
+                </div>
+                <span className="flex-1">{suggestion}</span>
+              </motion.button>
+            ))}
+          </motion.div>
+        </div>
+      )}
+
+      {/* Floating Input at Bottom */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent pointer-events-none">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            delay: hasMessages ? 0 : 0.35,
+            duration: 0.5,
+            ease: [0.4, 0, 0.2, 1],
+          }}
+          className="max-w-2xl mx-auto pointer-events-auto"
+        >
+          <ConversationMessageInput
+            ref={messageInputRef}
+            selectedAgent={selectedAgent}
+            starshipId={starshipId}
+            conversationId={currentConversationId}
+            onConversationStart={handleConversationStart}
+            onMessageSent={handleFirstMessage}
+            disabled={!selectedAgent}
+            minimal={hasMessages}
+          >
+            {/* Footer Content - Agent Selector */}
+            <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
+          </ConversationMessageInput>
         </motion.div>
       </div>
     </div>

@@ -20,20 +20,12 @@ import { VirtualizedMessageList } from './VirtualizedMessageList'
 interface EnhancedConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
-  onMessageAdded?: (message: MessageModel) => void
   enableVirtualization?: boolean
   enableSearch?: boolean
   enableAccessibility?: boolean
 }
 
-export function EnhancedConversationMessageList({
-  conversationId,
-  starshipId,
-  onMessageAdded,
-  enableVirtualization = false,
-  enableSearch = true,
-  enableAccessibility = true,
-}: EnhancedConversationMessageListProps) {
+export function EnhancedConversationMessageList({ conversationId, starshipId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: EnhancedConversationMessageListProps) {
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
   const deleteMessage = useDeleteMessage()
@@ -53,11 +45,6 @@ export function EnhancedConversationMessageList({
 
   // Accessibility features
   const { isHighContrast, isReducedMotion } = useAccessibilityFeatures()
-
-  // Add new message to the list (for real-time updates)
-  const addMessage = (newMessage: MessageModel) => {
-    onMessageAdded?.(newMessage)
-  }
 
   // Selection handlers
   const handleSelectionChange = (messageIds: string[]) => {
@@ -107,19 +94,6 @@ export function EnhancedConversationMessageList({
     setIsSelectionMode(!isSelectionMode)
     setSelectedMessages([])
   }
-
-  // Expose method to parent component for compatibility
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      ;(window as any).addMessage = addMessage
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        delete (window as any).addMessage
-      }
-    }
-  }, [conversationId])
 
   // Reset selection when conversation changes
   useEffect(() => {

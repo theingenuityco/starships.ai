@@ -2,15 +2,15 @@
 
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationHeader } from '@/components/conversation/ConversationHeader'
-import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
-import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
+import { EnhancedConversationMessageList } from '@/components/conversation/EnhancedConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useConversation, useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
 import type { ConversationModel } from '@starships/protocol'
 import { Sparkles, Users } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 interface ConversationInterfaceProps {
@@ -28,6 +28,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+
+  // Ref for direct communication with message input
+  const messageInputRef = useRef<ConversationMessageInputRef>(null)
 
   // Conversation data and mutations
   const { data: conversationData } = useConversation(currentConversationId || '', !!currentConversationId)
@@ -89,17 +92,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   // Handle first message to trigger layout transition
-  const handleFirstMessage = (_message: any) => {
+  const handleFirstMessage = () => {
     setHasMessages(true)
   }
 
   // Handle suggestion click
   const handleSuggestionClick = (suggestion: string) => {
-    if (typeof window !== 'undefined' && (window as any).conversationMessageInputRef) {
-      const inputRef = (window as any).conversationMessageInputRef
-      if (inputRef.current?.handleSuggestionSubmit) {
-        inputRef.current.handleSuggestionSubmit(suggestion)
-      }
+    // Use ref to directly call the input component method
+    if (messageInputRef.current?.handleSuggestionSubmit) {
+      messageInputRef.current.handleSuggestionSubmit(suggestion)
     }
   }
 
@@ -159,7 +160,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <AnimatePresence>
         {hasMessages && currentConversationId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} transition={{ duration: 0.4, ease: 'easeInOut' }} className="flex-1 min-h-0 overflow-hidden">
-            <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} key={currentConversationId} />
+            <EnhancedConversationMessageList
+              conversationId={currentConversationId}
+              starshipId={starshipId}
+              key={currentConversationId}
+              enableVirtualization={true}
+              enableSearch={true}
+              enableAccessibility={true}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -213,15 +221,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               className="relative"
             >
               <ConversationMessageInput
+                ref={messageInputRef}
                 selectedAgent={selectedAgent}
                 starshipId={starshipId}
                 conversationId={currentConversationId}
                 onConversationStart={handleConversationStart}
                 onMessageSent={handleFirstMessage}
-                onMessageReceived={() => {
-                  // Message updates are now handled automatically by React Query
-                  // This callback is kept for compatibility but no longer needed for refresh
-                }}
                 disabled={!selectedAgent}
                 minimal={hasMessages}
               >
@@ -269,9 +274,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           </motion.div>
         </motion.div>
       </div>
-
-      {/* Connection Status Indicator - Currently disabled */}
-      <AnimatePresence>{/* Connection status functionality not yet implemented */}</AnimatePresence>
     </div>
   )
 }

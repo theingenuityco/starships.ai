@@ -1,6 +1,6 @@
 # @starships/models
 
-Data access layer and repository implementations for Starships.ai - a space-themed AI platform with autonomous agents deployed on configurable starships.
+Comprehensive data access layer and repository implementations for starships.ai, providing Neo4j database integration, entity management, and automated migration system.
 
 ## Overview
 
@@ -37,11 +37,16 @@ const starships = await starshipRepo.findAll();
 
 ## Core Concepts
 
-### Starship System
+### Core Domain Model
 
-- **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`)
-- **Agents**: AI entities deployed on starships with specific roles and capabilities
-- **Missions**: Task execution contexts with phases and messaging
+- **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`) and subscription billing
+- **Agents**: AI entities with deployment management and template system
+- **Missions**: Task execution contexts with orchestrator communication and progress tracking
+- **Workflows**: DAG-based automation blueprints with execution history
+- **Users**: Authentication and authorization management
+- **Agent Templates**: Reusable agent configurations for rapid deployment
+- **Conversations**: Communication logs with structured metadata
+- **Native Tools**: Encrypted API key management for external tool integration
 
 ### Direct Repository Usage
 
@@ -77,19 +82,25 @@ try {
 
 ## Available Repositories
 
-| Repository                     | Purpose                                            |
-| ------------------------------ | -------------------------------------------------- |
-| **StarshipRepository**         | Starship CRUD, agent deployment, status management |
-| **AgentRepository**            | Agent management, template instantiation           |
-| **AgentTemplateRepository**    | Reusable agent configurations                      |
-| **UserRepository**             | User accounts and authentication                   |
-| **ConversationRepository**     | Conversation management with lean validation       |
-| **MissionRepository**          | Mission lifecycle management                       |
-| **MissionMessageRepository**   | Mission communication logs                         |
-| **MissionClarityRepository**   | Mission requirement analysis                       |
-| **WorkflowRepository**         | Workflow definitions and execution                 |
-| **NativeToolApiKeyRepository** | API key management                                 |
-| **WaitlistRepository**         | User onboarding queue                              |
+| Repository                     | Purpose                                                  |
+| ------------------------------ | -------------------------------------------------------- |
+| **StarshipRepository**         | Starship CRUD, agent deployment, subscription management |
+| **AgentRepository**            | Agent lifecycle management and template instantiation    |
+| **AgentTemplateRepository**    | Reusable agent configurations and marketplace            |
+| **UserRepository**             | User accounts, authentication, and profiles              |
+| **ConversationRepository**     | Chat history and communication logs                      |
+| **MissionRepository**          | Mission orchestration and status tracking                |
+| **MissionMessageRepository**   | Mission-specific communication logs                      |
+| **MissionClarityRepository**   | Mission requirement analysis and feedback                |
+| **WorkflowRepository**         | Workflow definitions, execution, and history             |
+| **BlueprintRepository**        | Workflow blueprint storage and versioning                |
+| **ExecutionRepository**        | Workflow execution tracking and results                  |
+| **NodeRepository**             | Workflow node definitions and parameters                 |
+| **EdgeRepository**             | Workflow edge connections and routing                    |
+| **MemoryRepository**           | Agent memory and conversation context                    |
+| **MessageRepository**          | Individual message storage and retrieval                 |
+| **NativeToolApiKeyRepository** | Encrypted API key management for external tools          |
+| **WaitlistRepository**         | Early access user onboarding queue                       |
 
 ## Database Management
 
@@ -388,18 +399,18 @@ console.log('System status:', health.status);
 
 ## Related Packages
 
-This package is part of the Starships.ai monorepo:
+This package is part of the starships.ai monorepo:
 
 - [`@starships/protocol`](../protocol/) - Shared types and contracts
 - [`@starships/server`](../server/) - API server and business logic
 - [`@starships/client`](../client/) - Frontend application
-- [`@starships/agent-engine`](../agent-engine/) - AI agent execution engine
-- [`@starships/env-config`](../env-config/) - Environment configuration
+- [`@starships/autopilot`](../autopilot/) - Workflow execution engine
+- [`@starships/errors`](../errors/) - Comprehensive error handling system
 
 ## Development Status
 
-This package is actively developed and part of a private project. The API is stable but may evolve as new features are added to the platform.
+This package is actively developed and production-ready. The repository pattern and serialization system provide a stable foundation for the starships.ai platform.
 
-## Support
+## License
 
-For issues and questions related to this package, refer to the main project documentation or contact the development team.
+Private package - Part of the starships.ai project

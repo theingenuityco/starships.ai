@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -18,9 +18,10 @@ interface MessageContentProps {
   enableMarkdown?: boolean
   enableCopy?: boolean
   enableLinkPreview?: boolean
+  isStreaming?: boolean
 }
 
-export function MessageContent({ content, messageId, className, enableMarkdown = true, enableCopy = true, enableLinkPreview = true }: MessageContentProps) {
+export function MessageContent({ content, messageId, className, enableMarkdown = true, enableCopy = true, enableLinkPreview = true, isStreaming = false }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 
@@ -68,7 +69,10 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
   if (!enableMarkdown) {
     return (
       <div className={cn('relative group', className)}>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">{enableLinkPreview ? detectLinks(content) : content}</div>
+        <div className="text-sm leading-relaxed whitespace-pre-wrap flex items-start gap-2">
+          <span className="flex-1">{enableLinkPreview ? detectLinks(content) : content}</span>
+          {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
+        </div>
         {enableCopy && (
           <Button variant="ghost" size="icon" className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
             <Copy className="w-3 h-3" />
@@ -78,9 +82,20 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
     )
   }
 
+  // For streaming content, we need to be careful about markdown parsing
+  // since incomplete markdown can cause parsing errors
+  const safeContent = isStreaming ? content + (content.endsWith('`') ? '' : '') : content
+
   return (
     <div className={cn('relative group', className)}>
       <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content">
+        {/* Streaming indicator */}
+        {isStreaming && (
+          <div className="flex items-center gap-2 mb-2 text-muted-foreground">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span className="text-xs font-medium">Assistant is thinking...</span>
+          </div>
+        )}
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -167,8 +182,11 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
             h3: ({ children }) => <h3 className="text-base font-medium mt-3 mb-2 first:mt-0">{children}</h3>,
           }}
         >
-          {content}
+          {safeContent}
         </ReactMarkdown>
+
+        {/* Streaming cursor */}
+        {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
       </div>
 
       {/* Copy button for entire message */}

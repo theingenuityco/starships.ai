@@ -31,8 +31,13 @@ export interface MessageModel extends Message {
   threadDepth: number;
 
   // Processing status and metadata
-  processingStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  processingStatus: 'pending' | 'processing' | 'streaming' | 'completed' | 'failed';
   processingMetadata?: Record<string, unknown>;
+
+  // Streaming support
+  streamId?: string;
+  isStreaming?: boolean;
+  streamCompleted?: boolean;
 
   // Message classification
   messageType: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';
@@ -69,8 +74,13 @@ export interface CreateMessageRequest {
   threadDepth?: number;
 
   // Processing status and metadata (optional)
-  processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  processingStatus?: 'pending' | 'processing' | 'streaming' | 'completed' | 'failed';
   processingMetadata?: Record<string, unknown>;
+
+  // Streaming support (optional)
+  streamId?: string;
+  isStreaming?: boolean;
+  streamCompleted?: boolean;
 
   // Message classification (optional)
   messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';

@@ -65,7 +65,11 @@ export class HttpRequest {
   /**
    * Execute the HTTP request
    */
-  async execute(): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+  async execute(): Promise<{
+    status: 'completed' | 'failed';
+    data?: { status: number; statusText: string; headers: unknown; body: unknown; url: string | undefined };
+    error?: Error;
+  }> {
     try {
       console.log(`Executing HTTP ${this.params.method} request to: ${this.params.url}`);
 
@@ -111,7 +115,7 @@ export class HttpRequest {
 
       // Preserve original error as cause if possible
       if (error instanceof Error) {
-        (contextualError as any).cause = error;
+        Object.defineProperty(contextualError, 'cause', { value: error, enumerable: false });
       }
 
       return {

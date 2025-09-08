@@ -10,7 +10,9 @@ import { Agent, EventCallback, ExecutionEvent } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import { AutopilotStreamService } from './AutopilotStreamService';
 import { MessageService } from './MessageService';
+import type { StreamingService } from './StreamingService';
 
 // LLM response data structure from autopilot LLM class
 interface LlmResponseData {
@@ -29,6 +31,11 @@ export interface AgentOptions {
   userId?: string;
   loadConversationHistory?: boolean;
   eventCallback?: EventCallback;
+}
+
+export interface ConversationStreamingRequest extends ConversationRequest {
+  streamId: string;
+  streamingService: StreamingService;
 }
 
 /**
@@ -327,6 +334,143 @@ export class AgentService {
   // ============================================================================
   // AGENT EXECUTION APIs
   // ============================================================================
+
+  /**
+   * Execute conversation with agent using ConversationRequest format with streaming support
+   * Handles complete conversation lifecycle with event monitoring and message creation
+   */
+  static async executeConversationWithStreaming(request: ConversationStreamingRequest): Promise<ConversationResponse> {
+    const { agentId, userId, message, conversationId, streamId, streamingService } = request;
+
+    if (!agentId) {
+      throw new ValidationError('agentId is required for conversation execution', 'agentId');
+    }
+
+    if (!streamId) {
+      throw new ValidationError('streamId is required for streaming conversation execution', 'streamId');
+    }
+
+    console.log('🚀 [AGENT-SERVICE] Starting streaming conversation execution:', {
+      agentId,
+      userId,
+      message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
+      conversationId,
+      streamId,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Get agent from database
+    const agentRepo = new AgentRepository();
+    const dbAgent = await agentRepo.findById(agentId);
+
+    if (!dbAgent) {
+      console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
+      id: dbAgent.id,
+      name: dbAgent.name,
+      model: dbAgent.model,
+      executionMode: dbAgent.executionMode || 'simple',
+      hasBlueprint: !!dbAgent.blueprint,
+      starshipId: dbAgent.starshipId,
+    });
+
+    const startTime = Date.now();
+    const agentService = new AgentService();
+
+    try {
+      // Create event handler with MessageService to add messages on each node completion
+      const eventHandler = AgentService.createEventHandler({
+        agentId: agentId,
+        conversationId: conversationId,
+        userId: userId,
+        starshipId: dbAgent.starshipId,
+        messageService: agentService.messageService,
+      });
+
+      // Create agent instance with enhanced options
+      const agent = await agentService.createAgentInstance(dbAgent, {
+        includeMemory: true,
+        userId: userId,
+        conversationId: conversationId,
+        loadConversationHistory: true,
+        eventCallback: eventHandler,
+      });
+
+      // Create and inject streaming service
+      const autopilotStreamService = new AutopilotStreamService(streamingService, streamId, conversationId || 'unknown', agentId);
+
+      // Inject streaming service into agent's engine
+      agent.getEngine().setStreamingEmitter(autopilotStreamService);
+
+      // Add user message to memory
+      agent.addToMemory('user', message);
+
+      // Execute agent with streaming-enabled execution
+      const execution = await agent.execute(
+        {
+          currentNodeRef: undefined,
+          status: 'not_started',
+          executionResults: new Map(),
+          agentMemory: agent.getMemory(),
+          streaming: {
+            enabled: true,
+            streamId,
+            conversationId,
+            agentId,
+          },
+        },
+        eventHandler
+      );
+
+      // Extract response from execution result
+      const response = agentService.extractResponse(execution);
+
+      // Calculate usage statistics
+      const usage = agentService.calculateUsage(execution);
+
+      // Update agent usage count
+      await agentRepo.incrementUsageCount(agentId);
+
+      const executionTime = Date.now() - startTime;
+
+      console.log('✅ [AGENT-SERVICE] Streaming conversation execution completed successfully:', {
+        responseLength: response.length,
+        executionTime,
+        usageStats: usage,
+      });
+
+      return {
+        source: 'agent',
+        content: response,
+        agentId: agentId,
+        usage: {
+          promptTokens: Math.floor(usage.totalTokens * 0.7), // Estimate prompt tokens
+          completionTokens: Math.floor(usage.totalTokens * 0.3), // Estimate completion tokens
+        },
+      };
+    } catch (error) {
+      console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
+        agentId,
+        userId,
+        streamId,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      // Create error message in conversation
+      await agentService.createErrorResponse(error as Error, {
+        agentId,
+        userId,
+        conversationId,
+        starshipId: dbAgent.starshipId,
+      });
+
+      throw error;
+    }
+  }
 
   /**
    * Execute conversation with agent using ConversationRequest format
@@ -909,6 +1053,7 @@ export class AgentService {
             temperature: dbAgent.temperature || 0.7,
             maxTokens: dbAgent.maxTokens || 2000,
             timeout: 30000,
+            stream: true, // Enable streaming for all LLM nodes
           },
         },
         {

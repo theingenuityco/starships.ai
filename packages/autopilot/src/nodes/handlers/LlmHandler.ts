@@ -5,12 +5,21 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '@/nodes/Handler';
-import { Execution, ValidationResult, LlmNodeParameters, ValidationError, ValidationWarning } from '@/types';
 import { LLM } from '@/LLM';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, LlmNodeParameters, ValidationError, ValidationResult, ValidationWarning } from '@/types';
+import type { StreamingEmitter } from '@/types/streamingEmitter';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
+  private streamingEmitter?: StreamingEmitter;
+
+  /**
+   * Set streaming emitter for content streaming
+   */
+  setStreamingEmitter(emitter?: StreamingEmitter): void {
+    this.streamingEmitter = emitter;
+  }
 
   async execute(execution: Execution) {
     const params = this.node.parameters as LlmNodeParameters;
@@ -18,14 +27,54 @@ export class LlmHandler extends BaseHandler {
     try {
       console.log(`Executing LLM: ${params.model}`);
 
+      // Create streaming callbacks if streaming emitter is available
+      const streamingCallbacks =
+        this.streamingEmitter && execution.streaming?.enabled
+          ? {
+              onChunk: async (content: string, accumulated: string) => {
+                if (this.streamingEmitter) {
+                  await this.streamingEmitter.emitExecutionEvent({
+                    type: 'content_chunk',
+                    execution,
+                    timestamp: new Date().toISOString(),
+                    content,
+                    contentMetadata: {
+                      accumulated,
+                      isComplete: false,
+                      nodeRef: this.node.ref,
+                      model: params.model,
+                    },
+                  });
+                }
+              },
+              onComplete: async (finalContent: string) => {
+                if (this.streamingEmitter) {
+                  await this.streamingEmitter.emitExecutionEvent({
+                    type: 'content_complete',
+                    execution,
+                    timestamp: new Date().toISOString(),
+                    content: finalContent,
+                    contentMetadata: {
+                      accumulated: finalContent,
+                      isComplete: true,
+                      nodeRef: this.node.ref,
+                      model: params.model,
+                    },
+                  });
+                }
+              },
+            }
+          : undefined;
+
       // Create LLM instance from the full parameters and execute
       const llm = new LLM(params);
-      const llmResult = await llm.execute(execution);
+      const llmResult = await llm.execute(execution, streamingCallbacks);
 
       // Check if LLM execution was successful
       if (llmResult.status === 'completed') {
+        const baseData = llmResult.data && typeof llmResult.data === 'object' ? (llmResult.data as Record<string, unknown>) : {};
         return this.createSuccessResult(execution, {
-          ...llmResult.data,
+          ...baseData,
           output: `LLM ${params.model} completed successfully`,
         });
       } else {

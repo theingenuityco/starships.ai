@@ -22,3 +22,4 @@ export * from './domains/workflow';
 // Export API contracts
 export * from './contracts/api-response';
 export * from './contracts/errors';
+export * from './contracts/streaming';

@@ -57,6 +57,13 @@ export class Agent {
   }
 
   /**
+   * Get agent engine (for external configuration like streaming)
+   */
+  getEngine(): Engine {
+    return this.engine;
+  }
+
+  /**
    * Add content to agent memory
    */
   addToMemory(role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
@@ -109,27 +116,36 @@ export class Agent {
    * Execute the agent with optional event monitoring
    */
   async execute(initialExecution?: Execution, eventCallback?: EventCallback): Promise<Execution> {
-    const executionWithMemory: Execution = {
-      currentNodeRef: undefined,
-      status: 'not_started',
-      executionResults: new Map(),
-      agentMemory: this.memory,
-      ...initialExecution,
-    };
-
-    // Register event callback if provided
-    if (eventCallback) {
-      this.onEvent(eventCallback);
-    }
-
     try {
-      const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
-      return result;
-    } finally {
-      // Clean up event callback if it was registered
+      console.log(
+        `Executing Agent: ${this.params.name} (${this.params.model})${initialExecution?.streaming?.enabled ? ' (streaming)' : ''}`
+      );
+
+      const executionWithMemory: Execution = {
+        currentNodeRef: undefined,
+        status: 'not_started',
+        executionResults: new Map(),
+        agentMemory: this.memory,
+        ...initialExecution,
+      };
+
+      // Register event callback if provided
       if (eventCallback) {
-        this.offEvent(eventCallback);
+        this.onEvent(eventCallback);
       }
+
+      try {
+        const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
+        return result;
+      } finally {
+        // Clean up event callback
+        if (eventCallback) {
+          this.offEvent(eventCallback);
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Agent execution failed: ${errorMessage}`);
     }
   }
 

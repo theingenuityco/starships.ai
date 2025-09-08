@@ -1,17 +1,19 @@
 # @starships/server
 
-Production-ready Express.js HTTP API server powering the Starships mission control platform. Features mission orchestration, multi-agent expedition management, MCP tool integration, and Stripe billing with comprehensive security and monitoring.
+Production-ready Express.js API server powering the starships.ai platform. Features starship management, mission orchestration, agent deployment, conversation handling, and Stripe billing with comprehensive security and monitoring.
 
 ## 🚀 Features
 
+- **Starship Management**: Complete CRUD operations with subscription billing and agent deployment
 - **Mission Orchestration**: Advanced mission planning and execution with AI-powered orchestrators
-- **Multi-Agent Expeditions**: Complex expedition management with agent coordination
-- **Workflow DSL**: Complete workflow definition and execution system with approval workflows
-- **MCP Tool Integration**: HTTP bridge for Model Context Protocol tool discovery and execution
-- **Stripe Integration**: Complete subscription billing with webhook idempotency
-- **Enterprise Security**: JWT authentication, rate limiting, and comprehensive audit logging
-- **Production Monitoring**: Health checks, metrics, and performance monitoring
-- **Docker & Kubernetes**: Container orchestration with automated deployment
+- **Agent Marketplace**: Agent creation, templates, and deployment management
+- **Conversation System**: Chat interfaces with message history and structured logging
+- **Workflow Integration**: Integration with autopilot workflow execution system
+- **Stripe Integration**: Complete subscription billing with webhook idempotency and portal management
+- **JWT Authentication**: Secure authentication with middleware protection
+- **Waitlist Management**: Early access user onboarding system
+- **Health Monitoring**: Comprehensive health checks and system metrics
+- **Production Ready**: Error handling, request validation, and CORS configuration
 
 ## 📦 Installation
 
@@ -39,35 +41,29 @@ src/
 ├── config/
 │   └── environment.ts          # Environment configuration
 ├── routes/
-│   ├── agents.ts              # Agent marketplace with analytics
-│   ├── agent-templates.ts     # Agent template marketplace
-│   ├── starships.ts          # Starship CRUD operations
-│   ├── starships-enhanced.ts # Enhanced starship creation
-│   ├── missions.ts           # Mission orchestration endpoints
-│   ├── expeditions.ts        # Multi-agent expedition management
-│   ├── workflows.ts          # Workflow DSL execution
-│   ├── chat.ts              # Basic chat processing
-│   ├── sibil.ts             # AI assistant for onboarding
-│   ├── mcp-servers.ts       # MCP server template management
-│   ├── native-api-keys.ts   # Encrypted tool API key management
-│   ├── agent-communication.ts # Bidirectional agent communication
-│   ├── webhooks.ts          # Stripe webhook handling
-│   ├── users.ts             # User management
-│   ├── memory.ts            # Memory management endpoints
-│   └── health.ts            # Comprehensive health monitoring
+│   ├── agents.ts              # Agent CRUD and marketplace operations
+│   ├── agent-templates.ts     # Agent template management
+│   ├── auth.ts                # Authentication endpoints
+│   ├── conversations.ts       # Chat and communication endpoints
+│   ├── health.ts              # Health monitoring and metrics
+│   ├── memory.ts              # Memory management endpoints
+│   ├── missions.ts            # Mission orchestration endpoints
+│   ├── native-api-keys.ts     # Encrypted API key management
+│   ├── starships.ts           # Starship CRUD and billing operations
+│   ├── users.ts               # User management endpoints
+│   ├── waitlist.ts            # Waitlist management endpoints
+│   └── webhooks.ts            # Stripe webhook handling
 ├── services/
-│   ├── ExpeditionService.ts           # Multi-agent expedition orchestration
-│   ├── MissionService.ts             # Mission lifecycle management
-│   ├── WorkflowExecutionService.ts   # Workflow DSL execution
-│   ├── FirstOfficerService.ts        # AI expedition coordinator
-│   ├── BidirectionalCommunicationService.ts # Agent-to-First Officer communication
+│   ├── StarshipService.ts            # Starship lifecycle management
 │   ├── SubscriptionService.ts        # Stripe subscription management
-│   └── AgentService.ts               # Agent marketplace operations
-└── middleware/
-    ├── auth.ts                      # JWT authentication
-    ├── starship-access.ts           # Resource ownership validation
-    ├── expedition.ts                # Expedition access control
-    └── validation.ts                # Request validation
+│   └── (other services as needed)
+├── middleware/
+│   ├── auth.ts                       # Authentication middleware
+│   ├── jwt-auth.ts                   # JWT token validation
+│   ├── errorHandler.ts               # Centralized error handling
+│   └── validation.ts                 # Request validation
+└── utils/
+    └── responseHelpers.ts            # Standardized API responses
 ```
 
 ## 🔧 API Endpoints
@@ -128,20 +124,19 @@ Content-Type: application/json
 }
 ```
 
-### Multi-Agent Expeditions
+### Conversation System
 
-#### Start Expedition
+#### Create Conversation
 
 ```http
-POST /starships/:starshipId/expeditions
+POST /api/v1/conversations
 Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "title": "Competitive Analysis",
-  "objective": "Analyze top 10 AI productivity tools and create comparison report",
-  "selectedAgents": ["research-agent", "analysis-agent"],
-  "approvalRequired": true
+  "starshipId": "starship-123",
+  "title": "Research Discussion",
+  "description": "Planning research strategy"
 }
 ```
 
@@ -149,18 +144,28 @@ Content-Type: application/json
 
 ```json
 {
-  "expeditionId": "exp-123",
-  "title": "Competitive Analysis",
-  "phase": "plan",
-  "status": "planning",
-  "agents": ["research-agent", "analysis-agent"],
+  "id": "conv-456",
+  "starshipId": "starship-123",
+  "title": "Research Discussion",
+  "description": "Planning research strategy",
   "createdAt": "2024-01-15T10:30:00Z"
 }
 ```
 
-### Starship Endpoints
+#### Send Message
 
-### Enhanced Starship Management
+```http
+POST /api/v1/conversations/:id/messages
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "content": "Let's analyze the competitive landscape",
+  "role": "user"
+}
+```
+
+### Starship Management
 
 #### Create Starship
 

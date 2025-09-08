@@ -144,9 +144,15 @@ pnpm --filter @starships/reverse-proxy dev
 
 | Path Pattern     | Target          | Description                            |
 | ---------------- | --------------- | -------------------------------------- |
-| `/api/*`         | Backend (4000)  | All API endpoints                      |
+| `/api/*`         | Backend (4000)  | API endpoints (preserves full path)    |
 | `/_proxy/health` | Proxy           | Health check endpoint                  |
 | `/*`             | Frontend (3000) | All other routes (pages, assets, etc.) |
+
+### Example Request Flow
+
+- Browser requests: `http://localhost:8080/api/v1/starships`
+- Proxy forwards to backend as: `http://localhost:4000/api/v1/starships`
+- Backend receives: `/api/v1/starships`
 
 ## Health Check
 
@@ -198,7 +204,7 @@ Browser
 The proxy logs all requests (except Next.js HMR requests to reduce noise):
 
 ```
-[API] GET /api/users -> http://localhost:4000/api/users
+[API] GET /api/v1/starships -> http://localhost:4000/api/v1/starships
 [Frontend] GET /dashboard -> http://localhost:3000/dashboard
 ```
 

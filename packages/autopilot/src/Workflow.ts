@@ -6,6 +6,7 @@
  * Supports streaming through the injection-based architecture via Engine.
  */
 
+import { AgentMemory } from '@/AgentMemory';
 import { Engine } from '@/engine/Engine';
 import { Blueprint, Edge, Execution, Node, StreamingOptions, WorkflowNodeParameters } from '@/types';
 import { nanoid } from 'nanoid';
@@ -145,7 +146,7 @@ export class Workflow {
         currentNodeRef: undefined,
         status: 'not_started',
         executionResults: new Map(),
-        agentMemory: initialExecution?.agentMemory!,
+        agentMemory: initialExecution?.agentMemory || new AgentMemory(),
         ...initialExecution,
       };
 
@@ -166,7 +167,7 @@ export class Workflow {
       currentNodeRef: undefined,
       status: 'not_started',
       executionResults: new Map(),
-      agentMemory: initialExecution?.agentMemory!,
+      agentMemory: initialExecution?.agentMemory || new AgentMemory(),
       ...initialExecution,
       streaming: streamingOptions,
     };

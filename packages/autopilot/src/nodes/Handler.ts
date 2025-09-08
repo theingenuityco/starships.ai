@@ -4,7 +4,7 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { NodeResult, Execution, ValidationResult, Node as WorkflowNode, ValidationErrorCode, ValidationWarningCode } from '@/types';
+import { Execution, NodeResult, ValidationErrorCode, ValidationResult, ValidationWarningCode, Node as WorkflowNode } from '@/types';
 
 /**
  * Base interface for workflow node handlers
@@ -44,7 +44,7 @@ export abstract class BaseHandler implements Handler {
   /**
    * Helper to create successful result and push to execution results
    */
-  protected createSuccessResult(execution: Execution, data: any): Execution {
+  protected createSuccessResult(execution: Execution, data: unknown): Execution {
     const result: NodeResult = {
       nodeRef: this.node.ref,
       data,

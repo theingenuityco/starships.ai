@@ -251,12 +251,14 @@ function MessageBubble({
     const statusIcons = {
       pending: <Clock className="w-3 h-3" />,
       processing: <Loader2 className="w-3 h-3 animate-spin" />,
+      streaming: <Loader2 className="w-3 h-3 animate-spin" />,
       failed: <XCircle className="w-3 h-3 text-destructive" />,
     }
 
     const statusColors = {
       pending: 'text-muted-foreground',
       processing: 'text-blue-600',
+      streaming: 'text-green-600',
       failed: 'text-destructive',
     }
 

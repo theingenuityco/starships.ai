@@ -5,9 +5,9 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '@/nodes/Handler';
-import { Execution, ValidationResult, LlmNodeParameters, ValidationError, ValidationWarning } from '@/types';
 import { LLM } from '@/LLM';
+import { BaseHandler } from '@/nodes/Handler';
+import { Execution, LlmNodeParameters, ValidationError, ValidationResult, ValidationWarning } from '@/types';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
@@ -24,8 +24,9 @@ export class LlmHandler extends BaseHandler {
 
       // Check if LLM execution was successful
       if (llmResult.status === 'completed') {
+        const baseData = llmResult.data && typeof llmResult.data === 'object' ? (llmResult.data as Record<string, unknown>) : {};
         return this.createSuccessResult(execution, {
-          ...llmResult.data,
+          ...baseData,
           output: `LLM ${params.model} completed successfully`,
         });
       } else {

@@ -52,7 +52,7 @@ export class LLM {
   /**
    * Execute the LLM request with streaming support
    */
-  async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+  async execute(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     try {
       console.log(`Executing LLM: ${this.params.model}${this.params.stream ? ' (streaming)' : ''}`);
 
@@ -77,16 +77,16 @@ export class LLM {
   /**
    * Execute LLM with streaming support
    */
-  private async executeWithStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+  private async executeWithStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     const httpParams = this.buildHttpRequestParams(execution);
 
     // Ensure streaming is enabled in request body
     if (httpParams.body && typeof httpParams.body === 'object') {
-      (httpParams.body as any).stream = true;
+      (httpParams.body as Record<string, unknown>).stream = true;
     }
 
     let fullResponse = '';
-    let usage: any = null;
+    let usage: unknown = null;
 
     try {
       // Use fetch for streaming instead of HttpRequest
@@ -170,7 +170,7 @@ export class LLM {
   /**
    * Execute LLM without streaming (original logic)
    */
-  private async executeWithoutStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: any; error?: Error }> {
+  private async executeWithoutStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     // Create HttpRequest instance with current execution context (for memory integration)
     const httpRequest = new HttpRequest(this.buildHttpRequestParams(execution));
 
@@ -267,16 +267,22 @@ export class LLM {
   /**
    * Extract LLM response from OpenRouter response body
    */
-  private extractLlmResponse(responseBody: any): string {
+  private extractLlmResponse(responseBody: unknown): string {
     try {
       // OpenRouter uses OpenAI-compatible format
-      const openAIContent = responseBody.choices?.[0]?.message?.content;
-      if (openAIContent) return openAIContent;
+      if (typeof responseBody === 'object' && responseBody !== null) {
+        const body = responseBody as Record<string, unknown>;
+        const choices = body.choices as Array<{ message?: { content?: string } }> | undefined;
+        const openAIContent = choices?.[0]?.message?.content;
+        if (openAIContent && typeof openAIContent === 'string') return openAIContent;
+
+        // Fallback: try to extract any text content
+        if (body.content && typeof body.content === 'string') return body.content;
+        if (body.text && typeof body.text === 'string') return body.text;
+      }
 
       // Fallback: try to extract any text content
       if (typeof responseBody === 'string') return responseBody;
-      if (responseBody?.content) return responseBody.content;
-      if (responseBody?.text) return responseBody.text;
       return JSON.stringify(responseBody);
     } catch {
       // If parsing fails completely, return empty string

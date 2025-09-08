@@ -2,8 +2,8 @@
  * Validator Unit Tests
  */
 
+import { Blueprint } from '@/types';
 import { Validator } from '@/validation/Validator';
-import { Blueprint, ValidationResult } from '@/types';
 
 describe('Validator', () => {
   let validator: Validator;

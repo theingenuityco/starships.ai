@@ -65,8 +65,10 @@ export function useStarshipBySlug(slug: string, enabled: boolean = true) {
       return response.data.data
     },
     enabled: !!slug && enabled,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes - starship data rarely changes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false, // Don't refetch when switching between conversations
+    refetchOnMount: false, // Use cached data if available
   })
 }
 

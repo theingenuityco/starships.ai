@@ -1,10 +1,6 @@
 {
-  "typescript.preferences.includePackageJsonAutoImports": "on",
-  "typescript.suggest.autoImports": true,
-  "typescript.updateImportsOnFileMove.enabled": "always",
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit",
-    "source.organizeImports": "explicit"
   },
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -21,8 +17,5 @@
     "**/.turbo": true
   },
   "eslint.workingDirectories": ["packages/client", "packages/server", "packages/autopilot", "packages/models"],
-  "npm.packageManager": "pnpm",
-  "debug.node.autoAttach": "smart",
-  "debug.javascript.autoAttachFilter": "smart",
-  "debug.terminal.clearBeforeReusing": true
+  "npm.packageManager": "pnpm"
 }

@@ -131,6 +131,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             </p>
           </div>
 
+          {/* Spacer for floating input */}
+          <div className="h-32 mb-8"></div>
+
           {/* Suggestions */}
           <div className="space-y-3 max-w-2xl w-full opacity-100">
             {AGENT_SUGGESTIONS.map((suggestion, index) => (
@@ -149,8 +152,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         </div>
       )}
 
-      {/* Floating Input at Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none">
+      {/* Floating Input - Position changes based on state */}
+      <div className={`absolute left-0 right-0 p-4 pointer-events-none transition-all duration-300 ${
+        hasMessages && currentConversationId ? 'bottom-0' : 'top-1/3 -translate-y-8'
+      }`}>
         <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
           <ConversationMessageInput
             ref={messageInputRef}

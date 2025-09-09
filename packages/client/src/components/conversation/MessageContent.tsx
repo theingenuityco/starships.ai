@@ -82,7 +82,6 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
     )
   }
 
-  console.log({ isStreaming })
   // For streaming content, render plain text to avoid ReactMarkdown memoization issues
   if (isStreaming) {
     return (

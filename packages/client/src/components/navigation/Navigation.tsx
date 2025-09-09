@@ -54,12 +54,9 @@ export function Navigation({}: NavigationProps) {
   // Floating mode - compact icon-only layout
   return (
     <div
-      className="flex flex-col w-16 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-border/20 bg-background/5 dark:bg-foreground/5"
+      className="flex flex-col w-16 frosted-glass rounded-2xl overflow-hidden shadow-frosted-xl"
       style={{
         height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
-        background: 'linear-gradient(135deg, hsl(var(--background) / 0.03) 0%, hsl(var(--background) / 0.01) 100%)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
       }}
     >
       {/* Compact Header with Theme Toggle */}

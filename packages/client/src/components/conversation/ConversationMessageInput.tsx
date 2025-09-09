@@ -46,6 +46,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const sendMessage = useSendMessage()
     const isStreaming = sendMessage.isPending
 
+
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
       if (textareaRef.current && selectedAgent && !disabled) {

@@ -18,6 +18,7 @@ interface ConversationInterfaceProps {
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
 
+
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
 
@@ -39,26 +40,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Reset conversation when external conversation ID changes
   useEffect(() => {
-    if (userId && isAuthenticated && externalConversationId !== undefined) {
-      setCurrentConversationId(externalConversationId)
-      setHasMessages(!!externalConversationId)
-    }
-  }, [userId, isAuthenticated, externalConversationId])
-
-  // Reset conversation when agent changes (separate effect to avoid cascading)
-  useEffect(() => {
-    if (userId && isAuthenticated && !externalConversationId) {
-      if (selectedAgent) {
-        // Reset conversation for agent - server will provide actual conversation ID
-        setCurrentConversationId(null)
-        setHasMessages(false)
+    if (userId && isAuthenticated) {
+      if (externalConversationId !== undefined) {
+        setCurrentConversationId(externalConversationId)
+        setHasMessages(!!externalConversationId)
       } else {
-        // No conversation without selected agent
+        // Only reset if we don't have an external conversation ID
         setCurrentConversationId(null)
         setHasMessages(false)
       }
     }
-  }, [userId, isAuthenticated, selectedAgent, externalConversationId])
+  }, [userId, isAuthenticated, externalConversationId])
 
   // Show loading state
   if (isLoading) {

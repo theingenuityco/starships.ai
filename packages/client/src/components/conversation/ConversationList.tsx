@@ -106,7 +106,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             placeholder="Search conversations..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-muted/50 rounded-lg border border-border/50 focus:outline-none focus:border-primary/50 transition-colors"
+            className="w-full px-3 py-2 text-sm frosted-glass-light rounded-lg focus:outline-none focus:border-primary/50 transition-colors"
           />
         </div>
       </div>
@@ -202,7 +202,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       </ScrollArea>
 
       {/* Footer Stats */}
-      <div className="p-4 border-t bg-muted/20">
+      <div className="p-4 border-t frosted-glass-light">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>{filteredConversations.length} conversations</span>
           <span>{filteredConversations.filter(c => c.status === 'active').length} active</span>

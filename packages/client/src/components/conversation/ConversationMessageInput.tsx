@@ -216,9 +216,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         <div
           className={cn(
             'relative transition-all',
-            minimal ? 'rounded-xl border border-border/30' : 'rounded-2xl border border-border/40',
-            'bg-card/50 backdrop-blur-sm',
-            minimal ? 'shadow-sm focus-within:ring-1 focus-within:ring-primary/15' : 'shadow-lg focus-within:ring-2 focus-within:ring-primary/20',
+            minimal
+              ? 'frosted-glass-light rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
+              : 'frosted-glass-card rounded-2xl shadow-frosted-xl focus-within:ring-2 focus-within:ring-primary/20',
             'focus-within:border-primary/40',
             disabled && 'opacity-50'
           )}
@@ -306,9 +306,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         </div>
 
         {/* Agent Indicator - Only show in non-minimal mode */}
-        {!minimal && selectedAgent && (
-          <div className="absolute -top-3 left-4 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full border border-primary/20">Chatting with {selectedAgent.name}</div>
-        )}
+        {!minimal && selectedAgent && <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">Chatting with {selectedAgent.name}</div>}
       </motion.div>
     )
   }

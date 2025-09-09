@@ -8,7 +8,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { History, MessageSquare, Plus, Target, Users } from 'lucide-react'
+import { History, MessageSquare, Plus, Target, Users, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -203,16 +203,16 @@ export function Navigation({}: NavigationProps) {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.2 }}
                           onClick={handleToggleConversationHistory}
-                          className={`group relative transition-all duration-300 p-1.5 rounded-lg ${
-                            showConversationList
-                              ? 'bg-gradient-to-r from-primary/15 to-primary/10 shadow-md border border-primary/20'
-                              : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                          }`}
+                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
                           <div className="flex items-center justify-center">
-                            <History className={`w-4 h-4 ${showConversationList ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                            {showConversationList ? (
+                              <X className="w-4 h-4 text-primary transition-colors" />
+                            ) : (
+                              <History className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            )}
                           </div>
                         </motion.button>
                       </TooltipTrigger>

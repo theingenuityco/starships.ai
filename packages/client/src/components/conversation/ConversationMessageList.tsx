@@ -2,8 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useConversationMessages } from '@/hooks/useConversations'
-import { useDeleteMessage } from '@/hooks/useMessages'
+import { useConversationMessages, useDeleteMessage } from '@/hooks/useMessages'
 import { useMessageStreaming } from '@/hooks/useMessageStreaming'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
@@ -29,7 +28,7 @@ interface ConversationMessageListProps {
 
 export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: ConversationMessageListProps) {
   // Data fetching
-  const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
+  const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
   const deleteMessage = useDeleteMessage()
 
   // Streaming state - use streamId from props
@@ -58,7 +57,9 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
         hasAttachments: false,
         streaming: true,
       }
-      return [...messages, streamingMessage]
+      // Add streaming message at the beginning since API returns newest first
+      // and column-reverse will put it at the bottom
+      return [streamingMessage, ...messages]
     }
     return messages
   }, [messages, isStreaming, streamingContent, streamingState.status, conversationId, starshipId])
@@ -187,7 +188,7 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
         {enableVirtualization && displayMessages.length > 50 ? (
           <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" />
         ) : (
-          <div className="h-full overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 message-scroll-area">
+          <div className="h-full overflow-y-auto message-scroll-area p-2 sm:p-4 flex flex-col-reverse gap-3 sm:gap-4">
             {displayMessages.map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
           </div>
         )}

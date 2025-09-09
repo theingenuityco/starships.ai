@@ -31,6 +31,8 @@ export function VirtualizedMessageList({ messages, renderMessage, className, est
       className={cn('h-full overflow-y-auto message-scroll-area', className)}
       style={{
         contain: 'strict',
+        display: 'flex',
+        flexDirection: 'column-reverse',
       }}
     >
       <div

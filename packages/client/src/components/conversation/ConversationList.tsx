@@ -16,9 +16,10 @@ interface ConversationListProps {
   starshipId: string
   onConversationDelete?: (conversationId: string) => void
   onConversationArchive?: (conversationId: string) => void
+  onConversationSelect?: (conversationId: string) => void
 }
 
-export function ConversationList({ starshipId, onConversationDelete, onConversationArchive }: ConversationListProps) {
+export function ConversationList({ starshipId, onConversationDelete, onConversationArchive, onConversationSelect }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
@@ -68,6 +69,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   const handleConversationClick = (conversationId: string) => {
     router.push(`/ship/${slug}/conversations/${conversationId}`)
+    onConversationSelect?.(conversationId)
   }
 
   if (isLoading) {

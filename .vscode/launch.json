@@ -2,7 +2,80 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Next.js Server",
+      "name": "Attach to Reverse Proxy",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/packages/reverse-proxy/**/*.js"],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "name": "Attach to Express Server",
+      "type": "node",
+      "request": "attach",
+      "port": 9230,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/packages/server/**/*.js"],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "name": "Attach to Next.js Server",
+      "type": "node",
+      "request": "attach",
+      "port": 9231,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/packages/client/**/*.js"],
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "name": "Debug Browser",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:8080",
+      "webRoot": "${workspaceFolder}/packages/client",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./*": "${workspaceFolder}/packages/client/*",
+        "webpack:///packages/client/*": "${workspaceFolder}/packages/client/*",
+        "webpack:///*": "${workspaceFolder}/*"
+      }
+    },
+    {
+      "name": "Launch Reverse Proxy with Debug",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/packages/reverse-proxy",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "name": "Launch Express Server with Debug",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/packages/server",
+      "env": {
+        "NODE_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true,
+      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+    },
+    {
+      "name": "Launch Next.js with Debug",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/packages/client/node_modules/next/dist/bin/next",
@@ -12,7 +85,7 @@
         "NODE_ENV": "development"
       },
       "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
       "sourceMaps": true,
       "resolveSourceMapLocations": [
         "${workspaceFolder}/packages/client/**",
@@ -20,73 +93,43 @@
         "${workspaceFolder}/packages/protocol/**",
         "${workspaceFolder}/packages/errors/**",
         "!**/node_modules/**"
-      ],
-      "serverReadyAction": {
-        "pattern": "ready - started server on .+, url: (https?://\\S+)",
-        "uriFormat": "%s",
-        "action": "openExternally"
-      }
-    },
-    {
-      "name": "Debug Next.js Client (Browser)",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}/packages/client",
-      "sourceMaps": true,
-      "sourceMapPathOverrides": {
-        "webpack:///./*": "${workspaceFolder}/packages/client/*",
-        "webpack:///packages/client/*": "${workspaceFolder}/packages/client/*",
-        "webpack:///*": "${workspaceFolder}/*"
-      },
-      "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
-    },
-    {
-      "name": "Debug Express Server",
-      "type": "node",
-      "request": "launch",
-      "program": "${workspaceFolder}/packages/server/node_modules/tsx/dist/cli.mjs",
-      "args": ["watch", "src/index.ts"],
-      "cwd": "${workspaceFolder}/packages/server",
-      "env": {
-        "NODE_ENV": "development"
-      },
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"],
-      "restart": true,
-      "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
-    },
-    {
-      "name": "Attach Process",
-      "type": "node",
-      "request": "attach",
-      "processId": "${command:PickProcess}",
-      "skipFiles": ["<node_internals>/**"],
-      "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+      ]
     }
   ],
   "compounds": [
     {
-      "name": "Debug Client (Full Stack)",
-      "configurations": ["Debug Next.js Server", "Debug Next.js Client (Browser)"],
+      "name": "Launch Backend Services",
+      "configurations": ["Launch Reverse Proxy with Debug", "Launch Express Server with Debug"],
       "presentation": {
         "hidden": false,
-        "group": "client",
+        "group": "backend",
         "order": 1
       },
       "stopAll": true
     },
     {
-      "name": "Debug Application (Full Stack)",
-      "configurations": ["Debug Express Server", "Debug Next.js Server", "Debug Next.js Client (Browser)"],
+      "name": "Launch Full Stack",
+      "configurations": [
+        "Launch Reverse Proxy with Debug",
+        "Launch Express Server with Debug",
+        "Launch Next.js with Debug",
+        "Debug Browser"
+      ],
       "presentation": {
         "hidden": false,
         "group": "starships",
         "order": 2
       },
       "stopAll": true
+    },
+    {
+      "name": "Attach to Running Services",
+      "configurations": ["Attach to Reverse Proxy", "Attach to Express Server", "Attach to Next.js Server"],
+      "presentation": {
+        "hidden": false,
+        "group": "debug",
+        "order": 3
+      }
     }
   ]
 }

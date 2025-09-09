@@ -21,8 +21,5 @@
     "**/.turbo": true
   },
   "eslint.workingDirectories": ["packages/client", "packages/server", "packages/autopilot", "packages/models"],
-  "npm.packageManager": "pnpm",
-  "debug.node.autoAttach": "smart",
-  "debug.javascript.autoAttachFilter": "smart",
-  "debug.terminal.clearBeforeReusing": true
+  "npm.packageManager": "pnpm"
 }

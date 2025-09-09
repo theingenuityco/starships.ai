@@ -28,6 +28,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
+  const [currentStreamId, setCurrentStreamId] = useState<string | null>(null)
 
   // Ref for direct communication with message input
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
@@ -96,6 +97,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     setHasMessages(true)
   }
 
+  // Handle streaming start
+  const handleStreamStart = (streamId: string) => {
+    console.log('[ConversationInterface] Streaming started with ID:', streamId)
+    setCurrentStreamId(streamId)
+  }
+
   // Handle suggestion click
   const handleSuggestionClick = (suggestion: string) => {
     // Use ref to directly call the input component method
@@ -141,9 +148,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     toast.info('Conversation settings - Feature coming soon!')
   }
 
-  {
-    console.log('hi there', {})
-  }
   return (
     <div className="relative flex flex-col h-screen bg-background">
       {/* Conversation Header - Only shown when there's an active conversation */}
@@ -165,6 +169,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           <ConversationMessageList
             conversationId={currentConversationId}
             starshipId={starshipId}
+            streamId={currentStreamId}
             key={currentConversationId}
             enableVirtualization={true}
             enableSearch={true}
@@ -236,6 +241,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             conversationId={currentConversationId}
             onConversationStart={handleConversationStart}
             onMessageSent={handleFirstMessage}
+            onStreamStart={handleStreamStart}
             disabled={!selectedAgent}
             minimal={hasMessages}
           >

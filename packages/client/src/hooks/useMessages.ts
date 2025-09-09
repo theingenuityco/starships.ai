@@ -248,14 +248,26 @@ export function useCreateMessage() {
 
 /**
  * Send message with optimistic updates (for real-time chat)
+ * Supports both regular and streaming modes
  */
 export function useSendMessage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateMessageRequest & { expectResponse?: boolean }): Promise<MessageModel> => {
-      const response: AxiosResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
-      return response.data.data
+    mutationFn: async (data: CreateMessageRequest & { expectResponse?: boolean; stream?: boolean }): Promise<MessageModel | { streamId: string }> => {
+      if (data.stream) {
+        // For streaming, POST to conversation messages endpoint to get streamId
+        const response: AxiosResponse<ApiResponse<{ streamId: string }>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
+          agentId: data.agentId,
+          message: data.content,
+          stream: true,
+        })
+        return response.data.data
+      } else {
+        // Regular message creation
+        const response: AxiosResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
+        return response.data.data
+      }
     },
     onMutate: async variables => {
       if (!variables.conversationId) return
@@ -304,10 +316,21 @@ export function useSendMessage() {
 
       return { previousMessages, tempMessage, conversationId: variables.conversationId }
     },
-    onSuccess: (message, variables, context) => {
+    onSuccess: (result, variables, context) => {
       if (!variables.conversationId || !context) return
 
-      // Replace temp message with real message
+      // For streaming requests, just mark user message as sent - streaming hook handles assistant response
+      if (variables.stream && 'streamId' in result) {
+        queryClient.setQueryData(MESSAGE_QUERY_KEYS.byConversation(variables.conversationId), (old: any) => {
+          if (!old) return old
+          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...msg, sending: false, id: `user-${Date.now()}` } : msg))
+          return { ...old, messages }
+        })
+        return
+      }
+
+      // For regular requests, replace temp message with real message
+      const message = result as MessageModel
       queryClient.setQueryData(MESSAGE_QUERY_KEYS.byConversation(variables.conversationId), (old: any) => {
         if (!old) return { messages: [message], total: 1, conversationId: variables.conversationId }
 

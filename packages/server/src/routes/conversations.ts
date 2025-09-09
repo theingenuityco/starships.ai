@@ -1,4 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { MessageService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
 import { MemoryService } from '@/services/MemoryService';
 import { StreamingService } from '@/services/StreamingService';
@@ -51,6 +52,62 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
     return null;
   }
 };
+
+/**
+ * GET /conversations/:conversationId/messages - Get conversation messages
+ */
+router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Authentication check
+    if (!checkAuth(req, res)) return;
+
+    // Validate conversationId parameter
+    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+
+    // Validate pagination parameters
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
+
+    const { conversationId } = paramValidation;
+    const { page, limit } = paginationValidation;
+
+    // Validate query parameters for ordering
+    const orderValidation = validateData(
+      z.object({
+        orderBy: z.enum(['timestamp', 'created_at']).optional(),
+        orderDirection: z.enum(['asc', 'desc']).optional(),
+      }),
+      req.query,
+      res,
+      'order parameters'
+    );
+    if (!orderValidation) return;
+
+    // Delegate to service layer
+    const messageService = new MessageService();
+    const conversationData = await messageService.getConversation({
+      conversationId,
+      limit,
+      offset: (page - 1) * limit,
+      orderBy: orderValidation.orderBy,
+      orderDirection: orderValidation.orderDirection,
+    });
+
+    if (!conversationData) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+        resource: 'conversation',
+        id: conversationId,
+      });
+      return;
+    }
+
+    const paginationMeta = createPaginationMeta(page, limit, conversationData.total);
+    sendSuccess(res, conversationData, 200, paginationMeta);
+  } catch (error) {
+    handleCommonError(error, res, 'fetching conversation messages');
+  }
+});
 
 /**
  * POST /conversations/:conversationId/messages - Send message to agent (supports streaming)

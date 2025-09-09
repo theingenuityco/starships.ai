@@ -75,24 +75,8 @@ export function useConversation(conversationId: string, enabled: boolean = true)
   })
 }
 
-// Get messages for a conversation
-export function useConversationMessages(conversationId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId),
-    queryFn: async (): Promise<{ messages: MessageModel[] }> => {
-      const response: AxiosResponse<ApiResponse<{ messages: MessageModel[] }>> = await api.get(`/api/v1/conversations/${conversationId}`, {
-        params: { includeMessages: true },
-      })
-
-      const data = response.data.data
-      return { messages: data.messages || [] }
-    },
-    enabled: !!conversationId && enabled,
-    staleTime: 5 * 1000, // 5 seconds - messages change frequently
-    gcTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: true,
-  })
-}
+// NOTE: useConversationMessages is available in useMessages.ts
+// Import it from there for better functionality and consistency
 
 // Get conversations for a user
 export function useUserConversations(userId: string, onlyActive: boolean = false, enabled: boolean = true) {

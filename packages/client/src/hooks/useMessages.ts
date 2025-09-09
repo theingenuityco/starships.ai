@@ -120,7 +120,7 @@ export function useConversationMessages(conversationId: string, limit: number = 
           lastActivityAt: string
         }>
       > = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
-        params: { limit, page: 1, orderBy: 'timestamp', orderDirection: 'asc' },
+        params: { limit, page: 1, orderBy: 'timestamp', orderDirection: 'desc' },
       })
       return response.data.data
     },

@@ -39,7 +39,7 @@ export function ConversationHeader({ conversation, onStatusChange, onArchive, on
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="border-b border-border/40 bg-card/50 backdrop-blur-sm">
+    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="border-b border-border/40 frosted-glass-card">
       <div className="flex items-center justify-between p-4">
         {/* Left side - Status and metadata */}
         <div className="flex items-center gap-4">

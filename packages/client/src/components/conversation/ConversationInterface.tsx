@@ -223,7 +223,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       )}
 
       {/* Floating Input at Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}

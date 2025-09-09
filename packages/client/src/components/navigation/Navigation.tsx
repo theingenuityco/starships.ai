@@ -91,6 +91,11 @@ export function Navigation({}: NavigationProps) {
     setShowConversationList(!showConversationList)
   }
 
+  // Handle conversation selection - hide history pane
+  const handleConversationSelect = (conversationId: string) => {
+    setShowConversationList(false)
+  }
+
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {
     // Only show navigation inside starship context (/ship/<slug>/*)
@@ -122,15 +127,17 @@ export function Navigation({}: NavigationProps) {
       >
         {/* Compact Header with Theme Toggle */}
         <div className="p-3 border-b border-border/20 flex-shrink-0">
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-col items-center justify-center gap-2">
             <div
-              className="p-2 bg-primary/15 rounded-xl cursor-pointer hover:bg-primary/25 transition-colors duration-200 hover:scale-105 transform transition-transform"
+              className="p-2 bg-primary/15 rounded-xl cursor-pointer hover:bg-primary/25 transition-colors duration-200 hover:scale-105 transform transition-transform flex items-center justify-center"
               onClick={handleLogoClick}
               title="Navigate to Conversations"
             >
               <StarshipsLogo width={20} height={20} gradientId="nav-gradient" animationDelay={1} repeatDelay={8} />
             </div>
-            <ThemeToggle />
+            <div className="flex items-center justify-center">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
 
@@ -181,13 +188,11 @@ export function Navigation({}: NavigationProps) {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.1 }}
                           onClick={handleNewConversation}
-                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          <div className="flex items-center justify-center">
-                            <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                          </div>
+                          <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
                         </motion.button>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -203,17 +208,15 @@ export function Navigation({}: NavigationProps) {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.2 }}
                           onClick={handleToggleConversationHistory}
-                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          <div className="flex items-center justify-center">
-                            {showConversationList ? (
-                              <X className="w-4 h-4 text-primary transition-colors" />
-                            ) : (
-                              <History className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                            )}
-                          </div>
+                          {showConversationList ? (
+                            <X className="w-4 h-4 text-primary transition-colors" />
+                          ) : (
+                            <History className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          )}
                         </motion.button>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
@@ -233,7 +236,7 @@ export function Navigation({}: NavigationProps) {
         </div>
 
         {/* User Profile Section - Collapsed Mode */}
-        <div className="border-t border-border/20 flex-shrink-0 p-2">
+        <div className="border-t border-border/20 flex-shrink-0 p-2 flex items-center justify-center">
           <UserProfile mode="collapsed" />
         </div>
       </div>
@@ -248,7 +251,7 @@ export function Navigation({}: NavigationProps) {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="border-l border-border/20 overflow-hidden"
           >
-            <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationArchive={handleConversationArchive} />
+            <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationArchive={handleConversationArchive} onConversationSelect={handleConversationSelect} />
           </motion.div>
         )}
       </AnimatePresence>

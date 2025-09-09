@@ -8,8 +8,8 @@ import { useStreamingConversation } from '@/hooks/useStreamingConversation'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Search, Timer, User, XCircle } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AccessibilityEnhancements, MessageAccessibility, useAccessibilityFeatures } from './AccessibilityEnhancements'
 import { MessageContent } from './MessageContent'
@@ -27,41 +27,41 @@ interface ConversationMessageListProps {
 }
 
 export function ConversationMessageList({ conversationId, starshipId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: ConversationMessageListProps) {
+  console.log('message list rerender', {})
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
   const deleteMessage = useDeleteMessage()
 
   // Streaming state
   const { streamingState, isStreaming, streamingContent } = useStreamingConversation()
-
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 
-  // Create streaming message for display
-  const streamingMessage =
-    isStreaming && streamingState.status !== 'idle'
-      ? {
-          id: 'streaming-message',
-          content: streamingContent || '',
-          role: 'assistant' as const,
-          timestamp: new Date().toISOString(),
-          conversationId: conversationId || '',
-          starshipId: starshipId || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          version: '1.0.0',
-          threadDepth: 0,
-          processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
-          messageType: 'agent_response' as const,
-          importance: 'medium' as const,
-          contentLength: streamingContent?.length || 0,
-          hasAttachments: false,
-          streaming: true,
-        }
-      : null
-
-  // Combine regular messages with streaming message
-  const displayMessages = streamingMessage ? [...messages, streamingMessage] : messages
+  // Create streaming message directly in render - React will handle updates
+  const displayMessages = useMemo(() => {
+    if (isStreaming && streamingContent) {
+      const streamingMessage = {
+        id: 'streaming-message',
+        content: streamingContent,
+        role: 'assistant' as const,
+        timestamp: new Date().toISOString(),
+        conversationId: conversationId || '',
+        starshipId: starshipId || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
+        messageType: 'agent_response' as const,
+        importance: 'medium' as const,
+        contentLength: streamingContent.length,
+        hasAttachments: false,
+        streaming: true,
+      }
+      return [...messages, streamingMessage]
+    }
+    return messages
+  }, [messages, isStreaming, streamingContent, streamingState.status, conversationId, starshipId])
 
   // Message selection state
   const [selectedMessages, setSelectedMessages] = useState<string[]>([])
@@ -133,7 +133,7 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
 
   const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => (
     <MessageBubble
-      key={message.id}
+      key={message.streaming ? `streaming-${message.content.length}` : message.id}
       message={message}
       index={index}
       totalMessages={displayMessages.length}
@@ -187,17 +187,9 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
         {enableVirtualization && displayMessages.length > 50 ? (
           <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" />
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={conversationId}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="h-full overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 message-scroll-area"
-            >
-              {displayMessages.map((message, index) => renderMessage(message, index))}
-            </motion.div>
-          </AnimatePresence>
+          <div className="h-full overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 message-scroll-area">
+            {displayMessages.map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
+          </div>
         )}
 
         {/* Search Button */}
@@ -326,13 +318,17 @@ function MessageBubble({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        scale: isHighlighted ? 1.02 : 1,
-        transition: { duration: isReducedMotion ? 0 : 0.2 },
-      }}
+      initial={message.streaming ? false : { opacity: 0, y: 10 }}
+      animate={
+        message.streaming
+          ? false
+          : {
+              opacity: 1,
+              y: 0,
+              scale: isHighlighted ? 1.02 : 1,
+              transition: { duration: isReducedMotion ? 0 : 0.2 },
+            }
+      }
       className={cn(
         'flex gap-2 sm:gap-3 group',
         isUser ? 'justify-end' : 'justify-start',

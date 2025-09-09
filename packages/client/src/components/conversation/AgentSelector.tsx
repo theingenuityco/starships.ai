@@ -5,7 +5,7 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Bot, ChevronDown, Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface AgentSelectorProps {
   selectedAgent: AgentModel | null
@@ -16,7 +16,10 @@ interface AgentSelectorProps {
 
 export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compact = false }: AgentSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const { data: agents = [], isLoading: loading } = useStarshipAgents(starshipId || '')
+  const { data: agentsData = [], isLoading: loading } = useStarshipAgents(starshipId || '')
+  
+  // Memoize agents array to prevent unnecessary rerenders
+  const agents = useMemo(() => agentsData, [agentsData])
 
   // Auto-select first agent when agents are loaded
   useEffect(() => {

@@ -1,7 +1,6 @@
 'use client'
 
 import { NavigationItem } from '@/components/navigation/NavigationItem'
-import { ChevronRight } from 'lucide-react'
 import { motion } from 'motion/react'
 
 interface NavigationSectionProps {
@@ -12,24 +11,15 @@ interface NavigationSectionProps {
     icon: React.ComponentType<{ className?: string }>
   }>
   pathname: string
-  compact?: boolean
-  iconOnly?: boolean
 }
 
-export function NavigationSection({ title, items, pathname, compact = false, iconOnly = false }: NavigationSectionProps) {
+export function NavigationSection({ title, items, pathname }: NavigationSectionProps) {
   return (
-    <motion.div className={iconOnly ? 'space-y-1' : 'space-y-2'} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-      {/* Hide section title in icon-only mode */}
-      {!iconOnly && (
-        <div className="flex items-center gap-2 px-3 group">
-          <ChevronRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
-          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{title}</h4>
-        </div>
-      )}
+    <motion.div className="space-y-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
       <div className="space-y-1">
         {items.map((item, index) => (
           <motion.div key={item.href} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2, delay: index * 0.05 }}>
-            <NavigationItem {...item} isActive={pathname === item.href} compact={compact} iconOnly={iconOnly} />
+            <NavigationItem {...item} isActive={pathname === item.href} />
           </motion.div>
         ))}
       </div>

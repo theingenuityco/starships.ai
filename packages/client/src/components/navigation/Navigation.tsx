@@ -34,7 +34,7 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   },
 ]
 
-export function Navigation({}: NavigationProps) {
+export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
 

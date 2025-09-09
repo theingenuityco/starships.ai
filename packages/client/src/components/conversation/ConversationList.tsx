@@ -96,17 +96,17 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b">
-        <h2 className="text-lg font-semibold mb-3">Conversations</h2>
+      <div className="p-3 border-b">
+        <h2 className="text-base font-semibold mb-2">Conversations</h2>
 
         {/* Search */}
         <div className="relative">
           <input
             type="text"
-            placeholder="Search conversations..."
+            placeholder="Search..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 text-sm frosted-glass-light rounded-lg focus:outline-none focus:border-primary/50 transition-colors"
+            className="w-full px-2 py-1.5 text-xs frosted-glass-light rounded-lg focus:outline-none focus:border-primary/50 transition-colors"
           />
         </div>
       </div>

@@ -48,31 +48,38 @@
       "name": "Launch Reverse Proxy with Debug",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["run", "dev"],
+      "program": "${workspaceFolder}/packages/reverse-proxy/node_modules/tsx/dist/cli.mjs",
+      "args": ["watch", "src/index.ts"],
       "cwd": "${workspaceFolder}/packages/reverse-proxy",
       "env": {
         "NODE_ENV": "development"
       },
       "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**", "**/tsx/**"],
       "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+      "resolveSourceMapLocations": ["${workspaceFolder}/packages/reverse-proxy/**", "!**/node_modules/**"]
     },
     {
       "name": "Launch Express Server with Debug",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["run", "dev"],
+      "program": "${workspaceFolder}/packages/server/node_modules/tsx/dist/cli.mjs",
+      "args": ["watch", "src/index.ts"],
       "cwd": "${workspaceFolder}/packages/server",
       "env": {
         "NODE_ENV": "development"
       },
       "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**", "**/tsx/**"],
       "sourceMaps": true,
-      "resolveSourceMapLocations": ["${workspaceFolder}/**", "!**/node_modules/**"]
+      "resolveSourceMapLocations": [
+        "${workspaceFolder}/packages/server/**",
+        "${workspaceFolder}/packages/models/**",
+        "${workspaceFolder}/packages/protocol/**",
+        "${workspaceFolder}/packages/errors/**",
+        "${workspaceFolder}/packages/autopilot/**",
+        "!**/node_modules/**"
+      ]
     },
     {
       "name": "Launch Next.js with Debug",

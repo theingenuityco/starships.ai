@@ -32,14 +32,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Conversation data
   const { data: conversationData } = useConversation(currentConversationId || '', !!currentConversationId)
 
-  // Reset conversation when agent/starship changes - let server manage conversation IDs
+  // Memoized agent change handler to prevent AgentSelector from remounting
+  const handleAgentChange = useCallback((agent: Agent | null) => {
+    setSelectedAgent(agent)
+  }, [])
+
+  // Reset conversation when external conversation ID changes
   useEffect(() => {
-    if (userId && isAuthenticated) {
-      if (externalConversationId !== undefined) {
-        // Use external conversation ID when provided
-        setCurrentConversationId(externalConversationId)
-        setHasMessages(!!externalConversationId)
-      } else if (selectedAgent) {
+    if (userId && isAuthenticated && externalConversationId !== undefined) {
+      setCurrentConversationId(externalConversationId)
+      setHasMessages(!!externalConversationId)
+    }
+  }, [userId, isAuthenticated, externalConversationId])
+
+  // Reset conversation when agent changes (separate effect to avoid cascading)
+  useEffect(() => {
+    if (userId && isAuthenticated && !externalConversationId) {
+      if (selectedAgent) {
         // Reset conversation for agent - server will provide actual conversation ID
         setCurrentConversationId(null)
         setHasMessages(false)
@@ -49,7 +58,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         setHasMessages(false)
       }
     }
-  }, [userId, isAuthenticated, selectedAgent, starshipId, externalConversationId])
+  }, [userId, isAuthenticated, selectedAgent, externalConversationId])
 
   // Show loading state
   if (isLoading) {
@@ -163,7 +172,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             minimal={false}
           >
             {/* Footer Content - Agent Selector */}
-            <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
+            <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />
           </ConversationMessageInput>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { setTokenProvider, type SyncedUser } from '@/lib/api'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 
 export interface AuthUser {
@@ -263,17 +263,18 @@ export function useAuth() {
     })
   }, [])
 
-  // Create synced user data for compatibility
-  const syncedUser: SyncedUser | null = user
-    ? {
-        id: user.id,
-        username: user.name || user.email.split('@')[0],
-        email: user.email,
-        displayName: user.name,
-        avatar: user.avatar,
-        createdAt: new Date().toISOString(),
-      }
-    : null
+  // Create synced user data for compatibility - MEMOIZED to prevent rerenders
+  const syncedUser: SyncedUser | null = useMemo(() => {
+    if (!user) return null
+    return {
+      id: user.id,
+      username: user.name || user.email.split('@')[0],
+      email: user.email,
+      displayName: user.name,
+      avatar: user.avatar,
+      createdAt: new Date().toISOString(),
+    }
+  }, [user])
 
   // Login function
   const login = useCallback(

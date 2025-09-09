@@ -5,7 +5,6 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Bot, ChevronDown, Loader2 } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 
 interface AgentSelectorProps {
@@ -51,15 +50,8 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
         {loading ? <Loader2 className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', 'animate-spin')} /> : <ChevronDown className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}
       </Button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            className={cn('absolute top-full left-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50', compact ? 'w-48' : 'w-full min-w-[250px]')}
-          >
+      {isOpen && (
+        <div className={cn('absolute top-full left-0 mt-2 bg-card border border-border rounded-lg shadow-lg z-50 opacity-100', compact ? 'w-48' : 'w-full min-w-[250px]')}>
             <div className="p-2 max-h-64 overflow-y-auto">
               {loading ? (
                 <div className="flex items-center justify-center py-4">
@@ -97,9 +89,8 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                 </>
               )}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   )
 }

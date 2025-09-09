@@ -7,7 +7,6 @@ import { useMessageStreaming } from '@/hooks/useMessageStreaming'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Timer, User, XCircle } from 'lucide-react'
-import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AccessibilityEnhancements, MessageAccessibility, useAccessibilityFeatures } from './AccessibilityEnhancements'
@@ -126,7 +125,7 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
 
   const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => (
     <MessageBubble
-      key={message.streaming ? `streaming-${message.content.length}` : message.id}
+      key={message.streaming ? 'streaming-message' : message.id}
       message={message}
       index={index}
       totalMessages={displayMessages.length}
@@ -303,20 +302,9 @@ function MessageBubble({
   }
 
   return (
-    <motion.div
-      initial={message.streaming ? false : { opacity: 0, y: 10 }}
-      animate={
-        message.streaming
-          ? false
-          : {
-              opacity: 1,
-              y: 0,
-              scale: isHighlighted ? 1.02 : 1,
-              transition: { duration: isReducedMotion ? 0 : 0.2 },
-            }
-      }
+    <div
       className={cn(
-        'flex gap-2 sm:gap-3 group',
+        'flex gap-2 sm:gap-3 group opacity-100',
         isUser ? 'justify-end' : 'justify-start',
         message.threadDepth ? `ml-${Math.min(message.threadDepth * 2, 8)} sm:ml-${Math.min(message.threadDepth * 4, 16)}` : '',
         isSelected && 'selection-highlight rounded-lg p-2',
@@ -398,7 +386,7 @@ function MessageBubble({
       </div>
 
       {isUser && <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center">{getRoleIcon()}</div>}
-    </motion.div>
+    </div>
   )
 }
 
@@ -411,7 +399,7 @@ function EmptyState() {
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md mx-auto space-y-6">
+      <div className="max-w-md mx-auto space-y-6 opacity-100">
         {/* Title */}
         <div className="space-y-2">
           <h3 className="text-2xl font-semibold text-foreground">{content.title}</h3>
@@ -423,19 +411,16 @@ function EmptyState() {
           <p className="text-sm font-medium text-muted-foreground">Try asking:</p>
           <div className="grid gap-2">
             {content.suggestions.map((suggestion, index) => (
-              <motion.div
+              <div
                 key={suggestion}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 * index }}
-                className="p-3 bg-muted/50 rounded-lg text-sm text-left border border-border/40 hover:bg-muted/70 transition-colors cursor-pointer"
+                className="p-3 bg-muted/50 rounded-lg text-sm text-left border border-border/40 hover:bg-muted/70 transition-colors cursor-pointer opacity-100"
               >
                 {suggestion}
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

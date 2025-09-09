@@ -7,7 +7,6 @@ import { useSendMessage } from '@/hooks/useMessages'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
-import { motion } from 'motion/react'
 import { forwardRef, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 // Simplified message interface for UI callbacks
@@ -211,7 +210,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     )
 
     return (
-      <motion.div className="relative" initial={{ opacity: 0, y: minimal ? 10 : 20 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="relative opacity-100">
         {/* Input Container */}
         <div
           className={cn(
@@ -273,32 +272,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   </Button>
 
                   {/* Send Button */}
-                  <motion.div
-                    animate={{
-                      scale: canSend ? 1 : 0.8,
-                      opacity: canSend ? 1 : 0.5,
-                    }}
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!canSend}
+                    size="icon"
+                    className={cn(
+                      'h-8 w-8 rounded-full shrink-0 transition-all',
+                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                    )}
                   >
-                    <Button
-                      onClick={handleSubmit}
-                      disabled={!canSend}
-                      size="icon"
-                      className={cn(
-                        'h-8 w-8 rounded-full shrink-0 transition-all',
-                        canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
-                      )}
-                    >
-                      {sending || isStreaming ? (
-                        <motion.div
-                          className="h-4 w-4 border-2 border-current border-t-transparent rounded-full"
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </motion.div>
+                    {sending || isStreaming ? (
+                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -307,7 +295,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         {/* Agent Indicator - Only show in non-minimal mode */}
         {!minimal && selectedAgent && <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">Chatting with {selectedAgent.name}</div>}
-      </motion.div>
+      </div>
     )
   }
 )

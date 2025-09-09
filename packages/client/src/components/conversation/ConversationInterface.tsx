@@ -7,8 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useConversation } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
-import { motion } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface ConversationInterfaceProps {
   starshipId?: string
@@ -56,12 +55,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   if (isLoading) {
     return (
       <div className="flex flex-col h-screen items-center justify-center">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-4">
+        <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
             <Sparkles className="w-8 h-8 text-primary animate-pulse" />
           </div>
           <p className="text-muted-foreground">Initializing conversation...</p>
-        </motion.div>
+        </div>
       </div>
     )
   }
@@ -70,41 +69,41 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col h-screen items-center justify-center">
-        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-4">
+        <div className="text-center space-y-4 opacity-100">
           <div className="w-16 h-16 mx-auto bg-muted/20 rounded-full flex items-center justify-center">
             <Users className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-muted-foreground">Please sign in to start a conversation</p>
-        </motion.div>
+        </div>
       </div>
     )
   }
 
   // Handle conversation start - receive actual database conversation ID
-  const handleConversationStart = (conversationId: string) => {
+  const handleConversationStart = useCallback((conversationId: string) => {
     console.log('[ConversationInterface] Conversation started with ID:', conversationId)
     setCurrentConversationId(conversationId)
     onConversationChange?.(conversationId)
-  }
+  }, [onConversationChange])
 
   // Handle first message to trigger layout transition
-  const handleFirstMessage = () => {
+  const handleFirstMessage = useCallback(() => {
     setHasMessages(true)
-  }
+  }, [])
 
   // Handle streaming start
-  const handleStreamStart = (streamId: string) => {
+  const handleStreamStart = useCallback((streamId: string) => {
     console.log('[ConversationInterface] Streaming started with ID:', streamId)
     setCurrentStreamId(streamId)
-  }
+  }, [])
 
   // Handle suggestion click
-  const handleSuggestionClick = (suggestion: string) => {
+  const handleSuggestionClick = useCallback((suggestion: string) => {
     // Use ref to directly call the input component method
     if (messageInputRef.current?.handleSuggestionSubmit) {
       messageInputRef.current.handleSuggestionSubmit(suggestion)
     }
-  }
+  }, [])
 
   return (
     <div className="relative flex flex-col h-screen bg-background">
@@ -115,7 +114,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             conversationId={currentConversationId}
             starshipId={starshipId}
             streamId={currentStreamId}
-            key={currentConversationId}
             enableVirtualization={true}
             enableAccessibility={true}
           />
@@ -135,21 +133,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           {/* Suggestions */}
           <div className="space-y-3 max-w-2xl w-full opacity-100">
             {AGENT_SUGGESTIONS.map((suggestion, index) => (
-              <motion.button
+              <button
                 key={suggestion}
-                whileHover={{
-                  scale: 1.01,
-                  backgroundColor: 'hsl(var(--muted) / 0.6)',
-                }}
-                whileTap={{ scale: 0.99 }}
-                className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group"
+                className="w-full text-left flex items-center gap-3 p-4 text-sm text-foreground/90 bg-muted/20 hover:bg-muted/30 rounded-xl border border-border/20 transition-all duration-200 backdrop-blur-sm group opacity-100"
                 onClick={() => handleSuggestionClick(suggestion)}
               >
                 <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
                   <Sparkles className="w-3 h-3 text-primary/70 group-hover:text-primary transition-colors" />
                 </div>
                 <span className="flex-1">{suggestion}</span>
-              </motion.button>
+              </button>
             ))}
           </div>
         </div>

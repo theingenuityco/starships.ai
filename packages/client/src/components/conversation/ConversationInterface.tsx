@@ -172,7 +172,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{
-            delay: hasMessages ? 0 : 0.35,
+            delay: 0,
             duration: 0.5,
             ease: [0.4, 0, 0.2, 1],
           }}
@@ -187,7 +187,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             onMessageSent={handleFirstMessage}
             onStreamStart={handleStreamStart}
             disabled={!selectedAgent}
-            minimal={hasMessages}
+            minimal={false}
           >
             {/* Footer Content - Agent Selector */}
             <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />

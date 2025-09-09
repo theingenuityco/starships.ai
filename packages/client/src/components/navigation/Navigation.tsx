@@ -138,15 +138,15 @@ export function Navigation({}: NavigationProps) {
         <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
           <div className="p-2 space-y-2">
             {/* Conversations Section - Expandable when on conversation routes */}
-            <div className="space-y-1">
-              {/* Main Conversations Icon */}
+            <div>
+              {/* Main Conversations Icon - Standalone */}
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
                   <Link href={`/ship/${starshipSlug}/conversations`}>
                     <motion.div
-                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl ${
+                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 ${
                         isConversationRoute
-                          ? 'bg-gradient-to-r from-primary/20 to-primary/15 shadow-lg border border-primary/30'
+                          ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
                           : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
                       }`}
                       whileHover={{ scale: 1.05 }}
@@ -163,7 +163,7 @@ export function Navigation({}: NavigationProps) {
                 </TooltipContent>
               </Tooltip>
 
-              {/* Expanded Sub-icons when on conversation routes */}
+              {/* Expanded Sub-icons Container - Visually joined from bottom */}
               <AnimatePresence>
                 {isConversationRoute && (
                   <motion.div
@@ -171,7 +171,7 @@ export function Navigation({}: NavigationProps) {
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="ml-2 space-y-1 overflow-hidden"
+                    className="border-l border-r border-b border-primary/15 rounded-bl-xl rounded-br-xl mx-1 space-y-1 overflow-hidden -mt-2 pt-4 pb-2 flex flex-col items-center three-way-border"
                   >
                     {/* New Conversation Icon */}
                     <Tooltip delayDuration={300}>
@@ -181,7 +181,7 @@ export function Navigation({}: NavigationProps) {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.1 }}
                           onClick={handleNewConversation}
-                          className="group relative transition-all duration-300 p-2 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
+                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
@@ -203,7 +203,7 @@ export function Navigation({}: NavigationProps) {
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.2 }}
                           onClick={handleToggleConversationHistory}
-                          className={`group relative transition-all duration-300 p-2 rounded-lg ${
+                          className={`group relative transition-all duration-300 p-1.5 rounded-lg ${
                             showConversationList
                               ? 'bg-gradient-to-r from-primary/15 to-primary/10 shadow-md border border-primary/20'
                               : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'

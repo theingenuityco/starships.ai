@@ -520,4 +520,37 @@
     animation: scale-x 0.5s ease-out forwards;
     transform-origin: left;
   }
+
+  /* Three-way border for navigation child container */
+  .three-way-border {
+    position: relative;
+  }
+
+  .three-way-border::before,
+  .three-way-border::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    top: -12px;
+    border: 1px solid hsl(var(--primary) / 0.15);
+    background: transparent;
+    z-index: 1;
+  }
+
+  .three-way-border::before {
+    left: 0px;
+    border-right: 0;
+    border-bottom: 0;
+    border-top-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+  }
+
+  .three-way-border::after {
+    right: 0px;
+    border-left: 0;
+    border-bottom: 0;
+    border-top-right-radius: 12px;
+    border-bottom-left-radius: 12px;
+  }
 }

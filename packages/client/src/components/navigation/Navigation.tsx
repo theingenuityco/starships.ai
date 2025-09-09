@@ -71,48 +71,36 @@ export function Navigation({}: NavigationProps) {
 
   const navigationSections = getNavigationSections()
 
-  // Sidebar mode - professional layout
+  // Floating mode - compact icon-only layout
   return (
-    <motion.div className="flex flex-col h-full bg-gradient-to-b from-background to-muted/5 border-r border-border/50" variants={containerVariants} initial="hidden" animate="show">
-      {/* Enhanced Header */}
-      <motion.div className="p-3 pt-8 pb-8 border-b border-border/40 bg-card/50 backdrop-blur-sm flex-shrink-0" variants={itemVariants}>
-        <motion.div variants={itemVariants} className="flex items-center justify-between min-w-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Command className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">Navigation</h2>
-              <p className="text-xs text-muted-foreground">System Control</p>
-            </div>
+    <motion.div
+      className="flex flex-col w-16 bg-gradient-to-b from-background/95 to-muted/20 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-border/30"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+    >
+      {/* Compact Header with Theme Toggle */}
+      <motion.div className="p-3 border-b border-border/20 flex-shrink-0" variants={itemVariants}>
+        <div className="flex flex-col items-center gap-2">
+          <div className="p-2 bg-primary/15 rounded-xl">
+            <Command className="w-5 h-5 text-primary" />
           </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-          </div>
-        </motion.div>
+          <ThemeToggle />
+        </div>
       </motion.div>
 
-      {/* Enhanced Navigation Sections */}
-      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
-        <div className="space-y-4 mt-4">
-          {navigationSections.map((section, index) => (
-            <motion.div key={section.title} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3, delay: 0.1 * index }}>
-              {index > 0 && (
-                <div className="my-3 px-3">
-                  <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-                </div>
-              )}
-              <NavigationSection title={section.title} items={section.items} pathname={pathname} compact={true} />
-            </motion.div>
+      {/* Navigation Items - Icon Only */}
+      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0">
+        <div className="space-y-2 mt-2">
+          {navigationSections.map(section => (
+            <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} compact={true} iconOnly={true} />
           ))}
         </div>
       </motion.div>
 
-      {/* Separator */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-      {/* Enhanced User Profile Section */}
-      <motion.div variants={itemVariants} className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0 pb-1">
-        <UserProfile mode="expanded" />
+      {/* User Profile Section - Collapsed Mode */}
+      <motion.div variants={itemVariants} className="border-t border-border/20 flex-shrink-0 p-2">
+        <UserProfile mode="collapsed" />
       </motion.div>
     </motion.div>
   )

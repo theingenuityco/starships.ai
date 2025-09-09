@@ -3,8 +3,9 @@
 import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Command, MessageSquare, Target, Users } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { MessageSquare, Target, Users } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -34,14 +35,23 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
 
 export function Navigation({}: NavigationProps) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  // Extract starship slug from path
+  const getStarshipSlug = () => {
+    if (pathname.startsWith('/ship/')) {
+      const pathParts = pathname.split('/')
+      return pathParts[2] // /ship/<slug>/...
+    }
+    return null
+  }
+
+  const starshipSlug = getStarshipSlug()
 
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {
     // Only show navigation inside starship context (/ship/<slug>/*)
-    if (pathname.startsWith('/ship/')) {
-      // Extract starship slug from path
-      const pathParts = pathname.split('/')
-      const starshipSlug = pathParts[2] // /ship/<slug>/...
+    if (starshipSlug) {
       return getStarshipNavigationSections(starshipSlug)
     }
 
@@ -50,6 +60,13 @@ export function Navigation({}: NavigationProps) {
   }
 
   const navigationSections = getNavigationSections()
+
+  // Handle logo click - navigate to conversations
+  const handleLogoClick = () => {
+    if (starshipSlug) {
+      router.push(`/ship/${starshipSlug}/conversations`)
+    }
+  }
 
   // Floating mode - compact icon-only layout
   return (
@@ -62,8 +79,12 @@ export function Navigation({}: NavigationProps) {
       {/* Compact Header with Theme Toggle */}
       <div className="p-3 border-b border-border/20 flex-shrink-0">
         <div className="flex flex-col items-center gap-2">
-          <div className="p-2 bg-primary/15 rounded-xl">
-            <Command className="w-5 h-5 text-primary" />
+          <div
+            className="p-2 bg-primary/15 rounded-xl cursor-pointer hover:bg-primary/25 transition-colors duration-200 hover:scale-105 transform transition-transform"
+            onClick={handleLogoClick}
+            title="Navigate to Conversations"
+          >
+            <StarshipsLogo width={20} height={20} gradientId="nav-gradient" animationDelay={1} repeatDelay={8} />
           </div>
           <ThemeToggle />
         </div>

@@ -6,14 +6,13 @@ import { useConversationMessages, useDeleteMessage } from '@/hooks/useMessages'
 import { useMessageStreaming } from '@/hooks/useMessageStreaming'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Search, Timer, User, XCircle } from 'lucide-react'
+import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Timer, User, XCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AccessibilityEnhancements, MessageAccessibility, useAccessibilityFeatures } from './AccessibilityEnhancements'
 import { MessageContent } from './MessageContent'
 import { MessageReactions, useMessageReactions } from './MessageReactions'
-import { MessageHighlight, MessageSearch, useMessageSearch } from './MessageSearch'
 import { MessageCheckbox, MessageSelection } from './MessageSelection'
 import { VirtualizedMessageList } from './VirtualizedMessageList'
 
@@ -22,11 +21,10 @@ interface ConversationMessageListProps {
   starshipId?: string
   streamId?: string | null
   enableVirtualization?: boolean
-  enableSearch?: boolean
   enableAccessibility?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableAccessibility = true }: ConversationMessageListProps) {
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
   const deleteMessage = useDeleteMessage()
@@ -73,9 +71,6 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
   // Message reactions
   const { addReaction, removeReaction, getMessageReactions } = useMessageReactions()
 
-  // Search functionality
-  const { isSearching, highlightedMessageId, startSearch, stopSearch, highlightMessage } = useMessageSearch(messages)
-
   // Accessibility features
   const { isHighContrast, isReducedMotion } = useAccessibilityFeatures()
 
@@ -118,11 +113,6 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
     }
   }
 
-  const handleSearchResultClick = (messageId: string, index: number) => {
-    highlightMessage(messageId)
-    // Scroll to message if needed
-  }
-
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode)
     setSelectedMessages([])
@@ -142,7 +132,7 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
       totalMessages={displayMessages.length}
       isSelected={selectedMessages.includes(message.id)}
       isSelecting={isSelectionMode}
-      isHighlighted={highlightedMessageId === message.id}
+      isHighlighted={false}
       isHighContrast={isHighContrast}
       isReducedMotion={isReducedMotion}
       onToggleSelection={handleMessageToggle}
@@ -150,7 +140,7 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
       reactions={getMessageReactions(message.id)}
       onAddReaction={addReaction}
       onRemoveReaction={removeReaction}
-      searchTerm={isSearching ? '' : ''} // Pass search term if needed
+      searchTerm=""
     />
   )
 
@@ -176,14 +166,11 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
 
   return (
     <div className="h-full flex flex-col">
-      {/* Search Interface */}
-      {enableSearch && isSearching && <MessageSearch messages={messages} onSearchResultClick={handleSearchResultClick} onClose={stopSearch} />}
-
       {/* Message Selection Bar */}
       <MessageSelection selectedMessages={selectedMessages} messages={messages} onSelectionChange={handleSelectionChange} onBulkCopy={handleBulkCopy} onBulkDelete={handleBulkDelete} />
 
       {/* Accessibility Enhancements */}
-      {enableAccessibility && <AccessibilityEnhancements messages={messages} onStartSearch={startSearch} />}
+      {enableAccessibility && <AccessibilityEnhancements messages={messages} />}
 
       {/* Messages List */}
       <div className="flex-1 relative">
@@ -196,13 +183,6 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
               .reverse()
               .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
           </div>
-        )}
-
-        {/* Search Button */}
-        {enableSearch && !isSearching && (
-          <Button variant="outline" size="icon" onClick={startSearch} className="absolute top-4 right-4 z-10 focus-visible-ring">
-            <Search className="w-4 h-4" />
-          </Button>
         )}
       </div>
     </div>
@@ -384,12 +364,8 @@ function MessageBubble({
             {message.hasAttachments && <Paperclip className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-muted-foreground" />}
           </div>
 
-          {/* Message content with search highlighting */}
-          {searchTerm ? (
-            <MessageHighlight content={message.content} searchTerm={searchTerm} className="message-content" />
-          ) : (
-            <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} isStreaming={message.streaming} />
-          )}
+          {/* Message content */}
+          <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} isStreaming={message.streaming} />
 
           {/* Message footer */}
           <div className="flex items-center justify-between mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-current/10">

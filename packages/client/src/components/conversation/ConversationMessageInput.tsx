@@ -2,8 +2,8 @@
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation, useSendMessage } from '@/hooks/useConversations'
-import { useStreamingConversation } from '@/hooks/useStreamingConversation'
+import { useCreateConversation } from '@/hooks/useConversations'
+import { useSendMessage } from '@/hooks/useMessages'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
@@ -26,6 +26,7 @@ interface ConversationMessageInputProps {
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   onMessageSent?: () => void // Simplified callback for UI state updates
+  onStreamStart?: (streamId: string) => void // New callback for streaming start
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
@@ -36,7 +37,7 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onStreamStart, disabled = false, minimal = false, children }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -44,7 +45,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
     const sendMessage = useSendMessage()
-    const { sendMessageWithStreaming, isStreaming } = useStreamingConversation()
+    const isStreaming = sendMessage.isPending
 
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
@@ -90,12 +91,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message using streaming API hook
-        await sendMessageWithStreaming.mutateAsync({
+        // Send message using streaming API
+        const result = await sendMessage.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
-          message: messageToSend,
+          content: messageToSend,
+          role: 'user',
+          starshipId: starshipId!,
+          messageType: 'user_input',
+          stream: true,
         })
+
+        // If streaming enabled and we got a streamId, notify parent
+        if (result && 'streamId' in result && result.streamId) {
+          onStreamStart?.(result.streamId)
+        }
 
         // Clear input and reset UI
         setMessage('')
@@ -142,12 +152,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message using streaming API hook
-        await sendMessageWithStreaming.mutateAsync({
+        // Send message using streaming API
+        const result = await sendMessage.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
-          message: suggestionText,
+          content: suggestionText,
+          role: 'user',
+          starshipId: starshipId!,
+          messageType: 'user_input',
+          stream: true,
         })
+
+        // If streaming enabled and we got a streamId, notify parent
+        if (result && 'streamId' in result && result.streamId) {
+          onStreamStart?.(result.streamId)
+        }
       } catch (error) {
         console.error('Failed to send suggestion:', error)
       } finally {

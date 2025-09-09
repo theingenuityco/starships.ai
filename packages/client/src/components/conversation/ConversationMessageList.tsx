@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useConversationMessages } from '@/hooks/useConversations'
 import { useDeleteMessage } from '@/hooks/useMessages'
-import { useStreamingConversation } from '@/hooks/useStreamingConversation'
+import { useMessageStreaming } from '@/hooks/useMessageStreaming'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Search, Timer, User, XCircle } from 'lucide-react'
@@ -21,19 +21,19 @@ import { VirtualizedMessageList } from './VirtualizedMessageList'
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  streamId?: string | null
   enableVirtualization?: boolean
   enableSearch?: boolean
   enableAccessibility?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: ConversationMessageListProps) {
-  console.log('message list rerender', {})
+export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: ConversationMessageListProps) {
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
   const deleteMessage = useDeleteMessage()
 
-  // Streaming state
-  const { streamingState, isStreaming, streamingContent } = useStreamingConversation()
+  // Streaming state - use streamId from props
+  const { streamingState, isStreaming, streamingContent } = useMessageStreaming(streamId ?? undefined, conversationId ?? undefined)
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 

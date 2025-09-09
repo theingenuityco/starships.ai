@@ -4,7 +4,6 @@ import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Command, MessageSquare, Target, Users } from 'lucide-react'
-import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
 
 interface NavigationProps {
@@ -33,25 +32,6 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   },
 ]
 
-// Animation variants
-const containerVariants: any = {
-  hidden: { opacity: 0, scale: 0.9 },
-  show: {
-    opacity: 1,
-    scale: 1,
-    transition: {
-      duration: 0.5,
-      staggerChildren: 0.2,
-      delayChildren: 0.3,
-    },
-  },
-}
-
-const itemVariants: any = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-}
-
 export function Navigation({}: NavigationProps) {
   const pathname = usePathname()
 
@@ -73,36 +53,38 @@ export function Navigation({}: NavigationProps) {
 
   // Floating mode - compact icon-only layout
   return (
-    <motion.div
-      className="flex flex-col w-16 bg-gradient-to-b from-background/95 to-muted/20 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-border/30"
-      style={{ height: 'calc(100vh - 3rem)' }} // Full height minus top (1.5rem) and bottom (1.5rem) padding
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
+    <div
+      className="flex flex-col w-16 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-border/20 bg-background/5 dark:bg-foreground/5"
+      style={{
+        height: 'calc(100vh - 3rem)', // Full height minus top (1.5rem) and bottom (1.5rem) padding
+        background: 'linear-gradient(135deg, hsl(var(--background) / 0.03) 0%, hsl(var(--background) / 0.01) 100%)',
+        backdropFilter: 'blur(20px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      }}
     >
       {/* Compact Header with Theme Toggle */}
-      <motion.div className="p-3 border-b border-border/20 flex-shrink-0" variants={itemVariants}>
+      <div className="p-3 border-b border-border/20 flex-shrink-0">
         <div className="flex flex-col items-center gap-2">
           <div className="p-2 bg-primary/15 rounded-xl">
             <Command className="w-5 h-5 text-primary" />
           </div>
           <ThemeToggle />
         </div>
-      </motion.div>
+      </div>
 
       {/* Navigation Items - Icon Only */}
-      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0 flex flex-col justify-center">
+      <div className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0 flex flex-col justify-center">
         <div className="space-y-2">
           {navigationSections.map(section => (
             <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} />
           ))}
         </div>
-      </motion.div>
+      </div>
 
       {/* User Profile Section - Collapsed Mode */}
-      <motion.div variants={itemVariants} className="border-t border-border/20 flex-shrink-0 p-2">
+      <div className="border-t border-border/20 flex-shrink-0 p-2">
         <UserProfile mode="collapsed" />
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   )
 }

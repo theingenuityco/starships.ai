@@ -83,7 +83,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
               className="w-full h-full bg-background/70 backdrop-blur-lg border-r border-border/40 shadow-xl overflow-hidden"
             >
-              <Navigation mode="sidebar" isMobile={isMobile} />
+              <Navigation isMobile={isMobile} />
             </motion.aside>
           </div>
         )}

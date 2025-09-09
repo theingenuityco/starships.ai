@@ -141,6 +141,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     toast.info('Conversation settings - Feature coming soon!')
   }
 
+  {
+    console.log('hi there', {})
+  }
   return (
     <div className="relative flex flex-col h-screen bg-background">
       {/* Conversation Header - Only shown when there's an active conversation */}

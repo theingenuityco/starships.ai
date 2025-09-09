@@ -173,6 +173,68 @@ const DEBUG_STREAMING = true
 - **Rate Limiting**: Client-side throttling prevents spam
 - **Fallback Strategy**: Graceful degradation for unsupported browsers
 
+## Recent Improvements (2025)
+
+### Simplified Real-time Streaming
+
+**Problem**: The original implementation had complex state management using refs, render triggers, setTimeout, and flushSync that caused timing issues and prevented real-time UI updates despite receiving streaming data.
+
+**Solution**: Simplified the approach by:
+
+1. **Direct State Updates in useStreamingConversation**:
+   - Removed `streamingContentRef` and `renderTrigger` complexity
+   - Use direct `setStreamingState` updates for content accumulation
+   - Let React handle re-rendering naturally
+
+```typescript
+// Before: Complex ref + trigger approach
+streamingContentRef.current = streamingContentRef.current + chunk.content
+setTimeout(() => {
+  flushSync(() => {
+    setStreamingState(prev => ({ ...prev, content: currentContent }))
+    setRenderTrigger(prev => prev + 1)
+  })
+}, 0)
+
+// After: Simple direct state update
+setStreamingState((prev: StreamingState) => ({
+  ...prev,
+  content: prev.content + chunk.content,
+  lastUpdate: Date.now(),
+}))
+```
+
+2. **Optimized Message List Rendering**:
+   - Replaced `useState` + `useEffect` pattern with `useMemo` for streaming messages
+   - Removed artificial render triggers and keys
+   - Streaming messages update reactively based on content changes
+
+```typescript
+// Before: Complex state management
+const [streamingMessage, setStreamingMessage] = useState(null)
+useEffect(() => {
+  /* complex logic */
+}, [streamingContent, renderTrigger])
+
+// After: Simple reactive computation
+const displayMessages = useMemo(() => {
+  if (isStreaming && streamingContent) {
+    const streamingMessage = {
+      /* message object */
+    }
+    return [...messages, streamingMessage]
+  }
+  return messages
+}, [messages, isStreaming, streamingContent, streamingState.status])
+```
+
+3. **Enhanced MessageContent for Streaming**:
+   - Proper link detection in streaming content
+   - Clean separation between streaming and final rendering
+   - Removed memoization blockers
+
+**Result**: Real-time streaming now works smoothly with immediate UI updates as content streams in, no more rendering delays or stale state issues.
+
 ## Browser Support
 
 - **Modern Browsers**: Full SSE support

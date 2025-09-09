@@ -1,10 +1,15 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { StreamingChunk, StreamingConnection, StreamingError, StreamingHeartbeat, StreamingResponse, StreamingState } from '@starships/protocol'
+import type { StreamingState as BaseStreamingState, StreamingChunk, StreamingConnection, StreamingError, StreamingHeartbeat, StreamingResponse } from '@starships/protocol'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { CONVERSATION_QUERY_KEYS } from './useConversations'
 import { MESSAGE_QUERY_KEYS, type ClientMessage } from './useMessages'
+
+// Extend StreamingState to include lastUpdate for forcing React re-renders
+interface StreamingState extends BaseStreamingState {
+  lastUpdate?: number
+}
 
 /**
  * Hook for sending messages with streaming support via Server-Sent Events
@@ -104,15 +109,21 @@ export function useStreamingConversation() {
 
               switch (chunk.type) {
                 case 'content':
-                  // Accumulate streaming content
+                  // Direct state update - React will handle the re-rendering
+                  console.log('content')
                   setStreamingState((prev: StreamingState) => ({
                     ...prev,
                     content: prev.content + chunk.content,
+                    lastUpdate: Date.now(),
                   }))
                   break
                 case 'thinking':
                   // Show thinking state
-                  setStreamingState((prev: StreamingState) => ({ ...prev, status: 'streaming' }))
+                  setStreamingState((prev: StreamingState) => ({
+                    ...prev,
+                    status: 'streaming',
+                    lastUpdate: Date.now(),
+                  }))
                   break
                 case 'node_start':
                   console.log(`[STREAMING] Node started: ${chunk.metadata?.nodeRef}`)
@@ -221,37 +232,20 @@ export function useStreamingConversation() {
       return { previousMessages, userMessage, conversationId }
     },
     onSuccess: (response, variables, context) => {
-      // Convert streaming response to MessageModel format
-      const assistantMessage: ClientMessage = {
-        id: `response-${Date.now()}`,
-        content: response.content,
-        role: 'assistant' as const,
-        timestamp: new Date().toISOString(),
-        conversationId: variables.conversationId,
-        starshipId: '', // Will be set by server
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: 'completed',
-        messageType: 'agent_response',
-        importance: 'medium',
-        contentLength: response.content.length,
-        hasAttachments: false,
-        streaming: false,
-      }
+      // NOTE: We're not adding the assistant message here because it's already
+      // being displayed via the streaming state in ConversationMessageList
+      // This prevents the legacy flow from interfering with real-time streaming
 
+      // Just update the user message to mark it as sent (not sending)
       queryClient.setQueryData(MESSAGE_QUERY_KEYS.byConversation(variables.conversationId), (old: any) => {
-        if (!old) return { messages: [assistantMessage], total: 1, conversationId: variables.conversationId }
+        if (!old) return old
 
-        // Remove the temporary sending user message and add both final user + assistant messages
-        const messages = old.messages.filter((m: ClientMessage) => m.id !== context?.userMessage.id)
-        const finalUserMessage = { ...context!.userMessage, sending: false }
+        // Update the temporary user message to mark it as sent
+        const messages = old.messages.map((m: ClientMessage) => (m.id === context?.userMessage.id ? { ...m, sending: false, id: `user-${Date.now()}` } : m))
+
         return {
           ...old,
-          messages: [...messages, finalUserMessage, assistantMessage],
-          total: messages.length + 2,
-          lastActivityAt: assistantMessage.timestamp,
+          messages,
         }
       })
 
@@ -272,8 +266,11 @@ export function useStreamingConversation() {
       })
     },
     onSettled: (data, error, variables) => {
-      // Always refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: MESSAGE_QUERY_KEYS.byConversation(variables.conversationId) })
+      // Don't refetch immediately - let the streaming message stay visible
+      // Only refetch after a delay to get the final persisted message from server
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: MESSAGE_QUERY_KEYS.byConversation(variables.conversationId) })
+      }, 2000)
     },
   })
 

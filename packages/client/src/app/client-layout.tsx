@@ -4,7 +4,7 @@ import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { Menu } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -58,11 +58,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   if (isDashboard || isWaitlist) {
     // Landing page and waitlist routes - no authentication required
     return (
-      <AnimatePresence mode="wait">
-        <motion.div key={pathname} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full w-full">
-          {children}
-        </motion.div>
-      </AnimatePresence>
+      <div className="h-full w-full">
+        {children}
+      </div>
     )
   }
 
@@ -97,11 +95,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         )}
 
         {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-        <AnimatePresence mode="wait">
-          <motion.main key={pathname} initial="initial" animate="animate" exit="exit" variants={pageVariants} className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto">
-            {children}
-          </motion.main>
-        </AnimatePresence>
+        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto">
+          {children}
+        </main>
       </div>
     </JwtAuthGate>
   )

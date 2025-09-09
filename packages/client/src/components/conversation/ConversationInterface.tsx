@@ -123,31 +123,20 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
           {/* Welcome Section */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8 max-w-2xl">
-            <motion.h1
-              className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
+          <div className="text-center mb-8 max-w-2xl opacity-100">
+            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
               Meet Your AI Agents
-            </motion.h1>
-            <motion.p className="text-muted-foreground text-lg font-light" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+            </h1>
+            <p className="text-muted-foreground text-lg font-light">
               Connect with specialized agents for focused assistance
-            </motion.p>
-          </motion.div>
+            </p>
+          </div>
 
           {/* Suggestions */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45, duration: 0.4 }} className="space-y-3 max-w-2xl w-full">
+          <div className="space-y-3 max-w-2xl w-full opacity-100">
             {AGENT_SUGGESTIONS.map((suggestion, index) => (
               <motion.button
                 key={suggestion}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{
-                  delay: 0.5 + index * 0.1,
-                  duration: 0.3,
-                }}
                 whileHover={{
                   scale: 1.01,
                   backgroundColor: 'hsl(var(--muted) / 0.6)',
@@ -162,22 +151,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 <span className="flex-1">{suggestion}</span>
               </motion.button>
             ))}
-          </motion.div>
+          </div>
         </div>
       )}
 
       {/* Floating Input at Bottom */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pointer-events-none">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            delay: 0,
-            duration: 0.5,
-            ease: [0.4, 0, 0.2, 1],
-          }}
-          className="max-w-2xl mx-auto pointer-events-auto"
-        >
+        <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
           <ConversationMessageInput
             ref={messageInputRef}
             selectedAgent={selectedAgent}
@@ -192,7 +172,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             {/* Footer Content - Agent Selector */}
             <AgentSelector selectedAgent={selectedAgent} onAgentChange={setSelectedAgent} starshipId={starshipId} compact={true} />
           </ConversationMessageInput>
-        </motion.div>
+        </div>
       </div>
     </div>
   )

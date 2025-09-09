@@ -93,7 +93,7 @@ export function Navigation({}: NavigationProps) {
       <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0">
         <div className="space-y-2 mt-2">
           {navigationSections.map(section => (
-            <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} compact={true} iconOnly={true} />
+            <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} />
           ))}
         </div>
       </motion.div>

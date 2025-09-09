@@ -82,20 +82,30 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
     )
   }
 
-  // For streaming content, we need to be careful about markdown parsing
-  // since incomplete markdown can cause parsing errors
-  const safeContent = isStreaming ? content + (content.endsWith('`') ? '' : '') : content
-
-  return (
-    <div className={cn('relative group', className)}>
-      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content">
-        {/* Streaming indicator */}
-        {isStreaming && (
+  // For streaming content, render plain text to avoid ReactMarkdown memoization issues
+  if (isStreaming) {
+    return (
+      <div className={cn('relative group', className)}>
+        <div className="text-sm leading-relaxed message-content">
+          {/* Streaming indicator */}
           <div className="flex items-center gap-2 mb-2 text-muted-foreground">
             <Loader2 className="w-3 h-3 animate-spin" />
             <span className="text-xs font-medium">Assistant is thinking...</span>
           </div>
-        )}
+          {/* Plain text content that updates in real-time */}
+          <div className="whitespace-pre-wrap">
+            {enableLinkPreview ? detectLinks(content) : content}
+            <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // For non-streaming content, use full markdown rendering
+  return (
+    <div className={cn('relative group', className)}>
+      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
@@ -182,11 +192,8 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
             h3: ({ children }) => <h3 className="text-base font-medium mt-3 mb-2 first:mt-0">{children}</h3>,
           }}
         >
-          {safeContent}
+          {content}
         </ReactMarkdown>
-
-        {/* Streaming cursor */}
-        {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
       </div>
 
       {/* Copy button for entire message */}

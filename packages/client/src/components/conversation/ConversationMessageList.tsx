@@ -2,66 +2,66 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useConversationMessages } from '@/hooks/useConversations'
-import { useDeleteMessage } from '@/hooks/useMessages'
-import { useStreamingConversation } from '@/hooks/useStreamingConversation'
+import { useConversationMessages, useDeleteMessage } from '@/hooks/useMessages'
+import { useMessageStreaming } from '@/hooks/useMessageStreaming'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Search, Timer, User, XCircle } from 'lucide-react'
-import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useState } from 'react'
+import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Timer, User, XCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { AccessibilityEnhancements, MessageAccessibility, useAccessibilityFeatures } from './AccessibilityEnhancements'
 import { MessageContent } from './MessageContent'
 import { MessageReactions, useMessageReactions } from './MessageReactions'
-import { MessageHighlight, MessageSearch, useMessageSearch } from './MessageSearch'
 import { MessageCheckbox, MessageSelection } from './MessageSelection'
 import { VirtualizedMessageList } from './VirtualizedMessageList'
 
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  streamId?: string | null
   enableVirtualization?: boolean
-  enableSearch?: boolean
   enableAccessibility?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, enableVirtualization = false, enableSearch = true, enableAccessibility = true }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableAccessibility = true }: ConversationMessageListProps) {
   // Data fetching
-  const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', !!conversationId)
+  const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
   const deleteMessage = useDeleteMessage()
 
-  // Streaming state
-  const { streamingState, isStreaming, streamingContent } = useStreamingConversation()
-
+  // Streaming state - use streamId from props
+  const { streamingState, isStreaming, streamingContent } = useMessageStreaming(streamId ?? undefined, conversationId ?? undefined)
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 
-  // Create streaming message for display
-  const streamingMessage =
-    isStreaming && streamingState.status !== 'idle'
-      ? {
-          id: 'streaming-message',
-          content: streamingContent || '',
-          role: 'assistant' as const,
-          timestamp: new Date().toISOString(),
-          conversationId: conversationId || '',
-          starshipId: starshipId || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          version: '1.0.0',
-          threadDepth: 0,
-          processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
-          messageType: 'agent_response' as const,
-          importance: 'medium' as const,
-          contentLength: streamingContent?.length || 0,
-          hasAttachments: false,
-          streaming: true,
-        }
-      : null
+  // Optimize message ordering - avoid array reversal on every render
+  const displayMessages = useMemo(() => {
+    // Create streaming message if needed
+    const streamingMessage =
+      isStreaming && streamingContent
+        ? {
+            id: 'streaming-message',
+            content: streamingContent,
+            role: 'assistant' as const,
+            timestamp: new Date().toISOString(),
+            conversationId: conversationId || '',
+            starshipId: starshipId || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            version: '1.0.0',
+            threadDepth: 0,
+            processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
+            messageType: 'agent_response' as const,
+            importance: 'medium' as const,
+            contentLength: streamingContent.length,
+            hasAttachments: false,
+            streaming: true,
+          }
+        : null
 
-  // Combine regular messages with streaming message
-  const displayMessages = streamingMessage ? [...messages, streamingMessage] : messages
+    // Messages come from API in newest-first order, but we want oldest-first for chat
+    // Pass reverse flag to VirtualizedMessageList instead of creating new array
+    return streamingMessage ? [...messages, streamingMessage] : messages
+  }, [messages, isStreaming, streamingContent, streamingState.status, conversationId, starshipId])
 
   // Message selection state
   const [selectedMessages, setSelectedMessages] = useState<string[]>([])
@@ -69,9 +69,6 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
 
   // Message reactions
   const { addReaction, removeReaction, getMessageReactions } = useMessageReactions()
-
-  // Search functionality
-  const { isSearching, highlightedMessageId, startSearch, stopSearch, highlightMessage } = useMessageSearch(messages)
 
   // Accessibility features
   const { isHighContrast, isReducedMotion } = useAccessibilityFeatures()
@@ -115,11 +112,6 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
     }
   }
 
-  const handleSearchResultClick = (messageId: string, index: number) => {
-    highlightMessage(messageId)
-    // Scroll to message if needed
-  }
-
   const toggleSelectionMode = () => {
     setIsSelectionMode(!isSelectionMode)
     setSelectedMessages([])
@@ -133,13 +125,13 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
 
   const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => (
     <MessageBubble
-      key={message.id}
+      key={message.streaming ? 'streaming-message' : message.id}
       message={message}
       index={index}
       totalMessages={displayMessages.length}
       isSelected={selectedMessages.includes(message.id)}
       isSelecting={isSelectionMode}
-      isHighlighted={highlightedMessageId === message.id}
+      isHighlighted={false}
       isHighContrast={isHighContrast}
       isReducedMotion={isReducedMotion}
       onToggleSelection={handleMessageToggle}
@@ -147,7 +139,7 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
       reactions={getMessageReactions(message.id)}
       onAddReaction={addReaction}
       onRemoveReaction={removeReaction}
-      searchTerm={isSearching ? '' : ''} // Pass search term if needed
+      searchTerm=""
     />
   )
 
@@ -173,38 +165,25 @@ export function ConversationMessageList({ conversationId, starshipId, enableVirt
 
   return (
     <div className="h-full flex flex-col">
-      {/* Search Interface */}
-      {enableSearch && isSearching && <MessageSearch messages={messages} onSearchResultClick={handleSearchResultClick} onClose={stopSearch} />}
-
       {/* Message Selection Bar */}
       <MessageSelection selectedMessages={selectedMessages} messages={messages} onSelectionChange={handleSelectionChange} onBulkCopy={handleBulkCopy} onBulkDelete={handleBulkDelete} />
 
       {/* Accessibility Enhancements */}
-      {enableAccessibility && <AccessibilityEnhancements messages={messages} onStartSearch={startSearch} />}
+      {enableAccessibility && <AccessibilityEnhancements messages={messages} />}
 
       {/* Messages List */}
       <div className="flex-1 relative">
-        {enableVirtualization && displayMessages.length > 50 ? (
-          <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" />
+        {enableVirtualization ? (
+          <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" reverseOrder={true} />
         ) : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={conversationId}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="h-full overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 message-scroll-area"
-            >
-              {displayMessages.map((message, index) => renderMessage(message, index))}
-            </motion.div>
-          </AnimatePresence>
-        )}
-
-        {/* Search Button */}
-        {enableSearch && !isSearching && (
-          <Button variant="outline" size="icon" onClick={startSearch} className="absolute top-4 right-4 z-10 focus-visible-ring">
-            <Search className="w-4 h-4" />
-          </Button>
+          <div className="h-full overflow-y-auto message-scroll-area flex justify-center">
+            <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
+              {displayMessages
+                .slice()
+                .reverse()
+                .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -325,16 +304,9 @@ function MessageBubble({
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{
-        opacity: 1,
-        y: 0,
-        scale: isHighlighted ? 1.02 : 1,
-        transition: { duration: isReducedMotion ? 0 : 0.2 },
-      }}
+    <div
       className={cn(
-        'flex gap-2 sm:gap-3 group',
+        'flex gap-2 sm:gap-3 group opacity-100',
         isUser ? 'justify-end' : 'justify-start',
         message.threadDepth ? `ml-${Math.min(message.threadDepth * 2, 8)} sm:ml-${Math.min(message.threadDepth * 4, 16)}` : '',
         isSelected && 'selection-highlight rounded-lg p-2',
@@ -382,12 +354,8 @@ function MessageBubble({
             {message.hasAttachments && <Paperclip className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-muted-foreground" />}
           </div>
 
-          {/* Message content with search highlighting */}
-          {searchTerm ? (
-            <MessageHighlight content={message.content} searchTerm={searchTerm} className="message-content" />
-          ) : (
-            <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} isStreaming={message.streaming} />
-          )}
+          {/* Message content */}
+          <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} isStreaming={message.streaming} />
 
           {/* Message footer */}
           <div className="flex items-center justify-between mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-current/10">
@@ -420,7 +388,7 @@ function MessageBubble({
       </div>
 
       {isUser && <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center">{getRoleIcon()}</div>}
-    </motion.div>
+    </div>
   )
 }
 
@@ -433,7 +401,7 @@ function EmptyState() {
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md mx-auto space-y-6">
+      <div className="max-w-md mx-auto space-y-6 opacity-100">
         {/* Title */}
         <div className="space-y-2">
           <h3 className="text-2xl font-semibold text-foreground">{content.title}</h3>
@@ -445,19 +413,13 @@ function EmptyState() {
           <p className="text-sm font-medium text-muted-foreground">Try asking:</p>
           <div className="grid gap-2">
             {content.suggestions.map((suggestion, index) => (
-              <motion.div
-                key={suggestion}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.1 * index }}
-                className="p-3 bg-muted/50 rounded-lg text-sm text-left border border-border/40 hover:bg-muted/70 transition-colors cursor-pointer"
-              >
+              <div key={suggestion} className="p-3 bg-muted/50 rounded-lg text-sm text-left border border-border/40 hover:bg-muted/70 transition-colors cursor-pointer opacity-100">
                 {suggestion}
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
-      </motion.div>
+      </div>
     </div>
   )
 }

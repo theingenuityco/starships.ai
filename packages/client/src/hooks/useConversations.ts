@@ -31,9 +31,10 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
       return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,
-    staleTime: 30 * 1000, // 30 seconds
-    gcTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes - conversations list doesn't change often
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false, // Don't refetch when switching between conversations
+    refetchOnMount: false, // Use cached data if available
   })
 }
 
@@ -74,24 +75,8 @@ export function useConversation(conversationId: string, enabled: boolean = true)
   })
 }
 
-// Get messages for a conversation
-export function useConversationMessages(conversationId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId),
-    queryFn: async (): Promise<{ messages: MessageModel[] }> => {
-      const response: AxiosResponse<ApiResponse<{ messages: MessageModel[] }>> = await api.get(`/api/v1/conversations/${conversationId}`, {
-        params: { includeMessages: true },
-      })
-
-      const data = response.data.data
-      return { messages: data.messages || [] }
-    },
-    enabled: !!conversationId && enabled,
-    staleTime: 5 * 1000, // 5 seconds - messages change frequently
-    gcTime: 2 * 60 * 1000, // 2 minutes
-    refetchOnWindowFocus: true,
-  })
-}
+// NOTE: useConversationMessages is available in useMessages.ts
+// Import it from there for better functionality and consistency
 
 // Get conversations for a user
 export function useUserConversations(userId: string, onlyActive: boolean = false, enabled: boolean = true) {

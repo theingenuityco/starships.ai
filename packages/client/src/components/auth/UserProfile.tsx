@@ -1,10 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
-import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuth } from '@/hooks/useAuth'
 import { LogOut, User } from 'lucide-react'
+import React, { useState } from 'react'
 
 interface UserProfileProps {
   mode?: 'collapsed' | 'expanded'
@@ -37,10 +37,11 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
         </TooltipTrigger>
         <TooltipContent
           side="right"
-          className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground z-[70]"
+          className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground z-[1001]"
           sideOffset={15}
           avoidCollisions={true}
           collisionPadding={10}
+          style={{ zIndex: 1001 }}
         >
           <div className="p-3">
             {/* Action buttons only */}
@@ -89,7 +90,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
           </div>
         </div>
       </TooltipTrigger>
-      <TooltipContent side="right" className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground" sideOffset={10}>
+      <TooltipContent side="right" className="p-0 bg-popover border border-border shadow-lg rounded-lg max-w-xs text-popover-foreground z-[1001]" sideOffset={10} style={{ zIndex: 1001 }}>
         <div className="p-3">
           {/* Action buttons only */}
           <div className="space-y-1">

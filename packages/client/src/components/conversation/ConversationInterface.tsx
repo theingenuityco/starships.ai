@@ -18,7 +18,6 @@ interface ConversationInterfaceProps {
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
 
-
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
 
@@ -81,11 +80,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   // Handle conversation start - receive actual database conversation ID
-  const handleConversationStart = useCallback((conversationId: string) => {
-    console.log('[ConversationInterface] Conversation started with ID:', conversationId)
-    setCurrentConversationId(conversationId)
-    onConversationChange?.(conversationId)
-  }, [onConversationChange])
+  const handleConversationStart = useCallback(
+    (conversationId: string) => {
+      console.log('[ConversationInterface] Conversation started with ID:', conversationId)
+      setCurrentConversationId(conversationId)
+      onConversationChange?.(conversationId)
+    },
+    [onConversationChange]
+  )
 
   // Handle first message to trigger layout transition
   const handleFirstMessage = useCallback(() => {
@@ -111,24 +113,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area or Welcome Screen */}
       {hasMessages && currentConversationId ? (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <ConversationMessageList
-            conversationId={currentConversationId}
-            starshipId={starshipId}
-            streamId={currentStreamId}
-            enableVirtualization={true}
-            enableAccessibility={true}
-          />
+          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} streamId={currentStreamId} enableVirtualization={true} enableAccessibility={true} />
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
           {/* Welcome Section */}
           <div className="text-center mb-8 max-w-2xl opacity-100">
-            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">
-              Meet Your AI Agents
-            </h1>
-            <p className="text-muted-foreground text-lg font-light">
-              Connect with specialized agents for focused assistance
-            </p>
+            <h1 className="text-5xl font-light mb-4 bg-gradient-to-b from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent">Meet Your AI Agents</h1>
+            <p className="text-muted-foreground text-lg font-light">Connect with specialized agents for focused assistance</p>
           </div>
 
           {/* Spacer for floating input */}
@@ -153,9 +145,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       )}
 
       {/* Floating Input - Position changes based on state */}
-      <div className={`absolute left-0 right-0 p-4 pointer-events-none transition-all duration-300 ${
-        hasMessages && currentConversationId ? 'bottom-0' : 'top-1/3 -translate-y-8'
-      }`}>
+      <div
+        className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out"
+        style={{
+          bottom: hasMessages && currentConversationId ? '0px' : 'calc(50% + 2rem)',
+        }}
+      >
         <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
           <ConversationMessageInput
             ref={messageInputRef}
@@ -166,7 +161,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             onMessageSent={handleFirstMessage}
             onStreamStart={handleStreamStart}
             disabled={!selectedAgent}
-            minimal={false}
+            minimal={hasMessages && !!currentConversationId}
           >
             {/* Footer Content - Agent Selector */}
             <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />

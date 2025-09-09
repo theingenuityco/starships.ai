@@ -76,15 +76,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         {/* Floating Navigation - conditionally rendered */}
         {!shouldHideNavigation && (
           <div className="fixed top-6 left-6 z-[1000]">
-            <motion.aside
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, when: 'beforeChildren', staggerChildren: 0.2 }}
-              className="relative bg-background/95 backdrop-blur-xl border border-border/60 shadow-2xl rounded-2xl overflow-hidden"
-              style={{ zIndex: 1000 }}
-            >
+            <aside className="relative" style={{ zIndex: 1000 }}>
               <Navigation isMobile={isMobile} />
-            </motion.aside>
+            </aside>
           </div>
         )}
 

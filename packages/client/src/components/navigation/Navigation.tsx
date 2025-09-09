@@ -135,9 +135,6 @@ export function Navigation({}: NavigationProps) {
             >
               <StarshipsLogo width={20} height={20} gradientId="nav-gradient" animationDelay={1} repeatDelay={8} />
             </div>
-            <div className="flex items-center justify-center">
-              <ThemeToggle />
-            </div>
           </div>
         </div>
 
@@ -233,6 +230,9 @@ export function Navigation({}: NavigationProps) {
           </div>
         </div>
 
+        <div className="flex items-center justify-center">
+          <ThemeToggle />
+        </div>
         {/* User Profile Section - Collapsed Mode */}
         <div className="border-t border-border/20 flex-shrink-0 p-2 flex items-center justify-center">
           <UserProfile mode="collapsed" />
@@ -249,7 +249,12 @@ export function Navigation({}: NavigationProps) {
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             className="border-l border-border/20 overflow-hidden"
           >
-            <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationArchive={handleConversationArchive} onConversationSelect={handleConversationSelect} />
+            <ConversationList
+              starshipId={starshipData.id}
+              onConversationDelete={handleConversationDelete}
+              onConversationArchive={handleConversationArchive}
+              onConversationSelect={handleConversationSelect}
+            />
           </motion.div>
         )}
       </AnimatePresence>

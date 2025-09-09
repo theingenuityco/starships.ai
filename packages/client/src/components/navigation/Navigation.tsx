@@ -142,7 +142,7 @@ export function Navigation({}: NavigationProps) {
         </div>
 
         {/* Navigation Content */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+        <div className="flex-1 flex flex-col justify-center min-h-0">
           <div className="p-2 space-y-2">
             {/* Conversations Section - Expandable when on conversation routes */}
             <div>
@@ -151,7 +151,7 @@ export function Navigation({}: NavigationProps) {
                 <TooltipTrigger asChild>
                   <Link href={`/ship/${starshipSlug}/conversations`}>
                     <motion.div
-                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 ${
+                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
                         isConversationRoute
                           ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
                           : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
@@ -159,9 +159,7 @@ export function Navigation({}: NavigationProps) {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <div className="flex items-center justify-center">
-                        <MessageSquare className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
-                      </div>
+                      <MessageSquare className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
                     </motion.div>
                   </Link>
                 </TooltipTrigger>

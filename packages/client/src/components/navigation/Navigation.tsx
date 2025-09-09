@@ -2,13 +2,13 @@
 
 import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
+import { StarshipSelector } from '@/components/navigation/StarshipSelector'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Command, MessageSquare, Target, Users } from 'lucide-react'
 import { motion } from 'motion/react'
 import { usePathname } from 'next/navigation'
 
 interface NavigationProps {
-  mode?: 'sidebar' | 'module'
   isMobile?: boolean
 }
 
@@ -53,7 +53,7 @@ const itemVariants: any = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 }
 
-export function Navigation({ mode = 'sidebar' }: NavigationProps) {
+export function Navigation({}: NavigationProps) {
   const pathname = usePathname()
 
   // Determine which navigation sections to show based on current route
@@ -71,19 +71,6 @@ export function Navigation({ mode = 'sidebar' }: NavigationProps) {
   }
 
   const navigationSections = getNavigationSections()
-
-  // Module mode - simplified layout
-  if (mode === 'module') {
-    return (
-      <div className="h-full flex flex-col">
-        <div className="flex-1 overflow-y-auto space-y-3">
-          {navigationSections.map(section => (
-            <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} compact={true} />
-          ))}
-        </div>
-      </div>
-    )
-  }
 
   // Sidebar mode - professional layout
   return (
@@ -106,6 +93,13 @@ export function Navigation({ mode = 'sidebar' }: NavigationProps) {
         </motion.div>
       </motion.div>
 
+      {/* Show StarshipSelector for non-starship routes */}
+      {!pathname.startsWith('/ship/') && (
+        <motion.div variants={itemVariants} className="p-3 border-b border-border/40">
+          <StarshipSelector />
+        </motion.div>
+      )}
+
       {/* Enhanced Navigation Sections */}
       <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
         <div className="space-y-4 mt-4">
@@ -124,7 +118,9 @@ export function Navigation({ mode = 'sidebar' }: NavigationProps) {
 
       {/* Separator */}
       <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-
+      <div className="p-3 border-b border-border/40">
+        <StarshipSelector />
+      </div>
       {/* Enhanced User Profile Section */}
       <motion.div variants={itemVariants} className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0 pb-1">
         <UserProfile mode="expanded" />

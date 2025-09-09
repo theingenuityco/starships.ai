@@ -37,6 +37,35 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     setSelectedAgent(agent)
   }, [])
 
+  // Handle conversation start - receive actual database conversation ID
+  const handleConversationStart = useCallback(
+    (conversationId: string) => {
+      console.log('[ConversationInterface] Conversation started with ID:', conversationId)
+      setCurrentConversationId(conversationId)
+      onConversationChange?.(conversationId)
+    },
+    [onConversationChange]
+  )
+
+  // Handle first message to trigger layout transition
+  const handleFirstMessage = useCallback(() => {
+    setHasMessages(true)
+  }, [])
+
+  // Handle streaming start
+  const handleStreamStart = useCallback((streamId: string) => {
+    console.log('[ConversationInterface] Streaming started with ID:', streamId)
+    setCurrentStreamId(streamId)
+  }, [])
+
+  // Handle suggestion click
+  const handleSuggestionClick = useCallback((suggestion: string) => {
+    // Use ref to directly call the input component method
+    if (messageInputRef.current?.handleSuggestionSubmit) {
+      messageInputRef.current.handleSuggestionSubmit(suggestion)
+    }
+  }, [])
+
   // Reset conversation when external conversation ID changes
   useEffect(() => {
     if (userId && isAuthenticated) {
@@ -78,35 +107,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       </div>
     )
   }
-
-  // Handle conversation start - receive actual database conversation ID
-  const handleConversationStart = useCallback(
-    (conversationId: string) => {
-      console.log('[ConversationInterface] Conversation started with ID:', conversationId)
-      setCurrentConversationId(conversationId)
-      onConversationChange?.(conversationId)
-    },
-    [onConversationChange]
-  )
-
-  // Handle first message to trigger layout transition
-  const handleFirstMessage = useCallback(() => {
-    setHasMessages(true)
-  }, [])
-
-  // Handle streaming start
-  const handleStreamStart = useCallback((streamId: string) => {
-    console.log('[ConversationInterface] Streaming started with ID:', streamId)
-    setCurrentStreamId(streamId)
-  }, [])
-
-  // Handle suggestion click
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    // Use ref to directly call the input component method
-    if (messageInputRef.current?.handleSuggestionSubmit) {
-      messageInputRef.current.handleSuggestionSubmit(suggestion)
-    }
-  }, [])
 
   return (
     <div className="relative flex flex-col h-screen bg-background">

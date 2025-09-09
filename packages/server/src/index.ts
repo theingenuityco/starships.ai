@@ -25,6 +25,7 @@ import agentRoutes from '@/routes/agents';
 import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
 import memoryRoutes from '@/routes/memory';
+import messageRoutes from '@/routes/messages';
 import starshipRoutes from '@/routes/starships';
 import streamingRoutes from '@/routes/streaming';
 import userRoutes from '@/routes/users';
@@ -105,17 +106,18 @@ app.get('/api/v1/starships/pricing', async (req, res) => {
 
 // API Routes
 app.use('/api/v1', authRoutes); // Authentication routes (public)
-app.use('/api/v1', healthRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', waitlistRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', agentRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', agentTemplateRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', conversationRoutes); // Updated to OpenAPI standard with v1 prefix - conversation routes
-app.use('/api/v1', streamingRoutes); // Streaming routes for SSE support
-app.use('/api/v1', memoryRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', userRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', starshipRoutes); // Updated to OpenAPI standard with v1 prefix
-app.use('/api/v1', missionRoutes); // Updated to OpenAPI standard with v1 prefix
-// app.use('/api', expeditionRoutes);
+app.use('/api/v1', healthRoutes);
+app.use('/api/v1', waitlistRoutes);
+app.use('/api/v1', agentRoutes);
+app.use('/api/v1', agentTemplateRoutes);
+app.use('/api/v1', conversationRoutes);
+app.use('/api/v1', messageRoutes);
+app.use('/api/v1', streamingRoutes);
+app.use('/api/v1', memoryRoutes);
+app.use('/api/v1', userRoutes);
+app.use('/api/v1', starshipRoutes);
+app.use('/api/v1', missionRoutes);
+//
 app.use('/api', nativeApiKeysRoutes);
 
 // Add 404 handler for unmatched routes

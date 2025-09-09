@@ -165,7 +165,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       {/* Messages Area or Welcome Screen */}
       {hasMessages && currentConversationId ? (
-        <div className="flex-1 min-h-0 overflow-y-auto pb-28">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <ConversationMessageList
             conversationId={currentConversationId}
             starshipId={starshipId}

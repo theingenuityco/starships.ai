@@ -36,32 +36,34 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 
-  // Create streaming message directly in render - React will handle updates
+  // Optimize message ordering - avoid array reversal on every render
   const displayMessages = useMemo(() => {
-    if (isStreaming && streamingContent) {
-      const streamingMessage = {
-        id: 'streaming-message',
-        content: streamingContent,
-        role: 'assistant' as const,
-        timestamp: new Date().toISOString(),
-        conversationId: conversationId || '',
-        starshipId: starshipId || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
-        messageType: 'agent_response' as const,
-        importance: 'medium' as const,
-        contentLength: streamingContent.length,
-        hasAttachments: false,
-        streaming: true,
-      }
-      // Add streaming message at the beginning since API returns newest first
-      // and column-reverse will put it at the bottom
-      return [streamingMessage, ...messages]
-    }
-    return messages
+    // Create streaming message if needed
+    const streamingMessage =
+      isStreaming && streamingContent
+        ? {
+            id: 'streaming-message',
+            content: streamingContent,
+            role: 'assistant' as const,
+            timestamp: new Date().toISOString(),
+            conversationId: conversationId || '',
+            starshipId: starshipId || '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            version: '1.0.0',
+            threadDepth: 0,
+            processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
+            messageType: 'agent_response' as const,
+            importance: 'medium' as const,
+            contentLength: streamingContent.length,
+            hasAttachments: false,
+            streaming: true,
+          }
+        : null
+
+    // Messages come from API in newest-first order, but we want oldest-first for chat
+    // Pass reverse flag to VirtualizedMessageList instead of creating new array
+    return streamingMessage ? [...messages, streamingMessage] : messages
   }, [messages, isStreaming, streamingContent, streamingState.status, conversationId, starshipId])
 
   // Message selection state
@@ -185,11 +187,14 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
 
       {/* Messages List */}
       <div className="flex-1 relative">
-        {enableVirtualization && displayMessages.length > 50 ? (
-          <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" />
+        {enableVirtualization ? (
+          <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" reverseOrder={true} />
         ) : (
-          <div className="h-full overflow-y-auto message-scroll-area p-2 sm:p-4 flex flex-col-reverse gap-3 sm:gap-4">
-            {displayMessages.map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
+          <div className="h-full overflow-y-auto message-scroll-area p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
+            {displayMessages
+              .slice()
+              .reverse()
+              .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
           </div>
         )}
 

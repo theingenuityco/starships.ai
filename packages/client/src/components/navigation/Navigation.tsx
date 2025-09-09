@@ -2,7 +2,6 @@
 
 import { UserProfile } from '@/components/auth/UserProfile'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
-import { StarshipSelector } from '@/components/navigation/StarshipSelector'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { Command, MessageSquare, Target, Users } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -93,13 +92,6 @@ export function Navigation({}: NavigationProps) {
         </motion.div>
       </motion.div>
 
-      {/* Show StarshipSelector for non-starship routes */}
-      {!pathname.startsWith('/ship/') && (
-        <motion.div variants={itemVariants} className="p-3 border-b border-border/40">
-          <StarshipSelector />
-        </motion.div>
-      )}
-
       {/* Enhanced Navigation Sections */}
       <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-3 custom-scrollbar min-h-0">
         <div className="space-y-4 mt-4">
@@ -118,9 +110,6 @@ export function Navigation({}: NavigationProps) {
 
       {/* Separator */}
       <div className="h-px bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-      <div className="p-3 border-b border-border/40">
-        <StarshipSelector />
-      </div>
       {/* Enhanced User Profile Section */}
       <motion.div variants={itemVariants} className="border-t border-border/40 bg-gradient-to-br from-card/30 to-muted/20 backdrop-blur-sm flex-shrink-0 pb-1">
         <UserProfile mode="expanded" />

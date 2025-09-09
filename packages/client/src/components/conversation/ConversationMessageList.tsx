@@ -24,7 +24,6 @@ interface ConversationMessageListProps {
 }
 
 export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableAccessibility = true }: ConversationMessageListProps) {
-
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
   const deleteMessage = useDeleteMessage()
@@ -177,11 +176,13 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
         {enableVirtualization ? (
           <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" reverseOrder={true} />
         ) : (
-          <div className="h-full overflow-y-auto message-scroll-area p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
-            {displayMessages
-              .slice()
-              .reverse()
-              .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
+          <div className="h-full overflow-y-auto message-scroll-area flex justify-center">
+            <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
+              {displayMessages
+                .slice()
+                .reverse()
+                .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
+            </div>
           </div>
         )}
       </div>
@@ -412,10 +413,7 @@ function EmptyState() {
           <p className="text-sm font-medium text-muted-foreground">Try asking:</p>
           <div className="grid gap-2">
             {content.suggestions.map((suggestion, index) => (
-              <div
-                key={suggestion}
-                className="p-3 bg-muted/50 rounded-lg text-sm text-left border border-border/40 hover:bg-muted/70 transition-colors cursor-pointer opacity-100"
-              >
+              <div key={suggestion} className="p-3 bg-muted/50 rounded-lg text-sm text-left border border-border/40 hover:bg-muted/70 transition-colors cursor-pointer opacity-100">
                 {suggestion}
               </div>
             ))}
@@ -425,4 +423,3 @@ function EmptyState() {
     </div>
   )
 }
-

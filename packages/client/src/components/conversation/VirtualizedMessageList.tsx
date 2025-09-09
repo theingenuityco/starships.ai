@@ -57,15 +57,15 @@ export function VirtualizedMessageList({ messages, renderMessage, className, est
   return (
     <div
       ref={parentRef}
-      className={cn('h-full overflow-y-auto message-scroll-area', className)}
+      className={cn('h-full overflow-y-auto message-scroll-area flex justify-center', className)}
       style={{
         contain: 'strict',
       }}
     >
       <div
+        className="w-full max-w-4xl"
         style={{
           height: `${virtualizer.getTotalSize()}px`,
-          width: '100%',
           position: 'relative',
         }}
       >

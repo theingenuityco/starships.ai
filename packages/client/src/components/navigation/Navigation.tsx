@@ -75,6 +75,7 @@ export function Navigation({}: NavigationProps) {
   return (
     <motion.div
       className="flex flex-col w-16 bg-gradient-to-b from-background/95 to-muted/20 backdrop-blur-xl rounded-2xl overflow-hidden shadow-2xl border border-border/30"
+      style={{ height: 'calc(100vh - 3rem)' }} // Full height minus top (1.5rem) and bottom (1.5rem) padding
       variants={containerVariants}
       initial="hidden"
       animate="show"
@@ -90,8 +91,8 @@ export function Navigation({}: NavigationProps) {
       </motion.div>
 
       {/* Navigation Items - Icon Only */}
-      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0">
-        <div className="space-y-2 mt-2">
+      <motion.div variants={itemVariants} className="flex-1 overflow-y-auto p-2 custom-scrollbar min-h-0 flex flex-col justify-center">
+        <div className="space-y-2">
           {navigationSections.map(section => (
             <NavigationSection key={section.title} title={section.title} items={section.items} pathname={pathname} />
           ))}

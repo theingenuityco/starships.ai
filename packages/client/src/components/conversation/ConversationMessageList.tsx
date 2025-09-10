@@ -29,15 +29,18 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
   const deleteMessage = useDeleteMessage()
 
   // Streaming state - use streamId from props
-  const { streamingState, isStreaming, streamingContent } = useMessageStreaming(streamId ?? undefined, conversationId ?? undefined)
+  const { streamingState, isStreaming, streamingContent, streamingMessages } = useMessageStreaming(streamId ?? undefined, conversationId ?? undefined)
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 
-  // Optimize message ordering - avoid array reversal on every render
+  // Unified message display - combines API messages with streaming messages
   const displayMessages = useMemo(() => {
-    // Create streaming message if needed
-    const streamingMessage =
-      isStreaming && streamingContent
+    // Add streaming messages (separate workflow event messages)
+    const allStreamingMessages = streamingMessages || []
+
+    // Legacy: if we have streamingContent but no streaming messages, create fallback message
+    const legacyStreamingMessage =
+      isStreaming && streamingContent && allStreamingMessages.length === 0
         ? {
             id: 'streaming-message',
             content: streamingContent,
@@ -49,7 +52,7 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
             updatedAt: new Date().toISOString(),
             version: '1.0.0',
             threadDepth: 0,
-            processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
+            processingStatus: 'streaming' as const,
             messageType: 'agent_response' as const,
             importance: 'medium' as const,
             contentLength: streamingContent.length,
@@ -58,10 +61,19 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
           }
         : null
 
-    // Messages come from API in newest-first order, but we want oldest-first for chat
-    // Pass reverse flag to VirtualizedMessageList instead of creating new array
-    return streamingMessage ? [...messages, streamingMessage] : messages
-  }, [messages, isStreaming, streamingContent, streamingState.status, conversationId, starshipId])
+    // Combine API messages with streaming messages (multiple separate messages)
+    const combinedMessages = [...messages]
+
+    if (allStreamingMessages.length > 0) {
+      // Add each streaming message separately (workflow events as individual bubbles)
+      combinedMessages.push(...allStreamingMessages)
+    } else if (legacyStreamingMessage) {
+      // Fallback to single accumulated message for legacy content chunks
+      combinedMessages.push(legacyStreamingMessage)
+    }
+
+    return combinedMessages
+  }, [messages, isStreaming, streamingContent, streamingMessages, conversationId, starshipId])
 
   // Message selection state
   const [selectedMessages, setSelectedMessages] = useState<string[]>([])

@@ -175,6 +175,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
 
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
+      // This automatically sends connection confirmation via sendEvent('connection', ...)
       const streamingService = StreamingService.getInstance();
       streamingService.addConnection(conversationId, res);
 
@@ -191,6 +192,9 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
           console.error('❌ [UNIFIED STREAMING] Processing failed:', error);
           // Error will be handled by the streaming service and conversation service
         });
+
+      // Return early to keep connection open (similar to GET endpoint)
+      return;
     } else {
       // Handle regular JSON response
       const result = await conversationService.addMessage({

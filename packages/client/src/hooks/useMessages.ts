@@ -1,7 +1,7 @@
-import api from '@/lib/api'
+import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, BulkMessageRequest, CreateMessageRequest, MessageModel, UpdateMessageRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import axios, { type AxiosResponse } from 'axios'
 import { toast } from 'sonner'
 
 // Extended Message interface for client compatibility with optimistic updates
@@ -247,53 +247,98 @@ export function useCreateMessage() {
 }
 
 /**
- * Send message with optimistic updates (for real-time chat)
- * Supports both regular and streaming modes
+ * Send message with streaming support
  */
 export function useSendMessage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateMessageRequest & { expectResponse?: boolean; stream?: boolean }): Promise<MessageModel> => {
+    mutationFn: async (
+      data: CreateMessageRequest & {
+        stream?: boolean
+        onStreamingEvent?: (event: any) => void
+      }
+    ): Promise<MessageModel> => {
       if (data.stream) {
-        // For streaming, send request with Accept: text/event-stream header
-        // The response will be streamed directly, but we return user message
-        await api.post(
+        // Handle streaming POST response directly
+        const token = await getCurrentToken()
+        if (!token) {
+          throw new Error('No authentication token available')
+        }
+
+        const response = await axios.post(
           `/api/v1/conversations/${data.conversationId}/messages`,
           {
             agentId: data.agentId,
             message: data.content,
           },
           {
+            params: { stream: 'true' },
             headers: {
               Accept: 'text/event-stream',
+              Authorization: `Bearer ${token}`,
+              'Cache-Control': 'no-cache',
             },
+            responseType: 'stream',
           }
         )
 
-        // Return a temporary message for optimistic UI
-        return {
-          id: `user-${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          role: data.role,
-          content: data.content,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          version: '1.0.0',
-          starshipId: data.starshipId,
-          agentId: data.agentId,
-          memoryId: data.memoryId,
-          conversationId: data.conversationId,
-          threadDepth: data.threadDepth || 0,
-          processingStatus: data.processingStatus || 'pending',
-          messageType: data.messageType || 'user_input',
-          importance: data.importance || 'medium',
-          contentLength: data.content.length,
-          hasAttachments: data.hasAttachments || false,
-          ...(data.metadata && { metadata: data.metadata }),
-          ...(data.tokenCount && { tokenCount: data.tokenCount }),
-          ...(data.processingTimeMs && { processingTimeMs: data.processingTimeMs }),
-        } as MessageModel
+        // Handle streaming response
+        const stream = response.data
+        let buffer = ''
+
+        return new Promise((resolve, reject) => {
+          stream.on('data', (chunk: Buffer) => {
+            buffer += chunk.toString()
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || ''
+
+            for (const line of lines) {
+              if (!line.trim()) continue
+
+              if (line.startsWith('data: ')) {
+                const eventData = line.substring(6).trim()
+                if (!eventData) continue
+
+                try {
+                  const parsed = JSON.parse(eventData)
+                  data.onStreamingEvent?.(parsed)
+                } catch (parseError) {
+                  console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
+                }
+              }
+            }
+          })
+
+          stream.on('end', () => {
+            resolve({
+              id: `user-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              role: data.role,
+              content: data.content,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              version: '1.0.0',
+              starshipId: data.starshipId,
+              agentId: data.agentId,
+              memoryId: data.memoryId,
+              conversationId: data.conversationId,
+              threadDepth: data.threadDepth || 0,
+              processingStatus: data.processingStatus || 'completed',
+              messageType: data.messageType || 'user_input',
+              importance: data.importance || 'medium',
+              contentLength: data.content.length,
+              hasAttachments: data.hasAttachments || false,
+              ...(data.metadata && { metadata: data.metadata }),
+              ...(data.tokenCount && { tokenCount: data.tokenCount }),
+              ...(data.processingTimeMs && { processingTimeMs: data.processingTimeMs }),
+            } as MessageModel)
+          })
+
+          stream.on('error', (error: Error) => {
+            reject(error)
+          })
+        })
       } else {
         // Regular message creation
         const response: AxiosResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
@@ -364,10 +409,11 @@ export function useSendMessage() {
         }
       })
 
-      // For streaming requests, also start the streaming connection using conversationId
+      // For streaming requests, log streaming completion
       if (variables.stream) {
-        // The streaming hook will automatically connect using the conversationId
-        console.log(`[STREAMING] Message sent with streaming enabled for conversation ${variables.conversationId}`)
+        console.log(`[STREAMING] Message sent with streaming for conversation ${variables.conversationId}`)
+      } else {
+        console.log(`[MESSAGE] Message sent for conversation ${variables.conversationId}`)
       }
 
       // Invalidate related caches

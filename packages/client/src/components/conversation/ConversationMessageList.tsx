@@ -7,26 +7,27 @@ import { useMessageStreaming } from '@/hooks/useMessageStreaming'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Timer, User, XCircle } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { AccessibilityEnhancements, MessageAccessibility, useAccessibilityFeatures } from './AccessibilityEnhancements'
 import { MessageContent } from './MessageContent'
 import { MessageReactions, useMessageReactions } from './MessageReactions'
 import { MessageCheckbox, MessageSelection } from './MessageSelection'
-import { VirtualizedMessageList } from './VirtualizedMessageList'
 
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
   streamId?: string | null
-  enableVirtualization?: boolean
   enableAccessibility?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableAccessibility = true }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, streamId, enableAccessibility = true }: ConversationMessageListProps) {
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
   const deleteMessage = useDeleteMessage()
+
+  // Scroll container reference
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Streaming state - use streamId from props
   const { streamingState, isStreaming, streamingContent, streamingMessages } = useMessageStreaming(streamId ?? undefined, conversationId ?? undefined)
@@ -42,7 +43,7 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
     const legacyStreamingMessage =
       isStreaming && streamingContent && allStreamingMessages.length === 0
         ? {
-            id: 'streaming-message',
+            id: `streaming-legacy-${Date.now()}-${streamingContent.length}`,
             content: streamingContent,
             role: 'assistant' as const,
             timestamp: new Date().toISOString(),
@@ -137,25 +138,45 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
     setIsSelectionMode(false)
   }, [conversationId])
 
-  const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => (
-    <MessageBubble
-      key={message.streaming ? 'streaming-message' : message.id}
-      message={message}
-      index={index}
-      totalMessages={displayMessages.length}
-      isSelected={selectedMessages.includes(message.id)}
-      isSelecting={isSelectionMode}
-      isHighlighted={false}
-      isHighContrast={isHighContrast}
-      isReducedMotion={isReducedMotion}
-      onToggleSelection={handleMessageToggle}
-      onStartSelection={toggleSelectionMode}
-      reactions={getMessageReactions(message.id)}
-      onAddReaction={addReaction}
-      onRemoveReaction={removeReaction}
-      searchTerm=""
-    />
-  )
+  // Auto-scroll to bottom when new messages arrive or streaming content changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current
+      const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 100
+
+      // Auto-scroll if near bottom or if there are streaming messages
+      if (isNearBottom || isStreaming) {
+        setTimeout(() => {
+          container.scrollTop = container.scrollHeight
+        }, 100)
+      }
+    }
+  }, [displayMessages.length, isStreaming, streamingContent])
+
+  const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => {
+    // Generate unique key for each message, including streaming messages
+    const messageKey = message.streaming ? `streaming-${message.id}-${message.content?.length || 0}` : message.id
+
+    return (
+      <MessageBubble
+        key={messageKey}
+        message={message}
+        index={index}
+        totalMessages={displayMessages.length}
+        isSelected={selectedMessages.includes(message.id)}
+        isSelecting={isSelectionMode}
+        isHighlighted={false}
+        isHighContrast={isHighContrast}
+        isReducedMotion={isReducedMotion}
+        onToggleSelection={handleMessageToggle}
+        onStartSelection={toggleSelectionMode}
+        reactions={getMessageReactions(message.id)}
+        onAddReaction={addReaction}
+        onRemoveReaction={removeReaction}
+        searchTerm=""
+      />
+    )
+  }
 
   if (!conversationId) {
     return <EmptyState />
@@ -187,18 +208,14 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
 
       {/* Messages List */}
       <div className="flex-1 relative">
-        {enableVirtualization ? (
-          <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" reverseOrder={true} />
-        ) : (
-          <div className="h-full overflow-y-auto message-scroll-area flex justify-center">
-            <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
-              {displayMessages
-                .slice()
-                .reverse()
-                .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
-            </div>
+        <div ref={scrollContainerRef} className="h-full overflow-y-auto message-scroll-area flex justify-center">
+          <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
+            {displayMessages
+              .slice()
+              .reverse()
+              .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

@@ -5,11 +5,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // Extend StreamingState for client-side usage
 interface StreamingState extends BaseStreamingState {
   lastUpdate?: number
+  messages: any[] // Array of streaming message objects
 }
 
 /**
  * Pure streaming hook that handles SSE connection for a given streamId
- * Separated from message creation to avoid async closure blocking React renders
+ * Handles complete message objects instead of accumulating content chunks
  */
 export function useMessageStreaming(streamId: string | null | undefined, conversationId?: string) {
   const [streamingState, setStreamingState] = useState<StreamingState>({
@@ -18,6 +19,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
     content: '',
     error: null,
     isStreaming: false,
+    messages: [],
   })
   const eventSourceRef = useRef<EventSource | null>(null)
 
@@ -33,6 +35,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
       content: '',
       error: null,
       isStreaming: false,
+      messages: [],
     })
   }, [])
 
@@ -54,6 +57,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
           content: '',
           error: null,
           isStreaming: true,
+          messages: [],
         }))
 
         // Get JWT token for SSE authentication
@@ -86,6 +90,20 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
           console.log('[STREAMING] Heartbeat:', heartbeatData)
         })
 
+        // Handle new message objects (workflow events as separate messages)
+        eventSource.addEventListener('message', (event: MessageEvent) => {
+          if (!mounted) return
+          const message = JSON.parse(event.data)
+          console.log('[STREAMING] Received message object:', message)
+
+          setStreamingState(prev => ({
+            ...prev,
+            messages: [...prev.messages, message],
+            lastUpdate: Date.now(),
+          }))
+        })
+
+        // Legacy chunk handling for content streaming
         eventSource.addEventListener('chunk', (event: MessageEvent) => {
           if (!mounted) return
           const chunk: StreamingChunk = JSON.parse(event.data)
@@ -93,12 +111,27 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
 
           switch (chunk.type) {
             case 'content':
-              // Direct state update - React will handle re-rendering in real-time
-              setStreamingState(prev => ({
-                ...prev,
-                content: prev.content + chunk.content,
-                lastUpdate: Date.now(),
-              }))
+              // For legacy content chunks, update the last message if it's a content type
+              setStreamingState(prev => {
+                const lastMessage = prev.messages[prev.messages.length - 1]
+                if (lastMessage && lastMessage.role === 'assistant' && lastMessage.streaming) {
+                  const updatedMessages = [...prev.messages]
+                  updatedMessages[updatedMessages.length - 1] = {
+                    ...lastMessage,
+                    content: lastMessage.content + chunk.content,
+                  }
+                  return {
+                    ...prev,
+                    messages: updatedMessages,
+                    lastUpdate: Date.now(),
+                  }
+                }
+                return {
+                  ...prev,
+                  content: prev.content + chunk.content,
+                  lastUpdate: Date.now(),
+                }
+              })
               break
             case 'thinking':
               setStreamingState(prev => ({
@@ -191,6 +224,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
     streamingState,
     isStreaming: streamingState.isStreaming,
     streamingContent: streamingState.content,
+    streamingMessages: streamingState.messages,
     streamingStatus: streamingState.status,
     streamingError: streamingState.error,
     cleanup,

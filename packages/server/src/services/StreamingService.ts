@@ -94,6 +94,16 @@ export class StreamingService {
   }
 
   /**
+   * Broadcast complete message object to specific stream
+   */
+  async broadcastMessage(streamId: string, message: any): Promise<void> {
+    const res = this.connections.get(streamId);
+    if (res && !res.destroyed) {
+      this.sendEvent(res, 'message', message);
+    }
+  }
+
+  /**
    * Broadcast completion to specific stream
    */
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {

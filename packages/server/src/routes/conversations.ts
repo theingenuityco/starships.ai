@@ -54,7 +54,7 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 };
 
 /**
- * GET /conversations/:conversationId/messages - Get conversation messages
+ * GET /conversations/:conversationId/messages - Get conversation messages (supports streaming for live updates)
  */
 router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -65,45 +65,76 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
-    // Validate pagination parameters
-    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
-    if (!paginationValidation) return;
-
     const { conversationId } = paramValidation;
-    const { page, limit } = paginationValidation;
 
-    // Validate query parameters for ordering
-    const orderValidation = validateData(
-      z.object({
-        orderBy: z.enum(['timestamp', 'created_at']).optional(),
-        orderDirection: z.enum(['asc', 'desc']).optional(),
-      }),
-      req.query,
-      res,
-      'order parameters'
-    );
-    if (!orderValidation) return;
+    // Check if streaming is requested
+    const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
 
-    // Delegate to service layer
-    const messageService = new MessageService();
-    const conversationData = await messageService.getConversation({
-      conversationId,
-      limit,
-      offset: (page - 1) * limit,
-      orderBy: orderValidation.orderBy,
-      orderDirection: orderValidation.orderDirection,
-    });
+    if (wantsStreaming) {
+      // Add connection to streaming service - it will handle SSE headers and setup
+      const streamingService = StreamingService.getInstance();
+      streamingService.addConnection(conversationId, res);
 
-    if (!conversationData) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
-        resource: 'conversation',
-        id: conversationId,
+      // Send existing messages after connection is established
+      const messageService = new MessageService();
+      const conversationData = await messageService.getConversation({
+        conversationId,
+        limit: 1000, // Get all existing messages
+        offset: 0,
+        orderBy: 'timestamp',
+        orderDirection: 'asc',
       });
-      return;
-    }
 
-    const paginationMeta = createPaginationMeta(page, limit, conversationData.total);
-    sendSuccess(res, conversationData, 200, paginationMeta);
+      if (conversationData && conversationData.messages.length > 0) {
+        // Send existing messages via StreamingService
+        for (const message of conversationData.messages) {
+          await streamingService.broadcastMessage(conversationId, message);
+        }
+      }
+
+      // Connection stays open for live updates via StreamingService
+      return;
+    } else {
+      // Regular JSON response mode
+      // Validate pagination parameters
+      const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+      if (!paginationValidation) return;
+
+      const { page, limit } = paginationValidation;
+
+      // Validate query parameters for ordering
+      const orderValidation = validateData(
+        z.object({
+          orderBy: z.enum(['timestamp', 'created_at']).optional(),
+          orderDirection: z.enum(['asc', 'desc']).optional(),
+        }),
+        req.query,
+        res,
+        'order parameters'
+      );
+      if (!orderValidation) return;
+
+      // Delegate to service layer
+      const messageService = new MessageService();
+      const conversationData = await messageService.getConversation({
+        conversationId,
+        limit,
+        offset: (page - 1) * limit,
+        orderBy: orderValidation.orderBy,
+        orderDirection: orderValidation.orderDirection,
+      });
+
+      if (!conversationData) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
+          resource: 'conversation',
+          id: conversationId,
+        });
+        return;
+      }
+
+      const paginationMeta = createPaginationMeta(page, limit, conversationData.total);
+      sendSuccess(res, conversationData, 200, paginationMeta);
+    }
   } catch (error) {
     handleCommonError(error, res, 'fetching conversation messages');
   }
@@ -143,17 +174,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const conversationService = new ConversationService();
 
     if (wantsStreaming) {
-      // Set up SSE headers immediately
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Cache-Control',
-        'X-Accel-Buffering': 'no', // Disable nginx buffering for real-time streaming
-      });
-
-      // Add connection to streaming service using conversationId as stream identifier
+      // Add connection to streaming service - it will handle SSE headers and setup
       const streamingService = StreamingService.getInstance();
       streamingService.addConnection(conversationId, res);
 

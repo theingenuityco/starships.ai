@@ -25,7 +25,6 @@ interface ConversationMessageInputProps {
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   onMessageSent?: () => void // Simplified callback for UI state updates
-  onStreamStart?: (streamId: string) => void // New callback for streaming start
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
@@ -36,7 +35,7 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, onStreamStart, disabled = false, minimal = false, children }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -45,7 +44,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const createConversation = useCreateConversation()
     const sendMessage = useSendMessage()
     const isStreaming = sendMessage.isPending
-
 
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
@@ -91,8 +89,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message using streaming API
-        const result = await sendMessage.mutateAsync({
+        // Send message using streaming API - conversationId is used as stream identifier
+        await sendMessage.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           content: messageToSend,
@@ -102,10 +100,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           stream: true,
         })
 
-        // If streaming enabled and we got a streamId, notify parent
-        if (result && 'streamId' in result && result.streamId) {
-          onStreamStart?.(result.streamId)
-        }
+        // No need to manage streamId - streaming hook will use conversationId directly
 
         // Clear input and reset UI
         setMessage('')
@@ -152,8 +147,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message using streaming API
-        const result = await sendMessage.mutateAsync({
+        // Send message using streaming API - conversationId is used as stream identifier
+        await sendMessage.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           content: suggestionText,
@@ -163,10 +158,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           stream: true,
         })
 
-        // If streaming enabled and we got a streamId, notify parent
-        if (result && 'streamId' in result && result.streamId) {
-          onStreamStart?.(result.streamId)
-        }
+        // No need to manage streamId - streaming hook will use conversationId directly
       } catch (error) {
         console.error('Failed to send suggestion:', error)
       } finally {
@@ -282,11 +274,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                     )}
                   >
-                    {sending || isStreaming ? (
-                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
+                    {sending || isStreaming ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>

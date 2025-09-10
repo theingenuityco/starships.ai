@@ -17,11 +17,10 @@ import { MessageCheckbox, MessageSelection } from './MessageSelection'
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
-  streamId?: string | null
   enableAccessibility?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, streamId, enableAccessibility = true }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, enableAccessibility = true }: ConversationMessageListProps) {
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
   const deleteMessage = useDeleteMessage()
@@ -29,8 +28,8 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Streaming state - use streamId from props
-  const { streamingState, isStreaming, streamingContent, streamingMessages } = useMessageStreaming(streamId ?? undefined, conversationId ?? undefined)
+  // Streaming state - use conversationId directly as stream identifier
+  const { streamingState, isStreaming, streamingContent, streamingMessages } = useMessageStreaming(conversationId ?? undefined)
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 

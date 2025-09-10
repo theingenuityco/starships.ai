@@ -9,13 +9,13 @@ interface StreamingState extends BaseStreamingState {
 }
 
 /**
- * Pure streaming hook that handles SSE connection for a given streamId
- * Handles complete message objects instead of accumulating content chunks
+ * Pure streaming hook that handles SSE connection using conversationId directly
+ * Simplified approach - no separate streamId needed!
  */
-export function useMessageStreaming(streamId: string | null | undefined, conversationId?: string) {
+export function useMessageStreaming(conversationId: string | null | undefined) {
   const [streamingState, setStreamingState] = useState<StreamingState>({
     status: 'idle',
-    streamId: null,
+    streamId: conversationId || null, // Use conversationId as streamId
     content: '',
     error: null,
     isStreaming: false,
@@ -29,19 +29,19 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
       eventSourceRef.current.close()
       eventSourceRef.current = null
     }
-    setStreamingState({
+    setStreamingState(prev => ({
+      ...prev,
       status: 'idle',
-      streamId: null,
       content: '',
       error: null,
       isStreaming: false,
       messages: [],
-    })
+    }))
   }, [])
 
-  // Start streaming when streamId is provided
+  // Start streaming when conversationId is provided
   useEffect(() => {
-    if (!streamId || !conversationId) {
+    if (!conversationId) {
       return
     }
 
@@ -51,7 +51,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
       try {
         // Set initial streaming state - always start fresh
         setStreamingState({
-          streamId,
+          streamId: conversationId, // Use conversationId as streamId
           status: 'connecting',
           content: '', // Clear any previous content
           error: null,
@@ -62,11 +62,14 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
         // Get JWT token for SSE authentication
         const token = await getCurrentToken()
 
-        // Connect to streaming endpoint with streamId and token
-        let sseUrl = `/api/v1/conversations/${conversationId}/messages/stream?streamId=${streamId}`
+        // Connect to streaming endpoint directly (no separate streamId needed)
+        let sseUrl = `/api/v1/conversations/${conversationId}/messages`
+        const params = new URLSearchParams()
+        params.append('stream', 'true')
         if (token) {
-          sseUrl += `&token=${encodeURIComponent(token)}`
+          params.append('token', token)
         }
+        sseUrl += `?${params.toString()}`
 
         const eventSource = new EventSource(sseUrl)
         eventSourceRef.current = eventSource
@@ -205,7 +208,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
           if (!mounted) return
           console.error('[STREAMING] EventSource error:', event)
           const error: StreamingError = {
-            streamId: streamId,
+            streamId: conversationId,
             errorCode: 'CONNECTION_ERROR',
             message: 'Lost connection to streaming server',
             timestamp: new Date().toISOString(),
@@ -223,7 +226,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
         if (!mounted) return
         console.error('[STREAMING] Failed to start streaming:', error)
         const streamingError: StreamingError = {
-          streamId: streamId,
+          streamId: conversationId,
           errorCode: 'CONNECTION_FAILED',
           message: 'Failed to establish streaming connection',
           timestamp: new Date().toISOString(),
@@ -245,7 +248,7 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
       mounted = false
       cleanup()
     }
-  }, [streamId, conversationId, cleanup])
+  }, [conversationId, cleanup])
 
   // Cleanup on unmount
   useEffect(() => {

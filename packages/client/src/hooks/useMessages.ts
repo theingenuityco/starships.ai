@@ -254,15 +254,46 @@ export function useSendMessage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: CreateMessageRequest & { expectResponse?: boolean; stream?: boolean }): Promise<MessageModel | { streamId: string }> => {
+    mutationFn: async (data: CreateMessageRequest & { expectResponse?: boolean; stream?: boolean }): Promise<MessageModel> => {
       if (data.stream) {
-        // For streaming, POST to conversation messages endpoint to get streamId
-        const response: AxiosResponse<ApiResponse<{ streamId: string }>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
+        // For streaming, send request with Accept: text/event-stream header
+        // The response will be streamed directly, but we return user message
+        await api.post(
+          `/api/v1/conversations/${data.conversationId}/messages`,
+          {
+            agentId: data.agentId,
+            message: data.content,
+          },
+          {
+            headers: {
+              Accept: 'text/event-stream',
+            },
+          }
+        )
+
+        // Return a temporary message for optimistic UI
+        return {
+          id: `user-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          role: data.role,
+          content: data.content,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: '1.0.0',
+          starshipId: data.starshipId,
           agentId: data.agentId,
-          message: data.content,
-          stream: true,
-        })
-        return response.data.data
+          memoryId: data.memoryId,
+          conversationId: data.conversationId,
+          threadDepth: data.threadDepth || 0,
+          processingStatus: data.processingStatus || 'pending',
+          messageType: data.messageType || 'user_input',
+          importance: data.importance || 'medium',
+          contentLength: data.content.length,
+          hasAttachments: data.hasAttachments || false,
+          ...(data.metadata && { metadata: data.metadata }),
+          ...(data.tokenCount && { tokenCount: data.tokenCount }),
+          ...(data.processingTimeMs && { processingTimeMs: data.processingTimeMs }),
+        } as MessageModel
       } else {
         // Regular message creation
         const response: AxiosResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
@@ -319,17 +350,7 @@ export function useSendMessage() {
     onSuccess: (result, variables, context) => {
       if (!variables.conversationId || !context) return
 
-      // For streaming requests, just mark user message as sent - streaming hook handles assistant response
-      if (variables.stream && 'streamId' in result) {
-        queryClient.setQueryData(MESSAGE_QUERY_KEYS.byConversation(variables.conversationId), (old: any) => {
-          if (!old) return old
-          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...msg, sending: false, id: `user-${Date.now()}` } : msg))
-          return { ...old, messages }
-        })
-        return
-      }
-
-      // For regular requests, replace temp message with real message
+      // Replace temp message with real message
       const message = result as MessageModel
       queryClient.setQueryData(MESSAGE_QUERY_KEYS.byConversation(variables.conversationId), (old: any) => {
         if (!old) return { messages: [message], total: 1, conversationId: variables.conversationId }
@@ -342,6 +363,12 @@ export function useSendMessage() {
           lastActivityAt: message.timestamp,
         }
       })
+
+      // For streaming requests, also start the streaming connection using conversationId
+      if (variables.stream) {
+        // The streaming hook will automatically connect using the conversationId
+        console.log(`[STREAMING] Message sent with streaming enabled for conversation ${variables.conversationId}`)
+      }
 
       // Invalidate related caches
       queryClient.invalidateQueries({

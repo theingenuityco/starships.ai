@@ -28,6 +28,7 @@ interface ConversationMessageInputProps {
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
+  streamingEventHandler?: ((event: any) => void) | null
 }
 
 export interface ConversationMessageInputRef {
@@ -35,7 +36,7 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children, streamingEventHandler }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -89,7 +90,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message using streaming API - conversationId is used as stream identifier
+        // Send message with streaming (this handles everything: saves message + gets agent response)
         await sendMessage.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
@@ -98,6 +99,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           starshipId: starshipId!,
           messageType: 'user_input',
           stream: true,
+          onStreamingEvent: streamingEventHandler || undefined,
         })
 
         // No need to manage streamId - streaming hook will use conversationId directly
@@ -147,7 +149,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message using streaming API - conversationId is used as stream identifier
+        // Send message with streaming (this handles everything: saves message + gets agent response)
         await sendMessage.mutateAsync({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
@@ -156,6 +158,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           starshipId: starshipId!,
           messageType: 'user_input',
           stream: true,
+          onStreamingEvent: streamingEventHandler || undefined,
         })
 
         // No need to manage streamId - streaming hook will use conversationId directly

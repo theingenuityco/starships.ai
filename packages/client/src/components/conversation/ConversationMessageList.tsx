@@ -18,9 +18,10 @@ interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
   enableAccessibility?: boolean
+  onStreamingEvent?: (event: any) => void
 }
 
-export function ConversationMessageList({ conversationId, starshipId, enableAccessibility = true }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, enableAccessibility = true, onStreamingEvent }: ConversationMessageListProps) {
   // Data fetching
   const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
   const deleteMessage = useDeleteMessage()
@@ -29,49 +30,61 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Streaming state - use conversationId directly as stream identifier
-  const { streamingState, isStreaming, streamingContent, streamingMessages } = useMessageStreaming(conversationId ?? undefined)
+  const { streamingState, isStreaming, streamingContent, streamingMessages, handleStreamingEvent } = useMessageStreaming(conversationId ?? undefined)
   const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 
   // Unified message display - combines API messages with streaming messages
   const displayMessages = useMemo(() => {
-    // Add streaming messages (separate workflow event messages)
+    // Get all streaming messages from the streaming hook
     const allStreamingMessages = streamingMessages || []
 
-    // Legacy: if we have streamingContent but no streaming messages, create fallback message
-    const legacyStreamingMessage =
-      isStreaming && streamingContent && allStreamingMessages.length === 0
-        ? {
-            id: `streaming-legacy-${Date.now()}-${streamingContent.length}`,
-            content: streamingContent,
-            role: 'assistant' as const,
-            timestamp: new Date().toISOString(),
-            conversationId: conversationId || '',
-            starshipId: starshipId || '',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            version: '1.0.0',
-            threadDepth: 0,
-            processingStatus: 'streaming' as const,
-            messageType: 'agent_response' as const,
-            importance: 'medium' as const,
-            contentLength: streamingContent.length,
-            hasAttachments: false,
-            streaming: true,
-          }
-        : null
+    console.log('[MESSAGE-LIST] Rendering messages:', {
+      apiMessages: messages.length,
+      streamingMessages: allStreamingMessages.length,
+      isStreaming,
+      streamingContent: streamingContent?.substring(0, 50) + '...',
+    })
 
-    // Combine API messages with streaming messages
-    // Since messages get reversed for display (newest-first -> oldest-first),
-    // we need to insert streaming messages at the BEGINNING so they appear at the BOTTOM after reversal
-    const combinedMessages = [...messages]
+    // Start with API messages (existing conversation history)
+    let combinedMessages = [...messages]
 
+    // Add real-time streaming messages
     if (allStreamingMessages.length > 0) {
-      // Insert streaming messages at the beginning (they'll be at bottom after reverse)
-      combinedMessages.unshift(...allStreamingMessages)
-    } else if (legacyStreamingMessage) {
-      // Insert legacy streaming message at the beginning (it'll be at bottom after reverse)
-      combinedMessages.unshift(legacyStreamingMessage)
+      // Filter out any duplicate messages that might already be in API messages
+      const newStreamingMessages = allStreamingMessages.filter(streamingMsg => !messages.some(apiMsg => apiMsg.id === streamingMsg.id))
+
+      if (newStreamingMessages.length > 0) {
+        console.log('[MESSAGE-LIST] Adding streaming messages:', newStreamingMessages.length)
+        // Add streaming messages (they should appear at the end chronologically)
+        combinedMessages = [...combinedMessages, ...newStreamingMessages]
+      }
+    }
+
+    // Legacy fallback: if we have streamingContent but no structured messages,
+    // create a temporary streaming message (this handles old-style streaming)
+    else if (isStreaming && streamingContent && streamingContent.trim()) {
+      const legacyStreamingMessage = {
+        id: `streaming-content-${Date.now()}`,
+        content: streamingContent,
+        role: 'assistant' as const,
+        timestamp: new Date().toISOString(),
+        conversationId: conversationId || '',
+        starshipId: starshipId || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'streaming' as const,
+        messageType: 'agent_response' as const,
+        importance: 'medium' as const,
+        contentLength: streamingContent.length,
+        hasAttachments: false,
+        streaming: true,
+      }
+
+      console.log('[MESSAGE-LIST] Adding legacy streaming message:', streamingContent.substring(0, 50))
+      combinedMessages = [...combinedMessages, legacyStreamingMessage]
     }
 
     return combinedMessages
@@ -136,6 +149,14 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
     setSelectedMessages([])
     setIsSelectionMode(false)
   }, [conversationId])
+
+  // Pass streaming event handler to parent
+  useEffect(() => {
+    if (onStreamingEvent) {
+      // Share the handleStreamingEvent function with parent
+      onStreamingEvent(handleStreamingEvent)
+    }
+  }, [handleStreamingEvent, onStreamingEvent])
 
   // Auto-scroll to bottom when new messages arrive or streaming content changes
   useEffect(() => {

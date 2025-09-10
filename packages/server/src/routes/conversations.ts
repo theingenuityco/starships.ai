@@ -110,7 +110,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 });
 
 /**
- * POST /conversations/:conversationId/messages - Send message to agent (supports streaming)
+ * POST /conversations/:conversationId/messages - Send message to agent (supports unified streaming)
  */
 router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -121,12 +121,11 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
-    // Validate request body with streaming support
+    // Validate request body
     const bodyValidation = validateData(
       z.object({
         agentId: z.string().min(1, 'agentId is required'),
         message: z.string().min(1, 'message is required'),
-        stream: z.boolean().optional().default(false),
       }),
       req.body,
       res,
@@ -135,33 +134,44 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     if (!bodyValidation) return;
 
     const { conversationId } = paramValidation;
-    const { agentId, message, stream } = bodyValidation;
+    const { agentId, message } = bodyValidation;
     const userId = req.user!.id;
+
+    // Detect streaming request via Accept header or query parameter
+    const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
 
     const conversationService = new ConversationService();
 
-    if (stream) {
-      // Handle streaming request - return streamId immediately, process in background
-      const streamId = StreamingService.generateStreamId();
+    if (wantsStreaming) {
+      // Set up SSE headers immediately
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control',
+        'X-Accel-Buffering': 'no', // Disable nginx buffering for real-time streaming
+      });
 
-      // Return streamId immediately so client can connect to SSE endpoint
-      sendSuccess(res, { streamId, status: 'streaming_started' }, 200);
+      // Add connection to streaming service using conversationId as stream identifier
+      const streamingService = StreamingService.getInstance();
+      streamingService.addConnection(conversationId, res);
 
-      // Process message with streaming in background (don't await)
+      // Process conversation with streaming (async - don't await)
+      // Using conversationId as stream identifier - much simpler!
       conversationService
-        .addMessageWithStreaming({
+        .processConversationWithStreaming({
           conversationId,
           agentId,
           userId,
           message,
-          streamId,
         })
         .catch((error) => {
-          console.error('❌ [STREAMING] Background streaming failed:', error);
-          // Error will be handled by the streaming service
+          console.error('❌ [UNIFIED STREAMING] Processing failed:', error);
+          // Error will be handled by the streaming service and conversation service
         });
     } else {
-      // Handle regular (non-streaming) request
+      // Handle regular JSON response
       const result = await conversationService.addMessage({
         conversationId,
         agentId,

@@ -61,15 +61,17 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
           }
         : null
 
-    // Combine API messages with streaming messages (multiple separate messages)
+    // Combine API messages with streaming messages
+    // Since messages get reversed for display (newest-first -> oldest-first),
+    // we need to insert streaming messages at the BEGINNING so they appear at the BOTTOM after reversal
     const combinedMessages = [...messages]
 
     if (allStreamingMessages.length > 0) {
-      // Add each streaming message separately (workflow events as individual bubbles)
-      combinedMessages.push(...allStreamingMessages)
+      // Insert streaming messages at the beginning (they'll be at bottom after reverse)
+      combinedMessages.unshift(...allStreamingMessages)
     } else if (legacyStreamingMessage) {
-      // Fallback to single accumulated message for legacy content chunks
-      combinedMessages.push(legacyStreamingMessage)
+      // Insert legacy streaming message at the beginning (it'll be at bottom after reverse)
+      combinedMessages.unshift(legacyStreamingMessage)
     }
 
     return combinedMessages

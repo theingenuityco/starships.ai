@@ -275,6 +275,30 @@ export class ConversationService {
       // Configure autopilot streaming
       console.log(`📡 [STREAMING] Configuring autopilot streaming for stream ${streamId}`);
 
+      // Send immediate empty assistant message for instant UI feedback
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const emptyAssistantMessage = {
+        id: messageId,
+        role: 'assistant' as const,
+        content: '', // Empty initially - will be filled by chunks
+        timestamp: new Date().toISOString(),
+        conversationId,
+        starshipId: starshipInfo.id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'streaming' as const,
+        messageType: 'agent_response' as const,
+        importance: 'medium' as const,
+        contentLength: 0,
+        hasAttachments: false,
+        streaming: true,
+      };
+
+      // Broadcast empty message immediately for instant bubble
+      await this.streamingService.broadcastMessage(streamId, emptyAssistantMessage);
+
       // Execute agent conversation with streaming - updated to use new architecture
       const response = await AgentService.executeConversationWithStreaming({
         source: 'user',

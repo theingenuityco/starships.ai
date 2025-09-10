@@ -24,7 +24,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // UI state
   const [hasMessages, setHasMessages] = useState(false)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
-  const [currentStreamId, setCurrentStreamId] = useState<string | null>(null)
 
   // Ref for direct communication with message input
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
@@ -50,12 +49,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Handle first message to trigger layout transition
   const handleFirstMessage = useCallback(() => {
     setHasMessages(true)
-  }, [])
-
-  // Handle streaming start
-  const handleStreamStart = useCallback((streamId: string) => {
-    console.log('[ConversationInterface] Streaming started with ID:', streamId)
-    setCurrentStreamId(streamId)
   }, [])
 
   // Handle suggestion click
@@ -113,7 +106,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area or Welcome Screen */}
       {hasMessages && currentConversationId ? (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} streamId={currentStreamId} enableAccessibility={true} />
+          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} enableAccessibility={true} />
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
@@ -159,7 +152,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             conversationId={currentConversationId}
             onConversationStart={handleConversationStart}
             onMessageSent={handleFirstMessage}
-            onStreamStart={handleStreamStart}
             disabled={!selectedAgent}
             minimal={hasMessages && !!currentConversationId}
           >

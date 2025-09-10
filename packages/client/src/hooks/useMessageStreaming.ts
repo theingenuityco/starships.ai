@@ -49,16 +49,15 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
 
     const startStreaming = async () => {
       try {
-        // Set initial streaming state
-        setStreamingState(prev => ({
-          ...prev,
+        // Set initial streaming state - always start fresh
+        setStreamingState({
           streamId,
           status: 'connecting',
-          content: '',
+          content: '', // Clear any previous content
           error: null,
           isStreaming: true,
-          messages: [],
-        }))
+          messages: [], // Start with empty messages array
+        })
 
         // Get JWT token for SSE authentication
         const token = await getCurrentToken()
@@ -96,14 +95,29 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
           const message = JSON.parse(event.data)
           console.log('[STREAMING] Received message object:', message)
 
-          setStreamingState(prev => ({
-            ...prev,
-            messages: [...prev.messages, message],
-            lastUpdate: Date.now(),
-          }))
+          setStreamingState(prev => {
+            // If this is a new empty assistant message (start of new stream),
+            // clear any previous streaming messages and start fresh
+            if (message.role === 'assistant' && message.content === '' && message.streaming === true) {
+              console.log('[STREAMING] New assistant stream started - clearing previous messages')
+              return {
+                ...prev,
+                messages: [message], // Replace all messages with just the new empty one
+                content: '', // Clear accumulated content
+                lastUpdate: Date.now(),
+              }
+            }
+
+            // Otherwise, add to existing messages
+            return {
+              ...prev,
+              messages: [...prev.messages, message],
+              lastUpdate: Date.now(),
+            }
+          })
         })
 
-        // Legacy chunk handling for content streaming
+        // Enhanced chunk handling for content streaming
         eventSource.addEventListener('chunk', (event: MessageEvent) => {
           if (!mounted) return
           const chunk: StreamingChunk = JSON.parse(event.data)
@@ -111,14 +125,20 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
 
           switch (chunk.type) {
             case 'content':
-              // For legacy content chunks, update the last message if it's a content type
+              // Update the streaming assistant message with new content
               setStreamingState(prev => {
-                const lastMessage = prev.messages[prev.messages.length - 1]
-                if (lastMessage && lastMessage.role === 'assistant' && lastMessage.streaming) {
+                // Find the assistant message that's currently streaming
+                const streamingAssistantIndex = prev.messages.findIndex(msg => msg.role === 'assistant' && msg.streaming === true)
+
+                if (streamingAssistantIndex !== -1) {
+                  // Update the streaming message with new content
                   const updatedMessages = [...prev.messages]
-                  updatedMessages[updatedMessages.length - 1] = {
-                    ...lastMessage,
-                    content: lastMessage.content + chunk.content,
+                  const currentMessage = updatedMessages[streamingAssistantIndex]
+                  updatedMessages[streamingAssistantIndex] = {
+                    ...currentMessage,
+                    content: currentMessage.content + chunk.content,
+                    contentLength: (currentMessage.content + chunk.content).length,
+                    updatedAt: new Date().toISOString(),
                   }
                   return {
                     ...prev,
@@ -126,6 +146,8 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
                     lastUpdate: Date.now(),
                   }
                 }
+
+                // Fallback: accumulate in streaming state content
                 return {
                   ...prev,
                   content: prev.content + chunk.content,
@@ -151,8 +173,18 @@ export function useMessageStreaming(streamId: string | null | undefined, convers
 
         eventSource.addEventListener('complete', (event: MessageEvent) => {
           if (!mounted) return
-          console.log('[STREAMING] Stream complete:', JSON.parse(event.data))
-          setStreamingState(prev => ({ ...prev, status: 'complete' }))
+          const completeData = JSON.parse(event.data)
+          console.log('[STREAMING] Stream complete:', completeData)
+
+          // Mark all streaming messages as complete
+          setStreamingState(prev => ({
+            ...prev,
+            status: 'complete',
+            isStreaming: false,
+            messages: prev.messages.map(msg => (msg.streaming ? { ...msg, streaming: false, processingStatus: 'completed' } : msg)),
+            lastUpdate: Date.now(),
+          }))
+
           cleanup()
         })
 

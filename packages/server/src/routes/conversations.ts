@@ -18,16 +18,6 @@ const PaginationSchema = z.object({
 });
 const ConversationSourceSchema = z.enum(['agent', 'user']);
 
-// Helper function for authentication check
-const checkAuth = (req: Request, res: Response): boolean => {
-  const user = req.user;
-  if (!user?.id) {
-    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-    return false;
-  }
-  return true;
-};
-
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
   try {
@@ -58,9 +48,6 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
  */
 router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -72,7 +59,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
-      const streamingService = StreamingService.getInstance();
+      const streamingService = new StreamingService();
       streamingService.addConnection(conversationId, res);
 
       // Send existing messages after connection is established
@@ -145,9 +132,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
  */
 router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -168,15 +152,15 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { agentId, message } = bodyValidation;
     const userId = req.user!.id;
 
-    // Detect streaming request via Accept header or query parameter
-    const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
+    // Detect streaming request via Accept header
+    const wantsStreaming = req.get('Accept')?.includes('text/event-stream');
 
     const conversationService = new ConversationService();
 
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
       // This automatically sends connection confirmation via sendEvent('connection', ...)
-      const streamingService = StreamingService.getInstance();
+      const streamingService = new StreamingService();
       streamingService.addConnection(conversationId, res);
 
       // Process conversation with streaming (async - don't await)
@@ -218,9 +202,6 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
  */
 router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -255,9 +236,6 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
  */
 router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -295,9 +273,6 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
  */
 router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate starshipId parameter
     const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
@@ -331,9 +306,6 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
  */
 router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate userId parameter
     const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
     if (!paramValidation) return;
@@ -374,9 +346,6 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
  */
 router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate request body
     const bodyValidation = validateData(
       z.object({
@@ -413,9 +382,6 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
  */
 router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -472,9 +438,6 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
  */
 router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;

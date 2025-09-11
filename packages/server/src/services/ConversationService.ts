@@ -43,7 +43,7 @@ export class ConversationService {
     this.conversationRepository = new ConversationRepository();
     this.messageRepository = new MessageRepository();
     this.messageService = new MessageService();
-    this.streamingService = StreamingService.getInstance();
+    this.streamingService = new StreamingService();
   }
 
   /**

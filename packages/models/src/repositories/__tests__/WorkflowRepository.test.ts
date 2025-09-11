@@ -35,12 +35,10 @@ jest.mock('../../entities/WorkflowEntity', () => ({
         }
       }
       // Add serialize method to the returned object
-      result.serialize = jest
-        .fn()
-        .mockReturnValue({
-          ...result,
-          blueprint: typeof result.blueprint === 'object' ? JSON.stringify(result.blueprint) : result.blueprint,
-        });
+      result.serialize = jest.fn().mockReturnValue({
+        ...result,
+        blueprint: typeof result.blueprint === 'object' ? JSON.stringify(result.blueprint) : result.blueprint,
+      });
       return result;
     }),
   },
@@ -220,7 +218,16 @@ describe('WorkflowRepository', () => {
           authorId: 'author-123',
         };
 
-        const result = await repository.create(dataWithoutBlueprint);
+        const dataWithRequired = {
+          ...dataWithoutBlueprint,
+          category: 'general',
+          isPublic: false,
+          tags: [],
+          version: '1.0.0',
+          blueprint: { nodes: [], edges: [] },
+          executionMode: 'simple' as const,
+        };
+        const result = await repository.create(dataWithRequired);
 
         expect(result.blueprint).toEqual({ nodes: [], edges: [], metadata: {} });
       });
@@ -631,6 +638,12 @@ describe('WorkflowRepository', () => {
         repository.create({
           name: 'Test',
           authorId: 'author-123',
+          category: 'general',
+          isPublic: false,
+          tags: [],
+          version: '1.0.0',
+          blueprint: { nodes: [], edges: [] },
+          executionMode: 'simple' as const,
         })
       ).rejects.toThrow();
     });

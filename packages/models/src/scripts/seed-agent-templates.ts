@@ -374,13 +374,11 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'general-assistant',
     description: 'A helpful general-purpose assistant powered by autopilot workflows for enhanced capabilities.',
     category: 'general',
-    tags: ['general', 'helpful', 'assistant', 'versatile', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.7,
     maxTokens: 2000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.5,
+
     icon: '🤖',
     previewPrompts: ['Help me plan my day', 'Explain quantum computing in simple terms', 'What are some healthy meal ideas?'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.7, 2000),
@@ -397,13 +395,11 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'code-reviewer',
     description: 'An expert code reviewer with advanced autopilot workflows for comprehensive code analysis and improvement suggestions.',
     category: 'coding',
-    tags: ['programming', 'code-review', 'debugging', 'best-practices', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.3,
     maxTokens: 3000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.8,
+
     icon: '🔍',
     previewPrompts: [
       'Review this JavaScript function for bugs',
@@ -425,13 +421,11 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'creative-writer',
     description: 'A creative writing assistant with structured autopilot workflows for ideation, planning, and content creation.',
     category: 'creative',
-    tags: ['writing', 'storytelling', 'creative', 'content', 'fiction', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.8,
     maxTokens: 2500,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.6,
+
     icon: '✍️',
     previewPrompts: [
       'Help me develop a character for my story',
@@ -453,13 +447,11 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'data-analyst',
     description: 'An analytical assistant powered by autopilot for data interpretation, visualization, and insights.',
     category: 'analysis',
-    tags: ['data', 'analysis', 'statistics', 'insights', 'visualization', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.4,
     maxTokens: 2500,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.7,
+
     icon: '📊',
     previewPrompts: ['Analyze this sales data for trends', 'What statistical test should I use?', 'Help me interpret these survey results'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.4, 2500),
@@ -477,13 +469,11 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'customer-support',
     description: 'A friendly customer support assistant with autopilot-powered workflows for issue resolution.',
     category: 'support',
-    tags: ['customer-service', 'support', 'help', 'professional', 'problem-solving', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.6,
     maxTokens: 2000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.4,
+
     icon: '🎧',
     previewPrompts: ['I need help with my account', 'How do I return a product?', "My order hasn't arrived yet"],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.6, 2000),
@@ -502,13 +492,11 @@ const DEFAULT_TEMPLATES: Array<
     description:
       'Your expert starship navigator and first officer who helps new captains get started, configure their crew, and begin their journey.',
     category: 'general',
-    tags: ['starship', 'navigator', 'onboarding', 'guide', 'first-officer', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.5,
     maxTokens: 2000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.6,
+
     icon: '🧙‍♀️',
     previewPrompts: [
       'Help me set up my new starship',
@@ -554,8 +542,6 @@ export async function seedAgentTemplates(): Promise<void> {
           // Create the template
           await templateRepo.create({
             ...template,
-            usageCount: 0,
-            updatedAt: new Date().toISOString(),
           });
           addedCount++;
           logger.info(`Agent template created: ${template.name} (slug: ${template.slug})`);

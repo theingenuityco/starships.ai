@@ -47,7 +47,10 @@ jest.mock('../../entities/WorkflowEntity', () => ({
 describe('WorkflowRepository', () => {
   let repository: WorkflowRepository;
   let testHelper: RepositoryTestHelper;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+    executeWrite: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+  };
 
   beforeEach(() => {
     testHelper = new RepositoryTestHelper();
@@ -189,7 +192,7 @@ describe('WorkflowRepository', () => {
       });
 
       it('should validate required fields', async () => {
-        const invalidData = { ...mockWorkflowData, name: undefined } as any;
+        const invalidData = { ...mockWorkflowData, name: undefined } as unknown as typeof mockWorkflowData;
 
         await expect(repository.create(invalidData)).rejects.toThrow();
       });
@@ -276,13 +279,7 @@ describe('WorkflowRepository', () => {
     describe('update', () => {
       it('should update workflow successfully', async () => {
         const mockWorkflow = { id: 'workflow-1', name: 'Updated Workflow' };
-        const expectedResult = {
-          id: 'workflow-1',
-          name: 'Updated Workflow',
-          blueprint: null,
-          tags: [],
-          allowedStarshipClasses: [],
-        };
+        // Expected result structure for reference
         const updates = { name: 'Updated Workflow' };
         testHelper.mockUpdateWrite(mockWorkflow, 'w');
 

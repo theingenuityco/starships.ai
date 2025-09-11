@@ -5,6 +5,10 @@
 import { ConversationRepository } from '@/repositories/ConversationRepository';
 import { DatabaseError, NotFoundError } from '@starships/errors';
 import { ConversationModel } from '@starships/protocol';
+import { Neo4jConnection } from '@/helpers/database';
+
+// Define type aliases for test data
+type CreateConversationData = Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>;
 
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
@@ -29,7 +33,10 @@ import { getConnection } from '@/helpers/database';
 
 describe('ConversationRepository', () => {
   let repository: ConversationRepository;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+    executeWrite: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+  };
 
   beforeEach(() => {
     mockConnection = {
@@ -37,21 +44,21 @@ describe('ConversationRepository', () => {
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
-    repository = new ConversationRepository(mockConnection);
+    repository = new ConversationRepository(mockConnection as unknown as Neo4jConnection);
     jest.clearAllMocks();
   });
 
   describe('constructor', () => {
     it('should initialize with correct service name', () => {
-      expect((repository as any).serviceName).toBe('ConversationRepository');
+      expect((repository as unknown as { serviceName: string }).serviceName).toBe('ConversationRepository');
     });
   });
 
   describe('findAll', () => {
     it('should return all conversations ordered by last activity', async () => {
       const mockConversations: ConversationModel[] = [
-        global.createMockConversation({ id: 'conv-1', status: 'active' }),
-        global.createMockConversation({ id: 'conv-2', status: 'completed' }),
+        global.createMockConversation({ id: 'conv-1', status: 'active' }) as unknown as ConversationModel,
+        global.createMockConversation({ id: 'conv-2', status: 'completed' }) as unknown as ConversationModel,
       ];
 
       mockConnection.executeQuery.mockResolvedValue([{ c: mockConversations[0] }, { c: mockConversations[1] }]);
@@ -81,7 +88,7 @@ describe('ConversationRepository', () => {
 
   describe('findById', () => {
     it('should return conversation by ID', async () => {
-      const mockConversation = global.createMockConversation();
+      const mockConversation = global.createMockConversation() as unknown as ConversationModel;
       mockConnection.executeQuery.mockResolvedValue([{ c: mockConversation }]);
 
       const result = await repository.findById('conv-123');
@@ -117,7 +124,14 @@ describe('ConversationRepository', () => {
       };
 
       // Mock the createEntityWithAutoId method from BaseRepository
-      jest.spyOn(repository as any, 'createEntityWithAutoId').mockResolvedValue(createdConversation);
+      jest
+        .spyOn(
+          repository as unknown as {
+            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
+          },
+          'createEntityWithAutoId'
+        )
+        .mockResolvedValue(createdConversation);
 
       const result = await repository.create(conversationData);
 
@@ -139,7 +153,14 @@ describe('ConversationRepository', () => {
         updatedAt: expect.any(String),
       };
 
-      jest.spyOn(repository as any, 'createEntityWithAutoId').mockResolvedValue(createdConversation);
+      jest
+        .spyOn(
+          repository as unknown as {
+            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
+          },
+          'createEntityWithAutoId'
+        )
+        .mockResolvedValue(createdConversation);
       jest.spyOn(repository, 'linkToStarship').mockResolvedValue(undefined);
 
       const result = await repository.create(conversationData, 'starship-123');
@@ -154,7 +175,7 @@ describe('ConversationRepository', () => {
         // Missing required fields
       };
 
-      await expect(repository.create(incompleteData as any)).rejects.toThrow(DatabaseError);
+      await expect(repository.create(incompleteData as CreateConversationData)).rejects.toThrow(DatabaseError);
     });
 
     it('should validate enum values for status', async () => {
@@ -164,7 +185,7 @@ describe('ConversationRepository', () => {
         status: 'invalid_status',
       };
 
-      await expect(repository.create(invalidData as any)).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidData as CreateConversationData)).rejects.toThrow(DatabaseError);
     });
 
     it('should validate field types', async () => {
@@ -174,7 +195,7 @@ describe('ConversationRepository', () => {
         status: 'active',
       };
 
-      await expect(repository.create(invalidData as any)).rejects.toThrow();
+      await expect(repository.create(invalidData as unknown as CreateConversationData)).rejects.toThrow();
     });
   });
 
@@ -188,7 +209,7 @@ describe('ConversationRepository', () => {
       const updatedConversation = global.createMockConversation({
         id: 'conv-123',
         ...updates,
-      });
+      }) as unknown as ConversationModel;
 
       mockConnection.executeWrite.mockResolvedValue([{ c: updatedConversation }]);
 
@@ -206,7 +227,7 @@ describe('ConversationRepository', () => {
     });
 
     it('should return existing conversation when no updates provided', async () => {
-      const existingConversation = global.createMockConversation({ id: 'conv-123' });
+      const existingConversation = global.createMockConversation({ id: 'conv-123' }) as unknown as ConversationModel;
       jest.spyOn(repository, 'findById').mockResolvedValue(existingConversation);
 
       const result = await repository.update('conv-123', {});
@@ -222,11 +243,13 @@ describe('ConversationRepository', () => {
     });
 
     it('should validate enum values during update', async () => {
-      await expect(repository.update('conv-123', { status: 'invalid_status' as any })).rejects.toThrow(DatabaseError);
+      await expect(repository.update('conv-123', { status: 'invalid_status' as ConversationModel['status'] })).rejects.toThrow(
+        DatabaseError
+      );
     });
 
     it('should validate field types during update', async () => {
-      await expect(repository.update('conv-123', { messageCount: 'not_a_number' as any })).rejects.toThrow();
+      await expect(repository.update('conv-123', { messageCount: 'not_a_number' as unknown as number })).rejects.toThrow();
     });
   });
 
@@ -255,8 +278,8 @@ describe('ConversationRepository', () => {
   describe('findByStarship', () => {
     it('should return conversations for a specific starship', async () => {
       const mockConversations: ConversationModel[] = [
-        global.createMockConversation({ id: 'conv-1' }),
-        global.createMockConversation({ id: 'conv-2' }),
+        global.createMockConversation({ id: 'conv-1' }) as unknown as ConversationModel,
+        global.createMockConversation({ id: 'conv-2' }) as unknown as ConversationModel,
       ];
 
       mockConnection.executeQuery.mockResolvedValue([{ c: mockConversations[0] }, { c: mockConversations[1] }]);
@@ -343,7 +366,14 @@ describe('ConversationRepository', () => {
 
     it('should handle constraint violations during create', async () => {
       const error = new Error('unique constraint violation');
-      jest.spyOn(repository as any, 'createEntityWithAutoId').mockRejectedValue(error);
+      jest
+        .spyOn(
+          repository as unknown as {
+            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
+          },
+          'createEntityWithAutoId'
+        )
+        .mockRejectedValue(error);
 
       const conversationData = {
         lastActivityAt: '2023-01-01T00:00:00.000Z',
@@ -373,8 +403,15 @@ describe('ConversationRepository', () => {
       };
 
       // Create conversation
-      const createdConversation = global.createMockConversation(conversationData);
-      jest.spyOn(repository as any, 'createEntityWithAutoId').mockResolvedValue(createdConversation);
+      const createdConversation = global.createMockConversation(conversationData) as unknown as ConversationModel;
+      jest
+        .spyOn(
+          repository as unknown as {
+            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
+          },
+          'createEntityWithAutoId'
+        )
+        .mockResolvedValue(createdConversation);
 
       const newConversation = await repository.create(conversationData);
       expect(newConversation.status).toBe('active');

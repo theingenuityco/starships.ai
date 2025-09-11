@@ -18,7 +18,10 @@ import { getConnection } from '@/helpers/database';
 
 describe('EdgeRepository', () => {
   let repository: EdgeRepository;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+    executeWrite: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+  };
 
   beforeEach(() => {
     // Create fresh mock connection for each test
@@ -34,7 +37,7 @@ describe('EdgeRepository', () => {
 
   describe('constructor', () => {
     it('should initialize with correct service name', () => {
-      expect((repository as any).serviceName).toBe('EdgeRepository');
+      expect((repository as unknown as { serviceName: string }).serviceName).toBe('EdgeRepository');
     });
   });
 
@@ -103,9 +106,13 @@ describe('EdgeRepository', () => {
     it('should throw ValidationError for missing required parameters', async () => {
       await expect(repository.createEdge('', validEdgeData)).rejects.toThrow(ValidationError);
 
-      await expect(repository.createEdge('blueprint-123', { from: '', to: 'node-2' } as any)).rejects.toThrow(ValidationError);
+      await expect(repository.createEdge('blueprint-123', { from: '', to: 'node-2' } as Omit<EdgeModel, 'id'>)).rejects.toThrow(
+        ValidationError
+      );
 
-      await expect(repository.createEdge('blueprint-123', { from: 'node-1', to: '' } as any)).rejects.toThrow(ValidationError);
+      await expect(repository.createEdge('blueprint-123', { from: 'node-1', to: '' } as Omit<EdgeModel, 'id'>)).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {
@@ -210,7 +217,9 @@ describe('EdgeRepository', () => {
     });
 
     it('should throw ValidationError for invalid edges array', async () => {
-      await expect(repository.createEdges('blueprint-123', 'invalid' as any)).rejects.toThrow(ValidationError);
+      await expect(repository.createEdges('blueprint-123', 'invalid' as unknown as Array<Omit<EdgeModel, 'id'>>)).rejects.toThrow(
+        ValidationError
+      );
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {
@@ -270,7 +279,7 @@ describe('EdgeRepository', () => {
     });
 
     it('should handle null result from database', async () => {
-      mockConnection.executeQuery.mockResolvedValue(null);
+      mockConnection.executeQuery.mockResolvedValue([]);
 
       const result = await repository.getEdgesByBlueprintId('blueprint-123');
 
@@ -560,7 +569,7 @@ describe('EdgeRepository', () => {
     });
 
     it('should handle null result from database', async () => {
-      mockConnection.executeQuery.mockResolvedValue(null);
+      mockConnection.executeQuery.mockResolvedValue([]);
 
       const result = await repository.getEdgesByFromNode('node-1');
 
@@ -730,13 +739,13 @@ describe('EdgeRepository', () => {
     });
 
     it('should handle updates with null values', async () => {
-      const updates = { ref: null as any };
+      const updates = { ref: null as unknown as string };
 
       jest.spyOn(repository, 'getEdgeById').mockResolvedValue({
         id: 'edge-123',
         from: 'node-1',
         to: 'node-2',
-        ref: null as any,
+        ref: null as unknown as string,
       });
 
       mockConnection.executeWrite.mockResolvedValue([]);

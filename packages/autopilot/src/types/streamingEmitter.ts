@@ -3,7 +3,7 @@
  *
  * Provides a lean interface for external streaming implementations (like server)
  * to handle autopilot execution events without autopilot knowing about specific
- * streaming formats or protocols.
+ * streaming formats.
  */
 
 import type { ExecutionEvent } from '@/engine/Engine';

@@ -734,10 +734,6 @@ pnpm run dev
 - **jsonata** - JSONPath expressions for conditional routing
 - **nanoid** - Unique identifier generation
 
-### Peer Dependencies
-
-- **@starships/protocol** - Shared TypeScript types and interfaces
-
 ## Architecture
 
 ```

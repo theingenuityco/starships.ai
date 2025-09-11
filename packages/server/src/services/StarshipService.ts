@@ -323,7 +323,7 @@ export class StarshipService {
 
       // Find the "Sibyl" template to use as the default starship navigator
       const templates = await templateService.searchTemplates('Sibyl');
-      const defaultTemplate = templates.find((t) => t.name === 'Sibyl' && t.authorId === 'system');
+      const defaultTemplate = templates.find((t) => t.name === 'Sibyl');
 
       if (!defaultTemplate) {
         console.error('[STARSHIP-SERVICE] Sibyl agent template not found - skipping agent creation');

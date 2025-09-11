@@ -480,7 +480,10 @@ export class MissionOrchestratorAgent {
    * Convert BlueprintModel to autopilot Workflow format
    */
   private convertToAutopilotWorkflow(blueprint: BlueprintModel): Workflow {
-    const workflow = new Workflow();
+    const workflow = new Workflow({
+      name: 'Mission Orchestrator Workflow',
+      blueprint: { nodes: [], edges: [] },
+    });
 
     // Add nodes
     blueprint.nodes.forEach((node: any) => {

@@ -449,7 +449,11 @@ export class WorkflowService {
       timeout: dbWorkflow.timeout || 30000,
     };
 
-    return new Workflow(workflowParams);
+    return new Workflow({
+      name: 'Workflow Execution',
+      blueprint: workflowParams.blueprint || { nodes: [], edges: [] },
+      timeout: workflowParams.timeout,
+    });
   }
 
   /**

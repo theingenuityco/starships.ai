@@ -563,7 +563,7 @@ ${taskResults}
   private buildAgentListSection(agents: AgentModel[]): string {
     return agents
       .map((agent) => {
-        const capabilities = agent.category || 'general';
+        const capabilities = 'general'; // agent.category property no longer exists
         return `├─ ${agent.id}: ${agent.name} (${capabilities})\n   └─ ${agent.description || 'No description available'}`;
       })
       .join('\n');

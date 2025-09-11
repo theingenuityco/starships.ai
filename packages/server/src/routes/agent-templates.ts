@@ -302,7 +302,7 @@ router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (r
     let agent;
     try {
       agent = await templateService.validateAgentForTemplate(agentId, userId);
-      console.log('[TEMPLATE] Agent validated:', agent.id, agent.name, 'isPublic:', agent.isPublic);
+      console.log('[TEMPLATE] Agent validated:', agent.id, agent.name);
     } catch (agentError: any) {
       console.error('[TEMPLATE] Agent validation failed:', agentError);
       if (agentError?.name === 'NotFoundError') {

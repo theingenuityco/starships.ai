@@ -2,8 +2,7 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useConversationMessages, useDeleteMessage } from '@/hooks/useMessages'
-import { useMessageStreaming } from '@/hooks/useMessageStreaming'
+import { useConversation, useDeleteMessage } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Timer, User, XCircle } from 'lucide-react'
@@ -18,77 +17,63 @@ interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
   enableAccessibility?: boolean
-  onStreamingEvent?: (event: any) => void
 }
 
-export function ConversationMessageList({ conversationId, starshipId, enableAccessibility = true, onStreamingEvent }: ConversationMessageListProps) {
-  // Data fetching
-  const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
+export function ConversationMessageList({ conversationId, starshipId, enableAccessibility = true }: ConversationMessageListProps) {
+  // Unified conversation hook - handles messages, streaming, and sending
+  const { messages, isLoading: loading, error: queryError, streamingState, isStreaming, streamingContent } = useConversation(conversationId)
+
   const deleteMessage = useDeleteMessage()
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Streaming state - use conversationId directly as stream identifier
-  const { streamingState, isStreaming, streamingContent, streamingMessages, handleStreamingEvent } = useMessageStreaming(conversationId ?? undefined)
-  const messages = messageData?.messages || []
   const error = queryError ? 'Failed to load conversation history' : null
 
-  // Unified message display - combines API messages with streaming messages
+  // Simplified message display - all messages come from unified hook
   const displayMessages = useMemo(() => {
-    // Get all streaming messages from the streaming hook
-    const allStreamingMessages = streamingMessages || []
-
     console.log('[MESSAGE-LIST] Rendering messages:', {
-      apiMessages: messages.length,
-      streamingMessages: allStreamingMessages.length,
+      messages: messages.length,
       isStreaming,
       streamingContent: streamingContent?.substring(0, 50) + '...',
     })
 
-    // Start with API messages (existing conversation history)
+    // Start with messages from the unified hook
     let combinedMessages = [...messages]
 
-    // Add real-time streaming messages
-    if (allStreamingMessages.length > 0) {
-      // Filter out any duplicate messages that might already be in API messages
-      const newStreamingMessages = allStreamingMessages.filter(streamingMsg => !messages.some(apiMsg => apiMsg.id === streamingMsg.id))
+    // Legacy fallback: if we have streamingContent but no streaming message in the list,
+    // create a temporary streaming message
+    if (isStreaming && streamingContent && streamingContent.trim()) {
+      // Check if we already have a streaming message
+      const hasStreamingMessage = messages.some(msg => msg.streaming === true)
 
-      if (newStreamingMessages.length > 0) {
-        console.log('[MESSAGE-LIST] Adding streaming messages:', newStreamingMessages.length)
-        // Add streaming messages (they should appear at the end chronologically)
-        combinedMessages = [...combinedMessages, ...newStreamingMessages]
+      if (!hasStreamingMessage) {
+        const legacyStreamingMessage = {
+          id: `streaming-content-${Date.now()}`,
+          content: streamingContent,
+          role: 'assistant' as const,
+          timestamp: new Date().toISOString(),
+          conversationId: conversationId || '',
+          starshipId: starshipId || '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: '1.0.0',
+          threadDepth: 0,
+          processingStatus: 'streaming' as const,
+          messageType: 'agent_response' as const,
+          importance: 'medium' as const,
+          contentLength: streamingContent.length,
+          hasAttachments: false,
+          streaming: true,
+        }
+
+        console.log('[MESSAGE-LIST] Adding legacy streaming message:', streamingContent.substring(0, 50))
+        combinedMessages = [...combinedMessages, legacyStreamingMessage]
       }
-    }
-
-    // Legacy fallback: if we have streamingContent but no structured messages,
-    // create a temporary streaming message (this handles old-style streaming)
-    else if (isStreaming && streamingContent && streamingContent.trim()) {
-      const legacyStreamingMessage = {
-        id: `streaming-content-${Date.now()}`,
-        content: streamingContent,
-        role: 'assistant' as const,
-        timestamp: new Date().toISOString(),
-        conversationId: conversationId || '',
-        starshipId: starshipId || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: 'streaming' as const,
-        messageType: 'agent_response' as const,
-        importance: 'medium' as const,
-        contentLength: streamingContent.length,
-        hasAttachments: false,
-        streaming: true,
-      }
-
-      console.log('[MESSAGE-LIST] Adding legacy streaming message:', streamingContent.substring(0, 50))
-      combinedMessages = [...combinedMessages, legacyStreamingMessage]
     }
 
     return combinedMessages
-  }, [messages, isStreaming, streamingContent, streamingMessages, conversationId, starshipId])
+  }, [messages, isStreaming, streamingContent, conversationId, starshipId])
 
   // Message selection state
   const [selectedMessages, setSelectedMessages] = useState<string[]>([])
@@ -150,13 +135,8 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
     setIsSelectionMode(false)
   }, [conversationId])
 
-  // Pass streaming event handler to parent
-  useEffect(() => {
-    if (onStreamingEvent) {
-      // Share the handleStreamingEvent function with parent
-      onStreamingEvent(handleStreamingEvent)
-    }
-  }, [handleStreamingEvent, onStreamingEvent])
+  // Note: Streaming events are now handled internally by useConversation hook
+  // No need to pass event handlers around
 
   // Auto-scroll to bottom when new messages arrive or streaming content changes
   useEffect(() => {

@@ -10,7 +10,7 @@
     "type-check": "tsc --noEmit",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
-    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config ../../.eslintrc.json",
+    "lint": "eslint src --ext .ts",
     "migrate": "tsx src/scripts/migration-runner.ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
     "seed:agent-templates": "tsx src/scripts/seed-agent-templates.ts",

@@ -6,7 +6,6 @@
  */
 
 import type { AgentMemoryState } from '@/AgentMemory';
-import type { BaseBlueprint } from '@/types/base';
 import { Blueprint } from './blueprint';
 
 /**

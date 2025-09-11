@@ -246,7 +246,7 @@ export class Engine {
 
     // Pass streaming emitter to handler if it supports streaming
     if ('setStreamingEmitter' in handler && typeof handler.setStreamingEmitter === 'function') {
-      (handler as any).setStreamingEmitter(this.streamingEmitter);
+      (handler as Handler & { setStreamingEmitter: (emitter?: StreamingEmitter) => void }).setStreamingEmitter(this.streamingEmitter);
     }
 
     // Execute the node - this returns execution with result stored

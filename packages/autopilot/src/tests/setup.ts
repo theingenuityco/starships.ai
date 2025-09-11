@@ -12,15 +12,17 @@ jest.mock('nanoid', () => ({
 }));
 
 // Mock console methods to reduce noise in tests
-global.console = {
+const mockConsole = {
   ...console,
   log: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
 };
+global.console = mockConsole;
 
 // Global test utilities with type assertions
-(global as any).createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).createMockBlueprint = (overrides: Partial<Blueprint> = {}): Blueprint => ({
   nodes: [
     { ref: 'start', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
     { ref: 'end', type: 'end', name: 'End', description: 'End node', parameters: {} },
@@ -31,24 +33,29 @@ global.console = {
 });
 
 // Legacy support for tests that haven't been updated yet
-(global as any).createMockWorkflow = (global as any).createMockBlueprint;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).createMockWorkflow = (globalThis as any).createMockBlueprint;
 
 // Create AgentMemory helper
-(global as any).createAgentMemory = (): AgentMemory => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).createAgentMemory = (): AgentMemory => {
   const memory = new AgentMemory();
   memory.addMessage('system', 'Test system prompt');
   return memory;
 };
 
-(global as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({
   status: 'not_started',
   executionResults: new Map(),
-  agentMemory: (global as any).createAgentMemory(),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  agentMemory: (globalThis as any).createAgentMemory(),
   ...overrides,
 });
 
 // Create mock node helper
-(global as any).createMockNode = (overrides: Partial<Node> = {}): Node => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).createMockNode = (overrides: Partial<Node> = {}): Node => ({
   ref: 'test-node',
   type: 'start',
   name: 'Test Node',

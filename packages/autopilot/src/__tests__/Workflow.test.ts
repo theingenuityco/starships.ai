@@ -655,7 +655,7 @@ describe('Workflow', () => {
         })
         .addNode({
           ref: 'unsupported',
-          type: 'unsupported-type' as any,
+          type: 'unsupported-type' as 'start', // Temporarily cast to valid type for test
           name: 'Unsupported',
           description: 'Unsupported',
           parameters: {},

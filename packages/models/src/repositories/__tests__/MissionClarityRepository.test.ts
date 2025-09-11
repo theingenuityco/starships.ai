@@ -15,14 +15,14 @@ jest.mock('uuid', () => ({
 
 describe('MissionClarityRepository', () => {
   let repository: MissionClarityRepository;
-  let mockGetConnection: jest.MockedFunction<any>;
+  let mockGetConnection: jest.MockedFunction<typeof getConnection>;
   let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<Neo4jConnection>;
 
     // Mock getConnection to return our mock connection
     mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
@@ -119,7 +119,7 @@ describe('MissionClarityRepository', () => {
     it('should validate required fields', async () => {
       const invalidRequest = { missionId: 'mission-123' }; // Missing required scores
 
-      await expect(repository.upsertByMissionId('mission-123', invalidRequest as any)).rejects.toThrow(ValidationError);
+      await expect(repository.upsertByMissionId('mission-123', invalidRequest as never)).rejects.toThrow(ValidationError);
     });
 
     it('should validate score ranges', async () => {
@@ -131,7 +131,7 @@ describe('MissionClarityRepository', () => {
       ];
 
       for (const invalidScore of invalidScores) {
-        const request = createMockClarityRequest(invalidScore as any);
+        const request = createMockClarityRequest(invalidScore as never);
         await expect(repository.upsertByMissionId('mission-123', request)).rejects.toThrow(ValidationError);
       }
     });
@@ -181,8 +181,8 @@ describe('MissionClarityRepository', () => {
 
     it('should validate missionId parameter', async () => {
       await expect(repository.getByMissionId('')).rejects.toThrow(ValidationError);
-      await expect(repository.getByMissionId(null as any)).rejects.toThrow(ValidationError);
-      await expect(repository.getByMissionId(undefined as any)).rejects.toThrow(ValidationError);
+      await expect(repository.getByMissionId(null as never)).rejects.toThrow(ValidationError);
+      await expect(repository.getByMissionId(undefined as never)).rejects.toThrow(ValidationError);
     });
 
     it('should handle database errors', async () => {
@@ -246,7 +246,7 @@ describe('MissionClarityRepository', () => {
       const invalidUpdates = [{ objectiveClarity: -1 }, { successMetrics: 11 }, { timelineDefinition: 'invalid' }];
 
       for (const invalidUpdate of invalidUpdates) {
-        await expect(repository.updateByMissionId('mission-123', invalidUpdate as any)).rejects.toThrow(ValidationError);
+        await expect(repository.updateByMissionId('mission-123', invalidUpdate as never)).rejects.toThrow(ValidationError);
       }
     });
 
@@ -311,7 +311,7 @@ describe('MissionClarityRepository', () => {
 
     it('should validate missionId parameter', async () => {
       await expect(repository.deleteByMissionId('')).rejects.toThrow(ValidationError);
-      await expect(repository.deleteByMissionId(null as any)).rejects.toThrow(ValidationError);
+      await expect(repository.deleteByMissionId(null as never)).rejects.toThrow(ValidationError);
     });
 
     it('should handle database errors', async () => {
@@ -569,7 +569,7 @@ describe('MissionClarityRepository', () => {
       jest.spyOn(repository, 'getByMissionId').mockResolvedValue(currentClarity);
       mockConnection.executeWrite.mockResolvedValue([{ mc: mockUpdated }]);
 
-      const result = await repository.updateByMissionId('mission-123', updates);
+      await repository.updateByMissionId('mission-123', updates);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),

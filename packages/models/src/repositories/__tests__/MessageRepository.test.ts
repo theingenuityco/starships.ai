@@ -5,7 +5,7 @@
 import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { DatabaseError } from '@starships/errors';
-import type { MessageModel } from '@starships/protocol';
+import type { MessageModel, CreateMessageRequest } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
@@ -15,14 +15,18 @@ jest.mock('uuid', () => ({
 
 describe('MessageRepository', () => {
   let repository: MessageRepository;
-  let mockGetConnection: jest.MockedFunction<any>;
+  let mockGetConnection: jest.MockedFunction<typeof getConnection>;
   let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
     mockConnection = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      getSession: jest.fn(),
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    } as any;
+      initializeSchema: jest.fn(),
+    } as unknown as jest.Mocked<Neo4jConnection>;
 
     // Mock getConnection to return our mock connection
     mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
@@ -59,7 +63,7 @@ describe('MessageRepository', () => {
     ...overrides,
   });
 
-  const createMockCreateInput = (overrides: any = {}) => ({
+  const createMockCreateInput = (overrides: Partial<CreateMessageRequest> = {}) => ({
     timestamp: '2024-01-01T00:00:00.000Z',
     role: 'user' as const,
     content: 'Hello, world!',
@@ -264,11 +268,11 @@ describe('MessageRepository', () => {
     it('should validate required fields', async () => {
       const invalidInput = { content: 'Hello' }; // Missing role and starshipId
 
-      await expect(repository.create(invalidInput as any)).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidInput as never)).rejects.toThrow(DatabaseError);
     });
 
     it('should validate role enum', async () => {
-      const invalidRole = createMockCreateInput({ role: 'invalid' });
+      const invalidRole = createMockCreateInput({ role: 'invalid' as 'user' });
 
       await expect(repository.create(invalidRole)).rejects.toThrow(DatabaseError);
     });
@@ -675,7 +679,6 @@ describe('MessageRepository', () => {
 
   describe('serialization/deserialization', () => {
     it('should serialize complex fields correctly', () => {
-      const repo = repository as any;
       const message = createMockMessage({
         metadata: { complex: 'data' },
         processingMetadata: { tokens: 100 },
@@ -691,7 +694,6 @@ describe('MessageRepository', () => {
     });
 
     it('should deserialize complex fields correctly', () => {
-      const repo = repository as any;
       const rawMessage = {
         id: 'message-123',
         content: 'Test',
@@ -708,7 +710,6 @@ describe('MessageRepository', () => {
     });
 
     it('should handle null/undefined complex fields', () => {
-      const repo = repository as any;
       const rawMessage = {
         id: 'message-123',
         content: 'Test',
@@ -724,7 +725,6 @@ describe('MessageRepository', () => {
     });
 
     it('should handle invalid JSON gracefully', () => {
-      const repo = repository as any;
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       const rawMessage = {
         id: 'message-123',
@@ -773,7 +773,7 @@ describe('MessageRepository', () => {
         parentMessageId: 'parent-123',
         threadDepth: 3,
         processingStatus: 'processing',
-        messageType: 'system_notification',
+        messageType: 'system_message',
         importance: 'critical',
         contentHash: 'hash123',
         hasAttachments: true,

@@ -4,7 +4,6 @@
  * Clean agent template type definitions for model types.
  */
 
-import type { AgentMemoryState, AgentParams, Blueprint } from '@starships/autopilot';
 import { AgentParamsWithoutMetadata } from './agent';
 
 // ============================================================================
@@ -55,59 +54,4 @@ export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMe
   category?: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];
-}
-
-/**
- * Agent template response structure
- */
-export interface AgentTemplateResponse {
-  template: AgentTemplateModel;
-}
-
-/**
- * Agent template list response
- */
-export interface AgentTemplateListResponse {
-  templates: AgentTemplateModel[];
-  total: number;
-}
-
-// ============================================================================
-// FILTER AND QUERY TYPES
-// ============================================================================
-
-/**
- * Filters for querying agent templates
- */
-export interface AgentTemplateFilters {
-  category?: AgentTemplateCategory;
-}
-
-/**
- * Sorting options for agent templates
- */
-export interface AgentTemplateSort {
-  field: 'createdAt' | 'updatedAt' | 'name' | 'usageCount';
-  direction: 'asc' | 'desc';
-}
-
-// ============================================================================
-// USAGE AND ANALYTICS TYPES
-// ============================================================================
-
-/**
- * Agent template usage statistics
- */
-export interface AgentTemplateUsage {
-  templateId: string;
-  usageCount: number;
-  lastUsed?: string;
-}
-
-/**
- * Request to increment template usage
- */
-export interface IncrementTemplateUsageRequest {
-  templateId: string;
-  userId: string;
 }

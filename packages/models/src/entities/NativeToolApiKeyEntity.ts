@@ -97,7 +97,7 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
   /**
    * Static factory method for creating NativeToolApiKeyEntity from raw data
    */
-  static deserialize(data: Record<string, any>): NativeToolApiKeyEntity {
+  static deserialize(data: Record<string, unknown>): NativeToolApiKeyEntity {
     return plainToInstance(NativeToolApiKeyEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -107,7 +107,7 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -117,8 +117,11 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
   /**
    * Validation method for different contexts
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = NativeToolApiKeyEntity.deserialize(data);
+  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const entity = NativeToolApiKeyEntity.deserialize(data as Record<string, unknown>);
 
     // Context-specific validation rules
     if (context === 'create') {

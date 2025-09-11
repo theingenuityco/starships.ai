@@ -151,7 +151,7 @@ export class StarshipEntity implements StarshipModel {
   /**
    * Static factory method for creating StarshipEntity from raw data
    */
-  static deserialize(data: Record<string, any>): StarshipEntity {
+  static deserialize(data: Record<string, unknown>): StarshipEntity {
     return plainToInstance(StarshipEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -161,7 +161,7 @@ export class StarshipEntity implements StarshipModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -171,8 +171,11 @@ export class StarshipEntity implements StarshipModel {
   /**
    * Validation method for different contexts
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = StarshipEntity.deserialize(data);
+  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const entity = StarshipEntity.deserialize(data as Record<string, unknown>);
 
     // Context-specific validation rules
     if (context === 'create') {

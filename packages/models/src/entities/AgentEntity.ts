@@ -9,7 +9,7 @@ import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import { AgentMemoryState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, instanceToPlain, plainToInstance } from 'class-transformer';
 import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
 
 export class AgentEntity implements AgentModel {
@@ -82,7 +82,7 @@ export class AgentEntity implements AgentModel {
   /**
    * Static factory method for creating AgentEntity from raw data
    */
-  static deserialize(data: Record<string, any>): AgentEntity {
+  static deserialize(data: Record<string, unknown>): AgentEntity {
     return plainToInstance(AgentEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -92,7 +92,7 @@ export class AgentEntity implements AgentModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -102,8 +102,11 @@ export class AgentEntity implements AgentModel {
   /**
    * Validation method for different contexts
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = AgentEntity.deserialize(data);
+  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const entity = AgentEntity.deserialize(data as Record<string, unknown>);
 
     // Context-specific validation rules
     if (context === 'create') {

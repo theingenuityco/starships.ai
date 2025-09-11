@@ -17,7 +17,7 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) RETURN m ORDER BY m.timestamp DESC');
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findAll',
       'Message'
@@ -30,7 +30,7 @@ export class MessageRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id RETURN m', { id });
         const message = result[0]?.m || null;
-        return message ? MessageEntity.deserialize(message) : null;
+        return message ? MessageEntity.deserialize(message as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Message',
@@ -46,7 +46,7 @@ export class MessageRepository extends BaseRepository {
           'MATCH (m:Message) WHERE m.starshipId = $starshipId RETURN m ORDER BY m.timestamp DESC',
           { starshipId }
         );
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByStarshipId',
       'Message'
@@ -61,7 +61,7 @@ export class MessageRepository extends BaseRepository {
           'MATCH (m:Message) WHERE m.agentId = $agentId RETURN m ORDER BY m.timestamp DESC',
           { agentId }
         );
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByAgentId',
       'Message'
@@ -76,7 +76,7 @@ export class MessageRepository extends BaseRepository {
           'MATCH (m:Message) WHERE m.memoryId = $memoryId RETURN m ORDER BY m.timestamp ASC',
           { memoryId }
         );
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByMemoryId',
       'Message'
@@ -88,7 +88,7 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE m.conversationId = $conversationId RETURN m ORDER BY m.timestamp ASC';
-        const params: any = { conversationId };
+        const params: Record<string, unknown> = { conversationId };
 
         if (limit) {
           cypher += ' SKIP $offset LIMIT $limit';
@@ -97,7 +97,7 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByConversationId',
       'Message'
@@ -109,7 +109,7 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE m.role = $role';
-        const params: any = { role };
+        const params: Record<string, unknown> = { role };
 
         if (starshipId) {
           cypher += ' AND m.starshipId = $starshipId';
@@ -119,7 +119,7 @@ export class MessageRepository extends BaseRepository {
         cypher += ' RETURN m ORDER BY m.timestamp DESC';
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByRole',
       'Message'
@@ -178,7 +178,7 @@ export class MessageRepository extends BaseRepository {
           await this.linkToConversation(result.id, entity.conversationId);
         }
 
-        return MessageEntity.deserialize(result);
+        return MessageEntity.deserialize(result as unknown as Record<string, unknown>);
       },
       'create',
       'Message'
@@ -208,7 +208,7 @@ export class MessageRepository extends BaseRepository {
         });
 
         const message = result[0]?.m || null;
-        return message ? MessageEntity.deserialize(message) : null;
+        return message ? MessageEntity.deserialize(message as unknown as Record<string, unknown>) : null;
       },
       'update',
       'Message',
@@ -303,7 +303,7 @@ export class MessageRepository extends BaseRepository {
       { parentId }
     );
 
-    const children = result.map((record) => MessageEntity.deserialize(record.m));
+    const children = result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
     const allChildren: MessageModel[] = [];
     const seenIds = new Set<string>();
 
@@ -350,7 +350,7 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE m.content CONTAINS $query';
-        const params: any = { query };
+        const params: Record<string, unknown> = { query };
 
         // Add filters
         if (filters?.starshipId) {
@@ -409,7 +409,7 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'searchMessages',
       'Message'
@@ -433,7 +433,7 @@ export class MessageRepository extends BaseRepository {
           { conversationId }
         );
 
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'getConversationMessages',
       'Message'
@@ -478,7 +478,7 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE 1=1';
-        const params: any = {};
+        const params: Record<string, unknown> = {};
 
         // Apply filters
         if (filters?.starshipId) {
@@ -617,7 +617,7 @@ export class MessageRepository extends BaseRepository {
         const connection = this.getConnection();
         let cypher = `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
                       RETURN m ORDER BY m.timestamp ASC`;
-        const params: any = { conversationId };
+        const params: Record<string, unknown> = { conversationId };
 
         if (limit) {
           cypher += ' SKIP $offset LIMIT $limit';
@@ -626,7 +626,7 @@ export class MessageRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByConversationIdViaRelationship',
       'Message'
@@ -690,7 +690,7 @@ export class MessageRepository extends BaseRepository {
           }
         );
 
-        return result[0]?.m ? MessageEntity.deserialize(result[0].m) : null;
+        return result[0]?.m ? MessageEntity.deserialize(result[0].m as unknown as Record<string, unknown>) : null;
       },
       'appendStreamingContent',
       'Message',
@@ -730,7 +730,7 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let cypher = 'MATCH (m:Message) WHERE m.isStreaming = true AND m.streamCompleted = false';
-        const params: any = {};
+        const params: Record<string, unknown> = {};
 
         if (conversationId) {
           cypher += ' AND m.conversationId = $conversationId';
@@ -740,7 +740,7 @@ export class MessageRepository extends BaseRepository {
         cypher += ' RETURN m ORDER BY m.createdAt ASC';
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return result.map((record) => MessageEntity.deserialize(record.m));
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findActiveStreamingMessages',
       'Message'

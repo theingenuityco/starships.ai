@@ -6,6 +6,7 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
+import type { Blueprint } from '@starships/autopilot';
 import type { WorkflowModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import {
@@ -115,7 +116,7 @@ export class WorkflowEntity implements WorkflowModel {
 
   @Expose()
   @Transformers.JsonTransform()
-  blueprint!: any; // Blueprint interface from autopilot package
+  blueprint!: Blueprint;
 
   @Expose()
   @Transform(({ value }) => value)
@@ -128,7 +129,7 @@ export class WorkflowEntity implements WorkflowModel {
    * Deserialize database record into WorkflowEntity
    * Converts raw database records to fully typed and validated WorkflowEntity instances
    */
-  static deserialize(data: Record<string, any>): WorkflowEntity {
+  static deserialize(data: Record<string, unknown>): WorkflowEntity {
     return plainToInstance(WorkflowEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -139,7 +140,7 @@ export class WorkflowEntity implements WorkflowModel {
    * Serialize WorkflowEntity to database record
    * Converts entity instance to plain object suitable for database storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -150,34 +151,38 @@ export class WorkflowEntity implements WorkflowModel {
    * Simple validation function using class-validator
    * This replaces complex validation classes with a lean solution
    */
-  static async validate(data: any, operation: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const dataRecord = data as Record<string, unknown>;
     const entity = new WorkflowEntity();
 
     // For create operations, validate all required fields
     if (operation === 'create') {
       Object.assign(entity, {
-        id: data.id || 'temp-id', // Will be replaced by auto-generated ID
-        createdAt: data.createdAt || new Date().toISOString(),
-        updatedAt: data.updatedAt || new Date().toISOString(),
-        name: data.name,
-        authorId: data.authorId,
-        description: data.description || '',
-        category: data.category || 'general',
-        version: data.version || '1.0.0',
-        usageCount: data.usageCount ?? 0,
-        isPublic: data.isPublic ?? false,
-        tags: data.tags || [],
-        rating: data.rating,
-        executionMode: data.executionMode || 'workflow',
-        allowedStarshipClasses: data.allowedStarshipClasses || [],
-        timeout: data.timeout ?? 30000,
-        blueprint: data.blueprint,
-        starshipId: data.starshipId,
-        ...data,
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        name: dataRecord.name,
+        authorId: dataRecord.authorId,
+        description: dataRecord.description || '',
+        category: dataRecord.category || 'general',
+        version: dataRecord.version || '1.0.0',
+        usageCount: dataRecord.usageCount ?? 0,
+        isPublic: dataRecord.isPublic ?? false,
+        tags: dataRecord.tags || [],
+        rating: dataRecord.rating,
+        executionMode: dataRecord.executionMode || 'workflow',
+        allowedStarshipClasses: dataRecord.allowedStarshipClasses || [],
+        timeout: dataRecord.timeout ?? 30000,
+        blueprint: dataRecord.blueprint,
+        starshipId: dataRecord.starshipId,
+        ...dataRecord,
       });
     } else {
       // For update operations, only validate provided fields
-      Object.assign(entity, data);
+      Object.assign(entity, dataRecord);
     }
 
     const errors = await validate(entity, {

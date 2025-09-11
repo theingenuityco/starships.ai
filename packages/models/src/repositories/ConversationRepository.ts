@@ -1,6 +1,6 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { ConversationModel } from '@starships/protocol';
+import type { ConversationModel } from '@starships/protocol';
 import { ConversationEntity } from '../entities/ConversationEntity';
 
 export class ConversationRepository extends BaseRepository {
@@ -15,7 +15,7 @@ export class ConversationRepository extends BaseRepository {
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
         );
-        return result.map((record) => ConversationEntity.deserialize(record.c));
+        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
       },
       'findAll',
       'Conversation'
@@ -27,7 +27,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0 ? ConversationEntity.deserialize(result[0].c) : null;
+        return result.length > 0 ? ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Conversation',
@@ -56,7 +56,7 @@ export class ConversationRepository extends BaseRepository {
 
         const conversationData = conversationEntity.serialize();
         // Remove id since it will be auto-generated
-        delete conversationData.id;
+        delete (conversationData as { id?: string }).id;
 
         // Use BaseRepository serialization (the conversationData is already properly prepared)
         const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
@@ -67,7 +67,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result);
+        return ConversationEntity.deserialize(result as unknown as Record<string, unknown>);
       },
       'create',
       'Conversation'
@@ -129,7 +129,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result[0].c);
+        return ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>);
       },
       'update',
       'Conversation',
@@ -166,7 +166,7 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.lastActivityAt DESC`,
           { starshipId }
         );
-        return result.map((record) => ConversationEntity.deserialize(record.c));
+        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
       },
       'findByStarship',
       'Conversation'
@@ -245,14 +245,14 @@ export class ConversationRepository extends BaseRepository {
     conversationId: string,
     orderBy: 'timestamp' | 'created_at' = 'timestamp',
     orderDirection: 'asc' | 'desc' = 'asc'
-  ): Promise<any[]> {
+  ): Promise<Record<string, unknown>[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
         const orderField = orderBy === 'timestamp' ? 'm.timestamp' : 'm.createdAt';
         const direction = orderDirection.toUpperCase();
 
-        const result = await connection.executeQuery<{ m: any }>(
+        const result = await connection.executeQuery<{ m: Record<string, unknown> }>(
           `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
            RETURN m ORDER BY ${orderField} ${direction}`,
           { conversationId }

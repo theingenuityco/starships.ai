@@ -23,8 +23,8 @@ export class NativeToolApiKeyRepository extends BaseRepository {
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
 
-    // Cast to any to access getAuthTag method
-    const authTag = (cipher as any).getAuthTag();
+    // Cast to crypto.CipherGCM to access getAuthTag method
+    const authTag = (cipher as crypto.CipherGCM).getAuthTag();
 
     return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
   }
@@ -39,8 +39,8 @@ export class NativeToolApiKeyRepository extends BaseRepository {
     const encrypted = parts[2];
 
     const decipher = crypto.createDecipheriv(this.algorithm, this.secretKey, iv);
-    // Cast to any to access setAuthTag method
-    (decipher as any).setAuthTag(authTag);
+    // Cast to crypto.DecipherGCM to access setAuthTag method
+    (decipher as crypto.DecipherGCM).setAuthTag(authTag);
 
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');

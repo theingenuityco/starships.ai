@@ -157,7 +157,7 @@ export class MessageEntity implements MessageModel {
   /**
    * Static factory method for creating MessageEntity from raw data
    */
-  static deserialize(data: Record<string, any>): MessageEntity {
+  static deserialize(data: Record<string, unknown>): MessageEntity {
     return plainToInstance(MessageEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -167,7 +167,7 @@ export class MessageEntity implements MessageModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -177,8 +177,11 @@ export class MessageEntity implements MessageModel {
   /**
    * Validation method for different contexts
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = MessageEntity.deserialize(data);
+  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const entity = MessageEntity.deserialize(data as Record<string, unknown>);
 
     // Context-specific validation rules
     if (context === 'create') {

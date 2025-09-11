@@ -139,8 +139,7 @@ const mockDriver = {
 (global as Record<string, unknown>).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') =>
   new NotFoundError(entityType, entityId);
 
-(global as Record<string, unknown>).createDatabaseError = (message = 'Database operation failed', operation = 'test') =>
-  new DatabaseError(operation);
+(global as Record<string, unknown>).createDatabaseError = (operation = 'test') => new DatabaseError(operation);
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 (global as Record<string, unknown>).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') =>

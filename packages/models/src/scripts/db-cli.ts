@@ -34,12 +34,12 @@ class DatabaseCLI {
       if (arg.startsWith('--')) {
         const [key, value] = arg.substring(2).split('=');
         if (value) {
-          (this.options as any)[key] = value;
+          (this.options as Record<string, unknown>)[key] = value;
         } else if (i + 1 < this.args.length && !this.args[i + 1].startsWith('-')) {
-          (this.options as any)[key] = this.args[i + 1];
+          (this.options as Record<string, unknown>)[key] = this.args[i + 1];
           i++;
         } else {
-          (this.options as any)[key] = true;
+          (this.options as Record<string, unknown>)[key] = true;
         }
       } else if (arg.startsWith('-')) {
         const flags = arg.substring(1);

@@ -3,7 +3,7 @@
  */
 
 import { Neo4jConnection, createConnection, getConnection, resetConnection, Neo4jConfig } from '../connection';
-import neo4j, { Driver, Session, ManagedTransaction, Integer } from 'neo4j-driver';
+import neo4j from 'neo4j-driver';
 
 // Mock neo4j-driver
 jest.mock('neo4j-driver', () => {
@@ -24,9 +24,20 @@ jest.mock('neo4j-driver', () => {
 });
 
 describe('Neo4jConnection', () => {
-  let mockDriver: any;
-  let mockSession: any;
-  let mockTransaction: any;
+  let mockDriver: {
+    verifyConnectivity: jest.Mock;
+    close: jest.Mock;
+    session: jest.Mock;
+  };
+  let mockSession: {
+    close: jest.Mock;
+    executeRead: jest.Mock;
+    executeWrite: jest.Mock;
+    run: jest.Mock;
+  };
+  let mockTransaction: {
+    run: jest.Mock;
+  };
   let connection: Neo4jConnection;
 
   const testConfig: Neo4jConfig = {
@@ -63,7 +74,7 @@ describe('Neo4jConnection', () => {
   describe('constructor', () => {
     it('should create connection with config', () => {
       expect(connection).toBeInstanceOf(Neo4jConnection);
-      expect((connection as any).config).toEqual(testConfig);
+      expect((connection as unknown as { config: Neo4jConfig }).config).toEqual(testConfig);
     });
   });
 
@@ -181,7 +192,7 @@ describe('Neo4jConnection', () => {
         ],
       };
 
-      mockSession.executeRead.mockImplementation((fn: any) => {
+      mockSession.executeRead.mockImplementation((fn: (tx: typeof mockTransaction) => Promise<typeof mockResult>) => {
         return fn(mockTransaction).then(() => mockResult);
       });
       mockTransaction.run.mockResolvedValue(mockResult);
@@ -196,7 +207,7 @@ describe('Neo4jConnection', () => {
     it('should handle query with no records', async () => {
       const mockResult = { records: [] };
 
-      mockSession.executeRead.mockImplementation((fn: any) => {
+      mockSession.executeRead.mockImplementation((fn: (tx: typeof mockTransaction) => Promise<typeof mockResult>) => {
         return fn(mockTransaction).then(() => mockResult);
       });
       mockTransaction.run.mockResolvedValue(mockResult);
@@ -216,7 +227,7 @@ describe('Neo4jConnection', () => {
         limit: 10,
       };
 
-      mockSession.executeRead.mockImplementation((fn: any) => {
+      mockSession.executeRead.mockImplementation((fn: (tx: typeof mockTransaction) => Promise<typeof mockResult>) => {
         return fn(mockTransaction).then(() => mockResult);
       });
       mockTransaction.run.mockResolvedValue(mockResult);
@@ -255,7 +266,7 @@ describe('Neo4jConnection', () => {
         ],
       };
 
-      mockSession.executeRead.mockImplementation((fn: any) => {
+      mockSession.executeRead.mockImplementation((fn: (tx: typeof mockTransaction) => Promise<typeof mockResult>) => {
         return Promise.resolve(fn(mockTransaction)).then(() => mockResult);
       });
       mockTransaction.run.mockResolvedValue(mockResult);
@@ -287,7 +298,7 @@ describe('Neo4jConnection', () => {
         ],
       };
 
-      mockSession.executeWrite.mockImplementation((fn: any) => {
+      mockSession.executeWrite.mockImplementation((fn: (tx: typeof mockTransaction) => Promise<typeof mockResult>) => {
         return fn(mockTransaction).then(() => mockResult);
       });
       mockTransaction.run.mockResolvedValue(mockResult);
@@ -345,10 +356,12 @@ describe('Neo4jConnection', () => {
   });
 
   describe('sanitizeParameters', () => {
-    let sanitizeMethod: any;
+    let sanitizeMethod: (value: unknown, depth?: number) => unknown;
 
     beforeEach(() => {
-      sanitizeMethod = (connection as any).sanitizeParameters.bind(connection);
+      sanitizeMethod = (connection as { sanitizeParameters: (value: unknown, depth?: number) => unknown }).sanitizeParameters.bind(
+        connection
+      );
     });
 
     it('should handle null and undefined values', () => {
@@ -427,12 +440,12 @@ describe('Neo4jConnection', () => {
 
     it('should handle deep recursion protection', () => {
       // Create a circular reference object
-      const circular: any = { value: 'test' };
+      const circular: Record<string, unknown> = { value: 'test' };
       circular.self = circular;
 
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
-      const result = sanitizeMethod(circular, 11); // Exceed max depth
+      sanitizeMethod(circular, 11); // Exceed max depth
 
       expect(consoleSpy).toHaveBeenCalledWith('[Neo4j] Maximum sanitization depth reached, returning value as-is:', 'object');
 
@@ -507,8 +520,17 @@ describe('Connection Factory Functions', () => {
 
 describe('Neo4jConnection Integration Scenarios', () => {
   let connection: Neo4jConnection;
-  let mockDriver: any;
-  let mockSession: any;
+  let mockDriver: {
+    verifyConnectivity: jest.Mock;
+    close: jest.Mock;
+    session: jest.Mock;
+  };
+  let mockSession: {
+    close: jest.Mock;
+    executeRead: jest.Mock;
+    executeWrite: jest.Mock;
+    run: jest.Mock;
+  };
 
   const testConfig: Neo4jConfig = {
     uri: 'bolt://localhost:7687',
@@ -548,7 +570,7 @@ describe('Neo4jConnection Integration Scenarios', () => {
       ],
     };
 
-    mockSession.executeWrite.mockImplementation((fn: any) => Promise.resolve(createResult));
+    mockSession.executeWrite.mockImplementation(() => Promise.resolve(createResult));
 
     const result = await connection.executeWrite('CREATE (u:User $props) RETURN u', {
       props: { id: 'user-1', email: 'test@example.com' },

@@ -24,10 +24,10 @@ describe('Logging and Monitoring System', () => {
     Logger.resetInstance();
 
     // Clear performance monitor timers
-    (PerformanceMonitor as any).timers.clear();
+    (PerformanceMonitor as unknown as { timers: Map<string, number> }).timers.clear();
 
     // Clear health monitor state
-    (HealthMonitor as any).healthChecks.clear();
+    (HealthMonitor as unknown as { healthChecks: Map<string, HealthStatus> }).healthChecks.clear();
   });
 
   describe('LogLevel enum', () => {
@@ -254,7 +254,7 @@ describe('Logging and Monitoring System', () => {
   describe('PerformanceMonitor', () => {
     it('should start and end timing operations', async () => {
       // Clear any existing timers first
-      (PerformanceMonitor as any).timers.clear();
+      (PerformanceMonitor as unknown as { timers: Map<string, number> }).timers.clear();
 
       const operationId = 'test-op-123';
 
@@ -271,7 +271,7 @@ describe('Logging and Monitoring System', () => {
 
     it('should handle missing timer gracefully', () => {
       // Clear any existing timers first
-      (PerformanceMonitor as any).timers.clear();
+      (PerformanceMonitor as unknown as { timers: Map<string, number> }).timers.clear();
 
       // Reset and create a new logger instance with warn level enabled
       Logger.resetInstance();
@@ -462,7 +462,7 @@ describe('Logging and Monitoring System', () => {
   describe('RequestContext', () => {
     beforeEach(() => {
       // Clear all contexts
-      (RequestContext as any).contexts.clear();
+      (RequestContext as unknown as { contexts: Map<string, LogContext> }).contexts.clear();
     });
 
     it('should create new request context', () => {

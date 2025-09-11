@@ -55,7 +55,7 @@ export const Transformers = {
   /**
    * Ensure array type with default empty array
    */
-  ArrayTransform: (defaultValue: any[] = []) =>
+  ArrayTransform: (defaultValue: unknown[] = []) =>
     Transform(({ value }) => {
       if (Array.isArray(value)) return value;
       if (value === null || value === undefined) return defaultValue;

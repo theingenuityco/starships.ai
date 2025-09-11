@@ -21,20 +21,20 @@ class TestRepository extends BaseRepository {
     return this.createContext(operation, resource, resourceId);
   }
 
-  public testHandleDatabaseError(error: any, operation: string, resource?: string, resourceId?: string) {
+  public testHandleDatabaseError(error: Record<string, unknown>, operation: string, resource?: string, resourceId?: string) {
     return this.handleDatabaseError(error, operation, resource, resourceId);
   }
 
-  public testHandleNotFound(resource: string, resourceId?: string, operation?: string) {
-    return this.handleNotFound(resource, resourceId, operation);
+  public testHandleNotFound(resource: string, resourceId?: string) {
+    return this.handleNotFound(resource, resourceId);
   }
 
-  public testHandleValidationError(fieldErrors: Array<{ field: string; message: string; value?: any }>, operation?: string) {
-    return this.handleValidationError(fieldErrors, operation);
+  public testHandleValidationError(fieldErrors: Array<{ field: string; message: string; value?: unknown }>) {
+    return this.handleValidationError(fieldErrors);
   }
 
-  public testHandleConflict(resource: string, conflictReason: string, operation?: string, resourceId?: string) {
-    return this.handleConflict(resource, conflictReason, operation, resourceId);
+  public testHandleConflict(resource: string, conflictReason: string) {
+    return this.handleConflict(resource, conflictReason);
   }
 
   public async testExecuteWithErrorHandling<T>(operation: () => Promise<T>, operationName: string, resource?: string, resourceId?: string) {
@@ -48,8 +48,8 @@ class TestRepository extends BaseRepository {
   // Note: Validation methods have been removed from BaseRepository
   // Validation is now handled by individual entities using class-validator decorators
 
-  public testCreateBusinessLogicError(code: string, message: string, operation?: string, resource?: string, resourceId?: string) {
-    return this.createBusinessLogicError(code, message, operation, resource, resourceId);
+  public testCreateBusinessLogicError(code: string, message: string) {
+    return this.createBusinessLogicError(code, message);
   }
 }
 
@@ -63,7 +63,7 @@ describe('BaseRepository', () => {
 
   describe('constructor', () => {
     it('should initialize with service name', () => {
-      expect((repository as any).serviceName).toBe('TestService');
+      expect((repository as unknown as { serviceName: string }).serviceName).toBe('TestService');
     });
   });
 
@@ -148,15 +148,16 @@ describe('BaseRepository', () => {
   describe('handleNotFound', () => {
     it('should throw NotFoundError with resource details', () => {
       expect(() => {
-        repository.testHandleNotFound('User', 'user-123', 'find');
+        repository.testHandleNotFound('User', 'user-123');
       }).toThrow(NotFoundError);
 
       try {
-        repository.testHandleNotFound('User', 'user-123', 'find');
-      } catch (error: any) {
-        expect(error.resource).toBe('User');
-        expect(error.id).toBe('user-123');
-        expect(error.message).toContain('User not found: user-123');
+        repository.testHandleNotFound('User', 'user-123');
+      } catch (error: unknown) {
+        const notFoundError = error as { resource: string; id: string; message: string };
+        expect(notFoundError.resource).toBe('User');
+        expect(notFoundError.id).toBe('user-123');
+        expect(notFoundError.message).toContain('User not found: user-123');
       }
     });
 
@@ -167,8 +168,9 @@ describe('BaseRepository', () => {
 
       try {
         repository.testHandleNotFound('User');
-      } catch (error: any) {
-        expect(error.id).toBe('unknown');
+      } catch (error: unknown) {
+        const notFoundError = error as { id: string };
+        expect(notFoundError.id).toBe('unknown');
       }
     });
   });
@@ -181,15 +183,16 @@ describe('BaseRepository', () => {
       ];
 
       expect(() => {
-        repository.testHandleValidationError(fieldErrors, 'create');
+        repository.testHandleValidationError(fieldErrors);
       }).toThrow(ValidationError);
 
       try {
         repository.testHandleValidationError(fieldErrors);
-      } catch (error: any) {
-        expect(error.message).toContain('email: Invalid email format');
-        expect(error.message).toContain('name: Name is required');
-        expect(error.field).toBe('email');
+      } catch (error: unknown) {
+        const validationError = error as { message: string; field: string };
+        expect(validationError.message).toContain('email: Invalid email format');
+        expect(validationError.message).toContain('name: Name is required');
+        expect(validationError.field).toBe('email');
       }
     });
 
@@ -203,15 +206,16 @@ describe('BaseRepository', () => {
   describe('handleConflict', () => {
     it('should throw ConflictError with details', () => {
       expect(() => {
-        repository.testHandleConflict('User', 'Email already exists', 'create', 'user-123');
+        repository.testHandleConflict('User', 'Email already exists');
       }).toThrow(ConflictError);
 
       try {
-        repository.testHandleConflict('User', 'Email already exists', 'create', 'user-123');
-      } catch (error: any) {
-        expect(error.message).toBe('Email already exists');
-        expect(error.code).toBe('CONFLICT');
-        expect(error.statusCode).toBe(409);
+        repository.testHandleConflict('User', 'Email already exists');
+      } catch (error: unknown) {
+        const conflictError = error as { message: string; code: string; statusCode: number };
+        expect(conflictError.message).toBe('Email already exists');
+        expect(conflictError.code).toBe('CONFLICT');
+        expect(conflictError.statusCode).toBe(409);
       }
     });
   });
@@ -276,21 +280,16 @@ describe('BaseRepository', () => {
   describe('createBusinessLogicError', () => {
     it('should throw DatabaseError with business logic details', () => {
       expect(() => {
-        repository.testCreateBusinessLogicError(
-          'INSUFFICIENT_PERMISSIONS',
-          'User lacks required permissions',
-          'authorize',
-          'User',
-          'user-123'
-        );
+        repository.testCreateBusinessLogicError('INSUFFICIENT_PERMISSIONS', 'User lacks required permissions');
       }).toThrow(DatabaseError);
 
       try {
         repository.testCreateBusinessLogicError('BUSINESS_ERROR', 'Business rule violation');
-      } catch (error: any) {
-        expect(error.message).toBe('Database unknown failed');
-        expect(error.code).toBe('DATABASE_ERROR');
-        expect(error.operation).toBe('unknown');
+      } catch (error: unknown) {
+        const businessError = error as { message: string; code: string; operation: string };
+        expect(businessError.message).toBe('Database unknown failed');
+        expect(businessError.code).toBe('DATABASE_ERROR');
+        expect(businessError.operation).toBe('unknown');
       }
     });
   });
@@ -364,7 +363,9 @@ describe('BaseRepository', () => {
     it('should have log method that outputs to console', () => {
       const consoleSpy = jest.spyOn(console, 'info').mockImplementation();
 
-      (repository as any).log('info', 'Test message', { data: 'test' });
+      (repository as unknown as { log: (level: string, message: string, data?: unknown) => void }).log('info', 'Test message', {
+        data: 'test',
+      });
 
       expect(consoleSpy).toHaveBeenCalledWith('[TESTSERVICE] Test message', { data: 'test' });
 
@@ -376,9 +377,10 @@ describe('BaseRepository', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       const errorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      (repository as any).log('debug', 'Debug message');
-      (repository as any).log('warn', 'Warning message');
-      (repository as any).log('error', 'Error message');
+      const logRepo = repository as unknown as { log: (level: string, message: string) => void };
+      logRepo.log('debug', 'Debug message');
+      logRepo.log('warn', 'Warning message');
+      logRepo.log('error', 'Error message');
 
       expect(debugSpy).toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalled();

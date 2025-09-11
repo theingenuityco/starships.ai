@@ -24,7 +24,7 @@ export interface MigrationResult {
 }
 
 export class MigrationRunner {
-  private connection: any = null;
+  private connection: ReturnType<typeof getConnection> | null = null;
   private migrationsPath = join(__dirname, '../../migrations');
 
   private getConnection() {
@@ -81,7 +81,7 @@ export class MigrationRunner {
       console.log('🚀 Initializing database schema...');
 
       try {
-        await this.executeMigrationContent(schemaContent, '000_complete_schema');
+        await this.executeMigrationContent(schemaContent);
         console.log('✅ Migration content executed successfully, now verifying...');
       } catch (executionError) {
         console.error('❌ Migration content execution failed:', executionError);
@@ -157,7 +157,7 @@ export class MigrationRunner {
 
       // Execute rollback
       const rollbackContent = readFileSync(rollbackPath, 'utf-8');
-      await this.executeMigrationContent(rollbackContent, `rollback_${migrationId}`);
+      await this.executeMigrationContent(rollbackContent);
 
       result.success = true;
       result.executionTime = Date.now() - startTime;
@@ -173,11 +173,11 @@ export class MigrationRunner {
   async getAppliedMigrations(): Promise<MigrationInfo[]> {
     try {
       const result = await this.getConnection().executeQuery(
-        `MATCH (m:Migration) 
-         RETURN m 
-         ORDER BY m.appliedAt ASC`
+        `MATCH (m:Migration)
+       RETURN m
+       ORDER BY m.appliedAt ASC`
       );
-      return result.map((record: any) => record.m);
+      return result.map((record: Record<string, unknown>) => record.m as MigrationInfo);
     } catch (error) {
       console.error('Failed to get applied migrations:', error);
       return [];
@@ -245,7 +245,7 @@ export class MigrationRunner {
       const result = await this.getConnection().executeQuery('MATCH (m:Migration {id: $migrationId}) RETURN count(m) as count', {
         migrationId,
       });
-      return result[0]?.count > 0;
+      return (result[0] as { count: number })?.count > 0;
     } catch (error) {
       console.error('Failed to check migration status:', error);
       return false;
@@ -253,7 +253,7 @@ export class MigrationRunner {
   }
 
   /** Execute migration content with transaction handling */
-  private async executeMigrationContent(content: string, migrationId: string): Promise<void> {
+  private async executeMigrationContent(content: string): Promise<void> {
     // Clean content: remove comment lines and empty lines, but preserve multi-line statements
     const lines = content.split('\n');
     const cleanedLines: string[] = [];
@@ -410,14 +410,14 @@ export class MigrationRunner {
       // Check basic constraints exist
       const constraints = await this.getConnection().executeQuery('SHOW CONSTRAINTS YIELD name RETURN count(*) as count');
 
-      if (constraints[0]?.count < 5) {
+      if ((constraints[0] as { count: number })?.count < 5) {
         errors.push('Expected constraints not found');
       }
 
       // Check basic indexes exist
       const indexes = await this.getConnection().executeQuery('SHOW INDEXES YIELD name RETURN count(*) as count');
 
-      if (indexes[0]?.count < 5) {
+      if ((indexes[0] as { count: number })?.count < 5) {
         errors.push('Expected indexes not found');
       }
     } catch (error) {

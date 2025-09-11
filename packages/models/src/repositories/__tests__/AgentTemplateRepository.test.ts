@@ -53,7 +53,10 @@ jest.mock('../../entities/AgentTemplateEntity', () => ({
 describe('AgentTemplateRepository', () => {
   let repository: AgentTemplateRepository;
   let testHelper: RepositoryTestHelper;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.Mock;
+    executeWrite: jest.Mock;
+  };
 
   beforeEach(() => {
     testHelper = new RepositoryTestHelper();
@@ -83,7 +86,7 @@ describe('AgentTemplateRepository', () => {
       space: { description: 'helpful environment' },
     },
     blueprint: {
-      nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} }],
+      nodes: [{ ref: 'start', type: 'start' as const, name: 'Start', description: 'Begin', parameters: {} }],
       edges: [],
       metadata: {},
     },
@@ -93,20 +96,21 @@ describe('AgentTemplateRepository', () => {
   });
 
   // Helper to create mock template as it would be stored in Neo4j (serialized)
-  const createMockRawTemplate = (overrides: any = {}): any => {
-    const template = createMockTemplate(overrides);
+  const createMockRawTemplate = (overrides: Record<string, unknown> = {}): Record<string, unknown> => {
+    const template = createMockTemplate(overrides as Partial<AgentTemplateModel>);
     return {
       ...template,
       memory: template.memory ? JSON.stringify(template.memory) : null,
       blueprint: template.blueprint ? JSON.stringify(template.blueprint) : null,
+      ...overrides,
     };
   };
 
-  const createMockCreateInput = (overrides: any = {}) => ({
+  const createMockCreateInput = (overrides: Record<string, unknown> = {}) => ({
     name: 'Test Template',
     slug: 'test-template',
     description: 'A test agent template',
-    category: 'general',
+    category: 'general' as const,
     model: 'gpt-4',
     temperature: 0.7,
     maxTokens: 2000,
@@ -121,7 +125,7 @@ describe('AgentTemplateRepository', () => {
       space: { description: 'helpful environment' },
     },
     blueprint: {
-      nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} }],
+      nodes: [{ ref: 'start', type: 'start' as const, name: 'Start', description: 'Begin', parameters: {} }],
       edges: [],
       metadata: {},
     },
@@ -134,7 +138,7 @@ describe('AgentTemplateRepository', () => {
     });
 
     it('should use provided connection', () => {
-      const customConnection = {} as any;
+      const customConnection = {} as unknown as import('@/helpers/database/connection').Neo4jConnection;
       const repo = new AgentTemplateRepository(customConnection);
       expect(repo).toBeInstanceOf(AgentTemplateRepository);
     });
@@ -301,7 +305,7 @@ describe('AgentTemplateRepository', () => {
     it('should validate required fields', async () => {
       const invalidInput = { description: 'Missing name' };
 
-      await expect(repository.create(invalidInput as any)).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidInput as unknown as Parameters<typeof repository.create>[0])).rejects.toThrow(DatabaseError);
     });
 
     it('should handle missing optional fields', async () => {
@@ -759,7 +763,7 @@ describe('AgentTemplateRepository', () => {
 
   describe('private helper methods', () => {
     it('should safely get values with defaults', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { getSafeValue: (value: unknown, defaultValue: string) => string };
 
       expect(repo.getSafeValue(null, 'default')).toBe('default');
       expect(repo.getSafeValue(undefined, 'default')).toBe('default');
@@ -768,7 +772,7 @@ describe('AgentTemplateRepository', () => {
     });
 
     it('should serialize templates correctly', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { serializeTemplate: (template: Record<string, unknown>) => Record<string, unknown> };
       const template = {
         name: 'Test',
         memory: { test: 'data' },
@@ -784,7 +788,7 @@ describe('AgentTemplateRepository', () => {
     });
 
     it('should deserialize templates correctly', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { deserializeTemplate: (template: Record<string, unknown>) => AgentTemplateModel };
       const rawTemplate = {
         name: 'Test',
         memory: JSON.stringify({ test: 'data' }),
@@ -801,7 +805,7 @@ describe('AgentTemplateRepository', () => {
     });
 
     it('should handle null memory and blueprint in deserialization', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { deserializeTemplate: (template: Record<string, unknown>) => AgentTemplateModel };
       const rawTemplate = {
         name: 'Test',
         memory: null,

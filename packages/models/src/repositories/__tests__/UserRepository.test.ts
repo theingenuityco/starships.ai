@@ -37,12 +37,20 @@ import { UserRepository } from '../UserRepository';
 describe('UserRepository', () => {
   let repository: UserRepository;
   let testHelper: RepositoryTestHelper;
-  let mockUserEntity: any;
+  let mockUserEntity: {
+    validate: jest.MockedFunction<(data: unknown, operation?: string) => Promise<void>>;
+    deserialize: jest.MockedFunction<(data: Record<string, unknown>) => UserModel>;
+    generateUsernameFromEmail: jest.MockedFunction<(email: string) => string>;
+  };
 
   beforeEach(() => {
     testHelper = new RepositoryTestHelper();
     repository = new UserRepository();
-    mockUserEntity = UserEntity as any;
+    mockUserEntity = UserEntity as unknown as {
+      validate: jest.MockedFunction<(data: unknown, operation?: string) => Promise<void>>;
+      deserialize: jest.MockedFunction<(data: Record<string, unknown>) => UserModel>;
+      generateUsernameFromEmail: jest.MockedFunction<(email: string) => string>;
+    };
 
     // Reset mocks
     testHelper.reset();
@@ -52,19 +60,19 @@ describe('UserRepository', () => {
 
     // Reset default implementations
     mockUserEntity.validate.mockResolvedValue(undefined);
-    mockUserEntity.deserialize.mockImplementation((data: any) => {
+    mockUserEntity.deserialize.mockImplementation((data: Record<string, unknown>) => {
       // Always add serialize method for entities
       return {
         ...data,
         serialize: jest.fn().mockReturnValue(data),
-      };
+      } as unknown as UserModel;
     });
     mockUserEntity.generateUsernameFromEmail.mockImplementation((email: string) => email.split('@')[0]);
   });
 
   describe('constructor', () => {
     it('should initialize with correct service name', () => {
-      expect((repository as any).serviceName).toBe('UserRepository');
+      expect((repository as unknown as { serviceName: string }).serviceName).toBe('UserRepository');
     });
   });
 
@@ -187,7 +195,9 @@ describe('UserRepository', () => {
 
       mockUserEntity.validate.mockRejectedValueOnce(new Error('Email is required for user creation'));
 
-      await expect(repository.create(incompleteData as any)).rejects.toThrow(DatabaseError);
+      await expect(
+        repository.create(incompleteData as { email: string; username?: string; displayName?: string; avatar?: string })
+      ).rejects.toThrow(DatabaseError);
       expect(mockUserEntity.validate).toHaveBeenCalledWith(incompleteData, 'create');
     });
 

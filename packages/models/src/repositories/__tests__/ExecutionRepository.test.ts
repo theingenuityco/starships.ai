@@ -32,7 +32,10 @@ import { getConnection } from '@/helpers/database';
 
 describe('ExecutionRepository', () => {
   let repository: ExecutionRepository;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+    executeWrite: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+  };
 
   beforeEach(() => {
     mockConnection = {
@@ -46,7 +49,7 @@ describe('ExecutionRepository', () => {
 
   describe('constructor', () => {
     it('should initialize with correct service name', () => {
-      expect((repository as any).serviceName).toBe('ExecutionRepository');
+      expect((repository as unknown as { serviceName: string }).serviceName).toBe('ExecutionRepository');
     });
   });
 

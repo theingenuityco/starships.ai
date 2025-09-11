@@ -6,7 +6,7 @@ import { BlueprintRepository } from '@/repositories/BlueprintRepository';
 import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { NodeRepository } from '@/repositories/NodeRepository';
 import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
-import type { CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
+import type { CreateBlueprintRequest, UpdateBlueprintRequest, BlueprintModel } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database', () => ({
@@ -50,7 +50,10 @@ import { RepositoryTestHelper } from '../../tests/repository-test-helper';
 describe('BlueprintRepository', () => {
   let repository: BlueprintRepository;
   let testHelper: RepositoryTestHelper;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+    executeWrite: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+  };
   let mockNodeRepo: jest.Mocked<NodeRepository>;
   let mockEdgeRepo: jest.Mocked<EdgeRepository>;
 
@@ -62,15 +65,15 @@ describe('BlueprintRepository', () => {
     repository = new BlueprintRepository();
 
     // Get mocked instances
-    mockNodeRepo = (repository as any).nodeRepo;
-    mockEdgeRepo = (repository as any).edgeRepo;
+    mockNodeRepo = (repository as unknown as { nodeRepo: jest.Mocked<NodeRepository> }).nodeRepo;
+    mockEdgeRepo = (repository as unknown as { edgeRepo: jest.Mocked<EdgeRepository> }).edgeRepo;
 
     testHelper.reset();
   });
 
   describe('constructor', () => {
     it('should initialize with correct service name', () => {
-      expect((repository as any).serviceName).toBe('BlueprintRepository');
+      expect((repository as unknown as { serviceName: string }).serviceName).toBe('BlueprintRepository');
     });
 
     it('should initialize NodeRepository and EdgeRepository', () => {
@@ -219,7 +222,7 @@ describe('BlueprintRepository', () => {
             ref: 'start',
           },
         ],
-        edges: 'invalid' as any,
+        edges: 'invalid' as unknown as CreateBlueprintRequest['edges'],
       };
 
       await expect(repository.createBlueprint(invalidRequest)).rejects.toThrow(ValidationError);
@@ -388,7 +391,7 @@ describe('BlueprintRepository', () => {
       };
 
       testHelper.mockUpdateWrite(updatedBlueprint, 'b');
-      jest.spyOn(repository, 'getBlueprintById').mockResolvedValue(updatedBlueprint as any);
+      jest.spyOn(repository, 'getBlueprintById').mockResolvedValue(updatedBlueprint as BlueprintModel);
 
       const result = await repository.updateBlueprint(blueprintId, updates);
 
@@ -412,7 +415,7 @@ describe('BlueprintRepository', () => {
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ b: {} }]);
-      jest.spyOn(repository, 'getBlueprintById').mockResolvedValue({} as any);
+      jest.spyOn(repository, 'getBlueprintById').mockResolvedValue({} as BlueprintModel);
 
       await repository.updateBlueprint(blueprintId, updates);
 
@@ -752,7 +755,7 @@ describe('BlueprintRepository', () => {
       };
 
       mockConnection.executeWrite.mockResolvedValue([{ b: {} }]);
-      jest.spyOn(repository, 'getBlueprintById').mockResolvedValue({} as any);
+      jest.spyOn(repository, 'getBlueprintById').mockResolvedValue({} as BlueprintModel);
 
       await repository.updateBlueprint('blueprint-123', updates);
 

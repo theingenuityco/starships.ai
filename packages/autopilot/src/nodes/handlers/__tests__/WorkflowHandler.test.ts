@@ -4,7 +4,7 @@
 
 import { WorkflowHandler } from '@/nodes/handlers/WorkflowHandler';
 import { Workflow } from '@/Workflow';
-import { Node, Execution, WorkflowNodeParameters, Blueprint, NodeResult } from '@/types';
+import { Node, Execution, WorkflowParams, Blueprint, NodeResult } from '@/types';
 
 // Mock Workflow class
 jest.mock('../../../Workflow');
@@ -40,7 +40,7 @@ describe('WorkflowHandler', () => {
       description: 'Workflow node for testing',
       parameters: {
         blueprint: mockBlueprint,
-      } as WorkflowNodeParameters,
+      } as WorkflowParams,
     };
 
     handler = new WorkflowHandler(mockNode);
@@ -183,7 +183,7 @@ describe('WorkflowHandler', () => {
         parameters: {
           blueprint: mockBlueprint,
           timeout: 30000,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
 
       const timeoutHandler = new WorkflowHandler(nodeWithTimeout);
@@ -263,7 +263,7 @@ describe('WorkflowHandler', () => {
         parameters: {
           blueprint: mockBlueprint,
           timeout: 60000,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
       const handlerWithTimeout = new WorkflowHandler(nodeWithTimeout);
 
@@ -276,7 +276,7 @@ describe('WorkflowHandler', () => {
     it('should fail validation when blueprint is missing', () => {
       const nodeWithoutBlueprint: Node = {
         ...mockNode,
-        parameters: {} as WorkflowNodeParameters,
+        parameters: {} as WorkflowParams,
       };
       const handlerWithoutBlueprint = new WorkflowHandler(nodeWithoutBlueprint);
 
@@ -301,7 +301,7 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: blueprintWithoutId,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -320,7 +320,7 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: blueprintWithoutNodes,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -345,7 +345,7 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: blueprintWithoutStart,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -373,7 +373,7 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: blueprintWithInvalidEdges,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
       const handlerWithInvalidBlueprint = new WorkflowHandler(nodeWithInvalidBlueprint);
 
@@ -400,7 +400,7 @@ describe('WorkflowHandler', () => {
         parameters: {
           blueprint: mockBlueprint,
           timeout: 500,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
       const handlerWithLowTimeout = new WorkflowHandler(nodeWithLowTimeout);
 
@@ -425,7 +425,7 @@ describe('WorkflowHandler', () => {
         ...mockNode,
         parameters: {
           blueprint: invalidBlueprint,
-        } as WorkflowNodeParameters,
+        } as WorkflowParams,
       };
       const handlerWithMultipleErrors = new WorkflowHandler(nodeWithMultipleErrors);
 

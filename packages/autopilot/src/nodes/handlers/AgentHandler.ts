@@ -6,14 +6,14 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, ValidationResult, AgentNodeParameters, ValidationError, ValidationWarning } from '@/types';
+import { Execution, ValidationResult, AgentParams, ValidationError, ValidationWarning } from '@/types';
 import { Agent } from '@/Agent';
 
 export class AgentHandler extends BaseHandler {
   readonly type = 'agent';
 
   async execute(execution: Execution) {
-    const params = this.node.parameters as AgentNodeParameters;
+    const params = this.node.parameters as AgentParams;
 
     try {
       console.log(`Executing agent: ${params.name} (model: ${params.model}) with workflow execution`);
@@ -50,7 +50,7 @@ export class AgentHandler extends BaseHandler {
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
-    const params = this.node.parameters as AgentNodeParameters;
+    const params = this.node.parameters as AgentParams;
 
     // Check for required fields first
     if (!params.name) {

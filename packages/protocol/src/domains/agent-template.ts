@@ -4,7 +4,7 @@
  * Clean agent template type definitions for model types.
  */
 
-import type { AgentMemoryState, AgentNodeParameters, Blueprint } from '@starships/autopilot';
+import type { AgentMemoryState, AgentParams, Blueprint } from '@starships/autopilot';
 import { AgentParamsWithoutMetadata } from './agent';
 
 // ============================================================================

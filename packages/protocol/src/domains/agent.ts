@@ -6,7 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type { AgentNodeParameters } from '@starships/autopilot';
+import type { AgentParams } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE AGENT INTERFACE
@@ -14,10 +14,10 @@ import type { AgentNodeParameters } from '@starships/autopilot';
 
 /**
  * Database Agent interface - core API contract type
- * Extends AgentNodeParameters to be a superset with additional database/marketplace fields
+ * Extends AgentParams to be a superset with additional database/marketplace fields
  */
 
-export type AgentParamsWithoutMetadata = Omit<AgentNodeParameters, 'metadata'>;
+export type AgentParamsWithoutMetadata = Omit<AgentParams, 'metadata'>;
 
 export interface AgentModel extends AgentParamsWithoutMetadata {
   // Core database fields

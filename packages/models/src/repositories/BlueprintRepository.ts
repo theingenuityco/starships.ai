@@ -101,9 +101,12 @@ export class BlueprintRepository extends BaseRepository {
         const connection = this.getConnection();
 
         // Get blueprint metadata
-        const blueprintResult = await connection.executeQuery<{ b: any }>('MATCH (b:Blueprint {id: $blueprintId})\n        RETURN b', {
-          blueprintId,
-        });
+        const blueprintResult = await connection.executeQuery<{ b: BlueprintModel }>(
+          'MATCH (b:Blueprint {id: $blueprintId})\n        RETURN b',
+          {
+            blueprintId,
+          }
+        );
 
         if (!blueprintResult || blueprintResult.length === 0) return null;
 
@@ -131,7 +134,7 @@ export class BlueprintRepository extends BaseRepository {
         const connection = this.getConnection();
 
         // Get all blueprints
-        const blueprintResults = await connection.executeQuery<{ b: any }>(
+        const blueprintResults = await connection.executeQuery<{ b: BlueprintModel }>(
           'MATCH (b:Blueprint)\n        RETURN b\n        ORDER BY b.createdAt DESC'
         );
 
@@ -190,7 +193,7 @@ export class BlueprintRepository extends BaseRepository {
 
         // Build SET clause dynamically
         const setClause: string[] = ['b.updatedAt = $updatedAt'];
-        const params: any = { blueprintId, updatedAt: now };
+        const params: Record<string, unknown> = { blueprintId, updatedAt: now };
 
         if (updates.name !== undefined) {
           setClause.push('b.name = $name');
@@ -298,7 +301,7 @@ export class BlueprintRepository extends BaseRepository {
         const connection = this.getConnection();
 
         // Get blueprints by category
-        const blueprintResults = await connection.executeQuery<{ b: any }>(
+        const blueprintResults = await connection.executeQuery<{ b: BlueprintModel }>(
           'MATCH (b:Blueprint {category: $category})\n        RETURN b\n        ORDER BY b.usageCount DESC, b.createdAt DESC',
           { category }
         );

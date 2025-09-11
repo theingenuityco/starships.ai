@@ -13,7 +13,7 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) RETURN e ORDER BY e.createdAt DESC');
-        return result.map((record) => ExecutionEntity.deserialize(record.e));
+        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
       },
       'findAll',
       'Execution'
@@ -25,7 +25,7 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) WHERE e.id = $id RETURN e', { id });
-        return result.length > 0 ? ExecutionEntity.deserialize(result[0].e) : null;
+        return result.length > 0 ? ExecutionEntity.deserialize(result[0].e as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Execution',
@@ -52,7 +52,7 @@ export class ExecutionRepository extends BaseRepository {
 
         const executionData = executionEntity.serialize();
         // Remove id since it will be auto-generated
-        delete executionData.id;
+        delete (executionData as { id?: string }).id;
 
         // Use BaseRepository serialization
         const result = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionData);
@@ -65,7 +65,7 @@ export class ExecutionRepository extends BaseRepository {
         );
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.deserialize(result);
+        return ExecutionEntity.deserialize(result as unknown as Record<string, unknown>);
       },
       'create',
       'Execution'
@@ -163,7 +163,7 @@ export class ExecutionRepository extends BaseRepository {
         }
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.deserialize(result[0].e);
+        return ExecutionEntity.deserialize(result[0].e as unknown as Record<string, unknown>);
       },
       'update',
       'Execution',
@@ -196,7 +196,7 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.workflowId = $workflowId RETURN e ORDER BY e.createdAt DESC',
           { workflowId }
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e));
+        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
       },
       'findByWorkflowId',
       'Execution'
@@ -211,7 +211,7 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.status = $status RETURN e ORDER BY e.createdAt DESC',
           { status }
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e));
+        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
       },
       'findByStatus',
       'Execution'
@@ -225,7 +225,7 @@ export class ExecutionRepository extends BaseRepository {
         const result = await connection.executeQuery<{ e: ExecutionModel }>(
           'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e));
+        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
       },
       'findActiveExecutions',
       'Execution'
@@ -236,7 +236,7 @@ export class ExecutionRepository extends BaseRepository {
     return this.update(id, {
       status: 'cancelled',
       error: reason || 'Execution cancelled by user',
-    } as any);
+    } as unknown as Partial<ExecutionModel>);
   }
 
   /**
@@ -250,7 +250,7 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.createdAt >= $startDate AND e.createdAt <= $endDate RETURN e ORDER BY e.createdAt DESC',
           { startDate, endDate }
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e));
+        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
       },
       'findByDateRange',
       'Execution'
@@ -273,7 +273,7 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let query = 'MATCH (e:Execution)';
-        const params: any = {};
+        const params: Record<string, unknown> = {};
 
         if (workflowId) {
           query += ' WHERE e.workflowId = $workflowId';

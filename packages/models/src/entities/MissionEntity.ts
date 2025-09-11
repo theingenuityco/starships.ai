@@ -127,7 +127,7 @@ export class MissionEntity implements MissionModel {
   /**
    * Static factory method for creating MissionEntity from raw data
    */
-  static deserialize(data: Record<string, any>): MissionEntity {
+  static deserialize(data: Record<string, unknown>): MissionEntity {
     return plainToInstance(MissionEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -137,7 +137,7 @@ export class MissionEntity implements MissionModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -147,8 +147,11 @@ export class MissionEntity implements MissionModel {
   /**
    * Validation method for different contexts
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = MissionEntity.deserialize(data);
+  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const entity = MissionEntity.deserialize(data as Record<string, unknown>);
 
     // Context-specific validation rules
     if (context === 'create') {

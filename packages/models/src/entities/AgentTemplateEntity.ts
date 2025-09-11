@@ -6,6 +6,7 @@
  */
 
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
+import type { AgentMemoryState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
@@ -101,12 +102,12 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  memory!: any; // AgentMemoryState - keeping flexible for now
+  memory!: AgentMemoryState;
 
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  blueprint!: any; // Blueprint - keeping flexible for now
+  blueprint!: Blueprint;
 
   // Template metadata
   @Expose()
@@ -133,7 +134,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   /**
    * Static factory method for creating AgentTemplateEntity from raw data
    */
-  static deserialize(data: Record<string, any>): AgentTemplateEntity {
+  static deserialize(data: Record<string, unknown>): AgentTemplateEntity {
     return plainToInstance(AgentTemplateEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -143,7 +144,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -153,8 +154,11 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   /**
    * Validation method for different contexts
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = AgentTemplateEntity.deserialize(data);
+  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const entity = AgentTemplateEntity.deserialize(data as Record<string, unknown>);
 
     // Context-specific validation rules
     if (context === 'create') {
@@ -215,7 +219,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
       if (typeof entity.blueprint === 'string') {
         try {
           blueprintObj = JSON.parse(entity.blueprint);
-        } catch (error) {
+        } catch {
           throw new Error('Blueprint must be a valid JSON object');
         }
       }

@@ -146,7 +146,7 @@ export class UserEntity implements UserModel {
   /**
    * Static factory method for creating UserEntity from raw data
    */
-  static deserialize(data: Record<string, any>): UserEntity {
+  static deserialize(data: Record<string, unknown>): UserEntity {
     return plainToInstance(UserEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -156,7 +156,7 @@ export class UserEntity implements UserModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -166,8 +166,11 @@ export class UserEntity implements UserModel {
   /**
    * Validation method for different contexts
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = UserEntity.deserialize(data);
+  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const entity = UserEntity.deserialize(data as Record<string, unknown>);
 
     // Context-specific validation rules
     if (context === 'create') {
@@ -274,6 +277,7 @@ export class UserEntity implements UserModel {
    */
   toSafeObject(): Omit<UserModel, 'password'> {
     const serialized = this.serialize();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...safeData } = serialized;
     return safeData as Omit<UserModel, 'password'>;
   }

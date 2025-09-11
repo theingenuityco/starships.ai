@@ -14,7 +14,7 @@ export class MemoryRepository extends BaseRepository {
   /**
    * Serialize complex objects for Neo4j storage
    */
-  private serializeComplexFields(memory: MemoryModel): any {
+  private serializeComplexFields(memory: MemoryModel): Record<string, unknown> {
     const serialized = {
       ...memory,
       state: memory.state ? JSON.stringify(memory.state) : '{}',
@@ -26,12 +26,12 @@ export class MemoryRepository extends BaseRepository {
   /**
    * Deserialize complex objects from Neo4j storage
    */
-  private deserializeComplexFields(memory: any): MemoryModel {
+  private deserializeComplexFields(memory: Record<string, unknown>): MemoryModel {
     try {
       const deserialized = {
         ...memory,
-        state: memory.state ? JSON.parse(memory.state) : {},
-      };
+        state: memory.state && typeof memory.state === 'string' ? JSON.parse(memory.state) : memory.state || {},
+      } as MemoryModel;
 
       return deserialized;
     } catch (error) {
@@ -39,7 +39,7 @@ export class MemoryRepository extends BaseRepository {
       return {
         ...memory,
         state: {},
-      };
+      } as MemoryModel;
     }
   }
 
@@ -48,7 +48,9 @@ export class MemoryRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>('MATCH (m:Memory) RETURN m ORDER BY m.createdAt DESC');
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.m as unknown as Record<string, unknown>))
+        );
       },
       'findAll',
       'Memory'
@@ -61,7 +63,7 @@ export class MemoryRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MemoryModel }>('MATCH (m:Memory) WHERE m.id = $id RETURN m', { id });
         const memory = result[0]?.m || null;
-        return memory ? convertNeo4jIntsInObject(this.deserializeComplexFields(memory)) : null;
+        return memory ? convertNeo4jIntsInObject(this.deserializeComplexFields(memory as unknown as Record<string, unknown>)) : null;
       },
       'findById',
       'Memory',
@@ -77,7 +79,9 @@ export class MemoryRepository extends BaseRepository {
           'MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory) RETURN m ORDER BY m.updatedAt DESC',
           { starshipId }
         );
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.m as unknown as Record<string, unknown>))
+        );
       },
       'findByStarshipId',
       'Memory'
@@ -92,7 +96,9 @@ export class MemoryRepository extends BaseRepository {
           'MATCH (a:Agent {id: $agentId})-[:HAS_MEMORY]->(m:Memory) RETURN m ORDER BY m.updatedAt DESC',
           { agentId }
         );
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.m as unknown as Record<string, unknown>))
+        );
       },
       'findByAgentId',
       'Memory'
@@ -107,7 +113,9 @@ export class MemoryRepository extends BaseRepository {
           'MATCH (m:Memory) WHERE any(tag IN $tags WHERE tag IN m.tags) RETURN m ORDER BY m.updatedAt DESC',
           { tags }
         );
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.m as unknown as Record<string, unknown>))
+        );
       },
       'findByTags',
       'Memory'
@@ -150,7 +158,7 @@ export class MemoryRepository extends BaseRepository {
         );
 
         // Deserialize complex fields before returning
-        return convertNeo4jIntsInObject(this.deserializeComplexFields(memory));
+        return convertNeo4jIntsInObject(this.deserializeComplexFields(memory as unknown as Record<string, unknown>));
       },
       'create',
       'Memory'
@@ -167,7 +175,7 @@ export class MemoryRepository extends BaseRepository {
         };
 
         // Serialize complex fields in updates
-        const serializedUpdates = this.serializeComplexFields(updateProps as any);
+        const serializedUpdates = this.serializeComplexFields(updateProps as MemoryModel);
 
         const result = await connection.executeWrite<{ m: MemoryModel }>('MATCH (m:Memory) WHERE m.id = $id SET m += $updates RETURN m', {
           id,
@@ -175,7 +183,7 @@ export class MemoryRepository extends BaseRepository {
         });
 
         const memory = result[0]?.m || null;
-        return memory ? convertNeo4jIntsInObject(this.deserializeComplexFields(memory)) : null;
+        return memory ? convertNeo4jIntsInObject(this.deserializeComplexFields(memory as unknown as Record<string, unknown>)) : null;
       },
       'update',
       'Memory',
@@ -212,7 +220,7 @@ export class MemoryRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let cypher = 'MATCH (m:Memory) WHERE m.id IS NOT NULL';
-        const params: any = {};
+        const params: Record<string, unknown> = {};
 
         // Add starship filter using relationship
         if (filters?.starshipId) {
@@ -223,7 +231,9 @@ export class MemoryRepository extends BaseRepository {
         cypher += ' RETURN m ORDER BY m.updatedAt DESC LIMIT 50';
 
         const result = await connection.executeQuery<{ m: MemoryModel }>(cypher, params);
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.m as unknown as Record<string, unknown>))
+        );
       },
       'searchMemories',
       'Memory'
@@ -245,13 +255,15 @@ export class MemoryRepository extends BaseRepository {
           return null;
         }
 
-        const memory = this.deserializeComplexFields(result[0].m);
-        const messages = (memory.state as any).messages || [];
+        const memory = this.deserializeComplexFields(result[0].m as unknown as Record<string, unknown>);
+        const messages = Array.isArray((memory.state as Record<string, unknown>)?.messages)
+          ? ((memory.state as Record<string, unknown>).messages as Record<string, unknown>[])
+          : [];
 
         // Calculate statistics
         const messagesByRole = { system: 0, user: 0, assistant: 0 };
-        messages.forEach((msg: any) => {
-          if (msg.role && Object.prototype.hasOwnProperty.call(messagesByRole, msg.role)) {
+        messages.forEach((msg: Record<string, unknown>) => {
+          if (msg.role && typeof msg.role === 'string' && Object.prototype.hasOwnProperty.call(messagesByRole, msg.role)) {
             messagesByRole[msg.role as keyof typeof messagesByRole]++;
           }
         });
@@ -283,7 +295,7 @@ export class MemoryRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let cypher = 'MATCH (m:Memory) WHERE 1=1';
-        const params: any = {};
+        const params: Record<string, unknown> = {};
 
         // Use relationship for starship filtering
         if (filters.starshipId) {
@@ -308,7 +320,9 @@ export class MemoryRepository extends BaseRepository {
         }
 
         const result = await connection.executeQuery<{ m: MemoryModel }>(cypher, params);
-        return convertNeo4jIntsInArray(result.map((record) => this.deserializeComplexFields(record.m)));
+        return convertNeo4jIntsInArray(
+          result.map((record) => this.deserializeComplexFields(record.m as unknown as Record<string, unknown>))
+        );
       },
       'findWithFilters',
       'Memory'

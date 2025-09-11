@@ -4,6 +4,7 @@ import { StreamingService } from '@/services/StreamingService';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, MessageRepository } from '@starships/models';
 import { ConversationModel } from '@starships/protocol';
+import { AutopilotStreamService } from './AutopilotStreamService';
 
 export interface CreateConversationData {
   metadata?: Record<string, unknown>;
@@ -208,29 +209,17 @@ export class ConversationService {
         userId,
       });
 
-      // Send immediate empty assistant message for instant UI feedback
-      // Use conversationId as stream identifier
-      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const emptyAssistantMessage = {
-        id: messageId,
-        role: 'assistant' as const,
-        content: '', // Empty initially - will be filled by chunks
-        timestamp: new Date().toISOString(),
+      // Send instant assistant response through AutopilotStreamService
+      // Create AutopilotStreamService instance to emit instant response
+      const autopilotStreamService = new AutopilotStreamService(
+        this.streamingService,
+        conversationId, // Use conversationId as streamId
         conversationId,
-        starshipId: starshipInfo.id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: 'processing' as const,
-        messageType: 'agent_response' as const,
-        importance: 'medium' as const,
-        contentLength: 0,
-        hasAttachments: false,
-      };
+        agentId
+      );
 
-      // Broadcast empty message immediately for instant bubble (using conversationId as streamId)
-      await this.streamingService.broadcastMessage(conversationId, emptyAssistantMessage);
+      // Emit instant empty assistant response
+      await autopilotStreamService.emitInstantAssistantResponse('');
 
       // Execute agent conversation with streaming
       const response = await AgentService.executeConversationWithStreaming({

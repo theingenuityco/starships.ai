@@ -32,8 +32,8 @@ export const sharedConfig = [
     },
   },
   {
-    files: ['**/*.spec.ts', '**/*.test.ts'],
-
+    // Add Jest globals to test setup files
+    files: ['**/tests/setup.ts', '**/tests/**/*.ts', '**/*.spec.ts', '**/*.test.ts'],
     languageOptions: {
       globals: {
         ...globals.jest,

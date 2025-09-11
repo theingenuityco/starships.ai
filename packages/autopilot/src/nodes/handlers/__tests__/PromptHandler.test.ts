@@ -155,9 +155,7 @@ describe('PromptHandler', () => {
     });
 
     it('should set execution timestamp', async () => {
-      const beforeExecution = Date.now();
       const result = await handler.execute(mockExecution);
-      const afterExecution = Date.now();
 
       expect(result).toBeDefined();
       const nodeResult = result.executionResults.get('prompt-node');

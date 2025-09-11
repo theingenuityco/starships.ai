@@ -59,7 +59,7 @@ describe('WorkflowHandler', () => {
       removeNode: jest.fn(),
       removeEdge: jest.fn(),
       clone: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<Workflow>;
 
     (Workflow as jest.MockedClass<typeof Workflow>).mockImplementation(() => mockWorkflow);
   });
@@ -238,9 +238,7 @@ describe('WorkflowHandler', () => {
 
       mockWorkflow.execute.mockResolvedValue(mockRuntimeState);
 
-      const beforeExecution = Date.now();
       const result = await handler.execute(mockExecution);
-      const afterExecution = Date.now();
 
       expect(result).toBeDefined();
       const nodeResult = result.executionResults.get('workflow-node');

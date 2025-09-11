@@ -159,16 +159,4 @@ describe('Engine', () => {
       expect(execution.status).toBe('completed');
     });
   });
-
-  describe('event handling', () => {
-    it('should register and unregister event callbacks', () => {
-      const callback = jest.fn();
-
-      engine.onEvent(callback);
-      engine.offEvent(callback);
-
-      // No direct way to test this without executing a workflow
-      expect(callback).not.toHaveBeenCalled();
-    });
-  });
 });

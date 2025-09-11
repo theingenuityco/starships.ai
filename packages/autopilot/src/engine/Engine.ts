@@ -49,15 +49,9 @@ export interface ExecutionEvent {
 }
 
 /**
- * Callback for workflow execution events
- */
-export type EventCallback = (event: ExecutionEvent) => Promise<void>;
-
-/**
  * Main workflow execution engine
  */
 export class Engine {
-  private eventCallbacks: EventCallback[] = [];
   private execution!: Execution;
   private streamingEmitter?: StreamingEmitter;
 
@@ -384,36 +378,9 @@ export class Engine {
   }
 
   /**
-   * Register event callback
-   */
-  onEvent(callback: EventCallback): void {
-    this.eventCallbacks.push(callback);
-  }
-
-  /**
-   * Remove event callback
-   */
-  offEvent(callback: EventCallback): void {
-    const index = this.eventCallbacks.indexOf(callback);
-    if (index > -1) {
-      this.eventCallbacks.splice(index, 1);
-    }
-  }
-
-  /**
-   * Emit workflow execution event with optional streaming support
+   * Emit workflow execution event via streaming emitter
    */
   private async emitEvent(event: ExecutionEvent): Promise<void> {
-    // Call all registered callbacks first
-    for (const callback of this.eventCallbacks) {
-      try {
-        await callback(event);
-      } catch (error) {
-        // Silent fail for event callbacks to not interrupt execution
-        console.error('Error in workflow event callback:', error);
-      }
-    }
-
     // Delegate streaming to injected emitter if available and enabled
     if (this.streamingEmitter?.isEnabled() && event.execution.streaming?.enabled) {
       try {

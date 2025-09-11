@@ -15,7 +15,7 @@ export { Agent } from './Agent';
 // ===== ENGINE SYSTEM =====
 // Engine class and event types
 export { Engine } from './engine/Engine';
-export type { EventCallback, ExecutionEvent } from './engine/Engine';
+export type { ExecutionEvent } from './engine/Engine';
 
 // Memory system
 export { Memory } from './Memory';

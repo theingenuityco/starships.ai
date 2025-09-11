@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { ConversationModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsIn, IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
+import { IsBoolean, IsIn, IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
 
 /**
  * Conversation Entity with validation and serialization
@@ -70,6 +70,63 @@ export class ConversationEntity implements ConversationModel {
   @IsString()
   @Length(1, 255)
   userId?: string;
+
+  // Streaming support fields
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  currentStreamId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  isStreaming?: boolean;
+
+  @Expose()
+  @Transformers.DateTransform()
+  @IsOptional()
+  @IsISO8601()
+  streamStartedAt?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsIn(['active', 'paused', 'completed', 'failed'])
+  streamStatus?: 'active' | 'paused' | 'completed' | 'failed';
+
+  /**
+   * Helper method to start streaming for this conversation
+   */
+  startStreaming(streamId: string): void {
+    this.currentStreamId = streamId;
+    this.isStreaming = true;
+    this.streamStartedAt = new Date().toISOString();
+    this.streamStatus = 'active';
+  }
+
+  /**
+   * Helper method to complete streaming for this conversation
+   */
+  completeStreaming(): void {
+    this.isStreaming = false;
+    this.streamStatus = 'completed';
+    // Keep currentStreamId for reference until next stream
+  }
+
+  /**
+   * Helper method to fail streaming for this conversation
+   */
+  failStreaming(): void {
+    this.isStreaming = false;
+    this.streamStatus = 'failed';
+  }
+
+  /**
+   * Helper method to check if conversation is currently streaming
+   */
+  isCurrentlyStreaming(): boolean {
+    return this.isStreaming === true && this.streamStatus === 'active';
+  }
 
   /**
    * Deserialize database record into ConversationEntity

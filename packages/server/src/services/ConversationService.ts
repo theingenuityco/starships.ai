@@ -22,9 +22,7 @@ export interface AddMessageData {
   message: string;
 }
 
-export interface AddMessageStreamingData extends AddMessageData {
-  streamId: string;
-}
+// No separate streaming interface needed - using AddMessageData for all cases
 
 export interface AddMessageResponse {
   reply: string;
@@ -184,6 +182,112 @@ export class ConversationService {
   }
 
   /**
+   * Process conversation with streaming support
+   * Uses conversationId as the stream identifier - no database streaming state needed
+   */
+  async processConversationWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
+    const { conversationId, agentId, userId, message } = data;
+
+    try {
+      // Verify conversation exists
+      const conversation = await this.conversationRepository.findById(conversationId);
+      if (!conversation) {
+        throw new NotFoundError('Conversation', conversationId);
+      }
+
+      // Get starship information for message context
+      const starshipInfo = await this.getConversationStarship(conversationId);
+      if (!starshipInfo) {
+        throw new NotFoundError('Starship', `for conversation ${conversationId}`);
+      }
+
+      // Save user message to database
+      await this.messageService.addToConversation(conversationId, 'user', message, {
+        starshipId: starshipInfo.id,
+        agentId,
+        userId,
+      });
+
+      // Send immediate empty assistant message for instant UI feedback
+      // Use conversationId as stream identifier
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const emptyAssistantMessage = {
+        id: messageId,
+        role: 'assistant' as const,
+        content: '', // Empty initially - will be filled by chunks
+        timestamp: new Date().toISOString(),
+        conversationId,
+        starshipId: starshipInfo.id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        threadDepth: 0,
+        processingStatus: 'processing' as const,
+        messageType: 'agent_response' as const,
+        importance: 'medium' as const,
+        contentLength: 0,
+        hasAttachments: false,
+      };
+
+      // Broadcast empty message immediately for instant bubble (using conversationId as streamId)
+      await this.streamingService.broadcastMessage(conversationId, emptyAssistantMessage);
+
+      // Execute agent conversation with streaming
+      const response = await AgentService.executeConversationWithStreaming({
+        source: 'user',
+        agentId,
+        userId,
+        message,
+        conversationId,
+        streamId: conversationId, // Use conversationId as streamId
+        streamingService: this.streamingService,
+      });
+
+      // Save agent response to database
+      await this.messageService.addToConversation(
+        conversationId,
+        'assistant',
+        response.content,
+        {
+          starshipId: starshipInfo.id,
+          agentId,
+          userId,
+        },
+        {
+          usage: response.usage,
+          tokenCount: response.usage?.totalTokens,
+        }
+      );
+
+      // Update conversation metrics (no streaming state to update)
+      await this.updateConversationActivity(conversationId);
+      await this.incrementMessageCount(conversationId, 2); // User message + assistant response
+
+      // Send final completion event via streaming (using conversationId as streamId)
+      await this.streamingService.broadcastComplete(conversationId, response);
+
+      return {
+        reply: response.content,
+        usage: response.usage,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Broadcast error using conversationId as streamId
+      await this.streamingService.broadcastError(conversationId, {
+        streamId: conversationId,
+        errorCode: 'CONVERSATION_PROCESSING_FAILED',
+        message: errorMessage,
+        timestamp: new Date().toISOString(),
+        recoverable: false,
+        context: { conversationId, agentId },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
    * Add message to conversation and get agent response
    */
   async addMessage(data: AddMessageData): Promise<AddMessageResponse> {
@@ -248,89 +352,11 @@ export class ConversationService {
 
   /**
    * Add message to conversation with streaming support
+   * @deprecated Use processConversationWithStreaming instead for conversation-level streaming
    */
-  async addMessageWithStreaming(data: AddMessageStreamingData): Promise<AddMessageResponse> {
-    const { conversationId, agentId, userId, message, streamId } = data;
-
-    try {
-      // Verify conversation exists
-      const conversation = await this.conversationRepository.findById(conversationId);
-      if (!conversation) {
-        throw new NotFoundError('Conversation', conversationId);
-      }
-
-      // Get starship information for message context
-      const starshipInfo = await this.getConversationStarship(conversationId);
-      if (!starshipInfo) {
-        throw new NotFoundError('Starship', `for conversation ${conversationId}`);
-      }
-
-      // Save user message to database
-      await this.messageService.addToConversation(conversationId, 'user', message, {
-        starshipId: starshipInfo.id,
-        agentId,
-        userId,
-      });
-
-      // Configure autopilot streaming
-      console.log(`📡 [STREAMING] Configuring autopilot streaming for stream ${streamId}`);
-
-      // Execute agent conversation with streaming - updated to use new architecture
-      const response = await AgentService.executeConversationWithStreaming({
-        source: 'user',
-        agentId,
-        userId,
-        message,
-        conversationId,
-        streamId,
-        streamingService: this.streamingService,
-      });
-
-      // Save agent response to database
-      await this.messageService.addToConversation(
-        conversationId,
-        'assistant',
-        response.content,
-        {
-          starshipId: starshipInfo.id,
-          agentId,
-          userId,
-        },
-        {
-          usage: response.usage,
-          tokenCount: response.usage?.totalTokens,
-          streamId,
-        }
-      );
-
-      // Update conversation metrics
-      await Promise.all([
-        this.updateConversationActivity(conversationId),
-        this.incrementMessageCount(conversationId, 2), // User message + assistant response
-      ]);
-
-      // Send final completion event via streaming
-      await this.streamingService.broadcastComplete(streamId, response);
-
-      return {
-        reply: response.content,
-        usage: response.usage,
-      };
-    } catch (error) {
-      // Handle errors and send via streaming
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      await this.streamingService.broadcastError(streamId, {
-        streamId,
-        errorCode: 'CONVERSATION_PROCESSING_FAILED',
-        message: errorMessage,
-        timestamp: new Date().toISOString(),
-        recoverable: false,
-        context: { conversationId, agentId },
-      });
-
-      throw error;
-    }
+  async addMessageWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
+    // Delegate to new conversation-level streaming method
+    return this.processConversationWithStreaming(data);
   }
 
   /**

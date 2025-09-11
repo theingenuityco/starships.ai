@@ -1,7 +1,7 @@
 import api from '@/lib/api'
 import type { AgentModel, ApiResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
 // Extended Agent interface for client compatibility with optimistic updates
@@ -41,7 +41,7 @@ export function useAgent(agentId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: AGENT_QUERY_KEYS.detail(agentId),
     queryFn: async (): Promise<AgentModel> => {
-      const response: AxiosResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${agentId}`)
+      const response: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${agentId}`)
       return response.data.data
     },
     enabled: !!agentId && enabled,
@@ -57,7 +57,7 @@ export function useStarshipAgents(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: AGENT_QUERY_KEYS.byStarship(starshipId),
     queryFn: async (): Promise<AgentModel[]> => {
-      const response: AxiosResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`)
+      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`)
       return response.data.data
     },
     enabled: !!starshipId && enabled,
@@ -74,7 +74,7 @@ export function useUserAgents(userId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: AGENT_QUERY_KEYS.byUser(userId),
     queryFn: async (): Promise<AgentModel[]> => {
-      const response: AxiosResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/users/${userId}/agents`)
+      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/users/${userId}/agents`)
       return response.data.data
     },
     enabled: !!userId && enabled,
@@ -91,7 +91,7 @@ export function usePublicAgents(limit: number = 50, enabled: boolean = true) {
   return useQuery({
     queryKey: AGENT_QUERY_KEYS.public(),
     queryFn: async (): Promise<AgentModel[]> => {
-      const response: AxiosResponse<ApiResponse<AgentModel[]>> = await api.get('/api/v1/agents/public', {
+      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get('/api/v1/agents/public', {
         params: { limit, page: 1 },
       })
       return response.data.data
@@ -109,7 +109,7 @@ export function useAgents(filters?: AgentFilters, enabled: boolean = true) {
   return useQuery({
     queryKey: AGENT_QUERY_KEYS.list(filters),
     queryFn: async (): Promise<AgentModel[]> => {
-      const response: AxiosResponse<ApiResponse<AgentModel[]>> = await api.get('/api/v1/agents', {
+      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get('/api/v1/agents', {
         params: filters,
       })
       return response.data.data
@@ -128,7 +128,7 @@ export function useSearchAgents(query: string, enabled: boolean = true) {
   return useQuery({
     queryKey: AGENT_QUERY_KEYS.search(query),
     queryFn: async (): Promise<AgentModel[]> => {
-      const response: AxiosResponse<ApiResponse<AgentModel[]>> = await api.get('/api/v1/agents/search', {
+      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get('/api/v1/agents/search', {
         params: { q: query },
       })
       return response.data.data
@@ -155,7 +155,7 @@ export function useAgentAnalytics(agentId: string, enabled: boolean = true) {
       category: string
       isPublic: boolean
     }> => {
-      const response: AxiosResponse<
+      const response: FetchResponse<
         ApiResponse<{
           id: string
           name: string
@@ -183,7 +183,7 @@ export function useCreateAgent() {
 
   return useMutation({
     mutationFn: async (data: CreateAgentRequest): Promise<AgentModel> => {
-      const response: AxiosResponse<ApiResponse<AgentModel>> = await api.post('/api/v1/agents', data)
+      const response: FetchResponse<ApiResponse<AgentModel>> = await api.post('/api/v1/agents', data)
       return response.data.data
     },
     onSuccess: (agent, variables) => {
@@ -238,7 +238,7 @@ export function useUpdateAgent() {
 
   return useMutation({
     mutationFn: async ({ agentId, updates }: { agentId: string; updates: UpdateAgentRequest }): Promise<AgentModel> => {
-      const response: AxiosResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
+      const response: FetchResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
       return response.data.data
     },
     onSuccess: (updatedAgent, variables) => {
@@ -284,7 +284,7 @@ export function useDeleteAgent() {
 
   return useMutation({
     mutationFn: async (agentId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/agents/${agentId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/agents/${agentId}`)
       return response.data.data
     },
     onMutate: async agentId => {
@@ -358,7 +358,7 @@ export function useDeployAgent() {
 
   return useMutation({
     mutationFn: async ({ agentId, starshipId }: { agentId: string; starshipId: string }): Promise<{ message: string; agent: AgentModel }> => {
-      const response: AxiosResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.put(`/api/v1/agents/${agentId}/starship`, { starshipId })
+      const response: FetchResponse<ApiResponse<{ message: string; agent: AgentModel }>> = await api.put(`/api/v1/agents/${agentId}/starship`, { starshipId })
       return response.data.data
     },
     onSuccess: (data, variables) => {
@@ -399,7 +399,7 @@ export function useRateAgent() {
 
   return useMutation({
     mutationFn: async ({ agentId, rating }: { agentId: string; rating: number }) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/agents/${agentId}/ratings`, { rating })
+      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/agents/${agentId}/ratings`, { rating })
       return response.data.data
     },
     onSuccess: (data, variables) => {
@@ -428,7 +428,7 @@ export function useTrackAgentUsage() {
 
   return useMutation({
     mutationFn: async (agentId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/agents/${agentId}/usage`)
+      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/agents/${agentId}/usage`)
       return response.data.data
     },
     onSuccess: (data, agentId) => {

@@ -33,11 +33,28 @@ interface ApiResponse<T> {
  */
 async function apiRequest<T>(endpoint: string, options: { method?: string; body?: string } = {}): Promise<ApiResponse<T>> {
   try {
-    const response = await api({
-      url: endpoint,
-      method: options.method || 'GET',
-      data: options.body ? JSON.parse(options.body) : undefined,
-    })
+    const method = options.method || 'GET'
+    let response: any
+
+    switch (method.toUpperCase()) {
+      case 'GET':
+        response = await api.get(endpoint)
+        break
+      case 'POST':
+        response = await api.post(endpoint, options.body ? JSON.parse(options.body) : undefined)
+        break
+      case 'PUT':
+        response = await api.put(endpoint, options.body ? JSON.parse(options.body) : undefined)
+        break
+      case 'PATCH':
+        response = await api.patch(endpoint, options.body ? JSON.parse(options.body) : undefined)
+        break
+      case 'DELETE':
+        response = await api.delete(endpoint)
+        break
+      default:
+        throw new Error(`Unsupported HTTP method: ${method}`)
+    }
 
     // Handle standardized API response format { data: T, meta?: ... }
     return { data: response.data.data }

@@ -388,6 +388,8 @@ export class AgentService {
         userId: userId,
         starshipId: dbAgent.starshipId,
         messageService: agentService.messageService,
+        streamingService: streamingService,
+        streamId: streamId,
       });
 
       // Create agent instance with enhanced options
@@ -646,6 +648,8 @@ export class AgentService {
     userId?: string;
     starshipId?: string;
     messageService?: MessageService;
+    streamingService?: any;
+    streamId?: string;
   }): EventCallback {
     return async (event: ExecutionEvent) => {
       console.log(`[AGENT-SERVICE] Event: ${event.type}`, {
@@ -655,6 +659,7 @@ export class AgentService {
         currentNode: event.execution.currentNodeRef,
         status: event.execution.status,
         timestamp: event.timestamp,
+        streaming: !!context.streamingService,
       });
 
       // Add custom event handling logic here based on event type
@@ -690,27 +695,55 @@ export class AgentService {
    */
   private static async handleWorkflowStarted(
     event: ExecutionEvent,
-    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+    context: {
+      agentId: string;
+      conversationId?: string;
+      userId?: string;
+      starshipId?: string;
+      messageService?: MessageService;
+      streamingService?: any;
+      streamId?: string;
+    }
   ): Promise<void> {
     if (!context.conversationId || !context.starshipId || !context.messageService) {
       return;
     }
 
     try {
-      await context.messageService.createMessage({
-        role: 'system',
+      const messageData = {
+        role: 'system' as const,
         content: `🚀 Agent workflow started`,
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId: context.conversationId,
-        messageType: 'system_message',
-        importance: 'low',
-        processingStatus: 'completed',
+        messageType: 'system_message' as const,
+        importance: 'low' as const,
+        processingStatus: 'completed' as const,
         metadata: {
           event: 'workflow_started',
           timestamp: event.timestamp,
         },
-      });
+      };
+
+      // For streaming: broadcast message object
+      if (context.streamingService && context.streamId) {
+        const tempMessage = {
+          id: `temp-${Date.now()}-workflow-started`,
+          ...messageData,
+          timestamp: event.timestamp,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+          version: '1.0.0',
+          threadDepth: 0,
+          contentLength: messageData.content.length,
+          hasAttachments: false,
+          streaming: true,
+        };
+        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
+      }
+
+      // Always create database message
+      await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create workflow_started message:`, error);
     }
@@ -721,28 +754,56 @@ export class AgentService {
    */
   private static async handleNodeStarted(
     event: ExecutionEvent,
-    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+    context: {
+      agentId: string;
+      conversationId?: string;
+      userId?: string;
+      starshipId?: string;
+      messageService?: MessageService;
+      streamingService?: any;
+      streamId?: string;
+    }
   ): Promise<void> {
     if (!context.conversationId || !context.starshipId || !context.messageService) {
       return;
     }
 
     try {
-      await context.messageService.createMessage({
-        role: 'system',
+      const messageData = {
+        role: 'system' as const,
         content: `⏳ Starting node: ${event.execution.currentNodeRef}`,
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId: context.conversationId,
-        messageType: 'system_message',
-        importance: 'low',
-        processingStatus: 'completed',
+        messageType: 'system_message' as const,
+        importance: 'low' as const,
+        processingStatus: 'completed' as const,
         metadata: {
           event: 'node_started',
           nodeRef: event.execution.currentNodeRef,
           timestamp: event.timestamp,
         },
-      });
+      };
+
+      // For streaming: broadcast message object
+      if (context.streamingService && context.streamId) {
+        const tempMessage = {
+          id: `temp-${Date.now()}-node-started-${event.execution.currentNodeRef}`,
+          ...messageData,
+          timestamp: event.timestamp,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+          version: '1.0.0',
+          threadDepth: 0,
+          contentLength: messageData.content.length,
+          hasAttachments: false,
+          streaming: true,
+        };
+        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
+      }
+
+      // Always create database message
+      await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create node_started message:`, error);
     }
@@ -753,7 +814,15 @@ export class AgentService {
    */
   private static async handleNodeCompleted(
     event: ExecutionEvent,
-    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+    context: {
+      agentId: string;
+      conversationId?: string;
+      userId?: string;
+      starshipId?: string;
+      messageService?: MessageService;
+      streamingService?: any;
+      streamId?: string;
+    }
   ): Promise<void> {
     if (!context.conversationId || !context.starshipId || !context.messageService) {
       return;
@@ -775,42 +844,82 @@ export class AgentService {
 
         // Create assistant message with LLM response if we have content
         if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
-          await context.messageService.createMessage({
-            role: 'assistant',
+          const assistantMessageData = {
+            role: 'assistant' as const,
             content: llmResponseContent.trim(),
             starshipId: context.starshipId,
             agentId: context.agentId,
             conversationId: context.conversationId,
-            messageType: 'agent_response',
-            importance: 'high',
-            processingStatus: 'completed',
+            messageType: 'agent_response' as const,
+            importance: 'high' as const,
+            processingStatus: 'completed' as const,
             metadata: {
               event: 'llm_response',
               nodeRef: currentNodeRef,
               model: llmData.model,
               timestamp: event.timestamp,
             },
-          });
+          };
+
+          // For streaming: broadcast assistant message object
+          if (context.streamingService && context.streamId) {
+            const tempMessage = {
+              id: `temp-${Date.now()}-assistant-${currentNodeRef}`,
+              ...assistantMessageData,
+              timestamp: event.timestamp,
+              createdAt: event.timestamp,
+              updatedAt: event.timestamp,
+              version: '1.0.0',
+              threadDepth: 0,
+              contentLength: assistantMessageData.content.length,
+              hasAttachments: false,
+              streaming: true,
+            };
+            await context.streamingService.broadcastMessage(context.streamId, tempMessage);
+          }
+
+          // Always create database message
+          await context.messageService.createMessage(assistantMessageData);
         }
       }
 
       // Create system message for node completion tracking (for all nodes)
-      await context.messageService.createMessage({
-        role: 'system',
+      const completionMessageData = {
+        role: 'system' as const,
         content: `✅ Completed node: ${currentNodeRef}`,
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId: context.conversationId,
-        messageType: 'system_message',
-        importance: 'low',
-        processingStatus: 'completed',
+        messageType: 'system_message' as const,
+        importance: 'low' as const,
+        processingStatus: 'completed' as const,
         metadata: {
           event: 'node_completed',
           nodeRef: currentNodeRef,
           nodeResult: nodeResultData,
           timestamp: event.timestamp,
         },
-      });
+      };
+
+      // For streaming: broadcast completion message object
+      if (context.streamingService && context.streamId) {
+        const tempMessage = {
+          id: `temp-${Date.now()}-completed-${currentNodeRef}`,
+          ...completionMessageData,
+          timestamp: event.timestamp,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+          version: '1.0.0',
+          threadDepth: 0,
+          contentLength: completionMessageData.content.length,
+          hasAttachments: false,
+          streaming: true,
+        };
+        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
+      }
+
+      // Always create database message
+      await context.messageService.createMessage(completionMessageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create node_completed message:`, error);
     }
@@ -821,28 +930,56 @@ export class AgentService {
    */
   private static async handleWorkflowCompleted(
     event: ExecutionEvent,
-    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+    context: {
+      agentId: string;
+      conversationId?: string;
+      userId?: string;
+      starshipId?: string;
+      messageService?: MessageService;
+      streamingService?: any;
+      streamId?: string;
+    }
   ): Promise<void> {
     if (!context.conversationId || !context.starshipId || !context.messageService) {
       return;
     }
 
     try {
-      await context.messageService.createMessage({
-        role: 'system',
+      const messageData = {
+        role: 'system' as const,
         content: `🎉 Agent workflow completed successfully`,
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId: context.conversationId,
-        messageType: 'system_message',
-        importance: 'medium',
-        processingStatus: 'completed',
+        messageType: 'system_message' as const,
+        importance: 'medium' as const,
+        processingStatus: 'completed' as const,
         metadata: {
           event: 'workflow_completed',
           timestamp: event.timestamp,
           executionResults: Array.from(event.execution.executionResults.keys()),
         },
-      });
+      };
+
+      // For streaming: broadcast message object
+      if (context.streamingService && context.streamId) {
+        const tempMessage = {
+          id: `temp-${Date.now()}-workflow-completed`,
+          ...messageData,
+          timestamp: event.timestamp,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+          version: '1.0.0',
+          threadDepth: 0,
+          contentLength: messageData.content.length,
+          hasAttachments: false,
+          streaming: true,
+        };
+        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
+      }
+
+      // Always create database message
+      await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create workflow_completed message:`, error);
     }
@@ -853,28 +990,56 @@ export class AgentService {
    */
   private static async handleWorkflowFailed(
     event: ExecutionEvent,
-    context: { agentId: string; conversationId?: string; userId?: string; starshipId?: string; messageService?: MessageService }
+    context: {
+      agentId: string;
+      conversationId?: string;
+      userId?: string;
+      starshipId?: string;
+      messageService?: MessageService;
+      streamingService?: any;
+      streamId?: string;
+    }
   ): Promise<void> {
     if (!context.conversationId || !context.starshipId || !context.messageService) {
       return;
     }
 
     try {
-      await context.messageService.createMessage({
-        role: 'system',
+      const messageData = {
+        role: 'system' as const,
         content: `❌ Agent workflow failed: ${event.execution.error?.message || 'Unknown error'}`,
         starshipId: context.starshipId,
         agentId: context.agentId,
         conversationId: context.conversationId,
-        messageType: 'error',
-        importance: 'high',
-        processingStatus: 'completed',
+        messageType: 'error' as const,
+        importance: 'high' as const,
+        processingStatus: 'completed' as const,
         metadata: {
           event: 'workflow_failed',
           error: event.execution.error,
           timestamp: event.timestamp,
         },
-      });
+      };
+
+      // For streaming: broadcast message object
+      if (context.streamingService && context.streamId) {
+        const tempMessage = {
+          id: `temp-${Date.now()}-workflow-failed`,
+          ...messageData,
+          timestamp: event.timestamp,
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+          version: '1.0.0',
+          threadDepth: 0,
+          contentLength: messageData.content.length,
+          hasAttachments: false,
+          streaming: true,
+        };
+        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
+      }
+
+      // Always create database message
+      await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create workflow_failed message:`, error);
     }

@@ -2,66 +2,78 @@
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useConversationMessages, useDeleteMessage } from '@/hooks/useMessages'
-import { useMessageStreaming } from '@/hooks/useMessageStreaming'
+import { useConversation, useDeleteMessage } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { AlertCircle, Bot, Clock, Loader2, MessageSquare, MoreVertical, Paperclip, Timer, User, XCircle } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { AccessibilityEnhancements, MessageAccessibility, useAccessibilityFeatures } from './AccessibilityEnhancements'
 import { MessageContent } from './MessageContent'
 import { MessageReactions, useMessageReactions } from './MessageReactions'
 import { MessageCheckbox, MessageSelection } from './MessageSelection'
-import { VirtualizedMessageList } from './VirtualizedMessageList'
 
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
-  streamId?: string | null
-  enableVirtualization?: boolean
   enableAccessibility?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, streamId, enableVirtualization = false, enableAccessibility = true }: ConversationMessageListProps) {
-  // Data fetching
-  const { data: messageData, isLoading: loading, error: queryError } = useConversationMessages(conversationId || '', 100, !!conversationId)
+export function ConversationMessageList({ conversationId, starshipId, enableAccessibility = true }: ConversationMessageListProps) {
+  // Unified conversation hook - handles messages, streaming, and sending
+  const { messages, isLoading: loading, error: queryError, streamingState, isStreaming, streamingContent } = useConversation(conversationId)
+
   const deleteMessage = useDeleteMessage()
 
-  // Streaming state - use streamId from props
-  const { streamingState, isStreaming, streamingContent } = useMessageStreaming(streamId ?? undefined, conversationId ?? undefined)
-  const messages = messageData?.messages || []
+  // Scroll container reference
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
   const error = queryError ? 'Failed to load conversation history' : null
 
-  // Optimize message ordering - avoid array reversal on every render
+  // Simplified message display - all messages come from unified hook
   const displayMessages = useMemo(() => {
-    // Create streaming message if needed
-    const streamingMessage =
-      isStreaming && streamingContent
-        ? {
-            id: 'streaming-message',
-            content: streamingContent,
-            role: 'assistant' as const,
-            timestamp: new Date().toISOString(),
-            conversationId: conversationId || '',
-            starshipId: starshipId || '',
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            version: '1.0.0',
-            threadDepth: 0,
-            processingStatus: streamingState.status === 'streaming' ? ('streaming' as const) : ('pending' as const),
-            messageType: 'agent_response' as const,
-            importance: 'medium' as const,
-            contentLength: streamingContent.length,
-            hasAttachments: false,
-            streaming: true,
-          }
-        : null
+    console.log('[MESSAGE-LIST] Rendering messages:', {
+      messages: messages.length,
+      isStreaming,
+      streamingContent: streamingContent?.substring(0, 50) + '...',
+    })
 
-    // Messages come from API in newest-first order, but we want oldest-first for chat
-    // Pass reverse flag to VirtualizedMessageList instead of creating new array
-    return streamingMessage ? [...messages, streamingMessage] : messages
-  }, [messages, isStreaming, streamingContent, streamingState.status, conversationId, starshipId])
+    // Start with messages from the unified hook
+    let combinedMessages = [...messages]
+
+    // Legacy fallback: if we have streamingContent but no streaming message in the list,
+    // create a temporary streaming message
+    if (isStreaming && streamingContent && streamingContent.trim()) {
+      // Check if we already have a streaming message
+      const hasStreamingMessage = messages.some(msg => msg.streaming === true)
+
+      if (!hasStreamingMessage) {
+        const legacyStreamingMessage = {
+          id: `streaming-content-${Date.now()}`,
+          content: streamingContent,
+          role: 'assistant' as const,
+          timestamp: new Date().toISOString(),
+          conversationId: conversationId || '',
+          starshipId: starshipId || '',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: '1.0.0',
+          threadDepth: 0,
+          processingStatus: 'streaming' as const,
+          messageType: 'agent_response' as const,
+          importance: 'medium' as const,
+          contentLength: streamingContent.length,
+          hasAttachments: false,
+          streaming: true,
+        }
+
+        console.log('[MESSAGE-LIST] Adding legacy streaming message:', streamingContent.substring(0, 50))
+        combinedMessages = [...combinedMessages, legacyStreamingMessage]
+      }
+    }
+
+    return combinedMessages
+  }, [messages, isStreaming, streamingContent, conversationId, starshipId])
 
   // Message selection state
   const [selectedMessages, setSelectedMessages] = useState<string[]>([])
@@ -123,25 +135,48 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
     setIsSelectionMode(false)
   }, [conversationId])
 
-  const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => (
-    <MessageBubble
-      key={message.streaming ? 'streaming-message' : message.id}
-      message={message}
-      index={index}
-      totalMessages={displayMessages.length}
-      isSelected={selectedMessages.includes(message.id)}
-      isSelecting={isSelectionMode}
-      isHighlighted={false}
-      isHighContrast={isHighContrast}
-      isReducedMotion={isReducedMotion}
-      onToggleSelection={handleMessageToggle}
-      onStartSelection={toggleSelectionMode}
-      reactions={getMessageReactions(message.id)}
-      onAddReaction={addReaction}
-      onRemoveReaction={removeReaction}
-      searchTerm=""
-    />
-  )
+  // Note: Streaming events are now handled internally by useConversation hook
+  // No need to pass event handlers around
+
+  // Auto-scroll to bottom when new messages arrive or streaming content changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      const container = scrollContainerRef.current
+      const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 100
+
+      // Auto-scroll if near bottom or if there are streaming messages
+      if (isNearBottom || isStreaming) {
+        setTimeout(() => {
+          container.scrollTop = container.scrollHeight
+        }, 100)
+      }
+    }
+  }, [displayMessages.length, isStreaming, streamingContent])
+
+  const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => {
+    // Generate unique key for each message, including streaming messages
+    const messageKey = message.streaming ? `streaming-${message.id}-${message.content?.length || 0}` : message.id
+
+    return (
+      <MessageBubble
+        key={messageKey}
+        message={message}
+        index={index}
+        totalMessages={displayMessages.length}
+        isSelected={selectedMessages.includes(message.id)}
+        isSelecting={isSelectionMode}
+        isHighlighted={false}
+        isHighContrast={isHighContrast}
+        isReducedMotion={isReducedMotion}
+        onToggleSelection={handleMessageToggle}
+        onStartSelection={toggleSelectionMode}
+        reactions={getMessageReactions(message.id)}
+        onAddReaction={addReaction}
+        onRemoveReaction={removeReaction}
+        searchTerm=""
+      />
+    )
+  }
 
   if (!conversationId) {
     return <EmptyState />
@@ -173,18 +208,14 @@ export function ConversationMessageList({ conversationId, starshipId, streamId, 
 
       {/* Messages List */}
       <div className="flex-1 relative">
-        {enableVirtualization ? (
-          <VirtualizedMessageList messages={displayMessages} renderMessage={renderMessage} className="h-full message-scroll-area" reverseOrder={true} />
-        ) : (
-          <div className="h-full overflow-y-auto message-scroll-area flex justify-center">
-            <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
-              {displayMessages
-                .slice()
-                .reverse()
-                .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
-            </div>
+        <div ref={scrollContainerRef} className="h-full overflow-y-auto message-scroll-area flex justify-center">
+          <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
+            {displayMessages
+              .slice()
+              .reverse()
+              .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )

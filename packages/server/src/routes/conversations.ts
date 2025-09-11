@@ -82,7 +82,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         limit: 1000, // Get all existing messages
         offset: 0,
         orderBy: 'timestamp',
-        orderDirection: 'asc',
+        orderDirection: 'desc', // Consistent with API mode
       });
 
       if (conversationData && conversationData.messages.length > 0) {

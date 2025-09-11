@@ -5,6 +5,7 @@
  */
 
 import type { AgentMemoryState, AgentNodeParameters, Blueprint } from '@starships/autopilot';
+import { AgentParamsWithoutMetadata } from './agent';
 
 // ============================================================================
 // AGENT TEMPLATE TYPES
@@ -18,7 +19,7 @@ export type AgentTemplateCategory = 'general' | 'coding' | 'creative' | 'analysi
 /**
  * Core agent template entity
  */
-export interface AgentTemplateModel extends AgentNodeParameters {
+export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
   // Core template fields
   id: string;
   slug: string;
@@ -41,17 +42,8 @@ export interface AgentTemplateModel extends AgentNodeParameters {
 /**
  * Request to create a new agent template
  */
-export interface CreateAgentTemplateRequest {
-  name: string;
-  slug?: string;
-  description: string;
+export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
   category: AgentTemplateCategory;
-  model: string;
-  temperature?: number;
-  maxTokens?: number;
-  blueprint: Blueprint;
-  memory: AgentMemoryState;
-  timeout: number;
   icon?: string;
   previewPrompts?: string[];
 }
@@ -59,17 +51,8 @@ export interface CreateAgentTemplateRequest {
 /**
  * Request to update agent template information
  */
-export interface UpdateAgentTemplateRequest {
-  name?: string;
-  slug?: string;
-  description?: string;
+export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMetadata> {
   category?: AgentTemplateCategory;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  blueprint?: Blueprint;
-  memory?: AgentMemoryState;
-  timeout?: number;
   icon?: string;
   previewPrompts?: string[];
 }

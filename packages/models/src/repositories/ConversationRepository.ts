@@ -207,11 +207,11 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         await connection.executeWrite(
           `MATCH (s:Starship {id: $starshipId}), (conversation:Conversation {id: $conversationId})
-           CREATE (s)-[:HAS_CONVERSATION {key: $key}]->(conversation)`,
+           CREATE (s)-[:HAS_CONVERSATION {id: $id}]->(conversation)`,
           {
             starshipId,
             conversationId,
-            key: `${starshipId}_${conversationId}`,
+            id: `${starshipId}_${conversationId}`,
           }
         );
       },

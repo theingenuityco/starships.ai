@@ -5,7 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
  */
 
-import { Transformers } from '@/helpers/serializer';
+import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import type { AgentTemplateModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
@@ -14,53 +14,6 @@ import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Ma
  * Custom transformers for the AgentTemplateEntity
  */
 export class AgentTemplateTransformers {
-  /**
-   * Transform usage count to ensure it's always a number
-   */
-  static UsageCountTransform() {
-    return Transform(({ value }) => {
-      if (typeof value === 'number') return value;
-      if (typeof value === 'string') return parseInt(value, 10) || 0;
-      return 0;
-    });
-  }
-
-  /**
-   * Transform temperature to ensure proper range
-   */
-  static TemperatureTransform() {
-    return Transform(({ value }) => {
-      if (value == null) return undefined;
-      const temp = typeof value === 'string' ? parseFloat(value) : value;
-      if (isNaN(temp)) return undefined;
-      return Math.max(0, Math.min(2, temp)); // Clamp between 0 and 2
-    });
-  }
-
-  /**
-   * Transform maxTokens to ensure it's a positive integer
-   */
-  static MaxTokensTransform() {
-    return Transform(({ value }) => {
-      if (value == null) return undefined;
-      const tokens = typeof value === 'string' ? parseInt(value, 10) : value;
-      if (isNaN(tokens) || tokens < 1) return undefined;
-      return Math.min(tokens, 100000); // Reasonable upper limit
-    });
-  }
-
-  /**
-   * Transform timeout to ensure it's a positive integer (milliseconds)
-   */
-  static TimeoutTransform() {
-    return Transform(({ value }) => {
-      if (value == null) return 30000; // Default 30 seconds
-      const timeout = typeof value === 'string' ? parseInt(value, 10) : value;
-      if (isNaN(timeout) || timeout < 1000) return 30000; // Minimum 1 second
-      return Math.min(timeout, 300000); // Maximum 5 minutes
-    });
-  }
-
   /**
    * Transform preview prompts array
    */
@@ -124,7 +77,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @AgentTemplateTransformers.TemperatureTransform()
+  @LLMTransformers.TemperatureTransform()
   @IsNumber()
   @Min(0)
   @Max(2)
@@ -132,14 +85,14 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @AgentTemplateTransformers.MaxTokensTransform()
+  @LLMTransformers.MaxTokensTransform()
   @IsNumber()
   @Min(1)
   @Max(100000)
   maxTokens?: number;
 
   @Expose()
-  @AgentTemplateTransformers.TimeoutTransform()
+  @LLMTransformers.TimeoutTransform()
   @IsNumber()
   @Min(1000)
   @Max(300000)
@@ -161,7 +114,6 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   category!: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
 
   @Expose()
-  @AgentTemplateTransformers.UsageCountTransform()
   @IsNumber()
   @Min(0)
   usageCount!: number;
@@ -293,123 +245,5 @@ export class AgentTemplateEntity implements AgentTemplateModel {
     if (entity.previewPrompts && entity.previewPrompts.length > 10) {
       throw new Error('Preview prompts cannot exceed 10 items');
     }
-  }
-
-  /**
-   * Helper method to check if template is public
-   */
-  isPublicTemplate(): boolean {
-    // Templates don't have isPublic field, they're generally all public
-    return true;
-  }
-
-  /**
-   * Helper method to check if template has been used
-   */
-  hasBeenUsed(): boolean {
-    return this.usageCount > 0;
-  }
-
-  /**
-   * Helper method to get template age in milliseconds
-   */
-  getAge(): number {
-    return Date.now() - new Date(this.createdAt).getTime();
-  }
-
-  /**
-   * Helper method to check if template has custom blueprint
-   */
-  hasCustomBlueprint(): boolean {
-    return !!this.blueprint && typeof this.blueprint === 'object';
-  }
-
-  /**
-   * Helper method to check if template has custom memory configuration
-   */
-  hasCustomMemory(): boolean {
-    return !!this.memory && typeof this.memory === 'object';
-  }
-
-  /**
-   * Helper method to get template category display name
-   */
-  getCategoryDisplayName(): string {
-    const categoryMap = {
-      general: 'General Assistant',
-      coding: 'Code Assistant',
-      creative: 'Creative Assistant',
-      analysis: 'Analysis Assistant',
-      support: 'Support Assistant',
-    };
-    return categoryMap[this.category] || 'Unknown Category';
-  }
-
-  /**
-   * Helper method to get template usage level
-   */
-  getUsageLevel(): 'new' | 'light' | 'moderate' | 'heavy' {
-    if (this.usageCount === 0) return 'new';
-    if (this.usageCount < 10) return 'light';
-    if (this.usageCount < 100) return 'moderate';
-    return 'heavy';
-  }
-
-  /**
-   * Helper method to check if template needs attention (old or unused)
-   */
-  needsAttention(): boolean {
-    const daysSinceCreation = this.getAge() / (1000 * 60 * 60 * 24);
-    const daysSinceLastUpdate = (Date.now() - new Date(this.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
-
-    // Needs attention if:
-    // - Created more than 30 days ago but never used
-    // - Not updated in 90 days and has low usage
-    return (daysSinceCreation > 30 && this.usageCount === 0) || (daysSinceLastUpdate > 90 && this.usageCount < 5);
-  }
-
-  /**
-   * Helper method to get model provider
-   */
-  getModelProvider(): string {
-    const model = this.model.toLowerCase();
-    if (model.includes('gpt') || model.includes('openai')) return 'OpenAI';
-    if (model.includes('claude') || model.includes('anthropic')) return 'Anthropic';
-    if (model.includes('gemini') || model.includes('google')) return 'Google';
-    if (model.includes('llama') || model.includes('meta')) return 'Meta';
-    return 'Unknown';
-  }
-
-  /**
-   * Helper method to estimate cost per request (rough estimation)
-   */
-  getEstimatedCostPerRequest(): number {
-    const tokens = this.maxTokens || 2000;
-    const model = this.model.toLowerCase();
-
-    // Rough cost estimation per 1000 tokens (in USD)
-    let costPer1k = 0.002; // Default
-
-    if (model.includes('gpt-4')) costPer1k = 0.03;
-    else if (model.includes('gpt-3.5')) costPer1k = 0.002;
-    else if (model.includes('claude')) costPer1k = 0.008;
-    else if (model.includes('gemini')) costPer1k = 0.001;
-
-    return (tokens / 1000) * costPer1k;
-  }
-
-  /**
-   * Helper method to check if template has preview content
-   */
-  hasPreviewContent(): boolean {
-    return !!(this.previewPrompts && this.previewPrompts.length > 0);
-  }
-
-  /**
-   * Helper method to get safe preview prompts (max 3 for display)
-   */
-  getPreviewPrompts(max: number = 3): string[] {
-    if (!this.previewPrompts) return [];
-    return this.previewPrompts.slice(0, max);
   }
 }

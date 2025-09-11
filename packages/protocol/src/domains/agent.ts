@@ -6,7 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type { AgentMemoryState, Blueprint, AgentNodeParameters } from '@starships/autopilot';
+import type { AgentNodeParameters } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE AGENT INTERFACE
@@ -16,24 +16,14 @@ import type { AgentMemoryState, Blueprint, AgentNodeParameters } from '@starship
  * Database Agent interface - core API contract type
  * Extends AgentNodeParameters to be a superset with additional database/marketplace fields
  */
-export interface AgentModel extends Omit<AgentNodeParameters, 'metadata'> {
+
+export type AgentParamsWithoutMetadata = Omit<AgentNodeParameters, 'metadata'>;
+
+export interface AgentModel extends AgentParamsWithoutMetadata {
   // Core database fields
   id: string;
   createdAt: string;
   updatedAt: string;
-  version: string;
-
-  // Marketplace fields
-  category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
-  usageCount: number;
-  isPublic?: boolean;
-  authorId?: string;
-
-  // Template relationship
-  templateId?: string;
-
-  // Deployment settings
-  starshipId: string;
 }
 
 // ============================================================================
@@ -43,29 +33,12 @@ export interface AgentModel extends Omit<AgentNodeParameters, 'metadata'> {
 /**
  * Request to create a new agent
  */
-export interface CreateAgentRequest {
-  name: string;
-  description?: string;
-  category: AgentModel['category'];
-  model: string;
-  temperature?: number;
-  maxTokens?: number;
-  templateId?: string; // Reference to template if agent is created from template
-  starshipId: string; // REQUIRED for new agents
-
-  // Autopilot-specific fields (optional for backward compatibility)
-  blueprint?: Blueprint;
-  memory?: AgentMemoryState;
-  timeout?: number;
-}
+export interface CreateAgentRequest extends AgentParamsWithoutMetadata {}
 
 /**
  * Request to update an agent
  */
-export interface UpdateAgentRequest extends Partial<CreateAgentRequest> {
-  version?: string;
-  starshipId?: string; // Allow updating starship assignment
-}
+export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {}
 
 // ============================================================================
 // AGENT COLLECTION-SPECIFIC TYPES
@@ -94,7 +67,6 @@ export interface AgentResponse {
  */
 export interface SearchAgentsRequest {
   query: string;
-  category?: string;
   limit?: number;
   offset?: number;
 }
@@ -112,8 +84,7 @@ export interface SearchAgentsResponse {
  * Request to filter agents
  */
 export interface AgentFilters {
-  category?: string;
-  starshipId?: string;
+  // No filters for now since we removed category and starshipId
 }
 
 /**
@@ -121,7 +92,6 @@ export interface AgentFilters {
  */
 export interface DeployAgentRequest {
   agentId: string;
-  starshipId: string;
 }
 
 /**
@@ -132,7 +102,6 @@ export interface DeployAgentResponse {
   message: string;
   deployment?: {
     agentId: string;
-    starshipId: string;
     deployedAt: string;
   };
 }

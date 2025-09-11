@@ -1,134 +1,436 @@
-import api from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel } from '@starships/protocol'
+import api, { getCurrentToken } from '@/lib/api'
+import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 
-// Client-specific message extension for UI states
+// Import FetchResponse type
+interface FetchResponse<T = any> {
+  data: T
+  status: number
+  statusText: string
+  headers: Headers
+}
+
+// Extended Message interface for client-side states
 interface ClientMessage extends MessageModel {
   sending?: boolean
   streaming?: boolean
+  error?: boolean
+}
+
+// Streaming state interface
+interface StreamingState {
+  status: 'idle' | 'connecting' | 'streaming' | 'complete' | 'error'
+  isStreaming: boolean
+  content: string
+  error: any
+  lastUpdate?: number
 }
 
 // Centralized query keys
 export const CONVERSATION_QUERY_KEYS = {
   all: ['conversations'] as const,
   lists: () => [...CONVERSATION_QUERY_KEYS.all, 'list'] as const,
-  list: (filters?: any) => [...CONVERSATION_QUERY_KEYS.lists(), { filters }] as const,
-  details: () => [...CONVERSATION_QUERY_KEYS.all, 'detail'] as const,
-  detail: (id: string) => [...CONVERSATION_QUERY_KEYS.details(), id] as const,
   byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
-  byUser: (userId: string) => [...CONVERSATION_QUERY_KEYS.all, 'user', userId] as const,
+  detail: (id: string) => [...CONVERSATION_QUERY_KEYS.all, 'detail', id] as const,
   messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
 } as const
 
-// Get conversations by starship ID
-export function useStarshipConversations(starshipId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
-      const response: AxiosResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
-      return { conversations: response.data.data }
-    },
-    enabled: !!starshipId && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes - conversations list doesn't change often
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnWindowFocus: false, // Don't refetch when switching between conversations
-    refetchOnMount: false, // Use cached data if available
+/**
+ * Unified conversation hook - handles everything conversation-related
+ * - Conversation details
+ * - Messages (with real-time streaming)
+ * - Send message (with streaming support)
+ * - All TanStack Query benefits (caching, optimistic updates, etc.)
+ */
+export function useConversation(conversationId: string | null) {
+  const queryClient = useQueryClient()
+  const [streamingState, setStreamingState] = useState<StreamingState>({
+    status: 'idle',
+    isStreaming: false,
+    content: '',
+    error: null,
   })
-}
 
-// Get conversation details with messages
-export function useConversation(conversationId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId),
-    queryFn: async () => {
-      const response: AxiosResponse<ApiResponse<ConversationModel & { messages: any[] }>> = await api.get(`/api/v1/conversations/${conversationId}`)
-      const data = response.data.data
+  // Get conversation messages
+  const messagesQuery = useQuery({
+    queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId!),
+    queryFn: async (): Promise<{
+      conversationId: string
+      messages: ClientMessage[]
+      total: number
+      participants: string[]
+      startedAt: string
+      lastActivityAt: string
+    }> => {
+      const response: FetchResponse<
+        ApiResponse<{
+          conversationId: string
+          messages: MessageModel[]
+          total: number
+          participants: string[]
+          startedAt: string
+          lastActivityAt: string
+        }>
+      > = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
+        params: { limit: 100, page: 1, orderBy: 'timestamp', orderDirection: 'desc' },
+      })
 
       return {
-        conversation: {
-          id: data.id,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
-          lastActivityAt: data.lastActivityAt,
-          messageCount: data.messageCount,
-          totalTokens: data.totalTokens,
-          status: data.status,
-          metadata: data.metadata,
-          // Handle optional relationship fields safely
-          starshipId: (data as any).starshipId,
-          userId: (data as any).userId,
-        },
-        messages: data.messages.map((msg: any) => ({
-          id: msg.id,
-          content: msg.content,
-          role: msg.role,
-          timestamp: msg.timestamp,
-          conversationId: msg.conversationId || conversationId,
-        })),
+        ...response.data.data,
+        messages: response.data.data.messages.map((msg: MessageModel) => ({ ...msg }) as ClientMessage),
       }
     },
-    enabled: !!conversationId && enabled,
-    staleTime: 10 * 1000, // 10 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!conversationId,
+    staleTime: 5 * 1000, // 5 seconds - messages change frequently
+    gcTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: true,
   })
-}
 
-// NOTE: useConversationMessages is available in useMessages.ts
-// Import it from there for better functionality and consistency
+  // Process streaming events and update TanStack Query cache
+  const handleStreamingEvent = useCallback(
+    (data: any) => {
+      // Content chunks (incremental text)
+      if (data.type === 'content') {
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'streaming',
+          isStreaming: true,
+          content: prev.content + data.content,
+          lastUpdate: Date.now(),
+        }))
 
-// Get conversations for a user
-export function useUserConversations(userId: string, onlyActive: boolean = false, enabled: boolean = true) {
-  return useQuery({
-    queryKey: CONVERSATION_QUERY_KEYS.byUser(userId),
-    queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
-      const response: AxiosResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/users/${userId}/conversations`, {
-        params: { active: onlyActive ? 'true' : undefined },
-      })
-      return { conversations: response.data.data }
+        // Update the streaming message in TanStack Query cache
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          if (!old) return old
+
+          const updatedMessages = [...old.messages]
+          // Find and update the last streaming assistant message
+          for (let i = updatedMessages.length - 1; i >= 0; i--) {
+            const msg = updatedMessages[i]
+            if (msg.role === 'assistant' && msg.streaming === true) {
+              updatedMessages[i] = {
+                ...msg,
+                content: (msg.content || '') + data.content,
+                contentLength: ((msg.content || '') + data.content).length,
+                updatedAt: new Date().toISOString(),
+              }
+              break
+            }
+          }
+
+          return { ...old, messages: updatedMessages }
+        })
+        return
+      }
+
+      // Complete message objects
+      if (data.role !== undefined) {
+        const message = data as ClientMessage
+
+        // Empty assistant message - start streaming
+        if (message.role === 'assistant' && (!message.content || message.content.trim() === '')) {
+          setStreamingState(prev => ({
+            ...prev,
+            status: 'streaming',
+            isStreaming: true,
+            content: '',
+            lastUpdate: Date.now(),
+          }))
+
+          // Add streaming message to cache
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+            if (!old) return { messages: [{ ...message, streaming: true }], total: 1, conversationId }
+            return {
+              ...old,
+              messages: [...old.messages, { ...message, streaming: true }],
+              total: old.total + 1,
+            }
+          })
+          return
+        }
+
+        // Regular message - add to cache
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          if (!old) return { messages: [message], total: 1, conversationId }
+          return {
+            ...old,
+            messages: [...old.messages, message],
+            total: old.total + 1,
+          }
+        })
+        return
+      }
+
+      // Complete event
+      if (data.status === 'complete') {
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'complete',
+          isStreaming: false,
+          content: '',
+        }))
+
+        // Mark streaming messages as complete
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          if (!old) return old
+          return {
+            ...old,
+            messages: old.messages.map((msg: ClientMessage) => (msg.streaming ? { ...msg, streaming: false, processingStatus: 'completed' } : msg)),
+          }
+        })
+        return
+      }
+
+      // Error event
+      if (data.errorCode !== undefined) {
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'error',
+          error: data,
+          isStreaming: false,
+        }))
+        return
+      }
     },
-    enabled: !!userId && enabled,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    [conversationId, queryClient]
+  )
+
+  // Send message mutation with streaming support
+  const sendMessageMutation = useMutation({
+    mutationFn: async (
+      data: CreateMessageRequest & {
+        stream?: boolean
+      }
+    ): Promise<ClientMessage> => {
+      if (data.stream) {
+        // Handle streaming POST response
+        const token = await getCurrentToken()
+        if (!token) {
+          throw new Error('No authentication token available')
+        }
+
+        return new Promise((resolve, reject) => {
+          const processStreaming = async () => {
+            try {
+              const response = await fetch(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                  Accept: 'text/event-stream',
+                  'Cache-Control': 'no-cache',
+                },
+                body: JSON.stringify({
+                  agentId: data.agentId,
+                  message: data.content,
+                }),
+              })
+
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+              }
+
+              const reader = response.body?.getReader()
+              if (!reader) {
+                throw new Error('No readable stream available')
+              }
+
+              const decoder = new TextDecoder()
+              let buffer = ''
+
+              const processStream = async () => {
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    buffer += decoder.decode(value, { stream: true })
+                    const lines = buffer.split('\n')
+                    buffer = lines.pop() || ''
+
+                    for (const line of lines) {
+                      if (!line.trim()) continue
+
+                      if (line.startsWith('data: ')) {
+                        const eventData = line.substring(6).trim()
+                        if (!eventData) continue
+
+                        try {
+                          const parsed = JSON.parse(eventData)
+                          handleStreamingEvent(parsed)
+                        } catch (parseError) {
+                          console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
+                        }
+                      }
+                    }
+                  }
+                } finally {
+                  reader.releaseLock()
+                }
+              }
+
+              // Process the stream
+              await processStream()
+
+              // Resolve with the user message
+              resolve({
+                id: `user-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                role: data.role,
+                content: data.content,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                version: '1.0.0',
+                starshipId: data.starshipId,
+                agentId: data.agentId,
+                conversationId: data.conversationId,
+                threadDepth: data.threadDepth || 0,
+                processingStatus: data.processingStatus || 'completed',
+                messageType: data.messageType || 'user_input',
+                importance: data.importance || 'medium',
+                contentLength: data.content.length,
+                hasAttachments: data.hasAttachments || false,
+              } as ClientMessage)
+            } catch (error) {
+              reject(error)
+            }
+          }
+
+          processStreaming()
+        })
+      } else {
+        // Regular message creation
+        const response: FetchResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
+        return response.data.data as ClientMessage
+      }
+    },
+    onMutate: async variables => {
+      if (!variables.conversationId) return
+
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.messages(variables.conversationId),
+      })
+
+      // Snapshot the previous messages
+      const previousMessages = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId))
+
+      // Optimistically add the user message
+      const tempMessage: ClientMessage = {
+        id: `temp-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        role: variables.role,
+        content: variables.content,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: '1.0.0',
+        starshipId: variables.starshipId,
+        agentId: variables.agentId,
+        conversationId: variables.conversationId,
+        threadDepth: variables.threadDepth || 0,
+        processingStatus: variables.processingStatus || 'pending',
+        messageType: variables.messageType || 'user_input',
+        importance: variables.importance || 'medium',
+        contentLength: variables.content.length,
+        hasAttachments: variables.hasAttachments || false,
+        sending: true,
+      }
+
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
+        if (!old) return { messages: [tempMessage], total: 1, conversationId: variables.conversationId }
+        return {
+          ...old,
+          messages: [...old.messages, tempMessage],
+          total: old.total + 1,
+        }
+      })
+
+      return { previousMessages, tempMessage, conversationId: variables.conversationId }
+    },
+    onSuccess: (result, variables, context) => {
+      if (!variables.conversationId || !context) return
+
+      // Replace temp message with real message (for non-streaming)
+      if (!variables.stream) {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
+          if (!old) return { messages: [result], total: 1, conversationId: variables.conversationId }
+
+          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...result, sending: false } : msg))
+
+          return {
+            ...old,
+            messages,
+            lastActivityAt: result.timestamp,
+          }
+        })
+      } else {
+        // For streaming, just mark the temp message as sent
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
+          if (!old) return old
+
+          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...msg, sending: false } : msg))
+
+          return { ...old, messages }
+        })
+      }
+    },
+    onError: (error: any, variables, context) => {
+      if (!variables.conversationId || !context) return
+
+      // Rollback optimistic update
+      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), context.previousMessages)
+
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
+      toast.error('Failed to send message', {
+        description: errorMessage,
+      })
+    },
   })
+
+  return {
+    // Query data
+    messages: messagesQuery.data?.messages || [],
+    total: messagesQuery.data?.total || 0,
+    participants: messagesQuery.data?.participants || [],
+    isLoading: messagesQuery.isLoading,
+    error: messagesQuery.error,
+
+    // Streaming state
+    streamingState,
+    isStreaming: streamingState.isStreaming,
+    streamingContent: streamingState.content,
+
+    // Actions
+    sendMessage: (data: CreateMessageRequest & { stream?: boolean }) => sendMessageMutation.mutateAsync(data),
+    isSending: sendMessageMutation.isPending,
+
+    // Utilities
+    refetch: messagesQuery.refetch,
+    invalidate: () =>
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId!),
+      }),
+  }
 }
 
-// Create a new conversation
+// Additional conversation management hooks (kept from useConversations.ts)
 export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string; userId?: string }): Promise<ConversationModel> => {
-      const response: AxiosResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
+    mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string }): Promise<ConversationModel> => {
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },
     onSuccess: (conversation, variables) => {
-      // Invalidate and refetch relevant conversation lists
+      // Invalidate starship conversations list
       if (variables.starshipId) {
         queryClient.invalidateQueries({
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId),
         })
       }
-
-      if (variables.userId) {
-        queryClient.invalidateQueries({
-          queryKey: CONVERSATION_QUERY_KEYS.byUser(variables.userId),
-        })
-      }
-
-      // Add new conversation to cache optimistically
-      if (variables.starshipId) {
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId), (old: { conversations: ConversationModel[] } | undefined) => {
-          if (!old) return { conversations: [conversation] }
-          // Add to beginning (most recent)
-          return {
-            ...old,
-            conversations: [conversation, ...old.conversations],
-          }
-        })
-      }
-
       toast.success('New conversation created successfully!')
     },
     onError: (error: any) => {
@@ -140,123 +442,16 @@ export function useCreateConversation() {
   })
 }
 
-// Send message to conversation
-export function useSendMessage() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (data: { conversationId: string; agentId: string; message: string }) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
-        agentId: data.agentId,
-        message: data.message,
-      })
-      return response.data.data
+export function useStarshipConversations(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
+    queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
+      const response: FetchResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
+      return { conversations: response.data.data }
     },
-    onMutate: async ({ conversationId, message }) => {
-      // Cancel any outgoing refetches for conversation messages
-      await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
-
-      // Snapshot the previous messages
-      const previousMessages = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId))
-
-      // Optimistically add user message
-      const userMessage: ClientMessage = {
-        id: `temp-${Date.now()}`,
-        content: message,
-        role: 'user' as const,
-        timestamp: new Date().toISOString(),
-        conversationId,
-        starshipId: '', // Will be set by server
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: 'pending',
-        messageType: 'user_input',
-        importance: 'medium',
-        contentLength: message.length,
-        hasAttachments: false,
-        sending: true,
-      }
-
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: { messages: MessageModel[] } | undefined) => {
-        const messages = old?.messages || []
-        return { messages: [...messages, userMessage] }
-      })
-
-      return { previousMessages, userMessage, conversationId }
-    },
-    onSuccess: (response, variables, context) => {
-      // Convert server response to MessageModel format
-      const assistantMessage: MessageModel = {
-        id: `response-${Date.now()}`,
-        content: response.reply || response.content || 'No response',
-        role: 'assistant' as const,
-        timestamp: new Date().toISOString(),
-        conversationId: variables.conversationId,
-        starshipId: '', // Will be set by server
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: 'completed',
-        messageType: 'agent_response',
-        importance: 'medium',
-        contentLength: (response.reply || response.content || '').length,
-        hasAttachments: false,
-      }
-
-      queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: { messages: MessageModel[] } | undefined) => {
-        const messages = old?.messages || []
-        // Remove the temporary sending user message and add both user + assistant messages
-        const withoutTempMessage = messages.filter(m => m.id !== context?.userMessage.id)
-        const finalUserMessage = { ...context!.userMessage, sending: false }
-        return { messages: [...withoutTempMessage, finalUserMessage, assistantMessage] }
-      })
-
-      // Update conversation activity
-      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(variables.conversationId) })
-    },
-    onError: (error: any, variables, context) => {
-      // Rollback the optimistic update
-      if (context?.previousMessages) {
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), context.previousMessages)
-      }
-
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
-      toast.error('Failed to send message', {
-        description: errorMessage,
-      })
-    },
-    onSettled: (data, error, variables) => {
-      // Always refetch to ensure consistency
-      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(variables.conversationId) })
-    },
-  })
-}
-
-// Clear conversation memory
-export function useClearConversationMemory() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (conversationId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/conversations/${conversationId}/memory`)
-      return response.data.data
-    },
-    onSuccess: (data, conversationId) => {
-      // Invalidate conversation details and messages
-      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId) })
-      queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
-
-      toast.success('Conversation memory cleared successfully!')
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to clear conversation memory'
-      toast.error('Failed to clear memory', {
-        description: errorMessage,
-      })
-    },
+    enabled: !!starshipId && enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   })
 }
 
@@ -266,7 +461,7 @@ export function useDeleteConversation() {
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/conversations/${conversationId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/conversations/${conversationId}`)
       return response.data.data
     },
     onMutate: async conversationId => {
@@ -324,13 +519,69 @@ export function useDeleteConversation() {
   })
 }
 
+// Delete message
+export function useDeleteMessage() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (messageId: string) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/messages/${messageId}`)
+      return response.data.data
+    },
+    onMutate: async messageId => {
+      // Get message details to know which caches to update
+      const message = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.detail(messageId)) as MessageModel | undefined
+
+      if (message?.conversationId) {
+        await queryClient.cancelQueries({
+          queryKey: CONVERSATION_QUERY_KEYS.messages(message.conversationId),
+        })
+
+        // Optimistically remove the message
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(message.conversationId), (old: any) => {
+          if (!old) return old
+          return {
+            ...old,
+            messages: old.messages.filter((msg: MessageModel) => msg.id !== messageId),
+            total: Math.max(0, old.total - 1),
+          }
+        })
+      }
+
+      return { message }
+    },
+    onSuccess: (data, messageId, context) => {
+      if (context?.message?.conversationId) {
+        // Invalidate to refresh from server
+        queryClient.invalidateQueries({
+          queryKey: CONVERSATION_QUERY_KEYS.messages(context.message.conversationId),
+        })
+      }
+      toast.success('Message deleted successfully!')
+    },
+    onError: (error: any, messageId, context) => {
+      // Rollback optimistic deletion if we have the message data
+      if (context?.message?.conversationId) {
+        queryClient.invalidateQueries({
+          queryKey: CONVERSATION_QUERY_KEYS.messages(context.message.conversationId),
+        })
+      }
+
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete message'
+      toast.error('Failed to delete message', {
+        description: errorMessage,
+      })
+    },
+  })
+}
+
 // Update conversation status
 export function useUpdateConversationStatus() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (data: { conversationId: string; status: 'active' | 'paused' | 'completed' | 'archived' }) => {
-      const response: AxiosResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}/status`, {
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}/status`, {
         status: data.status,
       })
       return response.data.data
@@ -361,28 +612,4 @@ export function useUpdateConversationStatus() {
       })
     },
   })
-}
-
-// Utility hook for managing active conversation selection with local storage
-export function useActiveConversation() {
-  const setActiveConversation = (conversationId: string | null) => {
-    if (conversationId) {
-      localStorage.setItem('activeConversationId', conversationId)
-    } else {
-      localStorage.removeItem('activeConversationId')
-    }
-  }
-
-  const getActiveConversationId = (): string | null => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('activeConversationId')
-    }
-    return null
-  }
-
-  return {
-    setActiveConversation,
-    getActiveConversationId,
-    clearActiveConversation: () => setActiveConversation(null),
-  }
 }

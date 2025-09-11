@@ -1,7 +1,7 @@
 import api from '@/lib/api'
 import type { ApiResponse, BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
 // Blueprint category type for filtering
@@ -43,7 +43,7 @@ export function useBlueprints(filters?: { category?: BlueprintCategory; search?:
       if (filters?.category) params.append('category', filters.category)
       if (filters?.search) params.append('search', filters.search)
 
-      const response: AxiosResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints?${params.toString()}`)
+      const response: FetchResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints?${params.toString()}`)
       return { blueprints: response.data.data }
     },
     enabled,
@@ -58,7 +58,7 @@ export function useBlueprint(blueprintId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.detail(blueprintId),
     queryFn: async (): Promise<BlueprintModel> => {
-      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.get(`/api/v1/blueprints/${blueprintId}`)
+      const response: FetchResponse<ApiResponse<BlueprintModel>> = await api.get(`/api/v1/blueprints/${blueprintId}`)
       return response.data.data
     },
     enabled: !!blueprintId && enabled,
@@ -72,7 +72,7 @@ export function useBlueprintsByCategory(category: BlueprintCategory, enabled: bo
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.byCategory(category),
     queryFn: async (): Promise<{ blueprints: BlueprintModel[] }> => {
-      const response: AxiosResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints/category/${category}`)
+      const response: FetchResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints/category/${category}`)
       return { blueprints: response.data.data }
     },
     enabled: !!category && enabled,
@@ -86,7 +86,7 @@ export function usePopularBlueprints(limit: number = 10, enabled: boolean = true
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.popular(limit),
     queryFn: async (): Promise<{ blueprints: BlueprintModel[] }> => {
-      const response: AxiosResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints/popular?limit=${limit}`)
+      const response: FetchResponse<ApiResponse<BlueprintModel[]>> = await api.get(`/api/v1/blueprints/popular?limit=${limit}`)
       return { blueprints: response.data.data }
     },
     enabled,
@@ -100,7 +100,7 @@ export function useBlueprintStats(blueprintId: string, enabled: boolean = true) 
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.stats(blueprintId),
     queryFn: async (): Promise<BlueprintStats> => {
-      const response: AxiosResponse<ApiResponse<BlueprintStats>> = await api.get(`/api/v1/blueprints/${blueprintId}/stats`)
+      const response: FetchResponse<ApiResponse<BlueprintStats>> = await api.get(`/api/v1/blueprints/${blueprintId}/stats`)
       return response.data.data
     },
     enabled: !!blueprintId && enabled,
@@ -114,7 +114,7 @@ export function useBlueprintValidation(blueprintId: string, enabled: boolean = t
   return useQuery({
     queryKey: BLUEPRINT_QUERY_KEYS.validation(blueprintId),
     queryFn: async (): Promise<BlueprintValidation> => {
-      const response: AxiosResponse<ApiResponse<BlueprintValidation>> = await api.post(`/api/v1/blueprints/${blueprintId}/validate`)
+      const response: FetchResponse<ApiResponse<BlueprintValidation>> = await api.post(`/api/v1/blueprints/${blueprintId}/validate`)
       return response.data.data
     },
     enabled: !!blueprintId && enabled,
@@ -129,7 +129,7 @@ export function useCreateBlueprint() {
 
   return useMutation({
     mutationFn: async (data: CreateBlueprintRequest): Promise<BlueprintModel> => {
-      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.post('/api/v1/blueprints', data)
+      const response: FetchResponse<ApiResponse<BlueprintModel>> = await api.post('/api/v1/blueprints', data)
       return response.data.data
     },
     onMutate: async newBlueprint => {
@@ -197,7 +197,7 @@ export function useUpdateBlueprint() {
 
   return useMutation({
     mutationFn: async ({ blueprintId, updates }: { blueprintId: string; updates: UpdateBlueprintRequest }): Promise<BlueprintModel> => {
-      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.put(`/api/v1/blueprints/${blueprintId}`, updates)
+      const response: FetchResponse<ApiResponse<BlueprintModel>> = await api.put(`/api/v1/blueprints/${blueprintId}`, updates)
       return response.data.data
     },
     onMutate: async ({ blueprintId, updates }) => {
@@ -249,7 +249,7 @@ export function useDeleteBlueprint() {
 
   return useMutation({
     mutationFn: async (blueprintId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/blueprints/${blueprintId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/blueprints/${blueprintId}`)
       return response.data.data
     },
     onMutate: async blueprintId => {
@@ -331,7 +331,7 @@ export function useCloneBlueprint() {
         metadata?: Record<string, unknown>
       }
     }): Promise<BlueprintModel> => {
-      const response: AxiosResponse<ApiResponse<BlueprintModel>> = await api.post(`/api/v1/blueprints/${blueprintId}/clone`, cloneData)
+      const response: FetchResponse<ApiResponse<BlueprintModel>> = await api.post(`/api/v1/blueprints/${blueprintId}/clone`, cloneData)
       return response.data.data
     },
     onSuccess: (clonedBlueprint, variables) => {
@@ -373,7 +373,7 @@ export function useTrackBlueprintUsage() {
 
   return useMutation({
     mutationFn: async (blueprintId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/blueprints/${blueprintId}/track-usage`)
+      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/blueprints/${blueprintId}/track-usage`)
       return response.data.data
     },
     onSuccess: (data, blueprintId) => {

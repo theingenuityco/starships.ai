@@ -104,10 +104,10 @@ export class MessageEntity implements MessageModel {
   @Max(100) // Reasonable thread depth limit
   threadDepth!: number;
 
-  // Processing status and metadata (enhanced for streaming)
+  // Processing status and metadata
   @Expose()
-  @IsEnum(['pending', 'processing', 'streaming', 'completed', 'failed'])
-  processingStatus!: 'pending' | 'processing' | 'streaming' | 'completed' | 'failed';
+  @IsEnum(['pending', 'processing', 'completed', 'failed'])
+  processingStatus!: 'pending' | 'processing' | 'completed' | 'failed';
 
   @Expose()
   @IsOptional()
@@ -153,22 +153,6 @@ export class MessageEntity implements MessageModel {
   @IsNumber()
   @Min(0)
   processingTimeMs?: number;
-
-  // Streaming support fields
-  @Expose()
-  @IsOptional()
-  @IsString()
-  streamId?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsBoolean()
-  isStreaming?: boolean;
-
-  @Expose()
-  @IsOptional()
-  @IsBoolean()
-  streamCompleted?: boolean;
 
   /**
    * Static factory method for creating MessageEntity from raw data
@@ -273,31 +257,5 @@ export class MessageEntity implements MessageModel {
    */
   hasAttachedContent(): boolean {
     return this.hasAttachments;
-  }
-
-  /**
-   * Helper method to check if message is currently streaming
-   */
-  isCurrentlyStreaming(): boolean {
-    return this.isStreaming === true && this.streamCompleted !== true;
-  }
-
-  /**
-   * Helper method to mark message as streaming
-   */
-  markAsStreaming(streamId: string): void {
-    this.streamId = streamId;
-    this.isStreaming = true;
-    this.streamCompleted = false;
-    this.processingStatus = 'streaming';
-  }
-
-  /**
-   * Helper method to complete streaming
-   */
-  completeStreaming(): void {
-    this.isStreaming = false;
-    this.streamCompleted = true;
-    this.processingStatus = 'completed';
   }
 }

@@ -1,10 +1,188 @@
 import type { ApiResponse } from '@starships/protocol'
-import axios, { AxiosResponse } from 'axios'
 
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
-const api = axios.create({
+// Custom fetch response wrapper to match axios-like interface
+interface FetchResponse<T = any> {
+  data: T
+  status: number
+  statusText: string
+  headers: Headers
+}
+
+// Interceptor types
+type RequestInterceptor = (config: RequestConfig) => Promise<RequestConfig> | RequestConfig
+type ResponseInterceptor = (response: FetchResponse) => FetchResponse
+type ErrorInterceptor = (error: any) => any
+
+interface RequestConfig extends RequestInit {
+  url?: string
+  timeout?: number
+}
+
+// Custom fetch client with timeout and headers
+class FetchClient {
+  private timeout: number
+  private baseHeaders: Record<string, string>
+  private requestInterceptors: RequestInterceptor[] = []
+  private responseInterceptors: ResponseInterceptor[] = []
+  private errorInterceptors: ErrorInterceptor[] = []
+
+  public interceptors = {
+    request: {
+      use: (onFulfilled: RequestInterceptor, onRejected?: (error: any) => any) => {
+        this.requestInterceptors.push(onFulfilled)
+        if (onRejected) this.errorInterceptors.push(onRejected)
+      },
+    },
+    response: {
+      use: (onFulfilled: ResponseInterceptor, onRejected?: (error: any) => any) => {
+        this.responseInterceptors.push(onFulfilled)
+        if (onRejected) this.errorInterceptors.push(onRejected)
+      },
+    },
+  }
+
+  constructor(config: { timeout?: number; headers?: Record<string, string> } = {}) {
+    this.timeout = config.timeout || 120000 // 120s (2 minutes)
+    this.baseHeaders = config.headers || { 'Content-Type': 'application/json' }
+  }
+
+  async request<T = any>(url: string, options: RequestInit = {}): Promise<FetchResponse<T>> {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+
+    try {
+      // Apply request interceptors
+      let config: RequestConfig = {
+        ...options,
+        url,
+        headers: {
+          ...this.baseHeaders,
+          ...((options.headers as Record<string, string>) || {}),
+        },
+        signal: controller.signal,
+      }
+
+      for (const interceptor of this.requestInterceptors) {
+        config = await interceptor(config)
+      }
+
+      const response = await fetch(config.url || url, config)
+
+      clearTimeout(timeoutId)
+
+      let data: any
+      const contentType = response.headers.get('content-type')
+
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json()
+      } else {
+        data = await response.text()
+      }
+
+      if (!response.ok) {
+        const error = new Error(`HTTP error! status: ${response.status}`) as any
+        error.response = {
+          status: response.status,
+          statusText: response.statusText,
+          data,
+          headers: response.headers,
+        }
+        error.config = { url: config.url || url, method: config.method }
+
+        // Apply error interceptors
+        for (const interceptor of this.errorInterceptors) {
+          try {
+            return interceptor(error)
+          } catch (e) {
+            // Continue to next interceptor if this one throws
+          }
+        }
+
+        throw error
+      }
+
+      let fetchResponse: FetchResponse<T> = {
+        data,
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+      }
+
+      // Apply response interceptors
+      for (const interceptor of this.responseInterceptors) {
+        fetchResponse = interceptor(fetchResponse)
+      }
+
+      return fetchResponse
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+
+      if (error.name === 'AbortError') {
+        const timeoutError = new Error('Request timeout') as any
+        timeoutError.code = 'ECONNABORTED'
+        timeoutError.config = { url, method: options.method }
+        throw timeoutError
+      }
+
+      // Apply error interceptors for network errors
+      for (const interceptor of this.errorInterceptors) {
+        try {
+          return interceptor(error)
+        } catch (e) {
+          // Continue to next interceptor if this one throws
+        }
+      }
+
+      throw error
+    }
+  }
+
+  async get<T = any>(url: string, config: { params?: Record<string, any> } = {}): Promise<FetchResponse<T>> {
+    let requestUrl = url
+    if (config.params) {
+      const searchParams = new URLSearchParams()
+      Object.entries(config.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          searchParams.append(key, String(value))
+        }
+      })
+      if (searchParams.toString()) {
+        requestUrl += `?${searchParams.toString()}`
+      }
+    }
+    return this.request<T>(requestUrl, { method: 'GET' })
+  }
+
+  async post<T = any>(url: string, data?: any): Promise<FetchResponse<T>> {
+    return this.request<T>(url, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  async put<T = any>(url: string, data?: any): Promise<FetchResponse<T>> {
+    return this.request<T>(url, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  async patch<T = any>(url: string, data?: any): Promise<FetchResponse<T>> {
+    return this.request<T>(url, {
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    })
+  }
+
+  async delete<T = any>(url: string): Promise<FetchResponse<T>> {
+    return this.request<T>(url, { method: 'DELETE' })
+  }
+}
+
+const api = new FetchClient({
   timeout: 120000, // Increased to 120s (2 minutes) for long-running operations
   headers: {
     'Content-Type': 'application/json',
@@ -12,7 +190,7 @@ const api = axios.create({
 })
 
 // Simple helper to extract data from ApiResponse<T> - enforces response contract
-const extractResponseData = <T>(response: AxiosResponse<ApiResponse<T>>): T => response.data.data
+const extractResponseData = <T>(response: FetchResponse<ApiResponse<T>>): T => response.data.data
 
 // Token provider function for dynamic token retrieval
 let getTokenFunction: (() => Promise<string | null>) | null = null
@@ -67,7 +245,7 @@ const waitForTokenProvider = (): Promise<void> => {
 
 // Request interceptor to add authentication token
 api.interceptors.request.use(
-  async config => {
+  async (config: RequestConfig) => {
     console.log('[API] Request interceptor running for:', config.url, 'at', new Date().toISOString())
 
     // Check if this is an authenticated endpoint
@@ -101,7 +279,12 @@ api.interceptors.request.use(
       const token = await getTokenFunction()
       console.log('[API] Token from provider:', token ? 'Token present' : 'No token')
       if (token) {
-        config.headers.Authorization = `Bearer ${token}`
+        // Ensure headers is a proper object
+        if (!config.headers) {
+          config.headers = {}
+        }
+        const headers = config.headers as Record<string, string>
+        headers.Authorization = `Bearer ${token}`
         console.log('[API] Authorization header added successfully')
       } else {
         console.log('[API] No token available, proceeding without Authorization header')
@@ -117,7 +300,7 @@ api.interceptors.request.use(
     }
     return config
   },
-  error => {
+  (error: any) => {
     console.error('[API] Request interceptor error:', error)
     return Promise.reject(error)
   }
@@ -125,8 +308,8 @@ api.interceptors.request.use(
 
 // Response interceptor for auth error handling
 api.interceptors.response.use(
-  response => response,
-  error => {
+  (response: FetchResponse) => response,
+  (error: any) => {
     // Enhanced error logging to capture all possible error scenarios
     const errorDetails = {
       message: error.message,
@@ -164,7 +347,6 @@ api.interceptors.response.use(
           statusText: 'OK',
           data: { message: 'Already connected' },
           headers: error.response.headers,
-          config: error.config,
         })
       }
     } else if (!error.response) {

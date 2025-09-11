@@ -2,8 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation } from '@/hooks/useConversations'
-import { useSendMessage } from '@/hooks/useMessages'
+import { useCreateConversation, useConversation } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
@@ -28,7 +27,6 @@ interface ConversationMessageInputProps {
   disabled?: boolean
   minimal?: boolean
   children?: React.ReactNode // For footer content
-  streamingEventHandler?: ((event: any) => void) | null
 }
 
 export interface ConversationMessageInputRef {
@@ -36,15 +34,17 @@ export interface ConversationMessageInputRef {
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
-  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children, streamingEventHandler }, ref) => {
+  ({ selectedAgent, starshipId, conversationId, onConversationStart, onMessageSent, disabled = false, minimal = false, children }, ref) => {
     const { userId } = useAuth()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
     const [isRecording, setIsRecording] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
-    const sendMessage = useSendMessage()
-    const isStreaming = sendMessage.isPending
+
+    // Use unified conversation hook when we have a conversationId
+    const { sendMessage: sendMessageFn, isSending } = useConversation(conversationId || null)
+    const isStreaming = isSending
 
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
@@ -91,7 +91,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         onMessageSent?.()
 
         // Send message with streaming (this handles everything: saves message + gets agent response)
-        await sendMessage.mutateAsync({
+        await sendMessageFn({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           content: messageToSend,
@@ -99,7 +99,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           starshipId: starshipId!,
           messageType: 'user_input',
           stream: true,
-          onStreamingEvent: streamingEventHandler || undefined,
         })
 
         // No need to manage streamId - streaming hook will use conversationId directly
@@ -150,7 +149,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         onMessageSent?.()
 
         // Send message with streaming (this handles everything: saves message + gets agent response)
-        await sendMessage.mutateAsync({
+        await sendMessageFn({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           content: suggestionText,
@@ -158,7 +157,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           starshipId: starshipId!,
           messageType: 'user_input',
           stream: true,
-          onStreamingEvent: streamingEventHandler || undefined,
         })
 
         // No need to manage streamId - streaming hook will use conversationId directly

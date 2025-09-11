@@ -725,24 +725,7 @@ export class AgentService {
         },
       };
 
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-workflow-started`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
+      // Only create database message - streaming handled by AutopilotStreamService
       await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create workflow_started message:`, error);
@@ -785,24 +768,7 @@ export class AgentService {
         },
       };
 
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-node-started-${event.execution.currentNodeRef}`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
+      // Only create database message - streaming handled by AutopilotStreamService
       await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create node_started message:`, error);
@@ -861,24 +827,7 @@ export class AgentService {
             },
           };
 
-          // For streaming: broadcast assistant message object
-          if (context.streamingService && context.streamId) {
-            const tempMessage = {
-              id: `temp-${Date.now()}-assistant-${currentNodeRef}`,
-              ...assistantMessageData,
-              timestamp: event.timestamp,
-              createdAt: event.timestamp,
-              updatedAt: event.timestamp,
-              version: '1.0.0',
-              threadDepth: 0,
-              contentLength: assistantMessageData.content.length,
-              hasAttachments: false,
-              streaming: true,
-            };
-            await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-          }
-
-          // Always create database message
+          // Only create database message - streaming handled by AutopilotStreamService
           await context.messageService.createMessage(assistantMessageData);
         }
       }
@@ -901,24 +850,7 @@ export class AgentService {
         },
       };
 
-      // For streaming: broadcast completion message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-completed-${currentNodeRef}`,
-          ...completionMessageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: completionMessageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
+      // Only create database message - streaming handled by AutopilotStreamService
       await context.messageService.createMessage(completionMessageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create node_completed message:`, error);
@@ -961,24 +893,7 @@ export class AgentService {
         },
       };
 
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-workflow-completed`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
+      // Only create database message - streaming handled by AutopilotStreamService
       await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create workflow_completed message:`, error);
@@ -1021,24 +936,7 @@ export class AgentService {
         },
       };
 
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-workflow-failed`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
+      // Only create database message - streaming handled by AutopilotStreamService
       await context.messageService.createMessage(messageData);
     } catch (error) {
       console.error(`[AGENT-SERVICE] Failed to create workflow_failed message:`, error);

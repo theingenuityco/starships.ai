@@ -117,7 +117,7 @@ export class MissionMessageRepository extends BaseRepository {
 
         return convertNeo4jIntsInArray(
           result?.map((record) => record.msg as unknown as Record<string, unknown>) || []
-        ) as MissionMessageModel[];
+        ) as unknown as MissionMessageModel[];
       },
       'getMessagesByMission',
       'MissionMessageModel'

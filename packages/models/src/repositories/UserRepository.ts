@@ -134,7 +134,7 @@ export class UserRepository extends BaseRepository {
         );
 
         if (result.length === 0) {
-          this.handleNotFound('User', id, 'update');
+          this.handleNotFound('User', id);
         }
 
         return UserEntity.deserialize(result[0].u as unknown as Record<string, unknown>);

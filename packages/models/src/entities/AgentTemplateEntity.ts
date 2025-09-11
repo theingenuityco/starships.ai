@@ -134,7 +134,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   /**
    * Static factory method for creating AgentTemplateEntity from raw data
    */
-  static deserialize(data: Record<string, unknown>): AgentTemplateEntity {
+  static deserialize(data: Record<string, unknown> | AgentTemplateModel): AgentTemplateEntity {
     return plainToInstance(AgentTemplateEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,

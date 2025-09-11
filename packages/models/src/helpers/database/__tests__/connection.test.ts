@@ -359,9 +359,9 @@ describe('Neo4jConnection', () => {
     let sanitizeMethod: (value: unknown, depth?: number) => unknown;
 
     beforeEach(() => {
-      sanitizeMethod = (connection as { sanitizeParameters: (value: unknown, depth?: number) => unknown }).sanitizeParameters.bind(
-        connection
-      );
+      sanitizeMethod = (
+        connection as unknown as { sanitizeParameters: (value: unknown, depth?: number) => unknown }
+      ).sanitizeParameters.bind(connection);
     });
 
     it('should handle null and undefined values', () => {

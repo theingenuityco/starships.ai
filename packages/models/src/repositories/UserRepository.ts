@@ -11,7 +11,7 @@ export class UserRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
-        return result.map((record) => UserEntity.deserialize(record.u));
+        return result.map((record) => UserEntity.deserialize(record.u as unknown as Record<string, unknown>));
       },
       'findAll',
       'User'
@@ -24,7 +24,7 @@ export class UserRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.id = $id RETURN u', { id: id });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user) : null;
+        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'User',
@@ -38,7 +38,7 @@ export class UserRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user) : null;
+        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
       },
       'findByEmail',
       'User',
@@ -54,7 +54,7 @@ export class UserRepository extends BaseRepository {
           username: username,
         });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user) : null;
+        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
       },
       'findByUsername',
       'User',
@@ -84,7 +84,7 @@ export class UserRepository extends BaseRepository {
           userEntity.serialize()
         );
 
-        return UserEntity.deserialize(user);
+        return UserEntity.deserialize(user as unknown as Record<string, unknown>);
       },
       'create',
       'User'
@@ -119,6 +119,7 @@ export class UserRepository extends BaseRepository {
         }
 
         // Filter out protected fields from params
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _, createdAt: __, ...filteredUpdateData } = updateData;
         const params = {
           id: id, // Use the actual user ID parameter
@@ -136,7 +137,7 @@ export class UserRepository extends BaseRepository {
           this.handleNotFound('User', id, 'update');
         }
 
-        return UserEntity.deserialize(result[0].u);
+        return UserEntity.deserialize(result[0].u as unknown as Record<string, unknown>);
       },
       'update',
       'User',
@@ -173,7 +174,7 @@ export class UserRepository extends BaseRepository {
         );
 
         const user = result[0]?.user || null;
-        return user ? UserEntity.deserialize(user) : null;
+        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
       },
       'findByStripeCustomerId',
       'User',
@@ -212,7 +213,7 @@ export class UserRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user) : null;
+        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
       },
       'findByEmailWithPassword',
       'User',
@@ -253,7 +254,7 @@ export class UserRepository extends BaseRepository {
           userEntity.serialize()
         );
 
-        return UserEntity.deserialize(user);
+        return UserEntity.deserialize(user as unknown as Record<string, unknown>);
       },
       'createWithPassword',
       'User'

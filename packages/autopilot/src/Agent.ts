@@ -7,7 +7,7 @@
  */
 
 import { AgentMemory, AgentMemoryState } from '@/AgentMemory';
-import { Engine, EventCallback } from '@/engine/Engine';
+import { Engine } from '@/engine/Engine';
 import { AgentParams, Blueprint, Edge, Execution, Node } from '@/types';
 
 export class Agent {
@@ -104,9 +104,9 @@ export class Agent {
   }
 
   /**
-   * Execute the agent with optional event monitoring
+   * Execute the agent
    */
-  async execute(initialExecution?: Execution, eventCallback?: EventCallback): Promise<Execution> {
+  async execute(initialExecution?: Execution): Promise<Execution> {
     try {
       console.log(
         `Executing Agent: ${this.params.name} (${this.params.model})${initialExecution?.streaming?.enabled ? ' (streaming)' : ''}`
@@ -120,20 +120,8 @@ export class Agent {
         ...initialExecution,
       };
 
-      // Register event callback if provided
-      if (eventCallback) {
-        this.onEvent(eventCallback);
-      }
-
-      try {
-        const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
-        return result;
-      } finally {
-        // Clean up event callback
-        if (eventCallback) {
-          this.offEvent(eventCallback);
-        }
-      }
+      const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
+      return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Agent execution failed: ${errorMessage}`);
@@ -257,23 +245,5 @@ export class Agent {
     };
 
     return new Agent(updatedParams);
-  }
-
-  // ============================================================================
-  // EVENT HANDLING - Forward Engine Events
-  // ============================================================================
-
-  /**
-   * Register a callback to receive workflow execution events
-   */
-  onEvent(callback: EventCallback): void {
-    this.engine.onEvent(callback);
-  }
-
-  /**
-   * Remove an event callback
-   */
-  offEvent(callback: EventCallback): void {
-    this.engine.offEvent(callback);
   }
 }

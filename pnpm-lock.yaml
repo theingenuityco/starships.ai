@@ -61,9 +61,6 @@ importers:
 
   packages/autopilot:
     dependencies:
-      '@starships/protocol':
-        specifier: workspace:*
-        version: link:../protocol
       axios:
         specifier: ^1.11.0
         version: 1.11.0

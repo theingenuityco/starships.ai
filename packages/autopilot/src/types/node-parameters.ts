@@ -7,6 +7,7 @@
 
 import type { AgentMemoryState } from '@/AgentMemory';
 import type { BaseBlueprint } from '@/types/base';
+import { Blueprint } from './blueprint';
 
 /**
  * Agent-specific node parameters
@@ -29,7 +30,7 @@ export interface AgentNodeParameters {
   memory: AgentMemoryState;
 
   // Blueprint execution
-  blueprint: BaseBlueprint;
+  blueprint: Blueprint;
 
   // Metadata
   metadata?: Record<string, unknown>;

@@ -1,52 +1,21 @@
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
-import { Neo4jConnection, convertNeo4jIntsInArray, convertNeo4jIntsInObject } from '@/helpers/database';
+import { Neo4jConnection } from '@/helpers/database';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { AgentMemoryState } from '@starships/autopilot';
-import type { AgentModel, AgentTemplateModel } from '@starships/protocol';
-import { int } from 'neo4j-driver';
+import type { AgentModel, AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest } from '@starships/protocol';
 
 export class AgentTemplateRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
     super('AgentTemplateRepository', connection);
   }
 
-  /**
-   * Helper to safely get value or default, handling empty objects from Neo4j
-   */
-  private getSafeValue<T>(value: T | {} | null | undefined, defaultValue: T): T {
-    if (value === null || value === undefined || (typeof value === 'object' && Object.keys(value as any).length === 0)) {
-      return defaultValue;
-    }
-    return value as T;
-  }
-
-  /**
-   * Helper to deserialize template from Neo4j format back to AgentTemplateModel
-   */
-  private deserializeTemplate(rawTemplate: any): AgentTemplateModel {
-    return AgentTemplateEntity.deserialize(rawTemplate);
-  }
-
-  /**
-   * Helper to serialize template for Neo4j storage
-   */
-  private serializeTemplate(template: any): any {
-    const entity = AgentTemplateEntity.deserialize(template);
-    return entity.serialize();
-  }
-
   async findAll(): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const query = `
-        MATCH (t:AgentTemplate)
-        RETURN t
-        ORDER BY t.createdAt DESC
-      `;
-
-        const results = await this.getConnection().executeQuery<{ t: any }>(query);
-        return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
+        const connection = this.getConnection();
+        const query = `MATCH (t:AgentTemplate) RETURN t ORDER BY t.createdAt DESC`;
+        const result = await connection.executeQuery<{ t: AgentTemplateModel }>(query);
+        return result.map((record) => AgentTemplateEntity.deserialize(record.t));
       },
       'findAll',
       'AgentTemplate'
@@ -64,10 +33,10 @@ export class AgentTemplateRepository extends BaseRepository {
         MATCH (t:AgentTemplate {id: $id})
         RETURN t
       `;
-
-        const results = await this.getConnection().executeQuery<{ t: any }>(query, { id });
+        const connection = this.getConnection();
+        const results = await connection.executeQuery<{ t: AgentTemplateModel }>(query, { id });
         const template = results.length > 0 ? results[0].t : null;
-        return template ? this.deserializeTemplate(convertNeo4jIntsInObject(template)) : null;
+        return template ? AgentTemplateEntity.deserialize(template) : null;
       },
       'findById',
       'AgentTemplate',
@@ -87,9 +56,9 @@ export class AgentTemplateRepository extends BaseRepository {
         RETURN t
       `;
 
-        const results = await this.getConnection().executeQuery<{ t: any }>(query, { slug });
+        const results = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { slug });
         const template = results.length > 0 ? results[0].t : null;
-        return template ? this.deserializeTemplate(convertNeo4jIntsInObject(template)) : null;
+        return template ? AgentTemplateEntity.deserialize(template) : null;
       },
       'findBySlug',
       'AgentTemplate',
@@ -97,101 +66,75 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Omit<AgentTemplateModel, 'id' | 'createdAt'>): Promise<AgentTemplateModel> {
+  async create(data: CreateAgentTemplateRequest): Promise<AgentTemplateModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Skip entity validation for create operations since data comes from service layer
-        // with proper TypeScript validation. Entity validation is designed for Neo4j data
-        // where complex objects are JSON strings, not service data where objects are intact.
-        // await AgentTemplateEntity.validate(entity, 'create');
+        // validate using data
+        AgentTemplateEntity.validate(data);
 
         const now = new Date().toISOString();
 
         // Generate slug if not provided
-        const slug = (entity as any).slug || generateSlug((entity as any).name);
+        const slug = generateSlug(data.name);
 
         // Build template data, ensuring no complex objects for Neo4j storage
-        const templateData = {
+        const templateProps = {
           // Explicit primitive fields
-          name: entity.name,
+          name: data.name,
           slug: slug,
-          description: entity.description,
-          category: entity.category,
-          model: entity.model,
-          temperature: entity.temperature,
-          maxTokens: entity.maxTokens,
-          timeout: this.getSafeValue(entity.timeout, 30000) as number,
-          authorId: entity.authorId,
-          isPublic: entity.isPublic,
-          rating: entity.rating,
-          icon: entity.icon,
-          previewPrompts: entity.previewPrompts,
-          tags: entity.tags,
+          description: data.description,
+          category: data.category,
+          model: data.model,
+          temperature: data.temperature,
+          maxTokens: data.maxTokens,
+          timeout: data.timeout,
+          icon: data.icon,
+          previewPrompts: data.previewPrompts,
+          memory: data.memory,
+          blueprint: data.blueprint,
+          usageCount: 0,
 
           // Database fields
           createdAt: now,
           updatedAt: now,
-          usageCount: 0,
-
-          // Serialize complex objects to JSON strings for Neo4j storage
-          memory: entity.memory ? JSON.stringify(entity.memory) : null,
-          blueprint: entity.blueprint ? JSON.stringify(entity.blueprint) : null,
         };
 
-        const created = await this.createEntityWithAutoId<any>('AgentTemplate', templateData);
+        // Transform using Entity
+        const templateEntity = AgentTemplateEntity.deserialize(templateProps);
 
-        // Don't deserialize newly created templates since they're already properly structured
-        // from the service layer. Deserialization is only needed for data retrieved from Neo4j.
-        const convertedNeo4j = convertNeo4jIntsInObject(created);
+        // Use base repository for database operation
+        const template = await this.createEntityWithAutoId<AgentModel>('AgentTemplate', templateEntity.serialize());
 
         // Parse the JSON strings back to objects manually for the response
-        return {
-          ...convertedNeo4j,
-          memory: convertedNeo4j.memory ? JSON.parse(convertedNeo4j.memory) : undefined,
-          blueprint: convertedNeo4j.blueprint ? JSON.parse(convertedNeo4j.blueprint) : undefined,
-        } as AgentTemplateModel;
+        return AgentTemplateEntity.deserialize(template);
       },
       'create',
       'AgentTemplate'
     );
   }
 
-  async update(id: string, updates: Partial<AgentTemplateModel>): Promise<AgentTemplateModel | null> {
+  async update(id: string, updates: UpdateAgentTemplateRequest): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        if (!id?.trim()) {
-          throw new Error('ID is required for update operation');
-        }
+        const connection = this.getConnection();
+        const updateProps = {
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
 
-        // Use entity validation for updates
-        await AgentTemplateEntity.validate(updates, 'update');
+        // Transform using Entity
+        const updateEntity = AgentTemplateEntity.deserialize(updateProps);
 
-        // Serialize complex objects in updates
-        const serializedUpdates = this.serializeTemplate(updates);
+        const result = await connection.executeWrite<{ a: AgentModel }>(
+          'MATCH (t:AgentTemplate) WHERE t.id = $id SET t += $updates RETURN t',
+          {
+            id,
+            updates: updateEntity.serialize(),
+          }
+        );
 
-        const updateFields = Object.keys(serializedUpdates)
-          .filter((key) => key !== 'id' && key !== 'createdAt' && serializedUpdates[key] !== undefined && serializedUpdates[key] !== null)
-          .map((key) => `t.${key} = $updates.${key}`)
-          .join(', ');
-
-        if (!updateFields) {
-          return this.findById(id);
-        }
-
-        const query = `
-        MATCH (t:AgentTemplate {id: $id})
-        SET ${updateFields}, t.updatedAt = $now
-        RETURN t
-      `;
-
-        const results = await this.getConnection().executeWrite<{ t: any }>(query, {
-          id,
-          updates: serializedUpdates,
-          now: new Date().toISOString(),
-        });
-
-        const template = results.length > 0 ? results[0].t : null;
-        return template ? this.deserializeTemplate(convertNeo4jIntsInObject(template)) : null;
+        const template = result[0]?.a || null;
+        return template ? AgentTemplateEntity.deserialize(template) : null;
       },
       'update',
       'AgentTemplate',
@@ -202,43 +145,17 @@ export class AgentTemplateRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        if (!id?.trim()) {
-          throw new Error('ID is required for delete operation');
-        }
+        const connection = this.getConnection();
+        const result = await connection.executeWrite<{ deletedCount: number }>(
+          'MATCH (t:AgentTemplate) WHERE t.id = $id DETACH DELETE t RETURN count(t) as deletedCount',
+          { id }
+        );
 
-        const query = `
-        MATCH (t:AgentTemplate {id: $id})
-        DETACH DELETE t
-        RETURN count(t) as deletedCount
-      `;
-
-        const results = await this.getConnection().executeWrite<{ deletedCount: number }>(query, { id });
-        return results[0]?.deletedCount > 0;
+        return result[0]?.deletedCount > 0;
       },
       'delete',
       'AgentTemplate',
       id
-    );
-  }
-
-  async findByAuthor(authorId: string): Promise<AgentTemplateModel[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        if (!authorId?.trim()) {
-          throw new Error('Author ID is required for findByAuthor operation');
-        }
-
-        const query = `
-        MATCH (t:AgentTemplate {authorId: $authorId})
-        RETURN t
-        ORDER BY t.createdAt DESC
-      `;
-
-        const results = await this.getConnection().executeQuery<{ t: any }>(query, { authorId });
-        return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
-      },
-      'findByAuthor',
-      'AgentTemplate'
     );
   }
 
@@ -253,65 +170,13 @@ export class AgentTemplateRepository extends BaseRepository {
         MATCH (t:AgentTemplate {category: $category})
         WHERE t.isPublic = true
         RETURN t
-        ORDER BY t.usageCount DESC, t.rating DESC
+        ORDER BY t.usageCount DESC
       `;
 
-        const results = await this.getConnection().executeQuery<{ t: any }>(query, { category });
-        return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
+        const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { category });
+        return result.map((record) => AgentTemplateEntity.deserialize(record.t));
       },
       'findByCategory',
-      'AgentTemplate'
-    );
-  }
-
-  async findByTags(tags: string[]): Promise<AgentTemplateModel[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        if (!Array.isArray(tags) || tags.length === 0) {
-          throw new Error('Tags must be a non-empty array');
-        }
-
-        const query = `
-        MATCH (t:AgentTemplate)
-        WHERE t.isPublic = true AND ANY(tag IN $tags WHERE tag IN t.tags)
-        RETURN t, size([tag IN $tags WHERE tag IN t.tags]) as matchCount
-        ORDER BY matchCount DESC, t.usageCount DESC, t.rating DESC
-      `;
-
-        const results = await this.getConnection().executeQuery<{ t: any }>(query, { tags });
-        return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
-      },
-      'findByTags',
-      'AgentTemplate'
-    );
-  }
-
-  async findPublic(limit: number = 50, offset: number = 0): Promise<AgentTemplateModel[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        if (limit < 1 || limit > 100) {
-          throw new Error('Limit must be between 1 and 100');
-        }
-
-        if (offset < 0) {
-          throw new Error('Offset must be non-negative');
-        }
-
-        const query = `
-        MATCH (t:AgentTemplate {isPublic: true})
-        RETURN t
-        ORDER BY t.usageCount DESC, t.rating DESC, t.createdAt DESC
-        SKIP $offset
-        LIMIT $limit
-      `;
-
-        const results = await this.getConnection().executeQuery<{ t: any }>(query, {
-          limit: int(limit),
-          offset: int(offset),
-        });
-        return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
-      },
-      'findPublic',
       'AgentTemplate'
     );
   }
@@ -329,10 +194,9 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const searchQuery = `
         MATCH (t:AgentTemplate)
-        WHERE t.isPublic = true AND (
+        WHERE (
           toLower(t.name) CONTAINS toLower($query) OR
-          toLower(t.description) CONTAINS toLower($query) OR
-          ANY(tag IN t.tags WHERE toLower(tag) CONTAINS toLower($query))
+          toLower(t.description) CONTAINS toLower($query)
         )
         RETURN t,
           CASE
@@ -343,10 +207,10 @@ export class AgentTemplateRepository extends BaseRepository {
         ORDER BY relevance DESC, t.usageCount DESC, t.rating DESC
       `;
 
-        const results = await this.getConnection().executeQuery<{ t: any }>(searchQuery, {
+        const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(searchQuery, {
           query,
         });
-        return convertNeo4jIntsInArray(results.map((result) => this.deserializeTemplate(result.t)));
+        return result.map((record) => AgentTemplateEntity.deserialize(record.t));
       },
       'searchTemplates',
       'AgentTemplate'
@@ -370,221 +234,6 @@ export class AgentTemplateRepository extends BaseRepository {
       'incrementUsageCount',
       'AgentTemplate',
       id
-    );
-  }
-
-  async updateRating(id: string, rating: number): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        if (!id?.trim()) {
-          throw new Error('ID is required for updateRating operation');
-        }
-
-        if (typeof rating !== 'number' || rating < 0 || rating > 5) {
-          throw new Error('Rating must be a number between 0 and 5');
-        }
-
-        const query = `
-        MATCH (t:AgentTemplate {id: $id})
-        SET t.rating = $rating, t.updatedAt = $now
-      `;
-
-        await this.getConnection().executeWrite(query, { id, rating, now: new Date().toISOString() });
-      },
-      'updateRating',
-      'AgentTemplate',
-      id
-    );
-  }
-
-  async createAgentFromTemplate(templateId: string, agentName: string, authorId: string, starshipId: string): Promise<AgentModel> {
-    // First get the template
-    const template = await this.findById(templateId);
-    if (!template) {
-      throw new Error(`Template with id ${templateId} not found`);
-    }
-
-    // Increment template usage count
-    await this.incrementUsageCount(templateId);
-
-    const now = new Date().toISOString();
-
-    // Prepare agent data for creation
-    const agentData = {
-      // Core AgentNodeParameters fields from template
-      name: agentName,
-      description: template.description,
-      model: template.model,
-      temperature: template.temperature,
-      maxTokens: template.maxTokens,
-      timeout: template.timeout || 30000,
-      memory: template.memory ? JSON.stringify(template.memory) : null,
-      blueprint: template.blueprint ? JSON.stringify(template.blueprint) : null,
-
-      // Database-specific fields
-      createdAt: now,
-      updatedAt: now,
-      version: '1.0.0',
-      category: template.category,
-      usageCount: 0,
-      templateId: templateId,
-      starshipId: starshipId,
-    };
-
-    // Create agent with auto-generated ID
-    const rawAgent = await this.createEntityWithAutoId<any>('Agent', agentData);
-    // Create relationship with starship
-    try {
-      await this.getConnection().executeWrite(
-        `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
-         CREATE (a)-[:DEPLOYED_ON]->(s)`,
-        { starshipId, agentId: rawAgent.id }
-      );
-    } catch (error) {
-      console.warn('Failed to create Agent-Starship relationship:', error);
-    }
-    // Deserialize for return (assuming Agent has similar structure)
-    const createdAgent = {
-      ...convertNeo4jIntsInObject(rawAgent),
-      memory: rawAgent.memory ? JSON.parse(rawAgent.memory) : undefined,
-      blueprint: rawAgent.blueprint ? JSON.parse(rawAgent.blueprint) : undefined,
-    };
-
-    return createdAgent as AgentModel;
-  }
-
-  async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        if (!agentId?.trim()) {
-          throw new Error('Agent ID is required for createTemplateFromAgent operation');
-        }
-
-        // First get the agent
-        const query = `
-        MATCH (a:Agent {id: $agentId})
-        WHERE a.isPublic = true
-        RETURN a
-      `;
-
-        const agentResults = await this.getConnection().executeQuery<{ a: AgentModel }>(query, {
-          agentId,
-        });
-
-        if (agentResults.length === 0) {
-          return null; // Agent not found or not public
-        }
-
-        const agent = agentResults[0].a;
-
-        const now = new Date().toISOString();
-
-        // Create default blueprint for simple chat
-        const defaultBlueprint = {
-          nodes: [
-            {
-              ref: 'start',
-              type: 'start' as const,
-              name: 'Start',
-              description: 'Begin conversation',
-              parameters: {},
-            },
-            {
-              ref: 'chat-response',
-              type: 'llm' as const,
-              name: 'Generate Response',
-              description: 'Process user input and respond',
-              parameters: {
-                model: agent.model,
-                prompt: 'Respond helpfully to the user based on the conversation context and your system instructions.',
-                temperature: agent.temperature || 0.7,
-                maxTokens: agent.maxTokens || 2000,
-              },
-            },
-            {
-              ref: 'end',
-              type: 'end' as const,
-              name: 'End',
-              description: 'Complete conversation',
-              parameters: {},
-            },
-          ],
-          edges: [
-            { ref: 'edge-1', from: 'start', to: 'chat-response' },
-            { ref: 'edge-2', from: 'chat-response', to: 'end' },
-          ],
-          metadata: {
-            version: '1.0',
-            type: 'simple-chat',
-            complexity: 'basic',
-          },
-        };
-
-        // Create default memory config
-        const defaultMemory: AgentMemoryState = {
-          identity: {
-            name: String(agent.name || 'AI Assistant'),
-            role: 'AI Assistant',
-            personality: 'Professional and helpful',
-          },
-          purpose: {
-            primary: String(this.getSafeValue(agent.description, 'Assist users with their requests')),
-            constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy'],
-          },
-          space: {
-            description: 'Professional assistance environment focused on providing accurate and helpful responses.',
-          },
-        };
-
-        // Prepare template data for creation
-        const templateData = {
-          // Core AgentNodeParameters fields
-          name: `${agent.name} Template`,
-          description: this.getSafeValue(agent.description, '') as string,
-          model: agent.model as string,
-          temperature: agent.temperature as number | undefined,
-          maxTokens: agent.maxTokens as number | undefined,
-          timeout: 30000,
-          memory: JSON.stringify(defaultMemory),
-          blueprint: JSON.stringify(defaultBlueprint),
-
-          // Database-specific fields
-          createdAt: now,
-          updatedAt: now,
-          category: agent.category,
-          usageCount: 0,
-
-          // Template-specific fields
-          icon: '🤖', // Default icon
-          previewPrompts: [],
-        };
-
-        const rawCreated = await this.createEntityWithAutoId<any>('AgentTemplate', templateData);
-        const created = this.deserializeTemplate(convertNeo4jIntsInObject(rawCreated));
-
-        // Create USER-[:CREATES]->AGENT_TEMPLATE relationship if author user exists
-        try {
-          if (created.authorId && created.authorId !== 'system') {
-            await this.getConnection().executeWrite(
-              `MATCH (u:User {id: $authorId}), (t:AgentTemplate {id: $templateId})
-             MERGE (u)-[r:CREATES]->(t)
-             ON CREATE SET r.createdAt = $now`,
-              {
-                authorId: created.authorId,
-                templateId: created.id,
-                now,
-              }
-            );
-          }
-        } catch (error) {
-          console.warn('Failed to create USER-[:CREATES]->AGENT_TEMPLATE relationship:', error);
-        }
-
-        return created;
-      },
-      'createTemplateFromAgent',
-      'AgentTemplate',
-      agentId
     );
   }
 }

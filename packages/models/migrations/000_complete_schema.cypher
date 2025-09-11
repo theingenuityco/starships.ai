@@ -29,17 +29,17 @@ CREATE RANGE INDEX starship_created_at IF NOT EXISTS FOR (s:Starship) ON (s.crea
 // ============================================================================
 
 // Agent constraints
-CREATE CONSTRAINT agent_id_unique IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE;
+CREATE CONSTRAINT unique_agent_id IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UNIQUE;
 
-// Agent indexes
-CREATE INDEX agent_starship_id IF NOT EXISTS FOR (a:Agent) ON (a.starshipId);
+// Agent relationship constraints
+CREATE CONSTRAINT unique_agent_starship IF NOT EXISTS FOR ()-[r:DEPLOYED_ON]-() REQUIRE r.id IS UNIQUE;
 
 // ============================================================================
 // AGENT TEMPLATE COLLECTION
 // ============================================================================
 
 // Agent Template constraints
-CREATE CONSTRAINT agent_template_id_unique IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.id IS UNIQUE;
+CREATE CONSTRAINT unique_agent_template_id IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.id IS UNIQUE;
 
 // ============================================================================
 // MISSION COLLECTION
@@ -122,10 +122,10 @@ CREATE RANGE INDEX message_created_at IF NOT EXISTS FOR (msg:Message) ON (msg.cr
 // ============================================================================
 
 // Session constraints
-CREATE CONSTRAINT session_id_unique IF NOT EXISTS FOR (cs:Session) REQUIRE cs.id IS UNIQUE;
+CREATE CONSTRAINT unique_conversation_id IF NOT EXISTS FOR (c:Conversation) REQUIRE c.id IS UNIQUE;
 
 // Session relationship constraints
-CREATE CONSTRAINT unique_starship_session IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() REQUIRE r.key IS UNIQUE;
+CREATE CONSTRAINT unique_starship_conversation IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() REQUIRE r.id IS UNIQUE;
 
 // ============================================================================
 // EXECUTION COLLECTION

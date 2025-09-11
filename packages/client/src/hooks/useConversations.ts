@@ -2,7 +2,6 @@ import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { AxiosResponse } from 'axios'
-import axios from 'axios'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 
@@ -205,51 +204,69 @@ export function useConversation(conversationId: string | null) {
           throw new Error('No authentication token available')
         }
 
-        const response = await axios.post(
-          `/api/v1/conversations/${data.conversationId}/messages`,
-          {
-            agentId: data.agentId,
-            message: data.content,
-          },
-          {
-            params: { stream: 'true' },
-            headers: {
-              Accept: 'text/event-stream',
-              Authorization: `Bearer ${token}`,
-              'Cache-Control': 'no-cache',
-            },
-            responseType: 'stream',
-          }
-        )
+        return new Promise(async (resolve, reject) => {
+          try {
+            const response = await fetch(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+                Accept: 'text/event-stream',
+                'Cache-Control': 'no-cache',
+              },
+              body: JSON.stringify({
+                agentId: data.agentId,
+                message: data.content,
+              }),
+            })
 
-        // Process streaming response
-        const stream = response.data
-        let buffer = ''
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`)
+            }
 
-        return new Promise((resolve, reject) => {
-          stream.on('data', (chunk: Buffer) => {
-            buffer += chunk.toString()
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
+            const reader = response.body?.getReader()
+            if (!reader) {
+              throw new Error('No readable stream available')
+            }
 
-            for (const line of lines) {
-              if (!line.trim()) continue
+            const decoder = new TextDecoder()
+            let buffer = ''
 
-              if (line.startsWith('data: ')) {
-                const eventData = line.substring(6).trim()
-                if (!eventData) continue
+            const processStream = async () => {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read()
+                  if (done) break
 
-                try {
-                  const parsed = JSON.parse(eventData)
-                  handleStreamingEvent(parsed)
-                } catch (parseError) {
-                  console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
+                  buffer += decoder.decode(value, { stream: true })
+                  const lines = buffer.split('\n')
+                  buffer = lines.pop() || ''
+
+                  for (const line of lines) {
+                    if (!line.trim()) continue
+
+                    if (line.startsWith('data: ')) {
+                      const eventData = line.substring(6).trim()
+                      if (!eventData) continue
+
+                      try {
+                        const parsed = JSON.parse(eventData)
+                        handleStreamingEvent(parsed)
+                      } catch (parseError) {
+                        console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
+                      }
+                    }
+                  }
                 }
+              } finally {
+                reader.releaseLock()
               }
             }
-          })
 
-          stream.on('end', () => {
+            // Process the stream
+            await processStream()
+
+            // Resolve with the user message
             resolve({
               id: `user-${Date.now()}`,
               timestamp: new Date().toISOString(),
@@ -268,11 +285,9 @@ export function useConversation(conversationId: string | null) {
               contentLength: data.content.length,
               hasAttachments: data.hasAttachments || false,
             } as ClientMessage)
-          })
-
-          stream.on('error', (error: Error) => {
+          } catch (error) {
             reject(error)
-          })
+          }
         })
       } else {
         // Regular message creation

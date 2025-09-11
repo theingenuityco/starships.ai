@@ -1,9 +1,16 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
+
+// Import FetchResponse type
+interface FetchResponse<T = any> {
+  data: T
+  status: number
+  statusText: string
+  headers: Headers
+}
 
 // Extended Message interface for client-side states
 interface ClientMessage extends MessageModel {
@@ -57,7 +64,7 @@ export function useConversation(conversationId: string | null) {
       startedAt: string
       lastActivityAt: string
     }> => {
-      const response: AxiosResponse<
+      const response: FetchResponse<
         ApiResponse<{
           conversationId: string
           messages: MessageModel[]
@@ -72,7 +79,7 @@ export function useConversation(conversationId: string | null) {
 
       return {
         ...response.data.data,
-        messages: response.data.data.messages.map(msg => ({ ...msg }) as ClientMessage),
+        messages: response.data.data.messages.map((msg: MessageModel) => ({ ...msg }) as ClientMessage),
       }
     },
     enabled: !!conversationId,
@@ -204,94 +211,98 @@ export function useConversation(conversationId: string | null) {
           throw new Error('No authentication token available')
         }
 
-        return new Promise(async (resolve, reject) => {
-          try {
-            const response = await fetch(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-                Accept: 'text/event-stream',
-                'Cache-Control': 'no-cache',
-              },
-              body: JSON.stringify({
-                agentId: data.agentId,
-                message: data.content,
-              }),
-            })
+        return new Promise((resolve, reject) => {
+          const processStreaming = async () => {
+            try {
+              const response = await fetch(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                  Accept: 'text/event-stream',
+                  'Cache-Control': 'no-cache',
+                },
+                body: JSON.stringify({
+                  agentId: data.agentId,
+                  message: data.content,
+                }),
+              })
 
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`)
-            }
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+              }
 
-            const reader = response.body?.getReader()
-            if (!reader) {
-              throw new Error('No readable stream available')
-            }
+              const reader = response.body?.getReader()
+              if (!reader) {
+                throw new Error('No readable stream available')
+              }
 
-            const decoder = new TextDecoder()
-            let buffer = ''
+              const decoder = new TextDecoder()
+              let buffer = ''
 
-            const processStream = async () => {
-              try {
-                while (true) {
-                  const { done, value } = await reader.read()
-                  if (done) break
+              const processStream = async () => {
+                try {
+                  while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
 
-                  buffer += decoder.decode(value, { stream: true })
-                  const lines = buffer.split('\n')
-                  buffer = lines.pop() || ''
+                    buffer += decoder.decode(value, { stream: true })
+                    const lines = buffer.split('\n')
+                    buffer = lines.pop() || ''
 
-                  for (const line of lines) {
-                    if (!line.trim()) continue
+                    for (const line of lines) {
+                      if (!line.trim()) continue
 
-                    if (line.startsWith('data: ')) {
-                      const eventData = line.substring(6).trim()
-                      if (!eventData) continue
+                      if (line.startsWith('data: ')) {
+                        const eventData = line.substring(6).trim()
+                        if (!eventData) continue
 
-                      try {
-                        const parsed = JSON.parse(eventData)
-                        handleStreamingEvent(parsed)
-                      } catch (parseError) {
-                        console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
+                        try {
+                          const parsed = JSON.parse(eventData)
+                          handleStreamingEvent(parsed)
+                        } catch (parseError) {
+                          console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
+                        }
                       }
                     }
                   }
+                } finally {
+                  reader.releaseLock()
                 }
-              } finally {
-                reader.releaseLock()
               }
+
+              // Process the stream
+              await processStream()
+
+              // Resolve with the user message
+              resolve({
+                id: `user-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                role: data.role,
+                content: data.content,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                version: '1.0.0',
+                starshipId: data.starshipId,
+                agentId: data.agentId,
+                conversationId: data.conversationId,
+                threadDepth: data.threadDepth || 0,
+                processingStatus: data.processingStatus || 'completed',
+                messageType: data.messageType || 'user_input',
+                importance: data.importance || 'medium',
+                contentLength: data.content.length,
+                hasAttachments: data.hasAttachments || false,
+              } as ClientMessage)
+            } catch (error) {
+              reject(error)
             }
-
-            // Process the stream
-            await processStream()
-
-            // Resolve with the user message
-            resolve({
-              id: `user-${Date.now()}`,
-              timestamp: new Date().toISOString(),
-              role: data.role,
-              content: data.content,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              version: '1.0.0',
-              starshipId: data.starshipId,
-              agentId: data.agentId,
-              conversationId: data.conversationId,
-              threadDepth: data.threadDepth || 0,
-              processingStatus: data.processingStatus || 'completed',
-              messageType: data.messageType || 'user_input',
-              importance: data.importance || 'medium',
-              contentLength: data.content.length,
-              hasAttachments: data.hasAttachments || false,
-            } as ClientMessage)
-          } catch (error) {
-            reject(error)
           }
+
+          processStreaming()
         })
       } else {
         // Regular message creation
-        const response: AxiosResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
+        const response: FetchResponse<ApiResponse<MessageModel>> = await api.post('/api/v1/messages', data)
         return response.data.data as ClientMessage
       }
     },
@@ -410,7 +421,7 @@ export function useCreateConversation() {
 
   return useMutation({
     mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string }): Promise<ConversationModel> => {
-      const response: AxiosResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },
     onSuccess: (conversation, variables) => {
@@ -435,7 +446,7 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
     queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
-      const response: AxiosResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
+      const response: FetchResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
       return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,
@@ -450,7 +461,7 @@ export function useDeleteConversation() {
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/conversations/${conversationId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/conversations/${conversationId}`)
       return response.data.data
     },
     onMutate: async conversationId => {
@@ -514,7 +525,7 @@ export function useDeleteMessage() {
 
   return useMutation({
     mutationFn: async (messageId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/messages/${messageId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/messages/${messageId}`)
       return response.data.data
     },
     onMutate: async messageId => {
@@ -570,7 +581,7 @@ export function useUpdateConversationStatus() {
 
   return useMutation({
     mutationFn: async (data: { conversationId: string; status: 'active' | 'paused' | 'completed' | 'archived' }) => {
-      const response: AxiosResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}/status`, {
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${data.conversationId}/status`, {
         status: data.status,
       })
       return response.data.data

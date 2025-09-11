@@ -1,7 +1,7 @@
 import api from '@/lib/api'
 import type { ApiResponse, CreateExecutionRequest, ExecutionModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
 // Execution status type for filtering
@@ -41,7 +41,7 @@ export function useExecutions(filters?: { status?: ExecutionStatus; workflowId?:
       if (filters?.status) params.append('status', filters.status)
       if (filters?.workflowId) params.append('workflowId', filters.workflowId)
 
-      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/executions?${params.toString()}`)
+      const response: FetchResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/executions?${params.toString()}`)
       return { executions: response.data.data }
     },
     enabled,
@@ -56,7 +56,7 @@ export function useExecution(executionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.detail(executionId),
     queryFn: async (): Promise<ExecutionModel> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.get(`/api/v1/executions/${executionId}`)
+      const response: FetchResponse<ApiResponse<ExecutionModel>> = await api.get(`/api/v1/executions/${executionId}`)
       return response.data.data
     },
     enabled: !!executionId && enabled,
@@ -70,7 +70,7 @@ export function useExecutionsByStatus(status: ExecutionStatus, enabled: boolean 
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.byStatus(status),
     queryFn: async (): Promise<{ executions: ExecutionModel[] }> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/executions?status=${status}`)
+      const response: FetchResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/executions?status=${status}`)
       return { executions: response.data.data }
     },
     enabled: !!status && enabled,
@@ -84,7 +84,7 @@ export function useExecutionsByWorkflow(workflowId: string, enabled: boolean = t
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.byWorkflow(workflowId),
     queryFn: async (): Promise<{ executions: ExecutionModel[] }> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/workflows/${workflowId}/executions`)
+      const response: FetchResponse<ApiResponse<ExecutionModel[]>> = await api.get(`/api/v1/workflows/${workflowId}/executions`)
       return { executions: response.data.data }
     },
     enabled: !!workflowId && enabled,
@@ -98,7 +98,7 @@ export function useActiveExecutions(enabled: boolean = true) {
   return useQuery({
     queryKey: EXECUTION_QUERY_KEYS.active(),
     queryFn: async (): Promise<{ executions: ExecutionModel[] }> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel[]>> = await api.get('/api/v1/executions') // Default returns active executions
+      const response: FetchResponse<ApiResponse<ExecutionModel[]>> = await api.get('/api/v1/executions') // Default returns active executions
       return { executions: response.data.data }
     },
     enabled,
@@ -115,7 +115,7 @@ export function useExecutionStats(workflowId?: string, enabled: boolean = true) 
     queryKey: EXECUTION_QUERY_KEYS.stats(workflowId),
     queryFn: async (): Promise<ExecutionStats> => {
       const url = workflowId ? `/api/v1/workflows/${workflowId}/executions/stats` : '/api/v1/executions/stats'
-      const response: AxiosResponse<ApiResponse<ExecutionStats>> = await api.get(url)
+      const response: FetchResponse<ApiResponse<ExecutionStats>> = await api.get(url)
       return response.data.data
     },
     enabled,
@@ -130,7 +130,7 @@ export function useCreateExecution() {
 
   return useMutation({
     mutationFn: async (data: CreateExecutionRequest): Promise<ExecutionModel> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post('/api/v1/executions', data)
+      const response: FetchResponse<ApiResponse<ExecutionModel>> = await api.post('/api/v1/executions', data)
       return response.data.data
     },
     onMutate: async newExecution => {
@@ -210,7 +210,7 @@ export function useUpdateExecution() {
       executionId: string
       updates: Partial<ExecutionModel & { executionData?: Record<string, unknown>; result?: Record<string, unknown> }>
     }): Promise<ExecutionModel> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.put(`/api/v1/executions/${executionId}`, updates)
+      const response: FetchResponse<ApiResponse<ExecutionModel>> = await api.put(`/api/v1/executions/${executionId}`, updates)
       return response.data.data
     },
     onMutate: async ({ executionId, updates }) => {
@@ -263,7 +263,7 @@ export function useStartExecution() {
 
   return useMutation({
     mutationFn: async (executionId: string): Promise<ExecutionModel> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/start`)
+      const response: FetchResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/start`)
       return response.data.data
     },
     onSuccess: (execution, executionId) => {
@@ -289,7 +289,7 @@ export function usePauseExecution() {
 
   return useMutation({
     mutationFn: async (executionId: string): Promise<ExecutionModel> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/pause`)
+      const response: FetchResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/pause`)
       return response.data.data
     },
     onSuccess: (execution, executionId) => {
@@ -314,7 +314,7 @@ export function useResumeExecution() {
 
   return useMutation({
     mutationFn: async (executionId: string): Promise<ExecutionModel> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/resume`)
+      const response: FetchResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/resume`)
       return response.data.data
     },
     onSuccess: (execution, executionId) => {
@@ -339,7 +339,7 @@ export function useCancelExecution() {
 
   return useMutation({
     mutationFn: async ({ executionId, reason }: { executionId: string; reason?: string }): Promise<ExecutionModel> => {
-      const response: AxiosResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/cancel`, { reason })
+      const response: FetchResponse<ApiResponse<ExecutionModel>> = await api.post(`/api/v1/executions/${executionId}/cancel`, { reason })
       return response.data.data
     },
     onSuccess: (execution, variables) => {
@@ -364,7 +364,7 @@ export function useDeleteExecution() {
 
   return useMutation({
     mutationFn: async (executionId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/executions/${executionId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/executions/${executionId}`)
       return response.data.data
     },
     onMutate: async executionId => {

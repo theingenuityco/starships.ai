@@ -8,7 +8,7 @@
 import api from '@/lib/api'
 import type { ApiResponse, CreateUserRequest, UpdateUserRequest, UserModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
 // Extended User interface for client compatibility with optimistic updates
@@ -79,7 +79,7 @@ export function useUser(userId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.detail(userId),
     queryFn: async (): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/${userId}`)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/${userId}`)
       return response.data.data
     },
     enabled: !!userId && enabled,
@@ -96,7 +96,7 @@ export function useUserByEmail(email: string, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.byEmail(email),
     queryFn: async (): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/email/${encodeURIComponent(email)}`)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/email/${encodeURIComponent(email)}`)
       return response.data.data
     },
     enabled: !!email && email.includes('@') && enabled,
@@ -113,7 +113,7 @@ export function useUserByUsername(username: string, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.byUsername(username),
     queryFn: async (): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/username/${encodeURIComponent(username)}`)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/username/${encodeURIComponent(username)}`)
       return response.data.data
     },
     enabled: !!username && enabled,
@@ -130,7 +130,7 @@ export function useUserByStripeId(stripeCustomerId: string, enabled: boolean = t
   return useQuery({
     queryKey: USER_QUERY_KEYS.byStripe(stripeCustomerId),
     queryFn: async (): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/stripe/${stripeCustomerId}`)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/stripe/${stripeCustomerId}`)
       return response.data.data
     },
     enabled: !!stripeCustomerId && stripeCustomerId.startsWith('cus_') && enabled,
@@ -147,7 +147,7 @@ export function useUsers(filters?: UserFilters, enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.list(filters),
     queryFn: async (): Promise<UserModel[]> => {
-      const response: AxiosResponse<ApiResponse<UserModel[]>> = await api.get('/api/v1/users', {
+      const response: FetchResponse<ApiResponse<UserModel[]>> = await api.get('/api/v1/users', {
         params: filters,
       })
       return response.data.data
@@ -166,7 +166,7 @@ export function useUserStats(enabled: boolean = true) {
   return useQuery({
     queryKey: USER_QUERY_KEYS.stats(),
     queryFn: async (): Promise<UserStats> => {
-      const response: AxiosResponse<ApiResponse<UserStats>> = await api.get('/api/v1/users/stats')
+      const response: FetchResponse<ApiResponse<UserStats>> = await api.get('/api/v1/users/stats')
       return response.data.data
     },
     enabled,
@@ -184,7 +184,7 @@ export function useCurrentUser(userId: string | null, enabled: boolean = true) {
     queryKey: USER_QUERY_KEYS.currentUser(),
     queryFn: async (): Promise<UserModel> => {
       if (!userId) throw new Error('No user ID provided')
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/${userId}`)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/${userId}`)
       return response.data.data
     },
     enabled: !!userId && enabled,
@@ -202,7 +202,7 @@ export function useRegisterUser() {
 
   return useMutation({
     mutationFn: async (data: RegisterUserRequest): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users/register', data)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users/register', data)
       return response.data.data
     },
     onSuccess: user => {
@@ -240,7 +240,7 @@ export function useCreateUser() {
 
   return useMutation({
     mutationFn: async (data: CreateUserRequest): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users', data)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users', data)
       return response.data.data
     },
     onSuccess: user => {
@@ -278,7 +278,7 @@ export function useUpdateUserProfile() {
 
   return useMutation({
     mutationFn: async ({ userId, updates }: { userId: string; updates: UpdateUserProfileRequest }): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.put(`/api/v1/users/${userId}/profile`, updates)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.put(`/api/v1/users/${userId}/profile`, updates)
       return response.data.data
     },
     onMutate: async ({ userId, updates }) => {
@@ -351,7 +351,7 @@ export function useUpdateUser() {
 
   return useMutation({
     mutationFn: async ({ userId, updates }: { userId: string; updates: UpdateUserRequest }): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.put(`/api/v1/users/${userId}`, updates)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.put(`/api/v1/users/${userId}`, updates)
       return response.data.data
     },
     onSuccess: (updatedUser, variables) => {
@@ -384,7 +384,7 @@ export function useDeleteUser() {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/users/${userId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/users/${userId}`)
       return response.data.data
     },
     onMutate: async userId => {
@@ -435,7 +435,7 @@ export function useLinkStripeCustomer() {
 
   return useMutation({
     mutationFn: async ({ userId, stripeCustomerId }: { userId: string; stripeCustomerId: string }) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/users/${userId}/stripe`, { stripeCustomerId })
+      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/users/${userId}/stripe`, { stripeCustomerId })
       return response.data.data
     },
     onSuccess: (data, variables) => {
@@ -465,7 +465,7 @@ export function useAuthenticateUser() {
 
   return useMutation({
     mutationFn: async (credentials: { email: string; password: string }): Promise<UserModel> => {
-      const response: AxiosResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users/authenticate', credentials)
+      const response: FetchResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users/authenticate', credentials)
       return response.data.data
     },
     onSuccess: user => {

@@ -186,7 +186,7 @@ export class ConversationService {
    * Process conversation with streaming support
    * Uses conversationId as the stream identifier - no database streaming state needed
    */
-  async processConversationWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
+  async addMessageWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
     const { conversationId, agentId, userId, message } = data;
 
     try {
@@ -208,18 +208,6 @@ export class ConversationService {
         agentId,
         userId,
       });
-
-      // Send instant assistant response through AutopilotStreamService
-      // Create AutopilotStreamService instance to emit instant response
-      const autopilotStreamService = new AutopilotStreamService(
-        this.streamingService,
-        conversationId, // Use conversationId as streamId
-        conversationId,
-        agentId
-      );
-
-      // Emit instant empty assistant response
-      await autopilotStreamService.emitInstantAssistantResponse('');
 
       // Execute agent conversation with streaming
       const response = await AgentService.executeConversationWithStreaming({
@@ -253,7 +241,7 @@ export class ConversationService {
       await this.incrementMessageCount(conversationId, 2); // User message + assistant response
 
       // Send final completion event via streaming (using conversationId as streamId)
-      await this.streamingService.broadcastComplete(conversationId, response);
+      await this.streamingService.broadcastComplete(response);
 
       return {
         reply: response.content,
@@ -263,7 +251,7 @@ export class ConversationService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       // Broadcast error using conversationId as streamId
-      await this.streamingService.broadcastError(conversationId, {
+      await this.streamingService.broadcastError({
         streamId: conversationId,
         errorCode: 'CONVERSATION_PROCESSING_FAILED',
         message: errorMessage,
@@ -337,15 +325,6 @@ export class ConversationService {
       reply: response.content,
       usage: response.usage,
     };
-  }
-
-  /**
-   * Add message to conversation with streaming support
-   * @deprecated Use processConversationWithStreaming instead for conversation-level streaming
-   */
-  async addMessageWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
-    // Delegate to new conversation-level streaming method
-    return this.processConversationWithStreaming(data);
   }
 
   /**

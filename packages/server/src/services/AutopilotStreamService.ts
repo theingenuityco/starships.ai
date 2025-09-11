@@ -77,10 +77,10 @@ export class AutopilotStreamService implements StreamingEmitter {
       if (event.type === 'content_chunk') {
         // Handle content streaming - convert to chunk
         const serverChunk = this.convertEventToServerChunk(event);
-        await this.streamingService.broadcastChunk(this.streamId, serverChunk);
+        await this.streamingService.broadcastChunk(serverChunk);
       } else if (event.type === 'workflow_failed' || event.type === 'node_failed') {
         // Handle errors with special error broadcast
-        await this.streamingService.broadcastError(this.streamId, {
+        await this.streamingService.broadcastError({
           streamId: this.streamId,
           errorCode: event.execution.error?.code || 'EXECUTION_FAILED',
           message: event.execution.error?.message || 'Execution failed',
@@ -94,7 +94,7 @@ export class AutopilotStreamService implements StreamingEmitter {
       } else {
         // All other events become messages
         const messageData = this.convertEventToMessage(event);
-        await this.streamingService.broadcastMessage(this.streamId, messageData);
+        await this.streamingService.broadcastMessage(messageData);
       }
     } catch (error) {
       console.error('[AutopilotStreamService] Failed to emit event:', error);
@@ -112,7 +112,7 @@ export class AutopilotStreamService implements StreamingEmitter {
     try {
       // Handle server errors differently
       if (event.type === 'server_error') {
-        await this.streamingService.broadcastError(this.streamId, {
+        await this.streamingService.broadcastError({
           streamId: this.streamId,
           errorCode: event.error?.code || 'SERVER_ERROR',
           message: event.error?.message || 'Server error',
@@ -127,7 +127,7 @@ export class AutopilotStreamService implements StreamingEmitter {
       } else {
         // Server events become messages (like autopilot events)
         const messageData = this.convertServerEventToMessage(event);
-        await this.streamingService.broadcastMessage(this.streamId, messageData);
+        await this.streamingService.broadcastMessage(messageData);
       }
     } catch (error) {
       console.error('[AutopilotStreamService] Failed to emit server event:', error);
@@ -508,27 +508,6 @@ export class AutopilotStreamService implements StreamingEmitter {
   }
 
   /**
-   * Create server event for instant assistant response (replaces old broadcastMessage for empty responses)
-   */
-  async emitInstantAssistantResponse(content: string = ''): Promise<void> {
-    const serverEvent: ServerEvent = {
-      type: 'server_instant_response',
-      timestamp: new Date().toISOString(),
-      conversationId: this.conversationId,
-      agentId: this.agentId,
-      messageData: {
-        role: 'assistant',
-        content,
-        messageType: 'agent_response',
-        importance: 'medium',
-        processingStatus: 'processing',
-      },
-    };
-
-    await this.emitServerEvent(serverEvent);
-  }
-
-  /**
    * Create server event for system messages (replaces old broadcastMessage for system messages)
    */
   async emitSystemMessage(content: string, messageType: string = 'system_message', importance: string = 'low'): Promise<void> {
@@ -548,29 +527,6 @@ export class AutopilotStreamService implements StreamingEmitter {
 
     await this.emitServerEvent(serverEvent);
   }
-
-  /**
-   * Create server event for existing message objects (replaces old broadcastMessage)
-   */
-  async emitExistingMessage(messageObject: any): Promise<void> {
-    const serverEvent: ServerEvent = {
-      type: 'server_message',
-      timestamp: new Date().toISOString(),
-      conversationId: this.conversationId,
-      agentId: this.agentId,
-      messageData: {
-        role: messageObject.role || 'system',
-        content: messageObject.content || '',
-        messageType: messageObject.messageType || 'system_message',
-        importance: messageObject.importance || 'medium',
-        processingStatus: messageObject.processingStatus || 'completed',
-        metadata: messageObject,
-      },
-    };
-
-    await this.emitServerEvent(serverEvent);
-  }
-
   /**
    * Get current streaming configuration
    */

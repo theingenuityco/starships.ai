@@ -17,16 +17,7 @@ export class Agent {
 
   constructor(params: AgentNodeParameters) {
     // Store agent parameters
-    this.params = {
-      ...params,
-      // Ensure blueprint has a deep copy to avoid mutations
-      blueprint: {
-        ...params.blueprint,
-        nodes: (params.blueprint.nodes || []).map((node) => ({ ...node })),
-        edges: (params.blueprint.edges || []).map((edge) => ({ ...edge })),
-        metadata: { ...params.blueprint.metadata },
-      },
-    };
+    this.params = structuredClone(params);
 
     // Create AgentMemory instance from config
     this.memory = new AgentMemory({ state: params.memory });

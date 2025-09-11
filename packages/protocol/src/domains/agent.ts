@@ -16,7 +16,7 @@ import type { AgentMemoryState, Blueprint, AgentNodeParameters } from '@starship
  * Database Agent interface - core API contract type
  * Extends AgentNodeParameters to be a superset with additional database/marketplace fields
  */
-export interface AgentModel extends AgentNodeParameters {
+export interface AgentModel extends Omit<AgentNodeParameters, 'metadata'> {
   // Core database fields
   id: string;
   createdAt: string;

@@ -25,14 +25,6 @@ interface LlmResponseData {
   model?: string;
 }
 
-export interface AgentOptions {
-  includeMemory?: boolean;
-  conversationId?: string;
-  userId?: string;
-  loadConversationHistory?: boolean;
-  eventCallback?: EventCallback;
-}
-
 export interface ConversationStreamingRequest extends ConversationRequest {
   streamId: string;
   streamingService: StreamingService;
@@ -55,148 +47,24 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Create a new agent and return as Agent instance
+   * Create a new agent and return as AgentModel
    */
-  async createAgent(request: CreateAgentRequest, options: AgentOptions = {}): Promise<Agent> {
-    // Create agent with default blueprint and memory if none provided
+  async createAgent(request: CreateAgentRequest & { authorId: string }): Promise<AgentModel> {
     const agentData = {
       ...request,
       blueprint: request.blueprint || this.createDefaultBlueprint(request),
       memory: request.memory || this.createDefaultMemoryConfig(request),
       timeout: request.timeout || 30000,
-      version: '1.0.0', // Default version for all new agents
+      version: '1.0.0',
     };
 
-    // Entity validation and transformation is now handled in the repository layer
-    const dbAgent = await this.agentRepository.create(agentData);
-    return await this.createAgentInstance(dbAgent, options);
-  }
-
-  /**
-   * Get agent by ID as Agent instance
-   */
-  async getAgent(agentId: string, options: AgentOptions = {}): Promise<Agent | null> {
-    const dbAgent = await this.agentRepository.findById(agentId);
-    if (!dbAgent) {
-      return null;
-    }
-    return await this.createAgentInstance(dbAgent, options);
-  }
-
-  /**
-   * Get all agents as Agent instances
-   */
-  async getAllAgents(options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findAll();
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  /**
-   * Get agents by starship as Agent instances
-   */
-  async getAgentsByStarship(starshipId: string, options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findByStarshipId(starshipId);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  /**
-   * Get agents by user as Agent instances
-   */
-  async getAgentsByUser(userId: string, options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findByAuthor(userId);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  /**
-   * Update agent and return as Agent instance
-   */
-  async updateAgent(agentId: string, updates: UpdateAgentRequest, options: AgentOptions = {}): Promise<Agent | null> {
-    // Validate blueprint if being updated
-    if (updates.blueprint) {
-      const validation = this.validateBlueprint(updates.blueprint);
-      if (!validation.valid) {
-        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
-      }
-    }
-
-    const dbAgent = await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
-    if (!dbAgent) {
-      return null;
-    }
-    return await this.createAgentInstance(dbAgent, options);
-  }
-
-  /**
-   * Delete agent
-   */
-  async deleteAgent(agentId: string): Promise<boolean> {
-    return await this.agentRepository.delete(agentId);
-  }
-
-  /**
-   * Deploy agent to starship
-   */
-  async deployAgent(agentId: string, starshipId: string): Promise<void> {
-    await this.agentRepository.updateStarshipId(agentId, starshipId);
-  }
-
-  /**
-   * Search agents and return as Agent instances
-   */
-  async searchAgents(query: string, options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.searchAgents(query);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  /**
-   * Get agents with filters as Agent instances
-   */
-  async getAgentsWithFilters(
-    filters: {
-      category?: string;
-      tags?: string[];
-      isPublic?: boolean;
-      authorId?: string;
-      starshipClass?: 'scout' | 'cruiser';
-    },
-    options: AgentOptions = {}
-  ): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findWithFilters(filters);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  // ============================================================================
-  // AGENT DATA MANAGEMENT APIs (for Routes Layer)
-  // ============================================================================
-
-  /**
-   * Create a new agent and return as AgentModel (for routes layer)
-   */
-  async createAgentModel(request: CreateAgentRequest & { authorId: string }): Promise<AgentModel> {
-    // Create agent with default blueprint and memory if none provided
-    const agentData = {
-      ...request,
-      blueprint: request.blueprint || this.createDefaultBlueprint(request),
-      memory: request.memory || this.createDefaultMemoryConfig(request),
-      timeout: request.timeout || 30000,
-      version: '1.0.0', // Default version for all new agents
-    };
-
-    // Entity validation and transformation is now handled in the repository layer
     return await this.agentRepository.create(agentData);
   }
 
   /**
-   * Get agent by ID as AgentModel (for routes layer)
+   * Update agent and return as AgentModel
    */
-  async getAgentModel(agentId: string): Promise<AgentModel | null> {
-    return await this.agentRepository.findById(agentId);
-  }
-
-  /**
-   * Update agent and return as AgentModel (for routes layer)
-   */
-  async updateAgentModel(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
+  async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
     // Validate blueprint if being updated
     if (updates.blueprint) {
       const validation = this.validateBlueprint(updates.blueprint);
@@ -209,44 +77,51 @@ export class AgentService {
   }
 
   /**
-   * Get agents by starship as AgentModel array (for routes layer)
+   * Get agent by ID as AgentModel
    */
-  async getAgentModelsByStarship(starshipId: string): Promise<AgentModel[]> {
+  async getAgent(agentId: string): Promise<AgentModel | null> {
+    return await this.agentRepository.findById(agentId);
+  }
+
+  /**
+   * Get agents by starship as AgentModel array
+   */
+  async getAgentsByStarship(starshipId: string): Promise<AgentModel[]> {
     return await this.agentRepository.findByStarshipId(starshipId);
   }
 
   /**
-   * Get agents by user as AgentModel array (for routes layer)
+   * Get agents by user as AgentModel array
    */
-  async getAgentModelsByUser(userId: string): Promise<AgentModel[]> {
+  async getAgentsByUser(userId: string): Promise<AgentModel[]> {
     return await this.agentRepository.findByAuthor(userId);
   }
 
   /**
-   * Get agents by category as AgentModel array (for routes layer)
+   * Get agents by category as AgentModel array
    */
-  async getAgentModelsByCategory(category: string): Promise<AgentModel[]> {
+  async getAgentsByCategory(category: string): Promise<AgentModel[]> {
     return await this.agentRepository.findByCategory(category);
   }
 
   /**
-   * Get public agents as AgentModel array (for routes layer)
+   * Get public agents as AgentModel array
    */
-  async getPublicAgentModels(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
+  async getPublicAgents(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
     return await this.agentRepository.findPublic(limit, offset);
   }
 
   /**
-   * Search agents and return as AgentModel array (for routes layer)
+   * Search agents and return as AgentModel array
    */
-  async searchAgentModels(query: string): Promise<AgentModel[]> {
+  async searchAgents(query: string): Promise<AgentModel[]> {
     return await this.agentRepository.searchAgents(query);
   }
 
   /**
-   * Get agents with filters as AgentModel array (for routes layer)
+   * Get agents with filters as AgentModel array
    */
-  async getAgentModelsWithFilters(filters: {
+  async getAgentsWithFilters(filters: {
     category?: string;
     tags?: string[];
     isPublic?: boolean;
@@ -254,6 +129,13 @@ export class AgentService {
     starshipClass?: 'scout' | 'cruiser';
   }): Promise<AgentModel[]> {
     return await this.agentRepository.findWithFilters(filters);
+  }
+
+  /**
+   * Delete agent
+   */
+  async deleteAgent(agentId: string): Promise<boolean> {
+    return await this.agentRepository.delete(agentId);
   }
 
   /**
@@ -332,6 +214,51 @@ export class AgentService {
   }
 
   // ============================================================================
+  // MODEL ↔ INSTANCE CONVERSION METHODS
+  // ============================================================================
+
+  /**
+   * Convert AgentModel to Agent instance, storing model ID in instance metadata
+   */
+  async fromModelToInstance(agentModel: AgentModel): Promise<Agent> {
+    const agentInstance = await this.createAgentInstance(agentModel);
+
+    // Store the model ID in the agent's metadata
+    const currentMemory = agentInstance.getMemory();
+    agentInstance.setMemory({
+      ...currentMemory,
+      metadata: {
+        ...currentMemory.metadata,
+        modelId: agentModel.id,
+        convertedFrom: 'model',
+        conversionTimestamp: new Date().toISOString(),
+      },
+    });
+
+    return agentInstance;
+  }
+
+  /**
+   * Convert Agent instance to AgentModel, retrieving model ID from instance metadata
+   */
+  async fromInstanceToModel(agentInstance: Agent): Promise<AgentModel> {
+    const memory = agentInstance.getMemory();
+    const modelId = memory.metadata?.modelId;
+
+    if (!modelId) {
+      throw new ValidationError('Cannot convert Agent instance to model: missing model ID in metadata', 'modelId');
+    }
+
+    // Get the current model from database using the stored ID
+    const agentModel = await this.agentRepository.findById(modelId);
+    if (!agentModel) {
+      throw new NotFoundError('Agent model not found during conversion', modelId);
+    }
+
+    return agentModel;
+  }
+
+  // ============================================================================
   // AGENT EXECUTION APIs
   // ============================================================================
 
@@ -393,13 +320,7 @@ export class AgentService {
       });
 
       // Create agent instance with enhanced options
-      const agent = await agentService.createAgentInstance(dbAgent, {
-        includeMemory: true,
-        userId: userId,
-        conversationId: conversationId,
-        loadConversationHistory: true,
-        eventCallback: eventHandler,
-      });
+      const agent = await agentService.createAgentInstance(dbAgent);
 
       // Create and inject streaming service
       const autopilotStreamService = new AutopilotStreamService(streamingService, streamId, conversationId || 'unknown', agentId);
@@ -525,13 +446,7 @@ export class AgentService {
       });
 
       // Create agent instance with enhanced options
-      const agent = await agentService.createAgentInstance(dbAgent, {
-        includeMemory: true,
-        userId: userId,
-        conversationId: conversationId,
-        loadConversationHistory: true,
-        eventCallback: eventHandler,
-      });
+      const agent = await agentService.createAgentInstance(dbAgent);
 
       // Add user message to memory
       agent.addToMemory('user', message);
@@ -996,7 +911,7 @@ export class AgentService {
   /**
    * Convert database agent to agent instance
    */
-  private async createAgentInstance(dbAgent: AgentModel, options: AgentOptions): Promise<Agent> {
+  private async createAgentInstance(dbAgent: AgentModel): Promise<Agent> {
     // Get or create blueprint - ensure it has proper nodes and edges arrays
     let blueprint = dbAgent.blueprint;
     if (!blueprint || !blueprint.nodes || !blueprint.edges) {

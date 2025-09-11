@@ -6,13 +6,13 @@
  */
 
 import type { AgentMemoryState } from '@/AgentMemory';
-import type { BaseBlueprint, BaseNodeParameters } from '@/types/base';
+import type { BaseBlueprint } from '@/types/base';
 
 /**
  * Agent-specific node parameters
  * Contains full agent configuration for workflow execution
  */
-export interface AgentNodeParameters extends BaseNodeParameters {
+export interface AgentNodeParameters {
   // Core agent identity
   name: string;
   description?: string;
@@ -30,12 +30,15 @@ export interface AgentNodeParameters extends BaseNodeParameters {
 
   // Blueprint execution
   blueprint: BaseBlueprint;
+
+  // Metadata
+  metadata?: Record<string, unknown>;
 }
 
 /**
  * Conditional node parameters for data-driven routing
  */
-export interface ConditionalNodeParameters extends BaseNodeParameters {
+export interface ConditionalNodeParameters {
   sourceNodeId: string;
   expression: string;
   conditions: Record<string, string>;
@@ -45,7 +48,7 @@ export interface ConditionalNodeParameters extends BaseNodeParameters {
 /**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptNodeParameters extends BaseNodeParameters {
+export interface UserPromptNodeParameters {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string;
@@ -56,7 +59,7 @@ export interface UserPromptNodeParameters extends BaseNodeParameters {
 /**
  * Output node parameters for final result generation
  */
-export interface OutputNodeParameters extends BaseNodeParameters {
+export interface OutputNodeParameters {
   template: string;
   sources: string[];
   format: OutputFormat;
@@ -81,7 +84,7 @@ export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf'
 /**
  * HTTP request node parameters for making HTTP calls
  */
-export interface HttpRequestNodeParameters extends BaseNodeParameters {
+export interface HttpRequestNodeParameters {
   url: string;
   method: HttpMethod;
   headers?: Record<string, string>;
@@ -113,7 +116,7 @@ export interface HttpAuthentication {
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
  */
-export interface LlmNodeParameters extends BaseNodeParameters {
+export interface LlmNodeParameters {
   model: string;
   prompt: string;
   temperature?: number;
@@ -128,15 +131,15 @@ export interface LlmNodeParameters extends BaseNodeParameters {
 /**
  * Workflow node parameters for executing embedded blueprints
  */
-export interface WorkflowNodeParameters extends BaseNodeParameters {
+export interface WorkflowNodeParameters {
   blueprint: BaseBlueprint;
   timeout?: number;
 }
 
 /**
- * Start and End node parameters (empty but extends base)
+ * Start and End node parameters
  */
-export type StartEndNodeParameters = BaseNodeParameters;
+export type StartEndNodeParameters = Record<string, unknown>;
 
 /**
  * Union type for all workflow node parameters

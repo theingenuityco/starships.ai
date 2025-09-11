@@ -8,7 +8,7 @@
 import api from '@/lib/api'
 import type { ApiResponse, CreateMissionRequest, MissionFilters, MissionModel, MissionSort, UpdateMissionRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
 // Extended Mission interface for client compatibility with optimistic updates
@@ -60,7 +60,7 @@ export function useMission(missionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.detail(missionId),
     queryFn: async (): Promise<MissionModel> => {
-      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.get(`/api/v1/missions/${missionId}`)
+      const response: FetchResponse<ApiResponse<MissionModel>> = await api.get(`/api/v1/missions/${missionId}`)
       return response.data.data
     },
     enabled: !!missionId && enabled,
@@ -77,7 +77,7 @@ export function useStarshipMissions(starshipId: string, filters?: MissionFilters
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.byStarship(starshipId, filters, sort),
     queryFn: async (): Promise<MissionModel[]> => {
-      const response: AxiosResponse<ApiResponse<MissionModel[]>> = await api.get(`/api/v1/starships/${starshipId}/missions`, {
+      const response: FetchResponse<ApiResponse<MissionModel[]>> = await api.get(`/api/v1/starships/${starshipId}/missions`, {
         params: { ...filters, ...sort },
       })
       return response.data.data
@@ -96,7 +96,7 @@ export function useMissions(filters?: MissionFilters, sort?: MissionSort, enable
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.list(filters, sort),
     queryFn: async (): Promise<MissionModel[]> => {
-      const response: AxiosResponse<ApiResponse<MissionModel[]>> = await api.get('/api/v1/missions', {
+      const response: FetchResponse<ApiResponse<MissionModel[]>> = await api.get('/api/v1/missions', {
         params: { ...filters, ...sort },
       })
       return response.data.data
@@ -115,7 +115,7 @@ export function useMissionStats(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.stats(starshipId),
     queryFn: async (): Promise<MissionStats> => {
-      const response: AxiosResponse<ApiResponse<MissionStats>> = await api.get(`/api/v1/starships/${starshipId}/missions/stats`)
+      const response: FetchResponse<ApiResponse<MissionStats>> = await api.get(`/api/v1/starships/${starshipId}/missions/stats`)
       return response.data.data
     },
     enabled: !!starshipId && enabled,
@@ -132,7 +132,7 @@ export function useMissionClarity(missionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.clarity(missionId),
     queryFn: async (): Promise<MissionClarity> => {
-      const response: AxiosResponse<ApiResponse<MissionClarity>> = await api.get(`/api/v1/missions/${missionId}/clarity`)
+      const response: FetchResponse<ApiResponse<MissionClarity>> = await api.get(`/api/v1/missions/${missionId}/clarity`)
       return response.data.data
     },
     enabled: !!missionId && enabled,
@@ -149,7 +149,7 @@ export function useMissionWorkflow(missionId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: MISSION_QUERY_KEYS.workflow(missionId),
     queryFn: async (): Promise<any> => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.get(`/api/v1/missions/${missionId}/workflow`)
+      const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/missions/${missionId}/workflow`)
       return response.data.data
     },
     enabled: !!missionId && enabled,
@@ -167,7 +167,7 @@ export function useCreateMission() {
 
   return useMutation({
     mutationFn: async (data: CreateMissionRequest): Promise<MissionModel> => {
-      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post('/api/v1/missions', data)
+      const response: FetchResponse<ApiResponse<MissionModel>> = await api.post('/api/v1/missions', data)
       return response.data.data
     },
     onSuccess: (mission, variables) => {
@@ -207,7 +207,7 @@ export function useUpdateMission() {
 
   return useMutation({
     mutationFn: async ({ missionId, updates }: { missionId: string; updates: UpdateMissionRequest }): Promise<MissionModel> => {
-      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.put(`/api/v1/missions/${missionId}`, updates)
+      const response: FetchResponse<ApiResponse<MissionModel>> = await api.put(`/api/v1/missions/${missionId}`, updates)
       return response.data.data
     },
     onMutate: async ({ missionId, updates }) => {
@@ -281,7 +281,7 @@ export function useDeleteMission() {
 
   return useMutation({
     mutationFn: async (missionId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/missions/${missionId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/missions/${missionId}`)
       return response.data.data
     },
     onMutate: async missionId => {
@@ -348,7 +348,7 @@ export function useStartMission() {
 
   return useMutation({
     mutationFn: async (missionId: string): Promise<MissionModel> => {
-      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/start`)
+      const response: FetchResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/start`)
       return response.data.data
     },
     onSuccess: (updatedMission, missionId) => {
@@ -387,7 +387,7 @@ export function useCompleteMission() {
 
   return useMutation({
     mutationFn: async (missionId: string): Promise<MissionModel> => {
-      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/complete`)
+      const response: FetchResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/complete`)
       return response.data.data
     },
     onSuccess: (updatedMission, missionId) => {
@@ -426,7 +426,7 @@ export function useCancelMission() {
 
   return useMutation({
     mutationFn: async (missionId: string): Promise<MissionModel> => {
-      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/cancel`)
+      const response: FetchResponse<ApiResponse<MissionModel>> = await api.post(`/api/v1/missions/${missionId}/cancel`)
       return response.data.data
     },
     onSuccess: (updatedMission, missionId) => {
@@ -465,7 +465,7 @@ export function useUpdateMissionPhase() {
 
   return useMutation({
     mutationFn: async ({ missionId, phase }: { missionId: string; phase: 'welcome' | 'analysis' | 'plan' | 'execute' | 'converse' }): Promise<MissionModel> => {
-      const response: AxiosResponse<ApiResponse<MissionModel>> = await api.put(`/api/v1/missions/${missionId}/phase`, { phase })
+      const response: FetchResponse<ApiResponse<MissionModel>> = await api.put(`/api/v1/missions/${missionId}/phase`, { phase })
       return response.data.data
     },
     onSuccess: (updatedMission, variables) => {
@@ -499,7 +499,7 @@ export function useUpdateWorkflowApproval() {
 
   return useMutation({
     mutationFn: async ({ missionId, approvalStatus, rejectionReason }: { missionId: string; approvalStatus: 'approved' | 'rejected'; rejectionReason?: string }): Promise<any> => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.put(`/api/v1/missions/${missionId}/workflow/approval`, {
+      const response: FetchResponse<ApiResponse<any>> = await api.put(`/api/v1/missions/${missionId}/workflow/approval`, {
         approvalStatus,
         rejectionReason,
       })

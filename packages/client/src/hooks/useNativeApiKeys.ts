@@ -1,7 +1,7 @@
 import api from '@/lib/api'
 import type { ApiResponse } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
 // Native API Key interface
@@ -31,7 +31,7 @@ export function useNativeApiKeys(starshipId: string, enabled: boolean = true) {
     queryKey: NATIVE_API_KEY_QUERY_KEYS.byStarship(starshipId),
     queryFn: async (): Promise<Record<string, string>> => {
       try {
-        const response: AxiosResponse<ApiResponse<Record<string, string>>> = await api.get(`/api/v1/starships/${starshipId}/native-api-keys`)
+        const response: FetchResponse<ApiResponse<Record<string, string>>> = await api.get(`/api/v1/starships/${starshipId}/native-api-keys`)
         return response.data.data
       } catch (error) {
         console.error('Failed to load native API keys:', error)
@@ -53,7 +53,7 @@ export function useNativeApiKey(starshipId: string, toolName: string, enabled: b
   return useQuery({
     queryKey: NATIVE_API_KEY_QUERY_KEYS.detail(starshipId, toolName),
     queryFn: async (): Promise<{ apiKey: string; config?: Record<string, string> }> => {
-      const response: AxiosResponse<ApiResponse<{ apiKey: string; config?: Record<string, string> }>> = await api.get(`/api/v1/starships/${starshipId}/native-api-keys/${toolName}`)
+      const response: FetchResponse<ApiResponse<{ apiKey: string; config?: Record<string, string> }>> = await api.get(`/api/v1/starships/${starshipId}/native-api-keys/${toolName}`)
       return response.data.data
     },
     enabled: !!starshipId && !!toolName && enabled,
@@ -70,7 +70,7 @@ export function useSaveNativeApiKey() {
 
   return useMutation({
     mutationFn: async (data: { starshipId: string; toolName: string; apiKey: string; config?: Record<string, string> }) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.post(`/api/v1/starships/${data.starshipId}/native-api-keys`, {
+      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/starships/${data.starshipId}/native-api-keys`, {
         toolName: data.toolName,
         apiKey: data.apiKey,
         config: data.config,
@@ -113,7 +113,7 @@ export function useDeleteNativeApiKey() {
 
   return useMutation({
     mutationFn: async (data: { starshipId: string; toolName: string }) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/starships/${data.starshipId}/native-api-keys/${data.toolName}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/starships/${data.starshipId}/native-api-keys/${data.toolName}`)
       return response.data.data
     },
     onMutate: async ({ starshipId, toolName }) => {

@@ -1,7 +1,7 @@
 import api from '@/lib/api'
 import type { ApiResponse, CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AxiosResponse } from 'axios'
+import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 
 // Extended Starship interface for client compatibility with optimistic updates
@@ -28,7 +28,7 @@ export function useStarship(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.detail(starshipId),
     queryFn: async (): Promise<StarshipModel> => {
-      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.get(`/api/v1/starships/${starshipId}`)
+      const response: FetchResponse<ApiResponse<StarshipModel>> = await api.get(`/api/v1/starships/${starshipId}`)
       return response.data.data
     },
     enabled: !!starshipId && enabled,
@@ -44,7 +44,7 @@ export function useUserStarships(userId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.byOwner(userId),
     queryFn: async (): Promise<StarshipModel[]> => {
-      const response: AxiosResponse<ApiResponse<StarshipModel[]>> = await api.get(`/api/v1/users/${userId}/starships`)
+      const response: FetchResponse<ApiResponse<StarshipModel[]>> = await api.get(`/api/v1/users/${userId}/starships`)
       return response.data.data
     },
     enabled: !!userId && enabled,
@@ -61,7 +61,7 @@ export function useStarshipBySlug(slug: string, enabled: boolean = true) {
   return useQuery({
     queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', slug] as const,
     queryFn: async (): Promise<StarshipModel> => {
-      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.get(`/api/v1/starships/${slug}`)
+      const response: FetchResponse<ApiResponse<StarshipModel>> = await api.get(`/api/v1/starships/${slug}`)
       return response.data.data
     },
     enabled: !!slug && enabled,
@@ -82,7 +82,7 @@ export function useStarships() {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.lists(),
     queryFn: async () => {
-      const response: AxiosResponse<ApiResponse<StarshipModel[]>> = await api.get('/api/v1/starships')
+      const response: FetchResponse<ApiResponse<StarshipModel[]>> = await api.get('/api/v1/starships')
       return { starships: response.data.data }
     },
     staleTime: 10 * 1000, // 10 seconds
@@ -98,7 +98,7 @@ export function useStarshipAgents(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: STARSHIP_QUERY_KEYS.agents(starshipId),
     queryFn: async () => {
-      const response: AxiosResponse<ApiResponse<any[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`)
+      const response: FetchResponse<ApiResponse<any[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`)
       return response.data.data
     },
     enabled: !!starshipId && enabled,
@@ -115,7 +115,7 @@ export function useCreateStarship() {
 
   return useMutation({
     mutationFn: async (data: CreateStarshipRequest): Promise<StarshipModel> => {
-      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.post('/api/v1/starships', data)
+      const response: FetchResponse<ApiResponse<StarshipModel>> = await api.post('/api/v1/starships', data)
       return response.data.data
     },
     onSuccess: (starship, variables) => {
@@ -151,7 +151,7 @@ export function useUpdateStarship() {
 
   return useMutation({
     mutationFn: async ({ starshipId, updates }: { starshipId: string; updates: UpdateStarshipRequest }): Promise<StarshipModel> => {
-      const response: AxiosResponse<ApiResponse<StarshipModel>> = await api.put(`/api/v1/starships/${starshipId}`, updates)
+      const response: FetchResponse<ApiResponse<StarshipModel>> = await api.put(`/api/v1/starships/${starshipId}`, updates)
       return response.data.data
     },
     onSuccess: (updatedStarship, variables) => {
@@ -185,7 +185,7 @@ export function useDeleteStarship() {
 
   return useMutation({
     mutationFn: async (starshipId: string) => {
-      const response: AxiosResponse<ApiResponse<any>> = await api.delete(`/api/v1/starships/${starshipId}`)
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/starships/${starshipId}`)
       return response.data.data
     },
     onMutate: async starshipId => {

@@ -58,7 +58,7 @@ describe('OutputHandler', () => {
       expect(nodeResult?.data).toHaveProperty('format', 'markdown');
       expect(nodeResult?.data).toHaveProperty('sourceData');
 
-      const data = nodeResult?.data as any;
+      const data = nodeResult?.data as { output: string; sourceData: Record<string, unknown> };
       expect(data.output).toContain('# Test Report');
       expect(data.sourceData).toEqual({
         source1: { message: 'Hello from source 1', score: 85 },
@@ -86,7 +86,7 @@ describe('OutputHandler', () => {
       const nodeResult = result.executionResults.get('no-title-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
-      const data = nodeResult?.data as any;
+      const data = nodeResult?.data as { output: string };
       expect(data.output).toContain('# Workflow Output'); // Default title
     });
 
@@ -111,7 +111,7 @@ describe('OutputHandler', () => {
       const nodeResult = result.executionResults.get('single-source-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
-      const data = nodeResult?.data as any;
+      const data = nodeResult?.data as { sourceData: Record<string, unknown>; output: string };
       expect(data.sourceData).toEqual({
         source1: { message: 'Hello from source 1', score: 85 },
       });
@@ -139,7 +139,7 @@ describe('OutputHandler', () => {
       const nodeResult = result.executionResults.get('missing-sources-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
-      const data = nodeResult?.data as any;
+      const data = nodeResult?.data as { sourceData: Record<string, unknown> };
 
       // Should only include existing sources
       expect(data.sourceData).toEqual({
@@ -171,7 +171,7 @@ describe('OutputHandler', () => {
         const nodeResult = result.executionResults.get(`format-${format}-node`);
         expect(nodeResult).toBeDefined();
         expect(nodeResult?.error).toBeUndefined();
-        expect((nodeResult?.data as any).format).toBe(format);
+        expect((nodeResult?.data as { format: string }).format).toBe(format);
       }
     });
 
@@ -195,7 +195,7 @@ describe('OutputHandler', () => {
       const nodeResult = result.executionResults.get('empty-sources-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
-      const data = nodeResult?.data as any;
+      const data = nodeResult?.data as { sourceData: Record<string, unknown> };
       expect(data.sourceData).toEqual({});
     });
 
@@ -244,14 +244,12 @@ describe('OutputHandler', () => {
       const nodeResult = result.executionResults.get('complex-data-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
-      const data = nodeResult?.data as any;
+      const data = nodeResult?.data as { sourceData: Record<string, unknown> };
       expect(data.sourceData['complex-source']).toEqual(complexSourceResult.data);
     });
 
     it('should set execution timestamp', async () => {
-      const beforeExecution = Date.now();
       const result = await handler.execute(mockExecution);
-      const afterExecution = Date.now();
 
       expect(result).toBeDefined();
       const nodeResult = result.executionResults.get('output-node');
@@ -267,7 +265,7 @@ describe('OutputHandler', () => {
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('output-node');
-      const data = nodeResult?.data as any;
+      const data = nodeResult?.data as { sourceData: Record<string, unknown> };
       expect(data.sourceData).toEqual({});
     });
   });

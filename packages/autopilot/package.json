@@ -17,7 +17,7 @@
     "build": "tsc && tsc-alias -p tsconfig.json",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit",
-    "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src --ext .ts --config .eslintrc.cjs",
+    "lint": "eslint src --ext .ts --config .eslintrc.json",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

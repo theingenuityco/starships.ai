@@ -8,16 +8,16 @@
 import { LLM } from '@/LLM';
 import { BaseHandler } from '@/nodes/Handler';
 import { Execution, LlmNodeParameters, ValidationError, ValidationResult, ValidationWarning } from '@/types';
-import type { StreamingEmitter } from '@/types/streamingEmitter';
+import type { EngineEmitter } from '@/types/emitters';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
-  private streamingEmitter?: StreamingEmitter;
+  private streamingEmitter?: EngineEmitter;
 
   /**
    * Set streaming emitter for content streaming
    */
-  setStreamingEmitter(emitter?: StreamingEmitter): void {
+  setStreamingEmitter(emitter?: EngineEmitter): void {
     this.streamingEmitter = emitter;
   }
 

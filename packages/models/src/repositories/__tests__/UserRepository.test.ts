@@ -195,9 +195,7 @@ describe('UserRepository', () => {
 
       mockUserEntity.validate.mockRejectedValueOnce(new Error('Email is required for user creation'));
 
-      await expect(
-        repository.create(incompleteData as { email: string; username?: string; displayName?: string; avatar?: string })
-      ).rejects.toThrow(DatabaseError);
+      await expect(repository.create(incompleteData as unknown as Omit<UserModel, 'id' | 'createdAt'>)).rejects.toThrow(DatabaseError);
       expect(mockUserEntity.validate).toHaveBeenCalledWith(incompleteData, 'create');
     });
 

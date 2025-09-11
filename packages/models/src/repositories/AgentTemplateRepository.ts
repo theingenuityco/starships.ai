@@ -15,7 +15,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const connection = this.getConnection();
         const query = `MATCH (t:AgentTemplate) RETURN t ORDER BY t.createdAt DESC`;
         const result = await connection.executeQuery<{ t: AgentTemplateModel }>(query);
-        return result.map((record) => AgentTemplateEntity.deserialize(record.t));
+        return result.map((record) => AgentTemplateEntity.deserialize(record.t as unknown as Record<string, unknown>));
       },
       'findAll',
       'AgentTemplate'
@@ -36,7 +36,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const connection = this.getConnection();
         const results = await connection.executeQuery<{ t: AgentTemplateModel }>(query, { id });
         const template = results.length > 0 ? results[0].t : null;
-        return template ? AgentTemplateEntity.deserialize(template) : null;
+        return template ? AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'AgentTemplate',
@@ -58,7 +58,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const results = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { slug });
         const template = results.length > 0 ? results[0].t : null;
-        return template ? AgentTemplateEntity.deserialize(template) : null;
+        return template ? AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>) : null;
       },
       'findBySlug',
       'AgentTemplate',
@@ -106,7 +106,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const template = await this.createEntityWithAutoId<AgentModel>('AgentTemplate', templateEntity.serialize());
 
         // Parse the JSON strings back to objects manually for the response
-        return AgentTemplateEntity.deserialize(template);
+        return AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>);
       },
       'create',
       'AgentTemplate'
@@ -134,7 +134,7 @@ export class AgentTemplateRepository extends BaseRepository {
         );
 
         const template = result[0]?.a || null;
-        return template ? AgentTemplateEntity.deserialize(template) : null;
+        return template ? AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>) : null;
       },
       'update',
       'AgentTemplate',
@@ -174,7 +174,7 @@ export class AgentTemplateRepository extends BaseRepository {
       `;
 
         const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { category });
-        return result.map((record) => AgentTemplateEntity.deserialize(record.t));
+        return result.map((record) => AgentTemplateEntity.deserialize(record.t as unknown as Record<string, unknown>));
       },
       'findByCategory',
       'AgentTemplate'
@@ -210,7 +210,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(searchQuery, {
           query,
         });
-        return result.map((record) => AgentTemplateEntity.deserialize(record.t));
+        return result.map((record) => AgentTemplateEntity.deserialize(record.t as unknown as Record<string, unknown>));
       },
       'searchTemplates',
       'AgentTemplate'

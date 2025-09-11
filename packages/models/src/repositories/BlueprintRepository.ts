@@ -29,29 +29,23 @@ export class BlueprintRepository extends BaseRepository {
         await BlueprintEntity.validate(request, 'create');
 
         if (!Array.isArray(request.nodes) || request.nodes.length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'nodes',
-                message: 'At least one node is required',
-                value: request.nodes,
-              },
-            ],
-            'createBlueprint'
-          );
+          this.handleValidationError([
+            {
+              field: 'nodes',
+              message: 'At least one node is required',
+              value: request.nodes,
+            },
+          ]);
         }
 
         if (!Array.isArray(request.edges)) {
-          this.handleValidationError(
-            [
-              {
-                field: 'edges',
-                message: 'Edges array is required',
-                value: request.edges,
-              },
-            ],
-            'createBlueprint'
-          );
+          this.handleValidationError([
+            {
+              field: 'edges',
+              message: 'Edges array is required',
+              value: request.edges,
+            },
+          ]);
         }
 
         const now = new Date().toISOString();
@@ -177,15 +171,12 @@ export class BlueprintRepository extends BaseRepository {
         await BlueprintEntity.validate(updates, 'update');
 
         if (!updates || Object.keys(updates).length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'updates',
-                message: 'At least one field must be provided for update',
-              },
-            ],
-            'updateBlueprint'
-          );
+          this.handleValidationError([
+            {
+              field: 'updates',
+              message: 'At least one field must be provided for update',
+            },
+          ]);
         }
 
         const connection = this.getConnection();
@@ -229,7 +220,7 @@ export class BlueprintRepository extends BaseRepository {
         const result = await connection.executeWrite(query, params);
 
         if (!result || result.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId, 'updateBlueprint');
+          this.handleNotFound('Blueprint', blueprintId);
         }
 
         // Return full updated blueprint

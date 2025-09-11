@@ -159,7 +159,7 @@ export class ExecutionRepository extends BaseRepository {
         );
 
         if (result.length === 0) {
-          this.handleNotFound('Execution', id, 'update');
+          this.handleNotFound('Execution', id);
         }
 
         // Use ExecutionEntity for consistent mapping

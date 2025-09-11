@@ -103,16 +103,13 @@ export class EdgeRepository extends BaseRepository {
         }
 
         if (!Array.isArray(edgesData)) {
-          this.handleValidationError(
-            [
-              {
-                field: 'edgesData',
-                message: 'Edges array is required',
-                value: edgesData,
-              },
-            ],
-            'createEdges'
-          );
+          this.handleValidationError([
+            {
+              field: 'edgesData',
+              message: 'Edges array is required',
+              value: edgesData,
+            },
+          ]);
         }
 
         const connection = this.getConnection();
@@ -278,15 +275,12 @@ export class EdgeRepository extends BaseRepository {
         }
 
         if (!updates || Object.keys(updates).length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'updates',
-                message: 'At least one field must be provided for update',
-              },
-            ],
-            'updateEdge'
-          );
+          this.handleValidationError([
+            {
+              field: 'updates',
+              message: 'At least one field must be provided for update',
+            },
+          ]);
         }
 
         // Check if edge exists first

@@ -3,7 +3,7 @@
  */
 
 import { Workflow } from '@/Workflow';
-import { Blueprint, Execution, WorkflowNodeParameters } from '@/types';
+import { Blueprint, Execution, WorkflowParams } from '@/types';
 
 describe('Workflow', () => {
   let mockExecution: Execution;
@@ -19,7 +19,7 @@ describe('Workflow', () => {
         edges: [],
         metadata: {},
       };
-      const params: WorkflowNodeParameters = {
+      const params: WorkflowParams = {
         blueprint: testBlueprint,
       };
       const workflow = new Workflow(params);
@@ -40,7 +40,7 @@ describe('Workflow', () => {
         metadata: { version: '1.0' },
       };
 
-      const params: WorkflowNodeParameters = {
+      const params: WorkflowParams = {
         blueprint: mockBlueprint,
         timeout: 30000,
       };
@@ -61,7 +61,7 @@ describe('Workflow', () => {
         metadata: {},
       };
 
-      const params: WorkflowNodeParameters = {
+      const params: WorkflowParams = {
         blueprint: originalBlueprint,
       };
       const workflow = new Workflow(params);

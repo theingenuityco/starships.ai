@@ -543,7 +543,7 @@ const result = workflow.validate();
 Agents use the new AgentMemory system for structured context management and execute embedded workflows:
 
 ```typescript
-interface AgentNodeParameters {
+interface AgentParams {
   // Core agent identity
   name: string;
   description?: string;

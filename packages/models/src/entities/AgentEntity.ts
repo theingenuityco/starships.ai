@@ -29,7 +29,7 @@ export class AgentEntity implements AgentModel {
   @IsISO8601()
   updatedAt!: string;
 
-  // Core AgentNodeParameters fields
+  // Core AgentParams fields
   @Expose()
   @IsString()
   @Length(1, 100)

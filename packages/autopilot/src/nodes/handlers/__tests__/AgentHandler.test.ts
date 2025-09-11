@@ -3,7 +3,7 @@
  */
 
 import { AgentHandler } from '@/nodes/handlers/AgentHandler';
-import { Node, Execution, AgentNodeParameters } from '@/types';
+import { Node, Execution, AgentParams } from '@/types';
 import { AgentMemoryState } from '@/AgentMemory';
 
 interface AgentExecutionResult {
@@ -46,7 +46,7 @@ describe('AgentHandler', () => {
         maxTokens: 500,
         timeout: 5000,
         blueprint: global.createMockBlueprint(),
-      } as AgentNodeParameters,
+      } as AgentParams,
     };
     handler = new AgentHandler(mockNode);
     mockExecution = global.createMockExecution();
@@ -95,7 +95,7 @@ describe('AgentHandler', () => {
         model: 'openai/gpt-4',
         memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
-      } as AgentNodeParameters;
+      } as AgentParams;
 
       const minimalNode: Node = {
         ref: 'minimal-agent-node',
@@ -170,7 +170,7 @@ describe('AgentHandler', () => {
         model: 'openai/gpt-4',
         memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
-      } as AgentNodeParameters;
+      } as AgentParams;
 
       const minimalNode: Node = {
         ref: 'minimal-agent-node',
@@ -192,7 +192,7 @@ describe('AgentHandler', () => {
         model: 'openai/gpt-4',
         memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
-      } as unknown as AgentNodeParameters;
+      } as unknown as AgentParams;
 
       const nodeWithoutName: Node = {
         ref: 'no-name-agent-node',
@@ -220,7 +220,7 @@ describe('AgentHandler', () => {
         name: 'Test Agent',
         memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
-      } as unknown as AgentNodeParameters;
+      } as unknown as AgentParams;
 
       const nodeWithoutModel: Node = {
         ref: 'no-model-agent-node',
@@ -246,7 +246,7 @@ describe('AgentHandler', () => {
       const paramsWithoutRequiredParams = {
         memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
-      } as unknown as AgentNodeParameters;
+      } as unknown as AgentParams;
 
       const nodeWithoutRequiredParams: Node = {
         ref: 'no-required-agent-node',
@@ -265,7 +265,7 @@ describe('AgentHandler', () => {
     });
 
     it('should fail validation when parameters are completely missing', () => {
-      const emptyParams = {} as AgentNodeParameters;
+      const emptyParams = {} as AgentParams;
 
       const nodeWithoutParams: Node = {
         ref: 'empty-params-agent-node',
@@ -291,7 +291,7 @@ describe('AgentHandler', () => {
         model: '',
         memory: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
-      } as AgentNodeParameters;
+      } as AgentParams;
 
       const nodeWithEmptyValues: Node = {
         ref: 'empty-values-agent-node',

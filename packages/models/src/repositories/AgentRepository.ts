@@ -115,7 +115,7 @@ export class AgentRepository extends BaseRepository {
 
         // Create agent properties without ID (Neo4j will generate it)
         const agentProps = {
-          // Core AgentNodeParameters fields
+          // Core AgentParams fields
           name: data.name,
           description: data.description,
           model: data.model,

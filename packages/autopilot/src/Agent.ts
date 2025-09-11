@@ -8,14 +8,14 @@
 
 import { AgentMemory, AgentMemoryState } from '@/AgentMemory';
 import { Engine, EventCallback } from '@/engine/Engine';
-import { AgentNodeParameters, Blueprint, Edge, Execution, Node } from '@/types';
+import { AgentParams, Blueprint, Edge, Execution, Node } from '@/types';
 
 export class Agent {
-  private params: AgentNodeParameters;
+  private params: AgentParams;
   private memory: AgentMemory;
   private engine: Engine;
 
-  constructor(params: AgentNodeParameters) {
+  constructor(params: AgentParams) {
     // Store agent parameters
     this.params = structuredClone(params);
 
@@ -71,7 +71,7 @@ export class Agent {
   /**
    * Get agent parameters (read-only copy)
    */
-  getParameters(): AgentNodeParameters {
+  getParameters(): AgentParams {
     return JSON.parse(JSON.stringify(this.params));
   }
 
@@ -222,7 +222,7 @@ export class Agent {
       messages: this.memory.getMessageHistory(),
     };
 
-    const clonedParams: AgentNodeParameters = {
+    const clonedParams: AgentParams = {
       ...this.params,
       memory: memoryState,
       blueprint: {
@@ -238,7 +238,7 @@ export class Agent {
   /**
    * Update agent parameters
    */
-  updateParameters(updates: Partial<AgentNodeParameters>): Agent {
+  updateParameters(updates: Partial<AgentParams>): Agent {
     // Convert current memory back to state if not being updated
     const currentMemoryState: AgentMemoryState = {
       identity: this.memory.getIdentity(),

@@ -10,33 +10,6 @@ import type { BaseBlueprint } from '@/types/base';
 import { Blueprint } from './blueprint';
 
 /**
- * Agent-specific node parameters
- * Contains full agent configuration for workflow execution
- */
-export interface AgentNodeParameters {
-  // Core agent identity
-  name: string;
-  description?: string;
-
-  // LLM configuration
-  model: string;
-  temperature?: number;
-  maxTokens?: number;
-
-  // Execution parameters
-  timeout?: number;
-
-  // Memory system (required)
-  memory: AgentMemoryState;
-
-  // Blueprint execution
-  blueprint: Blueprint;
-
-  // Metadata
-  metadata?: Record<string, unknown>;
-}
-
-/**
  * Conditional node parameters for data-driven routing
  */
 export interface ConditionalNodeParameters {
@@ -132,9 +105,46 @@ export interface LlmNodeParameters {
 /**
  * Workflow node parameters for executing embedded blueprints
  */
-export interface WorkflowNodeParameters {
-  blueprint: BaseBlueprint;
+export interface WorkflowParams {
+  // Core agent identity
+  name: string;
+  description?: string;
+
+  // Execution parameters
   timeout?: number;
+
+  // Blueprint execution
+  blueprint: Blueprint;
+
+  // Metadata
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Agent-specific node parameters
+ * Contains full agent configuration for workflow execution
+ */
+export interface AgentParams {
+  // Core agent identity
+  name: string;
+  description?: string;
+
+  // LLM configuration
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
+
+  // Execution parameters
+  timeout?: number;
+
+  // Memory system (required)
+  memory: AgentMemoryState;
+
+  // Blueprint execution
+  blueprint: Blueprint;
+
+  // Metadata
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -146,11 +156,11 @@ export type StartEndNodeParameters = Record<string, unknown>;
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
-  | AgentNodeParameters
+  | AgentParams
   | ConditionalNodeParameters
   | UserPromptNodeParameters
   | OutputNodeParameters
   | HttpRequestNodeParameters
   | LlmNodeParameters
-  | WorkflowNodeParameters
+  | WorkflowParams
   | StartEndNodeParameters;

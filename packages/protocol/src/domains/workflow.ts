@@ -5,7 +5,7 @@
  * Imports workflow types from @starships/autopilot to avoid duplication.
  */
 
-import type { Blueprint, WorkflowNodeParameters } from '@starships/autopilot';
+import type { Blueprint, WorkflowParams } from '@starships/autopilot';
 
 // ============================================================================
 // CORE WORKFLOW MODEL TYPES (following Agent pattern)
@@ -13,9 +13,9 @@ import type { Blueprint, WorkflowNodeParameters } from '@starships/autopilot';
 
 /**
  * Database Workflow interface - core API contract type
- * Extends WorkflowNodeParameters to be a superset with additional database/marketplace fields
+ * Extends WorkflowParams to be a superset with additional database/marketplace fields
  */
-export interface WorkflowModel extends WorkflowNodeParameters {
+export interface WorkflowModel extends WorkflowParams {
   // Core database fields
   id: string;
   createdAt: string;
@@ -50,7 +50,7 @@ export interface CreateWorkflowRequest {
   tags?: string[];
   executionMode?: 'simple' | 'workflow';
 
-  // Core WorkflowNodeParameters fields
+  // Core WorkflowParams fields
   blueprint?: Blueprint;
   timeout?: number;
 }

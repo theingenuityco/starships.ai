@@ -8,34 +8,16 @@
 
 import { AgentMemory } from '@/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { Blueprint, Edge, Execution, Node, StreamingOptions, WorkflowNodeParameters } from '@/types';
+import { Blueprint, Edge, Execution, Node, StreamingOptions, WorkflowParams } from '@/types';
 import { nanoid } from 'nanoid';
 
 export class Workflow {
-  private params: WorkflowNodeParameters;
+  private params: WorkflowParams;
   private engine: Engine;
 
-  constructor(params?: WorkflowNodeParameters) {
-    // Create blueprint or use provided one
-    const blueprint: Blueprint = params?.blueprint || {
-      nodes: [],
-      edges: [],
-      metadata: {},
-    };
-
-    // Create a deep copy to avoid mutations to the original blueprint
-    const clonedBlueprint = {
-      ...blueprint,
-      nodes: blueprint.nodes.map((node) => ({ ...node })),
-      edges: blueprint.edges.map((edge) => ({ ...edge })),
-      metadata: { ...blueprint.metadata },
-    };
-
+  constructor(params: WorkflowParams) {
     // Store parameters with cloned blueprint
-    this.params = {
-      ...params,
-      blueprint: clonedBlueprint,
-    };
+    this.params = structuredClone(params);
 
     // Create engine - handles all node types internally
     this.engine = new Engine();
@@ -106,7 +88,7 @@ export class Workflow {
   /**
    * Get workflow parameters (read-only copy)
    */
-  getParameters(): WorkflowNodeParameters {
+  getParameters(): WorkflowParams {
     return JSON.parse(JSON.stringify(this.params));
   }
 
@@ -223,7 +205,7 @@ export class Workflow {
       edges: this.params.blueprint.edges.map((edge) => ({ ...edge })),
     };
 
-    const clonedParams: WorkflowNodeParameters = {
+    const clonedParams: WorkflowParams = {
       ...this.params,
       blueprint: clonedBlueprint,
     };

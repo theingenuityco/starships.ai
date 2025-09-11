@@ -99,7 +99,7 @@ export class WorkflowService {
   static async createWorkflow(request: CreateWorkflowRequest): Promise<WorkflowModel> {
     const repository = new WorkflowRepository();
 
-    // Provide defaults for core WorkflowNodeParameters fields
+    // Provide defaults for core WorkflowParams fields
     const workflowData = {
       ...request,
       blueprint: request.blueprint || { nodes: [], edges: [], metadata: {} },

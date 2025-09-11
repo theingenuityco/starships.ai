@@ -55,7 +55,7 @@ export { Validator } from './validation/Validator';
 // Workflow Types - clean exports
 export type {
   // Node parameter types
-  AgentNodeParameters,
+  AgentParams,
   // Core workflow types
   Blueprint,
   ConditionalNodeParameters,
@@ -76,7 +76,7 @@ export type {
   ValidationResult,
   ValidationSuggestion,
   ValidationWarning,
-  WorkflowNodeParameters,
+  WorkflowParams,
 } from './types';
 
 // Configuration

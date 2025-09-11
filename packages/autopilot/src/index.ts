@@ -15,7 +15,6 @@ export { Agent } from './Agent';
 // ===== ENGINE SYSTEM =====
 // Engine class and event types
 export { Engine } from './engine/Engine';
-export type { ExecutionEvent } from './engine/Engine';
 
 // Memory system
 export { Memory } from './Memory';
@@ -88,4 +87,4 @@ export type { AutopilotConfig, AutopilotCredentials } from './Autopilot';
 
 // ===== STREAMING SYSTEM =====
 // Minimal streaming interface for external implementations
-export type { StreamingEmitter } from './types/streamingEmitter';
+export type { EngineEmitter } from './types/emitters';

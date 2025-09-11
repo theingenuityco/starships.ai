@@ -13,7 +13,7 @@ export interface ValidationResult {
   passed: boolean;
   message: string;
   severity: 'error' | 'warning' | 'info';
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface SchemaValidationReport {
@@ -386,12 +386,15 @@ export class SchemaValidator {
       });
 
       // Check index usage
-      const indexStats = await this.connection.executeQuery(
+      const indexStats = await this.connection.executeQuery<{
+        relationshipCount: number;
+        nodeCount: number;
+      }>(
         `CALL db.stats.retrieve('GRAPH COUNTS') YIELD data
          RETURN data.relationships as relationshipCount, data.nodes as nodeCount`
       );
 
-      const nodeCount = indexStats[0]?.nodeCount || 0;
+      const nodeCount = Number(indexStats[0]?.nodeCount || 0);
       results.push({
         category: 'Performance',
         test: 'Database size check',

@@ -31,7 +31,7 @@ export class MissionClarityRepository extends BaseRepository {
           !request.reasoning ||
           request.iteration === undefined
         ) {
-          this.handleValidationError([{ field: 'request', message: 'All required fields must be provided' }], 'upsert');
+          this.handleValidationError([{ field: 'request', message: 'All required fields must be provided' }]);
         }
 
         // Validate score ranges (0-10)
@@ -39,16 +39,13 @@ export class MissionClarityRepository extends BaseRepository {
         for (const field of scoreFields) {
           const score = request[field as keyof CreateMissionClarityRequest] as number;
           if (typeof score !== 'number' || score < 0 || score > 10) {
-            this.handleValidationError(
-              [
-                {
-                  field,
-                  message: `${field} must be a number between 0 and 10`,
-                  value: score,
-                },
-              ],
-              'upsert'
-            );
+            this.handleValidationError([
+              {
+                field,
+                message: `${field} must be a number between 0 and 10`,
+                value: score,
+              },
+            ]);
           }
         }
 
@@ -64,7 +61,7 @@ export class MissionClarityRepository extends BaseRepository {
         });
 
         if (!missionCheck || missionCheck.length === 0) {
-          this.handleNotFound('Mission', missionId, 'upsert');
+          this.handleNotFound('Mission', missionId);
         }
 
         // Use MERGE pattern with createEntityWithAutoId for new entities
@@ -113,16 +110,13 @@ export class MissionClarityRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         if (!missionId) {
-          this.handleValidationError(
-            [
-              {
-                field: 'missionId',
-                message: 'missionId is required',
-                value: missionId,
-              },
-            ],
-            'get'
-          );
+          this.handleValidationError([
+            {
+              field: 'missionId',
+              message: 'missionId is required',
+              value: missionId,
+            },
+          ]);
         }
 
         const cypher = `
@@ -152,21 +146,18 @@ export class MissionClarityRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         if (!missionId) {
-          this.handleValidationError(
-            [
-              {
-                field: 'missionId',
-                message: 'missionId is required',
-                value: missionId,
-              },
-            ],
-            'update'
-          );
+          this.handleValidationError([
+            {
+              field: 'missionId',
+              message: 'missionId is required',
+              value: missionId,
+            },
+          ]);
         }
 
         // Build dynamic SET clause based on provided fields
         const setClauses: string[] = ['mc.updatedAt = $updatedAt'];
-        const params: any = {
+        const params: Record<string, unknown> = {
           missionId,
           updatedAt: new Date().toISOString(),
         };
@@ -179,16 +170,13 @@ export class MissionClarityRepository extends BaseRepository {
           const value = request[field as keyof UpdateMissionClarityRequest];
           if (value !== undefined) {
             if (typeof value !== 'number' || value < 0 || value > 10) {
-              this.handleValidationError(
-                [
-                  {
-                    field,
-                    message: `${field} must be a number between 0 and 10`,
-                    value,
-                  },
-                ],
-                'update'
-              );
+              this.handleValidationError([
+                {
+                  field,
+                  message: `${field} must be a number between 0 and 10`,
+                  value,
+                },
+              ]);
             }
             setClauses.push(`mc.${field} = $${field}`);
             params[field] = value;
@@ -212,7 +200,7 @@ export class MissionClarityRepository extends BaseRepository {
           // Get current scores for missing fields
           const currentClarity = await this.getByMissionId(missionId);
           if (!currentClarity) {
-            this.handleNotFound('MissionClarityModel', missionId, 'update');
+            this.handleNotFound('MissionClarityModel', missionId);
           }
 
           const allScores = [
@@ -237,7 +225,7 @@ export class MissionClarityRepository extends BaseRepository {
         const result = await connection.executeWrite(cypher, params);
 
         if (result.length === 0) {
-          this.handleNotFound('MissionClarityModel', missionId, 'update');
+          this.handleNotFound('MissionClarityModel', missionId);
         }
 
         return result[0].mc as MissionClarityModel;
@@ -255,16 +243,13 @@ export class MissionClarityRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         if (!missionId) {
-          this.handleValidationError(
-            [
-              {
-                field: 'missionId',
-                message: 'missionId is required',
-                value: missionId,
-              },
-            ],
-            'delete'
-          );
+          this.handleValidationError([
+            {
+              field: 'missionId',
+              message: 'missionId is required',
+              value: missionId,
+            },
+          ]);
         }
 
         const cypher = `
@@ -276,7 +261,7 @@ export class MissionClarityRepository extends BaseRepository {
         const connection = getConnection();
         const result = await connection.executeWrite(cypher, { missionId });
 
-        return result.length > 0 && result[0].deletedCount > 0;
+        return result.length > 0 && (result[0] as { deletedCount: number }).deletedCount > 0;
       },
       'deleteByMissionId',
       'MissionClarityModel',
@@ -313,16 +298,13 @@ export class MissionClarityRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         if (minScore < 0 || maxScore > 10 || minScore > maxScore) {
-          this.handleValidationError(
-            [
-              {
-                field: 'scoreRange',
-                message: 'Invalid score range: must be between 0-10 and min <= max',
-                value: { minScore, maxScore },
-              },
-            ],
-            'getByScoreRange'
-          );
+          this.handleValidationError([
+            {
+              field: 'scoreRange',
+              message: 'Invalid score range: must be between 0-10 and min <= max',
+              value: { minScore, maxScore },
+            },
+          ]);
         }
 
         const cypher = `

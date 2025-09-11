@@ -41,7 +41,6 @@ export class ConversationRepository extends BaseRepository {
         // Use lean validation from ConversationEntity
         await ConversationEntity.validate(entity, 'create');
 
-        const connection = this.getConnection();
         const now = new Date().toISOString();
 
         // Prepare conversation data with defaults and validation
@@ -125,7 +124,7 @@ export class ConversationRepository extends BaseRepository {
         );
 
         if (result.length === 0) {
-          this.handleNotFound('Conversation', id, 'update');
+          this.handleNotFound('Conversation', id);
         }
 
         // Use ConversationEntity for consistent mapping

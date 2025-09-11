@@ -2,7 +2,7 @@
  * Neo4j Helpers Unit Tests
  */
 
-import { Integer, int } from 'neo4j-driver';
+import { int } from 'neo4j-driver';
 import { convertNeo4jInt, convertNeo4jIntsInObject, convertNeo4jIntsInArray, isNeo4jInt } from '../neo4j-helpers';
 
 describe('Neo4j Helpers', () => {
@@ -269,7 +269,7 @@ describe('Neo4j Helpers', () => {
 
   describe('edge cases and error handling', () => {
     it('should handle circular reference prevention', () => {
-      const obj: any = { id: int(1) };
+      const obj: Record<string, unknown> = { id: int(1) };
       obj.self = obj; // Create circular reference
 
       // Should not throw, but may not handle circular reference perfectly

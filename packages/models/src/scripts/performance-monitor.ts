@@ -12,7 +12,7 @@ export interface QueryMetrics {
   queryType: string;
   executionTime: number;
   timestamp: string;
-  parameters?: any;
+  parameters?: Record<string, unknown>;
   resultCount?: number;
   indexesUsed?: string[];
   plannerEstimate?: number;
@@ -48,7 +48,7 @@ export interface PerformanceAlert {
   type: string;
   message: string;
   timestamp: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export class PerformanceMonitor {
@@ -77,7 +77,13 @@ export class PerformanceMonitor {
   /**
    * Record query execution metrics
    */
-  recordQuery(queryType: string, executionTime: number, parameters?: any, resultCount?: number, indexesUsed?: string[]): void {
+  recordQuery(
+    queryType: string,
+    executionTime: number,
+    parameters?: Record<string, unknown>,
+    resultCount?: number,
+    indexesUsed?: string[]
+  ): void {
     const metric: QueryMetrics = {
       queryId: `${queryType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       queryType,
@@ -109,8 +115,8 @@ export class PerformanceMonitor {
   async getCurrentStats(): Promise<{
     activeConnections: number;
     queryQueueLength: number;
-    memoryUsage: any;
-    indexStats: any;
+    memoryUsage: Record<string, unknown>;
+    indexStats: Record<string, unknown>[];
   }> {
     try {
       // Get database statistics
@@ -133,16 +139,16 @@ export class PerformanceMonitor {
       return {
         activeConnections: 1, // Neo4j doesn't expose this easily
         queryQueueLength: 0,
-        memoryUsage: dbStats[0]?.data || {},
-        indexStats: indexStats[0]?.indexes || [],
+        memoryUsage: (dbStats[0]?.data || {}) as Record<string, unknown>,
+        indexStats: (indexStats[0]?.indexes || []) as Record<string, unknown>[],
       };
     } catch (error) {
       console.error('Failed to get current stats:', error);
       return {
         activeConnections: 0,
         queryQueueLength: 0,
-        memoryUsage: {},
-        indexStats: [],
+        memoryUsage: {} as Record<string, unknown>,
+        indexStats: [] as Record<string, unknown>[],
       };
     }
   }
@@ -431,7 +437,11 @@ export class PerformanceMonitor {
     try {
       const reports = await this.connection.executeQuery<{
         timestamp: string;
-        summary: any;
+        summary: {
+          totalQueries: number;
+          averageExecutionTime: number;
+          slowQueries: number;
+        };
       }>(
         `MATCH (pr:PerformanceReport)
          WHERE datetime(pr.timestamp) > datetime() - duration({days: $days})

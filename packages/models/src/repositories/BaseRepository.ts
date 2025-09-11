@@ -33,8 +33,8 @@ export abstract class BaseRepository {
     operation: string,
     resource?: string,
     resourceId?: string,
-    additionalMetadata?: Record<string, any>
-  ): Record<string, any> {
+    additionalMetadata?: Record<string, unknown>
+  ): Record<string, unknown> {
     return {
       component: this.serviceName,
       operation,
@@ -63,9 +63,10 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleDatabaseError(error: any, operation: string, resource?: string, resourceId?: string): never {
-    const context = this.createContext(operation, resource, resourceId, {
-      originalError: error.message || error.toString(),
+  protected handleDatabaseError(error: unknown, operation: string, resource?: string, resourceId?: string): never {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    this.createContext(operation, resource, resourceId, {
+      originalError: errorMessage,
     });
 
     // Handle specific database error types
@@ -86,7 +87,7 @@ export abstract class BaseRepository {
     }
 
     // Generic database error
-    throw new DatabaseError(context.operation, error instanceof Error ? error : undefined);
+    throw new DatabaseError(operation, error instanceof Error ? error : undefined);
   }
 
   /**
@@ -99,7 +100,7 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleNotFound(resource: string, resourceId?: string, operation?: string): never {
+  protected handleNotFound(resource: string, resourceId?: string): never {
     throw new NotFoundError(resource, resourceId || 'unknown');
   }
 
@@ -112,7 +113,7 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleValidationError(fieldErrors: Array<{ field: string; message: string; value?: any }>, operation?: string): never {
+  protected handleValidationError(fieldErrors: Array<{ field: string; message: string; value?: unknown }>): never {
     const message = fieldErrors.map((e) => `${e.field}: ${e.message}`).join(', ');
     throw new ValidationError(message, fieldErrors[0]?.field, { fieldErrors });
   }
@@ -128,7 +129,7 @@ export abstract class BaseRepository {
    *
    * @protected
    */
-  protected handleConflict(resource: string, conflictReason: string, operation?: string, resourceId?: string): never {
+  protected handleConflict(resource: string, conflictReason: string): never {
     throw new ConflictError(conflictReason);
   }
 
@@ -157,7 +158,7 @@ export abstract class BaseRepository {
   ): Promise<T> {
     try {
       return await operation();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If it's already an AppError, re-throw
       if (error instanceof AppError) {
         throw error;
@@ -184,7 +185,7 @@ export abstract class BaseRepository {
   protected executeWithErrorHandlingSync<T>(operation: () => T, operationName: string, resource?: string, resourceId?: string): T {
     try {
       return operation();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If it's already an AppError, re-throw
       if (error instanceof AppError) {
         throw error;
@@ -202,7 +203,7 @@ export abstract class BaseRepository {
   /**
    * Check if error is a constraint violation
    */
-  private isConstraintViolationError(error: any): boolean {
+  private isConstraintViolationError(error: unknown): boolean {
     if (!error) return false;
 
     const constraintPatterns = [
@@ -217,51 +218,51 @@ export abstract class BaseRepository {
       'neo.clienterror.schema.constraintvalidationfailed',
     ];
 
-    const errorMessage = (error.message || '').toLowerCase();
-    const errorCode = (error.code || '').toLowerCase();
+    const errorMessage = (error as { message?: string }).message || '';
+    const errorCode = (error as { code?: string }).code || '';
 
-    return constraintPatterns.some((pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern));
+    return constraintPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern) || errorCode.toLowerCase().includes(pattern));
   }
 
   /**
    * Check if error is a connection error
    */
-  private isConnectionError(error: any): boolean {
+  private isConnectionError(error: unknown): boolean {
     if (!error) return false;
 
     const connectionPatterns = ['connection', 'connect', 'econnrefused', 'enotfound', 'network', 'timeout'];
 
-    const errorMessage = (error.message || '').toLowerCase();
-    const errorCode = (error.code || '').toLowerCase();
+    const errorMessage = (error as { message?: string }).message || '';
+    const errorCode = (error as { code?: string }).code || '';
 
-    return connectionPatterns.some((pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern));
+    return connectionPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern) || errorCode.toLowerCase().includes(pattern));
   }
 
   /**
    * Check if error is a timeout error
    */
-  private isTimeoutError(error: any): boolean {
+  private isTimeoutError(error: unknown): boolean {
     if (!error) return false;
 
     const timeoutPatterns = ['timeout', 'etimedout', 'time out', 'timed out'];
 
-    const errorMessage = (error.message || '').toLowerCase();
-    const errorCode = (error.code || '').toLowerCase();
+    const errorMessage = (error as { message?: string }).message || '';
+    const errorCode = (error as { code?: string }).code || '';
 
-    return timeoutPatterns.some((pattern) => errorMessage.includes(pattern) || errorCode.includes(pattern));
+    return timeoutPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern) || errorCode.toLowerCase().includes(pattern));
   }
 
   /**
    * Check if error is a query error
    */
-  private isQueryError(error: any): boolean {
+  private isQueryError(error: unknown): boolean {
     if (!error) return false;
 
     const queryPatterns = ['syntax error', 'invalid query', 'query failed', 'sql error', 'cypher error'];
 
-    const errorMessage = (error.message || '').toLowerCase();
+    const errorMessage = (error as { message?: string }).message || '';
 
-    return queryPatterns.some((pattern) => errorMessage.includes(pattern));
+    return queryPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern));
   }
 
   // ============================================================================
@@ -283,7 +284,11 @@ export abstract class BaseRepository {
    * @param properties - Object properties to set on the node (excluding id)
    * @returns The created entity with generated ID
    */
-  protected async createEntityWithAutoId<T>(nodeLabel: string, properties: Record<string, any>, connection?: any): Promise<T> {
+  protected async createEntityWithAutoId<T>(
+    nodeLabel: string,
+    properties: Record<string, unknown>,
+    connection?: Neo4jConnection
+  ): Promise<T> {
     // Use provided connection or get from centralized getConnection method
     const conn = connection || this.getConnection();
 
@@ -291,7 +296,8 @@ export abstract class BaseRepository {
     const generatedId = nanoid();
 
     // Remove any existing 'id' from properties and add the generated one
-    const { id, ...propsWithoutId } = properties;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _existingId, ...propsWithoutId } = properties;
     const propsWithGeneratedId = { ...propsWithoutId, id: generatedId };
 
     const result = await conn.executeWrite(
@@ -305,7 +311,7 @@ export abstract class BaseRepository {
       throw new Error(`Failed to create ${nodeLabel}`);
     }
 
-    return result[0].n;
+    return result[0].n as T;
   }
 
   /**
@@ -321,10 +327,10 @@ export abstract class BaseRepository {
    */
   protected async mergeEntityWithAutoId<T>(
     nodeLabel: string,
-    matchProperties: Record<string, any>,
-    createProperties: Record<string, any> = {},
-    updateProperties: Record<string, any> = {},
-    connection?: any
+    matchProperties: Record<string, unknown>,
+    createProperties: Record<string, unknown> = {},
+    updateProperties: Record<string, unknown> = {},
+    connection?: Neo4jConnection
   ): Promise<T> {
     // Use provided connection or get from centralized getConnection method
     const conn = connection || this.getConnection();
@@ -333,9 +339,12 @@ export abstract class BaseRepository {
     const generatedId = nanoid();
 
     // Remove ID from all property sets and add generated ID to create properties
-    const { id: _, ...matchProps } = matchProperties;
-    const { id: __, ...createProps } = createProperties;
-    const { id: ___, ...updateProps } = updateProperties;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _matchId, ...matchProps } = matchProperties;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _createId, ...createProps } = createProperties;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id: _updateId, ...updateProps } = updateProperties;
 
     // Add generated ID to create properties
     const createPropsWithId = { ...createProps, id: generatedId };
@@ -352,7 +361,7 @@ export abstract class BaseRepository {
 
     cypher += `\nRETURN n`;
 
-    const parameters: Record<string, any> = {
+    const parameters: Record<string, unknown> = {
       match: matchProps,
       create: createPropsWithId,
     };
@@ -362,7 +371,7 @@ export abstract class BaseRepository {
     }
 
     const result = await conn.executeWrite(cypher, parameters);
-    return result[0].n;
+    return result[0].n as T;
   }
 
   // ============================================================================
@@ -372,7 +381,7 @@ export abstract class BaseRepository {
   /**
    * Log repository operations (can be overridden by subclasses)
    */
-  protected log(level: 'debug' | 'info' | 'warn' | 'error', message: string, context?: any): void {
+  protected log(level: 'debug' | 'info' | 'warn' | 'error', message: string, context?: unknown): void {
     const logMessage = `[${this.serviceName.toUpperCase()}] ${message}`;
 
     switch (level) {
@@ -394,7 +403,7 @@ export abstract class BaseRepository {
   /**
    * Create a standardized error for business logic violations
    */
-  protected createBusinessLogicError(code: string, message: string, operation?: string, resource?: string, resourceId?: string): never {
+  protected createBusinessLogicError(_code: string, _message: string, operation?: string): never {
     throw new DatabaseError(operation || 'unknown');
   }
 }

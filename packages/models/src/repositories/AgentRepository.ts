@@ -2,7 +2,6 @@ import { AgentEntity } from '@/entities/AgentEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { int } from 'neo4j-driver';
 
 export class AgentRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -14,7 +13,7 @@ export class AgentRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
-        return result.map((record) => AgentEntity.deserialize(record.a));
+        return result.map((record) => AgentEntity.deserialize(record.a as unknown as Record<string, unknown>));
       },
       'findAll',
       'Agent'
@@ -27,7 +26,7 @@ export class AgentRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id });
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.deserialize(agent) : null;
+        return agent ? AgentEntity.deserialize(agent as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Agent',
@@ -43,7 +42,7 @@ export class AgentRepository extends BaseRepository {
           'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a',
           { starshipId }
         );
-        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
+        return result?.map((record) => AgentEntity.deserialize(record.a as unknown as Record<string, unknown>)) || [];
       },
       'findByStarship',
       'Agent'
@@ -61,7 +60,7 @@ export class AgentRepository extends BaseRepository {
         });
 
         if (!starshipCheck[0] || starshipCheck[0].count === 0) {
-          this.handleNotFound('Starship', starshipId, 'updateStarshipId');
+          this.handleNotFound('Starship', starshipId);
         }
 
         // Remove existing DEPLOYED_ON relationships
@@ -94,7 +93,7 @@ export class AgentRepository extends BaseRepository {
         );
 
         if (!result[0].a) {
-          this.handleNotFound('Starship', starshipId, 'updateStarshipId');
+          this.handleNotFound('Starship', starshipId);
         }
 
         return result[0].a;
@@ -147,7 +146,7 @@ export class AgentRepository extends BaseRepository {
           }
         );
 
-        return AgentEntity.deserialize(agent);
+        return AgentEntity.deserialize(agent as unknown as Record<string, unknown>);
       },
       'create',
       'Agent'
@@ -172,7 +171,7 @@ export class AgentRepository extends BaseRepository {
         });
 
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.deserialize(agent) : null;
+        return agent ? AgentEntity.deserialize(agent as unknown as Record<string, unknown>) : null;
       },
       'update',
       'Agent',
@@ -205,7 +204,7 @@ export class AgentRepository extends BaseRepository {
           'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
           { query }
         );
-        return result?.map((record) => AgentEntity.deserialize(record.a)) || [];
+        return result?.map((record) => AgentEntity.deserialize(record.a as unknown as Record<string, unknown>)) || [];
       },
       'searchAgents',
       'Agent'

@@ -46,7 +46,7 @@ export class DisasterRecoveryManager {
   /**
    * Execute disaster recovery based on scenario
    */
-  async executeRecovery(scenario: DisasterScenario, options: any = {}): Promise<RecoveryResult> {
+  async executeRecovery(scenario: DisasterScenario, options: Record<string, unknown> = {}): Promise<RecoveryResult> {
     const startTime = Date.now();
     const actionsPerformed: string[] = [];
     const errors: string[] = [];
@@ -57,22 +57,52 @@ export class DisasterRecoveryManager {
     try {
       switch (scenario) {
         case DisasterScenario.MIGRATION_FAILURE:
-          return await this.handleMigrationFailure(options, actionsPerformed, errors, warnings, startTime);
+          return await this.handleMigrationFailure(
+            options as { rollbackDataPath?: string; backupPath?: string },
+            actionsPerformed,
+            errors,
+            warnings,
+            startTime
+          );
 
         case DisasterScenario.DATA_CORRUPTION:
-          return await this.handleDataCorruption(options, actionsPerformed, errors, warnings, startTime);
+          return await this.handleDataCorruption(
+            options as { backupPath?: string; autoFindBackup?: boolean },
+            actionsPerformed,
+            errors,
+            warnings,
+            startTime
+          );
 
         case DisasterScenario.BACKUP_CORRUPTION:
-          return await this.handleBackupCorruption(options, actionsPerformed, errors, warnings, startTime);
+          return await this.handleBackupCorruption(
+            options as { corruptedBackupPath: string },
+            actionsPerformed,
+            errors,
+            warnings,
+            startTime
+          );
 
         case DisasterScenario.PARTIAL_RESTORE:
-          return await this.handlePartialRestore(options, actionsPerformed, errors, warnings, startTime);
+          return await this.handlePartialRestore(options as { backupPath: string }, actionsPerformed, errors, warnings, startTime);
 
         case DisasterScenario.CONNECTION_FAILURE:
-          return await this.handleConnectionFailure(options, actionsPerformed, errors, warnings, startTime);
+          return await this.handleConnectionFailure(
+            options as { maxRetries?: number; retryDelay?: number },
+            actionsPerformed,
+            errors,
+            warnings,
+            startTime
+          );
 
         case DisasterScenario.DISK_SPACE_EXHAUSTION:
-          return await this.handleDiskSpaceExhaustion(options, actionsPerformed, errors, warnings, startTime);
+          return await this.handleDiskSpaceExhaustion(
+            options as { cleanupOldBackups?: boolean; maxBackupsToKeep?: number },
+            actionsPerformed,
+            errors,
+            warnings,
+            startTime
+          );
 
         default:
           throw new Error(`Unknown disaster scenario: ${scenario}`);
@@ -734,7 +764,7 @@ export class DisasterRecoveryManager {
 /**
  * CLI interface for disaster recovery
  */
-export async function executeDisasterRecovery(scenario: string, options: any = {}): Promise<void> {
+export async function executeDisasterRecovery(scenario: string, options: Record<string, unknown> = {}): Promise<void> {
   console.log('🚨 Starting Disaster Recovery');
   console.log('==============================');
 

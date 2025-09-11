@@ -13,10 +13,7 @@ export class MissionMessageRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!message.missionId || !message.role || !message.content || !message.timestamp) {
-          this.handleValidationError(
-            [{ field: 'message', message: 'missionId, role, content, and timestamp are required' }],
-            'saveMessage'
-          );
+          this.handleValidationError([{ field: 'message', message: 'missionId, role, content, and timestamp are required' }]);
         }
 
         // Validate field types
@@ -26,31 +23,28 @@ export class MissionMessageRepository extends BaseRepository {
           typeof message.content !== 'string' ||
           typeof message.timestamp !== 'string'
         ) {
-          this.handleValidationError([{ field: 'message', message: 'Invalid field types' }], 'saveMessage');
+          this.handleValidationError([{ field: 'message', message: 'Invalid field types' }]);
         }
 
         // Validate role
         const validRoles: MissionMessageRole[] = ['user', 'orchestrator', 'system'];
         if (!validRoles.includes(message.role as MissionMessageRole)) {
-          this.handleValidationError(
-            [
-              {
-                field: 'role',
-                message: `Role must be one of: ${validRoles.join(', ')}`,
-                value: message.role,
-              },
-            ],
-            'saveMessage'
-          );
+          this.handleValidationError([
+            {
+              field: 'role',
+              message: `Role must be one of: ${validRoles.join(', ')}`,
+              value: message.role,
+            },
+          ]);
         }
 
         // Validate string lengths
         if (message.content.length < 1 || message.content.length > 10000) {
-          this.handleValidationError([{ field: 'content', message: 'Content must be between 1 and 10000 characters' }], 'saveMessage');
+          this.handleValidationError([{ field: 'content', message: 'Content must be between 1 and 10000 characters' }]);
         }
 
         if (message.senderName && (message.senderName.length < 1 || message.senderName.length > 200)) {
-          this.handleValidationError([{ field: 'senderName', message: 'Sender name must be between 1 and 200 characters' }], 'saveMessage');
+          this.handleValidationError([{ field: 'senderName', message: 'Sender name must be between 1 and 200 characters' }]);
         }
 
         const connection = getConnection();
@@ -61,7 +55,7 @@ export class MissionMessageRepository extends BaseRepository {
         });
 
         if (!missionCheck || missionCheck.length === 0) {
-          this.handleNotFound('Mission', message.missionId, 'saveMessage');
+          this.handleNotFound('Mission', message.missionId);
         }
 
         // Create message with auto-generated ID
@@ -84,7 +78,7 @@ export class MissionMessageRepository extends BaseRepository {
           { missionId: message.missionId, messageId: createdMessage.id }
         );
 
-        return convertNeo4jIntsInObject(createdMessage);
+        return convertNeo4jIntsInObject(createdMessage) as MissionMessageModel;
       },
       'saveMessage',
       'MissionMessageModel'
@@ -96,7 +90,7 @@ export class MissionMessageRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!missionId) {
-          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'getMessagesByMission');
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }]);
         }
 
         const connection = getConnection();
@@ -108,7 +102,7 @@ export class MissionMessageRepository extends BaseRepository {
         ORDER BY msg.timestamp ASC
       `;
 
-        const params: any = { missionId };
+        const params: Record<string, unknown> = { missionId };
 
         if (limit !== undefined && limit > 0) {
           if (offset !== undefined && offset > 0) {
@@ -121,7 +115,9 @@ export class MissionMessageRepository extends BaseRepository {
 
         const result = await connection.executeQuery<{ msg: MissionMessageModel }>(query, params);
 
-        return convertNeo4jIntsInArray(result?.map((record) => record.msg) || []);
+        return convertNeo4jIntsInArray(
+          result?.map((record) => record.msg as unknown as Record<string, unknown>) || []
+        ) as MissionMessageModel[];
       },
       'getMessagesByMission',
       'MissionMessageModel'
@@ -133,7 +129,7 @@ export class MissionMessageRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!missionId) {
-          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'getMessageCount');
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }]);
         }
 
         const connection = getConnection();
@@ -168,34 +164,28 @@ export class MissionMessageRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!missionId) {
-          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'getMessagesByMissionWithPagination');
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }]);
         }
 
         // Validate pagination parameters
         if (page < 1) {
-          this.handleValidationError(
-            [
-              {
-                field: 'page',
-                message: 'Page must be >= 1',
-                value: page,
-              },
-            ],
-            'getMessagesByMissionWithPagination'
-          );
+          this.handleValidationError([
+            {
+              field: 'page',
+              message: 'Page must be >= 1',
+              value: page,
+            },
+          ]);
         }
 
         if (pageSize < 1 || pageSize > 200) {
-          this.handleValidationError(
-            [
-              {
-                field: 'pageSize',
-                message: 'Page size must be between 1 and 200',
-                value: pageSize,
-              },
-            ],
-            'getMessagesByMissionWithPagination'
-          );
+          this.handleValidationError([
+            {
+              field: 'pageSize',
+              message: 'Page size must be between 1 and 200',
+              value: pageSize,
+            },
+          ]);
         }
 
         // Calculate offset as regular number
@@ -227,7 +217,7 @@ export class MissionMessageRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!missionId) {
-          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }], 'deleteMessagesByMission');
+          this.handleValidationError([{ field: 'missionId', message: 'missionId is required' }]);
         }
 
         const connection = getConnection();
@@ -238,7 +228,7 @@ export class MissionMessageRepository extends BaseRepository {
         });
 
         if (!missionCheck || missionCheck.length === 0) {
-          this.handleNotFound('Mission', missionId, 'deleteMessagesByMission');
+          this.handleNotFound('Mission', missionId);
         }
 
         // Delete all messages belonging to the mission
@@ -258,7 +248,7 @@ export class MissionMessageRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!messageId) {
-          this.handleValidationError([{ field: 'messageId', message: 'messageId is required' }], 'deleteMessage');
+          this.handleValidationError([{ field: 'messageId', message: 'messageId is required' }]);
         }
 
         const connection = getConnection();
@@ -270,7 +260,7 @@ export class MissionMessageRepository extends BaseRepository {
         );
 
         if (!existingResult || existingResult.length === 0) {
-          this.handleNotFound('MissionMessageModel', messageId, 'deleteMessage');
+          this.handleNotFound('MissionMessageModel', messageId);
         }
 
         // Delete the message
@@ -289,7 +279,7 @@ export class MissionMessageRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!messageId) {
-          this.handleValidationError([{ field: 'messageId', message: 'messageId is required' }], 'findMessageById');
+          this.handleValidationError([{ field: 'messageId', message: 'messageId is required' }]);
         }
 
         const connection = getConnection();
@@ -303,7 +293,7 @@ export class MissionMessageRepository extends BaseRepository {
           return null;
         }
 
-        return convertNeo4jIntsInObject(result[0].msg);
+        return convertNeo4jIntsInObject(result[0].msg as unknown as Record<string, unknown>) as unknown as MissionMessageModel;
       },
       'findMessageById',
       'MissionMessageModel',

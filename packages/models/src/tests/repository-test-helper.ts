@@ -5,7 +5,10 @@
 import { getConnection } from '@/helpers/database';
 
 export class RepositoryTestHelper {
-  public mockConnection: any;
+  public mockConnection: {
+    executeQuery: jest.Mock;
+    executeWrite: jest.Mock;
+  };
 
   constructor() {
     this.mockConnection = {
@@ -25,7 +28,7 @@ export class RepositoryTestHelper {
   }
 
   // Mock patterns for different repository operations
-  mockFindQuery(data: any, alias: string = 'n') {
+  mockFindQuery(data: unknown, alias: string = 'n') {
     if (Array.isArray(data)) {
       this.mockConnection.executeQuery.mockResolvedValue(data.map((item) => ({ [alias]: item })));
     } else if (data) {
@@ -35,17 +38,17 @@ export class RepositoryTestHelper {
     }
   }
 
-  mockCreateWrite(data: any) {
+  mockCreateWrite(data: unknown) {
     // Mock for createEntityWithAutoId pattern
     this.mockConnection.executeWrite.mockResolvedValue([{ n: data }]);
   }
 
-  mockMergeWrite(data: any) {
+  mockMergeWrite(data: unknown) {
     // Mock for mergeEntityWithAutoId pattern
     this.mockConnection.executeWrite.mockResolvedValue([{ n: data }]);
   }
 
-  mockUpdateWrite(data: any, alias: string = 'u') {
+  mockUpdateWrite(data: unknown, alias: string = 'u') {
     if (data) {
       this.mockConnection.executeWrite.mockResolvedValue([{ [alias]: data }]);
     } else {

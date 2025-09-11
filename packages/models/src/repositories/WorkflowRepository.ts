@@ -13,7 +13,7 @@ export class WorkflowRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC');
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'findAll',
       'Workflow'
@@ -25,7 +25,7 @@ export class WorkflowRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) WHERE w.id = $id RETURN w', { id });
-        return result.length > 0 ? WorkflowEntity.deserialize(result[0].w) : null;
+        return result.length > 0 ? WorkflowEntity.deserialize(result[0].w as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Workflow',
@@ -39,7 +39,6 @@ export class WorkflowRepository extends BaseRepository {
         // Use WorkflowEntity validation
         await WorkflowEntity.validate(entity, 'create');
 
-        const connection = this.getConnection();
         const now = new Date().toISOString();
 
         // Prepare workflow data with defaults and validation
@@ -75,7 +74,7 @@ export class WorkflowRepository extends BaseRepository {
         }
 
         // Use WorkflowEntity for consistent mapping
-        return WorkflowEntity.deserialize(result);
+        return WorkflowEntity.deserialize(result as unknown as Record<string, unknown>);
       },
       'create',
       'Workflow'
@@ -161,11 +160,11 @@ export class WorkflowRepository extends BaseRepository {
         );
 
         if (result.length === 0) {
-          this.handleNotFound('Workflow', id, 'update');
+          this.handleNotFound('Workflow', id);
         }
 
         // Use WorkflowEntity for consistent mapping
-        return WorkflowEntity.deserialize(result[0].w);
+        return WorkflowEntity.deserialize(result[0].w as unknown as Record<string, unknown>);
       },
       'update',
       'Workflow',
@@ -198,7 +197,7 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
           { authorId }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'findByAuthor',
       'Workflow'
@@ -213,7 +212,7 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
           { category }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'findByCategory',
       'Workflow'
@@ -228,7 +227,7 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.starshipId = $starshipId RETURN w ORDER BY w.name',
           { starshipId }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'findByStarshipId',
       'Workflow'
@@ -243,7 +242,7 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
           { tags }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'findByTags',
       'Workflow'
@@ -258,7 +257,7 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.isPublic = true RETURN w ORDER BY w.usageCount DESC, w.rating DESC SKIP $offset LIMIT $limit',
           { limit, offset }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'findPublic',
       'Workflow'
@@ -277,7 +276,7 @@ export class WorkflowRepository extends BaseRepository {
            RETURN w ORDER BY w.usageCount DESC LIMIT 20`,
           { query }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'searchWorkflows',
       'Workflow'
@@ -295,7 +294,7 @@ export class WorkflowRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let query = 'MATCH (w:Workflow) WHERE 1=1';
-        const params: any = {};
+        const params: Record<string, unknown> = {};
 
         if (filters.category) {
           query += ' AND w.category = $category';
@@ -325,7 +324,7 @@ export class WorkflowRepository extends BaseRepository {
         query += ' RETURN w ORDER BY w.usageCount DESC, w.rating DESC';
 
         const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
-        return result.map((record) => WorkflowEntity.deserialize(record.w));
+        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
       },
       'findWithFilters',
       'Workflow'
@@ -411,7 +410,7 @@ export class WorkflowRepository extends BaseRepository {
         );
 
         if (!result[0] || result[0].count === 0) {
-          this.handleNotFound('Workflow', workflowId, 'updateStarshipId');
+          this.handleNotFound('Workflow', workflowId);
         }
 
         // Update Neo4j relationship for backward compatibility

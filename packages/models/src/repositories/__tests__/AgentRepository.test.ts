@@ -5,7 +5,6 @@
 import { getConnection } from '@/helpers/database';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { ConflictError, DatabaseError, NotFoundError } from '@starships/errors';
-import type { AgentModel } from '@starships/protocol';
 
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
@@ -32,7 +31,10 @@ jest.mock('uuid', () => ({
 
 describe('AgentRepository', () => {
   let repository: AgentRepository;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.Mock;
+    executeWrite: jest.Mock;
+  };
 
   beforeEach(() => {
     // Create fresh mock connection for each test

@@ -1,7 +1,7 @@
 module.exports = {
   // Extend the root ESLint configuration
-  extends: ['../../.eslintrc.cjs'],
-  
+  extends: ['../../.eslintrc.json'],
+
   // Override specific rules for the protocol package
   rules: {
     // Make these rules errors instead of warnings

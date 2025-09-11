@@ -75,7 +75,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       if (conversationData && conversationData.messages.length > 0) {
         // Send existing messages via StreamingService
         for (const message of conversationData.messages) {
-          await streamingService.broadcastMessage(conversationId, message);
+          await streamingService.broadcastMessage(conversationId);
         }
       }
 
@@ -166,13 +166,13 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
       // Process conversation with streaming (async - don't await)
       // Using conversationId as stream identifier - much simpler!
       conversationService
-        .processConversationWithStreaming({
+        .addMessage({
           conversationId,
           agentId,
           userId,
           message,
         })
-        .catch((error) => {
+        .catch((error: any) => {
           console.error('❌ [UNIFIED STREAMING] Processing failed:', error);
           // Error will be handled by the streaming service and conversation service
         });

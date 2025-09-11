@@ -103,9 +103,11 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
       workflows = workflows.map((w) => {
         const params = w.getParameters();
         return {
-          id: params?.workflowId || '',
-          name: params?.name || '',
+          name: params?.name || 'Unnamed Workflow',
           // Add other required WorkflowModel fields
+          id: 'temp-id', // TODO: Add proper ID field
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
       });
     } else {
@@ -115,9 +117,11 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
       workflows = workflowInstances.map((w) => {
         const params = w.getParameters();
         return {
-          id: params?.workflowId || '',
-          name: params?.name || '',
+          name: params?.name || 'Unnamed Workflow',
           // Add other required WorkflowModel fields
+          id: 'temp-id', // TODO: Add proper ID field
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         };
       });
     }

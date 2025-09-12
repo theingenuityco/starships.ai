@@ -1,5 +1,5 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest, DeltaChunk } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest, StreamingDeltaChunk } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
@@ -110,7 +110,7 @@ export function useConversation(conversationId: string | null) {
           if (!old) {
             // Initialize with empty messages array if no data exists
             const initialData = { messages: [], total: 0, conversationId: conversationId! }
-            const deltaResult = safeApplyDeltas(initialData.messages, [data as DeltaChunk])
+            const deltaResult = safeApplyDeltas(initialData.messages, [data as StreamingDeltaChunk])
 
             if (deltaResult.success && deltaResult.result) {
               return {
@@ -123,7 +123,7 @@ export function useConversation(conversationId: string | null) {
           }
 
           // Apply patch to existing messages
-          const deltaResult = safeApplyDeltas(old.messages || [], [data as DeltaChunk])
+          const deltaResult = safeApplyDeltas(old.messages || [], [data as StreamingDeltaChunk])
 
           if (deltaResult.success && deltaResult.result) {
             return {

@@ -3,7 +3,7 @@ import { Agent, agentAPI } from '@/lib/api'
 
 interface UseAgentPaginationOptions {
   pageSize?: number
-  category?: Agent['category']
+  category?: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
   authorId?: string
   searchQuery?: string
   isPublic?: boolean

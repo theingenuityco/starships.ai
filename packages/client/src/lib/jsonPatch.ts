@@ -4,12 +4,12 @@
  * Simple implementation for applying delta chunks received from streaming
  */
 
-import type { DeltaChunk } from '@starships/protocol'
+import type { StreamingDeltaChunk } from '@starships/protocol'
 
 /**
  * Apply delta chunks to any object
  */
-export function applyDeltas<T>(target: T, deltas: DeltaChunk[]): T {
+export function applyDeltas<T>(target: T, deltas: StreamingDeltaChunk[]): T {
   let result = JSON.parse(JSON.stringify(target)) // Deep clone
 
   for (const delta of deltas) {
@@ -22,7 +22,7 @@ export function applyDeltas<T>(target: T, deltas: DeltaChunk[]): T {
 /**
  * Apply a single delta chunk
  */
-function applyDelta(target: any, delta: DeltaChunk): any {
+function applyDelta(target: any, delta: StreamingDeltaChunk): any {
   const pathParts = delta.path === '' ? [] : delta.path.split('/').slice(1)
 
   switch (delta.op) {
@@ -162,7 +162,7 @@ function getValue(target: any, pathParts: string[]): any {
 /**
  * Validate delta chunks before applying them
  */
-export function validateDeltas(deltas: DeltaChunk[]): boolean {
+export function validateDeltas(deltas: StreamingDeltaChunk[]): boolean {
   try {
     for (const delta of deltas) {
       if (!delta.op || !delta.path) {
@@ -185,7 +185,7 @@ export function validateDeltas(deltas: DeltaChunk[]): boolean {
 /**
  * Safe delta application with error handling
  */
-export function safeApplyDeltas<T>(target: T, deltas: DeltaChunk[]): { success: boolean; result?: T; error?: string } {
+export function safeApplyDeltas<T>(target: T, deltas: StreamingDeltaChunk[]): { success: boolean; result?: T; error?: string } {
   try {
     if (!validateDeltas(deltas)) {
       return { success: false, error: 'Invalid delta operations' }

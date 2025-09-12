@@ -34,7 +34,7 @@ export class AgentRepository extends BaseRepository {
     );
   }
 
-  async findByStarshipId(starshipId: string): Promise<AgentModel[]> {
+  async findByStarship(starshipId: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();

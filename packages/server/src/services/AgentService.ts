@@ -71,7 +71,7 @@ export class AgentService {
    * Get agents by starship as AgentModel array
    */
   async getAgentsByStarship(starshipId: string): Promise<AgentModel[]> {
-    return await this.agentRepository.findByStarshipId(starshipId);
+    return await this.agentRepository.findByStarship(starshipId);
   }
 
   /**

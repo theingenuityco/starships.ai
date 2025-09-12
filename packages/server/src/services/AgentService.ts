@@ -497,7 +497,7 @@ export class AgentService {
     }
 
     // Look for LLM response in execution results
-    const results = Array.from(executionResult.executionResults.values()) as any[];
+    const results = Array.from(executionResult.results.values()) as any[];
 
     // Find the last successful LLM response
     for (let i = results.length - 1; i >= 0; i--) {
@@ -528,7 +528,7 @@ export class AgentService {
    */
   private calculateUsage(executionResult: any): any {
     // Extract usage information from execution results
-    const results = Array.from(executionResult.executionResults.values()) as any[];
+    const results = Array.from(executionResult.results.values()) as any[];
     let totalTokens = 0;
     let totalCost = 0;
 

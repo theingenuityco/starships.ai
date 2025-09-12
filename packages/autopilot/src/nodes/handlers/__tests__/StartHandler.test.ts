@@ -29,9 +29,9 @@ describe('StartHandler', () => {
       const result = await handler.execute(mockExecution);
 
       expect(result.status).toBe('not_started');
-      expect(result.executionResults.size).toBe(1);
+      expect(result.results.size).toBe(1);
 
-      const nodeResult = result.executionResults.get('start-node');
+      const nodeResult = result.results.get('start-node');
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('start-node');
       expect(nodeResult?.data).toEqual({ message: 'Workflow started' });
@@ -45,29 +45,29 @@ describe('StartHandler', () => {
       const result = await handler.execute(customExecution);
 
       expect(result.status).toBe('running');
-      const nodeResult = result.executionResults.get('start-node');
+      const nodeResult = result.results.get('start-node');
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('start-node');
     });
 
     it('should preserve existing execution results', async () => {
       // Add some existing results
-      mockExecution.executionResults.set('existing-node', {
+      mockExecution.results.set('existing-node', {
         nodeRef: 'existing-node',
         data: { test: 'data' },
       });
 
       const result = await handler.execute(mockExecution);
 
-      expect(result.executionResults.size).toBe(2);
-      expect(result.executionResults.get('existing-node')).toBeDefined();
-      expect(result.executionResults.get('start-node')).toBeDefined();
+      expect(result.results.size).toBe(2);
+      expect(result.results.get('existing-node')).toBeDefined();
+      expect(result.results.get('start-node')).toBeDefined();
     });
 
     it('should set execution timestamp within reasonable time', async () => {
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('start-node');
+      const nodeResult = result.results.get('start-node');
       expect(nodeResult).toBeDefined();
     });
   });

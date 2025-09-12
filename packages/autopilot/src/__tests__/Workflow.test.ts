@@ -521,7 +521,7 @@ describe('Workflow', () => {
       const result = await workflow.execute(mockExecution);
 
       expect(result.status).toBe('completed');
-      expect(result.executionResults.size).toBe(2);
+      expect(result.results.size).toBe(2);
     });
 
     it('should handle execution with initial execution state', async () => {

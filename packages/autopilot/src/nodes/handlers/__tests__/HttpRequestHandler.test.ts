@@ -3,7 +3,7 @@
  */
 
 import { HttpRequestHandler } from '@/nodes/handlers/HttpRequestHandler';
-import { Node, Execution, HttpRequestNodeParameters } from '@/types';
+import { Node, Execution, HttpRequestParams } from '@/types';
 
 // Mock HttpRequest class
 jest.mock('../../../HttpRequest');
@@ -26,7 +26,7 @@ describe('HttpRequestHandler', () => {
       parameters: {
         url: 'https://api.example.com/data',
         method: 'GET',
-      } as HttpRequestNodeParameters,
+      } as HttpRequestParams,
     };
 
     handler = new HttpRequestHandler(mockNode);
@@ -60,7 +60,7 @@ describe('HttpRequestHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('http-request-node');
+      const nodeResult = result.results.get('http-request-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBe('HTTP GET request to https://api.example.com/data failed: HTTP request failed: Network Error');
       expect(nodeResult?.nodeRef).toBe('http-request-node');
@@ -82,7 +82,7 @@ describe('HttpRequestHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('http-request-node');
+      const nodeResult = result.results.get('http-request-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('http-request-node');
@@ -111,7 +111,7 @@ describe('HttpRequestHandler', () => {
         ...mockNode,
         parameters: {
           method: 'GET',
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
       const handlerWithoutURL = new HttpRequestHandler(nodeWithoutURL);
 
@@ -132,7 +132,7 @@ describe('HttpRequestHandler', () => {
         ...mockNode,
         parameters: {
           url: 'https://api.example.com/data',
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
       const handlerWithoutMethod = new HttpRequestHandler(nodeWithoutMethod);
 
@@ -154,7 +154,7 @@ describe('HttpRequestHandler', () => {
         parameters: {
           url: 'not-a-valid-url',
           method: 'GET',
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
 
       // Mock validation to return the expected error
@@ -182,7 +182,7 @@ describe('HttpRequestHandler', () => {
         parameters: {
           url: 'https://api.example.com/data',
           method: 'INVALID' as 'GET', // Cast to valid type for test
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
 
       // Mock validation to return the expected error
@@ -213,7 +213,7 @@ describe('HttpRequestHandler', () => {
           authentication: {
             type: 'bearer',
           },
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
 
       // Mock validation to return the expected error
@@ -246,7 +246,7 @@ describe('HttpRequestHandler', () => {
             username: 'user',
             // missing password
           },
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
 
       // Mock validation to return the expected error
@@ -279,7 +279,7 @@ describe('HttpRequestHandler', () => {
             apiKey: 'key',
             // missing headerName
           },
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
 
       // Mock validation to return the expected error
@@ -308,7 +308,7 @@ describe('HttpRequestHandler', () => {
           url: 'https://api.example.com/data',
           method: 'GET',
           timeout: 500,
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
 
       // Mock validation to return the expected error
@@ -337,7 +337,7 @@ describe('HttpRequestHandler', () => {
           url: 'https://api.example.com/data',
           method: 'GET',
           retries: 10,
-        } as HttpRequestNodeParameters,
+        } as HttpRequestParams,
       };
       const handlerWithHighRetries = new HttpRequestHandler(nodeWithHighRetries);
 

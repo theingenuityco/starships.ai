@@ -62,14 +62,14 @@ export type {
   // Execution types
   Execution,
   ExecutionStatus,
-  HttpRequestNodeParameters,
-  LlmNodeParameters,
+  HttpRequestParams,
+  LlmParams,
   Node,
   NodeParameters,
   NodeResult,
   NodeType,
   OutputParams,
-  UserPromptNodeParameters,
+  UserPromptParams,
   ValidationError,
   // Validation types
   ValidationResult,

@@ -13,17 +13,17 @@ describe('Engine', () => {
   let mockExecution: Execution;
 
   beforeEach(() => {
-    engine = new Engine();
     mockBlueprint = global.createMockBlueprint();
+    engine = new Engine(mockBlueprint);
     mockExecution = global.createMockExecution();
   });
 
   describe('execute', () => {
     it('should execute a simple workflow successfully', async () => {
-      const result = await engine.execute(mockBlueprint, mockExecution);
+      const result = await engine.execute(mockExecution);
 
       expect(result.status).toBe('completed');
-      expect(result.executionResults.size).toBeGreaterThan(0);
+      expect(result.results.size).toBeGreaterThan(0);
     });
 
     it('should handle workflow without start node', async () => {
@@ -60,13 +60,13 @@ describe('Engine', () => {
     });
 
     it('should store node execution results', async () => {
-      const result = await engine.execute(mockBlueprint, mockExecution);
+      const result = await engine.execute(mockExecution);
 
       expect(result.status).toBe('completed');
-      expect(result.executionResults.size).toBe(2);
+      expect(result.results.size).toBe(2);
 
-      const startResult = result.executionResults.get('start');
-      const endResult = result.executionResults.get('end');
+      const startResult = result.results.get('start');
+      const endResult = result.results.get('end');
       expect(startResult?.error).toBeUndefined();
       expect(startResult?.nodeRef).toBe('start');
 
@@ -125,7 +125,7 @@ describe('Engine', () => {
   describe('execution control', () => {
     it('should allow pausing and resuming execution', async () => {
       // Start execution first so engine has a state
-      await engine.execute(mockBlueprint, mockExecution);
+      await engine.execute(mockExecution);
 
       // Now test pause/resume functionality
       const pauseResult = engine.pause();
@@ -143,7 +143,7 @@ describe('Engine', () => {
 
     it('should get current execution status', async () => {
       // Start an execution to have a status
-      await engine.execute(mockBlueprint, mockExecution);
+      await engine.execute(mockExecution);
 
       const status = engine.getExecutionStatus();
       expect(status).toBeDefined();
@@ -152,7 +152,7 @@ describe('Engine', () => {
 
     it('should get current execution', async () => {
       // Start an execution to have execution state
-      await engine.execute(mockBlueprint, mockExecution);
+      await engine.execute(mockExecution);
 
       const execution = engine.getCurrentExecution();
       expect(execution).toBeDefined();

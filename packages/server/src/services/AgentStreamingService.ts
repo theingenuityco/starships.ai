@@ -197,7 +197,7 @@ export class AgentStreamingService implements EngineEmitter {
 
       case 'node_completed': {
         // Check if this is an LLM node with response content
-        const nodeResult = event.execution.executionResults.get(event.execution.currentNodeRef || '');
+        const nodeResult = event.execution.results.get(event.execution.currentNodeRef || '');
         if (nodeResult && !nodeResult.error && nodeResult.data) {
           const llmData = nodeResult.data as any;
           const llmResponseContent = llmData.llmResponse;

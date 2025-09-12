@@ -6,14 +6,14 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, ValidationResult, HttpRequestNodeParameters, ValidationError, ValidationWarning } from '@/types';
+import { Execution, ValidationResult, HttpRequestParams, ValidationError, ValidationWarning } from '@/types';
 import { HttpRequest } from '@/HttpRequest';
 
 export class HttpRequestHandler extends BaseHandler {
   readonly type = 'http_request';
 
   async execute(execution: Execution) {
-    const params = this.node.parameters as HttpRequestNodeParameters;
+    const params = this.node.parameters as HttpRequestParams;
 
     try {
       console.log(`Executing HTTP ${params.method} request to: ${params.url}`);
@@ -42,7 +42,7 @@ export class HttpRequestHandler extends BaseHandler {
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
-    const params = this.node.parameters as HttpRequestNodeParameters;
+    const params = this.node.parameters as HttpRequestParams;
 
     // Check for required fields first
     if (!params.url) {

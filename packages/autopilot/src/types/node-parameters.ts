@@ -21,7 +21,7 @@ export interface ConditionalParams {
 /**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptNodeParameters {
+export interface UserPromptParams {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string;
@@ -57,7 +57,7 @@ export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf'
 /**
  * HTTP request node parameters for making HTTP calls
  */
-export interface HttpRequestNodeParameters {
+export interface HttpRequestParams {
   url: string;
   method: HttpMethod;
   headers?: Record<string, string>;
@@ -89,7 +89,7 @@ export interface HttpAuthentication {
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
  */
-export interface LlmNodeParameters {
+export interface LlmParams {
   model: string;
   prompt: string;
   temperature?: number;
@@ -157,9 +157,9 @@ export type StartEndNodeParameters = Record<string, unknown>;
 export type NodeParameters =
   | AgentParams
   | ConditionalParams
-  | UserPromptNodeParameters
+  | UserPromptParams
   | OutputParams
-  | HttpRequestNodeParameters
-  | LlmNodeParameters
+  | HttpRequestParams
+  | LlmParams
   | WorkflowParams
   | StartEndNodeParameters;

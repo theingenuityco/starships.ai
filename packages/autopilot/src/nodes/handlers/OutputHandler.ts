@@ -5,17 +5,17 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, ValidationResult, OutputNodeParameters, ValidationError } from '@/types';
+import { Execution, ValidationResult, OutputParams, ValidationError } from '@/types';
 
 export class OutputHandler extends BaseHandler {
   readonly type = 'output';
 
   async execute(execution: Execution) {
-    const params = this.node.parameters as OutputNodeParameters;
+    const params = this.node.parameters as OutputParams;
     // Gather data from source nodes
     const sourceData: Record<string, unknown> = {};
     for (const sourceNodeId of params.sources) {
-      const sourceResult = execution.executionResults.get(sourceNodeId);
+      const sourceResult = execution.results.get(sourceNodeId);
       if (sourceResult) {
         sourceData[sourceNodeId] = sourceResult.data;
       }
@@ -34,7 +34,7 @@ export class OutputHandler extends BaseHandler {
 
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
-    const params = this.node.parameters as OutputNodeParameters;
+    const params = this.node.parameters as OutputParams;
 
     if (!params.template) {
       errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Template is required'));

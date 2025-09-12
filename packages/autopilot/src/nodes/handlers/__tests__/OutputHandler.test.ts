@@ -3,7 +3,7 @@
  */
 
 import { OutputHandler } from '@/nodes/handlers/OutputHandler';
-import { Node, Execution, OutputNodeParameters, NodeResult } from '@/types';
+import { Node, Execution, OutputParams, NodeResult } from '@/types';
 
 describe('OutputHandler', () => {
   let handler: OutputHandler;
@@ -21,7 +21,7 @@ describe('OutputHandler', () => {
         sources: ['source1', 'source2'],
         format: 'markdown',
         title: 'Test Report',
-      } as OutputNodeParameters,
+      } as OutputParams,
     };
 
     handler = new OutputHandler(mockNode);
@@ -71,7 +71,7 @@ describe('OutputHandler', () => {
         template: 'Simple template',
         sources: ['source1'],
         format: 'text',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithoutTitle = new OutputHandler({
         ref: 'no-title-node',
@@ -96,7 +96,7 @@ describe('OutputHandler', () => {
         sources: ['source1'],
         format: 'text',
         title: 'Single Source Report',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const singleSourceHandler = new OutputHandler({
         ref: 'single-source-node',
@@ -124,7 +124,7 @@ describe('OutputHandler', () => {
         sources: ['source1', 'nonexistent-source', 'source2'],
         format: 'json',
         title: 'Mixed Sources Report',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithMissingSources = new OutputHandler({
         ref: 'missing-sources-node',
@@ -150,13 +150,13 @@ describe('OutputHandler', () => {
     });
 
     it('should handle all supported formats', async () => {
-      const formats: Array<OutputNodeParameters['format']> = ['text', 'markdown', 'json', 'html', 'xml', 'pdf', 'csv'];
+      const formats: Array<OutputParams['format']> = ['text', 'markdown', 'json', 'html', 'xml', 'pdf', 'csv'];
 
       for (const format of formats) {
         const paramsWithFormat = {
           ...mockNode.parameters,
           format,
-        } as OutputNodeParameters;
+        } as OutputParams;
 
         const handlerWithFormat = new OutputHandler({
           ref: `format-${format}-node`,
@@ -180,7 +180,7 @@ describe('OutputHandler', () => {
         template: 'Empty sources template',
         sources: [],
         format: 'text',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithEmptySources = new OutputHandler({
         ref: 'empty-sources-node',
@@ -229,7 +229,7 @@ describe('OutputHandler', () => {
         sources: ['complex-source'],
         format: 'json',
         title: 'Complex Data Report',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithComplexData = new OutputHandler({
         ref: 'complex-data-node',
@@ -285,7 +285,7 @@ describe('OutputHandler', () => {
         template: 'Simple template',
         sources: ['source1'],
         format: 'text',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const minimalHandler = new OutputHandler({
         ref: 'minimal-output-node',
@@ -304,7 +304,7 @@ describe('OutputHandler', () => {
       const paramsWithoutTemplate = {
         sources: ['source1'],
         format: 'text',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithoutTemplate = new OutputHandler({
         ref: 'no-template-node',
@@ -330,7 +330,7 @@ describe('OutputHandler', () => {
         template: '',
         sources: ['source1'],
         format: 'text',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithEmptyTemplate = new OutputHandler({
         ref: 'empty-template-node',
@@ -351,7 +351,7 @@ describe('OutputHandler', () => {
       const paramsWithoutSources = {
         template: 'Some template',
         format: 'text',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithoutSources = new OutputHandler({
         ref: 'no-sources-node',
@@ -377,7 +377,7 @@ describe('OutputHandler', () => {
         template: 'Some template',
         sources: [],
         format: 'text',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithEmptySources = new OutputHandler({
         ref: 'empty-sources-validation-node',
@@ -398,7 +398,7 @@ describe('OutputHandler', () => {
       const paramsWithMissingFields = {
         format: 'text',
         title: 'Some title',
-      } as OutputNodeParameters;
+      } as OutputParams;
 
       const handlerWithMissingFields = new OutputHandler({
         ref: 'missing-fields-node',
@@ -421,13 +421,13 @@ describe('OutputHandler', () => {
     });
 
     it('should validate with different output formats', () => {
-      const formats: Array<OutputNodeParameters['format']> = ['text', 'markdown', 'json', 'html', 'xml', 'pdf', 'csv'];
+      const formats: Array<OutputParams['format']> = ['text', 'markdown', 'json', 'html', 'xml', 'pdf', 'csv'];
 
       for (const format of formats) {
         const paramsWithFormat = {
           ...mockNode.parameters,
           format,
-        } as OutputNodeParameters;
+        } as OutputParams;
 
         const handlerWithFormat = new OutputHandler({
           ref: `format-validation-${format}-node`,

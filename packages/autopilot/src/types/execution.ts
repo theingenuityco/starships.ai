@@ -4,20 +4,10 @@
  * Types related to workflow execution runtime state and context
  */
 
-import type { AgentMemory } from '@/AgentMemory';
+export type ExecutionState = Record<string, unknown>;
 
 /**
- * Streaming options for workflow execution
- */
-export interface StreamingOptions {
-  enabled?: boolean;
-  streamId?: string;
-  conversationId?: string;
-  agentId?: string;
-}
-
-/**
- * Workflow execution state
+ * Workflow execution
  *
  * This interface is serializable and contains no callback functions.
  * Streaming is handled by the Engine's injected StreamingEmitter.
@@ -25,11 +15,9 @@ export interface StreamingOptions {
 export interface Execution {
   currentNodeRef?: string;
   status: ExecutionStatus;
-  executionResults: Map<string, NodeResult>;
+  state: ExecutionState;
+  results: Map<string, NodeResult>;
   error?: ExecutionError;
-  agentMemory: AgentMemory;
-  // Streaming configuration (serializable)
-  streaming?: StreamingOptions;
 }
 
 /**

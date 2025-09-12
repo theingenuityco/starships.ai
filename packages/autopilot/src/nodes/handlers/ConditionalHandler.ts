@@ -6,16 +6,16 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { ConditionalNodeParameters, Execution, NodeResult, ValidationError, ValidationResult } from '@/types';
+import { ConditionalParams, Execution, NodeResult, ValidationError, ValidationResult } from '@/types';
 import jsonata from 'jsonata';
 
 export class ConditionalHandler extends BaseHandler {
   readonly type = 'conditional';
 
   async execute(execution: Execution) {
-    const params = this.node.parameters as ConditionalNodeParameters;
+    const params = this.node.parameters as ConditionalParams;
     // Get data from source node
-    const sourceResult = execution.executionResults.get(params.sourceNodeId);
+    const sourceResult = execution.results.get(params.sourceNodeId);
     if (!sourceResult) {
       throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
     }
@@ -33,7 +33,7 @@ export class ConditionalHandler extends BaseHandler {
             data: { conditionMet: conditionKey, sourceData: sourceResult.data },
             nextEdgeCondition: conditionKey,
           };
-          execution.executionResults.set(this.node.ref, nodeResult);
+          execution.results.set(this.node.ref, nodeResult);
           return execution;
         }
       }
@@ -45,7 +45,7 @@ export class ConditionalHandler extends BaseHandler {
         data: { conditionMet: defaultCondition, sourceData: sourceResult.data },
         nextEdgeCondition: defaultCondition,
       };
-      execution.executionResults.set(this.node.ref, nodeResult);
+      execution.results.set(this.node.ref, nodeResult);
       return execution;
     } catch (error) {
       return this.createErrorResult(execution, `JSONata evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -54,7 +54,7 @@ export class ConditionalHandler extends BaseHandler {
 
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
-    const params = this.node.parameters as ConditionalNodeParameters;
+    const params = this.node.parameters as ConditionalParams;
 
     if (!params.sourceNodeId) {
       errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Source node ID is required'));

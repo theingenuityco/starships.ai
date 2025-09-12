@@ -25,7 +25,7 @@ export class AgentHandler extends BaseHandler {
       // Check if agent execution was successful
       if (agentResult.status === 'completed') {
         // Collect all successful agent results
-        const agentOutputs = Array.from(agentResult.executionResults.values())
+        const agentOutputs = Array.from(agentResult.results.values())
           .filter((result) => !result.error)
           .map((result) => result.data);
 

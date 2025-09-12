@@ -265,14 +265,15 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
 
-    // Get conversation from database
-    const conversationModel = this.conversationService.getConversationAgents(conversationId);
-    if (!conversationId) {
+    const conversationModel = await this.conversationService.getConversationById(conversationId);
+    if (!conversationModel) {
       throw new NotFoundError('Conversation', conversationId);
     }
 
+    // Get conversation messages from database
+    const messages = await this.conversationService.getConversationMessages(conversationId);
+
     const startTime = Date.now();
-    const agentService = new AgentService();
 
     try {
       // Create agent instance with enhanced options
@@ -282,7 +283,9 @@ export class AgentService {
       agent.getEngine().setEmitter(this.agentStreamingService);
 
       // Add user message to memory
-      agent.addToMemory('user', message);
+      messages.forEach((message) => {
+        agent.addToMemory(message.role, message.content);
+      });
 
       // Execute agent with streaming-enabled execution
       const execution = await agent.execute({

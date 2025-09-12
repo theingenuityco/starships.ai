@@ -41,7 +41,6 @@ const starships = await starshipRepo.findAll();
 
 - **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`) and subscription billing
 - **Agents**: AI entities with deployment management and template system
-- **Missions**: Task execution contexts with orchestrator communication and progress tracking
 - **Workflows**: DAG-based automation blueprints with execution history
 - **Users**: Authentication and authorization management
 - **Agent Templates**: Reusable agent configurations for rapid deployment
@@ -54,11 +53,10 @@ Direct repository instantiation for clean and simple data access:
 
 ```typescript
 // Import and instantiate repositories directly
-import { StarshipRepository, AgentRepository, MissionRepository, UserRepository } from '@starships/models';
+import { StarshipRepository, AgentRepository, UserRepository } from '@starships/models';
 
 const starshipRepo = new StarshipRepository();
 const agentRepo = new AgentRepository();
-const missionRepo = new MissionRepository();
 const userRepo = new UserRepository();
 ```
 
@@ -89,9 +87,6 @@ try {
 | **AgentTemplateRepository**    | Reusable agent configurations and marketplace            |
 | **UserRepository**             | User accounts, authentication, and profiles              |
 | **ConversationRepository**     | Chat history and communication logs                      |
-| **MissionRepository**          | Mission orchestration and status tracking                |
-| **MissionMessageRepository**   | Mission-specific communication logs                      |
-| **MissionClarityRepository**   | Mission requirement analysis and feedback                |
 | **WorkflowRepository**         | Workflow definitions, execution, and history             |
 | **BlueprintRepository**        | Workflow blueprint storage and versioning                |
 | **ExecutionRepository**        | Workflow execution tracking and results                  |
@@ -160,28 +155,6 @@ await starshipRepo.deployAgent(starship.id, 'agent-456');
 
 // Check available slots
 const slots = await starshipRepo.getAvailableSlots(starship.id);
-```
-
-### Mission Management
-
-```typescript
-import { MissionRepository } from '@starships/models';
-const missionRepo = new MissionRepository();
-
-// Create mission
-const mission = await missionRepo.createMission({
-  title: 'Data Analysis Task',
-  description: 'Analyze customer data patterns',
-  starshipId: 'starship-123',
-  agentIds: ['agent-456'],
-  priority: 'high',
-});
-
-// Update mission status
-await missionRepo.updateMission(mission.id, {
-  status: 'active',
-  phase: 'execution',
-});
 ```
 
 ### Agent Template System

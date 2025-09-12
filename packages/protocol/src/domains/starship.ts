@@ -37,7 +37,6 @@ export interface StarshipModel {
   class: StarshipClass;
   name: string;
   maxAgents: number; // Based on class: Scout=3, Cruiser=5, Draught=10
-  maxActiveMissions: number; // Based on class: Scout=3, Cruiser=6, Draught=10
   status: StarshipStatus;
   createdAt: string;
   updatedAt: string;

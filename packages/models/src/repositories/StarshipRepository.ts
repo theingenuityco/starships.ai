@@ -68,7 +68,7 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'maxActiveMissions' | 'updatedAt' | 'slug'> & { slug?: string }
+    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -78,9 +78,6 @@ export class StarshipRepository extends BaseRepository {
         // Set maxAgents based on class (Scout: 3, Cruiser: 5, Draught: 10)
         const maxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
 
-        // Set maxActiveMissions based on class (Scout: 3, Cruiser: 6, Draught: 10)
-        const maxActiveMissions = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 6 : 10;
-
         // Generate unique slug if not provided
         const slug = entity.slug || (await this.generateUniqueSlug(entity.name, entity.ownerId));
 
@@ -88,7 +85,6 @@ export class StarshipRepository extends BaseRepository {
           ...entity,
           slug,
           maxAgents,
-          maxActiveMissions,
           status: entity.status || 'active', // Default to active
           createdAt: now,
           updatedAt: now,

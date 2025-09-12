@@ -78,7 +78,7 @@ export function LoginForm() {
     <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
       <Card>
         <CardHeader className="text-center">
-          <CardTitle>Access Mission Control</CardTitle>
+          <CardTitle>Access Your Starship</CardTitle>
           <CardDescription>Sign in to your starship or create a new account</CardDescription>
         </CardHeader>
 

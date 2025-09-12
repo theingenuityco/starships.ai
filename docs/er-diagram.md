@@ -22,7 +22,6 @@ erDiagram
         string class "scout|cruiser|draught"
         string name
         int maxAgents "Class-based limits"
-        int maxActiveMissions
         string status "active|inactive|restricted|disabled|pending_payment"
         string subscriptionId
         string plan "scout|cruiser|draught"
@@ -105,58 +104,7 @@ erDiagram
         string updatedAt
     }
 
-    %% Mission System
-    Mission {
-        string id PK
-        string starshipId FK
-        string name
-        string description
-        string status "draft|active|completed|failed|cancelled"
-        string phase "welcome|analysis|plan|execute|converse"
-        string[] agentIds "Assigned agent IDs"
-        string createdBy FK
-        json executionState "Workflow execution progress"
-        json executionResult "Final execution results"
-        string createdAt
-        string updatedAt
-    }
-
-    MissionMessage {
-        string id PK
-        string missionId FK
-        string role "user|orchestrator|system"
-        string content
-        string timestamp
-        string userId FK "When role=user"
-        string senderName "Cached display name"
-        json metadata
-    }
-
-    MissionClarity {
-        string id PK
-        string missionId FK
-        float objectiveClarity "0-10 scoring"
-        float successMetrics
-        float timelineDefinition
-        float scopeBoundaries
-        float visionAlignment
-        float overallScore "Calculated average"
-        string reasoning "AI qualitative analysis"
-        int iteration "Assessment iteration"
-        string createdAt
-        string updatedAt
-    }
-
     %% Workflow System
-    MissionWorkflow {
-        string id PK
-        string missionId FK
-        json nodes "WorkflowNode[]"
-        json edges "WorkflowEdge[]"
-        string approvalStatus "pending|approved|rejected"
-        string createdAt
-        string approvedAt
-    }
 
     WorkflowNode {
         string id PK
@@ -215,13 +163,10 @@ erDiagram
     User ||--o{ Starship : "OWNS"
     User ||--o{ Agent : "CREATES"
     User ||--o{ AgentTemplate : "CREATES"
-    User ||--o{ Mission : "CREATES"
-    User ||--o{ MissionMessage : "SENDS"
 
     %% Starship Relationships
     Starship ||--|| Vision : "HAS_VISION"
     Starship ||--o{ Agent : "DEPLOYED_ON"
-    Starship ||--o{ Mission : "HAS"
     Starship ||--o{ NativeToolApiKey : "HAS_API_KEYS"
 
     %% Agent System Relationships
@@ -229,14 +174,7 @@ erDiagram
     LLM ||--o{ Agent : "REFERENCES"
     AgentTemplate ||--o{ Agent : "CREATES_FROM"
 
-    %% Mission Relationships
-    Mission ||--|| MissionWorkflow : "HAS_WORKFLOW"
-    Mission ||--o{ MissionMessage : "BELONGS_TO"
-    Mission ||--o{ MissionClarity : "HAS_CLARITY"
-
     %% Workflow Relationships
-    MissionWorkflow ||--o{ WorkflowNode : "CONTAINS"
-    MissionWorkflow ||--|| WorkflowRuntimeState : "HAS_RUNTIME_STATE"
     WorkflowNode ||--o{ WorkflowEdge : "FLOWS_FROM"
     WorkflowNode ||--o{ WorkflowEdge : "FLOWS_TO"
 
@@ -250,7 +188,6 @@ graph TD
     U[User] --> S[Starship]
     S --> V[Vision]
     S --> A[Agent]
-    S --> M[Mission]
     S --> NK[NativeToolApiKey]
 
     %% Agent System
@@ -259,14 +196,9 @@ graph TD
     L[LLM] --> AT
     L --> A
 
-    %% Mission System
-    M --> MW[MissionWorkflow]
-    MW --> WN[WorkflowNode]
-    WN --> WE[WorkflowEdge]
-    MW --> WRS[WorkflowRuntimeState]
-    M --> MM[MissionMessage]
-    M --> MC[MissionClarity]
-    U --> MM
+    %% Workflow System
+    WN[WorkflowNode] --> WE[WorkflowEdge]
+    WRS[WorkflowRuntimeState]
 
     %% Stripe Integration
     SE[StripeEvent] -.-> S
@@ -279,7 +211,7 @@ graph TD
     classDef integration fill:#fff3e0
 
     class U,S primary
-    class A,M,V secondary
+    class A,V secondary
     class L,AT system
     class NK security
     class SE integration
@@ -292,13 +224,11 @@ graph TD
 - **Starship Classes**: Scout (3 agents, 3 missions), Cruiser (5 agents, 6 missions), Draught (10 agents, 10 missions)
 - **Vision**: Each starship has exactly one vision that can be refined over time
 - **Agent Deployment**: Agents are deployed to specific starships via `starshipId` FK
-- **Mission Assignment**: Missions belong to starships and reference assigned agent IDs as arrays
 
 ### Data Flow Patterns
 
-- **Workflow Execution**: `Mission` → `MissionWorkflow` → `WorkflowRuntimeState` tracks execution progress
-- **Message Threading**: `MissionMessage` entities belong to missions and maintain conversation history
-- **Clarity Assessment**: `MissionClarity` provides AI-driven mission assessment with 5-dimensional scoring
+- **Workflow Execution**: Workflow runtime state tracks execution progress
+- **Message Threading**: Message entities maintain conversation history with proper threading
 - **Template System**: `AgentTemplate` → `Agent` creation flow with usage tracking
 
 ### Security & Integration

@@ -9,10 +9,9 @@ import type { WorkflowModel, AgentModel } from '@starships/protocol'
 // Client-side workflow types for compatibility
 type WorkflowDSL = WorkflowModel | any
 type WorkflowDSLNode = any
-type MissionWorkflow = any
 
 export interface WorkflowVisualizationProps {
-  workflow: WorkflowDSL | MissionWorkflow
+  workflow: WorkflowDSL
   agents?: Record<string, AgentModel>
   currentNodeId?: string
   onNodeClick?: (nodeId: string) => void
@@ -254,7 +253,7 @@ const traverseWorkflowGraph = (workflowNodes: WorkflowDSLNode[], workflowEdges: 
 }
 
 // Convert workflow to React Flow format
-const convertToFlowData = (workflow: WorkflowDSL | MissionWorkflow, currentNodeId?: string, agents?: Record<string, AgentModel>) => {
+const convertToFlowData = (workflow: WorkflowDSL, currentNodeId?: string, agents?: Record<string, AgentModel>) => {
   const nodes: FlowNode[] = []
   const edges: Edge[] = []
 

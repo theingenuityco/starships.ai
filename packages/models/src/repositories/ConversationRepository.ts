@@ -47,9 +47,6 @@ export class ConversationRepository extends BaseRepository {
         const conversationEntity = ConversationEntity.deserialize({
           ...entity,
           createdAt: now,
-          lastActivityAt: entity.lastActivityAt || now,
-          messageCount: entity.messageCount || 0,
-          totalTokens: entity.totalTokens || 0,
           status: entity.status || 'active',
         });
 
@@ -84,30 +81,10 @@ export class ConversationRepository extends BaseRepository {
         const params: Record<string, unknown> = { id };
 
         // Handle updatable fields with proper serialization
-        if (updates.lastActivityAt !== undefined) {
-          setFields.push('c.lastActivityAt = $lastActivityAt');
-          params.lastActivityAt = updates.lastActivityAt;
-        }
-        if (updates.messageCount !== undefined) {
-          setFields.push('c.messageCount = $messageCount');
-          params.messageCount = updates.messageCount;
-        }
-        if (updates.totalTokens !== undefined) {
-          setFields.push('c.totalTokens = $totalTokens');
-          params.totalTokens = updates.totalTokens;
-        }
         if (updates.status !== undefined) {
           setFields.push('c.status = $status');
           params.status = updates.status;
         }
-        if (updates.metadata !== undefined) {
-          setFields.push('c.metadata = $metadata');
-          // Use ConversationEntity to handle metadata serialization
-          const tempEntity = ConversationEntity.deserialize({ metadata: updates.metadata });
-          const serialized = tempEntity.serialize();
-          params.metadata = serialized.metadata;
-        }
-
         if (setFields.length === 0) {
           return this.findById(id);
         }
@@ -260,113 +237,6 @@ export class ConversationRepository extends BaseRepository {
         return result.map((record) => record.m);
       },
       'getConversationMessages',
-      'Conversation'
-    );
-  }
-
-  /**
-   * Update conversation statistics when messages are added/removed
-   */
-  async updateMessageStats(conversationId: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        await connection.executeWrite(
-          `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
-           WITH c, count(m) as messageCount, sum(m.tokenCount) as totalTokens, max(m.timestamp) as lastActivity
-           SET c.messageCount = messageCount,
-               c.totalTokens = COALESCE(totalTokens, 0),
-               c.lastActivityAt = COALESCE(lastActivity, c.lastActivityAt),
-               c.updatedAt = $updatedAt`,
-          {
-            conversationId,
-            updatedAt: new Date().toISOString(),
-          }
-        );
-      },
-      'updateMessageStats',
-      'Conversation'
-    );
-  }
-
-  /**
-   * Delete all messages in a conversation via relationships
-   */
-  async deleteAllMessages(conversationId: string): Promise<{ deletedCount: number }> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          `MATCH (c:Conversation {id: $conversationId})-[r:HAS_MESSAGE]->(m:Message)
-           DETACH DELETE m, r
-           RETURN count(m) as deletedCount`,
-          { conversationId }
-        );
-
-        // Update conversation stats after deleting messages
-        await this.updateMessageStats(conversationId);
-
-        return {
-          deletedCount: result[0]?.deletedCount || 0,
-        };
-      },
-      'deleteAllMessages',
-      'Conversation'
-    );
-  }
-
-  /**
-   * Get conversation statistics using Neo4j relationships
-   */
-  async getConversationStats(conversationId: string): Promise<{
-    messageCount: number;
-    totalTokens: number;
-    byRole: { system: number; user: number; assistant: number };
-    lastMessageAt: string | null;
-  }> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{
-          messageCount: number;
-          totalTokens: number;
-          roles: string[];
-          lastMessageAt: string;
-        }>(
-          `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
-           RETURN count(m) as messageCount,
-                  sum(m.tokenCount) as totalTokens,
-                  collect(m.role) as roles,
-                  max(m.timestamp) as lastMessageAt`,
-          { conversationId }
-        );
-
-        const record = result[0];
-        if (!record || record.messageCount === 0) {
-          return {
-            messageCount: 0,
-            totalTokens: 0,
-            byRole: { system: 0, user: 0, assistant: 0 },
-            lastMessageAt: null,
-          };
-        }
-
-        // Count by role
-        const byRole = { system: 0, user: 0, assistant: 0 };
-        record.roles.forEach((role: string) => {
-          if (Object.prototype.hasOwnProperty.call(byRole, role)) {
-            byRole[role as keyof typeof byRole]++;
-          }
-        });
-
-        return {
-          messageCount: Number(record.messageCount),
-          totalTokens: Number(record.totalTokens) || 0,
-          byRole,
-          lastMessageAt: record.lastMessageAt,
-        };
-      },
-      'getConversationStats',
       'Conversation'
     );
   }

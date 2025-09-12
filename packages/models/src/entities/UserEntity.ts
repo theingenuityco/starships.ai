@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { UserModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches } from 'class-validator';
+import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the UserEntity
@@ -164,55 +164,43 @@ export class UserEntity implements UserModel {
   }
 
   /**
-   * Validation method for different contexts
+   * Simple validation function using class-validator
+   * This replaces the manual validation approach with a decorator-based solution
    */
-  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
       throw new Error('Data must be an object');
     }
-    const entity = UserEntity.deserialize(data as Record<string, unknown>);
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new UserEntity();
 
-    // Context-specific validation rules
-    if (context === 'create') {
-      // For creation, certain fields are required
-      if (!entity.username) {
-        throw new Error('Username is required for user creation');
-      }
-      if (!entity.email) {
-        throw new Error('Email is required for user creation');
-      }
+    // For create operations, validate all required fields
+    if (operation === 'create') {
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        username: dataRecord.username || '',
+        email: dataRecord.email,
+        displayName: dataRecord.displayName,
+        avatar: dataRecord.avatar,
+        password: dataRecord.password,
+        stripeCustomerId: dataRecord.stripeCustomerId,
+        ...dataRecord,
+      });
+    } else {
+      // For update operations, only validate provided fields
+      Object.assign(entity, dataRecord);
     }
 
-    // Business rule validations
-    if (entity.username && entity.username.length < 1) {
-      throw new Error('Username cannot be empty');
-    }
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
 
-    if (entity.username && entity.username.length > 50) {
-      throw new Error('Username cannot exceed 50 characters');
-    }
-
-    if (entity.displayName && entity.displayName.length > 100) {
-      throw new Error('Display name cannot exceed 100 characters');
-    }
-
-    if (entity.password && entity.password.length < 6) {
-      throw new Error('Password must be at least 6 characters long');
-    }
-
-    // Email format validation (additional business rules)
-    if (entity.email && !entity.email.includes('@')) {
-      throw new Error('Email must be a valid email address');
-    }
-
-    // Username format validation (additional business rules)
-    if (entity.username && !/^[a-zA-Z0-9_-]+$/.test(entity.username)) {
-      throw new Error('Username can only contain letters, numbers, underscores, and hyphens');
-    }
-
-    // Stripe customer ID format validation
-    if (entity.stripeCustomerId && !entity.stripeCustomerId.startsWith('cus_')) {
-      throw new Error('Invalid Stripe Customer ID format');
+    if (errors.length > 0) {
+      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
+      throw new Error(`Validation failed: ${errorMessages}`);
     }
   }
 

@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the StarshipEntity
@@ -169,67 +169,49 @@ export class StarshipEntity implements StarshipModel {
   }
 
   /**
-   * Validation method for different contexts
+   * Simple validation function using class-validator
+   * This replaces the manual validation approach with a decorator-based solution
    */
-  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
       throw new Error('Data must be an object');
     }
-    const entity = StarshipEntity.deserialize(data as Record<string, unknown>);
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new StarshipEntity();
 
-    // Context-specific validation rules
-    if (context === 'create') {
-      // For creation, certain fields are required
-      if (!entity.name) {
-        throw new Error('Name is required for starship creation');
-      }
-      if (!entity.class) {
-        throw new Error('Class is required for starship creation');
-      }
-      if (!entity.ownerId) {
-        throw new Error('Owner ID is required for starship creation');
-      }
+    // For create operations, validate all required fields
+    if (operation === 'create') {
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        slug: dataRecord.slug || '',
+        ownerId: dataRecord.ownerId || '',
+        class: dataRecord.class || 'scout',
+        name: dataRecord.name || '',
+        maxAgents: dataRecord.maxAgents ?? 3,
+        maxActiveMissions: dataRecord.maxActiveMissions ?? 3,
+        status: dataRecord.status || 'active',
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        subscriptionId: dataRecord.subscriptionId,
+        plan: dataRecord.plan,
+        billingPeriod: dataRecord.billingPeriod,
+        stripeCustomerId: dataRecord.stripeCustomerId,
+        ...dataRecord,
+      });
+    } else {
+      // For update operations, only validate provided fields
+      Object.assign(entity, dataRecord);
     }
 
-    // Business rule validations
-    if (entity.name && (entity.name.length < 1 || entity.name.length > 100)) {
-      throw new Error('Starship name must be between 1 and 100 characters');
-    }
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
 
-    if (entity.slug && (entity.slug.length < 1 || entity.slug.length > 100)) {
-      throw new Error('Starship slug must be between 1 and 100 characters');
-    }
-
-    // Validate slug format (URL-safe)
-    if (entity.slug && !/^[a-z0-9-]+$/.test(entity.slug)) {
-      throw new Error('Starship slug must contain only lowercase letters, numbers, and hyphens');
-    }
-
-    // Validate class-based limits
-    if (entity.class) {
-      const expectedMaxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
-      if (entity.maxAgents && entity.maxAgents !== expectedMaxAgents) {
-        console.warn(`Max agents (${entity.maxAgents}) doesn't match class expectation (${expectedMaxAgents})`);
-      }
-
-      const expectedMaxMissions = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 6 : 10;
-      if (entity.maxActiveMissions && entity.maxActiveMissions !== expectedMaxMissions) {
-        console.warn(`Max missions (${entity.maxActiveMissions}) doesn't match class expectation (${expectedMaxMissions})`);
-      }
-    }
-
-    // Validate Stripe fields consistency
-    if (entity.subscriptionId && !entity.stripeCustomerId) {
-      throw new Error('Stripe customer ID is required when subscription ID is provided');
-    }
-
-    if (entity.billingPeriod && !entity.subscriptionId) {
-      throw new Error('Subscription ID is required when billing period is specified');
-    }
-
-    // Validate status transitions (basic rules)
-    if (entity.status === 'pending_payment' && entity.subscriptionId) {
-      console.warn('Starship has pending payment status but subscription ID exists');
+    if (errors.length > 0) {
+      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
+      throw new Error(`Validation failed: ${errorMessages}`);
     }
   }
 

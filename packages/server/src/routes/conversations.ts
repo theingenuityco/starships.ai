@@ -3,7 +3,7 @@ import { MessageService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
 import { MemoryService } from '@/services/MemoryService';
 import { StreamingService } from '@/services/StreamingService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
@@ -123,7 +123,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       sendSuccess(res, conversationData, 200, paginationMeta);
     }
   } catch (error) {
-    handleCommonError(error, res, 'fetching conversation messages');
+    handleError(error, res, 'fetching conversation messages');
   }
 });
 
@@ -191,7 +191,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
       sendSuccess(res, result);
     }
   } catch (error) {
-    if (!handleCommonError(error, res, 'processing conversation message')) {
+    if (!handleError(error, res, 'processing conversation message')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to process conversation message');
     }
   }
@@ -225,9 +225,7 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
 
     sendSuccess(res, { message: 'Conversation memory cleared successfully' }, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'clearing conversation memory')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to clear conversation memory');
-    }
+    handleError(error, res, 'clearing conversation memory');
   }
 });
 
@@ -262,7 +260,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     const paginationMeta = createPaginationMeta(page, limit, conversationWithMessages.messages.length);
     sendSuccess(res, conversationWithMessages, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching conversation details')) {
+    if (!handleError(error, res, 'fetching conversation details')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch conversation details');
     }
   }
@@ -295,7 +293,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     const paginationMeta = createPaginationMeta(page, limit, allConversations.length);
     sendSuccess(res, conversations, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starship conversations')) {
+    if (!handleError(error, res, 'fetching starship conversations')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship conversations');
     }
   }
@@ -335,7 +333,7 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
     const paginationMeta = createPaginationMeta(page, limit, allConversations.length);
     sendSuccess(res, conversations, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user conversations')) {
+    if (!handleError(error, res, 'fetching user conversations')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user conversations');
     }
   }
@@ -371,7 +369,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
 
     sendSuccess(res, conversation, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating conversation')) {
+    if (!handleError(error, res, 'creating conversation')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create conversation');
     }
   }
@@ -427,7 +425,7 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
     const updatedConversation = await conversationService.getConversationById(conversationId);
     sendSuccess(res, updatedConversation, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating conversation status')) {
+    if (!handleError(error, res, 'updating conversation status')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update conversation status');
     }
   }
@@ -463,7 +461,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete conversation');
     }
   } catch (error) {
-    if (!handleCommonError(error, res, 'deleting conversation')) {
+    if (!handleError(error, res, 'deleting conversation')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete conversation');
     }
   }

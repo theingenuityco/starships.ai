@@ -7,7 +7,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
 import type { CreateUserRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -137,7 +137,7 @@ router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user')) {
+    if (!handleError(error, res, 'fetching user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
     }
   }
@@ -171,7 +171,7 @@ router.get('/users/email/:email', jwtAuthMiddleware, async (req: Request, res: R
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user by email')) {
+    if (!handleError(error, res, 'fetching user by email')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
     }
   }
@@ -205,7 +205,7 @@ router.get('/users/username/:username', jwtAuthMiddleware, async (req: Request, 
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user by username')) {
+    if (!handleError(error, res, 'fetching user by username')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
     }
   }
@@ -234,7 +234,7 @@ router.get('/users', jwtAuthMiddleware, async (req: Request, res: Response): Pro
 
     sendSuccess(res, paginatedUsers, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'listing users')) {
+    if (!handleError(error, res, 'listing users')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to list users');
     }
   }
@@ -253,7 +253,7 @@ router.post('/users', jwtAuthMiddleware, async (req: Request, res: Response): Pr
 
     sendSuccess(res, user, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating user')) {
+    if (!handleError(error, res, 'creating user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create user');
     }
   }
@@ -270,7 +270,7 @@ router.post('/users/register', async (req: Request, res: Response): Promise<void
 
     sendSuccess(res, user, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'registering user')) {
+    if (!handleError(error, res, 'registering user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to register user');
     }
   }
@@ -295,7 +295,7 @@ router.put('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating user')) {
+    if (!handleError(error, res, 'updating user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update user');
     }
   }
@@ -335,7 +335,7 @@ router.put('/users/:id/profile', jwtAuthMiddleware, async (req: Request, res: Re
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating user profile')) {
+    if (!handleError(error, res, 'updating user profile')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update user profile');
     }
   }
@@ -371,7 +371,7 @@ router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 
     sendSuccess(res, { message: 'User deleted successfully' }, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'deleting user')) {
+    if (!handleError(error, res, 'deleting user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete user');
     }
   }
@@ -400,7 +400,7 @@ router.post('/users/:id/stripe', jwtAuthMiddleware, async (req: Request, res: Re
 
     sendSuccess(res, { message: 'Stripe customer linked successfully' });
   } catch (error) {
-    if (!handleCommonError(error, res, 'linking Stripe customer')) {
+    if (!handleError(error, res, 'linking Stripe customer')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to link Stripe customer');
     }
   }
@@ -435,7 +435,7 @@ router.get('/users/stripe/:stripeCustomerId', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user by Stripe ID')) {
+    if (!handleError(error, res, 'fetching user by Stripe ID')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
     }
   }
@@ -458,7 +458,7 @@ router.get('/users/stats', jwtAuthMiddleware, async (req: Request, res: Response
 
     sendSuccess(res, stats);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user statistics')) {
+    if (!handleError(error, res, 'fetching user statistics')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user statistics');
     }
   }
@@ -492,7 +492,7 @@ router.post('/users/authenticate', async (req: Request, res: Response): Promise<
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleCommonError(error, res, 'authenticating user')) {
+    if (!handleError(error, res, 'authenticating user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to authenticate user');
     }
   }

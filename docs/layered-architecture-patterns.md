@@ -442,7 +442,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     const paginationMeta = createPaginationMeta(page, limit, conversationWithMessages.messages.length);
     sendSuccess(res, conversationWithMessages, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching conversation details');
+    handleError(error, res, 'fetching conversation details');
   }
 });
 ```

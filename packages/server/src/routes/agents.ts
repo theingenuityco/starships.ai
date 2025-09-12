@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { AgentService } from '../services/AgentService';
-import { handleCommonError, sendError, sendSuccess } from '../utils/responseHelpers';
+import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 
 const router: Router = Router();
 

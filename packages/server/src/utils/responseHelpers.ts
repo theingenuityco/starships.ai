@@ -54,6 +54,7 @@ export function createPaginationMeta(page: number, limit: number, total: number)
 
 /**
  * Validate pagination parameters
+ * TODO: Consider migrating other routes to use Zod schemas like agents.ts
  */
 export function validatePagination(
   page?: string,
@@ -93,7 +94,7 @@ export function validatePagination(
 
 /**
  * ID validation helper - validates the new ID format (base-36 encoded)
- * Replaces the old UUID validation to support the new ID generation method
+ * TODO: Consider migrating other routes to use Zod schemas like agents.ts
  */
 export function validateId(
   id: string,
@@ -133,7 +134,7 @@ export function validateId(
 
 /**
  * Flexible ID or slug validation helper
- * Supports both new ID format and URL-safe slugs (for starships, etc.)
+ * TODO: Consider migrating other routes to use Zod schemas like agents.ts
  */
 export function validateIdOrSlug(
   value: string,

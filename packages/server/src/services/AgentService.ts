@@ -9,10 +9,27 @@
 import { Agent, AgentParams } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
-import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { AutopilotStreamService } from './AutopilotStreamService';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
+
+export interface ConversationRequest {
+  agentId: string;
+  userId: string;
+  message: string;
+  conversationId?: string;
+}
+
+export interface ConversationResponse {
+  source: 'agent';
+  content: string;
+  agentId: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+  };
+}
 
 export interface ConversationStreamingRequest extends ConversationRequest {
   streamId: string;

@@ -5,8 +5,6 @@
  * No wrappers - just pure delta operations streamed as-is.
  */
 
-import type { ConversationResponse } from '../domains/conversation';
-
 /**
  * DeltaChunk - Pure RFC6902 JSON Patch Operation for streaming
  * This is sent directly as SSE data - no wrapper, no metadata
@@ -28,14 +26,6 @@ export interface StreamingError {
   timestamp: string;
   recoverable: boolean;
   context?: Record<string, unknown>;
-}
-
-/**
- * Final streaming response sent when conversation processing completes
- */
-export interface StreamingResponse extends ConversationResponse {
-  streamId: string;
-  processingTimeMs?: number;
 }
 
 /**
@@ -61,7 +51,7 @@ export type StreamingEvent =
   | { type: 'connection'; data: StreamingConnection }
   | { type: 'heartbeat'; data: StreamingHeartbeat }
   | { type: 'delta'; data: StreamingDeltaChunk }
-  | { type: 'complete'; data: StreamingResponse }
+  | { type: 'complete'; data: void }
   | { type: 'error'; data: StreamingError };
 
 /**

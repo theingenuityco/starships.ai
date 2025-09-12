@@ -52,11 +52,8 @@ export class ConversationService {
   async createConversation(data: CreateConversationData): Promise<ConversationModel> {
     const conversation = await this.conversationRepository.create(
       {
-        lastActivityAt: new Date().toISOString(),
-        messageCount: 0,
-        totalTokens: 0,
+        title: 'New Conversation',
         status: 'active',
-        metadata: data.metadata,
       },
       data.starshipId
     );
@@ -124,12 +121,12 @@ export class ConversationService {
    */
   async updateConversationActivity(conversationId: string): Promise<void> {
     await this.conversationRepository.update(conversationId, {
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
   /**
-   * Increment message count for a conversation
+   * Increment message count for a conversation (placeholder - no longer tracking count)
    */
   async incrementMessageCount(conversationId: string, increment: number = 1): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
@@ -138,13 +135,12 @@ export class ConversationService {
     }
 
     await this.conversationRepository.update(conversationId, {
-      messageCount: (conversation.messageCount || 0) + increment,
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
   /**
-   * Update token usage for a conversation
+   * Update token usage for a conversation (placeholder - no longer tracking tokens)
    */
   async updateTokenCount(conversationId: string, tokens: number): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
@@ -153,8 +149,7 @@ export class ConversationService {
     }
 
     await this.conversationRepository.update(conversationId, {
-      totalTokens: (conversation.totalTokens || 0) + tokens,
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -178,7 +173,7 @@ export class ConversationService {
   async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
     await this.conversationRepository.update(conversationId, {
       status,
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -211,7 +206,6 @@ export class ConversationService {
 
       // Execute agent conversation with streaming
       const response = await AgentService.executeConversationWithStreaming({
-        source: 'user',
         agentId,
         userId,
         message,
@@ -232,7 +226,7 @@ export class ConversationService {
         },
         {
           usage: response.usage,
-          tokenCount: response.usage?.totalTokens,
+          tokenCount: response.usage ? response.usage.promptTokens + response.usage.completionTokens : undefined,
         }
       );
 
@@ -291,7 +285,6 @@ export class ConversationService {
 
     // Execute agent conversation - streaming support will be added
     const response = await AgentService.executeConversation({
-      source: 'user',
       agentId,
       userId,
       message,
@@ -311,7 +304,7 @@ export class ConversationService {
       },
       {
         usage: response.usage,
-        tokenCount: response.usage?.totalTokens,
+        tokenCount: response.usage ? response.usage.promptTokens + response.usage.completionTokens : undefined,
       }
     );
 

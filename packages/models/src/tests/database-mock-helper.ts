@@ -34,7 +34,7 @@ export function mockRepositoryQuery(mockConnection: Record<string, unknown>, dat
         m: item, // for Message queries
         c: item, // for Conversation queries
         blueprint: item, // for Blueprint queries
-        mc: item, // for MissionClarity queries
+        mc: item, // for clarity queries
         user: item, // for User queries with 'user' alias
       }))
     );

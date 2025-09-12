@@ -274,7 +274,6 @@ export function useStarshipClasses() {
       label: 'Scout Class',
       description: 'Lightweight exploration vessel',
       maxAgents: 3,
-      maxMissions: 3,
       price: 'Free',
     },
     {
@@ -282,7 +281,6 @@ export function useStarshipClasses() {
       label: 'Cruiser Class',
       description: 'Balanced multi-purpose starship',
       maxAgents: 5,
-      maxMissions: 6,
       price: '$29/month',
     },
     {
@@ -290,7 +288,6 @@ export function useStarshipClasses() {
       label: 'Draught Class',
       description: 'Heavy-duty industrial vessel',
       maxAgents: 10,
-      maxMissions: 10,
       price: '$99/month',
     },
   ] as const

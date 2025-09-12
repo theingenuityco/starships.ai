@@ -52,7 +52,6 @@ export class StarshipTransformers {
 }
 
 export class StarshipEntity implements StarshipModel {
-  maxActiveMissions: number;
   @Expose()
   @IsString()
   @Length(1, 255)

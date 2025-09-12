@@ -1,5 +1,15 @@
-import type { ConversationResponse, StreamingDeltaChunk, StreamingError } from '@starships/protocol';
+import type { StreamingDeltaChunk, StreamingError } from '@starships/protocol';
 import type { Response } from 'express';
+
+interface ConversationResponse {
+  source: 'agent';
+  content: string;
+  agentId: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+  };
+}
 
 /**
  * Streaming Service using Server-Sent Events (SSE)

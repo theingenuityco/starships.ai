@@ -189,33 +189,12 @@ export function useCreateAgent() {
     onSuccess: (agent, variables) => {
       // Invalidate relevant agent lists
       queryClient.invalidateQueries({
-        queryKey: AGENT_QUERY_KEYS.byStarship(variables.starshipId),
+        queryKey: AGENT_QUERY_KEYS.all,
       })
-
-      if (agent.authorId) {
-        queryClient.invalidateQueries({
-          queryKey: AGENT_QUERY_KEYS.byUser(agent.authorId),
-        })
-      }
 
       queryClient.invalidateQueries({
         queryKey: AGENT_QUERY_KEYS.lists(),
       })
-
-      // Add to specific caches optimistically
-      if (variables.starshipId) {
-        queryClient.setQueryData(AGENT_QUERY_KEYS.byStarship(variables.starshipId), (old: AgentModel[] | undefined) => {
-          if (!old) return [agent]
-          return [...old, agent]
-        })
-      }
-
-      if (agent.authorId) {
-        queryClient.setQueryData(AGENT_QUERY_KEYS.byUser(agent.authorId), (old: AgentModel[] | undefined) => {
-          if (!old) return [agent]
-          return [...old, agent]
-        })
-      }
 
       toast.success('Agent created successfully!', {
         description: `${agent.name} has been created and deployed to the starship.`,
@@ -244,21 +223,6 @@ export function useUpdateAgent() {
     onSuccess: (updatedAgent, variables) => {
       // Update the specific agent in cache
       queryClient.setQueryData(AGENT_QUERY_KEYS.detail(variables.agentId), updatedAgent)
-
-      // Update agent in all relevant lists
-      if (updatedAgent.starshipId) {
-        queryClient.setQueryData(AGENT_QUERY_KEYS.byStarship(updatedAgent.starshipId), (old: AgentModel[] | undefined) => {
-          if (!old) return [updatedAgent]
-          return old.map(agent => (agent.id === variables.agentId ? updatedAgent : agent))
-        })
-      }
-
-      if (updatedAgent.authorId) {
-        queryClient.setQueryData(AGENT_QUERY_KEYS.byUser(updatedAgent.authorId), (old: AgentModel[] | undefined) => {
-          if (!old) return [updatedAgent]
-          return old.map(agent => (agent.id === variables.agentId ? updatedAgent : agent))
-        })
-      }
 
       // Invalidate related caches
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.lists() })
@@ -291,24 +255,11 @@ export function useDeleteAgent() {
       // Get agent details to know which caches to update
       const agent = queryClient.getQueryData(AGENT_QUERY_KEYS.detail(agentId)) as AgentModel | undefined
 
-      if (agent?.starshipId) {
-        await queryClient.cancelQueries({
-          queryKey: AGENT_QUERY_KEYS.byStarship(agent.starshipId),
-        })
-
-        // Optimistically remove the agent
-        queryClient.setQueryData(AGENT_QUERY_KEYS.byStarship(agent.starshipId), (old: AgentModel[] | undefined) => {
-          if (!old) return old
-          return old.filter(a => a.id !== agentId)
-        })
-      }
-
-      if (agent?.authorId) {
-        queryClient.setQueryData(AGENT_QUERY_KEYS.byUser(agent.authorId), (old: AgentModel[] | undefined) => {
-          if (!old) return old
-          return old.filter(a => a.id !== agentId)
-        })
-      }
+      // starshipId removed from AgentModel - just remove from general cache
+      queryClient.setQueryData(AGENT_QUERY_KEYS.all, (old: AgentModel[] | undefined) => {
+        if (!old) return old
+        return old.filter(a => a.id !== agentId)
+      })
 
       return { agent }
     },
@@ -330,16 +281,6 @@ export function useDeleteAgent() {
     onError: (error: any, agentId, context) => {
       // Rollback optimistic deletions
       if (context?.agent) {
-        if (context.agent.starshipId) {
-          queryClient.invalidateQueries({
-            queryKey: AGENT_QUERY_KEYS.byStarship(context.agent.starshipId),
-          })
-        }
-        if (context.agent.authorId) {
-          queryClient.invalidateQueries({
-            queryKey: AGENT_QUERY_KEYS.byUser(context.agent.authorId),
-          })
-        }
       }
 
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete agent'
@@ -435,7 +376,7 @@ export function useTrackAgentUsage() {
       // Update agent usage count in cache optimistically
       queryClient.setQueryData(AGENT_QUERY_KEYS.detail(agentId), (old: AgentModel | undefined) => {
         if (!old) return old
-        return { ...old, usageCount: (old.usageCount || 0) + 1 }
+        return old // usageCount removed from AgentModel
       })
 
       // Invalidate analytics to get fresh usage stats

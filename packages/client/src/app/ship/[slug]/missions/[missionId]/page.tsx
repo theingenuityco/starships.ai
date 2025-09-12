@@ -126,13 +126,13 @@ export default function MissionDetailPage({ params }: MissionDetailPageProps) {
 
   // Function to get agent emoji based on name and category (same logic as AgentCard)
   const getAgentEmoji = (agent: AgentModel) => {
-    if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
+    if (agent.name.toLowerCase().includes('support')) {
       return '🎧' // Headphones emoji
-    } else if (agent.name.toLowerCase().includes('data') || agent.name.toLowerCase().includes('analyst') || agent.category === 'analysis') {
+    } else if (agent.name.toLowerCase().includes('data') || agent.name.toLowerCase().includes('analyst')) {
       return '📊' // Bar chart emoji
-    } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
+    } else if (agent.name.toLowerCase().includes('creative')) {
       return '✏️' // Pencil emoji
-    } else if (agent.name.toLowerCase().includes('code') || agent.name.toLowerCase().includes('coding') || agent.category === 'coding') {
+    } else if (agent.name.toLowerCase().includes('code') || agent.name.toLowerCase().includes('coding')) {
       return '🔍' // Magnifying glass emoji
     } else {
       return '🤖' // Robot emoji as default

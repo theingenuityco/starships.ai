@@ -72,9 +72,6 @@ export class StarshipRepository extends BaseRepository {
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate using Entity
-        await StarshipEntity.validate(entity, 'create');
-
         const connection = this.getConnection();
         const now = new Date().toISOString();
 
@@ -96,6 +93,9 @@ export class StarshipRepository extends BaseRepository {
           createdAt: now,
           updatedAt: now,
         };
+
+        // Validate using Entity after all fields are populated
+        await StarshipEntity.validate(starshipData, 'create');
 
         // Transform using Entity
         const starshipEntity = StarshipEntity.deserialize(starshipData);

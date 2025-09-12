@@ -199,10 +199,8 @@ describe('StarshipRepository', () => {
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]); // CREATE starship
       mockConnection.executeWrite.mockResolvedValueOnce([]); // CREATE relationship
 
-      // Mock slug generation
-      jest
-        .spyOn(repository as unknown as { generateUniqueSlug: (name: string, ownerId: string) => Promise<string> }, 'generateUniqueSlug')
-        .mockResolvedValue('test-scout');
+      // Mock slug generation - fix spy setup
+      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-scout');
 
       const result = await repository.create(starshipData);
 
@@ -256,9 +254,7 @@ describe('StarshipRepository', () => {
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
       mockConnection.executeWrite.mockResolvedValueOnce([]);
 
-      jest
-        .spyOn(repository as unknown as { generateUniqueSlug: (name: string, ownerId: string) => Promise<string> }, 'generateUniqueSlug')
-        .mockResolvedValue('test-cruiser');
+      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-cruiser');
 
       const result = await repository.create(starshipData);
 
@@ -306,9 +302,7 @@ describe('StarshipRepository', () => {
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
       mockConnection.executeWrite.mockResolvedValueOnce([]);
 
-      jest
-        .spyOn(repository as unknown as { generateUniqueSlug: (name: string, ownerId: string) => Promise<string> }, 'generateUniqueSlug')
-        .mockResolvedValue('test-draught');
+      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-draught');
 
       const result = await repository.create(starshipData);
 
@@ -363,9 +357,7 @@ describe('StarshipRepository', () => {
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
       mockConnection.executeWrite.mockResolvedValueOnce([]);
 
-      jest
-        .spyOn(repository as unknown as { generateUniqueSlug: (name: string, ownerId: string) => Promise<string> }, 'generateUniqueSlug')
-        .mockResolvedValue('test-ship');
+      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-ship');
 
       await repository.create(starshipData);
 
@@ -384,7 +376,7 @@ describe('StarshipRepository', () => {
     it('should update starship successfully', async () => {
       const updates = {
         name: 'Updated Name',
-        description: 'Updated description',
+        status: 'inactive' as const, // Use a valid StarshipEntity property instead of description
       };
 
       const existingStarship = global.createMockStarship({
@@ -394,15 +386,13 @@ describe('StarshipRepository', () => {
       const updatedStarship = global.createMockStarship({
         id: 'starship-123',
         name: 'Updated Name',
-        description: 'Updated description',
+        status: 'inactive',
         slug: 'updated-name',
       });
 
       // Mock findById call for slug generation
       jest.spyOn(repository, 'findById').mockResolvedValue(existingStarship);
-      jest
-        .spyOn(repository as unknown as { generateUniqueSlug: (name: string, ownerId: string) => Promise<string> }, 'generateUniqueSlug')
-        .mockResolvedValue('updated-name');
+      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('updated-name');
       mockConnection.executeWrite.mockResolvedValue([{ s: updatedStarship }]);
 
       const result = await repository.update('starship-123', updates);
@@ -410,7 +400,8 @@ describe('StarshipRepository', () => {
       expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $id SET s += $updates RETURN s', {
         id: 'starship-123',
         updates: expect.objectContaining({
-          ...updates,
+          name: 'Updated Name',
+          status: 'inactive',
           slug: 'updated-name',
           updatedAt: expect.any(String),
         }),
@@ -429,18 +420,14 @@ describe('StarshipRepository', () => {
       const existingStarship = global.createMockStarship({ ownerId: 'owner-123' });
 
       jest.spyOn(repository, 'findById').mockResolvedValue(existingStarship);
-      jest
-        .spyOn(repository as unknown as { generateUniqueSlug: (name: string, ownerId: string) => Promise<string> }, 'generateUniqueSlug')
-        .mockResolvedValue('new-ship-name');
+      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('new-ship-name');
 
       mockConnection.executeWrite.mockResolvedValue([{ s: existingStarship }]);
 
       await repository.update('starship-123', updates);
 
       expect(repository.findById).toHaveBeenCalledWith('starship-123');
-      expect(
-        (repository as unknown as { generateUniqueSlug: (name: string, ownerId: string) => Promise<string> }).generateUniqueSlug
-      ).toHaveBeenCalledWith('New Ship Name', 'owner-123');
+      expect(repository.generateUniqueSlug).toHaveBeenCalledWith('New Ship Name', 'owner-123');
     });
 
     it('should return null when starship not found', async () => {

@@ -2,7 +2,7 @@ import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { AgentModel, AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest } from '@starships/protocol';
+import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest } from '@starships/protocol';
 
 export class AgentTemplateRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -103,7 +103,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const templateEntity = AgentTemplateEntity.deserialize(templateProps);
 
         // Use base repository for database operation
-        const template = await this.createEntityWithAutoId<AgentModel>('AgentTemplate', templateEntity.serialize());
+        const template = await this.createEntityWithAutoId<AgentTemplateModel>('AgentTemplate', templateEntity.serialize());
 
         // Parse the JSON strings back to objects manually for the response
         return AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>);
@@ -113,7 +113,7 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
-  async update(id: string, updates: UpdateAgentTemplateRequest): Promise<AgentModel | null> {
+  async update(id: string, updates: UpdateAgentTemplateRequest): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
@@ -125,7 +125,7 @@ export class AgentTemplateRepository extends BaseRepository {
         // Transform using Entity
         const updateEntity = AgentTemplateEntity.deserialize(updateProps);
 
-        const result = await connection.executeWrite<{ a: AgentModel }>(
+        const result = await connection.executeWrite<{ t: AgentTemplateModel }>(
           'MATCH (t:AgentTemplate) WHERE t.id = $id SET t += $updates RETURN t',
           {
             id,
@@ -133,7 +133,7 @@ export class AgentTemplateRepository extends BaseRepository {
           }
         );
 
-        const template = result[0]?.a || null;
+        const template = result[0]?.t || null;
         return template ? AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>) : null;
       },
       'update',
@@ -145,6 +145,10 @@ export class AgentTemplateRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!id?.trim()) {
+          throw new Error('ID is required for delete operation');
+        }
+
         const connection = this.getConnection();
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (t:AgentTemplate) WHERE t.id = $id DETACH DELETE t RETURN count(t) as deletedCount',

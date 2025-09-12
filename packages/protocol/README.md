@@ -73,7 +73,7 @@ import { ApiResponse, ApiError } from '@starships/protocol';
 ### Type Usage Examples
 
 ```typescript
-import { Starship, Agent, Mission } from '@starships/protocol';
+import { Starship, Agent } from '@starships/protocol';
 
 // Using domain types for data modeling
 const starship: Starship = {
@@ -84,7 +84,6 @@ const starship: Starship = {
   class: 'cruiser',
   status: 'active',
   maxAgents: 6,
-  maxActiveExpeditions: 5,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 };

@@ -71,7 +71,6 @@ Updated all model repositories to use automatic ID generation:
 - [`UserRepository`](../packages/models/src/repositories/UserRepository.ts)
 - [`StarshipRepository`](../packages/models/src/repositories/StarshipRepository.ts)
 - [`AgentRepository`](../packages/models/src/repositories/AgentRepository.ts)
-- [`MissionRepository`](../packages/models/src/repositories/MissionRepository.ts)
 
 **Before:**
 

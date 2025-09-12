@@ -636,11 +636,11 @@ export class MessageRepository extends BaseRepository {
   /**
    * Get conversation associated with a message using Neo4j relationship
    */
-  async getMessageConversation(messageId: string): Promise<{ id: string; lastActivityAt: string; messageCount: number } | null> {
+  async getMessageConversation(messageId: string): Promise<{ id: string; title: string; status: string } | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ c: { id: string; lastActivityAt: string; messageCount: number } }>(
+        const result = await connection.executeQuery<{ c: { id: string; title: string; status: string } }>(
           `MATCH (c:Conversation)-[:HAS_MESSAGE]->(m:Message {id: $messageId})
            RETURN c`,
           { messageId }
@@ -648,8 +648,8 @@ export class MessageRepository extends BaseRepository {
         return result.length > 0
           ? {
               id: result[0].c.id,
-              lastActivityAt: result[0].c.lastActivityAt,
-              messageCount: result[0].c.messageCount,
+              title: result[0].c.title,
+              status: result[0].c.status,
             }
           : null;
       },

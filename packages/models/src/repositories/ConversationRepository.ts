@@ -12,9 +12,7 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ c: ConversationModel }>(
-          'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
-        );
+        const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
         return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
       },
       'findAll',
@@ -139,7 +137,7 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
-           RETURN c ORDER BY c.lastActivityAt DESC`,
+           RETURN c ORDER BY c.createdAt DESC`,
           { starshipId }
         );
         return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));

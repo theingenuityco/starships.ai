@@ -2,46 +2,19 @@ import { AgentService } from '@/services';
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { NotFoundError } from '@starships/errors';
-import { ConversationRepository, MessageRepository } from '@starships/models';
-import { ConversationModel } from '@starships/protocol';
-import { AutopilotStreamService } from './AutopilotStreamService';
-
-export interface CreateConversationData {
-  metadata?: Record<string, unknown>;
-  starshipId?: string;
-  userId?: string;
-}
-
-export interface ConversationWithMessages extends ConversationModel {
-  messages: any[]; // Using any[] to match existing Message type from routes
-}
-
-export interface AddMessageData {
-  conversationId: string;
-  agentId: string;
-  userId: string;
-  message: string;
-}
-
-// No separate streaming interface needed - using AddMessageData for all cases
-
-export interface AddMessageResponse {
-  reply: string;
-  usage?: any;
-}
+import { ConversationRepository } from '@starships/models';
+import { ConversationModel, ConversationStatus, CreateConversationRequest, CreateMessageRequest, MessageModel } from '@starships/protocol';
 
 /**
  * Clean conversation service with proper error handling
  */
 export class ConversationService {
   private conversationRepository: ConversationRepository;
-  private messageRepository: MessageRepository;
   private messageService: MessageService;
   private streamingService: StreamingService;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
-    this.messageRepository = new MessageRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
   }
@@ -49,7 +22,7 @@ export class ConversationService {
   /**
    * Create a new conversation
    */
-  async createConversation(data: CreateConversationData): Promise<ConversationModel> {
+  async createConversation(data: CreateConversationRequest & { starshipId: string }): Promise<ConversationModel> {
     const conversation = await this.conversationRepository.create(
       {
         title: 'New Conversation',
@@ -66,33 +39,6 @@ export class ConversationService {
    */
   async getConversationsByStarship(starshipId: string): Promise<ConversationModel[]> {
     return this.conversationRepository.findByStarship(starshipId);
-  }
-
-  /**
-   * Get conversations by user (placeholder for future implementation)
-   */
-  async getConversationsByUser(userId: string): Promise<ConversationModel[]> {
-    // TODO: Implement user-conversation relationship in repository
-    return [];
-  }
-
-  /**
-   * Get conversation with messages
-   */
-  async getConversationWithMessages(
-    conversationId: string,
-    limit: number = 50,
-    offset: number = 0
-  ): Promise<ConversationWithMessages | null> {
-    const conversation = await this.conversationRepository.findById(conversationId);
-    if (!conversation) return null;
-
-    const messages = await this.messageRepository.findByConversationId(conversationId, limit, offset);
-
-    return {
-      ...conversation,
-      messages,
-    };
   }
 
   /**
@@ -117,43 +63,6 @@ export class ConversationService {
   }
 
   /**
-   * Update conversation activity timestamp
-   */
-  async updateConversationActivity(conversationId: string): Promise<void> {
-    await this.conversationRepository.update(conversationId, {
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  /**
-   * Increment message count for a conversation (placeholder - no longer tracking count)
-   */
-  async incrementMessageCount(conversationId: string, increment: number = 1): Promise<void> {
-    const conversation = await this.conversationRepository.findById(conversationId);
-    if (!conversation) {
-      throw new NotFoundError('Conversation', conversationId);
-    }
-
-    await this.conversationRepository.update(conversationId, {
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  /**
-   * Update token usage for a conversation (placeholder - no longer tracking tokens)
-   */
-  async updateTokenCount(conversationId: string, tokens: number): Promise<void> {
-    const conversation = await this.conversationRepository.findById(conversationId);
-    if (!conversation) {
-      throw new NotFoundError('Conversation', conversationId);
-    }
-
-    await this.conversationRepository.update(conversationId, {
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  /**
    * Complete a conversation
    */
   async completeConversation(conversationId: string): Promise<void> {
@@ -170,7 +79,7 @@ export class ConversationService {
   /**
    * Update conversation status and activity timestamp
    */
-  async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
+  async updateConversationStatus(conversationId: string, status: ConversationStatus): Promise<void> {
     await this.conversationRepository.update(conversationId, {
       status,
       updatedAt: new Date().toISOString(),
@@ -181,8 +90,8 @@ export class ConversationService {
    * Process conversation with streaming support
    * Uses conversationId as the stream identifier - no database streaming state needed
    */
-  async addMessageWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
-    const { conversationId, agentId, userId, message } = data;
+  async addMessageWithStreaming(data: CreateMessageRequest & { conversationId: string }): Promise<MessageModel[]> {
+    const { conversationId, content, role, messageType } = data;
 
     try {
       // Verify conversation exists
@@ -198,10 +107,11 @@ export class ConversationService {
       }
 
       // Save user message to database
-      await this.messageService.addToConversation(conversationId, 'user', message, {
-        starshipId: starshipInfo.id,
-        agentId,
-        userId,
+      await this.messageService.createMessage({
+        conversationId,
+        role: role,
+        content: content,
+        messageType: messageType,
       });
 
       // Execute agent conversation with streaming
@@ -215,27 +125,15 @@ export class ConversationService {
       });
 
       // Save agent response to database
-      await this.messageService.addToConversation(
+      await this.messageService.createMessage({
         conversationId,
-        'assistant',
-        response.content,
-        {
-          starshipId: starshipInfo.id,
-          agentId,
-          userId,
-        },
-        {
-          usage: response.usage,
-          tokenCount: response.usage ? response.usage.promptTokens + response.usage.completionTokens : undefined,
-        }
-      );
-
-      // Update conversation metrics (no streaming state to update)
-      await this.updateConversationActivity(conversationId);
-      await this.incrementMessageCount(conversationId, 2); // User message + assistant response
+        role: 'assistant',
+        content: response.content,
+        messageType: 'agent_response',
+      });
 
       // Send final completion event via streaming (using conversationId as streamId)
-      await this.streamingService.broadcastComplete(response);
+      await this.streamingService.broadcastComplete(conversationId, response);
 
       return {
         reply: response.content,
@@ -245,7 +143,7 @@ export class ConversationService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       // Broadcast error using conversationId as streamId
-      await this.streamingService.broadcastError({
+      await this.streamingService.broadcastError(conversationId, {
         streamId: conversationId,
         errorCode: 'CONVERSATION_PROCESSING_FAILED',
         message: errorMessage,
@@ -293,20 +191,11 @@ export class ConversationService {
     });
 
     // Save agent response to database
-    await this.messageService.addToConversation(
-      conversationId,
-      'assistant',
-      response.content,
-      {
-        starshipId: starshipInfo.id,
-        agentId,
-        userId,
-      },
-      {
-        usage: response.usage,
-        tokenCount: response.usage ? response.usage.promptTokens + response.usage.completionTokens : undefined,
-      }
-    );
+    await this.messageService.addToConversation(conversationId, 'assistant', response.content, {
+      starshipId: starshipInfo.id,
+      agentId,
+      userId,
+    });
 
     // Update conversation metrics
     await Promise.all([

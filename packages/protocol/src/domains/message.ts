@@ -27,3 +27,9 @@ export interface MessageModel extends Message {
   // Message classification
   messageType: MessageType;
 }
+
+export interface CreateMessageRequest extends Message {
+  messageType: MessageType;
+}
+
+export type UpdateMessageRequest = Omit<Message, 'role'>;

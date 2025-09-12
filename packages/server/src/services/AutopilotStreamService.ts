@@ -58,7 +58,7 @@ export class AutopilotStreamService implements EngineEmitter {
         await this.handleContentChunk(event);
       } else if (event.type === 'workflow_failed' || event.type === 'node_failed') {
         // Handle errors with special error broadcast
-        await this.streamingService.broadcastError({
+        await this.streamingService.broadcastError(this.streamId, {
           streamId: this.streamId,
           errorCode: event.execution.error?.code || 'EXECUTION_FAILED',
           message: event.execution.error?.message || 'Execution failed',
@@ -86,22 +86,13 @@ export class AutopilotStreamService implements EngineEmitter {
 
     // If we don't have an active message for streaming, create one
     if (this.activeMessageIndex === -1) {
-      const baseMessage = this.createBaseMessage(event.timestamp);
       const streamingMessage: MessageModel = {
-        ...baseMessage,
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         role: 'assistant',
         content: '',
         messageType: 'agent_response',
-        importance: 'high',
-        processingStatus: 'streaming',
-        contentLength: 0,
-        metadata: {
-          event: 'content_streaming',
-          nodeRef: event.contentMetadata?.nodeRef,
-          model: event.contentMetadata?.model,
-          isStreaming: true,
-          timestamp: event.timestamp,
-        },
+        createdAt: event.timestamp,
+        updatedAt: event.timestamp,
       };
 
       const result = this.deltaEncoder.append(streamingMessage);
@@ -120,11 +111,6 @@ export class AutopilotStreamService implements EngineEmitter {
         op: 'replace',
         path: `/${this.activeMessageIndex}/content`,
         value: newContent,
-      },
-      {
-        op: 'replace',
-        path: `/${this.activeMessageIndex}/contentLength`,
-        value: newContent.length,
       },
       {
         op: 'replace',
@@ -147,32 +133,13 @@ export class AutopilotStreamService implements EngineEmitter {
       const patchResult = this.deltaEncoder.applyOperations([
         {
           op: 'replace',
-          path: `/${this.activeMessageIndex}/processingStatus`,
-          value: 'completed',
-        },
-        {
-          op: 'replace',
           path: `/${this.activeMessageIndex}/content`,
           value: event.content || '',
         },
         {
           op: 'replace',
-          path: `/${this.activeMessageIndex}/contentLength`,
-          value: (event.content || '').length,
-        },
-        {
-          op: 'replace',
           path: `/${this.activeMessageIndex}/updatedAt`,
           value: event.timestamp,
-        },
-        {
-          op: 'replace',
-          path: `/${this.activeMessageIndex}/metadata`,
-          value: {
-            ...messageData.metadata,
-            isStreaming: false,
-            isComplete: true,
-          },
         },
       ]);
 
@@ -192,7 +159,7 @@ export class AutopilotStreamService implements EngineEmitter {
   private async broadcastDeltas(deltas: StreamingDeltaChunk[]): Promise<void> {
     // Send each JSON patch operation as a pure DeltaChunk
     for (const delta of deltas) {
-      await this.streamingService.broadcastDelta({
+      await this.streamingService.broadcastDelta(this.streamId, {
         op: delta.op,
         path: delta.path,
         value: delta.value,
@@ -202,62 +169,30 @@ export class AutopilotStreamService implements EngineEmitter {
   }
 
   /**
-   * Create base message structure
-   */
-  private createBaseMessage(
-    timestamp: string
-  ): Omit<MessageModel, 'role' | 'content' | 'messageType' | 'importance' | 'processingStatus' | 'contentLength'> {
-    return {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      conversationId: this.conversationId,
-      agentId: this.agentId,
-      timestamp,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      version: '1.0.0',
-      threadDepth: 0,
-      hasAttachments: false,
-      isStreaming: true,
-      starshipId: '', // Will need to be provided if required
-    };
-  }
-
-  /**
    * Convert autopilot ExecutionEvent to message data
    */
   private convertEventToMessage(event: ExecutionEvent): MessageModel {
-    const baseMessage = this.createBaseMessage(event.timestamp);
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     switch (event.type) {
       case 'workflow_started':
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'system',
           content: '🚀 Agent workflow started',
-          messageType: 'system_message',
-          importance: 'low',
-          processingStatus: 'completed',
-          contentLength: 27,
-          metadata: {
-            event: 'workflow_started',
-            timestamp: event.timestamp,
-          },
+          messageType: 'system_notification',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
 
       case 'node_started':
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'system',
           content: `⏳ Starting node: ${event.execution.currentNodeRef}`,
-          messageType: 'system_message',
-          importance: 'low',
-          processingStatus: 'completed',
-          contentLength: `⏳ Starting node: ${event.execution.currentNodeRef}`.length,
-          metadata: {
-            event: 'node_started',
-            nodeRef: event.execution.currentNodeRef,
-            timestamp: event.timestamp,
-          },
+          messageType: 'system_notification',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
 
       case 'node_completed': {
@@ -270,120 +205,75 @@ export class AutopilotStreamService implements EngineEmitter {
           if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
             // Return assistant message with LLM response
             return {
-              ...baseMessage,
+              id: messageId,
               role: 'assistant',
               content: llmResponseContent.trim(),
               messageType: 'agent_response',
-              importance: 'high',
-              processingStatus: 'completed',
-              contentLength: llmResponseContent.trim().length,
-              metadata: {
-                event: 'llm_response',
-                nodeRef: event.execution.currentNodeRef,
-                model: llmData.model,
-                timestamp: event.timestamp,
-              },
+              createdAt: event.timestamp,
+              updatedAt: event.timestamp,
             };
           }
         }
 
         // Fallback to system completion message
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'system',
           content: `✅ Completed node: ${event.execution.currentNodeRef}`,
-          messageType: 'system_message',
-          importance: 'low',
-          processingStatus: 'completed',
-          contentLength: `✅ Completed node: ${event.execution.currentNodeRef}`.length,
-          metadata: {
-            event: 'node_completed',
-            nodeRef: event.execution.currentNodeRef,
-            timestamp: event.timestamp,
-          },
+          messageType: 'system_notification',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
       }
 
       case 'workflow_completed':
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'system',
           content: '🎉 Agent workflow completed successfully',
-          messageType: 'system_message',
-          importance: 'medium',
-          processingStatus: 'completed',
-          contentLength: 40,
-          metadata: {
-            event: 'workflow_completed',
-            timestamp: event.timestamp,
-            executionResults: Array.from(event.execution.executionResults.keys()),
-          },
+          messageType: 'system_notification',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
 
       case 'content_complete':
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'assistant',
           content: event.content || '',
           messageType: 'agent_response',
-          importance: 'high',
-          processingStatus: 'completed',
-          contentLength: (event.content || '').length,
-          metadata: {
-            event: 'content_complete',
-            nodeRef: event.contentMetadata?.nodeRef,
-            model: event.contentMetadata?.model,
-            accumulated: event.contentMetadata?.accumulated,
-            isComplete: true,
-            timestamp: event.timestamp,
-          },
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
 
       case 'workflow_paused':
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'system',
           content: '⏸️ Workflow execution paused',
-          messageType: 'system_message',
-          importance: 'medium',
-          processingStatus: 'completed',
-          contentLength: 29,
-          metadata: {
-            event: 'workflow_paused',
-            status: 'paused',
-            timestamp: event.timestamp,
-          },
+          messageType: 'system_notification',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
 
       case 'workflow_resumed':
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'system',
           content: '▶️ Workflow execution resumed',
-          messageType: 'system_message',
-          importance: 'medium',
-          processingStatus: 'completed',
-          contentLength: 30,
-          metadata: {
-            event: 'workflow_resumed',
-            status: 'running',
-            timestamp: event.timestamp,
-          },
+          messageType: 'system_notification',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
 
       default:
         return {
-          ...baseMessage,
+          id: messageId,
           role: 'system',
           content: `Unknown event: ${event.type}`,
-          messageType: 'system_message',
-          importance: 'low',
-          processingStatus: 'completed',
-          contentLength: `Unknown event: ${event.type}`.length,
-          metadata: {
-            event: event.type,
-            timestamp: event.timestamp,
-          },
+          messageType: 'system_notification',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
         };
     }
   }

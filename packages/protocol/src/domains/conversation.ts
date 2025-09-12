@@ -11,9 +11,11 @@
 /**
  * Core conversation
  */
+export type ConversationStatus = 'active' | 'paused' | 'completed' | 'archived';
+
 export interface Conversation {
   title: string;
-  status: 'active' | 'paused' | 'completed' | 'archived';
+  status: ConversationStatus;
 }
 
 /**
@@ -24,3 +26,7 @@ export interface ConversationModel extends Conversation {
   createdAt: string;
   updatedAt?: string;
 }
+
+export type CreateConversationRequest = Omit<Conversation, 'status'>;
+
+export type UpdateConversationRequest = Conversation;

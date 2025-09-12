@@ -330,16 +330,13 @@ export class AgentService {
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
         agentId,
-        userId,
-        streamId,
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });
 
       // Create error message in conversation
-      await agentService.createErrorResponse(error as Error, {
+      await this.createErrorResponse(error as Error, {
         agentId,
-        userId,
         conversationId,
         starshipId: 'unknown', // starshipId property no longer exists on AgentModel
       });

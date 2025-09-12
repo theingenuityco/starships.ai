@@ -1,6 +1,5 @@
 import { AgentService } from '@/services';
 import { MessageService } from '@/services/MessageService';
-import { StreamingService } from '@/services/StreamingService';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -11,12 +10,12 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 export class ConversationService {
   private conversationRepository: ConversationRepository;
   private messageService: MessageService;
-  private streamingService: StreamingService;
+  private agentService: AgentService;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
-    this.streamingService = new StreamingService();
+    this.agentService = new AgentService();
   }
 
   /**
@@ -108,7 +107,7 @@ export class ConversationService {
     const agent = agents[0];
 
     // Execute agent conversation with streaming
-    await AgentService.replyToConversation(agent.id, data.conversationId);
+    await this.agentService.replyToConversation(agent.id, data.conversationId);
   }
 
   /**

@@ -335,8 +335,8 @@ export class WorkflowService {
       const initialExecution: Execution = {
         currentNodeRef: undefined,
         status: 'running',
-        executionResults: new Map(),
-        agentMemory: agentMemory,
+        results: new Map(),
+        state: {},
         error: undefined,
       };
 

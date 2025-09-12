@@ -21,7 +21,22 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest, onAnalytics, showActions = false }: AgentCardProps) {
-  const getCategoryColor = (category: AgentModel['category']) => {
+  const inferCategoryFromName = (agentName: string): 'general' | 'coding' | 'creative' | 'analysis' | 'support' => {
+    const name = agentName.toLowerCase()
+    if (name.includes('support')) {
+      return 'support'
+    } else if (name.includes('data') || name.includes('analyst')) {
+      return 'analysis'
+    } else if (name.includes('creative')) {
+      return 'creative'
+    } else if (name.includes('code') || name.includes('coding')) {
+      return 'coding'
+    } else {
+      return 'general'
+    }
+  }
+
+  const getCategoryColor = (agentName: string) => {
     const colors = {
       general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
       coding: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
@@ -29,10 +44,11 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
       analysis: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
       support: 'bg-gradient-to-r from-orange-500/10 to-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30',
     }
+    const category = inferCategoryFromName(agentName)
     return colors[category] || colors.general
   }
 
-  const getAvatarBackgroundColor = (category: AgentModel['category']) => {
+  const getAvatarBackgroundColor = (agentName: string) => {
     const colors = {
       general: 'bg-gradient-to-br from-gray-500/20 to-gray-500/30',
       coding: 'bg-gradient-to-br from-blue-500/20 to-blue-500/30',
@@ -40,9 +56,12 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
       analysis: 'bg-gradient-to-br from-green-500/20 to-green-500/30',
       support: 'bg-gradient-to-br from-orange-500/20 to-orange-500/30',
     }
+    const category = inferCategoryFromName(agentName)
     return colors[category] || colors.general
   }
-  const getCategoryIcon = (category: AgentModel['category']) => {
+
+  const getCategoryIcon = (agentName: string) => {
+    const category = inferCategoryFromName(agentName)
     switch (category) {
       case 'coding':
         return <Code className="w-3.5 h-3.5 mr-1" />
@@ -58,14 +77,14 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
   }
 
   const getAgentAvatarContent = (agent: AgentModel) => {
-    // Determine emoji-like icon based on agent name or category
-    if (agent.name.toLowerCase().includes('support') || agent.category === 'support') {
+    const name = agent.name.toLowerCase()
+    if (name.includes('support')) {
       return '🎧' // Headphones emoji
-    } else if (agent.name.toLowerCase().includes('data') || agent.name.toLowerCase().includes('analyst') || agent.category === 'analysis') {
+    } else if (name.includes('data') || name.includes('analyst')) {
       return '📊' // Bar chart emoji
-    } else if (agent.name.toLowerCase().includes('creative') || agent.category === 'creative') {
+    } else if (name.includes('creative')) {
       return '✏️' // Pencil emoji
-    } else if (agent.name.toLowerCase().includes('code') || agent.name.toLowerCase().includes('coding') || agent.category === 'coding') {
+    } else if (name.includes('code') || name.includes('coding')) {
       return '🔍' // Magnifying glass emoji
     } else {
       return '🤖' // Robot emoji as default
@@ -94,7 +113,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                 <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
                   <AvatarFallback
                     className={`
-                  ${isSelected ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' : `${getAvatarBackgroundColor(agent.category)} text-foreground`}
+                  ${isSelected ? 'bg-gradient-to-br from-primary to-primary/80 text-primary-foreground' : `${getAvatarBackgroundColor(agent.name)} text-foreground`}
                 `}
                   >
                     <span className="text-base">{getAgentAvatarContent(agent)}</span>
@@ -118,11 +137,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                   >
                     {agent.name}
                   </h3>
-                  {!agent.isPublic && (
-                    <div className="p-1 bg-muted/50 rounded">
-                      <EyeOff className="w-3 h-3 text-muted-foreground" />
-                    </div>
-                  )}
+                  {/* Private/Public status removed from AgentModel */}
                 </div>
 
                 {(agent as any).rating && (
@@ -134,9 +149,9 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
               </div>
 
               <div className="flex items-center gap-2 mb-2">
-                <Badge className={`text-xs ${getCategoryColor(agent.category)} flex items-center border font-semibold`}>
-                  {getCategoryIcon(agent.category)}
-                  {agent.category.charAt(0).toUpperCase() + agent.category.slice(1)}
+                <Badge className={`text-xs ${getCategoryColor(agent.name)} flex items-center border font-semibold`}>
+                  {getCategoryIcon(agent.name)}
+                  {inferCategoryFromName(agent.name).charAt(0).toUpperCase() + inferCategoryFromName(agent.name).slice(1)}
                 </Badge>
                 <div className="flex items-center gap-1 bg-muted/50 px-2 py-1 rounded-md">
                   <Brain className="w-3 h-3 text-muted-foreground" />

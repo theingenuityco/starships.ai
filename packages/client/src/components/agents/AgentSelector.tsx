@@ -23,7 +23,7 @@ interface AgentSelectorProps {
 }
 
 interface FilterState {
-  category?: AgentModel['category']
+  category?: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
   searchQuery: string
 }
 
@@ -59,7 +59,15 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
 
     // Category filter
     if (filters.category) {
-      filtered = filtered.filter(agent => agent.category === filters.category)
+      const inferCategoryFromName = (agentName: string): 'general' | 'coding' | 'creative' | 'analysis' | 'support' => {
+        const name = agentName.toLowerCase()
+        if (name.includes('support')) return 'support'
+        if (name.includes('data') || name.includes('analyst')) return 'analysis'
+        if (name.includes('creative')) return 'creative'
+        if (name.includes('code') || name.includes('coding')) return 'coding'
+        return 'general'
+      }
+      filtered = filtered.filter(agent => inferCategoryFromName(agent.name) === filters.category)
     }
 
     // Search filter

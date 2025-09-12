@@ -29,7 +29,7 @@ import crypto from 'crypto';
 
 describe('NativeToolApiKeyRepository', () => {
   let repository: NativeToolApiKeyRepository;
-  let mockGetConnection: jest.MockedFunction<any>;
+  let mockGetConnection: jest.MockedFunction<typeof getConnection>;
   let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('NativeToolApiKeyRepository', () => {
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<Neo4jConnection>;
 
     // Mock getConnection to return our mock connection
     mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
@@ -308,9 +308,9 @@ describe('NativeToolApiKeyRepository', () => {
         final: jest.fn().mockReturnValue('final-part'),
       });
 
-      // Access private methods via any casting
-      const encrypted = (repository as any).encrypt(originalKey);
-      const decrypted = (repository as any).decrypt(encrypted);
+      // Access private methods via unknown casting
+      const encrypted = (repository as unknown as { encrypt: (key: string) => string }).encrypt(originalKey);
+      const decrypted = (repository as unknown as { decrypt: (encryptedKey: string) => string }).decrypt(encrypted);
 
       expect(decrypted).toBe('decrypted-partfinal-part'); // This matches our mock return value
       expect(encrypted).toBe('1234567890123456:617574682d746167:encrypted-partfinal-part'); // 'auth-tag' in hex

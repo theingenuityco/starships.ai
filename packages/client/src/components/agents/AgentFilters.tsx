@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { X, Filter, ChevronDown } from 'lucide-react'
 
 interface FilterState {
-  category?: AgentModel['category']
+  category?: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
   tags: string[]
   isPublic?: boolean
   searchQuery: string

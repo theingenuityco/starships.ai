@@ -16,10 +16,42 @@ export interface BackupMetadata {
 
 export interface BackupData {
   metadata: BackupMetadata;
-  nodes: any[];
-  relationships: any[];
-  constraints: any[];
-  indexes: any[];
+  nodes: BackupNode[];
+  relationships: BackupRelationship[];
+  constraints: BackupConstraint[];
+  indexes: BackupIndex[];
+}
+
+interface BackupNode {
+  labels: string[];
+  properties: Record<string, unknown>;
+}
+
+interface BackupRelationship {
+  start: {
+    labels: string[];
+    properties: Record<string, unknown>;
+  };
+  relationship: {
+    type: string;
+    properties: Record<string, unknown>;
+  };
+  end: {
+    labels: string[];
+    properties: Record<string, unknown>;
+  };
+}
+
+interface BackupConstraint {
+  name?: string;
+  createStatement?: string;
+  [key: string]: unknown;
+}
+
+interface BackupIndex {
+  name?: string;
+  createStatement?: string;
+  [key: string]: unknown;
 }
 
 export interface RestoreResult {
@@ -243,7 +275,7 @@ export class BackupManager {
   /**
    * Export all nodes from the database
    */
-  private async exportNodes(session: Session): Promise<any[]> {
+  private async exportNodes(session: Session): Promise<BackupNode[]> {
     const result = await session.run(`
       MATCH (n)
       RETURN labels(n) as labels, properties(n) as properties
@@ -258,10 +290,10 @@ export class BackupManager {
   /**
    * Export all relationships from the database
    */
-  private async exportRelationships(session: Session): Promise<any[]> {
+  private async exportRelationships(session: Session): Promise<BackupRelationship[]> {
     const result = await session.run(`
       MATCH (start)-[r]->(end)
-      RETURN 
+      RETURN
         labels(start) as startLabels,
         properties(start) as startProperties,
         type(r) as relationshipType,
@@ -289,10 +321,10 @@ export class BackupManager {
   /**
    * Export database constraints
    */
-  private async exportConstraints(session: Session): Promise<any[]> {
+  private async exportConstraints(session: Session): Promise<BackupConstraint[]> {
     try {
       const result = await session.run('SHOW CONSTRAINTS');
-      return result.records.map((record) => record.toObject());
+      return result.records.map((record) => record.toObject() as BackupConstraint);
     } catch (error) {
       console.warn('[BACKUP] ⚠️ Could not export constraints:', error);
       return [];
@@ -302,10 +334,10 @@ export class BackupManager {
   /**
    * Export database indexes
    */
-  private async exportIndexes(session: Session): Promise<any[]> {
+  private async exportIndexes(session: Session): Promise<BackupIndex[]> {
     try {
       const result = await session.run('SHOW INDEXES');
-      return result.records.map((record) => record.toObject());
+      return result.records.map((record) => record.toObject() as BackupIndex);
     } catch (error) {
       console.warn('[BACKUP] ⚠️ Could not export indexes:', error);
       return [];
@@ -368,7 +400,7 @@ export class BackupManager {
   /**
    * Restore constraints from backup
    */
-  private async restoreConstraints(session: Session, constraints: any[]): Promise<void> {
+  private async restoreConstraints(session: Session, constraints: BackupConstraint[]): Promise<void> {
     for (const constraint of constraints) {
       try {
         if (constraint.createStatement) {
@@ -383,7 +415,7 @@ export class BackupManager {
   /**
    * Restore indexes from backup
    */
-  private async restoreIndexes(session: Session, indexes: any[]): Promise<void> {
+  private async restoreIndexes(session: Session, indexes: BackupIndex[]): Promise<void> {
     for (const index of indexes) {
       try {
         if (index.createStatement) {
@@ -398,7 +430,7 @@ export class BackupManager {
   /**
    * Restore nodes from backup
    */
-  private async restoreNodes(session: Session, nodes: any[]): Promise<number> {
+  private async restoreNodes(session: Session, nodes: BackupNode[]): Promise<number> {
     let restoredCount = 0;
 
     for (const node of nodes) {
@@ -418,7 +450,7 @@ export class BackupManager {
   /**
    * Restore relationships from backup
    */
-  private async restoreRelationships(session: Session, relationships: any[]): Promise<number> {
+  private async restoreRelationships(session: Session, relationships: BackupRelationship[]): Promise<number> {
     let restoredCount = 0;
 
     for (const rel of relationships) {

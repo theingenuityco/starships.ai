@@ -12,10 +12,10 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createEdge');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
         if (!edgeData?.from || !edgeData?.to) {
-          this.handleValidationError([{ field: 'edgeData', message: 'from and to fields are required' }], 'createEdge');
+          this.handleValidationError([{ field: 'edgeData', message: 'from and to fields are required' }]);
         }
 
         const connection = this.getConnection();
@@ -26,7 +26,7 @@ export class EdgeRepository extends BaseRepository {
         });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId, 'createEdge');
+          this.handleNotFound('Blueprint', blueprintId);
         }
 
         // Check if both nodes exist
@@ -38,16 +38,13 @@ export class EdgeRepository extends BaseRepository {
         );
 
         if (!nodesCheck || nodesCheck.length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'nodes',
-                message: 'Both from and to nodes must exist in the blueprint',
-                value: { from: edgeData.from, to: edgeData.to },
-              },
-            ],
-            'createEdge'
-          );
+          this.handleValidationError([
+            {
+              field: 'nodes',
+              message: 'Both from and to nodes must exist in the blueprint',
+              value: { from: edgeData.from, to: edgeData.to },
+            },
+          ]);
         }
 
         // Note: Edges are stored as Neo4j relationships, not as nodes with createEntityWithAutoId
@@ -58,7 +55,7 @@ export class EdgeRepository extends BaseRepository {
         };
 
         // Create relationship between nodes with generated ID
-        const result = await connection.executeWrite<{ edgeId: string }>(
+        await connection.executeWrite<{ edgeId: string }>(
           `
         MATCH (b:Blueprint {id: $blueprintId})-[:CONTAINS]->(from:Node {id: $fromId})
         MATCH (b)-[:CONTAINS]->(to:Node {id: $toId})
@@ -102,20 +99,17 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createEdges');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
 
         if (!Array.isArray(edgesData)) {
-          this.handleValidationError(
-            [
-              {
-                field: 'edgesData',
-                message: 'Edges array is required',
-                value: edgesData,
-              },
-            ],
-            'createEdges'
-          );
+          this.handleValidationError([
+            {
+              field: 'edgesData',
+              message: 'Edges array is required',
+              value: edgesData,
+            },
+          ]);
         }
 
         const connection = this.getConnection();
@@ -126,7 +120,7 @@ export class EdgeRepository extends BaseRepository {
         });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId, 'createEdges');
+          this.handleNotFound('Blueprint', blueprintId);
         }
 
         const edges: EdgeModel[] = [];
@@ -203,7 +197,7 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'getEdgesByBlueprintId');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -239,7 +233,7 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!edgeId) {
-          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }], 'getEdgeById');
+          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -277,25 +271,22 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!edgeId) {
-          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }], 'updateEdge');
+          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }]);
         }
 
         if (!updates || Object.keys(updates).length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'updates',
-                message: 'At least one field must be provided for update',
-              },
-            ],
-            'updateEdge'
-          );
+          this.handleValidationError([
+            {
+              field: 'updates',
+              message: 'At least one field must be provided for update',
+            },
+          ]);
         }
 
         // Check if edge exists first
         const currentEdge = await this.getEdgeById(edgeId);
         if (!currentEdge) {
-          this.handleNotFound('Edge', edgeId, 'updateEdge');
+          this.handleNotFound('Edge', edgeId);
         }
 
         // For edges, we typically only update by recreating the relationship
@@ -356,7 +347,7 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!edgeId) {
-          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }], 'deleteEdge');
+          this.handleValidationError([{ field: 'edgeId', message: 'edgeId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -368,7 +359,7 @@ export class EdgeRepository extends BaseRepository {
         );
 
         if (!existingResult || existingResult.length === 0) {
-          this.handleNotFound('Edge', edgeId, 'deleteEdge');
+          this.handleNotFound('Edge', edgeId);
         }
 
         // Delete the edge relationship
@@ -389,7 +380,7 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'deleteEdgesByBlueprintId');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -400,7 +391,7 @@ export class EdgeRepository extends BaseRepository {
         });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId, 'deleteEdgesByBlueprintId');
+          this.handleNotFound('Blueprint', blueprintId);
         }
 
         // Delete all edges belonging to the blueprint's nodes
@@ -423,7 +414,7 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!fromNodeId) {
-          this.handleValidationError([{ field: 'fromNodeId', message: 'fromNodeId is required' }], 'getEdgesByFromNode');
+          this.handleValidationError([{ field: 'fromNodeId', message: 'fromNodeId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -458,7 +449,7 @@ export class EdgeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!toNodeId) {
-          this.handleValidationError([{ field: 'toNodeId', message: 'toNodeId is required' }], 'getEdgesByToNode');
+          this.handleValidationError([{ field: 'toNodeId', message: 'toNodeId is required' }]);
         }
 
         const connection = this.getConnection();

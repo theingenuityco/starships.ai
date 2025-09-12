@@ -2,7 +2,7 @@
  * MissionRepository Unit Tests
  */
 
-import { getConnection } from '@/helpers/database';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
 import { MissionRepository } from '@/repositories/MissionRepository';
 import { DatabaseError, NotFoundError } from '@starships/errors';
 import type { CreateMissionRequest, MissionFilters, MissionSort, UpdateMissionRequest } from '@starships/protocol';
@@ -30,14 +30,18 @@ jest.mock('uuid', () => ({
 
 describe('MissionRepository', () => {
   let repository: MissionRepository;
-  let mockConnection: any;
+  let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
     repository = new MissionRepository();
     mockConnection = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      getSession: jest.fn(),
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    };
+      initializeSchema: jest.fn(),
+    } as unknown as jest.Mocked<Neo4jConnection>;
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     jest.clearAllMocks();
   });
@@ -96,7 +100,7 @@ describe('MissionRepository', () => {
     });
 
     it('should validate required fields', async () => {
-      const invalidRequest = { ...validRequest, starshipId: undefined } as any;
+      const invalidRequest = { ...validRequest, starshipId: undefined } as never;
 
       await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow(NotFoundError);
     });
@@ -109,7 +113,7 @@ describe('MissionRepository', () => {
     });
 
     it('should validate field types', async () => {
-      const invalidRequest = { ...validRequest, name: 123 } as any;
+      const invalidRequest = { ...validRequest, name: 123 } as never;
 
       // Don't mock starship check since validation should fail first
       await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow();
@@ -125,7 +129,7 @@ describe('MissionRepository', () => {
     });
 
     it('should validate agentIds is array', async () => {
-      const invalidRequest = { ...validRequest, agentIds: 'not-array' } as any;
+      const invalidRequest = { ...validRequest, agentIds: 'not-array' } as never;
 
       // Don't mock starship check since validation should fail first
       await expect(repository.createMission(invalidRequest, 'user-123')).rejects.toThrow();
@@ -246,7 +250,7 @@ describe('MissionRepository', () => {
       mockConnection.executeQuery.mockResolvedValue([mockMissions[0]].map((m) => ({ m })));
 
       const filters: MissionFilters = { createdBy: 'user-123' };
-      const result = await repository.getMissionModelsByStarshipId('starship-123', filters);
+      await repository.getMissionModelsByStarshipId('starship-123', filters);
 
       expect(mockConnection.executeQuery).toHaveBeenCalledWith(
         expect.stringContaining('m.createdBy = $createdBy'),
@@ -391,7 +395,7 @@ describe('MissionRepository', () => {
         updatedAt: '2024-01-01T00:00:00.000Z',
         starshipId: 'starship-123',
         description: 'Test Description',
-      } as any;
+      } as never;
 
       // Since empty updates still add updatedAt, we need to mock the executeWrite for the update
       mockConnection.executeWrite.mockResolvedValue([{ m: existingMission }]);
@@ -406,7 +410,7 @@ describe('MissionRepository', () => {
     });
 
     it('should validate mission status', async () => {
-      const updates = { status: 'invalid-status' } as any;
+      const updates = { status: 'invalid-status' } as never;
 
       await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(DatabaseError);
     });
@@ -454,7 +458,7 @@ describe('MissionRepository', () => {
     });
 
     it('should validate agentIds array', async () => {
-      const updates = { agentIds: 'not-array' } as any;
+      const updates = { agentIds: 'not-array' } as never;
 
       await expect(repository.updateMission('mission-123', updates)).rejects.toThrow(DatabaseError);
     });

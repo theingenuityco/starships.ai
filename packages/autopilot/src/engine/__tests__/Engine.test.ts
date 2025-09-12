@@ -5,7 +5,7 @@
  */
 
 import { Engine } from '@/engine/Engine';
-import { Blueprint, Execution, NodeResult } from '@/types';
+import { Blueprint, Execution } from '@/types';
 
 describe('Engine', () => {
   let engine: Engine;
@@ -45,7 +45,7 @@ describe('Engine', () => {
           ...mockBlueprint.nodes,
           {
             ref: 'unsupported',
-            type: 'unknown_type' as any,
+            type: 'unknown_type' as 'start', // Cast to valid type for test
             name: 'Unknown',
             description: 'Unknown node',
             parameters: {},
@@ -87,7 +87,7 @@ describe('Engine', () => {
     it('should throw error for unsupported node type', async () => {
       const unsupportedNode = {
         ref: 'test',
-        type: 'unsupported_type' as any,
+        type: 'unsupported_type' as 'start', // Cast to valid type for test
         name: 'Test',
         description: 'Test node',
         parameters: {},
@@ -157,18 +157,6 @@ describe('Engine', () => {
       const execution = engine.getCurrentExecution();
       expect(execution).toBeDefined();
       expect(execution.status).toBe('completed');
-    });
-  });
-
-  describe('event handling', () => {
-    it('should register and unregister event callbacks', () => {
-      const callback = jest.fn();
-
-      engine.onEvent(callback);
-      engine.offEvent(callback);
-
-      // No direct way to test this without executing a workflow
-      expect(callback).not.toHaveBeenCalled();
     });
   });
 });

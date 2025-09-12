@@ -3,7 +3,7 @@ import { MessageService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
 import { MemoryService } from '@/services/MemoryService';
 import { StreamingService } from '@/services/StreamingService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
@@ -17,16 +17,6 @@ const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 const ConversationSourceSchema = z.enum(['agent', 'user']);
-
-// Helper function for authentication check
-const checkAuth = (req: Request, res: Response): boolean => {
-  const user = req.user;
-  if (!user?.id) {
-    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-    return false;
-  }
-  return true;
-};
 
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
@@ -58,9 +48,6 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
  */
 router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -72,7 +59,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
-      const streamingService = StreamingService.getInstance();
+      const streamingService = new StreamingService();
       streamingService.addConnection(conversationId, res);
 
       // Send existing messages after connection is established
@@ -82,13 +69,13 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         limit: 1000, // Get all existing messages
         offset: 0,
         orderBy: 'timestamp',
-        orderDirection: 'asc',
+        orderDirection: 'desc', // Consistent with API mode
       });
 
       if (conversationData && conversationData.messages.length > 0) {
         // Send existing messages via StreamingService
         for (const message of conversationData.messages) {
-          await streamingService.broadcastMessage(conversationId, message);
+          await streamingService.broadcastMessage(conversationId);
         }
       }
 
@@ -136,7 +123,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       sendSuccess(res, conversationData, 200, paginationMeta);
     }
   } catch (error) {
-    handleCommonError(error, res, 'fetching conversation messages');
+    handleError(error, res, 'fetching conversation messages');
   }
 });
 
@@ -145,9 +132,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
  */
 router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -168,27 +152,27 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { agentId, message } = bodyValidation;
     const userId = req.user!.id;
 
-    // Detect streaming request via Accept header or query parameter
-    const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
+    // Detect streaming request via Accept header
+    const wantsStreaming = req.get('Accept')?.includes('text/event-stream');
 
     const conversationService = new ConversationService();
 
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
       // This automatically sends connection confirmation via sendEvent('connection', ...)
-      const streamingService = StreamingService.getInstance();
+      const streamingService = new StreamingService();
       streamingService.addConnection(conversationId, res);
 
       // Process conversation with streaming (async - don't await)
       // Using conversationId as stream identifier - much simpler!
       conversationService
-        .processConversationWithStreaming({
+        .addMessage({
           conversationId,
           agentId,
           userId,
           message,
         })
-        .catch((error) => {
+        .catch((error: any) => {
           console.error('❌ [UNIFIED STREAMING] Processing failed:', error);
           // Error will be handled by the streaming service and conversation service
         });
@@ -207,9 +191,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
       sendSuccess(res, result);
     }
   } catch (error) {
-    if (!handleCommonError(error, res, 'processing conversation message')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to process conversation message');
-    }
+    handleError(error, res, 'processing conversation message');
   }
 });
 
@@ -218,9 +200,6 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
  */
 router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -244,9 +223,7 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
 
     sendSuccess(res, { message: 'Conversation memory cleared successfully' }, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'clearing conversation memory')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to clear conversation memory');
-    }
+    handleError(error, res, 'clearing conversation memory');
   }
 });
 
@@ -255,9 +232,6 @@ router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async 
  */
 router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -284,9 +258,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     const paginationMeta = createPaginationMeta(page, limit, conversationWithMessages.messages.length);
     sendSuccess(res, conversationWithMessages, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching conversation details')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch conversation details');
-    }
+    handleError(error, res, 'fetching conversation details');
   }
 });
 
@@ -295,9 +267,6 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
  */
 router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate starshipId parameter
     const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
@@ -320,9 +289,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     const paginationMeta = createPaginationMeta(page, limit, allConversations.length);
     sendSuccess(res, conversations, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starship conversations')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship conversations');
-    }
+    handleError(error, res, 'fetching starship conversations');
   }
 });
 
@@ -331,9 +298,6 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
  */
 router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate userId parameter
     const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
     if (!paramValidation) return;
@@ -363,9 +327,7 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
     const paginationMeta = createPaginationMeta(page, limit, allConversations.length);
     sendSuccess(res, conversations, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user conversations')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user conversations');
-    }
+    handleError(error, res, 'fetching user conversations');
   }
 });
 
@@ -374,9 +336,6 @@ router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Reques
  */
 router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate request body
     const bodyValidation = validateData(
       z.object({
@@ -402,9 +361,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
 
     sendSuccess(res, conversation, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating conversation')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create conversation');
-    }
+    handleError(error, res, 'creating conversation');
   }
 });
 
@@ -413,9 +370,6 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
  */
 router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -461,9 +415,7 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
     const updatedConversation = await conversationService.getConversationById(conversationId);
     sendSuccess(res, updatedConversation, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating conversation status')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update conversation status');
-    }
+    handleError(error, res, 'updating conversation status');
   }
 });
 
@@ -472,9 +424,6 @@ router.patch('/conversations/:conversationId/status', jwtAuthMiddleware, async (
  */
 router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate conversationId parameter
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
@@ -500,9 +449,7 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete conversation');
     }
   } catch (error) {
-    if (!handleCommonError(error, res, 'deleting conversation')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete conversation');
-    }
+    handleError(error, res, 'deleting conversation');
   }
 });
 

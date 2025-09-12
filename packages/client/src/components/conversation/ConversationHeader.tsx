@@ -35,7 +35,7 @@ export function ConversationHeader({ conversation, onStatusChange, onArchive, on
   }
 
   const getLastActivityText = () => {
-    return formatDistanceToNow(new Date(conversation.lastActivityAt), { addSuffix: true })
+    return formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), { addSuffix: true })
   }
 
   return (
@@ -47,18 +47,8 @@ export function ConversationHeader({ conversation, onStatusChange, onArchive, on
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
-              <MessageSquare className="w-4 h-4" />
-              <span>{conversation.messageCount} messages</span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <Zap className="w-4 h-4" />
-              <span>{conversation.totalTokens.toLocaleString()} tokens</span>
-            </div>
-
-            <div className="flex items-center gap-1">
               <Clock className="w-4 h-4" />
-              <span>Active {getLastActivityText()}</span>
+              <span>Updated {getLastActivityText()}</span>
             </div>
           </div>
         </div>

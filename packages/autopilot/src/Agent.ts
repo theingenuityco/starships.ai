@@ -7,26 +7,17 @@
  */
 
 import { AgentMemory, AgentMemoryState } from '@/AgentMemory';
-import { Engine, EventCallback } from '@/engine/Engine';
-import { AgentNodeParameters, Blueprint, Edge, Execution, Node } from '@/types';
+import { Engine } from '@/engine/Engine';
+import { AgentParams, Blueprint, Edge, Execution, Node } from '@/types';
 
 export class Agent {
-  private params: AgentNodeParameters;
+  private params: AgentParams;
   private memory: AgentMemory;
   private engine: Engine;
 
-  constructor(params: AgentNodeParameters) {
+  constructor(params: AgentParams) {
     // Store agent parameters
-    this.params = {
-      ...params,
-      // Ensure blueprint has a deep copy to avoid mutations
-      blueprint: {
-        ...params.blueprint,
-        nodes: (params.blueprint.nodes || []).map((node) => ({ ...node })),
-        edges: (params.blueprint.edges || []).map((edge) => ({ ...edge })),
-        metadata: { ...params.blueprint.metadata },
-      },
-    };
+    this.params = structuredClone(params);
 
     // Create AgentMemory instance from config
     this.memory = new AgentMemory({ state: params.memory });
@@ -80,7 +71,7 @@ export class Agent {
   /**
    * Get agent parameters (read-only copy)
    */
-  getParameters(): AgentNodeParameters {
+  getParameters(): AgentParams {
     return JSON.parse(JSON.stringify(this.params));
   }
 
@@ -113,9 +104,9 @@ export class Agent {
   }
 
   /**
-   * Execute the agent with optional event monitoring
+   * Execute the agent
    */
-  async execute(initialExecution?: Execution, eventCallback?: EventCallback): Promise<Execution> {
+  async execute(initialExecution?: Execution): Promise<Execution> {
     try {
       console.log(
         `Executing Agent: ${this.params.name} (${this.params.model})${initialExecution?.streaming?.enabled ? ' (streaming)' : ''}`
@@ -129,20 +120,8 @@ export class Agent {
         ...initialExecution,
       };
 
-      // Register event callback if provided
-      if (eventCallback) {
-        this.onEvent(eventCallback);
-      }
-
-      try {
-        const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
-        return result;
-      } finally {
-        // Clean up event callback
-        if (eventCallback) {
-          this.offEvent(eventCallback);
-        }
-      }
+      const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
+      return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Agent execution failed: ${errorMessage}`);
@@ -231,7 +210,7 @@ export class Agent {
       messages: this.memory.getMessageHistory(),
     };
 
-    const clonedParams: AgentNodeParameters = {
+    const clonedParams: AgentParams = {
       ...this.params,
       memory: memoryState,
       blueprint: {
@@ -247,7 +226,7 @@ export class Agent {
   /**
    * Update agent parameters
    */
-  updateParameters(updates: Partial<AgentNodeParameters>): Agent {
+  updateParameters(updates: Partial<AgentParams>): Agent {
     // Convert current memory back to state if not being updated
     const currentMemoryState: AgentMemoryState = {
       identity: this.memory.getIdentity(),
@@ -266,23 +245,5 @@ export class Agent {
     };
 
     return new Agent(updatedParams);
-  }
-
-  // ============================================================================
-  // EVENT HANDLING - Forward Engine Events
-  // ============================================================================
-
-  /**
-   * Register a callback to receive workflow execution events
-   */
-  onEvent(callback: EventCallback): void {
-    this.engine.onEvent(callback);
-  }
-
-  /**
-   * Remove an event callback
-   */
-  offEvent(callback: EventCallback): void {
-    this.engine.offEvent(callback);
   }
 }

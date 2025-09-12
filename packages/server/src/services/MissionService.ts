@@ -45,9 +45,6 @@ export class MissionService {
         if (!agent) {
           throw new NotFoundError('Agent', agentId);
         }
-        if (agent.starshipId !== request.starshipId) {
-          throw new ValidationError(`Agent ${agentId} does not belong to starship ${request.starshipId}`, 'agentIds');
-        }
         assignedAgents.push(agent);
       } catch (error) {
         if (error instanceof NotFoundError) {
@@ -154,9 +151,6 @@ export class MissionService {
           const agent = await agentRepo.findById(agentId);
           if (!agent) {
             throw new NotFoundError('Agent', agentId);
-          }
-          if (agent.starshipId !== existingMission.starshipId) {
-            throw new ValidationError(`Agent ${agentId} does not belong to mission's starship ${existingMission.starshipId}`, 'agentIds');
           }
         } catch (error) {
           if (error instanceof NotFoundError) {

@@ -6,6 +6,22 @@
  */
 
 /**
+ * Simple request-like object interface for extracting context
+ */
+interface RequestLike {
+  method?: string;
+  path?: string;
+  url?: string;
+  id?: string;
+  requestId?: string;
+  ip?: string;
+  user?: { id?: string };
+  userId?: string;
+  connection?: { remoteAddress?: string };
+  get?: (header: string) => string | undefined;
+}
+
+/**
  * Simple context for error tracking
  */
 export interface ErrorContext {
@@ -22,7 +38,7 @@ export interface ErrorContext {
   requestId?: string;
 
   /** Any additional context data */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -34,7 +50,7 @@ export function createContext(
     operation?: string;
     userId?: string;
     requestId?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }
 ): ErrorContext {
   return {
@@ -56,14 +72,14 @@ export function generateRequestId(): string {
 /**
  * Extract safe user ID from request or context
  */
-export function extractUserId(req?: any): string | undefined {
+export function extractUserId(req?: RequestLike): string | undefined {
   return req?.user?.id || req?.userId || undefined;
 }
 
 /**
  * Create context from HTTP request
  */
-export function fromRequest(req: any, operation?: string): ErrorContext {
+export function fromRequest(req: RequestLike, operation?: string): ErrorContext {
   return {
     location: `${req.method} ${req.path || req.url}`,
     operation,

@@ -24,11 +24,23 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
   const [formData, setFormData] = useState<CreateAgentRequest>({
     name: agent?.name || '',
     description: agent?.description || '',
-    category: agent?.category || 'general',
     model: agent?.model || 'gpt-4',
     temperature: agent?.temperature,
     maxTokens: agent?.maxTokens,
-    starshipId: agent?.starshipId || '',
+    memory: agent?.memory || {
+      shortTermMemory: [],
+      longTermMemory: [],
+      emotionalState: {
+        currentMood: 'neutral',
+        intensity: 0.5,
+        previousMoods: [],
+      },
+      context: {},
+    },
+    blueprint: agent?.blueprint || {
+      nodes: [],
+      edges: [],
+    },
   })
 
   // Legacy UI state (not part of protocol)
@@ -49,13 +61,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
       errors.name = 'Agent name is required'
     }
 
-    if (!formData.category) {
-      errors.category = 'Category is required'
-    }
-
-    if (!(formData as any).starshipId) {
-      errors.starshipId = 'Starship assignment is required'
-    }
+    // starshipId validation removed
 
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -149,30 +155,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   <Tag className="h-4 w-4 text-muted-foreground" />
                   Category
                 </label>
-                <Select value={formData.category} onValueChange={value => setFormData(prev => ({ ...prev, category: value as AgentModel['category'] }))}>
-                  <SelectTrigger className="border-muted-foreground/20 focus:border-primary">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(categoryIcons).map(([category, Icon]) => (
-                      <SelectItem key={category} value={category}>
-                        <div className="flex items-center gap-2">
-                          <Icon
-                            className={cn(
-                              'h-4 w-4',
-                              category === 'general' && 'text-blue-500',
-                              category === 'coding' && 'text-green-500',
-                              category === 'creative' && 'text-purple-500',
-                              category === 'analysis' && 'text-orange-500',
-                              category === 'support' && 'text-pink-500'
-                            )}
-                          />
-                          <span className="capitalize">{category}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="text-sm text-muted-foreground p-2 border rounded border-muted-foreground/20 bg-muted/5">Category inferred from agent name</div>
                 <p className="text-xs text-muted-foreground">Select the category that best describes your agent&apos;s purpose</p>
               </div>
             </div>
@@ -183,14 +166,7 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   <Rocket className="h-4 w-4 text-muted-foreground" />
                   Starship Assignment
                 </label>
-                <StarshipSelector
-                  value={formData.starshipId}
-                  onValueChange={starshipId => setFormData(prev => ({ ...prev, starshipId }))}
-                  placeholder="Select a starship to deploy this agent"
-                  className={`border-muted-foreground/20 focus:border-primary ${formErrors.starshipId ? 'border-destructive' : ''}`}
-                />
-                {formErrors.starshipId && <p className="text-sm text-destructive">{formErrors.starshipId}</p>}
-                <p className="text-xs text-muted-foreground">Choose the starship where this agent will be deployed</p>
+                <div className="text-sm text-muted-foreground p-2 border rounded border-muted-foreground/20 bg-muted/5">Starship assignment managed separately</div>
               </div>
             </div>
           </div>

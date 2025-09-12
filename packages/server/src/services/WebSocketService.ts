@@ -1,5 +1,14 @@
-import type { ConversationResponse } from '@starships/protocol';
 import { WebSocket, WebSocketServer } from 'ws';
+
+interface ConversationResponse {
+  source: 'agent';
+  content: string;
+  agentId: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+  };
+}
 
 // Streaming chunk interface
 export interface StreamingChunk {

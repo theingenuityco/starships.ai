@@ -72,7 +72,9 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
       }
     }
 
-    return combinedMessages
+    // Sort messages by timestamp to ensure consistent ordering
+    // This handles both API messages and dynamically added messages (user/streaming)
+    return combinedMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
   }, [messages, isStreaming, streamingContent, conversationId, starshipId])
 
   // Message selection state
@@ -210,10 +212,7 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
       <div className="flex-1 relative">
         <div ref={scrollContainerRef} className="h-full overflow-y-auto message-scroll-area flex justify-center">
           <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
-            {displayMessages
-              .slice()
-              .reverse()
-              .map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
+            {displayMessages.map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
           </div>
         </div>
       </div>

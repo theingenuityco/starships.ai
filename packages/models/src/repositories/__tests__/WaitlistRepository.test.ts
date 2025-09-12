@@ -18,7 +18,7 @@ describe('WaitlistRepository', () => {
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<Neo4jConnection>;
 
     repository = new WaitlistRepository(mockConnection);
     jest.clearAllMocks();
@@ -347,7 +347,7 @@ describe('WaitlistRepository', () => {
   describe('private helper methods', () => {
     describe('normalizeEmail', () => {
       it('should convert to lowercase and trim whitespace', () => {
-        const repo = repository as any;
+        const repo = repository as unknown as { normalizeEmail: (email: string) => string };
 
         expect(repo.normalizeEmail('  TEST@EXAMPLE.COM  ')).toBe('test@example.com');
         expect(repo.normalizeEmail('MixedCase@Domain.org')).toBe('mixedcase@domain.org');
@@ -357,7 +357,7 @@ describe('WaitlistRepository', () => {
 
     describe('isValidEmail', () => {
       it('should validate correct email formats', () => {
-        const repo = repository as any;
+        const repo = repository as unknown as { isValidEmail: (email: string) => boolean };
 
         expect(repo.isValidEmail('test@example.com')).toBe(true);
         expect(repo.isValidEmail('user.name@domain.org')).toBe(true);
@@ -366,7 +366,7 @@ describe('WaitlistRepository', () => {
       });
 
       it('should reject invalid email formats', () => {
-        const repo = repository as any;
+        const repo = repository as unknown as { isValidEmail: (email: string) => boolean };
 
         expect(repo.isValidEmail('invalid-email')).toBe(false);
         expect(repo.isValidEmail('@example.com')).toBe(false);
@@ -453,7 +453,7 @@ describe('WaitlistRepository', () => {
       const mockEntry = createMockWaitlistEntry({ notes: undefined });
       mockConnection.executeWrite.mockResolvedValue([{ entry: mockEntry }]);
 
-      const result = await repository.addApprovedEmail('test@example.com', '');
+      await repository.addApprovedEmail('test@example.com', '');
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.any(String),

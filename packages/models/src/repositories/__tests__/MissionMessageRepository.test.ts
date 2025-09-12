@@ -15,14 +15,14 @@ jest.mock('uuid', () => ({
 
 describe('MissionMessageRepository', () => {
   let repository: MissionMessageRepository;
-  let mockGetConnection: jest.MockedFunction<any>;
+  let mockGetConnection: jest.MockedFunction<typeof getConnection>;
   let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
     mockConnection = {
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<Neo4jConnection>;
 
     // Mock getConnection to return our mock connection
     mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
@@ -43,7 +43,7 @@ describe('MissionMessageRepository', () => {
     ...overrides,
   });
 
-  const createMockMessageInput = (overrides: any = {}) => ({
+  const createMockMessageInput = (overrides: Record<string, unknown> = {}) => ({
     missionId: 'mission-123',
     role: 'user' as MissionMessageRole,
     content: 'Test message content',
@@ -110,7 +110,7 @@ describe('MissionMessageRepository', () => {
       ];
 
       for (const invalidInput of invalidInputs) {
-        await expect(repository.saveMessage(invalidInput as any)).rejects.toThrow(ValidationError);
+        await expect(repository.saveMessage(invalidInput as Parameters<typeof repository.saveMessage>[0])).rejects.toThrow(ValidationError);
       }
     });
 
@@ -123,14 +123,16 @@ describe('MissionMessageRepository', () => {
       ];
 
       for (const invalidType of invalidTypes) {
-        await expect(repository.saveMessage(invalidType as any)).rejects.toThrow(ValidationError);
+        await expect(repository.saveMessage(invalidType as unknown as Parameters<typeof repository.saveMessage>[0])).rejects.toThrow(
+          ValidationError
+        );
       }
     });
 
     it('should validate role enum', async () => {
       const invalidRole = createMockMessageInput({ role: 'invalid_role' });
 
-      await expect(repository.saveMessage(invalidRole as any)).rejects.toThrow(ValidationError);
+      await expect(repository.saveMessage(invalidRole as Parameters<typeof repository.saveMessage>[0])).rejects.toThrow(ValidationError);
     });
 
     it('should validate string lengths', async () => {
@@ -436,7 +438,7 @@ describe('MissionMessageRepository', () => {
 
       for (const role of invalidRoles) {
         const messageInput = createMockMessageInput({ role });
-        await expect(repository.saveMessage(messageInput as any)).rejects.toThrow(ValidationError);
+        await expect(repository.saveMessage(messageInput as Parameters<typeof repository.saveMessage>[0])).rejects.toThrow(ValidationError);
       }
     });
   });
@@ -622,7 +624,7 @@ describe('MissionMessageRepository', () => {
 
     it('should handle empty mission check result edge case', async () => {
       const messageInput = createMockMessageInput();
-      mockConnection.executeQuery.mockResolvedValue(null as any); // Null result
+      mockConnection.executeQuery.mockResolvedValue(null as unknown as never[]); // Null result
 
       await expect(repository.saveMessage(messageInput)).rejects.toThrow(NotFoundError);
     });

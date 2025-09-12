@@ -492,7 +492,7 @@ export const agentAPI = {
     console.log('[API] Creating new agent:', agent.name)
     const data = await api.post('/api/v1/agents', agent).then(res => {
       const agent = extractResponseData<Agent>(res)
-      console.log('[API] Agent created successfully:', agent.id, 'authorId:', agent.authorId)
+      console.log('[API] Agent created successfully:', agent.id)
       return agent
     })
     console.log('[API] Invalidating agent caches after creation')
@@ -512,7 +512,7 @@ export const agentAPI = {
   },
 
   // Enhanced query methods with caching
-  getByCategory: async (category: Agent['category']): Promise<Agent[]> => {
+  getByCategory: async (category: 'general' | 'coding' | 'creative' | 'analysis' | 'support'): Promise<Agent[]> => {
     const cacheKey = CACHE_KEYS.AGENTS_BY_CATEGORY(category)
     const cached = apiCache.get<Agent[]>(cacheKey)
     if (cached) {

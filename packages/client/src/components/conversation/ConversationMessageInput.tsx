@@ -79,7 +79,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (!currentConversationId) {
           console.log('Creating new conversation for agent chat...')
           const newConversation = await createConversation.mutateAsync({
-            source: 'agent',
+            title: `Chat with ${selectedAgent.name}`,
             starshipId: starshipId,
           })
           currentConversationId = newConversation.id
@@ -137,7 +137,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (!currentConversationId) {
           console.log('Creating new conversation for agent chat suggestion...')
           const newConversation = await createConversation.mutateAsync({
-            source: 'agent',
+            title: `Chat with ${selectedAgent.name}`,
             starshipId: starshipId,
           })
           currentConversationId = newConversation.id

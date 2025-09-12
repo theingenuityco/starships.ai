@@ -15,15 +15,16 @@ export function createDatabaseMock() {
   return mockConnection;
 }
 
-export function mockRepositorySuccess(mockConnection: any, data: any) {
+export function mockRepositorySuccess(mockConnection: Record<string, unknown>, data: unknown) {
   // Mock successful create operation using createEntityWithAutoId pattern
-  mockConnection.executeWrite.mockResolvedValue([{ n: data }]);
+  (mockConnection.executeWrite as jest.MockedFunction<() => Promise<unknown>>).mockResolvedValue([{ n: data }]);
 }
 
-export function mockRepositoryQuery(mockConnection: any, data: any) {
+export function mockRepositoryQuery(mockConnection: Record<string, unknown>, data: unknown) {
   // Mock successful query operations
+  const mockQuery = mockConnection.executeQuery as jest.MockedFunction<() => Promise<unknown>>;
   if (Array.isArray(data)) {
-    mockConnection.executeQuery.mockResolvedValue(
+    mockQuery.mockResolvedValue(
       data.map((item) => ({
         n: item,
         // Also provide common field mappings
@@ -38,7 +39,7 @@ export function mockRepositoryQuery(mockConnection: any, data: any) {
       }))
     );
   } else if (data) {
-    mockConnection.executeQuery.mockResolvedValue([
+    mockQuery.mockResolvedValue([
       {
         n: data,
         u: data,
@@ -52,35 +53,35 @@ export function mockRepositoryQuery(mockConnection: any, data: any) {
       },
     ]);
   } else {
-    mockConnection.executeQuery.mockResolvedValue([]);
+    mockQuery.mockResolvedValue([]);
   }
 }
 
-export function mockRepositoryError(mockConnection: any, errorMessage: string = 'Database error') {
-  mockConnection.executeQuery.mockRejectedValue(new Error(errorMessage));
-  mockConnection.executeWrite.mockRejectedValue(new Error(errorMessage));
+export function mockRepositoryError(mockConnection: Record<string, unknown>, errorMessage: string = 'Database error') {
+  (mockConnection.executeQuery as jest.MockedFunction<() => Promise<unknown>>).mockRejectedValue(new Error(errorMessage));
+  (mockConnection.executeWrite as jest.MockedFunction<() => Promise<unknown>>).mockRejectedValue(new Error(errorMessage));
 }
 
-export function mockConstraintViolationError(mockConnection: any) {
+export function mockConstraintViolationError(mockConnection: Record<string, unknown>) {
   const constraintError = new Error('Neo.ClientError.Schema.ConstraintValidationFailed: constraint violation');
-  mockConnection.executeWrite.mockRejectedValue(constraintError);
+  (mockConnection.executeWrite as jest.MockedFunction<() => Promise<unknown>>).mockRejectedValue(constraintError);
 }
 
-export function mockMergeEntityWithAutoId(mockConnection: any, data: any) {
+export function mockMergeEntityWithAutoId(mockConnection: Record<string, unknown>, data: unknown) {
   // Mock the mergeEntityWithAutoId pattern
-  mockConnection.executeWrite.mockResolvedValue([{ n: data }]);
+  (mockConnection.executeWrite as jest.MockedFunction<() => Promise<unknown>>).mockResolvedValue([{ n: data }]);
 }
 
-export function mockUpdateEntity(mockConnection: any, data: any) {
+export function mockUpdateEntity(mockConnection: Record<string, unknown>, data: unknown) {
   // Mock update operations
   if (data) {
-    mockConnection.executeWrite.mockResolvedValue([{ u: data }]);
+    (mockConnection.executeWrite as jest.MockedFunction<() => Promise<unknown>>).mockResolvedValue([{ u: data }]);
   } else {
-    mockConnection.executeWrite.mockResolvedValue([]);
+    (mockConnection.executeWrite as jest.MockedFunction<() => Promise<unknown>>).mockResolvedValue([]);
   }
 }
 
-export function mockDeleteEntity(mockConnection: any, deleted: boolean = true) {
+export function mockDeleteEntity(mockConnection: Record<string, unknown>, deleted: boolean = true) {
   // Mock delete operations
-  mockConnection.executeWrite.mockResolvedValue([{ deletedCount: deleted ? 1 : 0 }]);
+  (mockConnection.executeWrite as jest.MockedFunction<() => Promise<unknown>>).mockResolvedValue([{ deletedCount: deleted ? 1 : 0 }]);
 }

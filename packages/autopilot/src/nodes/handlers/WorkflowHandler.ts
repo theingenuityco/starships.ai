@@ -6,14 +6,14 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, ValidationError, ValidationResult, ValidationWarning, WorkflowNodeParameters } from '@/types';
+import { Execution, ValidationError, ValidationResult, ValidationWarning, WorkflowParams } from '@/types';
 import { Workflow } from '@/Workflow';
 
 export class WorkflowHandler extends BaseHandler {
   readonly type = 'workflow';
 
   async execute(execution: Execution) {
-    const params = this.node.parameters as WorkflowNodeParameters;
+    const params = this.node.parameters as WorkflowParams;
 
     try {
       console.log('Executing embedded workflow');
@@ -48,7 +48,7 @@ export class WorkflowHandler extends BaseHandler {
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
-    const params = this.node.parameters as WorkflowNodeParameters;
+    const params = this.node.parameters as WorkflowParams;
 
     // Check for required fields
     if (!params.blueprint) {

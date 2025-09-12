@@ -60,14 +60,14 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should limit metrics to maximum count', () => {
-      const maxMetrics = (performanceMonitor as any).maxMetrics; // 1000
+      const maxMetrics = (performanceMonitor as unknown as { maxMetrics: number }).maxMetrics; // 1000
 
       // Record more than max metrics
       for (let i = 0; i < maxMetrics + 100; i++) {
         performanceMonitor.recordQuery(`QUERY_${i}`, 100);
       }
 
-      const allMetrics = (performanceMonitor as any).metrics;
+      const allMetrics = (performanceMonitor as unknown as { metrics: QueryMetrics[] }).metrics;
       expect(allMetrics.length).toBe(maxMetrics);
 
       // Should keep the most recent ones
@@ -267,7 +267,7 @@ describe('PerformanceMonitor', () => {
       performanceMonitor.recordQuery('QUERY_2', 200);
       performanceMonitor.recordQuery('QUERY_3', 300);
 
-      const allMetrics = (performanceMonitor as any).metrics as QueryMetrics[];
+      const allMetrics = (performanceMonitor as unknown as { metrics: QueryMetrics[] }).metrics;
 
       for (let i = 1; i < allMetrics.length; i++) {
         expect(allMetrics[i].timestamp).toBeGreaterThan(allMetrics[i - 1].timestamp);
@@ -299,7 +299,7 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should handle null and undefined parameters correctly', () => {
-      performanceMonitor.recordQuery('NULL_PARAMS', 100, null, 5);
+      performanceMonitor.recordQuery('NULL_PARAMS', 100, null as unknown as Record<string, unknown>, 5);
       performanceMonitor.recordQuery('UNDEFINED_PARAMS', 150, undefined, 10);
 
       const nullParamMetrics = performanceMonitor.getMetricsForOperation('NULL_PARAMS');
@@ -368,7 +368,7 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should handle queries with circular references in parameters', () => {
-      const circularParams: any = { name: 'test' };
+      const circularParams: Record<string, unknown> = { name: 'test' };
       circularParams.self = circularParams;
 
       // Should not throw error when recording
@@ -535,7 +535,7 @@ describe('PerformanceMonitor', () => {
         performanceMonitor.recordQuery(`QUERY_${i}`, 100, {}, count);
       });
 
-      const allMetrics = (performanceMonitor as any).metrics as QueryMetrics[];
+      const allMetrics = (performanceMonitor as unknown as { metrics: QueryMetrics[] }).metrics;
 
       resultCounts.forEach((expectedCount, i) => {
         expect(allMetrics[i].resultCount).toBe(expectedCount);
@@ -589,14 +589,14 @@ describe('PerformanceMonitor', () => {
 
   describe('memory management', () => {
     it('should not exceed maximum metrics limit during normal operation', () => {
-      const maxMetrics = (performanceMonitor as any).maxMetrics;
+      const maxMetrics = (performanceMonitor as unknown as { maxMetrics: number }).maxMetrics;
 
       // Record exactly max metrics
       for (let i = 0; i < maxMetrics; i++) {
         performanceMonitor.recordQuery(`QUERY_${i}`, 100);
       }
 
-      const metricsArray = (performanceMonitor as any).metrics;
+      const metricsArray = (performanceMonitor as unknown as { metrics: QueryMetrics[] }).metrics;
       expect(metricsArray.length).toBe(maxMetrics);
 
       // Record one more
@@ -606,14 +606,14 @@ describe('PerformanceMonitor', () => {
     });
 
     it('should maintain most recent metrics when limit exceeded', () => {
-      const maxMetrics = (performanceMonitor as any).maxMetrics;
+      const maxMetrics = (performanceMonitor as unknown as { maxMetrics: number }).maxMetrics;
 
       // Record more than max
       for (let i = 0; i < maxMetrics + 5; i++) {
         performanceMonitor.recordQuery(`QUERY_${i}`, 100);
       }
 
-      const metricsArray = (performanceMonitor as any).metrics;
+      const metricsArray = (performanceMonitor as unknown as { metrics: QueryMetrics[] }).metrics;
 
       // Should have most recent metrics (5 through maxMetrics + 4)
       expect(metricsArray[0].operation).toBe('QUERY_5');

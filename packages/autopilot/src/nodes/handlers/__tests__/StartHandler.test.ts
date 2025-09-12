@@ -65,9 +65,7 @@ describe('StartHandler', () => {
     });
 
     it('should set execution timestamp within reasonable time', async () => {
-      const beforeTime = new Date().getTime();
       const result = await handler.execute(mockExecution);
-      const afterTime = new Date().getTime();
 
       const nodeResult = result.executionResults.get('start-node');
       expect(nodeResult).toBeDefined();

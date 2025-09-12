@@ -4,6 +4,7 @@ import { StreamingService } from '@/services/StreamingService';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, MessageRepository } from '@starships/models';
 import { ConversationModel } from '@starships/protocol';
+import { AutopilotStreamService } from './AutopilotStreamService';
 
 export interface CreateConversationData {
   metadata?: Record<string, unknown>;
@@ -42,7 +43,7 @@ export class ConversationService {
     this.conversationRepository = new ConversationRepository();
     this.messageRepository = new MessageRepository();
     this.messageService = new MessageService();
-    this.streamingService = StreamingService.getInstance();
+    this.streamingService = new StreamingService();
   }
 
   /**
@@ -51,11 +52,8 @@ export class ConversationService {
   async createConversation(data: CreateConversationData): Promise<ConversationModel> {
     const conversation = await this.conversationRepository.create(
       {
-        lastActivityAt: new Date().toISOString(),
-        messageCount: 0,
-        totalTokens: 0,
+        title: 'New Conversation',
         status: 'active',
-        metadata: data.metadata,
       },
       data.starshipId
     );
@@ -123,12 +121,12 @@ export class ConversationService {
    */
   async updateConversationActivity(conversationId: string): Promise<void> {
     await this.conversationRepository.update(conversationId, {
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
   /**
-   * Increment message count for a conversation
+   * Increment message count for a conversation (placeholder - no longer tracking count)
    */
   async incrementMessageCount(conversationId: string, increment: number = 1): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
@@ -137,13 +135,12 @@ export class ConversationService {
     }
 
     await this.conversationRepository.update(conversationId, {
-      messageCount: (conversation.messageCount || 0) + increment,
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
   /**
-   * Update token usage for a conversation
+   * Update token usage for a conversation (placeholder - no longer tracking tokens)
    */
   async updateTokenCount(conversationId: string, tokens: number): Promise<void> {
     const conversation = await this.conversationRepository.findById(conversationId);
@@ -152,8 +149,7 @@ export class ConversationService {
     }
 
     await this.conversationRepository.update(conversationId, {
-      totalTokens: (conversation.totalTokens || 0) + tokens,
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -177,7 +173,7 @@ export class ConversationService {
   async updateConversationStatus(conversationId: string, status: 'active' | 'paused' | 'completed' | 'archived'): Promise<void> {
     await this.conversationRepository.update(conversationId, {
       status,
-      lastActivityAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
   }
 
@@ -185,7 +181,7 @@ export class ConversationService {
    * Process conversation with streaming support
    * Uses conversationId as the stream identifier - no database streaming state needed
    */
-  async processConversationWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
+  async addMessageWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
     const { conversationId, agentId, userId, message } = data;
 
     try {
@@ -208,33 +204,8 @@ export class ConversationService {
         userId,
       });
 
-      // Send immediate empty assistant message for instant UI feedback
-      // Use conversationId as stream identifier
-      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const emptyAssistantMessage = {
-        id: messageId,
-        role: 'assistant' as const,
-        content: '', // Empty initially - will be filled by chunks
-        timestamp: new Date().toISOString(),
-        conversationId,
-        starshipId: starshipInfo.id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: 'processing' as const,
-        messageType: 'agent_response' as const,
-        importance: 'medium' as const,
-        contentLength: 0,
-        hasAttachments: false,
-      };
-
-      // Broadcast empty message immediately for instant bubble (using conversationId as streamId)
-      await this.streamingService.broadcastMessage(conversationId, emptyAssistantMessage);
-
       // Execute agent conversation with streaming
       const response = await AgentService.executeConversationWithStreaming({
-        source: 'user',
         agentId,
         userId,
         message,
@@ -255,7 +226,7 @@ export class ConversationService {
         },
         {
           usage: response.usage,
-          tokenCount: response.usage?.totalTokens,
+          tokenCount: response.usage ? response.usage.promptTokens + response.usage.completionTokens : undefined,
         }
       );
 
@@ -264,7 +235,7 @@ export class ConversationService {
       await this.incrementMessageCount(conversationId, 2); // User message + assistant response
 
       // Send final completion event via streaming (using conversationId as streamId)
-      await this.streamingService.broadcastComplete(conversationId, response);
+      await this.streamingService.broadcastComplete(response);
 
       return {
         reply: response.content,
@@ -274,7 +245,7 @@ export class ConversationService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
       // Broadcast error using conversationId as streamId
-      await this.streamingService.broadcastError(conversationId, {
+      await this.streamingService.broadcastError({
         streamId: conversationId,
         errorCode: 'CONVERSATION_PROCESSING_FAILED',
         message: errorMessage,
@@ -314,7 +285,6 @@ export class ConversationService {
 
     // Execute agent conversation - streaming support will be added
     const response = await AgentService.executeConversation({
-      source: 'user',
       agentId,
       userId,
       message,
@@ -334,7 +304,7 @@ export class ConversationService {
       },
       {
         usage: response.usage,
-        tokenCount: response.usage?.totalTokens,
+        tokenCount: response.usage ? response.usage.promptTokens + response.usage.completionTokens : undefined,
       }
     );
 
@@ -348,15 +318,6 @@ export class ConversationService {
       reply: response.content,
       usage: response.usage,
     };
-  }
-
-  /**
-   * Add message to conversation with streaming support
-   * @deprecated Use processConversationWithStreaming instead for conversation-level streaming
-   */
-  async addMessageWithStreaming(data: AddMessageData): Promise<AddMessageResponse> {
-    // Delegate to new conversation-level streaming method
-    return this.processConversationWithStreaming(data);
   }
 
   /**

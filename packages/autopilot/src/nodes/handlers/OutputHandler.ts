@@ -13,7 +13,7 @@ export class OutputHandler extends BaseHandler {
   async execute(execution: Execution) {
     const params = this.node.parameters as OutputNodeParameters;
     // Gather data from source nodes
-    const sourceData: Record<string, any> = {};
+    const sourceData: Record<string, unknown> = {};
     for (const sourceNodeId of params.sources) {
       const sourceResult = execution.executionResults.get(sourceNodeId);
       if (sourceResult) {

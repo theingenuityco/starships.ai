@@ -99,7 +99,7 @@ export class WorkflowService {
   static async createWorkflow(request: CreateWorkflowRequest): Promise<WorkflowModel> {
     const repository = new WorkflowRepository();
 
-    // Provide defaults for core WorkflowNodeParameters fields
+    // Provide defaults for core WorkflowParams fields
     const workflowData = {
       ...request,
       blueprint: request.blueprint || { nodes: [], edges: [], metadata: {} },
@@ -449,7 +449,11 @@ export class WorkflowService {
       timeout: dbWorkflow.timeout || 30000,
     };
 
-    return new Workflow(workflowParams);
+    return new Workflow({
+      name: 'Workflow Execution',
+      blueprint: workflowParams.blueprint || { nodes: [], edges: [] },
+      timeout: workflowParams.timeout,
+    });
   }
 
   /**

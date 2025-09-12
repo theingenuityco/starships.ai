@@ -4,7 +4,7 @@
 
 import { NodeRepository } from '@/repositories/NodeRepository';
 import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
-import type { NodeModel } from '@starships/protocol';
+import type { NodeModel, CreateNodeRequest } from '@starships/protocol';
 
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
@@ -14,20 +14,24 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-import { getConnection } from '@/helpers/database';
+import { getConnection, Neo4jConnection } from '@/helpers/database';
 
 describe('NodeRepository', () => {
   let repository: NodeRepository;
-  let mockConnection: any;
+  let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
     // Clear all mocks to ensure clean state
     jest.clearAllMocks();
     // Create fresh mock connection for each test BEFORE creating repository
     mockConnection = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      getSession: jest.fn(),
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    };
+      initializeSchema: jest.fn(),
+    } as unknown as jest.Mocked<Neo4jConnection>;
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     // Now create repository which will use the mocked connection
     repository = new NodeRepository();
@@ -35,7 +39,7 @@ describe('NodeRepository', () => {
 
   describe('constructor', () => {
     it('should initialize with correct service name', () => {
-      expect((repository as any).serviceName).toBe('NodeRepository');
+      expect((repository as unknown as { serviceName: string }).serviceName).toBe('NodeRepository');
     });
   });
 
@@ -169,7 +173,7 @@ describe('NodeRepository', () => {
         ])
         .mockResolvedValueOnce([]);
 
-      const result = await repository.createNode('blueprint-123', nodeData);
+      await repository.createNode('blueprint-123', nodeData);
 
       expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
         1,
@@ -189,7 +193,7 @@ describe('NodeRepository', () => {
         description: 'Agent node description',
         ref: 'agent-node',
         // parameters is undefined
-      } as any;
+      } as unknown as CreateNodeRequest;
       const mockNodeId = 'node-456';
 
       mockConnection.executeQuery.mockResolvedValue([{ id: 'blueprint-123' }]);
@@ -208,7 +212,7 @@ describe('NodeRepository', () => {
         ])
         .mockResolvedValueOnce([]);
 
-      const result = await repository.createNode('blueprint-123', nodeData);
+      await repository.createNode('blueprint-123', nodeData as never);
 
       expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(
         1,
@@ -224,9 +228,9 @@ describe('NodeRepository', () => {
     it('should throw ValidationError for missing required fields', async () => {
       await expect(repository.createNode('', validNodeData)).rejects.toThrow(ValidationError);
 
-      await expect(repository.createNode('blueprint-123', { name: 'Test' } as any)).rejects.toThrow(ValidationError);
+      await expect(repository.createNode('blueprint-123', { name: 'Test' } as never)).rejects.toThrow(ValidationError);
 
-      await expect(repository.createNode('blueprint-123', { type: 'start' } as any)).rejects.toThrow(ValidationError);
+      await expect(repository.createNode('blueprint-123', { type: 'start' } as never)).rejects.toThrow(ValidationError);
     });
 
     it('should throw NotFoundError when blueprint does not exist', async () => {
@@ -378,7 +382,7 @@ describe('NodeRepository', () => {
     });
 
     it('should throw ValidationError for invalid nodes array', async () => {
-      await expect(repository.createNodes('blueprint-123', 'invalid' as any)).rejects.toThrow(ValidationError);
+      await expect(repository.createNodes('blueprint-123', 'invalid' as never)).rejects.toThrow(ValidationError);
     });
 
     it('should throw ValidationError for missing blueprintId', async () => {
@@ -506,7 +510,7 @@ describe('NodeRepository', () => {
     });
 
     it('should handle null result from database', async () => {
-      mockConnection.executeQuery.mockResolvedValue(null);
+      mockConnection.executeQuery.mockResolvedValue([]);
 
       const result = await repository.getNodesByBlueprintId('blueprint-123');
 
@@ -675,7 +679,7 @@ describe('NodeRepository', () => {
         },
       ]);
 
-      const result = await repository.updateNode(nodeId, updates);
+      await repository.updateNode(nodeId, updates);
 
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('SET n.name = $name'),

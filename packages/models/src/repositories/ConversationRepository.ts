@@ -33,7 +33,7 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<ConversationModel> {
+  async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId: string): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
         // Use lean validation from ConversationEntity
@@ -181,11 +181,11 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         await connection.executeWrite(
           `MATCH (s:Starship {id: $starshipId}), (conversation:Conversation {id: $conversationId})
-           CREATE (s)-[:HAS_CONVERSATION {id: $id}]->(conversation)`,
+           CREATE (s)-[:HAS_CONVERSATION {key: $key}]->(conversation)`,
           {
             starshipId,
             conversationId,
-            id: `${starshipId}_${conversationId}`,
+            key: `${starshipId}_${conversationId}`,
           }
         );
       },

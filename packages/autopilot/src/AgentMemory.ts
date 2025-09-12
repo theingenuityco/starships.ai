@@ -84,14 +84,6 @@ export class AgentMemory extends Memory {
   }
 
   /**
-   * Add conversation entry with metadata (legacy compatibility)
-   * @deprecated Use addMessage instead
-   */
-  addConversation(role: 'user' | 'assistant' | 'system', content: string, metadata?: Record<string, unknown>): void {
-    this.addMessage(role, content, metadata);
-  }
-
-  /**
    * Get message history
    */
   getMessageHistory(): Message[] {
@@ -137,8 +129,6 @@ export class AgentMemory extends Memory {
     const systemContext = this.buildSystemContext();
     if (systemContext) {
       messages.push({
-        id: `sys-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString(),
         role: 'system',
         content: systemContext,
       });
@@ -205,7 +195,7 @@ export class AgentMemory extends Memory {
     // Remove conversation messages but keep system messages
     const systemMessages = super.getMessageEntries().filter((msg) => msg.role === 'system');
     super.clear();
-    systemMessages.forEach((msg) => super.addMessage(msg.role, msg.content, msg.metadata));
+    systemMessages.forEach((msg) => super.addMessage(msg.role, msg.content));
   }
 
   /**
@@ -232,7 +222,7 @@ export class AgentMemory extends Memory {
   clone(): AgentMemory {
     const cloned = new AgentMemory();
     // Copy message entries with metadata
-    super.getMessageEntries().forEach((msg) => cloned.addMessage(msg.role, msg.content, msg.metadata));
+    super.getMessageEntries().forEach((msg) => cloned.addMessage(msg.role, msg.content));
     // Copy agent-specific data
     cloned.state.identity = this.state.identity ? { ...this.state.identity } : undefined;
     cloned.state.purpose = this.state.purpose ? { ...this.state.purpose } : undefined;

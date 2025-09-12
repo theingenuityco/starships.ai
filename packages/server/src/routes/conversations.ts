@@ -16,7 +16,6 @@ const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
-const ConversationSourceSchema = z.enum(['agent', 'user']);
 
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
@@ -339,10 +338,7 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     // Validate request body
     const bodyValidation = validateData(
       z.object({
-        source: ConversationSourceSchema,
-        metadata: z.object({}).passthrough().optional(),
         starshipId: NanoidSchema.optional(),
-        userId: NanoidSchema.optional(),
       }),
       req.body,
       res,
@@ -350,14 +346,8 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     );
     if (!bodyValidation) return;
 
-    const { metadata, starshipId, userId } = bodyValidation;
-
     const conversationService = new ConversationService();
-    const conversation = await conversationService.createConversation({
-      metadata,
-      starshipId,
-      userId,
-    });
+    const conversation = await conversationService.createConversation(req.body);
 
     sendSuccess(res, conversation, 201);
   } catch (error) {

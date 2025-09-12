@@ -138,11 +138,11 @@ export class AgentRepository extends BaseRepository {
         const connection = this.getConnection();
         await connection.executeWrite(
           `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
-          CREATE (a)-[:DEPLOYED_ON { id: $id }]->(s)`,
+          CREATE (a)-[:DEPLOYED_ON { key: $key }]->(s)`,
           {
             starshipId: starshipId,
             agentId: agent.id,
-            id: `${agent.id}_${starshipId}`,
+            key: `${agent.id}_${starshipId}`,
           }
         );
 

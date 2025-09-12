@@ -25,7 +25,7 @@ export function sendError(
   code: StandardErrorCode,
   message: string,
   statusCode: number = 500,
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ): void {
   const response: ApiErrorResponse = {
     error: {
@@ -175,9 +175,10 @@ export function validateIdOrSlug(
 }
 
 /**
- * Handle common errors and convert to standardized responses
+ * Handle all errors and convert to standardized responses
+ * Handles both AppErrors and generic errors - no more need for if (!handleError()) pattern
  */
-export function handleCommonError(error: any, res: Response, context: string): boolean {
+export function handleError(error: unknown, res: Response, context: string, fallbackMessage?: string): void {
   console.error(`Error in ${context}:`, error);
 
   // Check if it's already a structured error from @starships/errors
@@ -188,21 +189,12 @@ export function handleCommonError(error: any, res: Response, context: string): b
       response.error.code as StandardErrorCode,
       response.error.message,
       error.statusCode,
-      response.error.details as Record<string, any> | undefined
+      response.error.details as Record<string, unknown> | undefined
     );
-    return true;
+    return;
   }
 
-  // Return false if not handled - caller should handle generic error
-  return false;
-}
-
-/**
- * Safe error message extraction
- */
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
+  // Handle generic errors with a fallback xmessage
+  const message = fallbackMessage || `Failed to ${context}`;
+  sendError(res, 'INTERNAL_SERVER_ERROR', message, 500);
 }

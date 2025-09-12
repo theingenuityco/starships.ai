@@ -5,13 +5,13 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import { HttpRequestNodeParameters } from '@/types';
+import { HttpRequestParams } from '@/types';
 import axios, { AxiosRequestConfig } from 'axios';
 
 export class HttpRequest {
-  private params: HttpRequestNodeParameters;
+  private params: HttpRequestParams;
 
-  constructor(params: HttpRequestNodeParameters) {
+  constructor(params: HttpRequestParams) {
     // Store HTTP request parameters with deep copy to avoid mutations
     this.params = {
       ...params,
@@ -51,7 +51,7 @@ export class HttpRequest {
   /**
    * Get HTTP request parameters (read-only copy)
    */
-  getParameters(): HttpRequestNodeParameters {
+  getParameters(): HttpRequestParams {
     return JSON.parse(JSON.stringify(this.params));
   }
 
@@ -128,7 +128,7 @@ export class HttpRequest {
   /**
    * Add authentication to request configuration
    */
-  private addAuthentication(config: AxiosRequestConfig, auth: HttpRequestNodeParameters['authentication']) {
+  private addAuthentication(config: AxiosRequestConfig, auth: HttpRequestParams['authentication']) {
     if (!auth || !config.headers) return;
 
     switch (auth.type) {
@@ -220,7 +220,7 @@ export class HttpRequest {
    * Clone HTTP request with the same parameters
    */
   clone(): HttpRequest {
-    const clonedParams: HttpRequestNodeParameters = {
+    const clonedParams: HttpRequestParams = {
       ...this.params,
       headers: this.params.headers ? { ...this.params.headers } : undefined,
       authentication: this.params.authentication ? { ...this.params.authentication } : undefined,
@@ -232,7 +232,7 @@ export class HttpRequest {
   /**
    * Update HTTP request parameters
    */
-  updateParameters(updates: Partial<HttpRequestNodeParameters>): HttpRequest {
+  updateParameters(updates: Partial<HttpRequestParams>): HttpRequest {
     const updatedParams = {
       ...this.params,
       ...updates,

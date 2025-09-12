@@ -3,7 +3,7 @@
  */
 
 import { LlmHandler } from '@/nodes/handlers/LlmHandler';
-import { Execution, LlmNodeParameters, Node } from '@/types';
+import { Execution, LlmParams, Node } from '@/types';
 
 // Type definitions for test data structures
 interface LlmResponseData {
@@ -36,7 +36,7 @@ describe('LlmHandler', () => {
       parameters: {
         model: 'anthropic/claude-3.5-sonnet',
         prompt: 'Hello, how are you?',
-      } as LlmNodeParameters,
+      } as LlmParams,
     };
 
     handler = new LlmHandler(mockNode);
@@ -86,7 +86,7 @@ describe('LlmHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('llm-node');
@@ -109,7 +109,7 @@ describe('LlmHandler', () => {
           presencePenalty: 0.2,
           timeout: 30000,
           stream: false,
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       const fullHandler = new LlmHandler(fullParamsNode);
@@ -139,7 +139,7 @@ describe('LlmHandler', () => {
 
       const result = await fullHandler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const resultData = nodeResult?.data as LlmResponseData;
@@ -154,7 +154,7 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'What is AI?',
           systemMessage: 'You are an expert AI researcher',
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       const systemHandler = new LlmHandler(systemMessageNode);
@@ -184,7 +184,7 @@ describe('LlmHandler', () => {
 
       const result = await systemHandler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const resultData = nodeResult?.data as LlmResponseData;
@@ -217,7 +217,7 @@ describe('LlmHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const resultData = nodeResult?.data as LlmResponseData;
@@ -269,7 +269,7 @@ describe('LlmHandler', () => {
 
         const result = await handler.execute(mockExecution);
 
-        const nodeResult = result.executionResults.get('llm-node');
+        const nodeResult = result.results.get('llm-node');
         const resultData = nodeResult?.data as LlmResponseData;
         expect(resultData.llmResponse).toBe(testCase.expected);
       }
@@ -285,7 +285,7 @@ describe('LlmHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBe('LLM anthropic/claude-3.5-sonnet execution failed: LLM request failed: HTTP request failed');
       expect(nodeResult?.nodeRef).toBe('llm-node');
@@ -301,7 +301,7 @@ describe('LlmHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBe('LLM anthropic/claude-3.5-sonnet execution failed: LLM request failed');
       expect(nodeResult?.nodeRef).toBe('llm-node');
@@ -312,7 +312,7 @@ describe('LlmHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBe('LLM anthropic/claude-3.5-sonnet execution failed: Network error');
       expect(nodeResult?.nodeRef).toBe('llm-node');
@@ -337,7 +337,7 @@ describe('LlmHandler', () => {
       const result = await handler.execute(mockExecution);
 
       expect(result).toBeDefined();
-      const nodeResult = result.executionResults.get('llm-node');
+      const nodeResult = result.results.get('llm-node');
       expect(nodeResult).toBeDefined();
     });
   });
@@ -350,7 +350,7 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Hello, how are you?',
           systemMessage: 'You are a helpful assistant',
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
       const handlerWithSystemMessage = new LlmHandler(nodeWithSystemMessage);
 
@@ -375,7 +375,7 @@ describe('LlmHandler', () => {
           presencePenalty: 0.2,
           timeout: 30000,
           stream: false,
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       const fullHandler = new LlmHandler(fullParamsNode);
@@ -391,7 +391,7 @@ describe('LlmHandler', () => {
         parameters: {
           // Remove model field
           prompt: 'Hello, how are you?',
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       // Mock validation to return the expected error for missing model
@@ -420,7 +420,7 @@ describe('LlmHandler', () => {
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
           // Remove prompt field
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       // Mock validation to return the expected error for missing prompt
@@ -450,7 +450,7 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           temperature: 3.0, // Invalid: > 2
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       // Mock validation to return the expected error
@@ -479,7 +479,7 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           maxTokens: 0, // Invalid: < 1
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       // Mock validation to return the expected error
@@ -508,7 +508,7 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           topP: 1.5, // Invalid: > 1
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
 
       // Mock validation to return the expected error
@@ -537,7 +537,7 @@ describe('LlmHandler', () => {
           model: 'anthropic/claude-3.5-sonnet',
           prompt: 'Test prompt',
           maxTokens: 5000, // High token count
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
       const handlerWithHighTokens = new LlmHandler(nodeWithHighTokens);
 
@@ -573,7 +573,7 @@ describe('LlmHandler', () => {
           prompt: 'Test prompt',
           timeout: 5000, // Low timeout
           openrouterApiKey: 'test-api-key',
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
       const handlerWithLowTimeout = new LlmHandler(nodeWithLowTimeout);
 
@@ -592,7 +592,7 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           temperature: 0.7,
-        } as LlmNodeParameters,
+        } as LlmParams,
       };
       const handlerWithMissingFields = new LlmHandler(nodeWithMissingFields);
 

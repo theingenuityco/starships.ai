@@ -64,7 +64,7 @@ describe('AgentHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('agent-node');
+      const nodeResult = result.results.get('agent-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('agent-node');
@@ -109,7 +109,7 @@ describe('AgentHandler', () => {
 
       const result = await minimalHandler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('minimal-agent-node');
+      const nodeResult = result.results.get('minimal-agent-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('minimal-agent-node');
@@ -136,7 +136,7 @@ describe('AgentHandler', () => {
       const result = await handler.execute(mockExecution);
 
       expect(result).toBeDefined();
-      const nodeResult = result.executionResults.get('agent-node');
+      const nodeResult = result.results.get('agent-node');
       expect(nodeResult).toBeDefined();
     });
 
@@ -145,7 +145,7 @@ describe('AgentHandler', () => {
 
       const result = await handler.execute(emptyExecution);
 
-      const nodeResult = result.executionResults.get('agent-node');
+      const nodeResult = result.results.get('agent-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('agent-node');

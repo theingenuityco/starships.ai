@@ -5,13 +5,13 @@
  */
 
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, UserPromptNodeParameters, ValidationError, ValidationResult } from '@/types';
+import { Execution, UserPromptParams, ValidationError, ValidationResult } from '@/types';
 
 export class PromptHandler extends BaseHandler {
   readonly type = 'user_prompt';
 
   async execute(execution: Execution) {
-    const params = this.node.parameters as UserPromptNodeParameters;
+    const params = this.node.parameters as UserPromptParams;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input
     console.log(`User prompt: ${params.promptText}`);
@@ -26,7 +26,7 @@ export class PromptHandler extends BaseHandler {
 
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
-    const params = this.node.parameters as UserPromptNodeParameters;
+    const params = this.node.parameters as UserPromptParams;
 
     if (!params.promptText) {
       errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Prompt text is required'));

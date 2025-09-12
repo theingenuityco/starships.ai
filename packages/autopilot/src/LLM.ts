@@ -8,7 +8,7 @@
  */
 
 import { HttpRequest } from '@/HttpRequest';
-import { Execution, HttpRequestNodeParameters, LlmNodeParameters } from '@/types';
+import { Execution, HttpRequestParams, LlmParams } from '@/types';
 import { autopilot } from './Autopilot';
 
 export interface StreamingCallbacks {
@@ -17,9 +17,9 @@ export interface StreamingCallbacks {
 }
 
 export class LLM {
-  private params: LlmNodeParameters;
+  private params: LlmParams;
 
-  constructor(params: LlmNodeParameters) {
+  constructor(params: LlmParams) {
     // Store LLM parameters with deep copy to avoid mutations
     this.params = {
       ...params,
@@ -43,7 +43,7 @@ export class LLM {
   /**
    * Get LLM parameters (read-only copy)
    */
-  getParameters(): LlmNodeParameters {
+  getParameters(): LlmParams {
     return JSON.parse(JSON.stringify(this.params));
   }
 
@@ -250,7 +250,7 @@ export class LLM {
   /**
    * Build HttpRequest parameters for OpenRouter API
    */
-  private buildHttpRequestParams(execution?: Execution): HttpRequestNodeParameters {
+  private buildHttpRequestParams(execution?: Execution): HttpRequestParams {
     const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
 
     // Get API key from Autopilot singleton, fallback to parameters for backward compatibility
@@ -395,7 +395,7 @@ export class LLM {
    * Clone LLM with the same parameters
    */
   clone(): LLM {
-    const clonedParams: LlmNodeParameters = {
+    const clonedParams: LlmParams = {
       ...this.params,
     };
 
@@ -405,7 +405,7 @@ export class LLM {
   /**
    * Update LLM parameters
    */
-  updateParameters(updates: Partial<LlmNodeParameters>): LLM {
+  updateParameters(updates: Partial<LlmParams>): LLM {
     const updatedParams = {
       ...this.params,
       ...updates,

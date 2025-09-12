@@ -94,7 +94,7 @@ describe('WorkflowHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('workflow-node');
+      const nodeResult = result.results.get('workflow-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('workflow-node');
@@ -136,7 +136,7 @@ describe('WorkflowHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('workflow-node');
+      const nodeResult = result.results.get('workflow-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toContain('Something went wrong');
       expect(nodeResult?.nodeRef).toBe('workflow-node');
@@ -151,7 +151,7 @@ describe('WorkflowHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('workflow-node');
+      const nodeResult = result.results.get('workflow-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toContain('Workflow execution failed');
     });
@@ -161,7 +161,7 @@ describe('WorkflowHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('workflow-node');
+      const nodeResult = result.results.get('workflow-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toContain('Workflow crashed');
       expect(nodeResult?.nodeRef).toBe('workflow-node');
@@ -172,7 +172,7 @@ describe('WorkflowHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('workflow-node');
+      const nodeResult = result.results.get('workflow-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toContain('Unknown error');
     });
@@ -224,7 +224,7 @@ describe('WorkflowHandler', () => {
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('workflow-node');
+      const nodeResult = result.results.get('workflow-node');
       expect(nodeResult).toBeDefined();
       const resultData = nodeResult?.data as WorkflowResponseData;
       expect(resultData.workflowResults).toHaveLength(1);
@@ -241,7 +241,7 @@ describe('WorkflowHandler', () => {
       const result = await handler.execute(mockExecution);
 
       expect(result).toBeDefined();
-      const nodeResult = result.executionResults.get('workflow-node');
+      const nodeResult = result.results.get('workflow-node');
       expect(nodeResult).toBeDefined();
     });
   });

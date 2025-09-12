@@ -40,7 +40,7 @@ describe('ConditionalHandler', () => {
 
     handler = new ConditionalHandler(mockNode);
     mockExecution = global.createMockExecution();
-    mockExecution.executionResults.set('source-node', mockSourceResult);
+    mockExecution.results.set('source-node', mockSourceResult);
   });
 
   describe('execute', () => {
@@ -48,9 +48,9 @@ describe('ConditionalHandler', () => {
       const result = await handler.execute(mockExecution);
 
       expect(result.status).toBe('not_started');
-      expect(result.executionResults.size).toBe(2); // source + conditional
+      expect(result.results.size).toBe(2); // source + conditional
 
-      const nodeResult = result.executionResults.get('conditional-node');
+      const nodeResult = result.results.get('conditional-node');
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('conditional-node');
       expect((nodeResult?.data as { conditionMet: string })?.conditionMet).toBe('high_value'); // First matching condition
@@ -60,18 +60,18 @@ describe('ConditionalHandler', () => {
     it('should return default condition when no conditions match', async () => {
       // Update source data to not match any conditions
       mockSourceResult.data = { value: 10, status: 'inactive', items: [] };
-      mockExecution.executionResults.set('source-node', mockSourceResult);
+      mockExecution.results.set('source-node', mockSourceResult);
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('conditional-node');
+      const nodeResult = result.results.get('conditional-node');
       expect(nodeResult?.error).toBeUndefined();
       expect((nodeResult?.data as { conditionMet: string })?.conditionMet).toBe('default');
       expect(nodeResult?.nextEdgeCondition).toBe('default');
     });
 
     it('should handle missing source node', async () => {
-      mockExecution.executionResults.clear();
+      mockExecution.results.clear();
 
       await expect(handler.execute(mockExecution)).rejects.toThrow('Source node source-node not found in execution results');
     });
@@ -92,25 +92,25 @@ describe('ConditionalHandler', () => {
 
       const result = await invalidHandler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('conditional-node');
+      const nodeResult = result.results.get('conditional-node');
       expect(nodeResult?.error).toContain('JSONata evaluation failed');
     });
 
     it('should include source data in result', async () => {
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('conditional-node');
+      const nodeResult = result.results.get('conditional-node');
       expect((nodeResult?.data as { sourceData: unknown })?.sourceData).toEqual(mockSourceResult.data);
     });
 
     it('should evaluate conditions in order and return first match', async () => {
       // Both conditions will match, but should return the first one
       mockSourceResult.data = { value: 50, status: 'active' };
-      mockExecution.executionResults.set('source-node', mockSourceResult);
+      mockExecution.results.set('source-node', mockSourceResult);
 
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('conditional-node');
+      const nodeResult = result.results.get('conditional-node');
       expect((nodeResult?.data as { conditionMet: string })?.conditionMet).toBe('high_value'); // First in object order
     });
 
@@ -130,7 +130,7 @@ describe('ConditionalHandler', () => {
 
       const result = await testHandler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('conditional-node');
+      const nodeResult = result.results.get('conditional-node');
       expect((nodeResult?.data as { conditionMet: string })?.conditionMet).toBe('actual_true'); // Should skip truthy value
     });
   });

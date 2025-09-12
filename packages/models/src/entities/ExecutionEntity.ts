@@ -138,7 +138,7 @@ export class ExecutionEntity implements ExecutionModel {
         startTime: dataRecord.startTime,
         endTime: dataRecord.endTime,
         pausedAt: dataRecord.pausedAt,
-        executionResults: dataRecord.executionResults,
+        executionResults: dataRecord.results,
         agentMemory: dataRecord.agentMemory,
         ...dataRecord,
       });

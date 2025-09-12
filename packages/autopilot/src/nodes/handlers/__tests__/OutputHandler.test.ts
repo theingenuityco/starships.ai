@@ -28,11 +28,11 @@ describe('OutputHandler', () => {
 
     mockExecution = global.createMockExecution();
     // Add mock source results to execution
-    mockExecution.executionResults.set('source1', {
+    mockExecution.results.set('source1', {
       nodeRef: 'source1',
       data: { message: 'Hello from source 1', score: 85 },
     });
-    mockExecution.executionResults.set('source2', {
+    mockExecution.results.set('source2', {
       nodeRef: 'source2',
       data: { message: 'Hello from source 2', category: 'premium' },
     });
@@ -48,7 +48,7 @@ describe('OutputHandler', () => {
     it('should execute successfully with valid parameters', async () => {
       const result = await handler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('output-node');
+      const nodeResult = result.results.get('output-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('output-node');
@@ -83,7 +83,7 @@ describe('OutputHandler', () => {
 
       const result = await handlerWithoutTitle.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('no-title-node');
+      const nodeResult = result.results.get('no-title-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const data = nodeResult?.data as { output: string };
@@ -108,7 +108,7 @@ describe('OutputHandler', () => {
 
       const result = await singleSourceHandler.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('single-source-node');
+      const nodeResult = result.results.get('single-source-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const data = nodeResult?.data as { sourceData: Record<string, unknown>; output: string };
@@ -136,7 +136,7 @@ describe('OutputHandler', () => {
 
       const result = await handlerWithMissingSources.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('missing-sources-node');
+      const nodeResult = result.results.get('missing-sources-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const data = nodeResult?.data as { sourceData: Record<string, unknown> };
@@ -168,7 +168,7 @@ describe('OutputHandler', () => {
 
         const result = await handlerWithFormat.execute(mockExecution);
 
-        const nodeResult = result.executionResults.get(`format-${format}-node`);
+        const nodeResult = result.results.get(`format-${format}-node`);
         expect(nodeResult).toBeDefined();
         expect(nodeResult?.error).toBeUndefined();
         expect((nodeResult?.data as { format: string }).format).toBe(format);
@@ -192,7 +192,7 @@ describe('OutputHandler', () => {
 
       const result = await handlerWithEmptySources.execute(mockExecution);
 
-      const nodeResult = result.executionResults.get('empty-sources-node');
+      const nodeResult = result.results.get('empty-sources-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const data = nodeResult?.data as { sourceData: Record<string, unknown> };
@@ -222,7 +222,7 @@ describe('OutputHandler', () => {
       };
 
       const executionWithComplexData = global.createMockExecution();
-      executionWithComplexData.executionResults.set('complex-source', complexSourceResult);
+      executionWithComplexData.results.set('complex-source', complexSourceResult);
 
       const paramsWithComplexData = {
         template: 'Complex data template',
@@ -241,7 +241,7 @@ describe('OutputHandler', () => {
 
       const result = await handlerWithComplexData.execute(executionWithComplexData);
 
-      const nodeResult = result.executionResults.get('complex-data-node');
+      const nodeResult = result.results.get('complex-data-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const data = nodeResult?.data as { sourceData: Record<string, unknown> };
@@ -252,7 +252,7 @@ describe('OutputHandler', () => {
       const result = await handler.execute(mockExecution);
 
       expect(result).toBeDefined();
-      const nodeResult = result.executionResults.get('output-node');
+      const nodeResult = result.results.get('output-node');
       expect(nodeResult).toBeDefined();
     });
 
@@ -261,7 +261,7 @@ describe('OutputHandler', () => {
 
       const result = await handler.execute(emptyExecution);
 
-      const nodeResult = result.executionResults.get('output-node');
+      const nodeResult = result.results.get('output-node');
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('output-node');

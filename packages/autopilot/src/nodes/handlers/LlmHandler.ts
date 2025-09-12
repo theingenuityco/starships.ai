@@ -7,7 +7,7 @@
 
 import { LLM } from '@/LLM';
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, LlmNodeParameters, ValidationError, ValidationResult, ValidationWarning } from '@/types';
+import { Execution, LlmParams, ValidationError, ValidationResult, ValidationWarning } from '@/types';
 import type { EngineEmitter } from '@/types/emitters';
 
 export class LlmHandler extends BaseHandler {
@@ -22,7 +22,7 @@ export class LlmHandler extends BaseHandler {
   }
 
   async execute(execution: Execution) {
-    const params = this.node.parameters as LlmNodeParameters;
+    const params = this.node.parameters as LlmParams;
 
     try {
       console.log(`Executing LLM: ${params.model}`);
@@ -90,7 +90,7 @@ export class LlmHandler extends BaseHandler {
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
-    const params = this.node.parameters as LlmNodeParameters;
+    const params = this.node.parameters as LlmParams;
 
     // Check for required fields first
     if (!params.model) {

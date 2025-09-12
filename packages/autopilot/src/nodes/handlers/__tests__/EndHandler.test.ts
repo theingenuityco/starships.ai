@@ -32,8 +32,8 @@ describe('EndHandler', () => {
     it('should execute successfully', async () => {
       const result = await handler.execute(mockExecution);
 
-      expect(result.executionResults.has('end-node')).toBe(true);
-      const nodeResult = result.executionResults.get('end-node');
+      expect(result.results.has('end-node')).toBe(true);
+      const nodeResult = result.results.get('end-node');
       expect(nodeResult?.nodeRef).toBe('end-node');
       expect(nodeResult?.data).toEqual({ message: 'Workflow completed' });
       expect(nodeResult?.error).toBeUndefined();
@@ -44,8 +44,8 @@ describe('EndHandler', () => {
 
       const result = await handler.execute(emptyExecution);
 
-      expect(result.executionResults.has('end-node')).toBe(true);
-      const nodeResult = result.executionResults.get('end-node');
+      expect(result.results.has('end-node')).toBe(true);
+      const nodeResult = result.results.get('end-node');
       expect(nodeResult?.nodeRef).toBe('end-node');
       expect(nodeResult?.error).toBeUndefined();
     });
@@ -53,10 +53,10 @@ describe('EndHandler', () => {
     it('should store result in execution results', async () => {
       const result = await handler.execute(mockExecution);
 
-      expect(result.executionResults.size).toBeGreaterThan(0);
-      expect(result.executionResults.has('end-node')).toBe(true);
+      expect(result.results.size).toBeGreaterThan(0);
+      expect(result.results.has('end-node')).toBe(true);
 
-      const nodeResult = result.executionResults.get('end-node');
+      const nodeResult = result.results.get('end-node');
       expect(nodeResult?.nodeRef).toBe('end-node');
       expect(nodeResult?.data).toEqual({ message: 'Workflow completed' });
     });

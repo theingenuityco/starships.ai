@@ -32,7 +32,8 @@ describe('Engine', () => {
         nodes: mockBlueprint.nodes.filter((node) => node.type !== 'start'),
       };
 
-      const result = await engine.execute(workflowWithoutStart, mockExecution);
+      const engineWithoutStart = new Engine(workflowWithoutStart);
+      const result = await engineWithoutStart.execute(mockExecution);
 
       expect(result.status).toBe('failed');
       expect(result.error?.message).toContain('Workflow must have a start node');
@@ -53,7 +54,8 @@ describe('Engine', () => {
         ],
       };
 
-      const result = await engine.execute(workflowWithUnsupportedNode, mockExecution);
+      const engineWithUnsupportedNode = new Engine(workflowWithUnsupportedNode);
+      const result = await engineWithUnsupportedNode.execute(mockExecution);
 
       expect(result.status).toBe('failed');
       expect(result.error?.message).toContain('Unsupported node types: unknown_type');

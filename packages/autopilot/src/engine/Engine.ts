@@ -26,8 +26,13 @@ const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
  * Main workflow execution engine
  */
 export class Engine {
+  private blueprint: Blueprint;
   private execution!: Execution;
   private emitter?: EngineEmitter;
+
+  constructor(blueprint: Blueprint) {
+    this.blueprint = blueprint;
+  }
 
   /**
    * Set streaming emitter (injected by external systems like server)
@@ -67,19 +72,21 @@ export class Engine {
   /**
    * Execute a workflow from start to completion
    */
-  async execute(blueprint: Blueprint, initialExecution?: Execution): Promise<Execution> {
-    // Set the provided initial execution - it must have agentMemory
-    if (!initialExecution) {
-      throw new Error('Execution with agentMemory is required');
-    }
-    this.execution = initialExecution;
+  async execute(initialExecution?: Execution): Promise<Execution> {
+    this.execution = {
+      status: initialExecution?.status || 'not_started',
+      state: initialExecution?.state || {},
+      results: initialExecution?.results || new Map(),
+      currentNodeRef: initialExecution?.currentNodeRef,
+      error: initialExecution?.error,
+    };
 
     try {
       // Validate workflow before execution
-      await this.validateForExecution(blueprint);
+      await this.validateForExecution(this.blueprint);
 
       // Find start node
-      const startNode = this.getStartNode(blueprint);
+      const startNode = this.getStartNode(this.blueprint);
       if (!startNode) {
         throw new Error('No start node found in workflow');
       }
@@ -95,7 +102,7 @@ export class Engine {
       this.execution.status = 'running';
 
       // Execute workflow graph
-      await this.executeGraph(blueprint, this.execution);
+      await this.executeGraph(this.blueprint, this.execution);
 
       // Mark as completed if no errors
       if (this.execution.status === 'running') {
@@ -152,7 +159,7 @@ export class Engine {
         const updatedExecution = await this.executeNode(currentNode, execution);
 
         // Get the result that was stored by the handler
-        const result = updatedExecution.executionResults.get(currentNode.ref);
+        const result = updatedExecution.results.get(currentNode.ref);
         if (!result) {
           throw new Error(`Handler failed to store result for node ${currentNode.ref}`);
         }
@@ -191,7 +198,7 @@ export class Engine {
           nodeRef: currentNode.ref,
           error: errorMessage,
         };
-        execution.executionResults.set(currentNode.ref, failedResult);
+        execution.results.set(currentNode.ref, failedResult);
 
         throw error;
       }
@@ -352,7 +359,7 @@ export class Engine {
    */
   private async emitEvent(event: ExecutionEvent): Promise<void> {
     // Delegate streaming to injected emitter if available and enabled
-    if (this.emitter?.isEnabled() && event.execution.streaming?.enabled) {
+    if (this.emitter?.isEnabled()) {
       try {
         await this.emitter.emitExecutionEvent(event);
       } catch (error) {

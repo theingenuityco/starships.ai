@@ -11,7 +11,7 @@ import { Blueprint } from './blueprint';
 /**
  * Conditional node parameters for data-driven routing
  */
-export interface ConditionalNodeParameters {
+export interface ConditionalParams {
   sourceNodeId: string;
   expression: string;
   conditions: Record<string, string>;
@@ -32,7 +32,7 @@ export interface UserPromptNodeParameters {
 /**
  * Output node parameters for final result generation
  */
-export interface OutputNodeParameters {
+export interface OutputParams {
   template: string;
   sources: string[];
   format: OutputFormat;
@@ -156,9 +156,9 @@ export type StartEndNodeParameters = Record<string, unknown>;
  */
 export type NodeParameters =
   | AgentParams
-  | ConditionalNodeParameters
+  | ConditionalParams
   | UserPromptNodeParameters
-  | OutputNodeParameters
+  | OutputParams
   | HttpRequestNodeParameters
   | LlmNodeParameters
   | WorkflowParams

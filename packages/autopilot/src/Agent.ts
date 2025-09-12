@@ -9,6 +9,7 @@
 import { AgentMemory, AgentMemoryState } from '@/AgentMemory';
 import { Engine } from '@/engine/Engine';
 import { AgentParams, Blueprint, Edge, Execution, Node } from '@/types';
+import { MessageRole } from './Memory';
 
 export class Agent {
   private params: AgentParams;
@@ -23,7 +24,7 @@ export class Agent {
     this.memory = new AgentMemory({ state: params.memory });
 
     // Create engine - handles all node types internally
-    this.engine = new Engine();
+    this.engine = new Engine(this.params.blueprint);
   }
 
   /**
@@ -57,7 +58,7 @@ export class Agent {
   /**
    * Add content to agent memory
    */
-  addToMemory(role: 'user' | 'assistant', content: string): void {
+  addToMemory(role: MessageRole, content: string): void {
     this.memory.addMessage(role, content);
   }
 
@@ -108,19 +109,7 @@ export class Agent {
    */
   async execute(initialExecution?: Execution): Promise<Execution> {
     try {
-      console.log(
-        `Executing Agent: ${this.params.name} (${this.params.model})${initialExecution?.streaming?.enabled ? ' (streaming)' : ''}`
-      );
-
-      const executionWithMemory: Execution = {
-        currentNodeRef: undefined,
-        status: 'not_started',
-        executionResults: new Map(),
-        agentMemory: this.memory,
-        ...initialExecution,
-      };
-
-      const result = await this.engine.execute(this.params.blueprint, executionWithMemory);
+      const result = await this.engine.execute(initialExecution);
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

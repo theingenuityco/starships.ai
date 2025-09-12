@@ -1,7 +1,8 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { AgentModel, Conversation, ConversationModel, StarshipModel } from '@starships/protocol';
+import type { AgentModel, Conversation, ConversationModel, MessageModel, StarshipModel } from '@starships/protocol';
 import { ConversationEntity } from '../entities/ConversationEntity';
+import { MessageEntity } from '../entities/MessageEntity';
 
 export class ConversationRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -215,20 +216,20 @@ export class ConversationRepository extends BaseRepository {
     conversationId: string,
     orderBy: 'timestamp' | 'created_at' = 'timestamp',
     orderDirection: 'asc' | 'desc' = 'asc'
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
         const orderField = orderBy === 'timestamp' ? 'm.timestamp' : 'm.createdAt';
         const direction = orderDirection.toUpperCase();
 
-        const result = await connection.executeQuery<{ m: Record<string, unknown> }>(
+        const result = await connection.executeQuery<{ m: MessageModel }>(
           `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
            RETURN m ORDER BY ${orderField} ${direction}`,
           { conversationId }
         );
 
-        return result.map((record) => record.m);
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'getConversationMessages',
       'Conversation'

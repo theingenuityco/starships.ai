@@ -50,7 +50,7 @@ export abstract class BaseHandler implements Handler {
       data,
     };
 
-    execution.executionResults.set(this.node.ref, result);
+    execution.results.set(this.node.ref, result);
     return execution;
   }
 
@@ -63,7 +63,7 @@ export abstract class BaseHandler implements Handler {
       error,
     };
 
-    execution.executionResults.set(this.node.ref, result);
+    execution.results.set(this.node.ref, result);
     return execution;
   }
 

@@ -65,7 +65,7 @@ export class LLM {
       console.log(`Executing LLM: ${this.params.model}${this.params.stream ? ' (streaming)' : ''}`);
 
       // Check if streaming is enabled - rely on execution context for streaming decisions
-      const isStreamingEnabled = this.params.stream && execution?.streaming?.enabled;
+      const isStreamingEnabled = this.params.stream;
 
       if (isStreamingEnabled) {
         return await this.executeWithStreaming(execution, streamingCallbacks);
@@ -200,11 +200,6 @@ export class LLM {
         await streamingCallbacks.onComplete(fullResponse);
       }
 
-      // Add LLM response to agent memory if execution context is provided
-      if (execution?.agentMemory && fullResponse) {
-        execution.agentMemory.addMessage('assistant', fullResponse);
-      }
-
       return {
         status: 'completed',
         data: {
@@ -233,11 +228,6 @@ export class LLM {
     // Check if HTTP request execution was successful
     if (httpResult.status === 'completed' && httpResult.data) {
       const llmResponse = this.extractLlmResponse(httpResult.data.body);
-
-      // Add LLM response to agent memory if execution context is provided
-      if (execution?.agentMemory) {
-        execution.agentMemory.addMessage('assistant', llmResponse);
-      }
 
       return {
         status: 'completed',
@@ -269,16 +259,7 @@ export class LLM {
     // Build messages array
     const messages: Array<{ role: string; content: string }> = [];
 
-    // Get messages from agent memory if available
-    if (execution?.agentMemory) {
-      const memoryMessages = execution.agentMemory.toMessages();
-      messages.push(
-        ...memoryMessages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        }))
-      );
-    }
+    console.log({ execution }, 'HISTORICAL MESSAGES not getting appended');
 
     // Add current prompt as user message
     messages.push({

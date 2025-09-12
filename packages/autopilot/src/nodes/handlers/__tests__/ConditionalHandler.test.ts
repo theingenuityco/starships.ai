@@ -5,7 +5,7 @@
  */
 
 import { ConditionalHandler } from '@/nodes/handlers/ConditionalHandler';
-import { Node, Execution, ConditionalNodeParameters, NodeResult } from '@/types';
+import { Node, Execution, ConditionalParams, NodeResult } from '@/types';
 
 describe('ConditionalHandler', () => {
   let handler: ConditionalHandler;
@@ -19,7 +19,7 @@ describe('ConditionalHandler', () => {
       data: { value: 42, status: 'active', items: [1, 2, 3] },
     };
 
-    const parameters: ConditionalNodeParameters = {
+    const parameters: ConditionalParams = {
       sourceNodeId: 'source-node',
       expression: '$$.value > 30', // Required field
       conditions: {
@@ -78,7 +78,7 @@ describe('ConditionalHandler', () => {
 
     it('should handle JSONata evaluation errors', async () => {
       // Create a node with invalid JSONata expression
-      const invalidParams: ConditionalNodeParameters = {
+      const invalidParams: ConditionalParams = {
         sourceNodeId: 'source-node',
         expression: '$$.value > 10',
         conditions: {
@@ -116,7 +116,7 @@ describe('ConditionalHandler', () => {
 
     it('should handle boolean true results only', async () => {
       // Create conditions that return truthy but not true values
-      const parameters: ConditionalNodeParameters = {
+      const parameters: ConditionalParams = {
         sourceNodeId: 'source-node',
         expression: '$$.value > 30',
         conditions: {
@@ -167,7 +167,7 @@ describe('ConditionalHandler', () => {
     });
 
     it('should validate JSONata expressions', () => {
-      const invalidParams: ConditionalNodeParameters = {
+      const invalidParams: ConditionalParams = {
         sourceNodeId: 'source-node',
         expression: '$$.value > 10',
         conditions: {

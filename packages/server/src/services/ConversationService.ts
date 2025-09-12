@@ -3,7 +3,7 @@ import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
-import { AgentModel, ConversationModel, ConversationStatus, Message, StarshipModel } from '@starships/protocol';
+import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 
 /**
  * Clean conversation service with proper error handling
@@ -109,6 +109,17 @@ export class ConversationService {
 
     // Execute agent conversation with streaming
     await AgentService.replyToConversation(agent.id, data.conversationId);
+  }
+
+  /**
+   * Get messages for a conversation
+   */
+  async getConversationMessages(
+    conversationId: string,
+    orderBy: 'timestamp' | 'created_at' = 'timestamp',
+    orderDirection: 'asc' | 'desc' = 'asc'
+  ): Promise<MessageModel[]> {
+    return this.conversationRepository.getConversationMessages(conversationId, orderBy, orderDirection);
   }
 
   /**

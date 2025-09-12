@@ -6,9 +6,8 @@
  * Supports streaming through the injection-based architecture via Engine.
  */
 
-import { AgentMemory } from '@/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { Blueprint, Edge, Execution, Node, StreamingOptions, WorkflowParams } from '@/types';
+import { Blueprint, Edge, Execution, Node, WorkflowParams } from '@/types';
 import { nanoid } from 'nanoid';
 
 export class Workflow {
@@ -20,7 +19,7 @@ export class Workflow {
     this.params = structuredClone(params);
 
     // Create engine - handles all node types internally
-    this.engine = new Engine();
+    this.engine = new Engine(this.params.blueprint);
   }
 
   /**
@@ -118,43 +117,12 @@ export class Workflow {
    */
   async execute(initialExecution?: Execution): Promise<Execution> {
     try {
-      console.log(
-        `Executing Workflow: ${this.params.blueprint.nodes.length} nodes${initialExecution?.streaming?.enabled ? ' (streaming)' : ''}`
-      );
-
-      // Streaming is now handled by the injected StreamingEmitter in the Engine
-      // We don't need separate streaming and non-streaming execution paths
-      const execution: Execution = {
-        currentNodeRef: undefined,
-        status: 'not_started',
-        executionResults: new Map(),
-        agentMemory: initialExecution?.agentMemory || new AgentMemory(),
-        ...initialExecution,
-      };
-
       // Execute workflow through engine - it will handle streaming if configured
-      return await this.engine.execute(this.params.blueprint, execution);
+      return await this.engine.execute(initialExecution);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Workflow execution failed: ${errorMessage}`);
     }
-  }
-
-  /**
-   * Execute workflow with streaming (convenient method)
-   */
-  async executeWithStreamingOptions(streamingOptions: StreamingOptions, initialExecution?: Execution): Promise<Execution> {
-    // Create execution with streaming options
-    const executionWithStreaming: Execution = {
-      currentNodeRef: undefined,
-      status: 'not_started',
-      executionResults: new Map(),
-      agentMemory: initialExecution?.agentMemory || new AgentMemory(),
-      ...initialExecution,
-      streaming: streamingOptions,
-    };
-
-    return this.execute(executionWithStreaming);
   }
 
   /**

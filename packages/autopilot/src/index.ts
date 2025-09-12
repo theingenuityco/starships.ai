@@ -57,7 +57,7 @@ export type {
   AgentParams,
   // Core workflow types
   Blueprint,
-  ConditionalNodeParameters,
+  ConditionalParams,
   Edge,
   // Execution types
   Execution,
@@ -68,7 +68,7 @@ export type {
   NodeParameters,
   NodeResult,
   NodeType,
-  OutputNodeParameters,
+  OutputParams,
   UserPromptNodeParameters,
   ValidationError,
   // Validation types

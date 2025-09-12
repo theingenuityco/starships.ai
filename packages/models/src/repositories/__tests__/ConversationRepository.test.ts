@@ -32,6 +32,15 @@ jest.mock('../../entities/ConversationEntity', () => ({
 import { getConnection } from '@/helpers/database';
 
 describe('ConversationRepository', () => {
+  // Helper function to create mock conversations
+  const createMockConversation = (overrides: Partial<ConversationModel> = {}): ConversationModel => ({
+    id: 'conversation-123',
+    title: 'Test Conversation',
+    status: 'active',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  });
   let repository: ConversationRepository;
   let mockConnection: {
     executeQuery: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
@@ -57,8 +66,8 @@ describe('ConversationRepository', () => {
   describe('findAll', () => {
     it('should return all conversations ordered by last activity', async () => {
       const mockConversations: ConversationModel[] = [
-        global.createMockConversation({ id: 'conv-1', status: 'active' }) as unknown as ConversationModel,
-        global.createMockConversation({ id: 'conv-2', status: 'completed' }) as unknown as ConversationModel,
+        createMockConversation({ id: 'conv-1', status: 'active' }),
+        createMockConversation({ id: 'conv-2', status: 'completed' }),
       ];
 
       mockConnection.executeQuery.mockResolvedValue([{ c: mockConversations[0] }, { c: mockConversations[1] }]);
@@ -88,7 +97,7 @@ describe('ConversationRepository', () => {
 
   describe('findById', () => {
     it('should return conversation by ID', async () => {
-      const mockConversation = global.createMockConversation() as unknown as ConversationModel;
+      const mockConversation = createMockConversation();
       mockConnection.executeQuery.mockResolvedValue([{ c: mockConversation }]);
 
       const result = await repository.findById('conv-123');
@@ -107,47 +116,20 @@ describe('ConversationRepository', () => {
   });
 
   describe('create', () => {
-    it('should create new conversation with required fields', async () => {
+    it('should create new conversation with starship link', async () => {
       const conversationData = {
         title: 'Test Conversation',
         status: 'active' as const,
       };
 
-      const createdConversation = {
+      const createdConversation: ConversationModel = {
         ...conversationData,
         id: 'test-uuid-123',
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
       };
 
       // Mock the createEntityWithAutoId method from BaseRepository
-      jest
-        .spyOn(
-          repository as unknown as {
-            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
-          },
-          'createEntityWithAutoId'
-        )
-        .mockResolvedValue(createdConversation);
-
-      const result = await repository.create(conversationData);
-
-      expect(result).toEqual(expect.objectContaining(createdConversation));
-    });
-
-    it('should create conversation with starship link', async () => {
-      const conversationData = {
-        title: 'Test Conversation',
-        status: 'active' as const,
-      };
-
-      const createdConversation = {
-        ...conversationData,
-        id: 'test-uuid-123',
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
-      };
-
       jest
         .spyOn(
           repository as unknown as {
@@ -170,7 +152,7 @@ describe('ConversationRepository', () => {
         // Missing title field
       };
 
-      await expect(repository.create(incompleteData as CreateConversationData)).rejects.toThrow(DatabaseError);
+      await expect(repository.create(incompleteData as CreateConversationData, 'starship-123')).rejects.toThrow(DatabaseError);
     });
 
     it('should validate enum values for status', async () => {
@@ -179,7 +161,7 @@ describe('ConversationRepository', () => {
         status: 'invalid_status',
       };
 
-      await expect(repository.create(invalidData as CreateConversationData)).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidData as CreateConversationData, 'starship-123')).rejects.toThrow(DatabaseError);
     });
 
     it('should validate field types', async () => {
@@ -188,7 +170,7 @@ describe('ConversationRepository', () => {
         status: 'active',
       };
 
-      await expect(repository.create(invalidData as unknown as CreateConversationData)).rejects.toThrow();
+      await expect(repository.create(invalidData as unknown as CreateConversationData, 'starship-123')).rejects.toThrow();
     });
   });
 
@@ -198,10 +180,10 @@ describe('ConversationRepository', () => {
         status: 'completed' as const,
       };
 
-      const updatedConversation = global.createMockConversation({
+      const updatedConversation = createMockConversation({
         id: 'conv-123',
         ...updates,
-      }) as unknown as ConversationModel;
+      });
 
       mockConnection.executeWrite.mockResolvedValue([{ c: updatedConversation }]);
 
@@ -218,7 +200,7 @@ describe('ConversationRepository', () => {
     });
 
     it('should return existing conversation when no updates provided', async () => {
-      const existingConversation = global.createMockConversation({ id: 'conv-123' }) as unknown as ConversationModel;
+      const existingConversation = createMockConversation({ id: 'conv-123' });
       jest.spyOn(repository, 'findById').mockResolvedValue(existingConversation);
 
       const result = await repository.update('conv-123', {});
@@ -268,10 +250,7 @@ describe('ConversationRepository', () => {
 
   describe('findByStarship', () => {
     it('should return conversations for a specific starship', async () => {
-      const mockConversations: ConversationModel[] = [
-        global.createMockConversation({ id: 'conv-1' }) as unknown as ConversationModel,
-        global.createMockConversation({ id: 'conv-2' }) as unknown as ConversationModel,
-      ];
+      const mockConversations: ConversationModel[] = [createMockConversation({ id: 'conv-1' }), createMockConversation({ id: 'conv-2' })];
 
       mockConnection.executeQuery.mockResolvedValue([{ c: mockConversations[0] }, { c: mockConversations[1] }]);
 
@@ -329,7 +308,7 @@ describe('ConversationRepository', () => {
         {
           starshipId: 'starship-456',
           conversationId: 'conv-123',
-          id: 'starship-456_conv-123',
+          key: 'starship-456_conv-123',
         }
       );
     });
@@ -371,7 +350,7 @@ describe('ConversationRepository', () => {
         status: 'active' as const,
       };
 
-      await expect(repository.create(conversationData)).rejects.toThrow();
+      await expect(repository.create(conversationData, 'starship-123')).rejects.toThrow();
     });
 
     it('should handle query timeout errors', async () => {
@@ -390,7 +369,7 @@ describe('ConversationRepository', () => {
       };
 
       // Create conversation
-      const createdConversation = global.createMockConversation(conversationData) as unknown as ConversationModel;
+      const createdConversation = createMockConversation(conversationData);
       jest
         .spyOn(
           repository as unknown as {
@@ -400,12 +379,13 @@ describe('ConversationRepository', () => {
         )
         .mockResolvedValue(createdConversation);
 
-      const newConversation = await repository.create(conversationData);
+      const newConversation = await repository.create(conversationData, 'starship-123');
       expect(newConversation.status).toBe('active');
 
       // The business logic methods (updateActivity, incrementMessageCount, etc.)
       // have been moved to ConversationService and are no longer part of the repository
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(0);
+      // But create() still calls linkToStarship which uses executeWrite once
+      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(1);
     });
 
     it('should handle starship relationship operations', async () => {

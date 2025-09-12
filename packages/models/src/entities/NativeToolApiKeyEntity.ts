@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { NativeToolApiKeyModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsISO8601, IsString, Length } from 'class-validator';
+import { IsISO8601, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the NativeToolApiKeyEntity
@@ -115,48 +115,41 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
   }
 
   /**
-   * Validation method for different contexts
+   * Simple validation function using class-validator
+   * This replaces the manual validation approach with a decorator-based solution
    */
-  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
       throw new Error('Data must be an object');
     }
-    const entity = NativeToolApiKeyEntity.deserialize(data as Record<string, unknown>);
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new NativeToolApiKeyEntity();
 
-    // Context-specific validation rules
-    if (context === 'create') {
-      // For creation, certain fields are required
-      if (!entity.starshipId) {
-        throw new Error('Starship ID is required for native tool API key creation');
-      }
-      if (!entity.toolName) {
-        throw new Error('Tool name is required for native tool API key creation');
-      }
-      if (!entity.encryptedApiKey) {
-        throw new Error('Encrypted API key is required for native tool API key creation');
-      }
+    // For create operations, validate all required fields
+    if (operation === 'create') {
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        starshipId: dataRecord.starshipId || '',
+        toolName: dataRecord.toolName || '',
+        encryptedApiKey: dataRecord.encryptedApiKey || '',
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        ...dataRecord,
+      });
+    } else {
+      // For update operations, only validate provided fields
+      Object.assign(entity, dataRecord);
     }
 
-    // Business rule validations
-    if (entity.starshipId && entity.starshipId.length > 255) {
-      throw new Error('Starship ID cannot exceed 255 characters');
-    }
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
 
-    if (entity.toolName && entity.toolName.length > 100) {
-      throw new Error('Tool name cannot exceed 100 characters');
-    }
-
-    if (entity.toolName && !/^[a-z0-9_-]+$/.test(entity.toolName)) {
-      throw new Error('Tool name can only contain lowercase letters, numbers, underscores, and hyphens');
-    }
-
-    if (entity.encryptedApiKey && entity.encryptedApiKey.length > 1000) {
-      throw new Error('Encrypted API key cannot exceed 1000 characters');
-    }
-
-    // Validate encrypted key format (basic check for encryption pattern)
-    if (entity.encryptedApiKey && !entity.encryptedApiKey.includes(':')) {
-      throw new Error('Invalid encrypted API key format');
+    if (errors.length > 0) {
+      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
+      throw new Error(`Validation failed: ${errorMessages}`);
     }
   }
 

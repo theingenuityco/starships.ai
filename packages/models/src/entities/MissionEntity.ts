@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { MissionModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsArray, IsEnum, IsISO8601, IsOptional, IsString, Length } from 'class-validator';
+import { IsArray, IsEnum, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the MissionEntity
@@ -145,68 +145,48 @@ export class MissionEntity implements MissionModel {
   }
 
   /**
-   * Validation method for different contexts
+   * Simple validation function using class-validator
+   * This replaces the manual validation approach with a decorator-based solution
    */
-  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
       throw new Error('Data must be an object');
     }
-    const entity = MissionEntity.deserialize(data as Record<string, unknown>);
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new MissionEntity();
 
-    // Context-specific validation rules
-    if (context === 'create') {
-      // For creation, certain fields are required
-      if (!entity.name) {
-        throw new Error('Name is required for mission creation');
-      }
-      if (!entity.description) {
-        throw new Error('Description is required for mission creation');
-      }
-      if (!entity.starshipId) {
-        throw new Error('Starship ID is required for mission creation');
-      }
-      if (!entity.createdBy) {
-        throw new Error('Created by user ID is required for mission creation');
-      }
+    // For create operations, validate all required fields
+    if (operation === 'create') {
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        createdBy: dataRecord.createdBy || '',
+        starshipId: dataRecord.starshipId || '',
+        name: dataRecord.name || '',
+        description: dataRecord.description || '',
+        status: dataRecord.status || 'draft',
+        phase: dataRecord.phase || 'welcome',
+        agentIds: dataRecord.agentIds || [],
+        blueprintId: dataRecord.blueprintId,
+        approvalStatus: dataRecord.approvalStatus || 'pending',
+        approvedAt: dataRecord.approvedAt,
+        ...dataRecord,
+      });
+    } else {
+      // For update operations, only validate provided fields
+      Object.assign(entity, dataRecord);
     }
 
-    // Business rule validations
-    if (entity.name && entity.name.length < 1) {
-      throw new Error('Mission name cannot be empty');
-    }
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
 
-    if (entity.name && entity.name.length > 200) {
-      throw new Error('Mission name cannot exceed 200 characters');
-    }
-
-    if (entity.description && entity.description.length < 1) {
-      throw new Error('Mission description cannot be empty');
-    }
-
-    if (entity.description && entity.description.length > 2000) {
-      throw new Error('Mission description cannot exceed 2000 characters');
-    }
-
-    if (entity.agentIds && entity.agentIds.length === 0) {
-      throw new Error('At least one agent must be assigned to the mission');
-    }
-
-    // Status validation
-    const validStatuses = ['draft', 'active', 'completed', 'failed', 'cancelled'];
-    if (entity.status && !validStatuses.includes(entity.status)) {
-      throw new Error('Invalid mission status');
-    }
-
-    // Phase validation
-    const validPhases = ['welcome', 'analysis', 'plan', 'execute', 'converse'];
-    if (entity.phase && !validPhases.includes(entity.phase)) {
-      throw new Error('Invalid mission phase');
-    }
-
-    // Approval status validation
-    const validApprovalStatuses = ['pending', 'approved', 'rejected', 'modified'];
-    if (entity.approvalStatus && !validApprovalStatuses.includes(entity.approvalStatus)) {
-      throw new Error('Invalid approval status');
+    if (errors.length > 0) {
+      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
+      throw new Error(`Validation failed: ${errorMessages}`);
     }
   }
 

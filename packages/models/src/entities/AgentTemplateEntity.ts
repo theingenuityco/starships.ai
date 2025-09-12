@@ -9,7 +9,7 @@ import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import type { AgentMemoryState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the AgentTemplateEntity
@@ -152,102 +152,51 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   }
 
   /**
-   * Validation method for different contexts
+   * Simple validation function using class-validator
+   * This replaces the manual validation approach with a decorator-based solution
    */
-  static async validate(data: unknown, context: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
       throw new Error('Data must be an object');
     }
-    const entity = AgentTemplateEntity.deserialize(data as Record<string, unknown>);
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new AgentTemplateEntity();
 
-    // Context-specific validation rules
-    if (context === 'create') {
-      // For creation, certain fields are required
-      if (!entity.name) {
-        throw new Error('Name is required for agent template creation');
-      }
-      if (!entity.slug) {
-        throw new Error('Slug is required for agent template creation');
-      }
-      if (!entity.model) {
-        throw new Error('Model is required for agent template creation');
-      }
-      if (!entity.category) {
-        throw new Error('Category is required for agent template creation');
-      }
+    // For create operations, validate all required fields
+    if (operation === 'create') {
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        slug: dataRecord.slug || '',
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        name: dataRecord.name || '',
+        description: dataRecord.description,
+        model: dataRecord.model || '',
+        temperature: dataRecord.temperature,
+        maxTokens: dataRecord.maxTokens,
+        timeout: dataRecord.timeout ?? 30000,
+        memory: dataRecord.memory || {},
+        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
+        category: dataRecord.category || 'general',
+        usageCount: dataRecord.usageCount ?? 0,
+        icon: dataRecord.icon,
+        previewPrompts: dataRecord.previewPrompts || [],
+        ...dataRecord,
+      });
+    } else {
+      // For update operations, only validate provided fields
+      Object.assign(entity, dataRecord);
     }
 
-    // Business rule validations
-    if (entity.name && entity.name.length > 100) {
-      throw new Error('Agent template name cannot exceed 100 characters');
-    }
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
 
-    if (entity.slug && entity.slug.length > 100) {
-      throw new Error('Agent template slug cannot exceed 100 characters');
-    }
-
-    if (entity.slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entity.slug)) {
-      throw new Error('Agent template slug must contain only lowercase letters, numbers, and hyphens');
-    }
-
-    if (entity.description && entity.description.length > 500) {
-      throw new Error('Agent template description cannot exceed 500 characters');
-    }
-
-    if (entity.temperature !== undefined && (entity.temperature < 0 || entity.temperature > 2)) {
-      throw new Error('Temperature must be between 0 and 2');
-    }
-
-    if (entity.maxTokens !== undefined && (entity.maxTokens < 1 || entity.maxTokens > 100000)) {
-      throw new Error('Max tokens must be between 1 and 100,000');
-    }
-
-    if (entity.timeout < 1000 || entity.timeout > 300000) {
-      throw new Error('Timeout must be between 1,000ms (1s) and 300,000ms (5m)');
-    }
-
-    // Validate blueprint structure if provided
-    if (entity.blueprint) {
-      console.log('[AgentTemplateEntity] Blueprint validation - type:', typeof entity.blueprint);
-      console.log(
-        '[AgentTemplateEntity] Blueprint validation - keys:',
-        entity.blueprint && typeof entity.blueprint === 'object' ? Object.keys(entity.blueprint) : 'N/A'
-      );
-
-      // Handle case where blueprint might be a JSON string that needs parsing
-      let blueprintObj = entity.blueprint;
-      if (typeof entity.blueprint === 'string') {
-        try {
-          blueprintObj = JSON.parse(entity.blueprint);
-        } catch {
-          throw new Error('Blueprint must be a valid JSON object');
-        }
-      }
-
-      if (typeof blueprintObj === 'object' && blueprintObj !== null) {
-        console.log('[AgentTemplateEntity] Blueprint object keys:', Object.keys(blueprintObj));
-        console.log('[AgentTemplateEntity] Has nodes?', 'nodes' in blueprintObj);
-        console.log('[AgentTemplateEntity] Nodes is array?', Array.isArray(blueprintObj.nodes));
-
-        if (!blueprintObj.nodes || !Array.isArray(blueprintObj.nodes)) {
-          throw new Error('Blueprint must have a nodes array');
-        }
-        if (!blueprintObj.edges || !Array.isArray(blueprintObj.edges)) {
-          throw new Error('Blueprint must have an edges array');
-        }
-      }
-    }
-
-    // Validate memory structure if provided
-    if (entity.memory && typeof entity.memory === 'object') {
-      if (entity.memory.identity && typeof entity.memory.identity !== 'object') {
-        throw new Error('Memory identity must be an object');
-      }
-    }
-
-    // Validate preview prompts
-    if (entity.previewPrompts && entity.previewPrompts.length > 10) {
-      throw new Error('Preview prompts cannot exceed 10 items');
+    if (errors.length > 0) {
+      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
+      throw new Error(`Validation failed: ${errorMessages}`);
     }
   }
 }

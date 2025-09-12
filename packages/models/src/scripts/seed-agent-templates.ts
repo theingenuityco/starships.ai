@@ -291,16 +291,11 @@ function createSibylMemoryConfig(): AgentMemoryState {
       name: 'Sibyl',
       role: 'Starship Navigator and First Officer',
       personality: 'Knowledgeable, welcoming, and expert at guiding new captains through their starship journey',
-      expertise: ['starship operations', 'crew management', 'mission planning', 'system configuration', 'onboarding guidance'],
+      expertise: ['starship operations', 'crew management', 'system configuration', 'onboarding guidance'],
     },
     purpose: {
       primary: 'Guide new captains through starship setup, operations, and help them get started on their journey',
-      secondary: [
-        'Explain starship features',
-        'Help configure agents and crew',
-        'Assist with mission planning',
-        'Provide operational guidance',
-      ],
+      secondary: ['Explain starship features', 'Help configure agents and crew', 'Provide operational guidance'],
       constraints: [
         'Prioritize safety and best practices',
         'Ensure smooth onboarding experience',

@@ -190,7 +190,6 @@ describe('StarshipRepository', () => {
         ownerId: 'owner-123',
         class: 'scout',
         maxAgents: 3,
-        maxActiveMissions: 3,
         slug: 'test-scout',
         status: 'active',
       });
@@ -213,7 +212,7 @@ describe('StarshipRepository', () => {
             ownerId: 'owner-123',
             class: 'scout',
             maxAgents: 3,
-            maxActiveMissions: 3,
+
             slug: 'test-scout',
             status: 'active',
           }),
@@ -225,7 +224,7 @@ describe('StarshipRepository', () => {
           ownerId: 'owner-123',
           class: 'scout',
           maxAgents: 3,
-          maxActiveMissions: 3,
+
           slug: 'test-scout',
           status: 'active',
         })
@@ -245,7 +244,7 @@ describe('StarshipRepository', () => {
         ownerId: 'owner-123',
         class: 'cruiser',
         maxAgents: 5,
-        maxActiveMissions: 6,
+
         slug: 'test-cruiser',
         status: 'active',
       });
@@ -263,7 +262,6 @@ describe('StarshipRepository', () => {
         expect.objectContaining({
           props: expect.objectContaining({
             maxAgents: 5,
-            maxActiveMissions: 6,
           }),
         })
       );
@@ -273,7 +271,7 @@ describe('StarshipRepository', () => {
           ownerId: 'owner-123',
           class: 'cruiser',
           maxAgents: 5,
-          maxActiveMissions: 6,
+
           slug: 'test-cruiser',
           status: 'active',
         })
@@ -293,7 +291,7 @@ describe('StarshipRepository', () => {
         ownerId: 'owner-123',
         class: 'draught',
         maxAgents: 10,
-        maxActiveMissions: 10,
+
         slug: 'test-draught',
         status: 'active',
       });
@@ -311,7 +309,6 @@ describe('StarshipRepository', () => {
         expect.objectContaining({
           props: expect.objectContaining({
             maxAgents: 10,
-            maxActiveMissions: 10,
           }),
         })
       );
@@ -321,7 +318,7 @@ describe('StarshipRepository', () => {
           ownerId: 'owner-123',
           class: 'draught',
           maxAgents: 10,
-          maxActiveMissions: 10,
+
           slug: 'test-draught',
           status: 'active',
         })

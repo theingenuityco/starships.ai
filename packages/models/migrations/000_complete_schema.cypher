@@ -42,33 +42,6 @@ CREATE CONSTRAINT unique_agent_starship IF NOT EXISTS FOR ()-[r:DEPLOYED_ON]-() 
 CREATE CONSTRAINT unique_agent_template_id IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.id IS UNIQUE;
 
 // ============================================================================
-// MISSION COLLECTION
-// ============================================================================
-
-// Mission constraints
-CREATE CONSTRAINT mission_id_unique IF NOT EXISTS FOR (m:MissionModel) REQUIRE m.id IS UNIQUE;
-
-// Mission indexes
-CREATE INDEX mission_starship_id IF NOT EXISTS FOR (m:MissionModel) ON (m.starshipId);
-CREATE INDEX mission_status IF NOT EXISTS FOR (m:MissionModel) ON (m.status);
-CREATE INDEX mission_phase IF NOT EXISTS FOR (m:MissionModel) ON (m.phase);
-CREATE RANGE INDEX mission_created_at IF NOT EXISTS FOR (m:MissionModel) ON (m.createdAt);
-
-// ============================================================================
-// MISSION MESSAGE COLLECTION
-// ============================================================================
-
-// Mission Message constraints
-CREATE CONSTRAINT mission_message_id_unique IF NOT EXISTS FOR (mm:MissionMessageModel) REQUIRE mm.id IS UNIQUE;
-
-// ============================================================================
-// MISSION CLARITY COLLECTION
-// ============================================================================
-
-// Mission Clarity constraints
-CREATE CONSTRAINT mission_clarity_id_unique IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE mc.id IS UNIQUE;
-
-// ============================================================================
 // WORKFLOW COLLECTION
 // ============================================================================
 
@@ -170,7 +143,6 @@ CREATE CONSTRAINT waitlist_email_unique IF NOT EXISTS FOR (w:Waitlist) REQUIRE w
 // ============================================================================
 
 CREATE FULLTEXT INDEX agentSearch IF NOT EXISTS FOR (n:Agent) ON EACH [n.name, n.description, n.systemPrompt, n.tags];
-CREATE FULLTEXT INDEX missionSearch IF NOT EXISTS FOR (n:Mission) ON EACH [n.name, n.description];
 CREATE FULLTEXT INDEX messageSearch IF NOT EXISTS FOR (n:Message) ON EACH [n.content];
 CREATE FULLTEXT INDEX workflowSearch IF NOT EXISTS FOR (n:Workflow) ON EACH [n.name, n.description, n.category, n.tags];
 CREATE FULLTEXT INDEX userSearch IF NOT EXISTS FOR (n:User) ON EACH [n.username, n.displayName, n.email];
@@ -192,7 +164,6 @@ CREATE (m:Migration {
     'starship_system',
     'agent_deployment',
     'agent_templates',
-    'mission_system',
     'workflow_dsl',
     'blueprint_management',
     'memory_management',

@@ -1,15 +1,14 @@
 # starships.ai – AI-Powered Agent Orchestration
 
-A comprehensive TypeScript monorepo for orchestrating AI-driven missions and missions. Built with Next.js 15, Express.js, Neo4j, and advanced workflow automation for transforming vision into reality.
+A comprehensive TypeScript monorepo for orchestrating AI-driven agents and workflows. Built with Next.js 15, Express.js, Neo4j, and advanced workflow automation for transforming vision into reality.
 
 > **Project Status:** Production-ready with live waitlist system and operational core features.
 
 ## 🌟 Key Features
 
 - **Vision Chamber**: AI-powered vision refinement with quality metrics and intelligent suggestions
-- **Mission Orchestration**: Advanced mission planning and execution with chat interfaces
 - **Autopilot Workflow Engine**: DAG-based workflow execution with conditional routing and AI model integration
-- **Multi-Agent missions**: Complex mission management with agent coordination
+- **Multi-Agent Coordination**: Complex agent management with intelligent coordination
 - **Starship Management**: Enhanced starship creation with vision integration and subscription tiers
 - **Production-Ready**: Docker containerization, Kubernetes deployment, SSL certificates, and comprehensive monitoring
 
@@ -70,7 +69,7 @@ pnpm lint         # Run ESLint
 
 | Package                                                  | Description                                                                                  |
 | -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with starship management, mission control, and conversation interfaces   |
+| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with starship management, agent control, and conversation interfaces     |
 | [`@starships/server`](./packages/server/README.md)       | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints   |
 | [`@starships/autopilot`](./packages/autopilot/README.md) | Workflow execution engine with DAG-based flows, agent system, and AI model integration       |
 | [`@starships/models`](./packages/models/README.md)       | Neo4j database models, repositories, migration system, and comprehensive data access layer   |
@@ -121,14 +120,14 @@ pnpm lint         # Run ESLint
 
 ## 🌐 Core System Overview
 
-### Mission Control Flow
+### Agent Coordination Flow
 
 ```mermaid
 graph TD
-    A[Vision Chamber] --> B[Mission Planning]
-    B --> C[mission Launch]
+    A[Vision Chamber] --> B[Agent Planning]
+    B --> C[Agent Launch]
     C --> D[Agent Coordination]
-    D --> E[Mission Execution]
+    D --> E[Workflow Execution]
     E --> F[Results & Insights]
 ```
 
@@ -154,11 +153,11 @@ graph TD
 - Agent deployment to starships with capacity management
 - Comprehensive agent analytics and performance tracking
 
-**Mission Orchestration**
+**Agent Orchestration**
 
-- Mission creation and lifecycle management
-- AI-powered mission orchestrators with chat interfaces
-- Mission-specific communication and progress tracking
+- Agent creation and lifecycle management
+- AI-powered agent orchestrators with chat interfaces
+- Agent-specific communication and progress tracking
 - Integration with autopilot workflow system
 
 **Conversation System**
@@ -203,17 +202,18 @@ curl -X POST http://localhost:4000/api/v1/starships \
   }'
 ```
 
-#### Create Mission
+#### Execute Workflow
 
 ```bash
-curl -X POST http://localhost:4000/api/v1/missions \
+curl -X POST http://localhost:4000/api/v1/workflows/execute \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "starshipId": "starship-123",
-    "title": "Market Research",
-    "objective": "Analyze competitive landscape",
-    "phase": "init"
+    "workflowId": "workflow-456",
+    "parameters": {
+      "objective": "Analyze competitive landscape"
+    }
   }'
 ```
 
@@ -373,7 +373,7 @@ Simple and efficient debug configurations for development:
 - ✅ JWT authentication with secure token validation
 - ✅ Waitlist system with controlled early access
 - ✅ Comprehensive starship management with billing
-- ✅ Mission orchestration with AI-powered orchestrators
+- ✅ Agent orchestration with AI-powered coordination
 - ✅ Agent marketplace with templates and custom agents
 - ✅ Conversation system with structured chat interfaces
 - ✅ Autopilot workflow execution engine with advanced memory
@@ -386,7 +386,7 @@ Simple and efficient debug configurations for development:
 
 - Advanced workflow node types and conditional logic
 - Enhanced agent analytics and performance metrics
-- Mission progress tracking and status updates
+- Agent progress tracking and status updates
 - Mobile-responsive interface optimizations
 - Advanced conversation features and AI interactions
 

@@ -305,7 +305,7 @@ export default function HomePage() {
                 }}
                 viewport={{ once: false, margin: '-10%' }}
               >
-                Your idea becomes a plan. Your plan becomes focused missions. Your missions become reality.
+                Your idea becomes a plan. Your plan becomes focused workflows. Your workflows become reality.
               </motion.p>
             </motion.div>
 
@@ -514,7 +514,7 @@ export default function HomePage() {
                 <SystemCard
                   icon={Compass}
                   title="Expeditions"
-                  description="Your idea becomes reality through focused missions. Ship meaningful pieces quickly. Learn from real users. Build momentum that compounds."
+                  description="Your idea becomes reality through focused execution. Ship meaningful pieces quickly. Learn from real users. Build momentum that compounds."
                   imageContent={
                     <div className="relative w-48 h-32 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/20 backdrop-blur-sm overflow-hidden">
                       {/* Strategic Line Icons around rocket */}
@@ -723,7 +723,7 @@ export default function HomePage() {
               >
                 <StarshipClass
                   name="Scout Class"
-                  description="Perfect for focused exploration and individual missions. Efficient and nimble."
+                  description="Perfect for focused exploration and individual tasks. Efficient and nimble."
                   features={['3 Crew Members', '1 Concurrent Expedition', 'Minimal Burn Rate', 'Quick Deployment']}
                 />
               </motion.div>
@@ -759,7 +759,7 @@ export default function HomePage() {
                 <StarshipClass
                   name="Dreadnought Class"
                   description="Maximum capability for complex, multi-faceted projects. Built for large-scale operations."
-                  features={['12+ Crew Members', 'Unlimited Expeditions', 'High Burn Rate', 'Epic Scale Missions']}
+                  features={['12+ Crew Members', 'Unlimited Expeditions', 'High Burn Rate', 'Epic Scale Operations']}
                 />
               </motion.div>
             </div>

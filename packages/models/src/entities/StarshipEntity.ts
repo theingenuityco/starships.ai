@@ -49,26 +49,6 @@ export class StarshipTransformers {
       }
     });
   }
-
-  /**
-   * Transform max active missions based on starship class
-   */
-  static MaxActiveMissionsTransform() {
-    return Transform(({ value, obj }) => {
-      if (typeof value === 'number' && value > 0) return value;
-      // Auto-calculate based on class if not provided
-      switch (obj.class) {
-        case 'scout':
-          return 3;
-        case 'cruiser':
-          return 6;
-        case 'draught':
-          return 10;
-        default:
-          return 3;
-      }
-    });
-  }
 }
 
 export class StarshipEntity implements StarshipModel {
@@ -103,13 +83,6 @@ export class StarshipEntity implements StarshipModel {
   @Min(1)
   @Max(50) // Reasonable upper limit
   maxAgents!: number;
-
-  @Expose()
-  @StarshipTransformers.MaxActiveMissionsTransform()
-  @IsNumber()
-  @Min(1)
-  @Max(50) // Reasonable upper limit
-  maxActiveMissions!: number;
 
   @Expose()
   @IsEnum(['active', 'inactive', 'restricted', 'disabled', 'pending_payment'])
@@ -188,7 +161,6 @@ export class StarshipEntity implements StarshipModel {
         class: dataRecord.class || 'scout',
         name: dataRecord.name || '',
         maxAgents: dataRecord.maxAgents ?? 3,
-        maxActiveMissions: dataRecord.maxActiveMissions ?? 3,
         status: dataRecord.status || 'active',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
@@ -316,13 +288,6 @@ export class StarshipEntity implements StarshipModel {
   }
 
   /**
-   * Helper method to get available mission slots
-   */
-  getAvailableMissionSlots(currentMissionCount: number = 0): number {
-    return Math.max(0, this.maxActiveMissions - currentMissionCount);
-  }
-
-  /**
    * Helper method to check if starship can accommodate more agents
    */
   canAddAgents(currentAgentCount: number = 0): boolean {
@@ -330,32 +295,16 @@ export class StarshipEntity implements StarshipModel {
   }
 
   /**
-   * Helper method to check if starship can accommodate more missions
-   */
-  canAddMissions(currentMissionCount: number = 0): boolean {
-    return this.getAvailableMissionSlots(currentMissionCount) > 0;
-  }
-
-  /**
    * Helper method to get starship capacity utilization
    */
-  getCapacityUtilization(
-    currentAgentCount: number = 0,
-    currentMissionCount: number = 0
-  ): {
+  getCapacityUtilization(currentAgentCount: number = 0): {
     agents: { used: number; max: number; percentage: number };
-    missions: { used: number; max: number; percentage: number };
   } {
     return {
       agents: {
         used: currentAgentCount,
         max: this.maxAgents,
         percentage: Math.round((currentAgentCount / this.maxAgents) * 100),
-      },
-      missions: {
-        used: currentMissionCount,
-        max: this.maxActiveMissions,
-        percentage: Math.round((currentMissionCount / this.maxActiveMissions) * 100),
       },
     };
   }

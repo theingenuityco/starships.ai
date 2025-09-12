@@ -142,10 +142,6 @@ export class Neo4jConnection {
         // 'CREATE CONSTRAINT constraint_id_unique IF NOT EXISTS FOR (con:Constraint) REQUIRE con.id IS UNIQUE',
         // 'CREATE CONSTRAINT concept_id_unique IF NOT EXISTS FOR (concept:Concept) REQUIRE concept.id IS UNIQUE',
         // 'CREATE CONSTRAINT meta_anchor_id_unique IF NOT EXISTS FOR (m:MetaAnchor) REQUIRE m.id IS UNIQUE',
-
-        // Mission system constraints
-        'CREATE CONSTRAINT mission_id_unique IF NOT EXISTS FOR (m:Mission) REQUIRE m.id IS UNIQUE',
-        'CREATE CONSTRAINT mission_clarity_id_unique IF NOT EXISTS FOR (mc:MissionClarity) REQUIRE mc.id IS UNIQUE',
       ];
 
       for (const constraint of constraints) {
@@ -167,16 +163,6 @@ export class Neo4jConnection {
         // 'CREATE INDEX concept_category_index IF NOT EXISTS FOR (concept:Concept) ON (concept.category)',
         // 'CREATE INDEX meta_anchor_codex_index IF NOT EXISTS FOR (m:MetaAnchor) ON (m.codexId)',
         'CREATE INDEX vision_starship_index IF NOT EXISTS FOR (v:Vision) ON (v.starshipId)',
-
-        // Mission system indexes
-        'CREATE INDEX mission_starship_index IF NOT EXISTS FOR (m:Mission) ON (m.starshipId)',
-        'CREATE INDEX mission_status_index IF NOT EXISTS FOR (m:Mission) ON (m.status)',
-        'CREATE INDEX mission_phase_index IF NOT EXISTS FOR (m:Mission) ON (m.phase)',
-        'CREATE INDEX mission_created_by_index IF NOT EXISTS FOR (m:Mission) ON (m.createdBy)',
-
-        'CREATE INDEX mission_clarity_mission_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.missionId)',
-        'CREATE INDEX mission_clarity_score_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.overallScore)',
-        'CREATE INDEX mission_clarity_iteration_index IF NOT EXISTS FOR (mc:MissionClarity) ON (mc.iteration)',
       ];
 
       for (const index of indexes) {

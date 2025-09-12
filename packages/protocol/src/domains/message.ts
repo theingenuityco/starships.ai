@@ -12,6 +12,8 @@ import type { Message } from '@starships/autopilot';
 // DATABASE MESSAGE INTERFACE
 // ============================================================================
 
+export type MessageType = 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';
+
 /**
  * Database Message interface - core API contract type
  * Extends Message from autopilot with additional database/persistence fields
@@ -40,7 +42,7 @@ export interface MessageModel extends Message {
   streamCompleted?: boolean;
 
   // Message classification
-  messageType: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'error';
+  messageType: MessageType;
   importance: 'low' | 'medium' | 'high' | 'critical';
 
   // Content analysis

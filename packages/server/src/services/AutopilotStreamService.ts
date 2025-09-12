@@ -1,42 +1,18 @@
 /**
- * Unified Stream Service
+ * Autopilot Stream Service
  *
- * Server-side implementation of the StreamingEmitter interface.
- * Converts both autopilot ExecutionEvents and server events to unified streaming format.
+ * Server-side implementation of the EngineEmitter interface.
+ * Converts autopilot ExecutionEvents directly to Message format for streaming.
  */
 
-import type { ExecutionEvent, StreamingEmitter } from '@starships/autopilot';
+import type { ExecutionEvent, EngineEmitter } from '@starships/autopilot';
 import type { StreamingChunk } from '@starships/protocol';
 import type { StreamingService } from './StreamingService';
 
 /**
- * Server event types for unified streaming
+ * Autopilot streaming service that converts ExecutionEvents directly to Message format
  */
-export interface ServerEvent {
-  type: 'server_message' | 'server_error' | 'server_instant_response';
-  timestamp: string;
-  conversationId?: string;
-  agentId?: string;
-  starshipId?: string;
-  messageData?: {
-    role: 'system' | 'assistant' | 'user';
-    content: string;
-    messageType?: string;
-    importance?: string;
-    processingStatus?: string;
-    metadata?: Record<string, unknown>;
-  };
-  error?: {
-    code?: string;
-    message: string;
-    recoverable?: boolean;
-  };
-}
-
-/**
- * Unified streaming service that converts both autopilot and server events to streaming format
- */
-export class AutopilotStreamService implements StreamingEmitter {
+export class AutopilotStreamService implements EngineEmitter {
   private streamingService: StreamingService;
   private streamId: string;
   private conversationId: string;
@@ -98,39 +74,6 @@ export class AutopilotStreamService implements StreamingEmitter {
       }
     } catch (error) {
       console.error('[AutopilotStreamService] Failed to emit event:', error);
-    }
-  }
-
-  /**
-   * Handle server-generated events (unified with autopilot events)
-   */
-  async emitServerEvent(event: ServerEvent): Promise<void> {
-    if (!this.enabled) {
-      return;
-    }
-
-    try {
-      // Handle server errors differently
-      if (event.type === 'server_error') {
-        await this.streamingService.broadcastError({
-          streamId: this.streamId,
-          errorCode: event.error?.code || 'SERVER_ERROR',
-          message: event.error?.message || 'Server error',
-          timestamp: event.timestamp,
-          recoverable: event.error?.recoverable ?? false,
-          context: {
-            eventType: event.type,
-            agentId: event.agentId,
-            conversationId: event.conversationId,
-          },
-        });
-      } else {
-        // Server events become messages (like autopilot events)
-        const messageData = this.convertServerEventToMessage(event);
-        await this.streamingService.broadcastMessage(messageData);
-      }
-    } catch (error) {
-      console.error('[AutopilotStreamService] Failed to emit server event:', error);
     }
   }
 
@@ -223,7 +166,7 @@ export class AutopilotStreamService implements StreamingEmitter {
           },
         };
 
-      case 'node_completed':
+      case 'node_completed': {
         // Check if this is an LLM node with response content
         const nodeResult = event.execution.executionResults.get(event.execution.currentNodeRef || '');
         if (nodeResult && !nodeResult.error && nodeResult.data) {
@@ -265,7 +208,7 @@ export class AutopilotStreamService implements StreamingEmitter {
             timestamp: event.timestamp,
           },
         };
-
+      }
       case 'workflow_completed':
         return {
           ...baseMessage,
@@ -351,156 +294,6 @@ export class AutopilotStreamService implements StreamingEmitter {
   }
 
   /**
-   * Convert server event to message data
-   */
-  private convertServerEventToMessage(event: ServerEvent): any {
-    const baseMessage = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      conversationId: event.conversationId || this.conversationId,
-      agentId: event.agentId || this.agentId,
-      timestamp: event.timestamp,
-      createdAt: event.timestamp,
-      updatedAt: event.timestamp,
-      version: '1.0.0',
-      threadDepth: 0,
-      hasAttachments: false,
-      streaming: true,
-    };
-
-    switch (event.type) {
-      case 'server_message':
-        if (event.messageData) {
-          return {
-            ...baseMessage,
-            role: event.messageData.role,
-            content: event.messageData.content,
-            messageType: event.messageData.messageType || 'system_message',
-            importance: event.messageData.importance || 'medium',
-            processingStatus: event.messageData.processingStatus || 'completed',
-            contentLength: event.messageData.content.length,
-            metadata: event.messageData.metadata || {
-              serverEvent: event.type,
-              timestamp: event.timestamp,
-            },
-          };
-        }
-        break;
-
-      case 'server_instant_response':
-        return {
-          ...baseMessage,
-          role: 'assistant',
-          content: event.messageData?.content || '',
-          messageType: 'agent_response',
-          importance: 'medium',
-          processingStatus: 'processing',
-          contentLength: (event.messageData?.content || '').length,
-          metadata: {
-            serverEvent: event.type,
-            instantResponse: true,
-            timestamp: event.timestamp,
-          },
-        };
-
-      default:
-        return {
-          ...baseMessage,
-          role: 'system',
-          content: `Unknown server event: ${event.type}`,
-          messageType: 'system_message',
-          importance: 'low',
-          processingStatus: 'completed',
-          contentLength: `Unknown server event: ${event.type}`.length,
-          metadata: {
-            serverEvent: event.type,
-            timestamp: event.timestamp,
-          },
-        };
-    }
-
-    return baseMessage;
-  }
-
-  /**
-   * Convert server event to streaming chunk (unified with autopilot events)
-   */
-  private convertServerEventToChunk(event: ServerEvent): StreamingChunk {
-    const baseChunk: StreamingChunk = {
-      id: this.generateChunkId(),
-      streamId: this.streamId,
-      conversationId: event.conversationId || this.conversationId,
-      agentId: event.agentId || this.agentId,
-      type: 'content', // default
-      content: '',
-      timestamp: event.timestamp,
-      metadata: {
-        eventType: event.type,
-      },
-    };
-
-    switch (event.type) {
-      case 'server_message':
-        // Convert server message data to appropriate chunk type
-        if (event.messageData) {
-          const chunkType =
-            event.messageData.role === 'assistant'
-              ? 'content'
-              : event.messageData.messageType === 'system_message'
-                ? 'thinking'
-                : 'content';
-
-          return {
-            ...baseChunk,
-            type: chunkType,
-            content: event.messageData.content,
-            metadata: {
-              ...baseChunk.metadata,
-              role: event.messageData.role,
-              messageType: event.messageData.messageType,
-              importance: event.messageData.importance,
-              processingStatus: event.messageData.processingStatus,
-              serverMetadata: event.messageData.metadata,
-            },
-          };
-        }
-        break;
-
-      case 'server_instant_response':
-        // For instant empty responses
-        return {
-          ...baseChunk,
-          type: 'content',
-          content: event.messageData?.content || '',
-          metadata: {
-            ...baseChunk.metadata,
-            role: 'assistant',
-            processingStatus: 'processing',
-            instantResponse: true,
-          },
-        };
-
-      case 'server_error':
-        return {
-          ...baseChunk,
-          type: 'error',
-          content: `Server error: ${event.error?.message || 'Unknown server error'}`,
-          metadata: {
-            ...baseChunk.metadata,
-            errorCode: event.error?.code,
-          },
-        };
-
-      default:
-        return {
-          ...baseChunk,
-          content: `Unknown server event: ${event.type}`,
-        };
-    }
-
-    return baseChunk;
-  }
-
-  /**
    * Generate unique chunk ID
    */
   private generateChunkId(): string {
@@ -508,24 +301,42 @@ export class AutopilotStreamService implements StreamingEmitter {
   }
 
   /**
-   * Create server event for system messages (replaces old broadcastMessage for system messages)
+   * Create system messages directly without using ServerEvent
    */
   async emitSystemMessage(content: string, messageType: string = 'system_message', importance: string = 'low'): Promise<void> {
-    const serverEvent: ServerEvent = {
-      type: 'server_message',
-      timestamp: new Date().toISOString(),
-      conversationId: this.conversationId,
-      agentId: this.agentId,
-      messageData: {
-        role: 'system',
+    if (!this.enabled) {
+      return;
+    }
+
+    try {
+      const timestamp = new Date().toISOString();
+      const messageData = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        conversationId: this.conversationId,
+        agentId: this.agentId,
+        timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        version: '1.0.0',
+        threadDepth: 0,
+        hasAttachments: false,
+        streaming: true,
+        role: 'system' as const,
         content,
         messageType,
         importance,
-        processingStatus: 'completed',
-      },
-    };
+        processingStatus: 'completed' as const,
+        contentLength: content.length,
+        metadata: {
+          serverGenerated: true,
+          timestamp,
+        },
+      };
 
-    await this.emitServerEvent(serverEvent);
+      await this.streamingService.broadcastMessage(messageData);
+    } catch (error) {
+      console.error('[AutopilotStreamService] Failed to emit system message:', error);
+    }
   }
   /**
    * Get current streaming configuration

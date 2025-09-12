@@ -87,4 +87,4 @@ export type { AutopilotConfig, AutopilotCredentials } from './Autopilot';
 
 // ===== STREAMING SYSTEM =====
 // Minimal streaming interface for external implementations
-export type { EngineEmitter } from './types/emitters';
+export type { EngineEmitter, ExecutionEvent } from './types/emitters';

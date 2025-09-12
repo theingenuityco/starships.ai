@@ -109,11 +109,8 @@ describe('ConversationRepository', () => {
   describe('create', () => {
     it('should create new conversation with required fields', async () => {
       const conversationData = {
-        lastActivityAt: '2023-01-01T00:00:00.000Z',
-        messageCount: 0,
-        totalTokens: 0,
+        title: 'Test Conversation',
         status: 'active' as const,
-        metadata: { key: 'value' },
       };
 
       const createdConversation = {
@@ -140,9 +137,7 @@ describe('ConversationRepository', () => {
 
     it('should create conversation with starship link', async () => {
       const conversationData = {
-        lastActivityAt: '2023-01-01T00:00:00.000Z',
-        messageCount: 0,
-        totalTokens: 0,
+        title: 'Test Conversation',
         status: 'active' as const,
       };
 
@@ -171,8 +166,8 @@ describe('ConversationRepository', () => {
 
     it('should validate required fields', async () => {
       const incompleteData = {
-        messageCount: 0,
-        // Missing required fields
+        status: 'active' as const,
+        // Missing title field
       };
 
       await expect(repository.create(incompleteData as CreateConversationData)).rejects.toThrow(DatabaseError);
@@ -180,8 +175,7 @@ describe('ConversationRepository', () => {
 
     it('should validate enum values for status', async () => {
       const invalidData = {
-        lastActivityAt: '2023-01-01T00:00:00.000Z',
-        messageCount: 0,
+        title: 'Test Conversation',
         status: 'invalid_status',
       };
 
@@ -190,8 +184,7 @@ describe('ConversationRepository', () => {
 
     it('should validate field types', async () => {
       const invalidData = {
-        lastActivityAt: '2023-01-01T00:00:00.000Z',
-        messageCount: 'not_a_number',
+        title: 123, // Should be string
         status: 'active',
       };
 
@@ -203,7 +196,6 @@ describe('ConversationRepository', () => {
     it('should update conversation with valid data', async () => {
       const updates = {
         status: 'completed' as const,
-        totalTokens: 100,
       };
 
       const updatedConversation = global.createMockConversation({
@@ -220,10 +212,9 @@ describe('ConversationRepository', () => {
         expect.objectContaining({
           id: 'conv-123',
           status: 'completed',
-          totalTokens: 100,
         })
       );
-      expect(result).toEqual(expect.objectContaining({ id: 'conv-123', status: 'completed', totalTokens: 100 }));
+      expect(result).toEqual(expect.objectContaining({ id: 'conv-123', status: 'completed' }));
     });
 
     it('should return existing conversation when no updates provided', async () => {
@@ -249,7 +240,7 @@ describe('ConversationRepository', () => {
     });
 
     it('should validate field types during update', async () => {
-      await expect(repository.update('conv-123', { messageCount: 'not_a_number' as unknown as number })).rejects.toThrow();
+      await expect(repository.update('conv-123', { title: 123 as unknown as string })).rejects.toThrow();
     });
   });
 
@@ -338,7 +329,7 @@ describe('ConversationRepository', () => {
         {
           starshipId: 'starship-456',
           conversationId: 'conv-123',
-          key: 'starship-456_conv-123',
+          id: 'starship-456_conv-123',
         }
       );
     });
@@ -376,9 +367,7 @@ describe('ConversationRepository', () => {
         .mockRejectedValue(error);
 
       const conversationData = {
-        lastActivityAt: '2023-01-01T00:00:00.000Z',
-        messageCount: 0,
-        totalTokens: 0,
+        title: 'Test Conversation',
         status: 'active' as const,
       };
 
@@ -396,9 +385,7 @@ describe('ConversationRepository', () => {
   describe('integration scenarios', () => {
     it('should handle conversation lifecycle', async () => {
       const conversationData = {
-        lastActivityAt: '2023-01-01T00:00:00.000Z',
-        messageCount: 0,
-        totalTokens: 0,
+        title: 'Test Conversation',
         status: 'active' as const,
       };
 

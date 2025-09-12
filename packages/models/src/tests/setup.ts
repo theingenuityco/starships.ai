@@ -69,11 +69,8 @@ const mockDriver = {
 // Mock conversation data
 (global as Record<string, unknown>).createMockConversation = (overrides: Record<string, unknown> = {}) => ({
   id: 'conversation-123',
-  lastActivityAt: '2024-01-01T00:00:00.000Z',
-  messageCount: 0,
-  totalTokens: 0,
+  title: 'Test Conversation',
   status: 'active',
-  metadata: {},
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
   ...overrides,

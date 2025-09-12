@@ -99,9 +99,8 @@ router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: 
       agent,
     });
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating agent starship assignment')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update agent starship assignment');
-    }
+    console.error('[AGENTS] Error updating agent starship assignment:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update agent starship assignment');
   }
 });
 
@@ -127,9 +126,8 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
 
     sendSuccess(res, result.agents, 200, { pagination: result.pagination });
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starship agents')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship agents');
-    }
+    console.error('[AGENTS] Error fetching starship agents:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship agents');
   }
 });
 
@@ -146,9 +144,8 @@ router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
 
     sendSuccess(res, agent);
   } catch (error) {
-    if (!handleCommonError(error, res, 'getting agent')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
-    }
+    console.error('[AGENTS] Error getting agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
   }
 });
 
@@ -179,9 +176,8 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
       sendSuccess(res, result.agents, 200, { pagination: result.pagination });
     }
   } catch (error) {
-    if (!handleCommonError(error, res, 'loading agents')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load agents');
-    }
+    console.error('[AGENTS] Error loading agents:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load agents');
   }
 });
 
@@ -198,9 +194,8 @@ router.get('/agents/public', jwtAuthMiddleware, async (req: Request, res: Respon
 
     sendSuccess(res, result.agents, 200, { pagination: result.pagination });
   } catch (error) {
-    if (!handleCommonError(error, res, 'loading public agents')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load public agents');
-    }
+    console.error('[AGENTS] Error loading public agents:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load public agents');
   }
 });
 
@@ -223,9 +218,8 @@ router.get('/agents/search', jwtAuthMiddleware, async (req: Request, res: Respon
 
     sendSuccess(res, agents);
   } catch (error) {
-    if (!handleCommonError(error, res, 'searching agents')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to search agents');
-    }
+    console.error('[AGENTS] Error searching agents:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to search agents');
   }
 });
 
@@ -268,9 +262,8 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
 
     sendSuccess(res, agent, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating agent')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create agent');
-    }
+    console.error('[AGENTS] Error creating agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create agent');
   }
 });
 
@@ -298,9 +291,8 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
 
     sendSuccess(res, agent);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating agent')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update agent');
-    }
+    console.error('[AGENTS] Error updating agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update agent');
   }
 });
 
@@ -317,9 +309,8 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
 
     sendSuccess(res, { message: 'Agent deleted successfully' }, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'deleting agent')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete agent');
-    }
+    console.error('[AGENTS] Error deleting agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete agent');
   }
 });
 

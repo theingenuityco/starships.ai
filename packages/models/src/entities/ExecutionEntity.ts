@@ -6,7 +6,7 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import type { AgentMemory, ExecutionStatus, NodeResult } from '@starships/autopilot';
+import type { ExecutionStatus, NodeResult } from '@starships/autopilot';
 import type { ExecutionModel, ExecutionError } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
@@ -84,11 +84,11 @@ export class ExecutionEntity implements ExecutionModel {
   // Properties from the Execution interface that may not be persisted
   @Expose()
   @Transformers.JsonTransform()
-  executionResults!: Map<string, NodeResult>;
+  results!: Map<string, NodeResult>;
 
   @Expose()
   @Transformers.JsonTransform()
-  agentMemory!: AgentMemory;
+  state!: Record<string, unknown>;
 
   /**
    * Deserialize database record into ExecutionEntity

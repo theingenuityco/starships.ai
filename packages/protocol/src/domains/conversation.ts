@@ -26,7 +26,3 @@ export interface ConversationModel extends Conversation {
   createdAt: string;
   updatedAt?: string;
 }
-
-export type CreateConversationRequest = Omit<Conversation, 'status'>;
-
-export type UpdateConversationRequest = Conversation;

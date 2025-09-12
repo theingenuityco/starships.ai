@@ -1,6 +1,6 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { ConversationModel } from '@starships/protocol';
+import type { AgentModel, Conversation, ConversationModel, StarshipModel } from '@starships/protocol';
 import { ConversationEntity } from '../entities/ConversationEntity';
 
 export class ConversationRepository extends BaseRepository {
@@ -33,7 +33,7 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId: string): Promise<ConversationModel> {
+  async create(entity: Conversation & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
         // Use lean validation from ConversationEntity
@@ -56,8 +56,10 @@ export class ConversationRepository extends BaseRepository {
         const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
 
         // Create relationship with starship if starshipId is provided
-        if (starshipId) {
-          await this.linkToStarship(result.id, starshipId);
+        await this.linkToStarship(result.id, entity.starshipId);
+
+        if (entity.agentId) {
+          await this.linkToAgent(result.id, entity.agentId);
         }
 
         // Use ConversationEntity for consistent mapping
@@ -150,22 +152,16 @@ export class ConversationRepository extends BaseRepository {
   /**
    * Get the starship associated with a conversation using Neo4j relationships
    */
-  async getConversationStarship(conversationId: string): Promise<{ id: string; name: string; slug: string } | null> {
+  async getConversationStarship(conversationId: string): Promise<StarshipModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ starship: { id: string; name: string; slug: string } }>(
-          `MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})
+        const result = await connection.executeQuery<{ s: StarshipModel }>(
+          `MATCH (s:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})
            RETURN starship`,
           { conversationId }
         );
-        return result.length > 0
-          ? {
-              id: result[0].starship.id,
-              name: result[0].starship.name,
-              slug: result[0].starship.slug,
-            }
-          : null;
+        return result.length > 0 ? result[0].s : null;
       },
       'getConversationStarship',
       'Conversation'
@@ -235,6 +231,66 @@ export class ConversationRepository extends BaseRepository {
         return result.map((record) => record.m);
       },
       'getConversationMessages',
+      'Conversation'
+    );
+  }
+
+  /**
+   * Create relationship between existing conversation and agent
+   */
+  async linkToAgent(conversationId: string, agentId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (c:Conversation {id: $conversationId}), (a:Agent {id: $agentId})
+           CREATE (c)-[:INVOLVES_AGENT {key: $key, linkedAt: $timestamp}]->(a)`,
+          {
+            conversationId,
+            agentId,
+            key: `${conversationId}_${agentId}`,
+            timestamp: new Date().toISOString(),
+          }
+        );
+      },
+      'linkToAgent',
+      'Conversation'
+    );
+  }
+
+  /**
+   * Remove relationship between conversation and agent
+   */
+  async unlinkFromAgent(conversationId: string, agentId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (c:Conversation {id: $conversationId})-[r:INVOLVES_AGENT]->(a:Agent {id: $agentId})
+           DELETE r`,
+          { conversationId, agentId }
+        );
+      },
+      'unlinkFromAgent',
+      'Conversation'
+    );
+  }
+
+  /**
+   * Get all agents involved in a conversation using Neo4j relationships
+   */
+  async getConversationAgents(conversationId: string): Promise<AgentModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ a: AgentModel }>(
+          `MATCH (c:Conversation {id: $conversationId})-[:INVOLVES_AGENT]->(a:Agent)
+           RETURN a`,
+          { conversationId }
+        );
+        return result.map((record) => record.a);
+      },
+      'getConversationAgents',
       'Conversation'
     );
   }

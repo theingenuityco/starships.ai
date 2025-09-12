@@ -18,7 +18,7 @@ export { Engine } from './engine/Engine';
 
 // Memory system
 export { Memory } from './Memory';
-export type { MemoryParams, MemoryState, Message } from './Memory';
+export type { MemoryParams, MemoryState, LlmMessage, MessageRole } from './Memory';
 
 // Agent memory system
 export { AgentMemory } from './AgentMemory';

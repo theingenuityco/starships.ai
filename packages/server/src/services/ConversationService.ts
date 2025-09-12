@@ -3,7 +3,7 @@ import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
-import { ConversationModel, ConversationStatus, CreateConversationRequest, CreateMessageRequest, MessageModel } from '@starships/protocol';
+import { AgentModel, ConversationModel, ConversationStatus, Message, StarshipModel } from '@starships/protocol';
 
 /**
  * Clean conversation service with proper error handling
@@ -22,14 +22,13 @@ export class ConversationService {
   /**
    * Create a new conversation
    */
-  async createConversation(data: CreateConversationRequest & { starshipId: string }): Promise<ConversationModel> {
-    const conversation = await this.conversationRepository.create(
-      {
-        title: 'New Conversation',
-        status: 'active',
-      },
-      data.starshipId
-    );
+  async createConversation(data: ConversationModel & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
+    const conversation = await this.conversationRepository.create({
+      title: data.title || 'New Conversation',
+      status: 'active',
+      starshipId: data.starshipId,
+      agentId: data.agentId,
+    });
 
     return conversation;
   }
@@ -51,8 +50,15 @@ export class ConversationService {
   /**
    * Get starship for conversation
    */
-  async getConversationStarship(conversationId: string): Promise<{ id: string; name: string; slug: string } | null> {
+  async getConversationStarship(conversationId: string): Promise<StarshipModel | null> {
     return this.conversationRepository.getConversationStarship(conversationId);
+  }
+
+  /**
+   * Get agents in conversation
+   */
+  async getConversationAgents(conversationId: string): Promise<AgentModel[]> {
+    return this.conversationRepository.getConversationAgents(conversationId);
   }
 
   /**
@@ -86,127 +92,23 @@ export class ConversationService {
     });
   }
 
-  /**
-   * Process conversation with streaming support
-   * Uses conversationId as the stream identifier - no database streaming state needed
-   */
-  async addMessageWithStreaming(data: CreateMessageRequest & { conversationId: string }): Promise<MessageModel[]> {
-    const { conversationId, content, role, messageType } = data;
-
-    try {
-      // Verify conversation exists
-      const conversation = await this.conversationRepository.findById(conversationId);
-      if (!conversation) {
-        throw new NotFoundError('Conversation', conversationId);
-      }
-
-      // Get starship information for message context
-      const starshipInfo = await this.getConversationStarship(conversationId);
-      if (!starshipInfo) {
-        throw new NotFoundError('Starship', `for conversation ${conversationId}`);
-      }
-
-      // Save user message to database
-      await this.messageService.createMessage({
-        conversationId,
-        role: role,
-        content: content,
-        messageType: messageType,
-      });
-
-      // Execute agent conversation with streaming
-      const response = await AgentService.executeConversationWithStreaming({
-        agentId,
-        userId,
-        message,
-        conversationId,
-        streamId: conversationId, // Use conversationId as streamId
-        streamingService: this.streamingService,
-      });
-
-      // Save agent response to database
-      await this.messageService.createMessage({
-        conversationId,
-        role: 'assistant',
-        content: response.content,
-        messageType: 'agent_response',
-      });
-
-      // Send final completion event via streaming (using conversationId as streamId)
-      await this.streamingService.broadcastComplete(conversationId, response);
-
-      return {
-        reply: response.content,
-        usage: response.usage,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-      // Broadcast error using conversationId as streamId
-      await this.streamingService.broadcastError(conversationId, {
-        streamId: conversationId,
-        errorCode: 'CONVERSATION_PROCESSING_FAILED',
-        message: errorMessage,
-        timestamp: new Date().toISOString(),
-        recoverable: false,
-        context: { conversationId, agentId },
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Add message to conversation and get agent response
-   */
-  async addMessage(data: AddMessageData): Promise<AddMessageResponse> {
-    const { conversationId, agentId, userId, message } = data;
-
-    // Verify conversation exists
-    const conversation = await this.conversationRepository.findById(conversationId);
-    if (!conversation) {
-      throw new NotFoundError('Conversation', conversationId);
-    }
-
-    // Get starship information for message context
-    const starshipInfo = await this.getConversationStarship(conversationId);
-    if (!starshipInfo) {
-      throw new NotFoundError('Starship', `for conversation ${conversationId}`);
-    }
-
+  async addMessage(data: Message & { conversationId: string }): Promise<void> {
     // Save user message to database
-    await this.messageService.addToConversation(conversationId, 'user', message, {
-      starshipId: starshipInfo.id,
-      agentId,
-      userId,
+    await this.messageService.createMessage({
+      conversationId: data.conversationId,
+      role: data.role,
+      content: data.content,
+      messageType: data.messageType,
     });
 
-    // Execute agent conversation - streaming support will be added
-    const response = await AgentService.executeConversation({
-      agentId,
-      userId,
-      message,
-      conversationId,
-      // stream parameter will be passed from request when streaming is implemented
-    });
+    const agents = await this.getConversationAgents(data.conversationId);
+    if (agents.length < 0) {
+      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
+    }
+    const agent = agents[0];
 
-    // Save agent response to database
-    await this.messageService.addToConversation(conversationId, 'assistant', response.content, {
-      starshipId: starshipInfo.id,
-      agentId,
-      userId,
-    });
-
-    // Update conversation metrics
-    await Promise.all([
-      this.updateConversationActivity(conversationId),
-      this.incrementMessageCount(conversationId, 2), // User message + assistant response
-    ]);
-
-    return {
-      reply: response.content,
-      usage: response.usage,
-    };
+    // Execute agent conversation with streaming
+    await AgentService.replyToConversation(agent.id, data.conversationId);
   }
 
   /**

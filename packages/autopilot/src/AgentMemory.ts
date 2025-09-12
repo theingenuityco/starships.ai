@@ -5,7 +5,7 @@
  * Built on top of the base Memory class for LLM message management
  */
 
-import { Memory, Message, MemoryState, MemoryParams } from '@/Memory';
+import { Memory, LlmMessage, MemoryState, MemoryParams } from '@/Memory';
 
 /**
  * Agent identity information
@@ -86,7 +86,7 @@ export class AgentMemory extends Memory {
   /**
    * Get message history
    */
-  getMessageHistory(): Message[] {
+  getMessageHistory(): LlmMessage[] {
     return super.getMessageEntries();
   }
 
@@ -94,7 +94,7 @@ export class AgentMemory extends Memory {
    * Get conversation history (legacy compatibility)
    * @deprecated Use getMessageHistory instead
    */
-  getConversationHistory(): Message[] {
+  getConversationHistory(): LlmMessage[] {
     return this.getMessageHistory();
   }
 
@@ -122,8 +122,8 @@ export class AgentMemory extends Memory {
   /**
    * Format messages for LLM with structured context
    */
-  toMessages(): Message[] {
-    const messages: Message[] = [];
+  toMessages(): LlmMessage[] {
+    const messages: LlmMessage[] = [];
 
     // Add structured system context if available
     const systemContext = this.buildSystemContext();
@@ -257,6 +257,3 @@ export class AgentMemory extends Memory {
     };
   }
 }
-
-// Export types for external use
-export type { Message, MemoryParams } from './Memory';

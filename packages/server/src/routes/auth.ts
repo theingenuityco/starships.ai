@@ -161,9 +161,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     );
   } catch (error: any) {
     console.error('[AUTH] Registration error:', error);
-    if (!handleError(error, res, 'user registration')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Registration failed', 500);
-    }
+    handleError(error, res, 'user registration');
   }
 });
 
@@ -241,9 +239,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     });
   } catch (error: any) {
     console.error('[AUTH] Login error:', error);
-    if (!handleError(error, res, 'user login')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Login failed', 500);
-    }
+    handleError(error, res, 'user login');
   }
 });
 
@@ -293,9 +289,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (!handleError(error, res, 'get current user')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Authentication failed', 500);
-    }
+    handleError(error, res, 'get current user');
   }
 });
 

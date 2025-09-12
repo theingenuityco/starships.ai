@@ -3,15 +3,7 @@ import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { getConnection } from '@starships/models';
 import { Request, Response, Router } from 'express';
 import { z, ZodError } from 'zod';
-import {
-  createPaginationMeta,
-  handleError,
-  sendError,
-  sendSuccess,
-  validateId,
-  validateIdOrSlug,
-  validatePagination,
-} from '../utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 
 const router: Router = Router();
 
@@ -88,26 +80,23 @@ router.get('/agent-templates', jwtAuthMiddleware, async (req: Request, res: Resp
       return;
     }
 
-    // Parse and validate pagination parameters
-    const pagination = validatePagination(req.query.page as string, req.query.limit as string);
-    if (pagination.error) {
-      sendError(res, pagination.error.code, pagination.error.message, 400);
-      return;
-    }
+    // Validate pagination parameters
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
+
+    const { page, limit } = queryValidation;
 
     const allTemplates = await templateService.getAllTemplates();
 
     // Apply pagination
-    const startIndex = (pagination.page - 1) * pagination.limit;
-    const paginatedTemplates = allTemplates.slice(startIndex, startIndex + pagination.limit);
+    const startIndex = (page - 1) * limit;
+    const paginatedTemplates = allTemplates.slice(startIndex, startIndex + limit);
 
-    const paginationMeta = createPaginationMeta(pagination.page, pagination.limit, paginatedTemplates.length);
+    const paginationMeta = createPaginationMeta(page, limit, paginatedTemplates.length);
 
     sendSuccess(res, paginatedTemplates, 200, paginationMeta);
   } catch (error) {
-    if (!handleError(error, res, 'loading templates')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load templates');
-    }
+    handleError(error, res, 'loading templates');
   }
 });
 
@@ -117,11 +106,8 @@ router.get('/agent-templates/:id', jwtAuthMiddleware, async (req: Request, res: 
     const { id } = req.params;
 
     // Validate template ID format
-    const { isValid, error } = validateId(id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
 
     const templateService = getAgentTemplateService();
     if (!templateService) {
@@ -141,9 +127,7 @@ router.get('/agent-templates/:id', jwtAuthMiddleware, async (req: Request, res: 
 
     sendSuccess(res, template, 200);
   } catch (error) {
-    if (!handleError(error, res, 'loading template')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load template');
-    }
+    handleError(error, res, 'loading template');
   }
 });
 
@@ -160,11 +144,8 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     }
 
     // Validate templateId format
-    const { isValid, error } = validateId(templateId, 'templateId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ templateId: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
 
     // Validate required fields
     if (!agentName || typeof agentName !== 'string' || !agentName.trim()) {
@@ -217,11 +198,13 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
       }
     } else {
       // Validate starshipId format (accepts both IDs and slugs)
-      const starshipValidation = validateIdOrSlug(targetStarshipId, 'starshipId');
-      if (!starshipValidation.isValid && starshipValidation.error) {
-        sendError(res, starshipValidation.error.code, starshipValidation.error.message, 400, starshipValidation.error.details);
-        return;
-      }
+      const starshipValidation = validateData(
+        z.object({ starshipId: z.string().regex(/^([a-z0-9_-]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug') }),
+        { starshipId: targetStarshipId },
+        res,
+        'starship identifier'
+      );
+      if (!starshipValidation) return;
 
       // Validate provided starshipId exists and belongs to user using service layer
       try {
@@ -265,9 +248,7 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
 
     sendSuccess(res, agent, 201);
   } catch (error) {
-    if (!handleError(error, res, 'creating agent from template')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create agent from template');
-    }
+    handleError(error, res, 'creating agent from template');
   }
 });
 
@@ -284,11 +265,8 @@ router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (r
     }
 
     // Validate agentId format
-    const { isValid, error } = validateId(agentId, 'agentId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ agentId: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
 
     console.log('[TEMPLATE] Getting template service...');
     const templateService = getAgentTemplateService();
@@ -344,11 +322,7 @@ router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (r
     sendSuccess(res, template, 201);
   } catch (error) {
     console.error('Error converting agent to template:', error);
-    if (!handleError(error, res, 'converting agent to template')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to convert agent to template', 500, {
-        details: String(error),
-      });
-    }
+    handleError(error, res, 'converting agent to template');
   }
 });
 

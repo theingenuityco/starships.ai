@@ -94,9 +94,7 @@ router.post(
         error: error instanceof Error ? error.message : 'Unknown error',
       });
 
-      if (!handleError(error, res, 'checking waitlist approval')) {
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Service temporarily unavailable. Please try again.');
-      }
+      handleError(error, res, 'checking waitlist approval');
     }
   })
 );
@@ -122,9 +120,7 @@ router.get('/waitlist/status', (req: Request, res: Response): void => {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    if (!handleError(error, res, 'checking waitlist status')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to check session status');
-    }
+    handleError(error, res, 'checking waitlist status');
   }
 });
 
@@ -142,9 +138,7 @@ router.post('/waitlist/logout', (req: Request, res: Response): void => {
       error: error instanceof Error ? error.message : 'Unknown error',
     });
 
-    if (!handleError(error, res, 'clearing waitlist session')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to clear session');
-    }
+    handleError(error, res, 'clearing waitlist session');
   }
 });
 

@@ -1,16 +1,17 @@
 /**
- * Autopilot Stream Service
+ * Autopilot Stream Service with Delta Encoding
  *
  * Server-side implementation of the EngineEmitter interface.
- * Converts autopilot ExecutionEvents directly to Message format for streaming.
+ * Uses RFC6902 JSON Patch to build complete message responses incrementally.
  */
 
 import type { ExecutionEvent, EngineEmitter } from '@starships/autopilot';
-import type { StreamingChunk } from '@starships/protocol';
 import type { StreamingService } from './StreamingService';
+import { ArrayDeltaEncoder } from '../utils/DeltaEncoder';
+import type { MessageModel, StreamingDeltaChunk } from '@starships/protocol';
 
 /**
- * Autopilot streaming service that converts ExecutionEvents directly to Message format
+ * Autopilot streaming service that uses delta encoding for incremental message updates
  */
 export class AutopilotStreamService implements EngineEmitter {
   private streamingService: StreamingService;
@@ -18,12 +19,15 @@ export class AutopilotStreamService implements EngineEmitter {
   private conversationId: string;
   private agentId: string;
   private enabled: boolean = true;
+  private deltaEncoder: ArrayDeltaEncoder<MessageModel>;
+  private activeMessageIndex: number = -1; // Index of current streaming message
 
   constructor(streamingService: StreamingService, streamId: string, conversationId: string, agentId: string) {
     this.streamingService = streamingService;
     this.streamId = streamId;
     this.conversationId = conversationId;
     this.agentId = agentId;
+    this.deltaEncoder = new ArrayDeltaEncoder<MessageModel>([]);
   }
 
   /**
@@ -49,11 +53,9 @@ export class AutopilotStreamService implements EngineEmitter {
     }
 
     try {
-      // Most events become messages, only content_chunk becomes chunk
       if (event.type === 'content_chunk') {
-        // Handle content streaming - convert to chunk
-        const serverChunk = this.convertEventToServerChunk(event);
-        await this.streamingService.broadcastChunk(serverChunk);
+        // Handle content streaming with patches
+        await this.handleContentChunk(event);
       } else if (event.type === 'workflow_failed' || event.type === 'node_failed') {
         // Handle errors with special error broadcast
         await this.streamingService.broadcastError({
@@ -68,9 +70,8 @@ export class AutopilotStreamService implements EngineEmitter {
           },
         });
       } else {
-        // All other events become messages
-        const messageData = this.convertEventToMessage(event);
-        await this.streamingService.broadcastMessage(messageData);
+        // All other events become messages using delta encoding
+        await this.handleEventAsMessage(event);
       }
     } catch (error) {
       console.error('[AutopilotStreamService] Failed to emit event:', error);
@@ -78,61 +79,154 @@ export class AutopilotStreamService implements EngineEmitter {
   }
 
   /**
-   * Convert autopilot ExecutionEvent to server streaming chunk (only for content_chunk)
+   * Handle content chunk by appending to existing message or creating new one
    */
-  private convertEventToServerChunk(event: ExecutionEvent): StreamingChunk {
-    const baseChunk: StreamingChunk = {
-      id: this.generateChunkId(),
-      streamId: this.streamId,
-      conversationId: this.conversationId,
-      agentId: this.agentId,
-      type: 'content',
-      content: '',
-      timestamp: event.timestamp,
-      metadata: {
-        eventType: event.type,
-      },
-    };
+  private async handleContentChunk(event: ExecutionEvent): Promise<void> {
+    const content = event.content || '';
 
-    // Only handle content_chunk events here
-    if (event.type === 'content_chunk') {
-      return {
-        ...baseChunk,
-        type: 'content',
-        content: event.content || '',
+    // If we don't have an active message for streaming, create one
+    if (this.activeMessageIndex === -1) {
+      const baseMessage = this.createBaseMessage(event.timestamp);
+      const streamingMessage: MessageModel = {
+        ...baseMessage,
+        role: 'assistant',
+        content: '',
+        messageType: 'agent_response',
+        importance: 'high',
+        processingStatus: 'streaming',
+        contentLength: 0,
         metadata: {
-          ...baseChunk.metadata,
+          event: 'content_streaming',
           nodeRef: event.contentMetadata?.nodeRef,
           model: event.contentMetadata?.model,
-          accumulated: event.contentMetadata?.accumulated,
-          isComplete: false,
+          isStreaming: true,
+          timestamp: event.timestamp,
         },
       };
+
+      const result = this.deltaEncoder.append(streamingMessage);
+      this.activeMessageIndex = result.state.length - 1;
+
+      await this.broadcastDeltas(result.patch);
     }
 
-    // Fallback for unexpected events
+    // Append content to the active message
+    const currentState = this.deltaEncoder.getCurrentState();
+    const currentMessage = currentState[this.activeMessageIndex];
+    const newContent = (currentMessage.content || '') + content;
+
+    const patchResult = this.deltaEncoder.applyOperations([
+      {
+        op: 'replace',
+        path: `/${this.activeMessageIndex}/content`,
+        value: newContent,
+      },
+      {
+        op: 'replace',
+        path: `/${this.activeMessageIndex}/contentLength`,
+        value: newContent.length,
+      },
+      {
+        op: 'replace',
+        path: `/${this.activeMessageIndex}/updatedAt`,
+        value: event.timestamp,
+      },
+    ]);
+
+    await this.broadcastDeltas(patchResult.patch);
+  }
+
+  /**
+   * Handle regular events as messages using delta encoding
+   */
+  private async handleEventAsMessage(event: ExecutionEvent): Promise<void> {
+    const messageData = this.convertEventToMessage(event);
+
+    // Special handling for content_complete - update the active streaming message
+    if (event.type === 'content_complete' && this.activeMessageIndex !== -1) {
+      const patchResult = this.deltaEncoder.applyOperations([
+        {
+          op: 'replace',
+          path: `/${this.activeMessageIndex}/processingStatus`,
+          value: 'completed',
+        },
+        {
+          op: 'replace',
+          path: `/${this.activeMessageIndex}/content`,
+          value: event.content || '',
+        },
+        {
+          op: 'replace',
+          path: `/${this.activeMessageIndex}/contentLength`,
+          value: (event.content || '').length,
+        },
+        {
+          op: 'replace',
+          path: `/${this.activeMessageIndex}/updatedAt`,
+          value: event.timestamp,
+        },
+        {
+          op: 'replace',
+          path: `/${this.activeMessageIndex}/metadata`,
+          value: {
+            ...messageData.metadata,
+            isStreaming: false,
+            isComplete: true,
+          },
+        },
+      ]);
+
+      this.activeMessageIndex = -1; // Reset active message
+      await this.broadcastDeltas(patchResult.patch);
+      return;
+    }
+
+    // For all other events, append as new message
+    const result = this.deltaEncoder.append(messageData);
+    await this.broadcastDeltas(result.patch);
+  }
+
+  /**
+   * Broadcast delta chunks via streaming service
+   */
+  private async broadcastDeltas(deltas: StreamingDeltaChunk[]): Promise<void> {
+    // Send each JSON patch operation as a pure DeltaChunk
+    for (const delta of deltas) {
+      await this.streamingService.broadcastDelta({
+        op: delta.op,
+        path: delta.path,
+        value: delta.value,
+        from: delta.from,
+      });
+    }
+  }
+
+  /**
+   * Create base message structure
+   */
+  private createBaseMessage(
+    timestamp: string
+  ): Omit<MessageModel, 'role' | 'content' | 'messageType' | 'importance' | 'processingStatus' | 'contentLength'> {
     return {
-      ...baseChunk,
-      content: `Unexpected chunk event: ${event.type}`,
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      conversationId: this.conversationId,
+      agentId: this.agentId,
+      timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      version: '1.0.0',
+      threadDepth: 0,
+      hasAttachments: false,
+      isStreaming: true,
+      starshipId: '', // Will need to be provided if required
     };
   }
 
   /**
    * Convert autopilot ExecutionEvent to message data
    */
-  private convertEventToMessage(event: ExecutionEvent): any {
-    const baseMessage = {
-      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      conversationId: this.conversationId,
-      agentId: this.agentId,
-      timestamp: event.timestamp,
-      createdAt: event.timestamp,
-      updatedAt: event.timestamp,
-      version: '1.0.0',
-      threadDepth: 0,
-      hasAttachments: false,
-      streaming: true,
-    };
+  private convertEventToMessage(event: ExecutionEvent): MessageModel {
+    const baseMessage = this.createBaseMessage(event.timestamp);
 
     switch (event.type) {
       case 'workflow_started':
@@ -209,6 +303,7 @@ export class AutopilotStreamService implements EngineEmitter {
           },
         };
       }
+
       case 'workflow_completed':
         return {
           ...baseMessage,
@@ -294,59 +389,31 @@ export class AutopilotStreamService implements EngineEmitter {
   }
 
   /**
-   * Generate unique chunk ID
+   * Get current messages state
    */
-  private generateChunkId(): string {
-    return `chunk_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  getCurrentMessages(): MessageModel[] {
+    return this.deltaEncoder.getCurrentState();
   }
 
   /**
-   * Create system messages directly without using ServerEvent
+   * Get current version
    */
-  async emitSystemMessage(content: string, messageType: string = 'system_message', importance: string = 'low'): Promise<void> {
-    if (!this.enabled) {
-      return;
-    }
-
-    try {
-      const timestamp = new Date().toISOString();
-      const messageData = {
-        id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        conversationId: this.conversationId,
-        agentId: this.agentId,
-        timestamp,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        version: '1.0.0',
-        threadDepth: 0,
-        hasAttachments: false,
-        streaming: true,
-        role: 'system' as const,
-        content,
-        messageType,
-        importance,
-        processingStatus: 'completed' as const,
-        contentLength: content.length,
-        metadata: {
-          serverGenerated: true,
-          timestamp,
-        },
-      };
-
-      await this.streamingService.broadcastMessage(messageData);
-    } catch (error) {
-      console.error('[AutopilotStreamService] Failed to emit system message:', error);
-    }
+  getCurrentVersion(): number {
+    return this.deltaEncoder.getCurrentVersion();
   }
+
   /**
-   * Get current streaming configuration
+   * Reset the delta encoder (useful for new conversations)
    */
-  getConfig() {
-    return {
-      streamId: this.streamId,
-      conversationId: this.conversationId,
-      agentId: this.agentId,
-      enabled: this.enabled,
-    };
+  reset(): void {
+    this.deltaEncoder = new ArrayDeltaEncoder<MessageModel>([]);
+    this.activeMessageIndex = -1;
+  }
+
+  /**
+   * Generate unique patch ID
+   */
+  private generatePatchId(): string {
+    return `patch_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   }
 }

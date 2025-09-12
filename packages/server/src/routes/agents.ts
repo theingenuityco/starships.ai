@@ -46,10 +46,6 @@ const UpdateAgentSchema = z.object({
     .optional(),
 });
 
-const RatingSchema = z.object({
-  rating: z.number().int().min(1).max(5, 'Rating must be between 1 and 5'),
-});
-
 const StarshipAssignmentSchema = z.object({
   starshipId: z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID'),
 });
@@ -79,71 +75,9 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
   }
 };
 
-// Helper function for authentication check
-const checkAuth = (req: Request, res: Response): boolean => {
-  const user = req.user;
-  if (!user?.id) {
-    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-    return false;
-  }
-  return true;
-};
-
-// POST /agents/:id/ratings - Rate agent (OpenAPI pattern)
-router.post('/agents/:id/ratings', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
-    // Validate agent ID parameter
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
-    if (!paramValidation) return;
-
-    // Validate request body
-    const bodyValidation = validateData(RatingSchema, req.body, res, 'rating data');
-    if (!bodyValidation) return;
-
-    const { id } = paramValidation;
-    const { rating } = bodyValidation;
-
-    // Delegate to service layer
-    const agentService = new AgentService();
-    await agentService.rateAgent(id, rating);
-    sendSuccess(res, { message: 'Agent rated successfully' }, 201);
-  } catch (error) {
-    if (!handleCommonError(error, res, 'rating agent')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to rate agent');
-    }
-  }
-});
-
-// POST /agents/:id/usage - Track agent usage (OpenAPI pattern)
-router.post('/agents/:id/usage', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    // Delegate to service layer
-    const agentService = new AgentService();
-    await agentService.trackAgentUsage(req.params.id);
-
-    sendSuccess(res, { message: 'Usage tracked successfully' });
-  } catch (error) {
-    if (!handleCommonError(error, res, 'tracking agent usage')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to track usage');
-    }
-  }
-});
-
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
 router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate agent ID parameter
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
@@ -155,21 +89,11 @@ router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: 
     const { id: agentId } = paramValidation;
     const { starshipId } = bodyValidation;
 
-    // TODO: Add validation to ensure starshipId references valid, accessible starship
-    // TODO: Add validation to ensure user owns the agent and/or has access to the starship
-
     console.log(`[AGENTS] Updating agent ${agentId} starship assignment to: ${starshipId}`);
 
     // Delegate to service layer
     const agentService = new AgentService();
     const agent = await agentService.updateAgentStarship(agentId, starshipId);
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        id: agentId,
-      });
-      return;
-    }
 
     sendSuccess(res, {
       message: 'Agent starship assignment updated successfully',
@@ -185,36 +109,10 @@ router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: 
 // GET /starships/:starshipId/agents - Fetch agents by starship (OpenAPI pattern)
 router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { starshipId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-
     // Validate starshipId format
-    const { isValid, error } = validateId(starshipId, 'starshipId');
+    const { isValid, error } = validateId(req.params.starshipId, 'starshipId');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    // Validate starship access
-    const { StarshipRepository } = await import('@starships/models');
-    const starshipRepository = new StarshipRepository();
-    const starship = await starshipRepository.findById(starshipId);
-
-    if (!starship) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
-        resource: 'starship',
-        id: starshipId,
-      });
-      return;
-    }
-
-    if (starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
 
@@ -227,15 +125,9 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const allAgents = await agentService.getAgentsByStarship(starshipId);
+    const result = await agentService.getAgentsByStarshipWithAccess(req.params.starshipId, req.user!.id, pagination.page, pagination.limit);
 
-    // Apply pagination
-    const startIndex = (pagination.page - 1) * pagination.limit;
-    const paginatedAgents = allAgents.slice(startIndex, startIndex + pagination.limit);
-
-    const paginationMeta = createPaginationMeta(pagination.page, pagination.limit, paginatedAgents.length);
-
-    sendSuccess(res, paginatedAgents, 200, paginationMeta);
+    sendSuccess(res, result.agents, 200, { pagination: result.pagination });
   } catch (error) {
     if (!handleCommonError(error, res, 'fetching starship agents')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship agents');
@@ -246,6 +138,7 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
 // GET /agents/:id - Get specific agent (OpenAPI pattern)
 router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Validate agent ID parameter
     const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
@@ -255,13 +148,6 @@ router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
     // Delegate to service layer
     const agentService = new AgentService();
     const agent = await agentService.getAgent(req.params.id);
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        id: req.params.id,
-      });
-      return;
-    }
 
     sendSuccess(res, agent);
   } catch (error) {
@@ -271,111 +157,19 @@ router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
   }
 });
 
-// GET /agents/:id/analytics - Get agent analytics (OpenAPI pattern)
-router.get('/agents/:id/analytics', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    // Delegate to service layer
-    const agentService = new AgentService();
-    const analytics = await agentService.getAgentAnalytics(req.params.id);
-
-    if (!analytics) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        id: req.params.id,
-      });
-      return;
-    }
-
-    sendSuccess(res, analytics);
-  } catch (error) {
-    if (!handleCommonError(error, res, 'getting agent analytics')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent analytics');
-    }
-  }
-});
-
-// GET /users/:userId/agents - Get agents for a user (OpenAPI pattern)
-router.get('/users/:userId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { userId: targetUserId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-
-    // Users can only access their own agents
-    if (targetUserId !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied', 403);
-      return;
-    }
-
-    // Validate userId format
-    const { isValid, error } = validateId(targetUserId, 'userId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
-
-    // Parse and validate pagination parameters
-    const pagination = validatePagination(req.query.page as string, req.query.limit as string);
-    if (pagination.error) {
-      sendError(res, pagination.error.code, pagination.error.message, 400);
-      return;
-    }
-
-    // Delegate to service layer
-    const agentService = new AgentService();
-    const allAgents = await agentService.getAgentsByUser(targetUserId);
-
-    // Apply pagination
-    const startIndex = (pagination.page - 1) * pagination.limit;
-    const paginatedAgents = allAgents.slice(startIndex, startIndex + pagination.limit);
-
-    const paginationMeta = createPaginationMeta(pagination.page, pagination.limit, paginatedAgents.length);
-
-    sendSuccess(res, paginatedAgents, 200, paginationMeta);
-  } catch (error) {
-    if (!handleCommonError(error, res, 'fetching user agents')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user agents');
-    }
-  }
-});
-
 // GET /agents - List agents with filtering and pagination (OpenAPI pattern)
 router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { category, authorId, tags, isPublic, starshipId } = req.query;
-    const userId = req.user?.id;
+    const { starshipId } = req.query;
 
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-
+    // Parse and validate pagination parameters
     const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
-
     if (paginationError) {
       sendError(res, paginationError.code, paginationError.message, 400);
       return;
     }
 
-    // Validate UUIDs if provided
-    if (authorId && typeof authorId === 'string') {
-      const { isValid, error } = validateId(authorId, 'authorId');
-      if (!isValid && error) {
-        sendError(res, error.code, error.message, 400, error.details);
-        return;
-      }
-    }
-
+    // Validate starshipId format if provided
     if (starshipId && typeof starshipId === 'string') {
       const { isValid, error } = validateId(starshipId, 'starshipId');
       if (!isValid && error) {
@@ -384,80 +178,17 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
       }
     }
 
-    let agents: AgentModel[];
-
-    // Handle different query scenarios - delegate to service layer
     const agentService = new AgentService();
 
-    if (category) {
-      agents = await agentService.getAgentsByCategory(category as string);
-    } else if (authorId) {
-      agents = await agentService.getAgentsByUser(authorId as string);
-    } else if (starshipId) {
-      // Validate starship access
-      const { StarshipRepository } = await import('@starships/models');
-      const starshipRepository = new StarshipRepository();
-      const starship = await starshipRepository.findById(starshipId as string);
-
-      if (!starship) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
-          resource: 'starship',
-          id: starshipId,
-        });
-        return;
-      }
-      if (starship.ownerId !== userId) {
-        sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
-        return;
-      }
-
-      agents = await agentService.getAgentsByStarship(starshipId as string);
-    } else if (tags) {
-      const tagArray = Array.isArray(tags) ? tags : [tags];
-      const filters = { tags: tagArray as string[] };
-      agents = await agentService.getAgentsWithFilters(filters);
-    } else if (isPublic === 'true') {
-      const offset = (page - 1) * limit;
-      agents = await agentService.getPublicAgents(limit, offset);
+    if (starshipId) {
+      // Get agents by starship with access control
+      const result = await agentService.getAgentsByStarshipWithAccess(starshipId as string, req.user!.id, page, limit);
+      sendSuccess(res, result.agents, 200, { pagination: result.pagination });
     } else {
-      // Default: get user's agents + public agents
-      console.log(`[AGENTS] Loading agents for user: ${userId}`);
-
-      let userAgents: AgentModel[] = [];
-      let publicAgents: AgentModel[] = [];
-
-      try {
-        userAgents = await agentService.getAgentsByUser(userId);
-        console.log(`[AGENTS] Found ${userAgents.length} user agents`);
-      } catch (userError: any) {
-        console.error(`[AGENTS] Failed to get user agents:`, userError);
-        // Continue with empty user agents array
-      }
-
-      try {
-        publicAgents = await agentService.getPublicAgents(50, 0);
-        console.log(`[AGENTS] Found ${publicAgents.length} public agents`);
-      } catch (publicError: any) {
-        console.error(`[AGENTS] Failed to get public agents:`, publicError);
-        // Continue with empty public agents array
-      }
-
-      // Combine and deduplicate
-      const allAgents = [...userAgents];
-      for (const publicAgent of publicAgents) {
-        if (!allAgents.find((a) => a.id === publicAgent.id)) {
-          allAgents.push(publicAgent);
-        }
-      }
-      agents = allAgents;
+      // Get all agents with pagination
+      const result = await agentService.getAgentsWithPagination(page, limit);
+      sendSuccess(res, result.agents, 200, { pagination: result.pagination });
     }
-
-    // Apply pagination for non-paginated scenarios
-    const total = agents.length;
-    const offset = (page - 1) * limit;
-    const paginatedAgents = agents.slice(offset, offset + limit);
-
-    sendSuccess(res, paginatedAgents, 200, createPaginationMeta(page, limit, total));
   } catch (error) {
     if (!handleCommonError(error, res, 'loading agents')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load agents');
@@ -468,28 +199,18 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
 // GET /agents/public - List public agents with pagination (OpenAPI pattern)
 router.get('/agents/public', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Parse and validate pagination parameters
     const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
-
     if (paginationError) {
       sendError(res, paginationError.code, paginationError.message, 400);
       return;
     }
 
-    const offset = (page - 1) * limit;
+    // Delegate to service layer
     const agentService = new AgentService();
-    const agents = await agentService.getPublicAgents(limit, offset);
+    const result = await agentService.getAgentsWithPagination(page, limit);
 
-    // For proper pagination, we'd need total count from service
-    // For now, assuming the returned count represents the page
-    sendSuccess(res, agents, 200, {
-      pagination: {
-        page,
-        limit,
-        total: agents.length, // This should come from service
-        has_next: agents.length === limit,
-        has_prev: page > 1,
-      },
-    });
+    sendSuccess(res, result.agents, 200, { pagination: result.pagination });
   } catch (error) {
     if (!handleCommonError(error, res, 'loading public agents')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load public agents');
@@ -500,8 +221,8 @@ router.get('/agents/public', jwtAuthMiddleware, async (req: Request, res: Respon
 // GET /agents/search - Search agents (OpenAPI pattern)
 router.get('/agents/search', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Validate search query parameter
     const query = req.query.q as string;
-
     if (!query) {
       sendError(res, 'MISSING_REQUIRED_FIELD', 'Search query is required', 400, {
         field: 'q',
@@ -510,8 +231,10 @@ router.get('/agents/search', jwtAuthMiddleware, async (req: Request, res: Respon
       return;
     }
 
+    // Delegate to service layer
     const agentService = new AgentService();
     const agents = await agentService.searchAgents(query);
+
     sendSuccess(res, agents);
   } catch (error) {
     if (!handleCommonError(error, res, 'searching agents')) {
@@ -523,9 +246,6 @@ router.get('/agents/search', jwtAuthMiddleware, async (req: Request, res: Respon
 // POST /agents - Create new agent (OpenAPI pattern)
 router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate request body
     const bodyValidation = validateData(CreateAgentSchema, req.body, res, 'agent creation data');
     if (!bodyValidation) return;
@@ -534,7 +254,7 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
 
     // TODO: Add validation to ensure starshipId references valid, accessible starship
 
-    // Prepare agent data with only valid AgentParams properties
+    // Prepare agent data with required properties and defaults
     const agentData = {
       name: bodyValidation.name,
       description: bodyValidation.description,
@@ -542,12 +262,19 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
       temperature: bodyValidation.temperature,
       maxTokens: bodyValidation.maxTokens,
       timeout: bodyValidation.timeout || 30000,
-      // memory and blueprint will be created by the service if not provided
-      authorId: userId, // Override with authenticated user ID
+      memory: {}, // Default empty memory object
+      blueprint: {
+        nodes: [
+          { ref: 'start', type: 'start' as const, name: 'Start', description: 'Start node', parameters: {} },
+          { ref: 'end', type: 'end' as const, name: 'End', description: 'End node', parameters: {} },
+        ],
+        edges: [{ ref: 'start-to-end', from: 'start', to: 'end' }],
+        metadata: { version: '1.0' },
+      },
       starshipId: bodyValidation.starshipId,
     };
 
-    console.log(`[AGENTS] Creating agent with authorId: ${agentData.authorId}, starshipId: ${agentData.starshipId} for user: ${userId}`);
+    console.log(`[AGENTS] Creating agent with starshipId: ${agentData.starshipId} for user: ${userId}`);
 
     const agentService = new AgentService();
     const agent = await agentService.createAgent(agentData);
@@ -564,9 +291,6 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
 // PUT /agents/:id - Update agent (OpenAPI pattern)
 router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
     // Validate agent ID parameter
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
@@ -582,15 +306,9 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
       console.log(`[AGENTS] Updating agent ${id} with new starshipId: ${updates.starshipId}`);
     }
 
+    // Delegate to service layer
     const agentService = new AgentService();
     const agent = await agentService.updateAgent(id, updates as any);
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        id: id,
-      });
-      return;
-    }
 
     sendSuccess(res, agent);
   } catch (error) {
@@ -603,21 +321,16 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
 // DELETE /agents/:id - Delete agent (OpenAPI pattern)
 router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Validate agent ID parameter
     const { isValid, error } = validateId(req.params.id, 'id');
     if (!isValid && error) {
       sendError(res, error.code, error.message, 400, error.details);
       return;
     }
 
+    // Delegate to service layer
     const agentService = new AgentService();
     const deleted = await agentService.deleteAgent(req.params.id);
-    if (!deleted) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        id: req.params.id,
-      });
-      return;
-    }
 
     sendSuccess(res, { message: 'Agent deleted successfully' }, 200);
   } catch (error) {

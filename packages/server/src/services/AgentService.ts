@@ -101,6 +101,100 @@ export class AgentService {
     return await this.agentRepository.updateStarship(agentId, starshipId);
   }
 
+  /**
+   * Get all agents with optional pagination
+   */
+  async getAllAgents(limit?: number, offset?: number): Promise<AgentModel[]> {
+    const allAgents = await this.agentRepository.findAll();
+
+    // Apply pagination if specified
+    if (limit !== undefined && offset !== undefined) {
+      return allAgents.slice(offset, offset + limit);
+    }
+
+    return allAgents;
+  }
+
+  /**
+   * Get agents with pagination metadata
+   */
+  async getAgentsWithPagination(
+    page: number = 1,
+    limit: number = 50
+  ): Promise<{
+    agents: AgentModel[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      has_next: boolean;
+      has_prev: boolean;
+    };
+  }> {
+    const allAgents = await this.agentRepository.findAll();
+    const total = allAgents.length;
+    const offset = (page - 1) * limit;
+    const paginatedAgents = allAgents.slice(offset, offset + limit);
+
+    return {
+      agents: paginatedAgents,
+      pagination: {
+        page,
+        limit,
+        total,
+        has_next: offset + limit < total,
+        has_prev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Validate starship access for a user
+   */
+  async validateStarshipAccess(starshipId: string, userId: string): Promise<boolean> {
+    const { StarshipRepository } = await import('@starships/models');
+    const starshipRepository = new StarshipRepository();
+    const starship = await starshipRepository.findById(starshipId);
+
+    if (!starship) {
+      throw new NotFoundError('Starship', starshipId);
+    }
+
+    return starship.ownerId === userId;
+  }
+
+  /**
+   * Get agents by starship with access control
+   */
+  async getAgentsByStarshipWithAccess(
+    starshipId: string,
+    userId: string,
+    page: number = 1,
+    limit: number = 50
+  ): Promise<{ agents: AgentModel[]; total: number; pagination: any }> {
+    // Validate access first
+    await this.validateStarshipAccess(starshipId, userId);
+
+    // Get all agents for the starship
+    const allAgents = await this.getAgentsByStarship(starshipId);
+
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const paginatedAgents = allAgents.slice(startIndex, startIndex + limit);
+
+    return {
+      agents: paginatedAgents,
+      total: allAgents.length,
+      pagination: {
+        page,
+        limit,
+        total: allAgents.length,
+        has_next: startIndex + limit < allAgents.length,
+        has_prev: page > 1,
+      },
+    };
+  }
+
   // ============================================================================
   // MODEL ↔ INSTANCE CONVERSION METHODS
   // ============================================================================

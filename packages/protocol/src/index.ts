@@ -11,7 +11,6 @@ export * from './domains/edge';
 export * from './domains/execution';
 export * from './domains/memory';
 export * from './domains/message';
-export * from './domains/mission';
 export * from './domains/native-tool';
 export * from './domains/node';
 export * from './domains/starship';

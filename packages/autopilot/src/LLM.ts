@@ -202,10 +202,7 @@ export class LLM {
 
       // Add LLM response to agent memory if execution context is provided
       if (execution?.agentMemory && fullResponse) {
-        execution.agentMemory.addMessage('assistant', fullResponse, {
-          model: this.params.model,
-          streaming: true,
-        });
+        execution.agentMemory.addMessage('assistant', fullResponse);
       }
 
       return {
@@ -239,9 +236,7 @@ export class LLM {
 
       // Add LLM response to agent memory if execution context is provided
       if (execution?.agentMemory) {
-        execution.agentMemory.addMessage('assistant', llmResponse, {
-          model: this.params.model,
-        });
+        execution.agentMemory.addMessage('assistant', llmResponse);
       }
 
       return {

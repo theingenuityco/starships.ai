@@ -57,8 +57,8 @@ export class Agent {
   /**
    * Add content to agent memory
    */
-  addToMemory(role: 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
-    this.memory.addConversation(role, content, metadata);
+  addToMemory(role: 'user' | 'assistant', content: string): void {
+    this.memory.addMessage(role, content);
   }
 
   /**

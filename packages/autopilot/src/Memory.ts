@@ -11,11 +11,8 @@
  * Message entry with metadata
  */
 export interface Message {
-  id: string;
-  timestamp: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -48,7 +45,7 @@ export class Memory {
     // Initialize messages if provided
     if (params.messages && params.messages.length > 0) {
       params.messages.forEach((message) => {
-        this.addMessage(message.role, message.content, message.metadata);
+        this.addMessage(message.role, message.content);
       });
     }
   }
@@ -56,14 +53,11 @@ export class Memory {
   /**
    * Add message to memory
    */
-  addMessage(role: 'system' | 'user' | 'assistant', content: string, metadata?: Record<string, unknown>): void {
+  addMessage(role: 'system' | 'user' | 'assistant', content: string): void {
     if (content && content.trim()) {
       const message: Message = {
-        id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: new Date().toISOString(),
         role,
         content: content.trim(),
-        metadata,
       };
       this.messages.push(message);
     }

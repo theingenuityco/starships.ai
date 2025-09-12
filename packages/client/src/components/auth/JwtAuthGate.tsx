@@ -43,7 +43,7 @@ export function JwtAuthGate({ children }: JwtAuthGateProps) {
 
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Welcome to Starships.ai</h1>
-            <p className="text-muted-foreground">Please sign in to access your mission control and manage your AI agents.</p>
+            <p className="text-muted-foreground">Please sign in to access your starship control and manage your AI agents.</p>
           </div>
 
           <LoginForm />

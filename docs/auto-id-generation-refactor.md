@@ -110,7 +110,6 @@ Verified that protocol interfaces already correctly exclude IDs from create requ
 - [`CreateUserRequest`](../packages/protocol/src/domains/user.ts) - excludes `id` field
 - [`CreateAgentRequest`](../packages/protocol/src/domains/agent.ts) - excludes `id` field
 - [`CreateStarshipRequest`](../packages/protocol/src/domains/starship.ts) - excludes `id` field
-- [`CreateMissionRequest`](../packages/protocol/src/domains/mission.ts) - excludes `id` field
 
 ## Benefits
 

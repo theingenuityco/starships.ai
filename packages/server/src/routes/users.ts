@@ -7,7 +7,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
-import { createPaginationMeta, handleError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { CreateUserRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -18,6 +18,12 @@ const router: Router = Router();
 // ============================================================================
 // VALIDATION SCHEMAS
 // ============================================================================
+
+const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
 
 const CreateUserSchema = z.object({
   username: z
@@ -118,11 +124,8 @@ router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
 
     const userService = new UserService();
     const user = await userService.getUserById(req.params.id);
@@ -137,9 +140,7 @@ router.get('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleError(error, res, 'fetching user')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
-    }
+    handleError(error, res, 'fetching user');
   }
 });
 
@@ -171,9 +172,7 @@ router.get('/users/email/:email', jwtAuthMiddleware, async (req: Request, res: R
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleError(error, res, 'fetching user by email')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
-    }
+    handleError(error, res, 'fetching user by email');
   }
 });
 
@@ -205,9 +204,7 @@ router.get('/users/username/:username', jwtAuthMiddleware, async (req: Request, 
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleError(error, res, 'fetching user by username')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
-    }
+    handleError(error, res, 'fetching user by username');
   }
 });
 
@@ -216,12 +213,10 @@ router.get('/users', jwtAuthMiddleware, async (req: Request, res: Response): Pro
   try {
     if (!checkAuth(req, res)) return;
 
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
 
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
+    const { page, limit } = queryValidation;
 
     const userService = new UserService();
     const allUsers = await userService.getAllUsers();
@@ -234,9 +229,7 @@ router.get('/users', jwtAuthMiddleware, async (req: Request, res: Response): Pro
 
     sendSuccess(res, paginatedUsers, 200, paginationMeta);
   } catch (error) {
-    if (!handleError(error, res, 'listing users')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to list users');
-    }
+    handleError(error, res, 'listing users');
   }
 });
 
@@ -253,9 +246,7 @@ router.post('/users', jwtAuthMiddleware, async (req: Request, res: Response): Pr
 
     sendSuccess(res, user, 201);
   } catch (error) {
-    if (!handleError(error, res, 'creating user')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create user');
-    }
+    handleError(error, res, 'creating user');
   }
 });
 
@@ -270,9 +261,7 @@ router.post('/users/register', async (req: Request, res: Response): Promise<void
 
     sendSuccess(res, user, 201);
   } catch (error) {
-    if (!handleError(error, res, 'registering user')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to register user');
-    }
+    handleError(error, res, 'registering user');
   }
 });
 
@@ -281,11 +270,8 @@ router.put('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
 
     const updates = validateData(UpdateUserSchema, req.body, res, 'user updates');
     if (!updates) return;
@@ -295,9 +281,7 @@ router.put('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleError(error, res, 'updating user')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update user');
-    }
+    handleError(error, res, 'updating user');
   }
 });
 
@@ -306,11 +290,8 @@ router.put('/users/:id/profile', jwtAuthMiddleware, async (req: Request, res: Re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
 
     // Authorization: Users can only update their own profile
     if (req.params.id !== req.user?.id) {
@@ -335,9 +316,7 @@ router.put('/users/:id/profile', jwtAuthMiddleware, async (req: Request, res: Re
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleError(error, res, 'updating user profile')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update user profile');
-    }
+    handleError(error, res, 'updating user profile');
   }
 });
 
@@ -346,11 +325,8 @@ router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Respons
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
 
     // Authorization: Users can only delete their own account (or admin in future)
     if (req.params.id !== req.user?.id) {
@@ -371,9 +347,7 @@ router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 
     sendSuccess(res, { message: 'User deleted successfully' }, 200);
   } catch (error) {
-    if (!handleError(error, res, 'deleting user')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete user');
-    }
+    handleError(error, res, 'deleting user');
   }
 });
 
@@ -386,11 +360,8 @@ router.post('/users/:id/stripe', jwtAuthMiddleware, async (req: Request, res: Re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
 
     const linkRequest = validateData(LinkStripeSchema, req.body, res, 'Stripe data');
     if (!linkRequest) return;
@@ -400,9 +371,7 @@ router.post('/users/:id/stripe', jwtAuthMiddleware, async (req: Request, res: Re
 
     sendSuccess(res, { message: 'Stripe customer linked successfully' });
   } catch (error) {
-    if (!handleError(error, res, 'linking Stripe customer')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to link Stripe customer');
-    }
+    handleError(error, res, 'linking Stripe customer');
   }
 });
 
@@ -435,9 +404,7 @@ router.get('/users/stripe/:stripeCustomerId', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleError(error, res, 'fetching user by Stripe ID')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user');
-    }
+    handleError(error, res, 'fetching user by Stripe ID');
   }
 });
 
@@ -458,9 +425,7 @@ router.get('/users/stats', jwtAuthMiddleware, async (req: Request, res: Response
 
     sendSuccess(res, stats);
   } catch (error) {
-    if (!handleError(error, res, 'fetching user statistics')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch user statistics');
-    }
+    handleError(error, res, 'fetching user statistics');
   }
 });
 
@@ -492,9 +457,7 @@ router.post('/users/authenticate', async (req: Request, res: Response): Promise<
 
     sendSuccess(res, user);
   } catch (error) {
-    if (!handleError(error, res, 'authenticating user')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to authenticate user');
-    }
+    handleError(error, res, 'authenticating user');
   }
 });
 

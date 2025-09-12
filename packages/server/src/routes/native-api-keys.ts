@@ -71,9 +71,7 @@ router.get('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (r
     const maskedKeys = await apiKeyService.getStarshipApiKeys(starshipId, userId);
     sendSuccess(res, maskedKeys);
   } catch (error) {
-    if (!handleError(error, res, 'fetching native API keys')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to fetch API keys');
-    }
+    handleError(error, res, 'fetching native API keys');
   }
 });
 
@@ -102,9 +100,7 @@ router.post('/starships/:starshipId/native-api-keys', jwtAuthMiddleware, async (
     await apiKeyService.saveApiKey(starshipId, userId, toolName, apiKey);
     sendSuccess(res, { message: 'API key saved successfully' }, 201);
   } catch (error) {
-    if (!handleError(error, res, 'saving native API key')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to save API key');
-    }
+    handleError(error, res, 'saving native API key');
   }
 });
 
@@ -136,9 +132,7 @@ router.delete('/starships/:starshipId/native-api-keys/:toolName', jwtAuthMiddlew
     await apiKeyService.deleteApiKey(starshipId, userId, toolName);
     sendSuccess(res, { message: 'API key deleted successfully' });
   } catch (error) {
-    if (!handleError(error, res, 'deleting native API key')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR' as StandardErrorCode, 'Failed to delete API key');
-    }
+    handleError(error, res, 'deleting native API key');
   }
 });
 

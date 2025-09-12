@@ -1,15 +1,14 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { AgentModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
 import { AgentService } from '../services/AgentService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId, validatePagination } from '../utils/responseHelpers';
+import { handleCommonError, sendError, sendSuccess } from '../utils/responseHelpers';
 
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
+const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
@@ -109,23 +108,22 @@ router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: 
 // GET /starships/:starshipId/agents - Fetch agents by starship (OpenAPI pattern)
 router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Validate starshipId format
-    const { isValid, error } = validateId(req.params.starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    // Validate starshipId parameter
+    const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
 
-    // Parse and validate pagination parameters
-    const pagination = validatePagination(req.query.page as string, req.query.limit as string);
-    if (pagination.error) {
-      sendError(res, pagination.error.code, pagination.error.message, 400);
-      return;
-    }
+    // Validate query parameters
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const result = await agentService.getAgentsByStarshipWithAccess(req.params.starshipId, req.user!.id, pagination.page, pagination.limit);
+    const result = await agentService.getAgentsByStarshipWithAccess(
+      paramValidation.starshipId,
+      req.user!.id,
+      queryValidation.page,
+      queryValidation.limit
+    );
 
     sendSuccess(res, result.agents, 200, { pagination: result.pagination });
   } catch (error) {
@@ -139,15 +137,12 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
 router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate agent ID parameter
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const agent = await agentService.getAgent(req.params.id);
+    const agent = await agentService.getAgent(paramValidation.id);
 
     sendSuccess(res, agent);
   } catch (error) {
@@ -160,29 +155,23 @@ router.get('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
 // GET /agents - List agents with filtering and pagination (OpenAPI pattern)
 router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { starshipId } = req.query;
+    // Validate query parameters
+    const queryValidation = validateData(
+      PaginationSchema.extend({
+        starshipId: IdSchema.optional(),
+      }),
+      req.query,
+      res,
+      'query parameters'
+    );
+    if (!queryValidation) return;
 
-    // Parse and validate pagination parameters
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
-
-    // Validate starshipId format if provided
-    if (starshipId && typeof starshipId === 'string') {
-      const { isValid, error } = validateId(starshipId, 'starshipId');
-      if (!isValid && error) {
-        sendError(res, error.code, error.message, 400, error.details);
-        return;
-      }
-    }
-
+    const { page, limit, starshipId } = queryValidation;
     const agentService = new AgentService();
 
     if (starshipId) {
       // Get agents by starship with access control
-      const result = await agentService.getAgentsByStarshipWithAccess(starshipId as string, req.user!.id, page, limit);
+      const result = await agentService.getAgentsByStarshipWithAccess(starshipId, req.user!.id, page, limit);
       sendSuccess(res, result.agents, 200, { pagination: result.pagination });
     } else {
       // Get all agents with pagination
@@ -199,16 +188,13 @@ router.get('/agents', jwtAuthMiddleware, async (req: Request, res: Response): Pr
 // GET /agents/public - List public agents with pagination (OpenAPI pattern)
 router.get('/agents/public', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    // Parse and validate pagination parameters
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
+    // Validate query parameters
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const result = await agentService.getAgentsWithPagination(page, limit);
+    const result = await agentService.getAgentsWithPagination(queryValidation.page, queryValidation.limit);
 
     sendSuccess(res, result.agents, 200, { pagination: result.pagination });
   } catch (error) {
@@ -322,15 +308,12 @@ router.put('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response)
 router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate agent ID parameter
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const deleted = await agentService.deleteAgent(req.params.id);
+    const deleted = await agentService.deleteAgent(paramValidation.id);
 
     sendSuccess(res, { message: 'Agent deleted successfully' }, 200);
   } catch (error) {

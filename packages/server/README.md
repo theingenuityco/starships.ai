@@ -1,11 +1,11 @@
 # @starships/server
 
-Production-ready Express.js API server powering the starships.ai platform. Features starship management, mission orchestration, agent deployment, conversation handling, and Stripe billing with comprehensive security and monitoring.
+Production-ready Express.js API server powering the starships.ai platform. Features starship management, workflow orchestration, agent deployment, conversation handling, and Stripe billing with comprehensive security and monitoring.
 
 ## 🚀 Features
 
 - **Starship Management**: Complete CRUD operations with subscription billing and agent deployment
-- **Mission Orchestration**: Advanced mission planning and execution with AI-powered orchestrators
+- **Workflow Orchestration**: Advanced workflow planning and execution with AI-powered orchestrators
 - **Agent Marketplace**: Agent creation, templates, and deployment management
 - **Conversation System**: Chat interfaces with message history and structured logging
 - **Workflow Integration**: Integration with autopilot workflow execution system
@@ -47,7 +47,6 @@ src/
 │   ├── conversations.ts       # Chat and communication endpoints
 │   ├── health.ts              # Health monitoring and metrics
 │   ├── memory.ts              # Memory management endpoints
-│   ├── missions.ts            # Mission orchestration endpoints
 │   ├── native-api-keys.ts     # Encrypted API key management
 │   ├── starships.ts           # Starship CRUD and billing operations
 │   ├── users.ts               # User management endpoints
@@ -67,62 +66,6 @@ src/
 ```
 
 ## 🔧 API Endpoints
-
-### Mission Orchestration
-
-#### Create Mission
-
-```http
-POST /missions
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "starshipId": "starship-123",
-  "title": "Market Research Mission",
-  "objective": "Research competitive landscape for AI productivity tools",
-  "phase": "init"
-}
-```
-
-**Response:**
-
-```json
-{
-  "id": "mission-456",
-  "title": "Market Research Mission",
-  "objective": "Research competitive landscape for AI productivity tools",
-  "phase": "init",
-  "status": "active",
-  "createdAt": "2024-01-15T10:30:00Z"
-}
-```
-
-#### Mission Chat with Orchestrator
-
-```http
-POST /missions/:id/chat
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "message": "Let's start with the top 10 AI productivity tools",
-  "role": "user"
-}
-```
-
-**Response:**
-
-```json
-{
-  "message": {
-    "id": "msg-789",
-    "content": "I'll help you research the top AI productivity tools. Let me break this down into phases...",
-    "role": "orchestrator",
-    "timestamp": "2024-01-15T10:35:00Z"
-  }
-}
-```
 
 ### Conversation System
 
@@ -941,7 +884,7 @@ node --inspect-brk dist/index.js
 - **jose**: JWT token validation and management
 - **@starships/agent-engine**: Advanced AI orchestration with MCP tools
 - **@starships/models**: Neo4j database with migration system
-- **@starships/protocol**: Shared types for missions and workflows
+- **@starships/protocol**: Shared types for agents and workflows
 - **@starships/core**: MCP HTTP bridge services
 
 ### Development Dependencies

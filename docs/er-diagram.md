@@ -297,8 +297,7 @@ graph TD
 ### Data Flow Patterns
 
 - **Workflow Execution**: `Mission` → `MissionWorkflow` → `WorkflowRuntimeState` tracks execution progress
-- **Message Threading**: `MissionMessage` entities belong to missions and maintain conversation history
-- **Clarity Assessment**: `MissionClarity` provides AI-driven mission assessment with 5-dimensional scoring
+- **Message Threading**: Message entities maintain conversation history with proper threading
 - **Template System**: `AgentTemplate` → `Agent` creation flow with usage tracking
 
 ### Security & Integration

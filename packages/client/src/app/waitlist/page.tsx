@@ -96,7 +96,7 @@ export default function WaitlistPage() {
             </motion.div>
 
             <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Starships.ai</h1>
-            <p className="text-muted-foreground">Your AI-powered mission control</p>
+            <p className="text-muted-foreground">Your AI-powered command center</p>
           </div>
 
           {/* Waitlist Form Card */}
@@ -166,7 +166,7 @@ export default function WaitlistPage() {
 
           {/* Additional Info */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.8 }} className="mt-8 text-center text-sm text-muted-foreground">
-            <p>Be among the first to experience the future of AI mission control</p>
+            <p>Be among the first to experience the future of AI automation</p>
             <p className="mt-2">Currently accepting a limited number of alpha testers</p>
           </motion.div>
         </motion.div>

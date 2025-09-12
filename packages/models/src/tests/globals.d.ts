@@ -14,7 +14,6 @@ declare global {
   var createMockMessage: (overrides?: Record<string, unknown>) => Record<string, unknown>;
   var createMockBlueprint: (overrides?: Record<string, unknown>) => Record<string, unknown>;
   var createMockExecution: (overrides?: Record<string, unknown>) => Record<string, unknown>;
-  var createMockMission: (overrides?: Record<string, unknown>) => Record<string, unknown>;
   var createMockDatabaseSession: () => Record<string, unknown>;
   var createValidationError: (message?: string, field?: string) => Error;
   var createNotFoundError: (entityType?: string, entityId?: string) => Error;

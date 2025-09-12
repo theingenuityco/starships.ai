@@ -249,12 +249,7 @@ api.interceptors.request.use(
     console.log('[API] Request interceptor running for:', config.url, 'at', new Date().toISOString())
 
     // Check if this is an authenticated endpoint
-    const requiresAuth =
-      config.url?.includes('/api/v1/starships') ||
-      config.url?.includes('/api/v1/agents') ||
-      config.url?.includes('/api/v1/users') ||
-      config.url?.includes('/api/v1/conversations') ||
-      config.url?.includes('/api/v1/missions')
+    const requiresAuth = config.url?.includes('/api/v1/starships') || config.url?.includes('/api/v1/agents') || config.url?.includes('/api/v1/users') || config.url?.includes('/api/v1/conversations')
 
     if (requiresAuth) {
       console.log('[API] Authenticated endpoint detected, waiting for token provider...')

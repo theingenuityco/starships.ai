@@ -44,7 +44,6 @@ const mockDriver = {
   ownerId: 'user-123',
   class: 'scout',
   maxAgents: 3,
-  maxActiveMissions: 3,
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -113,19 +112,6 @@ const mockDriver = {
   completedAt: null,
   result: null,
   error: null,
-  ...overrides,
-});
-
-// Mock mission data
-(global as Record<string, unknown>).createMockMission = (overrides: Record<string, unknown> = {}) => ({
-  id: 'mission-123',
-  title: 'Test Mission',
-  description: 'A test mission',
-  status: 'active',
-  starshipId: 'starship-123',
-  userId: 'user-123',
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
   ...overrides,
 });
 

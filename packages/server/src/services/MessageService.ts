@@ -6,7 +6,7 @@
  */
 
 import { MessageRepository } from '@starships/models';
-import type { CreateMessageRequest, MessageModel, UpdateMessageRequest } from '@starships/protocol';
+import type { Message, MessageModel } from '@starships/protocol';
 
 /**
  * Service class for managing messages and conversations
@@ -25,20 +25,18 @@ export class MessageService {
   /**
    * Create a new message with streaming support
    */
-  async createMessage(request: CreateMessageRequest & { conversationId: string }): Promise<MessageModel> {
+  async createMessage(request: Message & { conversationId: string }): Promise<MessageModel> {
     console.log('📝 [MESSAGE-SERVICE] Creating message:', {
       role: request.role,
     });
 
     // Create message with only available properties
-    const message = await this.messageRepository.create(
-      {
-        role: request.role,
-        content: request.content,
-        messageType: request.messageType,
-      },
-      request.conversationId
-    );
+    const message = await this.messageRepository.create({
+      role: request.role,
+      content: request.content,
+      messageType: request.messageType,
+      conversationId: request.conversationId,
+    });
 
     console.log('✅ [MESSAGE-SERVICE] Message created:', message.id);
     return message;
@@ -62,7 +60,7 @@ export class MessageService {
   /**
    * Update message
    */
-  async updateMessage(messageId: string, updates: UpdateMessageRequest): Promise<MessageModel | null> {
+  async updateMessage(messageId: string, updates: Partial<Pick<Message, 'content'>>): Promise<MessageModel | null> {
     // Filter updates to only include valid MessageModel properties
     const validUpdates: Partial<MessageModel> = {};
     if (updates.content !== undefined) validUpdates.content = updates.content;

@@ -564,7 +564,7 @@ export class StarshipRepository extends BaseRepository {
     const connection = this.getConnection();
     const result = await connection.executeQuery<{ c: Record<string, unknown> }>(
       `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
-       RETURN c ORDER BY c.lastActivityAt DESC`,
+       RETURN c ORDER BY c.createdAt DESC`,
       { starshipId }
     );
 
@@ -605,7 +605,7 @@ export class StarshipRepository extends BaseRepository {
     const result = await connection.executeQuery<{ c: Record<string, unknown> }>(
       `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
        WHERE c.status = 'active'
-       RETURN c ORDER BY c.lastActivityAt DESC`,
+       RETURN c ORDER BY c.createdAt DESC`,
       { starshipId }
     );
 

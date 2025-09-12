@@ -65,7 +65,7 @@ describe('ConversationRepository', () => {
 
       const result = await repository.findAll();
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC');
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual(expect.objectContaining({ id: 'conv-1', status: 'active' }));
       expect(result[1]).toEqual(expect.objectContaining({ id: 'conv-2', status: 'completed' }));

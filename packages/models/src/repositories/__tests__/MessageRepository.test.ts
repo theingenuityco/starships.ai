@@ -788,7 +788,7 @@ describe('MessageRepository', () => {
       expect(result).toMatchObject({
         threadDepth: 3,
         processingStatus: 'processing',
-        messageType: 'system_notification',
+        messageType: 'system_message',
         importance: 'critical',
         hasAttachments: true,
       });

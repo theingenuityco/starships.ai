@@ -13,7 +13,7 @@ import type { MessageModel, StreamingDeltaChunk } from '@starships/protocol';
 /**
  * Autopilot streaming service that uses delta encoding for incremental message updates
  */
-export class AutopilotStreamService implements EngineEmitter {
+export class AgentStreamingService implements EngineEmitter {
   private streamingService: StreamingService;
   private streamId: string;
   private conversationId: string;
@@ -74,7 +74,7 @@ export class AutopilotStreamService implements EngineEmitter {
         await this.handleEventAsMessage(event);
       }
     } catch (error) {
-      console.error('[AutopilotStreamService] Failed to emit event:', error);
+      console.error('[AgentStreamingService] Failed to emit event:', error);
     }
   }
 

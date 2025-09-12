@@ -10,9 +10,10 @@ import { Agent, AgentParams } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { AutopilotStreamService } from './AutopilotStreamService';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
+import { AgentStreamingService } from './AgentStreamingService';
+import { ConversationService } from './ConversationService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -42,10 +43,14 @@ export interface ConversationStreamingRequest extends ConversationRequest {
 export class AgentService {
   private agentRepository: AgentRepository;
   private messageService: MessageService;
+  private conversationService: ConversationService;
+  private agentStreamingService: AgentStreamingService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
+    this.agentStreamingService = new AgentStreamingService();
+    this.conversationService = new ConversationService();
   }
 
   // ============================================================================
@@ -247,7 +252,7 @@ export class AgentService {
    * Handles complete conversation lifecycle with event monitoring and message creation
    */
 
-  static async replyToConversation(agentId: string, conversationId: string): Promise<ConversationResponse> {
+  async replyToConversation(agentId: string, conversationId: string): Promise<ConversationResponse> {
     console.log('🚀 [AGENT-SERVICE] Starting streaming conversation execution:', {
       agentId,
       conversationId,
@@ -255,11 +260,15 @@ export class AgentService {
     });
 
     // Get agent from database
-    const agentRepo = new AgentRepository();
-    const agentModel = await agentRepo.findById(agentId);
-
+    const agentModel = await this.agentRepository.findById(agentId);
     if (!agentModel) {
       throw new NotFoundError('Agent', agentId);
+    }
+
+    // Get conversation from database
+    const conversationModel = this.conversationService.getConversationAgents(conversationId);
+    if (!conversationId) {
+      throw new NotFoundError('Conversation', conversationId);
     }
 
     const startTime = Date.now();
@@ -269,11 +278,8 @@ export class AgentService {
       // Create agent instance with enhanced options
       const agent = new Agent(agentModel);
 
-      // Create and inject streaming service
-      const autopilotStreamService = new AutopilotStreamService(conversationId || 'unknown', agentId);
-
       // Inject streaming service into agent's engine
-      agent.getEngine().setEmitter(autopilotStreamService);
+      agent.getEngine().setEmitter(this.agentStreamingService);
 
       // Add user message to memory
       agent.addToMemory('user', message);

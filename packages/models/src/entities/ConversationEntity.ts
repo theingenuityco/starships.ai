@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { ConversationModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
+import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
  * Conversation Entity with validation and serialization
@@ -32,101 +32,14 @@ export class ConversationEntity implements ConversationModel {
   updatedAt?: string;
 
   @Expose()
-  @Transformers.DateTransform()
-  @IsISO8601()
-  lastActivityAt!: string;
-
-  @Expose()
-  @Transformers.NumberTransform(0)
-  @IsNumber()
-  @Min(0)
-  messageCount!: number;
-
-  @Expose()
-  @Transformers.NumberTransform(0)
-  @IsNumber()
-  @Min(0)
-  totalTokens!: number;
+  @IsString()
+  @Length(1, 100)
+  title!: string;
 
   @Expose()
   @Transform(({ value }) => value || 'active')
   @IsIn(['active', 'paused', 'completed', 'archived'])
   status!: 'active' | 'paused' | 'completed' | 'archived';
-
-  @Expose()
-  @Transformers.JsonTransform()
-  @IsOptional()
-  metadata?: Record<string, unknown>;
-
-  // Add relationship fields
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  starshipId?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  userId?: string;
-
-  // Streaming support fields
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  currentStreamId?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsBoolean()
-  isStreaming?: boolean;
-
-  @Expose()
-  @Transformers.DateTransform()
-  @IsOptional()
-  @IsISO8601()
-  streamStartedAt?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsIn(['active', 'paused', 'completed', 'failed'])
-  streamStatus?: 'active' | 'paused' | 'completed' | 'failed';
-
-  /**
-   * Helper method to start streaming for this conversation
-   */
-  startStreaming(streamId: string): void {
-    this.currentStreamId = streamId;
-    this.isStreaming = true;
-    this.streamStartedAt = new Date().toISOString();
-    this.streamStatus = 'active';
-  }
-
-  /**
-   * Helper method to complete streaming for this conversation
-   */
-  completeStreaming(): void {
-    this.isStreaming = false;
-    this.streamStatus = 'completed';
-    // Keep currentStreamId for reference until next stream
-  }
-
-  /**
-   * Helper method to fail streaming for this conversation
-   */
-  failStreaming(): void {
-    this.isStreaming = false;
-    this.streamStatus = 'failed';
-  }
-
-  /**
-   * Helper method to check if conversation is currently streaming
-   */
-  isCurrentlyStreaming(): boolean {
-    return this.isStreaming === true && this.streamStatus === 'active';
-  }
 
   /**
    * Deserialize database record into ConversationEntity
@@ -166,9 +79,8 @@ export class ConversationEntity implements ConversationModel {
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
-        lastActivityAt: dataRecord.lastActivityAt || new Date().toISOString(),
-        messageCount: dataRecord.messageCount ?? 0,
-        totalTokens: dataRecord.totalTokens ?? 0,
+        updatedAt: dataRecord.updatedAt,
+        title: dataRecord.title || 'Untitled Conversation',
         status: dataRecord.status || 'active',
         ...dataRecord,
       });

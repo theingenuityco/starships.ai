@@ -314,7 +314,7 @@ describe('AgentRepository', () => {
         const mockAgents = [{ id: 'agent-1', name: 'Agent 1' }];
         mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
-        const result = await repository.findByStarshipId('starship-123');
+        const result = await repository.findByStarship('starship-123');
 
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a ORDER BY a.name',
@@ -330,7 +330,7 @@ describe('AgentRepository', () => {
         const mockAgents = [{ id: 'agent-1', name: 'Agent 1', starshipId: 'starship-123' }];
         mockConnection.executeQuery.mockResolvedValue(mockAgents.map((a) => ({ a })));
 
-        const result = await repository.findByStarshipId('starship-123');
+        const result = await repository.findByStarship('starship-123');
 
         expect(mockConnection.executeQuery).toHaveBeenCalledWith(
           'MATCH (a:Agent) WHERE a.starshipId = $starshipId RETURN a ORDER BY a.name',

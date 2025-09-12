@@ -7,11 +7,13 @@
 
 // uuid import removed as it's no longer used in constructor
 
+export type MessageRole = 'user' | 'assistant' | 'system';
+
 /**
  * Message entry with metadata
  */
-export interface Message {
-  role: 'user' | 'assistant' | 'system';
+export interface LlmMessage {
+  role: MessageRole;
   content: string;
 }
 
@@ -26,7 +28,7 @@ export type MemoryState = Record<string, unknown>;
  */
 export interface MemoryParams {
   state?: MemoryState;
-  messages?: Message[];
+  messages?: LlmMessage[];
 }
 
 /**
@@ -36,7 +38,7 @@ export interface MemoryParams {
  * but provides LLM-compatible format for external consumption
  */
 export class Memory {
-  protected messages: Message[] = [];
+  protected messages: LlmMessage[] = [];
   protected state: MemoryState = {};
 
   constructor(params: MemoryParams = {}) {
@@ -55,7 +57,7 @@ export class Memory {
    */
   addMessage(role: 'system' | 'user' | 'assistant', content: string): void {
     if (content && content.trim()) {
-      const message: Message = {
+      const message: LlmMessage = {
         role,
         content: content.trim(),
       };
@@ -66,21 +68,21 @@ export class Memory {
   /**
    * Get all messages
    */
-  getMessages(): Message[] {
+  getMessages(): LlmMessage[] {
     return [...this.messages];
   }
 
   /**
    * Get all message entries (alias for getMessages)
    */
-  getMessageEntries(): Message[] {
+  getMessageEntries(): LlmMessage[] {
     return this.getMessages();
   }
 
   /**
    * Format messages for LLM consumption (alias for getMessages)
    */
-  toMessages(): Message[] {
+  toMessages(): LlmMessage[] {
     return this.getMessages();
   }
 
@@ -101,14 +103,14 @@ export class Memory {
   /**
    * Get messages by role
    */
-  getMessagesByRole(role: 'system' | 'user' | 'assistant'): Message[] {
+  getMessagesByRole(role: 'system' | 'user' | 'assistant'): LlmMessage[] {
     return this.messages.filter((msg) => msg.role === role);
   }
 
   /**
    * Get last N messages
    */
-  getLastMessages(count: number): Message[] {
+  getLastMessages(count: number): LlmMessage[] {
     return this.messages.slice(-count);
   }
 

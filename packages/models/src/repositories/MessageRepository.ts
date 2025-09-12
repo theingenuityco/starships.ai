@@ -1,7 +1,7 @@
 import { MessageEntity } from '@/entities/MessageEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { MessageModel } from '@starships/protocol';
+import type { Message, MessageModel } from '@starships/protocol';
 
 /**
  * Neo4j-based message repository following layered architecture
@@ -59,7 +59,7 @@ export class MessageRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Omit<MessageModel, 'id' | 'createdAt' | 'updatedAt'>, conversationId: string): Promise<MessageModel> {
+  async create(entity: Message & { conversationId: string }): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
         // Validate using Entity
@@ -83,7 +83,7 @@ export class MessageRepository extends BaseRepository {
         const result = await this.createEntityWithAutoId<MessageModel>('Message', messageEntity.serialize());
 
         // Create explicit Neo4j relationship with conversation if conversationId is provided
-        await this.linkToConversation(result.id, conversationId);
+        await this.linkToConversation(result.id, entity.conversationId);
 
         return MessageEntity.deserialize(result as unknown as Record<string, unknown>);
       },

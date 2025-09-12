@@ -246,23 +246,11 @@ export class AgentService {
    * Execute conversation with agent using ConversationRequest format with streaming support
    * Handles complete conversation lifecycle with event monitoring and message creation
    */
-  static async executeConversationWithStreaming(request: ConversationStreamingRequest): Promise<ConversationResponse> {
-    const { agentId, userId, message, conversationId, streamId, streamingService } = request;
 
-    if (!agentId) {
-      throw new ValidationError('agentId is required for conversation execution', 'agentId');
-    }
-
-    if (!streamId) {
-      throw new ValidationError('streamId is required for streaming conversation execution', 'streamId');
-    }
-
+  static async replyToConversation(agentId: string, conversationId: string): Promise<ConversationResponse> {
     console.log('🚀 [AGENT-SERVICE] Starting streaming conversation execution:', {
       agentId,
-      userId,
-      message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
       conversationId,
-      streamId,
       timestamp: new Date().toISOString(),
     });
 
@@ -282,7 +270,7 @@ export class AgentService {
       const agent = new Agent(agentModel);
 
       // Create and inject streaming service
-      const autopilotStreamService = new AutopilotStreamService(streamingService, streamId, conversationId || 'unknown', agentId);
+      const autopilotStreamService = new AutopilotStreamService(conversationId || 'unknown', agentId);
 
       // Inject streaming service into agent's engine
       agent.getEngine().setEmitter(autopilotStreamService);

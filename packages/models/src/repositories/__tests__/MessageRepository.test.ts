@@ -50,6 +50,7 @@ describe('MessageRepository', () => {
     role: 'user' as const,
     content: 'Hello, world!',
     messageType: 'user_input' as const,
+    conversationId: 'conversation-123',
     ...overrides,
   });
 
@@ -145,7 +146,7 @@ describe('MessageRepository', () => {
       const mockCreated = createMockMessage();
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
-      const result = await repository.create(createInput, 'conversation-123');
+      const result = await repository.create(createInput);
 
       expect(result).toMatchObject({
         role: 'user',
@@ -167,17 +168,18 @@ describe('MessageRepository', () => {
     it('should validate required fields', async () => {
       const invalidInput = { content: 'Hello' }; // Missing role
 
-      await expect(repository.create(invalidInput as never, 'conversation-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidInput as never)).rejects.toThrow(DatabaseError);
     });
 
     it('should validate role enum', async () => {
       const invalidRole = createMockCreateInput({ role: 'invalid' as 'user' });
 
-      await expect(repository.create(invalidRole, 'conversation-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidRole)).rejects.toThrow(DatabaseError);
     });
 
     it('should use default messageType when not provided', async () => {
       const inputWithoutMessageType = {
+        conversationId: 'conversation-123',
         role: 'user' as const,
         content: 'Test message',
         messageType: 'user_input' as const,
@@ -185,7 +187,7 @@ describe('MessageRepository', () => {
       const mockCreated = createMockMessage(inputWithoutMessageType);
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
-      const result = await repository.create(inputWithoutMessageType, 'conversation-123');
+      const result = await repository.create(inputWithoutMessageType);
 
       expect(result.messageType).toBe('user_input');
     });
@@ -193,7 +195,7 @@ describe('MessageRepository', () => {
     it('should handle database errors', async () => {
       mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
 
-      await expect(repository.create(createMockCreateInput(), 'conversation-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.create(createMockCreateInput())).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -318,7 +320,7 @@ describe('MessageRepository', () => {
       const mockCreated = createMockMessage({ content: longContent });
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
-      const result = await repository.create(createInput, 'conversation-123');
+      const result = await repository.create(createInput);
 
       expect(result.content).toBe(longContent);
     });
@@ -329,7 +331,7 @@ describe('MessageRepository', () => {
       const mockCreated = createMockMessage({ content: specialContent });
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
-      const result = await repository.create(createInput, 'conversation-123');
+      const result = await repository.create(createInput);
 
       expect(result.content).toBe(specialContent);
     });
@@ -337,7 +339,7 @@ describe('MessageRepository', () => {
     it('should validate messageType enum', async () => {
       const invalidMessageType = createMockCreateInput({ messageType: 'invalid_type' as 'user_input' });
 
-      await expect(repository.create(invalidMessageType, 'conversation-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidMessageType)).rejects.toThrow(DatabaseError);
     });
   });
 });

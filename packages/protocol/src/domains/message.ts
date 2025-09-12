@@ -6,13 +6,17 @@
  */
 
 // Import autopilot types at the top level
-import type { Message } from '@starships/autopilot';
+import type { LlmMessage } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE MESSAGE INTERFACE
 // ============================================================================
 
 export type MessageType = 'user_input' | 'agent_response' | 'system_notification' | 'system_instruction' | 'workflow_output' | 'error';
+
+export interface Message extends LlmMessage {
+  messageType: MessageType;
+}
 
 /**
  * Database Message interface - core API contract type
@@ -23,13 +27,4 @@ export interface MessageModel extends Message {
   id: string;
   createdAt: string;
   updatedAt: string;
-
-  // Message classification
-  messageType: MessageType;
 }
-
-export interface CreateMessageRequest extends Message {
-  messageType: MessageType;
-}
-
-export type UpdateMessageRequest = Omit<Message, 'role'>;

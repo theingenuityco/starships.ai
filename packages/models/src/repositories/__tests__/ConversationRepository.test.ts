@@ -4,11 +4,11 @@
 
 import { ConversationRepository } from '@/repositories/ConversationRepository';
 import { DatabaseError, NotFoundError } from '@starships/errors';
-import { ConversationModel } from '@starships/protocol';
+import { Conversation, ConversationModel } from '@starships/protocol';
 import { Neo4jConnection } from '@/helpers/database';
 
 // Define type aliases for test data
-type CreateConversationData = Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>;
+type CreateConversationData = Conversation & { starshipId: string; agentId?: string };
 
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
@@ -120,6 +120,7 @@ describe('ConversationRepository', () => {
       const conversationData = {
         title: 'Test Conversation',
         status: 'active' as const,
+        starshipId: 'starship-123',
       };
 
       const createdConversation: ConversationModel = {
@@ -140,7 +141,7 @@ describe('ConversationRepository', () => {
         .mockResolvedValue(createdConversation);
       jest.spyOn(repository, 'linkToStarship').mockResolvedValue(undefined);
 
-      const result = await repository.create(conversationData, 'starship-123');
+      const result = await repository.create(conversationData);
 
       expect(repository.linkToStarship).toHaveBeenCalledWith(createdConversation.id, 'starship-123');
       expect(result).toEqual(expect.objectContaining(createdConversation));
@@ -148,29 +149,32 @@ describe('ConversationRepository', () => {
 
     it('should validate required fields', async () => {
       const incompleteData = {
+        starshipId: 'starship-123',
         status: 'active' as const,
         // Missing title field
       };
 
-      await expect(repository.create(incompleteData as CreateConversationData, 'starship-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.create(incompleteData as CreateConversationData)).rejects.toThrow(DatabaseError);
     });
 
     it('should validate enum values for status', async () => {
       const invalidData = {
+        starshipId: 'starship-123',
         title: 'Test Conversation',
         status: 'invalid_status',
       };
 
-      await expect(repository.create(invalidData as CreateConversationData, 'starship-123')).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidData as CreateConversationData)).rejects.toThrow(DatabaseError);
     });
 
     it('should validate field types', async () => {
       const invalidData = {
+        starshipId: 'starship-123',
         title: 123, // Should be string
         status: 'active',
       };
 
-      await expect(repository.create(invalidData as unknown as CreateConversationData, 'starship-123')).rejects.toThrow();
+      await expect(repository.create(invalidData as unknown as CreateConversationData)).rejects.toThrow();
     });
   });
 
@@ -346,11 +350,12 @@ describe('ConversationRepository', () => {
         .mockRejectedValue(error);
 
       const conversationData = {
+        starshipId: 'starship-123',
         title: 'Test Conversation',
         status: 'active' as const,
       };
 
-      await expect(repository.create(conversationData, 'starship-123')).rejects.toThrow();
+      await expect(repository.create(conversationData)).rejects.toThrow();
     });
 
     it('should handle query timeout errors', async () => {
@@ -364,6 +369,7 @@ describe('ConversationRepository', () => {
   describe('integration scenarios', () => {
     it('should handle conversation lifecycle', async () => {
       const conversationData = {
+        starshipId: 'starship-123',
         title: 'Test Conversation',
         status: 'active' as const,
       };
@@ -379,7 +385,7 @@ describe('ConversationRepository', () => {
         )
         .mockResolvedValue(createdConversation);
 
-      const newConversation = await repository.create(conversationData, 'starship-123');
+      const newConversation = await repository.create(conversationData);
       expect(newConversation.status).toBe('active');
 
       // The business logic methods (updateActivity, incrementMessageCount, etc.)

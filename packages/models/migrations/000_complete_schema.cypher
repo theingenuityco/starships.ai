@@ -100,6 +100,9 @@ CREATE CONSTRAINT unique_conversation_id IF NOT EXISTS FOR (c:Conversation) REQU
 // Session relationship constraints
 CREATE CONSTRAINT unique_starship_conversation IF NOT EXISTS FOR ()-[r:HAS_SESSION]-() REQUIRE r.key IS UNIQUE;
 
+// Conversation relationship constraints
+CREATE CONSTRAINT unique_conversation_agent IF NOT EXISTS FOR ()-[r:INVOLVES_AGENT]-() REQUIRE r.key IS UNIQUE;
+
 // ============================================================================
 // EXECUTION COLLECTION
 // ============================================================================

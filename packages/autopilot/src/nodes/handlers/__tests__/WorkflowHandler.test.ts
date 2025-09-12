@@ -84,7 +84,7 @@ describe('WorkflowHandler', () => {
 
       const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
-        executionResults: new Map([
+        results: new Map([
           ['start', mockNodeResult1],
           ['end', mockNodeResult2],
         ]),
@@ -214,7 +214,7 @@ describe('WorkflowHandler', () => {
 
       const mockRuntimeState: Execution = global.createMockExecution({
         status: 'completed',
-        executionResults: new Map([
+        results: new Map([
           ['success-node', successfulResult],
           ['failed-node', failedResult],
         ]),

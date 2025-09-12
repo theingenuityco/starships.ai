@@ -1,33 +1,21 @@
 /**
  * Streaming Event Contracts
  *
- * Shared streaming event definitions between client and server
- * for real-time conversation streaming via Server-Sent Events (SSE).
+ * Ultra-simplified streaming using DeltaChunk (RFC6902 JSON Patch) directly.
+ * No wrappers - just pure delta operations streamed as-is.
  */
 
 import type { ConversationResponse } from '../domains/conversation';
 
 /**
- * Real-time streaming chunk sent via SSE during conversation processing
+ * DeltaChunk - Pure RFC6902 JSON Patch Operation for streaming
+ * This is sent directly as SSE data - no wrapper, no metadata
  */
-export interface StreamingChunk {
-  id: string;
-  streamId: string;
-  conversationId: string;
-  agentId: string;
-  type: 'content' | 'thinking' | 'node_start' | 'node_complete' | 'error' | 'complete';
-  content: string;
-  timestamp: string;
-  metadata?: {
-    nodeRef?: string;
-    tokenCount?: number;
-    model?: string;
-    processingTimeMs?: number;
-    eventType?: string;
-    status?: string;
-    errorCode?: string;
-    [key: string]: unknown;
-  };
+export interface StreamingDeltaChunk {
+  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
+  path: string;
+  value?: unknown;
+  from?: string;
 }
 
 /**
@@ -67,23 +55,12 @@ export interface StreamingHeartbeat {
 }
 
 /**
- * Streaming request parameters
- */
-export interface StreamingRequest {
-  conversationId: string;
-  agentId: string;
-  message: string;
-  stream: boolean;
-  streamId?: string;
-}
-
-/**
  * Union type of all possible streaming events
  */
 export type StreamingEvent =
   | { type: 'connection'; data: StreamingConnection }
   | { type: 'heartbeat'; data: StreamingHeartbeat }
-  | { type: 'chunk'; data: StreamingChunk }
+  | { type: 'delta'; data: StreamingDeltaChunk }
   | { type: 'complete'; data: StreamingResponse }
   | { type: 'error'; data: StreamingError };
 
@@ -98,17 +75,12 @@ export type StreamingStatus = 'idle' | 'connecting' | 'streaming' | 'complete' |
 export interface StreamingState {
   status: StreamingStatus;
   streamId: string | null;
-  content: string;
   error: StreamingError | null;
   isStreaming: boolean;
+  version: number;
 }
-
-/**
- * Streaming chunk type mappings for event handling
- */
-export type StreamingChunkType = 'content' | 'thinking' | 'node_start' | 'node_complete' | 'error' | 'complete';
 
 /**
  * SSE event types
  */
-export type SSEEventType = 'connection' | 'heartbeat' | 'chunk' | 'complete' | 'error';
+export type SSEEventType = 'connection' | 'heartbeat' | 'delta' | 'complete' | 'error';

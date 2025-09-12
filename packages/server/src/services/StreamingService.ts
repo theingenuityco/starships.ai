@@ -1,4 +1,4 @@
-import type { ConversationResponse, StreamingChunk, StreamingError } from '@starships/protocol';
+import type { ConversationResponse, StreamingDeltaChunk, StreamingError } from '@starships/protocol';
 import type { Response } from 'express';
 
 /**
@@ -8,7 +8,7 @@ import type { Response } from 'express';
 export class StreamingService {
   private streamId?: string;
   private res?: Response;
-  private heartbeatInterval?: NodeJS.Timeout;
+  private heartbeatInterval?: ReturnType<typeof setInterval>;
 
   /**
    * Add new streaming connection (replaces any existing connection)
@@ -48,11 +48,11 @@ export class StreamingService {
   }
 
   /**
-   * Broadcast chunk to the current stream
+   * Broadcast delta chunk to the current stream
    */
-  async broadcastChunk(chunk: StreamingChunk): Promise<void> {
+  async broadcastDelta(delta: StreamingDeltaChunk): Promise<void> {
     if (this.res && !this.res.destroyed) {
-      this.sendEvent('chunk', chunk);
+      this.sendEvent('delta', delta);
     }
   }
 

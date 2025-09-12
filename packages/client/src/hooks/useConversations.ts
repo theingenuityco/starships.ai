@@ -1,8 +1,9 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest, DeltaChunk } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
+import { safeApplyDeltas } from '@/lib/jsonPatch'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -26,6 +27,7 @@ interface StreamingState {
   content: string
   error: any
   lastUpdate?: number
+  version?: number
 }
 
 // Centralized query keys
@@ -91,7 +93,54 @@ export function useConversation(conversationId: string | null) {
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
     (data: any) => {
-      // Content chunks (incremental text)
+      // JSON Patch events (RFC6902 delta updates)
+      if (data.type === 'patch' && data.patch && Array.isArray(data.patch)) {
+        console.log('[STREAMING] Received patch:', data.patch, 'version:', data.version)
+
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'streaming',
+          isStreaming: true,
+          lastUpdate: Date.now(),
+          version: data.version || prev.version,
+        }))
+
+        // Apply JSON patch to messages array
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          if (!old) {
+            // Initialize with empty messages array if no data exists
+            const initialData = { messages: [], total: 0, conversationId: conversationId! }
+            const deltaResult = safeApplyDeltas(initialData.messages, [data as DeltaChunk])
+
+            if (deltaResult.success && deltaResult.result) {
+              return {
+                ...initialData,
+                messages: deltaResult.result,
+                total: Array.isArray(deltaResult.result) ? deltaResult.result.length : 0,
+              }
+            }
+            return initialData
+          }
+
+          // Apply patch to existing messages
+          const deltaResult = safeApplyDeltas(old.messages || [], [data as DeltaChunk])
+
+          if (deltaResult.success && deltaResult.result) {
+            return {
+              ...old,
+              messages: deltaResult.result,
+              total: Array.isArray(deltaResult.result) ? deltaResult.result.length : old.total,
+              lastActivityAt: new Date().toISOString(),
+            }
+          } else {
+            console.error('[STREAMING] Failed to apply delta:', deltaResult.error)
+            return old // Return unchanged data on patch failure
+          }
+        })
+        return
+      }
+
+      // Legacy content chunks (incremental text) - kept for backward compatibility
       if (data.type === 'content') {
         setStreamingState(prev => ({
           ...prev,
@@ -259,6 +308,7 @@ export function useConversation(conversationId: string | null) {
 
                         try {
                           const parsed = JSON.parse(eventData)
+                          console.log('[STREAMING] Received SSE event:', parsed.op ? 'delta' : parsed.type || 'unknown', parsed)
                           handleStreamingEvent(parsed)
                         } catch (parseError) {
                           console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)

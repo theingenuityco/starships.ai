@@ -1,5 +1,5 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest, StreamingDeltaChunk } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, MessageModel, CreateMessageRequest, StreamingDeltaChunk } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
@@ -470,7 +470,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string }): Promise<ConversationModel> => {
+    mutationFn: async (data: { title: string; starshipId?: string }): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },
@@ -648,10 +648,6 @@ export function useUpdateConversationStatus() {
 
       // Invalidate related queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(variables.conversationId) })
-
-      if (updatedConversation.starshipId) {
-        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(updatedConversation.starshipId) })
-      }
 
       toast.success(`Conversation ${variables.status} successfully!`)
     },

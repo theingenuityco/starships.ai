@@ -16,14 +16,6 @@ interface LlmResponseData {
   model?: string;
 }
 
-interface OpenAIResponseBody {
-  choices: Array<{
-    message: {
-      content: string;
-    };
-  }>;
-}
-
 // Mock LLM class
 jest.mock('../../../LLM');
 
@@ -342,9 +334,7 @@ describe('LlmHandler', () => {
 
       MockedLLM.prototype.execute = jest.fn().mockResolvedValue(mockLlmResult);
 
-      const beforeExecution = Date.now();
       const result = await handler.execute(mockExecution);
-      const afterExecution = Date.now();
 
       expect(result).toBeDefined();
       const nodeResult = result.executionResults.get('llm-node');

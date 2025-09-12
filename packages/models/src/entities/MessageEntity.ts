@@ -8,7 +8,20 @@
 import { Transformers } from '@/helpers/serializer';
 import type { MessageModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
-import { IsBoolean, IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsEnum,
+  IsISO8601,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  Min,
+  validate,
+  ValidationError,
+} from 'class-validator';
 
 /**
  * Custom transformers for the MessageEntity
@@ -157,7 +170,7 @@ export class MessageEntity implements MessageModel {
   /**
    * Static factory method for creating MessageEntity from raw data
    */
-  static deserialize(data: Record<string, any>): MessageEntity {
+  static deserialize(data: Record<string, unknown>): MessageEntity {
     return plainToInstance(MessageEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -167,7 +180,7 @@ export class MessageEntity implements MessageModel {
   /**
    * Instance method for converting entity to plain object for storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -175,38 +188,58 @@ export class MessageEntity implements MessageModel {
   }
 
   /**
-   * Validation method for different contexts
+   * Simple validation function using class-validator
+   * This replaces the manual validation approach with a decorator-based solution
    */
-  static async validate(data: any, context: 'create' | 'update' = 'create'): Promise<void> {
-    const entity = MessageEntity.deserialize(data);
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new MessageEntity();
 
-    // Context-specific validation rules
-    if (context === 'create') {
-      // For creation, certain fields are required
-      if (!entity.role) {
-        throw new Error('Role is required for message creation');
-      }
-      if (!entity.content) {
-        throw new Error('Content is required for message creation');
-      }
-      if (!entity.starshipId) {
-        throw new Error('Starship ID is required for message creation');
-      }
+    // For create operations, validate all required fields
+    if (operation === 'create') {
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        timestamp: dataRecord.timestamp || new Date().toISOString(),
+        role: dataRecord.role || 'user',
+        content: dataRecord.content || '',
+        metadata: dataRecord.metadata,
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        version: dataRecord.version || '1.0.0',
+        starshipId: dataRecord.starshipId || '',
+        agentId: dataRecord.agentId,
+        memoryId: dataRecord.memoryId,
+        conversationId: dataRecord.conversationId,
+        parentMessageId: dataRecord.parentMessageId,
+        threadDepth: dataRecord.threadDepth ?? 0,
+        processingStatus: dataRecord.processingStatus || 'pending',
+        processingMetadata: dataRecord.processingMetadata,
+        messageType: dataRecord.messageType || 'user_input',
+        importance: dataRecord.importance || 'medium',
+        contentHash: dataRecord.contentHash,
+        contentLength: dataRecord.contentLength ?? 0,
+        hasAttachments: dataRecord.hasAttachments ?? false,
+        tokenCount: dataRecord.tokenCount,
+        processingTimeMs: dataRecord.processingTimeMs,
+        ...dataRecord,
+      });
+    } else {
+      // For update operations, only validate provided fields
+      Object.assign(entity, dataRecord);
     }
 
-    // Additional business rule validations
-    if (entity.threadDepth > 50) {
-      throw new Error('Thread depth cannot exceed 50 levels');
-    }
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
 
-    if (entity.content && entity.content.length > 50000) {
-      throw new Error('Message content cannot exceed 50,000 characters');
-    }
-
-    // Validate processing status consistency
-    if (entity.processingStatus === 'completed' && entity.messageType === 'user_input') {
-      // User input messages should not be marked as completed by default
-      console.warn('User input message marked as completed - ensure this is intentional');
+    if (errors.length > 0) {
+      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
+      throw new Error(`Validation failed: ${errorMessages}`);
     }
   }
 

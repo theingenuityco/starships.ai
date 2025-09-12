@@ -6,12 +6,10 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import type { ExecutionModel } from '@starships/protocol';
+import type { AgentMemory, ExecutionStatus, NodeResult } from '@starships/autopilot';
+import type { ExecutionModel, ExecutionError } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
-
-// Execution status type from autopilot
-export type ExecutionStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Execution Entity with validation and serialization
@@ -41,8 +39,8 @@ export class ExecutionEntity implements ExecutionModel {
 
   @Expose()
   @Transform(({ value }) => value || 'pending')
-  @IsIn(['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'])
-  status!: any; // Use any to avoid type conflicts between different ExecutionStatus definitions
+  @IsIn(['not_started', 'running', 'paused', 'completed', 'failed', 'cancelled'])
+  status!: ExecutionStatus;
 
   @Expose()
   @Transform(({ value }) => value)
@@ -58,7 +56,7 @@ export class ExecutionEntity implements ExecutionModel {
   @Expose()
   @Transformers.JsonTransform()
   @IsOptional()
-  error?: any; // Use any for flexibility in error handling
+  error?: ExecutionError;
 
   @Expose()
   @Transformers.JsonTransform()
@@ -86,17 +84,17 @@ export class ExecutionEntity implements ExecutionModel {
   // Properties from the Execution interface that may not be persisted
   @Expose()
   @Transformers.JsonTransform()
-  executionResults!: any; // Use any for flexibility since Map serialization can be complex
+  executionResults!: Map<string, NodeResult>;
 
   @Expose()
   @Transformers.JsonTransform()
-  agentMemory!: any;
+  agentMemory!: AgentMemory;
 
   /**
    * Deserialize database record into ExecutionEntity
    * Converts raw database records to fully typed and validated ExecutionEntity instances
    */
-  static deserialize(data: Record<string, any>): ExecutionEntity {
+  static deserialize(data: Record<string, unknown>): ExecutionEntity {
     return plainToInstance(ExecutionEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -107,7 +105,7 @@ export class ExecutionEntity implements ExecutionModel {
    * Serialize ExecutionEntity to database record
    * Converts entity instance to plain object suitable for database storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -118,31 +116,35 @@ export class ExecutionEntity implements ExecutionModel {
    * Simple validation function using class-validator
    * This replaces complex validation classes with a lean solution
    */
-  static async validate(data: any, operation: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const dataRecord = data as Record<string, unknown>;
     const entity = new ExecutionEntity();
 
     // For create operations, validate all required fields
     if (operation === 'create') {
       Object.assign(entity, {
-        id: data.id || 'temp-id', // Will be replaced by auto-generated ID
-        workflowId: data.workflowId,
-        createdAt: data.createdAt || new Date().toISOString(),
-        updatedAt: data.updatedAt || new Date().toISOString(),
-        status: data.status || 'pending',
-        currentNodeRef: data.currentNodeRef,
-        executionData: data.executionData,
-        error: data.error,
-        result: data.result,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        pausedAt: data.pausedAt,
-        executionResults: data.executionResults,
-        agentMemory: data.agentMemory,
-        ...data,
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        workflowId: dataRecord.workflowId,
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        status: dataRecord.status || 'not_started',
+        currentNodeRef: dataRecord.currentNodeRef,
+        executionData: dataRecord.executionData,
+        error: dataRecord.error,
+        result: dataRecord.result,
+        startTime: dataRecord.startTime,
+        endTime: dataRecord.endTime,
+        pausedAt: dataRecord.pausedAt,
+        executionResults: dataRecord.executionResults,
+        agentMemory: dataRecord.agentMemory,
+        ...dataRecord,
       });
     } else {
       // For update operations, only validate provided fields
-      Object.assign(entity, data);
+      Object.assign(entity, dataRecord);
     }
 
     const errors = await validate(entity, {

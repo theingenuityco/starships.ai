@@ -47,7 +47,7 @@ export class MissionRepository extends BaseRepository {
         });
 
         if (!starshipResult || starshipResult.length === 0) {
-          this.handleNotFound('Starship', request.starshipId, 'createMission');
+          this.handleNotFound('Starship', request.starshipId);
         }
 
         // Transform using Entity
@@ -56,7 +56,7 @@ export class MissionRepository extends BaseRepository {
         // Use base repository for database operation
         const result = await this.createEntityWithAutoId<MissionModel>('Mission', missionEntity.serialize());
 
-        return MissionEntity.deserialize(result);
+        return MissionEntity.deserialize(result as unknown as Record<string, unknown>);
       },
       'create',
       'Mission'
@@ -70,11 +70,11 @@ export class MissionRepository extends BaseRepository {
         const result = await connection.executeQuery<{ m: MissionModel }>('MATCH (m:Mission) WHERE m.id = $id RETURN m', { id });
 
         if (!result || result.length === 0) {
-          this.handleNotFound('Mission', id, 'getMissionById');
+          this.handleNotFound('Mission', id);
         }
 
         const mission = result[0].m;
-        return MissionEntity.deserialize(mission);
+        return MissionEntity.deserialize(mission as unknown as Record<string, unknown>);
       },
       'findById',
       'Mission',
@@ -89,7 +89,7 @@ export class MissionRepository extends BaseRepository {
 
         // Build WHERE clause
         let whereClause = 'm.starshipId = $starshipId';
-        const params: any = { starshipId };
+        const params: Record<string, unknown> = { starshipId };
 
         if (filters?.status && filters.status.length > 0) {
           whereClause += ' AND m.status IN $statusList';
@@ -116,7 +116,8 @@ export class MissionRepository extends BaseRepository {
 
         const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-        const missions: MissionModel[] = result?.map((record) => MissionEntity.deserialize(record.m)) || [];
+        const missions: MissionModel[] =
+          result?.map((record) => MissionEntity.deserialize(record.m as unknown as Record<string, unknown>)) || [];
 
         return {
           missions,
@@ -135,7 +136,7 @@ export class MissionRepository extends BaseRepository {
 
         // Build WHERE clause
         let whereClause = '';
-        const params: any = {};
+        const params: Record<string, unknown> = {};
 
         const conditions: string[] = [];
 
@@ -173,7 +174,8 @@ export class MissionRepository extends BaseRepository {
 
         const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
 
-        const missions: MissionModel[] = result?.map((record) => MissionEntity.deserialize(record.m)) || [];
+        const missions: MissionModel[] =
+          result?.map((record) => MissionEntity.deserialize(record.m as unknown as Record<string, unknown>)) || [];
 
         return {
           missions,
@@ -228,10 +230,10 @@ export class MissionRepository extends BaseRepository {
         );
 
         if (result.length === 0) {
-          this.handleNotFound('Mission', id, 'update');
+          this.handleNotFound('Mission', id);
         }
 
-        return MissionEntity.deserialize(result[0].m);
+        return MissionEntity.deserialize(result[0].m as unknown as Record<string, unknown>);
       },
       'update',
       'Mission',
@@ -249,7 +251,7 @@ export class MissionRepository extends BaseRepository {
         );
 
         if (result[0]?.deletedCount === 0) {
-          this.handleNotFound('Mission', id, 'delete');
+          this.handleNotFound('Mission', id);
         }
       },
       'delete',
@@ -265,7 +267,7 @@ export class MissionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         let query = 'MATCH (m:Mission) WHERE m.status = $status';
-        const params: any = { status };
+        const params: Record<string, unknown> = { status };
 
         if (starshipId) {
           query += ' AND m.starshipId = $starshipId';
@@ -275,7 +277,7 @@ export class MissionRepository extends BaseRepository {
         query += ' RETURN m ORDER BY m.updatedAt DESC';
 
         const result = await connection.executeQuery<{ m: MissionModel }>(query, params);
-        return result.map((record) => MissionEntity.deserialize(record.m));
+        return result.map((record) => MissionEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByStatus',
       'Mission'
@@ -290,7 +292,7 @@ export class MissionRepository extends BaseRepository {
           'MATCH (m:Mission) WHERE m.createdBy = $userId RETURN m ORDER BY m.createdAt DESC',
           { userId }
         );
-        return result.map((record) => MissionEntity.deserialize(record.m));
+        return result.map((record) => MissionEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'findByCreatedBy',
       'Mission'

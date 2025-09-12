@@ -7,7 +7,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MissionService } from '@/services/MissionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { CreateMissionRequest, MissionFilters, MissionSort, UpdateMissionRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -20,6 +20,10 @@ const router: Router = Router();
 // ============================================================================
 
 const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
+const PaginationSchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+});
 
 const CreateMissionSchema = z.object({
   starshipId: NanoidSchema,
@@ -86,19 +90,14 @@ router.get('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Respons
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const mission = await MissionService.getMissionById(req.params.id);
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission');
-    }
+    handleError(error, res, 'fetching mission');
   }
 });
 
@@ -107,18 +106,14 @@ router.get('/starships/:starshipId/missions', jwtAuthMiddleware, async (req: Req
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
 
     // Parse and validate pagination parameters
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
+
+    const { page, limit } = queryValidation;
 
     // Parse filters
     const filters = validateData(MissionFiltersSchema, req.query, res, 'filters');
@@ -138,9 +133,7 @@ router.get('/starships/:starshipId/missions', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, paginatedMissions, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starship missions')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship missions');
-    }
+    handleError(error, res, 'fetching starship missions');
   }
 });
 
@@ -150,11 +143,10 @@ router.get('/missions', jwtAuthMiddleware, async (req: Request, res: Response): 
     if (!checkAuth(req, res)) return;
 
     // Parse and validate pagination parameters
-    const { page, limit, error: paginationError } = validatePagination(req.query.page as string, req.query.limit as string);
-    if (paginationError) {
-      sendError(res, paginationError.code, paginationError.message, 400);
-      return;
-    }
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    if (!queryValidation) return;
+
+    const { page, limit } = queryValidation;
 
     // Parse filters
     const filters = validateData(MissionFiltersSchema, req.query, res, 'filters');
@@ -174,9 +166,7 @@ router.get('/missions', jwtAuthMiddleware, async (req: Request, res: Response): 
 
     sendSuccess(res, paginatedMissions, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'listing missions')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to list missions');
-    }
+    handleError(error, res, 'listing missions');
   }
 });
 
@@ -193,9 +183,7 @@ router.post('/missions', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, mission, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create mission');
-    }
+    handleError(error, res, 'creating mission');
   }
 });
 
@@ -204,11 +192,8 @@ router.put('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Respons
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const updates = validateData(UpdateMissionSchema, req.body, res, 'mission updates');
     if (!updates) return;
@@ -217,9 +202,7 @@ router.put('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update mission');
-    }
+    handleError(error, res, 'updating mission');
   }
 });
 
@@ -228,19 +211,14 @@ router.delete('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Resp
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     await MissionService.deleteMission(req.params.id);
 
     sendSuccess(res, { message: 'Mission deleted successfully' }, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'deleting mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete mission');
-    }
+    handleError(error, res, 'deleting mission');
   }
 });
 
@@ -253,19 +231,14 @@ router.post('/missions/:id/start', jwtAuthMiddleware, async (req: Request, res: 
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const mission = await MissionService.startMission(req.params.id);
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'starting mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to start mission');
-    }
+    handleError(error, res, 'starting mission');
   }
 });
 
@@ -274,19 +247,14 @@ router.post('/missions/:id/complete', jwtAuthMiddleware, async (req: Request, re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const mission = await MissionService.completeMission(req.params.id);
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'completing mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to complete mission');
-    }
+    handleError(error, res, 'completing mission');
   }
 });
 
@@ -295,19 +263,14 @@ router.post('/missions/:id/fail', jwtAuthMiddleware, async (req: Request, res: R
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const mission = await MissionService.failMission(req.params.id);
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'failing mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fail mission');
-    }
+    handleError(error, res, 'failing mission');
   }
 });
 
@@ -316,19 +279,14 @@ router.post('/missions/:id/cancel', jwtAuthMiddleware, async (req: Request, res:
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const mission = await MissionService.cancelMission(req.params.id);
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'cancelling mission')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to cancel mission');
-    }
+    handleError(error, res, 'cancelling mission');
   }
 });
 
@@ -337,11 +295,8 @@ router.put('/missions/:id/phase', jwtAuthMiddleware, async (req: Request, res: R
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const phaseValidation = validateData(
       z.object({
@@ -357,9 +312,7 @@ router.put('/missions/:id/phase', jwtAuthMiddleware, async (req: Request, res: R
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating mission phase')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update mission phase');
-    }
+    handleError(error, res, 'updating mission phase');
   }
 });
 
@@ -372,19 +325,14 @@ router.get('/starships/:starshipId/missions/stats', jwtAuthMiddleware, async (re
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.starshipId, 'starshipId');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ starshipId: NanoidSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
 
     const stats = await MissionService.getMissionStats(req.params.starshipId);
 
     sendSuccess(res, stats);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission statistics')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission statistics');
-    }
+    handleError(error, res, 'fetching mission statistics');
   }
 });
 
@@ -393,11 +341,8 @@ router.get('/missions/:id/clarity', jwtAuthMiddleware, async (req: Request, res:
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const clarity = await MissionService.getMissionClarity(req.params.id);
 
@@ -411,9 +356,7 @@ router.get('/missions/:id/clarity', jwtAuthMiddleware, async (req: Request, res:
 
     sendSuccess(res, clarity);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission clarity')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission clarity');
-    }
+    handleError(error, res, 'fetching mission clarity');
   }
 });
 
@@ -426,11 +369,8 @@ router.get('/missions/:id/workflow', jwtAuthMiddleware, async (req: Request, res
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const workflow = await MissionService.getWorkflowByMissionId(req.params.id);
 
@@ -444,9 +384,7 @@ router.get('/missions/:id/workflow', jwtAuthMiddleware, async (req: Request, res
 
     sendSuccess(res, workflow);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission workflow')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission workflow');
-    }
+    handleError(error, res, 'fetching mission workflow');
   }
 });
 
@@ -455,11 +393,8 @@ router.put('/missions/:id/workflow/approval', jwtAuthMiddleware, async (req: Req
   try {
     if (!checkAuth(req, res)) return;
 
-    const { isValid, error } = validateId(req.params.id, 'id');
-    if (!isValid && error) {
-      sendError(res, error.code, error.message, 400, error.details);
-      return;
-    }
+    const paramValidation = validateData(z.object({ id: NanoidSchema }), req.params, res, 'mission parameter');
+    if (!paramValidation) return;
 
     const approvalValidation = validateData(
       z.object({
@@ -476,9 +411,7 @@ router.put('/missions/:id/workflow/approval', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, result);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating workflow approval')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update workflow approval');
-    }
+    handleError(error, res, 'updating workflow approval');
   }
 });
 

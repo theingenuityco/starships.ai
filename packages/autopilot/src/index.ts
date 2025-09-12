@@ -15,7 +15,6 @@ export { Agent } from './Agent';
 // ===== ENGINE SYSTEM =====
 // Engine class and event types
 export { Engine } from './engine/Engine';
-export type { EventCallback, ExecutionEvent } from './engine/Engine';
 
 // Memory system
 export { Memory } from './Memory';
@@ -55,7 +54,7 @@ export { Validator } from './validation/Validator';
 // Workflow Types - clean exports
 export type {
   // Node parameter types
-  AgentNodeParameters,
+  AgentParams,
   // Core workflow types
   Blueprint,
   ConditionalNodeParameters,
@@ -76,7 +75,7 @@ export type {
   ValidationResult,
   ValidationSuggestion,
   ValidationWarning,
-  WorkflowNodeParameters,
+  WorkflowParams,
 } from './types';
 
 // Configuration
@@ -88,4 +87,4 @@ export type { AutopilotConfig, AutopilotCredentials } from './Autopilot';
 
 // ===== STREAMING SYSTEM =====
 // Minimal streaming interface for external implementations
-export type { StreamingEmitter } from './types/streamingEmitter';
+export type { EngineEmitter, ExecutionEvent } from './types/emitters';

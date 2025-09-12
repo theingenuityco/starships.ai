@@ -55,7 +55,7 @@ export const Transformers = {
   /**
    * Ensure array type with default empty array
    */
-  ArrayTransform: (defaultValue: any[] = []) =>
+  ArrayTransform: (defaultValue: unknown[] = []) =>
     Transform(({ value }) => {
       if (Array.isArray(value)) return value;
       if (value === null || value === undefined) return defaultValue;
@@ -80,4 +80,42 @@ export const Transformers = {
       if (value === null || value === undefined) return defaultValue;
       return Boolean(value);
     }),
+};
+
+export const LLMTransformers = {
+  /**
+   * Transform temperature to ensure proper range
+   */
+  TemperatureTransform: () => {
+    return Transform(({ value }) => {
+      if (value == null) return undefined;
+      const temp = typeof value === 'string' ? parseFloat(value) : value;
+      if (isNaN(temp)) return undefined;
+      return Math.max(0, Math.min(2, temp)); // Clamp between 0 and 2
+    });
+  },
+
+  /**
+   * Transform maxTokens to ensure it's a positive integer
+   */
+  MaxTokensTransform: () => {
+    return Transform(({ value }) => {
+      if (value == null) return undefined;
+      const tokens = typeof value === 'string' ? parseInt(value, 10) : value;
+      if (isNaN(tokens) || tokens < 1) return undefined;
+      return Math.min(tokens, 100000); // Reasonable upper limit
+    });
+  },
+
+  /**
+   * Transform timeout to ensure it's a positive integer (milliseconds)
+   */
+  TimeoutTransform: () => {
+    return Transform(({ value }) => {
+      if (value == null) return 30000; // Default 30 seconds
+      const timeout = typeof value === 'string' ? parseInt(value, 10) : value;
+      if (isNaN(timeout) || timeout < 1000) return 30000; // Minimum 1 second
+      return Math.min(timeout, 300000); // Maximum 5 minutes
+    });
+  },
 };

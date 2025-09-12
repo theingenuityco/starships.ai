@@ -181,7 +181,7 @@ describe('HttpRequestHandler', () => {
         ...mockNode,
         parameters: {
           url: 'https://api.example.com/data',
-          method: 'INVALID' as any,
+          method: 'INVALID' as 'GET', // Cast to valid type for test
         } as HttpRequestNodeParameters,
       };
 

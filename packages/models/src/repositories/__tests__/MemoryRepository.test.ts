@@ -5,7 +5,8 @@
 import { MemoryRepository } from '@/repositories/MemoryRepository';
 import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { DatabaseError, ConflictError } from '@starships/errors';
-import type { MemoryModel } from '@starships/protocol';
+import type { MemoryModel, CreateMemoryRequest } from '@starships/protocol';
+import type { MemoryState } from '@starships/autopilot';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
@@ -15,14 +16,18 @@ jest.mock('uuid', () => ({
 
 describe('MemoryRepository', () => {
   let repository: MemoryRepository;
-  let mockGetConnection: jest.MockedFunction<any>;
+  let mockGetConnection: jest.MockedFunction<typeof getConnection>;
   let mockConnection: jest.Mocked<Neo4jConnection>;
 
   beforeEach(() => {
     mockConnection = {
+      connect: jest.fn(),
+      disconnect: jest.fn(),
+      getSession: jest.fn(),
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-    } as any;
+      initializeSchema: jest.fn(),
+    } as unknown as jest.Mocked<Neo4jConnection>;
 
     // Mock getConnection to return our mock connection
     mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
@@ -48,7 +53,7 @@ describe('MemoryRepository', () => {
     ...overrides,
   });
 
-  const createMockCreateInput = (overrides: any = {}) => ({
+  const createMockCreateInput = (overrides: Partial<CreateMemoryRequest> = {}) => ({
     starshipId: 'starship-123',
     version: '1.0.0',
     state: {
@@ -577,7 +582,7 @@ describe('MemoryRepository', () => {
 
   describe('serialization/deserialization', () => {
     it('should serialize complex state correctly', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { serializeComplexFields: (memory: MemoryModel) => Record<string, unknown> };
       const memory = createMockMemory({
         state: {
           messages: [{ role: 'user', content: 'test' }],
@@ -596,8 +601,8 @@ describe('MemoryRepository', () => {
     });
 
     it('should handle null/undefined state', () => {
-      const repo = repository as any;
-      const memory = createMockMemory({ state: null as any });
+      const repo = repository as unknown as { serializeComplexFields: (memory: MemoryModel) => Record<string, unknown> };
+      const memory = createMockMemory({ state: null as unknown as MemoryState });
 
       const serialized = repo.serializeComplexFields(memory);
 
@@ -605,7 +610,7 @@ describe('MemoryRepository', () => {
     });
 
     it('should deserialize complex state correctly', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { deserializeComplexFields: (rawMemory: Record<string, unknown>) => MemoryModel };
       const rawMemory = {
         id: 'memory-123',
         state: JSON.stringify({
@@ -623,7 +628,7 @@ describe('MemoryRepository', () => {
     });
 
     it('should handle invalid JSON gracefully', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { deserializeComplexFields: (rawMemory: Record<string, unknown>) => MemoryModel };
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       const rawMemory = {
         id: 'memory-123',
@@ -639,7 +644,7 @@ describe('MemoryRepository', () => {
     });
 
     it('should handle null state field', () => {
-      const repo = repository as any;
+      const repo = repository as unknown as { deserializeComplexFields: (rawMemory: Record<string, unknown>) => MemoryModel };
       const rawMemory = {
         id: 'memory-123',
         state: null,

@@ -7,7 +7,7 @@
 
 import { Handler, HandlerConstructor } from '@/nodes/Handler';
 import { Blueprint, Execution, NodeResult, Node as WorkflowNode } from '@/types';
-import type { StreamingEmitter } from '@/types/streamingEmitter';
+import type { EngineEmitter, ExecutionEvent } from '@/types/emitters';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
@@ -23,53 +23,17 @@ const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
 };
 
 /**
- * Events that can be emitted during workflow execution
- */
-export interface ExecutionEvent {
-  type:
-    | 'workflow_started'
-    | 'node_started'
-    | 'node_completed'
-    | 'node_failed'
-    | 'workflow_paused'
-    | 'workflow_resumed'
-    | 'workflow_completed'
-    | 'workflow_failed'
-    | 'content_chunk'
-    | 'content_complete';
-  execution: Execution;
-  timestamp: string;
-  content?: string; // For streaming content chunks
-  contentMetadata?: {
-    accumulated?: string;
-    isComplete?: boolean;
-    nodeRef?: string;
-    model?: string;
-  };
-}
-
-/**
- * Callback for workflow execution events
- */
-export type EventCallback = (event: ExecutionEvent) => Promise<void>;
-
-/**
  * Main workflow execution engine
  */
 export class Engine {
-  private eventCallbacks: EventCallback[] = [];
   private execution!: Execution;
-  private streamingEmitter?: StreamingEmitter;
-
-  constructor() {
-    // Engine is completely stateless for handlers - pure dynamic loading
-  }
+  private emitter?: EngineEmitter;
 
   /**
    * Set streaming emitter (injected by external systems like server)
    */
-  setStreamingEmitter(emitter: StreamingEmitter): void {
-    this.streamingEmitter = emitter;
+  setEmitter(emitter: EngineEmitter): void {
+    this.emitter = emitter;
   }
 
   /**
@@ -245,8 +209,8 @@ export class Engine {
     const handler = await this.createHandler(node);
 
     // Pass streaming emitter to handler if it supports streaming
-    if ('setStreamingEmitter' in handler && typeof handler.setStreamingEmitter === 'function') {
-      (handler as any).setStreamingEmitter(this.streamingEmitter);
+    if ('setEmitter' in handler && typeof handler.setEmitter === 'function') {
+      (handler as Handler & { setEmitter: (emitter?: EngineEmitter) => void }).setEmitter(this.emitter);
     }
 
     // Execute the node - this returns execution with result stored
@@ -384,40 +348,13 @@ export class Engine {
   }
 
   /**
-   * Register event callback
-   */
-  onEvent(callback: EventCallback): void {
-    this.eventCallbacks.push(callback);
-  }
-
-  /**
-   * Remove event callback
-   */
-  offEvent(callback: EventCallback): void {
-    const index = this.eventCallbacks.indexOf(callback);
-    if (index > -1) {
-      this.eventCallbacks.splice(index, 1);
-    }
-  }
-
-  /**
-   * Emit workflow execution event with optional streaming support
+   * Emit workflow execution event via streaming emitter
    */
   private async emitEvent(event: ExecutionEvent): Promise<void> {
-    // Call all registered callbacks first
-    for (const callback of this.eventCallbacks) {
-      try {
-        await callback(event);
-      } catch (error) {
-        // Silent fail for event callbacks to not interrupt execution
-        console.error('Error in workflow event callback:', error);
-      }
-    }
-
     // Delegate streaming to injected emitter if available and enabled
-    if (this.streamingEmitter?.isEnabled() && event.execution.streaming?.enabled) {
+    if (this.emitter?.isEnabled() && event.execution.streaming?.enabled) {
       try {
-        await this.streamingEmitter.emitExecutionEvent(event);
+        await this.emitter.emitExecutionEvent(event);
       } catch (error) {
         // Silent fail for streaming events to not interrupt execution
         console.error('Error in external streaming emitter:', error);

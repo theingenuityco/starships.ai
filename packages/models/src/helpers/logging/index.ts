@@ -24,8 +24,8 @@ export interface LogContext {
   method?: string;
   statusCode?: number;
   duration?: number;
-  metadata?: Record<string, any>;
-  error?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+  error?: Record<string, unknown>;
   // Additional properties for error monitoring
   occurrenceId?: string;
   ruleId?: string;
@@ -44,12 +44,12 @@ export interface LogContext {
   resolutionTime?: number;
   ruleName?: string;
   actionType?: string;
-  alertData?: Record<string, any>;
+  alertData?: Record<string, unknown>;
   // Additional properties for health check logging
   status?: string;
   responseTime?: number;
   serviceCount?: number;
-  services?: any[];
+  services?: unknown[];
   stack?: string;
 }
 
@@ -60,7 +60,7 @@ export interface PerformanceMetrics {
   timestamp: string;
   success: boolean;
   errorCode?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /** Health check status interface */
@@ -69,7 +69,7 @@ export interface HealthStatus {
   status: 'healthy' | 'unhealthy' | 'degraded';
   timestamp: string;
   responseTime?: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 /** Logger configuration interface */
@@ -105,6 +105,7 @@ export class Logger {
 
   /** Reset singleton instance (for testing) */
   public static resetInstance(): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Logger.instance = undefined as any;
   }
 
@@ -131,7 +132,7 @@ export class Logger {
   }
 
   /** Format log message with context */
-  private formatMessage(level: LogLevel, message: string, context?: LogContext, error?: Error | AppError): Record<string, any> {
+  private formatMessage(level: LogLevel, message: string, context?: LogContext, error?: Error | AppError): Record<string, unknown> {
     const logEntry = {
       timestamp: new Date().toISOString(),
       level,
@@ -155,7 +156,7 @@ export class Logger {
   }
 
   /** Output log message */
-  private output(logEntry: Record<string, any>): void {
+  private output(logEntry: Record<string, unknown>): void {
     if (this.enableConsole) {
       const { level, timestamp, message, ...rest } = logEntry;
 
@@ -170,7 +171,7 @@ export class Logger {
 
       const reset = '\x1b[0m';
       const color = colors[level as LogLevel] || '';
-      const formattedMessage = `${color}[${timestamp}] ${level.toUpperCase()}${reset}: ${message}`;
+      const formattedMessage = `${color}[${timestamp}] ${(level as string).toUpperCase()}${reset}: ${message}`;
       const context = Object.keys(rest).length > 0 ? rest : '';
 
       // Use appropriate console method based on log level
@@ -295,7 +296,7 @@ class PerformanceMonitorClass {
     operation: string,
     success: boolean = true,
     errorCode?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): number {
     const startTime = this.timers.get(operationId);
     if (!startTime) {
@@ -320,7 +321,7 @@ class PerformanceMonitorClass {
   }
 
   /** Measure async operation */
-  public static async measure<T>(operation: string, fn: () => Promise<T>, metadata?: Record<string, any>): Promise<T> {
+  public static async measure<T>(operation: string, fn: () => Promise<T>, metadata?: Record<string, unknown>): Promise<T> {
     const operationId = nanoid();
     this.start(operationId);
 
@@ -336,7 +337,7 @@ class PerformanceMonitorClass {
   }
 
   /** Measure sync operation */
-  public static measureSync<T>(operation: string, fn: () => T, metadata?: Record<string, any>): T {
+  public static measureSync<T>(operation: string, fn: () => T, metadata?: Record<string, unknown>): T {
     const operationId = nanoid();
     this.start(operationId);
 
@@ -369,7 +370,7 @@ class HealthMonitorClass {
   ): Promise<HealthStatus> {
     const startTime = Date.now();
 
-    let timeoutHandle: NodeJS.Timeout | undefined;
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
     try {
       const timeoutPromise = new Promise<boolean>((_, reject) => {
@@ -496,7 +497,7 @@ class RequestContextClass {
 
     this.contexts.forEach((context, requestId) => {
       // Remove contexts older than maxAge
-      if (context.metadata?.createdAt && context.metadata.createdAt < cutoff) {
+      if (context.metadata?.createdAt && typeof context.metadata.createdAt === 'number' && context.metadata.createdAt < cutoff) {
         this.contexts.delete(requestId);
       }
     });

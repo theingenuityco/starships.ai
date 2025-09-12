@@ -33,7 +33,7 @@ export class Neo4jConnection {
       });
 
       // Add timeout to connectivity check
-      let timeoutHandle: NodeJS.Timeout;
+      let timeoutHandle: ReturnType<typeof setTimeout>;
       const timeoutPromise = new Promise<void>((_, reject) => {
         timeoutHandle = setTimeout(() => reject(new Error('Neo4j connection timeout')), 5000);
       });
@@ -69,7 +69,7 @@ export class Neo4jConnection {
     });
   }
 
-  async executeQuery<T = any>(cypher: string, parameters: any = {}): Promise<T[]> {
+  async executeQuery<T = Record<string, unknown>>(cypher: string, parameters: Record<string, unknown> = {}): Promise<T[]> {
     const session = this.getSession();
 
     try {
@@ -81,7 +81,7 @@ export class Neo4jConnection {
       return result.records.map((record) => {
         const obj = record.toObject();
         // Extract properties from Neo4j nodes
-        const processedObj: any = {};
+        const processedObj: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(obj)) {
           if (value && typeof value === 'object' && value.properties) {
             // This is a Neo4j node, extract its properties
@@ -98,7 +98,7 @@ export class Neo4jConnection {
     }
   }
 
-  async executeWrite<T = any>(cypher: string, parameters: any = {}): Promise<T[]> {
+  async executeWrite<T = Record<string, unknown>>(cypher: string, parameters: Record<string, unknown> = {}): Promise<T[]> {
     const session = this.getSession();
 
     try {
@@ -110,7 +110,7 @@ export class Neo4jConnection {
       return result.records.map((record) => {
         const obj = record.toObject();
         // Extract properties from Neo4j nodes
-        const processedObj: any = {};
+        const processedObj: Record<string, unknown> = {};
         for (const [key, value] of Object.entries(obj)) {
           if (value && typeof value === 'object' && value.properties) {
             // This is a Neo4j node, extract its properties
@@ -191,7 +191,7 @@ export class Neo4jConnection {
   }
 
   /** Recursively converts Map objects and other incompatible types to Neo4j-compatible values */
-  private sanitizeParameters(params: any, depth: number = 0): any {
+  private sanitizeParameters(params: unknown, depth: number = 0): unknown {
     // Prevent infinite recursion
     if (depth > 10) {
       console.warn('[Neo4j] Maximum sanitization depth reached, returning value as-is:', typeof params);
@@ -208,7 +208,7 @@ export class Neo4jConnection {
 
     // Handle Map objects - convert to plain objects
     if (params instanceof Map) {
-      const obj: any = {};
+      const obj: Record<string, unknown> = {};
       for (const [key, value] of params.entries()) {
         obj[key] = this.sanitizeParameters(value, depth + 1);
       }
@@ -222,7 +222,7 @@ export class Neo4jConnection {
 
     // Handle plain objects (but not Neo4j objects like Node, Relationship, etc.)
     if (typeof params === 'object' && params.constructor === Object) {
-      const sanitized: any = {};
+      const sanitized: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(params)) {
         // Special handling for limit parameter - ensure it's a Neo4j Integer
         if (key === 'limit' && typeof value === 'number' && Number.isInteger(value)) {

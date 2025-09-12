@@ -203,7 +203,17 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             <div>
               <h2 className="font-semibold text-lg text-white">Testing: {agent.name}</h2>
               <div className="flex items-center gap-2 mt-1">
-                <Badge className="bg-blue-600 text-white">{agent.category}</Badge>
+                <Badge className="bg-blue-600 text-white">
+                  {agent.name.toLowerCase().includes('support')
+                    ? 'support'
+                    : agent.name.toLowerCase().includes('data') || agent.name.toLowerCase().includes('analyst')
+                      ? 'analysis'
+                      : agent.name.toLowerCase().includes('creative')
+                        ? 'creative'
+                        : agent.name.toLowerCase().includes('code') || agent.name.toLowerCase().includes('coding')
+                          ? 'coding'
+                          : 'general'}
+                </Badge>
                 <Badge variant="outline" className="text-zinc-400 border-zinc-700">
                   {agent.model}
                 </Badge>

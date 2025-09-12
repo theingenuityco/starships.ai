@@ -1,6 +1,6 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { ExecutionService } from '@/services/ExecutionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
@@ -97,7 +97,7 @@ router.get('/executions', jwtAuthMiddleware, async (req: Request, res: Response)
     const paginationMeta = createPaginationMeta(page, limit, executions.length);
     sendSuccess(res, paginatedExecutions, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching executions');
+    handleError(error, res, 'fetching executions');
   }
 });
 
@@ -129,7 +129,7 @@ router.get('/executions/:executionId', jwtAuthMiddleware, async (req: Request, r
 
     sendSuccess(res, execution, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching execution details');
+    handleError(error, res, 'fetching execution details');
   }
 });
 
@@ -159,7 +159,7 @@ router.post('/executions', jwtAuthMiddleware, async (req: Request, res: Response
 
     sendSuccess(res, execution, 201);
   } catch (error) {
-    handleCommonError(error, res, 'creating execution');
+    handleError(error, res, 'creating execution');
   }
 });
 
@@ -206,7 +206,7 @@ router.put('/executions/:executionId', jwtAuthMiddleware, async (req: Request, r
 
     sendSuccess(res, updatedExecution, 200);
   } catch (error) {
-    handleCommonError(error, res, 'updating execution');
+    handleError(error, res, 'updating execution');
   }
 });
 
@@ -243,7 +243,7 @@ router.delete('/executions/:executionId', jwtAuthMiddleware, async (req: Request
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete execution');
     }
   } catch (error) {
-    handleCommonError(error, res, 'deleting execution');
+    handleError(error, res, 'deleting execution');
   }
 });
 
@@ -267,7 +267,7 @@ router.post('/executions/:executionId/start', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, execution, 200);
   } catch (error) {
-    handleCommonError(error, res, 'starting execution');
+    handleError(error, res, 'starting execution');
   }
 });
 
@@ -291,7 +291,7 @@ router.post('/executions/:executionId/pause', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, execution, 200);
   } catch (error) {
-    handleCommonError(error, res, 'pausing execution');
+    handleError(error, res, 'pausing execution');
   }
 });
 
@@ -315,7 +315,7 @@ router.post('/executions/:executionId/resume', jwtAuthMiddleware, async (req: Re
 
     sendSuccess(res, execution, 200);
   } catch (error) {
-    handleCommonError(error, res, 'resuming execution');
+    handleError(error, res, 'resuming execution');
   }
 });
 
@@ -351,7 +351,7 @@ router.post('/executions/:executionId/cancel', jwtAuthMiddleware, async (req: Re
 
     sendSuccess(res, execution, 200);
   } catch (error) {
-    handleCommonError(error, res, 'cancelling execution');
+    handleError(error, res, 'cancelling execution');
   }
 });
 
@@ -385,7 +385,7 @@ router.get('/workflows/:workflowId/executions', jwtAuthMiddleware, async (req: R
     const paginationMeta = createPaginationMeta(page, limit, allExecutions.length);
     sendSuccess(res, executions, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching workflow executions');
+    handleError(error, res, 'fetching workflow executions');
   }
 });
 
@@ -409,7 +409,7 @@ router.get('/workflows/:workflowId/executions/stats', jwtAuthMiddleware, async (
 
     sendSuccess(res, stats, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching execution statistics');
+    handleError(error, res, 'fetching execution statistics');
   }
 });
 

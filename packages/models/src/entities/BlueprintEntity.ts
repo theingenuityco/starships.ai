@@ -6,6 +6,7 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
+import type { Node, Edge } from '@starships/autopilot';
 import type { BlueprintModel } from '@starships/protocol';
 import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
 import { IsArray, IsIn, IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
@@ -66,18 +67,18 @@ export class BlueprintEntity implements BlueprintModel {
   @Expose()
   @Transformers.JsonTransform()
   @IsArray()
-  nodes!: any[];
+  nodes!: Node[];
 
   @Expose()
   @Transformers.JsonTransform()
   @IsArray()
-  edges!: any[];
+  edges!: Edge[];
 
   /**
    * Deserialize database record into BlueprintEntity
    * Converts raw database records to fully typed and validated BlueprintEntity instances
    */
-  static deserialize(data: Record<string, any>): BlueprintEntity {
+  static deserialize(data: Record<string, unknown>): BlueprintEntity {
     return plainToInstance(BlueprintEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -88,7 +89,7 @@ export class BlueprintEntity implements BlueprintModel {
    * Serialize BlueprintEntity to database record
    * Converts entity instance to plain object suitable for database storage
    */
-  serialize(): Record<string, any> {
+  serialize(): Record<string, unknown> {
     return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
@@ -99,27 +100,31 @@ export class BlueprintEntity implements BlueprintModel {
    * Simple validation function using class-validator
    * This replaces complex validation classes with a lean solution
    */
-  static async validate(data: any, operation: 'create' | 'update' = 'create'): Promise<void> {
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+    const dataRecord = data as Record<string, unknown>;
     const entity = new BlueprintEntity();
 
     // For create operations, validate all required fields
     if (operation === 'create') {
       Object.assign(entity, {
-        id: data.id || 'temp-id', // Will be replaced by auto-generated ID
-        createdAt: data.createdAt || new Date().toISOString(),
-        updatedAt: data.updatedAt || new Date().toISOString(),
-        name: data.name,
-        description: data.description || '',
-        category: data.category || 'general',
-        usageCount: data.usageCount ?? 0,
-        metadata: data.metadata || {},
-        nodes: data.nodes || [],
-        edges: data.edges || [],
-        ...data,
+        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        name: dataRecord.name,
+        description: dataRecord.description || '',
+        category: dataRecord.category || 'general',
+        usageCount: dataRecord.usageCount ?? 0,
+        metadata: dataRecord.metadata || {},
+        nodes: dataRecord.nodes || [],
+        edges: dataRecord.edges || [],
+        ...dataRecord,
       });
     } else {
       // For update operations, only validate provided fields
-      Object.assign(entity, data);
+      Object.assign(entity, dataRecord);
     }
 
     const errors = await validate(entity, {

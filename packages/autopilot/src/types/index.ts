@@ -10,7 +10,7 @@ export type { Blueprint, Node } from './blueprint';
 
 // ===== BASE TYPES =====
 // Shared base types (Edge, NodeType, BaseNodeParameters)
-export type { BaseNodeParameters, Edge, NodeType } from './base';
+export type { Edge, NodeType } from './base';
 
 // ===== NODE PARAMETER TYPES =====
 // Node-specific parameter definitions

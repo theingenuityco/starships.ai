@@ -7,9 +7,9 @@
 /**
  * Base interface for all workflow node parameters
  */
-export interface BaseNodeParameters {
-  [key: string]: unknown;
-}
+// export interface BaseNodeParameters {
+//   [key: string]: unknown;
+// }
 
 /**
  * Types of workflow nodes

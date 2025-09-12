@@ -86,7 +86,7 @@ export interface StarshipAgentsResponse {
   starshipClass: StarshipClass;
   maxAgents: number;
   deployedAgents: Array<{
-    // Core AgentNodeParameters fields
+    // Core AgentParams fields
     name: string;
     description?: string;
     model: string;

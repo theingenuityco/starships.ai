@@ -34,8 +34,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const filteredConversations =
     data?.conversations?.filter(conv => {
       if (!searchQuery) return true
-      const metadata = conv.metadata as any
-      const title = metadata?.title || `Conversation ${conv.id.slice(0, 8)}`
+      const title = conv.title || `Conversation ${conv.id.slice(0, 8)}`
       return title.toLowerCase().includes(searchQuery.toLowerCase())
     }) || []
 
@@ -133,9 +132,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                     <p className="text-xs font-medium text-muted-foreground px-2 mb-2">{groupKey}</p>
                     <div className="space-y-1">
                       {conversations.map((conversation: ConversationModel) => {
-                        const metadata = conversation.metadata as any
-                        const title = metadata?.title || `Conversation ${conversation.id.slice(0, 8)}`
-                        const preview = metadata?.lastMessage || 'No messages yet'
+                        const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
                         const isActive = conversation.id === currentConversationId
 
                         return (
@@ -149,16 +146,12 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                               <div className="flex items-center justify-between mb-1">
                                 <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
                                 <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(new Date(conversation.lastActivityAt || conversation.createdAt), {
+                                  {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
                                     addSuffix: false,
                                   })}
                                 </span>
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">{preview}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs text-muted-foreground">{conversation.messageCount || 0} messages</span>
-                                {conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}
-                              </div>
+                              <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
                             </div>
 
                             {/* Actions Menu */}

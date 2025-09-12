@@ -235,6 +235,43 @@ const displayMessages = useMemo(() => {
 
 **Result**: Real-time streaming now works smoothly with immediate UI updates as content streams in, no more rendering delays or stale state issues.
 
+### Unified Message Rendering (2025)
+
+**Problem**: Messages appeared in different orders when loaded via API versus streaming, causing inconsistent user experience where streaming messages would appear above user messages instead of below.
+
+**Root Cause**:
+
+- API mode: Server returned messages in `desc` order, client applied `.reverse()` → correct chronological order
+- Streaming mode: Server returned messages in `asc` order, client applied `.reverse()` → incorrect order
+
+**Solution**: Implemented unified rendering approach:
+
+1. **Client-Side Sorting**: Replace `.reverse()` with timestamp-based sorting for consistent ordering
+
+```typescript
+// Before: Inconsistent rendering based on source
+{displayMessages.slice().reverse().map(...)}
+
+// After: Unified chronological sorting
+const displayMessages = useMemo(() => {
+  // ... combine API and streaming messages
+  return combinedMessages.sort((a, b) =>
+    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  )
+}, [messages, isStreaming, streamingContent])
+
+{displayMessages.map(...)} // No reverse needed
+```
+
+2. **Server-Side Consistency**: Made streaming mode consistent with API mode ordering
+
+```typescript
+// Server streaming endpoint now uses consistent ordering
+orderDirection: 'desc' // Same as API mode
+```
+
+**Result**: Both API-loaded messages and streaming messages now appear in the same chronological order (oldest to newest), providing a unified experience regardless of how messages are received.
+
 ## Browser Support
 
 - **Modern Browsers**: Full SSE support

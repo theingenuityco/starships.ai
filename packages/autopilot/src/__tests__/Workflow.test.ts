@@ -3,7 +3,7 @@
  */
 
 import { Workflow } from '@/Workflow';
-import { Blueprint, Execution, WorkflowNodeParameters } from '@/types';
+import { Blueprint, Execution, WorkflowParams } from '@/types';
 
 describe('Workflow', () => {
   let mockExecution: Execution;
@@ -19,7 +19,8 @@ describe('Workflow', () => {
         edges: [],
         metadata: {},
       };
-      const params: WorkflowNodeParameters = {
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
         blueprint: testBlueprint,
       };
       const workflow = new Workflow(params);
@@ -40,7 +41,8 @@ describe('Workflow', () => {
         metadata: { version: '1.0' },
       };
 
-      const params: WorkflowNodeParameters = {
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
         blueprint: mockBlueprint,
         timeout: 30000,
       };
@@ -61,7 +63,8 @@ describe('Workflow', () => {
         metadata: {},
       };
 
-      const params: WorkflowNodeParameters = {
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
         blueprint: originalBlueprint,
       };
       const workflow = new Workflow(params);
@@ -85,7 +88,15 @@ describe('Workflow', () => {
 
   describe('addNode', () => {
     it('should add node with generated id', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addNode({
         type: 'start',
@@ -103,7 +114,15 @@ describe('Workflow', () => {
     });
 
     it('should add node with provided ref', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addNode({
         ref: 'custom-ref',
@@ -119,7 +138,15 @@ describe('Workflow', () => {
     });
 
     it('should add node with metadata', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addNode({
         type: 'conditional',
@@ -134,7 +161,15 @@ describe('Workflow', () => {
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       const result = workflow
         .addNode({ type: 'start', name: 'Start', description: 'Start', parameters: {} })
@@ -147,7 +182,15 @@ describe('Workflow', () => {
 
   describe('addEdge', () => {
     it('should add basic edge', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addEdge('node1', 'node2');
 
@@ -161,7 +204,15 @@ describe('Workflow', () => {
     });
 
     it('should add edge with condition', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addEdge('node1', 'node2', 'success');
 
@@ -170,7 +221,15 @@ describe('Workflow', () => {
     });
 
     it('should add edge with condition and label', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addEdge('node1', 'node2', 'success', 'Success Path');
 
@@ -180,7 +239,15 @@ describe('Workflow', () => {
     });
 
     it('should add edge with metadata', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addEdge('node1', 'node2');
 
@@ -189,7 +256,15 @@ describe('Workflow', () => {
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       const result = workflow.addEdge('start', 'middle').addEdge('middle', 'end');
 
@@ -200,7 +275,15 @@ describe('Workflow', () => {
 
   describe('removeNode', () => {
     it('should remove node and associated edges', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -237,7 +320,15 @@ describe('Workflow', () => {
     });
 
     it('should handle removing non-existent node', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addNode({
         ref: 'node1',
@@ -252,7 +343,15 @@ describe('Workflow', () => {
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -271,7 +370,15 @@ describe('Workflow', () => {
 
   describe('removeEdge', () => {
     it('should remove edge by ref', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addEdge('node1', 'node2').addEdge('node2', 'node3');
 
@@ -287,7 +394,15 @@ describe('Workflow', () => {
     });
 
     it('should handle removing non-existent edge', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addEdge('node1', 'node2');
 
@@ -296,7 +411,15 @@ describe('Workflow', () => {
     });
 
     it('should support method chaining', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addEdge('node1', 'node2');
       const edgeRef = workflow.getEdges()[0].ref;
@@ -308,7 +431,15 @@ describe('Workflow', () => {
 
   describe('getBlueprint', () => {
     it('should return deep copy of blueprint', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -332,7 +463,15 @@ describe('Workflow', () => {
 
   describe('getter methods', () => {
     it('should return copies of nodes and edges', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -358,7 +497,15 @@ describe('Workflow', () => {
 
   describe('execute', () => {
     it('should execute simple workflow successfully', async () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -378,7 +525,15 @@ describe('Workflow', () => {
     });
 
     it('should handle execution with initial execution state', async () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -399,7 +554,15 @@ describe('Workflow', () => {
     });
 
     it('should handle workflow execution failure', async () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       // Create workflow without start node to trigger failure
       workflow.addNode({
@@ -419,7 +582,15 @@ describe('Workflow', () => {
 
   describe('validate', () => {
     it('should validate successful workflow', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -439,7 +610,15 @@ describe('Workflow', () => {
     });
 
     it('should fail validation without start node', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addNode({
         ref: 'end',
@@ -456,7 +635,15 @@ describe('Workflow', () => {
     });
 
     it('should fail validation with unsupported node types', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -468,7 +655,7 @@ describe('Workflow', () => {
         })
         .addNode({
           ref: 'unsupported',
-          type: 'unsupported-type' as any,
+          type: 'unsupported-type' as 'start', // Temporarily cast to valid type for test
           name: 'Unsupported',
           description: 'Unsupported',
           parameters: {},
@@ -481,7 +668,15 @@ describe('Workflow', () => {
     });
 
     it('should fail validation with invalid edge references', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -500,7 +695,15 @@ describe('Workflow', () => {
     });
 
     it('should handle empty workflow', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       const validation = workflow.validate();
 
@@ -511,7 +714,15 @@ describe('Workflow', () => {
 
   describe('clone', () => {
     it('should clone workflow', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -534,7 +745,15 @@ describe('Workflow', () => {
     });
 
     it('should create independent clone', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow.addNode({
         ref: 'node1',
@@ -562,7 +781,15 @@ describe('Workflow', () => {
 
   describe('complex workflows', () => {
     it('should handle workflow with conditional routing', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -579,6 +806,7 @@ describe('Workflow', () => {
           description: 'Decision',
           parameters: {
             sourceNodeId: 'start',
+            expression: 'true',
             conditions: { success: 'true' },
             defaultCondition: 'success',
           },
@@ -592,7 +820,15 @@ describe('Workflow', () => {
     });
 
     it('should handle workflow with user prompts', () => {
-      const workflow = new Workflow();
+      const params: WorkflowParams = {
+        name: 'Test Workflow',
+        blueprint: {
+          nodes: [],
+          edges: [],
+          metadata: {},
+        },
+      };
+      const workflow = new Workflow(params);
 
       workflow
         .addNode({
@@ -610,8 +846,8 @@ describe('Workflow', () => {
           parameters: {
             promptText: 'Please choose:',
             choices: [
-              { ref: 'yes', text: 'Yes', value: true },
-              { ref: 'no', text: 'No', value: false },
+              { id: 'yes', text: 'Yes', value: true },
+              { id: 'no', text: 'No', value: false },
             ],
           },
         })

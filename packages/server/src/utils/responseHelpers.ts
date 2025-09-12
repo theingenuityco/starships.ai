@@ -18,26 +18,6 @@ export function sendSuccess<T>(res: Response, data: T, statusCode: number = 200,
 }
 
 /**
- * Send standardized error response
- */
-export function sendError(
-  res: Response,
-  code: StandardErrorCode,
-  message: string,
-  statusCode: number = 500,
-  details?: Record<string, unknown>
-): void {
-  const response: ApiErrorResponse = {
-    error: {
-      code,
-      message,
-      ...(details && { details }),
-    },
-  };
-  res.status(statusCode).json(response);
-}
-
-/**
  * Create pagination metadata
  */
 export function createPaginationMeta(page: number, limit: number, total: number): ApiResponseMeta {
@@ -175,8 +155,28 @@ export function validateIdOrSlug(
 }
 
 /**
+ * Send standardized error response
+ */
+export function sendError(
+  res: Response,
+  code: StandardErrorCode,
+  message: string,
+  statusCode: number = 500,
+  details?: Record<string, unknown>
+): void {
+  const response: ApiErrorResponse = {
+    error: {
+      code,
+      message,
+      ...(details && { details }),
+    },
+  };
+  res.status(statusCode).json(response);
+}
+
+/**
  * Handle all errors and convert to standardized responses
- * Handles both AppErrors and generic errors - no more need for if (!handleError()) pattern
+ * Handles both AppErrors and generic errors - unified with sendError for consistency
  */
 export function handleError(error: unknown, res: Response, context: string, fallbackMessage?: string): void {
   console.error(`Error in ${context}:`, error);
@@ -194,7 +194,7 @@ export function handleError(error: unknown, res: Response, context: string, fall
     return;
   }
 
-  // Handle generic errors with a fallback xmessage
+  // Handle generic errors with a fallback message
   const message = fallbackMessage || `Failed to ${context}`;
   sendError(res, 'INTERNAL_SERVER_ERROR', message, 500);
 }

@@ -5,7 +5,7 @@ import { Request, Response, Router } from 'express';
 import { z, ZodError } from 'zod';
 import {
   createPaginationMeta,
-  handleCommonError,
+  handleError,
   sendError,
   sendSuccess,
   validateId,
@@ -105,7 +105,7 @@ router.get('/agent-templates', jwtAuthMiddleware, async (req: Request, res: Resp
 
     sendSuccess(res, paginatedTemplates, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'loading templates')) {
+    if (!handleError(error, res, 'loading templates')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load templates');
     }
   }
@@ -141,7 +141,7 @@ router.get('/agent-templates/:id', jwtAuthMiddleware, async (req: Request, res: 
 
     sendSuccess(res, template, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'loading template')) {
+    if (!handleError(error, res, 'loading template')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to load template');
     }
   }
@@ -265,7 +265,7 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
 
     sendSuccess(res, agent, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating agent from template')) {
+    if (!handleError(error, res, 'creating agent from template')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create agent from template');
     }
   }
@@ -344,7 +344,7 @@ router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (r
     sendSuccess(res, template, 201);
   } catch (error) {
     console.error('Error converting agent to template:', error);
-    if (!handleCommonError(error, res, 'converting agent to template')) {
+    if (!handleError(error, res, 'converting agent to template')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to convert agent to template', 500, {
         details: String(error),
       });

@@ -6,7 +6,7 @@
 
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
-import { handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { getEnvConfig } from '@starships/env';
 import { StarshipRepository } from '@starships/models';
 import bcrypt from 'bcrypt';
@@ -161,7 +161,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     );
   } catch (error: any) {
     console.error('[AUTH] Registration error:', error);
-    if (!handleCommonError(error, res, 'user registration')) {
+    if (!handleError(error, res, 'user registration')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Registration failed', 500);
     }
   }
@@ -241,7 +241,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     });
   } catch (error: any) {
     console.error('[AUTH] Login error:', error);
-    if (!handleCommonError(error, res, 'user login')) {
+    if (!handleError(error, res, 'user login')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Login failed', 500);
     }
   }
@@ -293,7 +293,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (!handleCommonError(error, res, 'get current user')) {
+    if (!handleError(error, res, 'get current user')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Authentication failed', 500);
     }
   }

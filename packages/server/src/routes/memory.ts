@@ -1,6 +1,6 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MemoryService } from '@/services/MemoryService';
-import { handleCommonError, sendError, sendSuccess, validateId } from '@/utils/responseHelpers';
+import { handleError, sendError, sendSuccess, validateId } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 
@@ -40,7 +40,7 @@ router.post('/memory/reset', jwtAuthMiddleware, async (req: Request, res: Respon
 
     sendSuccess(res, { message: 'Memory cleared successfully' }, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'clearing memory')) {
+    if (!handleError(error, res, 'clearing memory')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to clear memory');
     }
   }

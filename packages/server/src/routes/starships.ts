@@ -5,7 +5,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
 import { SubscriptionService } from '@/services/SubscriptionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess, validateId } from '@/utils/responseHelpers';
 import type { StarshipModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -108,7 +108,7 @@ router.get('/starships', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, paginatedStarships, 200, createPaginationMeta(page, limit, total));
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starships')) {
+    if (!handleError(error, res, 'fetching starships')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starships');
     }
   }
@@ -162,7 +162,7 @@ router.post('/starships/create-paid', jwtAuthMiddleware, async (req: Request, re
       201
     );
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating paid starship')) {
+    if (!handleError(error, res, 'creating paid starship')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create paid starship');
     }
   }
@@ -301,7 +301,7 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       201
     );
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating starship')) {
+    if (!handleError(error, res, 'creating starship')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create starship');
     }
   }
@@ -335,7 +335,7 @@ router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: 
     // Note: For detailed agent info and available slots, use GET /starships/:id/agents endpoint
     sendSuccess(res, starship);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starship')) {
+    if (!handleError(error, res, 'fetching starship')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship');
     }
   }
@@ -394,7 +394,7 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
       }
     }
 
-    if (!handleCommonError(error, res, 'deploying agent')) {
+    if (!handleError(error, res, 'deploying agent')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to deploy agent');
     }
   }
@@ -449,7 +449,7 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
     // Return 204 No Content for successful deletion
     res.status(204).send();
   } catch (error) {
-    if (!handleCommonError(error, res, 'removing agent')) {
+    if (!handleError(error, res, 'removing agent')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to remove agent');
     }
   }
@@ -554,7 +554,7 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
 
     sendSuccess(res, updatedStarship);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating starship')) {
+    if (!handleError(error, res, 'updating starship')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update starship');
     }
   }
@@ -647,7 +647,7 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
           : null,
     });
   } catch (error) {
-    if (!handleCommonError(error, res, 'deleting starship')) {
+    if (!handleError(error, res, 'deleting starship')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to process starship deletion');
     }
   }
@@ -697,7 +697,7 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
       deployedCount: deployedAgents.length,
     });
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starship agents')) {
+    if (!handleError(error, res, 'fetching starship agents')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship agents');
     }
   }
@@ -712,7 +712,7 @@ router.get('/starships/pricing', async (req: Request, res: Response): Promise<vo
     const pricing = await subscriptionService.getPricingData();
     sendSuccess(res, pricing);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching pricing')) {
+    if (!handleError(error, res, 'fetching pricing')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch pricing');
     }
   }
@@ -768,7 +768,7 @@ router.post('/starships/checkout-sessions', jwtAuthMiddleware, async (req: Reque
 
     sendSuccess(res, { url: checkoutUrl }, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating checkout session')) {
+    if (!handleError(error, res, 'creating checkout session')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create checkout session');
     }
   }
@@ -797,7 +797,7 @@ router.post('/starships/:id/billing-portal', jwtAuthMiddleware, async (req: Requ
 
     sendSuccess(res, { url: portalUrl }, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating billing portal')) {
+    if (!handleError(error, res, 'creating billing portal')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create billing portal');
     }
   }
@@ -882,7 +882,7 @@ router.post('/starships/:id/retry-payment', jwtAuthMiddleware, async (req: Reque
       201
     );
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating checkout session for retry')) {
+    if (!handleError(error, res, 'creating checkout session for retry')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create checkout session for retry');
     }
   }

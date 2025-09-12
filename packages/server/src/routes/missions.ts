@@ -7,7 +7,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MissionService } from '@/services/MissionService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess, validateId, validatePagination } from '@/utils/responseHelpers';
 import type { CreateMissionRequest, MissionFilters, MissionSort, UpdateMissionRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -96,7 +96,7 @@ router.get('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission')) {
+    if (!handleError(error, res, 'fetching mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission');
     }
   }
@@ -138,7 +138,7 @@ router.get('/starships/:starshipId/missions', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, paginatedMissions, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching starship missions')) {
+    if (!handleError(error, res, 'fetching starship missions')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship missions');
     }
   }
@@ -174,7 +174,7 @@ router.get('/missions', jwtAuthMiddleware, async (req: Request, res: Response): 
 
     sendSuccess(res, paginatedMissions, 200, paginationMeta);
   } catch (error) {
-    if (!handleCommonError(error, res, 'listing missions')) {
+    if (!handleError(error, res, 'listing missions')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to list missions');
     }
   }
@@ -193,7 +193,7 @@ router.post('/missions', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, mission, 201);
   } catch (error) {
-    if (!handleCommonError(error, res, 'creating mission')) {
+    if (!handleError(error, res, 'creating mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create mission');
     }
   }
@@ -217,7 +217,7 @@ router.put('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Respons
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating mission')) {
+    if (!handleError(error, res, 'updating mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update mission');
     }
   }
@@ -238,7 +238,7 @@ router.delete('/missions/:id', jwtAuthMiddleware, async (req: Request, res: Resp
 
     sendSuccess(res, { message: 'Mission deleted successfully' }, 200);
   } catch (error) {
-    if (!handleCommonError(error, res, 'deleting mission')) {
+    if (!handleError(error, res, 'deleting mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete mission');
     }
   }
@@ -263,7 +263,7 @@ router.post('/missions/:id/start', jwtAuthMiddleware, async (req: Request, res: 
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'starting mission')) {
+    if (!handleError(error, res, 'starting mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to start mission');
     }
   }
@@ -284,7 +284,7 @@ router.post('/missions/:id/complete', jwtAuthMiddleware, async (req: Request, re
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'completing mission')) {
+    if (!handleError(error, res, 'completing mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to complete mission');
     }
   }
@@ -305,7 +305,7 @@ router.post('/missions/:id/fail', jwtAuthMiddleware, async (req: Request, res: R
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'failing mission')) {
+    if (!handleError(error, res, 'failing mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fail mission');
     }
   }
@@ -326,7 +326,7 @@ router.post('/missions/:id/cancel', jwtAuthMiddleware, async (req: Request, res:
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'cancelling mission')) {
+    if (!handleError(error, res, 'cancelling mission')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to cancel mission');
     }
   }
@@ -357,7 +357,7 @@ router.put('/missions/:id/phase', jwtAuthMiddleware, async (req: Request, res: R
 
     sendSuccess(res, mission);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating mission phase')) {
+    if (!handleError(error, res, 'updating mission phase')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update mission phase');
     }
   }
@@ -382,7 +382,7 @@ router.get('/starships/:starshipId/missions/stats', jwtAuthMiddleware, async (re
 
     sendSuccess(res, stats);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission statistics')) {
+    if (!handleError(error, res, 'fetching mission statistics')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission statistics');
     }
   }
@@ -411,7 +411,7 @@ router.get('/missions/:id/clarity', jwtAuthMiddleware, async (req: Request, res:
 
     sendSuccess(res, clarity);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission clarity')) {
+    if (!handleError(error, res, 'fetching mission clarity')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission clarity');
     }
   }
@@ -444,7 +444,7 @@ router.get('/missions/:id/workflow', jwtAuthMiddleware, async (req: Request, res
 
     sendSuccess(res, workflow);
   } catch (error) {
-    if (!handleCommonError(error, res, 'fetching mission workflow')) {
+    if (!handleError(error, res, 'fetching mission workflow')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch mission workflow');
     }
   }
@@ -476,7 +476,7 @@ router.put('/missions/:id/workflow/approval', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, result);
   } catch (error) {
-    if (!handleCommonError(error, res, 'updating workflow approval')) {
+    if (!handleError(error, res, 'updating workflow approval')) {
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update workflow approval');
     }
   }

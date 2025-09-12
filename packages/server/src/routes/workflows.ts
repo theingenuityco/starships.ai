@@ -1,6 +1,6 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { WorkflowService } from '@/services/WorkflowService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
@@ -133,7 +133,7 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
     const paginationMeta = createPaginationMeta(page, limit, workflows.length);
     sendSuccess(res, paginatedWorkflows, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching workflows');
+    handleError(error, res, 'fetching workflows');
   }
 });
 
@@ -164,7 +164,7 @@ router.get('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, res
 
     sendSuccess(res, workflow, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching workflow details');
+    handleError(error, res, 'fetching workflow details');
   }
 });
 
@@ -205,7 +205,7 @@ router.post('/workflows', jwtAuthMiddleware, async (req: Request, res: Response)
 
     sendSuccess(res, workflow, 201);
   } catch (error) {
-    handleCommonError(error, res, 'creating workflow');
+    handleError(error, res, 'creating workflow');
   }
 });
 
@@ -272,7 +272,7 @@ router.put('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, res
 
     sendSuccess(res, updatedWorkflow, 200);
   } catch (error) {
-    handleCommonError(error, res, 'updating workflow');
+    handleError(error, res, 'updating workflow');
   }
 });
 
@@ -316,7 +316,7 @@ router.delete('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, 
       sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete workflow');
     }
   } catch (error) {
-    handleCommonError(error, res, 'deleting workflow');
+    handleError(error, res, 'deleting workflow');
   }
 });
 
@@ -349,7 +349,7 @@ router.get('/workflows/category/:category', jwtAuthMiddleware, async (req: Reque
     const paginationMeta = createPaginationMeta(page, limit, allWorkflows.length);
     sendSuccess(res, workflows, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching workflows by category');
+    handleError(error, res, 'fetching workflows by category');
   }
 });
 
@@ -389,7 +389,7 @@ router.get('/workflows/author/:authorId', jwtAuthMiddleware, async (req: Request
     const paginationMeta = createPaginationMeta(page, limit, allWorkflows.length);
     sendSuccess(res, workflows, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching workflows by author');
+    handleError(error, res, 'fetching workflows by author');
   }
 });
 
@@ -414,7 +414,7 @@ router.get('/workflows/public', jwtAuthMiddleware, async (req: Request, res: Res
     const paginationMeta = createPaginationMeta(page, limit, workflows.length);
     sendSuccess(res, workflows, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching public workflows');
+    handleError(error, res, 'fetching public workflows');
   }
 });
 
@@ -475,7 +475,7 @@ router.post('/workflows/:workflowId/deploy', jwtAuthMiddleware, async (req: Requ
       200
     );
   } catch (error) {
-    handleCommonError(error, res, 'deploying workflow');
+    handleError(error, res, 'deploying workflow');
   }
 });
 
@@ -498,7 +498,7 @@ router.post('/workflows/:workflowId/track-usage', jwtAuthMiddleware, async (req:
 
     sendSuccess(res, { message: 'Workflow usage tracked successfully' }, 200);
   } catch (error) {
-    handleCommonError(error, res, 'tracking workflow usage');
+    handleError(error, res, 'tracking workflow usage');
   }
 });
 
@@ -528,7 +528,7 @@ router.post('/workflows/search', jwtAuthMiddleware, async (req: Request, res: Re
 
     sendSuccess(res, workflows, 200);
   } catch (error) {
-    handleCommonError(error, res, 'searching workflows');
+    handleError(error, res, 'searching workflows');
   }
 });
 

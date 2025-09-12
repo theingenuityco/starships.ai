@@ -1,6 +1,6 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MessageService } from '@/services/MessageService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
@@ -115,7 +115,7 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, message, 201);
   } catch (error) {
-    handleCommonError(error, res, 'creating message');
+    handleError(error, res, 'creating message');
   }
 });
 
@@ -147,7 +147,7 @@ router.get('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
 
     sendSuccess(res, message, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching message');
+    handleError(error, res, 'fetching message');
   }
 });
 
@@ -183,7 +183,7 @@ router.put('/messages/:messageId', jwtAuthMiddleware, async (req: Request, res: 
 
     sendSuccess(res, updatedMessage, 200);
   } catch (error) {
-    handleCommonError(error, res, 'updating message');
+    handleError(error, res, 'updating message');
   }
 });
 
@@ -215,7 +215,7 @@ router.delete('/messages/:messageId', jwtAuthMiddleware, async (req: Request, re
 
     sendSuccess(res, { message: 'Message deleted successfully' }, 200);
   } catch (error) {
-    handleCommonError(error, res, 'deleting message');
+    handleError(error, res, 'deleting message');
   }
 });
 
@@ -248,7 +248,7 @@ router.get('/messages/search', jwtAuthMiddleware, async (req: Request, res: Resp
     const paginationMeta = createPaginationMeta(page, limit, searchResult.total);
     sendSuccess(res, searchResult, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'searching messages');
+    handleError(error, res, 'searching messages');
   }
 });
 
@@ -278,7 +278,7 @@ router.get('/starships/:starshipId/messages', jwtAuthMiddleware, async (req: Req
     const paginationMeta = createPaginationMeta(page, limit, messages.length);
     sendSuccess(res, { messages }, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching starship messages');
+    handleError(error, res, 'fetching starship messages');
   }
 });
 
@@ -308,7 +308,7 @@ router.get('/agents/:agentId/messages', jwtAuthMiddleware, async (req: Request, 
     const paginationMeta = createPaginationMeta(page, limit, messages.length);
     sendSuccess(res, { messages }, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching agent messages');
+    handleError(error, res, 'fetching agent messages');
   }
 });
 
@@ -341,7 +341,7 @@ router.get('/messages/:messageId/thread', jwtAuthMiddleware, async (req: Request
 
     sendSuccess(res, threadData, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching message thread');
+    handleError(error, res, 'fetching message thread');
   }
 });
 
@@ -363,7 +363,7 @@ router.post('/messages/bulk', jwtAuthMiddleware, async (req: Request, res: Respo
 
     sendSuccess(res, result, 200);
   } catch (error) {
-    handleCommonError(error, res, 'performing bulk operation');
+    handleError(error, res, 'performing bulk operation');
   }
 });
 
@@ -395,7 +395,7 @@ router.get('/messages/stats', jwtAuthMiddleware, async (req: Request, res: Respo
 
     sendSuccess(res, stats, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching message statistics');
+    handleError(error, res, 'fetching message statistics');
   }
 });
 
@@ -427,7 +427,7 @@ router.get('/conversations/:conversationId/analytics', jwtAuthMiddleware, async 
 
     sendSuccess(res, analytics, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching conversation analytics');
+    handleError(error, res, 'fetching conversation analytics');
   }
 });
 

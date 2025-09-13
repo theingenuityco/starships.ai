@@ -6,7 +6,8 @@
 
 import jsonata from 'jsonata';
 import { NodeHandler } from '@/types/node-handler';
-import { ConditionalParams, ValidationResult, ValidationError } from '@/types';
+import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions } from '@/types';
+import { EventCallback } from '@/types/events';
 
 export interface ConditionalResult {
   result: unknown;
@@ -15,9 +16,11 @@ export interface ConditionalResult {
 
 export class Conditional implements NodeHandler {
   private params: ConditionalParams;
+  private eventCallback?: EventCallback;
 
-  constructor(params: ConditionalParams) {
+  constructor(params: ConditionalParams, options?: NodeHandlerOptions) {
     this.params = params;
+    this.eventCallback = options?.eventCallback;
   }
 
   /**

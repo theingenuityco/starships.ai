@@ -9,7 +9,7 @@ import type { LlmParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import type { LlmMessage, MessageRole } from '@/memory/Memory';
 import { autopilot } from '@/Autopilot';
-import { NodeHandler } from '@/types/node-handler';
+import { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
 import { EventCallback } from '@/types/events';
 
 export interface LLMUsage {
@@ -55,9 +55,9 @@ export class LLM implements NodeHandler {
   private params: LlmParams;
   private eventCallback?: EventCallback;
 
-  constructor(params: LlmParams, eventCallback?: EventCallback) {
+  constructor(params: LlmParams, options?: NodeHandlerOptions) {
     this.params = params;
-    this.eventCallback = eventCallback;
+    this.eventCallback = options?.eventCallback;
   }
 
   /**

@@ -7,7 +7,7 @@
  */
 
 import { Engine, EngineConfig } from '@/engine/Engine';
-import { NodeResult, ValidationResult, WorkflowParams } from '@/types';
+import { NodeHandlerOptions, NodeResult, ValidationResult, WorkflowParams } from '@/types';
 import { ValidationError } from '@/types/validation';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
@@ -17,10 +17,10 @@ export class Workflow implements NodeHandler {
   private engine: Engine;
   private eventCallback?: EventCallback;
 
-  constructor(params: WorkflowParams, eventCallback?: EventCallback) {
+  constructor(params: WorkflowParams, options?: NodeHandlerOptions) {
     // Store parameters with cloned blueprint
     this.params = structuredClone(params);
-    this.eventCallback = eventCallback;
+    this.eventCallback = options?.eventCallback;
     // Create engine - handles all node types internally
     const engineConfig = {
       blueprint: this.params.blueprint,

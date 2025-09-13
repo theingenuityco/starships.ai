@@ -84,7 +84,7 @@ export class ExecutionEntity implements ExecutionModel {
   // Properties from the Execution interface that may not be persisted
   @Expose()
   @Transformers.JsonTransform()
-  results!: Map<string, NodeResult>;
+  results!: NodeResult[];
 
   @Expose()
   @Transformers.JsonTransform()

@@ -75,7 +75,7 @@ export class Conditional implements NodeHandler {
     if (!this.params.expression || this.params.expression.trim() === '') {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
-        message: 'JSONata expression is required',
+        message: 'Expression is required',
       });
     }
 
@@ -92,16 +92,16 @@ export class Conditional implements NodeHandler {
     }
 
     // Timeout validation
-    if (this.params.timeout !== undefined && this.params.timeout < 100) {
+    if (this.params.timeout !== undefined && this.params.timeout <= 0) {
       errors.push({
         code: 'INVALID_PARAMETERS',
-        message: 'Timeout should be at least 100ms',
+        message: 'Timeout must be greater than 0',
       });
     }
 
     return {
       valid: errors.length === 0,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: errors.length > 0 ? errors : [],
     };
   }
 }

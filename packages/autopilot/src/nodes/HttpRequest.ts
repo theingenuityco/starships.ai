@@ -91,12 +91,12 @@ export class HttpRequest implements NodeHandler {
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-
         // Parse response body
         let responseBody: unknown;
-        const contentType = response.headers.get('content-type');
+        const contentType =
+          response.headers && typeof response.headers.get === 'function' ? response.headers.get('content-type') || '' : '';
 
-        if (contentType?.includes('application/json')) {
+        if (contentType.includes('application/json')) {
           try {
             responseBody = await response.json();
           } catch {
@@ -108,9 +108,11 @@ export class HttpRequest implements NodeHandler {
 
         // Convert headers to object
         const responseHeaders: Record<string, string> = {};
-        response.headers.forEach((value, key) => {
-          responseHeaders[key] = value;
-        });
+        if (response.headers && typeof response.headers.forEach === 'function') {
+          response.headers.forEach((value, key) => {
+            responseHeaders[key] = value;
+          });
+        }
 
         return {
           status: response.status,

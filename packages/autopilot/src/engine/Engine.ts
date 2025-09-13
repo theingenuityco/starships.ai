@@ -202,47 +202,39 @@ export class Engine {
     // Find edges from current node
     const outgoingEdges = this.blueprint.edges.filter((edge) => edge.from === this.execution.currentNodeRef);
 
-    if (outgoingEdges.length === 0) {
-      return null; // No outgoing edges, workflow complete
-    }
-
-    // Get the last execution result to check for conditional output
-    const lastResult = this.execution.results[this.execution.results.length - 1];
-    let edgeCondition: string | undefined;
-
-    // Check if last result was from a conditional node
-    if (lastResult?.data && typeof lastResult.data === 'object') {
-      const conditionalResult = lastResult.data as Record<string, unknown>;
-      if (conditionalResult.condition !== undefined) {
-        edgeCondition = String(conditionalResult.condition);
-      }
-    }
-
-    // If we have an edge condition, look for matching edge
-    if (edgeCondition) {
-      const matchingEdge = outgoingEdges.find((edge) => edge.condition === edgeCondition);
-      if (matchingEdge) {
-        return this.blueprint.nodes.find((node) => node.ref === matchingEdge.to) || null;
-      }
-
-      // For boolean conditions, also check for 'true'/'false' string matches
-      const boolMatchingEdge = outgoingEdges.find(
-        (edge) => (edge.condition === 'true' && edgeCondition === 'true') || (edge.condition === 'false' && edgeCondition === 'false')
-      );
-      if (boolMatchingEdge) {
-        return this.blueprint.nodes.find((node) => node.ref === boolMatchingEdge.to) || null;
-      }
-    }
-
-    // Look for default edge (no condition)
-    const defaultEdge = outgoingEdges.find((edge) => !edge.condition);
-    if (defaultEdge) {
-      return this.blueprint.nodes.find((node) => node.ref === defaultEdge.to) || null;
-    }
-
-    // If no matching edge found and we have edges, take the first one
     if (outgoingEdges.length > 0) {
-      return this.blueprint.nodes.find((node) => node.ref === outgoingEdges[0].to) || null;
+      // Get the last execution result to check for conditional output
+      const lastResult = this.execution.results[this.execution.results.length - 1];
+      let edgeCondition: string | undefined;
+
+      // Check if last result was from a conditional node
+      if (lastResult?.data && typeof lastResult.data === 'object') {
+        const conditionalResult = lastResult.data as Record<string, unknown>;
+        if (conditionalResult.condition !== undefined) {
+          edgeCondition = String(conditionalResult.condition);
+        }
+      }
+
+      // If we have an edge condition, look for matching edge
+      if (edgeCondition) {
+        const matchingEdge = outgoingEdges.find((edge) => edge.condition === edgeCondition);
+        if (matchingEdge) {
+          return this.blueprint.nodes.find((node) => node.ref === matchingEdge.to) || null;
+        }
+
+        // For boolean conditions, also check for 'true'/'false' string matches
+        const boolMatchingEdge = outgoingEdges.find(
+          (edge) => (edge.condition === 'true' && edgeCondition === 'true') || (edge.condition === 'false' && edgeCondition === 'false')
+        );
+        if (boolMatchingEdge) {
+          return this.blueprint.nodes.find((node) => node.ref === boolMatchingEdge.to) || null;
+        }
+      }
+    }
+
+    const currentNode = this.blueprint.nodes.find((node) => this.execution.currentNodeRef === node.ref);
+    if (currentNode?.type !== 'end') {
+      throw new Error(`Engine exited unexpectedly, at Node: ${currentNode?.ref}`);
     }
 
     return null;

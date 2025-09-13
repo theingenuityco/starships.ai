@@ -7,7 +7,6 @@
 import jsonata from 'jsonata';
 import { NodeHandler } from '@/types/node-handler';
 import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions } from '@/types';
-import { EventCallback } from '@/types/events';
 
 export interface ConditionalResult {
   result: unknown;
@@ -16,11 +15,11 @@ export interface ConditionalResult {
 
 export class Conditional implements NodeHandler {
   private params: ConditionalParams;
-  private eventCallback?: EventCallback;
+  private options?: NodeHandlerOptions;
 
   constructor(params: ConditionalParams, options?: NodeHandlerOptions) {
     this.params = params;
-    this.eventCallback = options?.eventCallback;
+    this.options = options;
   }
 
   /**
@@ -33,9 +32,19 @@ export class Conditional implements NodeHandler {
       // Create JSONata expression
       const expression = jsonata(this.params.expression);
 
-      // Evaluate expression against current execution state
-      // Note: In a real implementation, you'd pass the current workflow state here
-      const result = await expression.evaluate({});
+      // Get execution state for JSONata evaluation
+      const executionContext = {
+        // Include current execution state
+        state: this.options?.execution?.state || {},
+        // Include previous node results for reference
+        results: this.options?.execution?.results || [],
+        // Include execution status and metadata
+        status: this.options?.execution?.status || 'not_started',
+        currentNodeRef: this.options?.execution?.currentNodeRef,
+      };
+
+      // Evaluate expression against current execution context
+      const result = await expression.evaluate(executionContext);
 
       // Convert result to boolean or string condition
       let condition: string | boolean;

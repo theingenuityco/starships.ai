@@ -17,6 +17,7 @@ export const sharedConfig = [
     languageOptions: {
       globals: {
         ...globals.node,
+        RequestInit: true,
       },
 
       parser: tsParser,

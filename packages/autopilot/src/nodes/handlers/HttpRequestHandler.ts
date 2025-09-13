@@ -75,10 +75,6 @@ export class HttpRequestHandler extends BaseHandler {
       warnings.push(this.createValidationWarning('POTENTIAL_TIMEOUT', 'Timeout is very low, this may cause frequent failures'));
     }
 
-    if (params.retries && params.retries > 5) {
-      warnings.push(this.createValidationWarning('POTENTIAL_TIMEOUT', 'High retry count may cause long execution times'));
-    }
-
     return {
       valid: errors.length === 0,
       errors,

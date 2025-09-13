@@ -607,7 +607,13 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({ processed: true });
+      expect(result).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/json' },
+        body: { processed: true },
+        url: 'https://api.example.com/complex',
+      });
       expect(mockFetch).toHaveBeenCalledWith(
         'https://api.example.com/complex',
         expect.objectContaining({

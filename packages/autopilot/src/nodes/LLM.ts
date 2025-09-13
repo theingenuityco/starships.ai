@@ -5,12 +5,12 @@
  * Simplified implementation focusing on core LLM functionality without unnecessary bloat.
  */
 
-import { LlmParams } from './types/node-parameters';
-import { ValidationResult, ValidationError } from './types/validation';
-import { LlmMessage, MessageRole } from './Memory';
-import { autopilot } from './Autopilot';
-import { NodeHandler } from './engine/NodeHandler';
-import { EventCallback } from './types/emitters';
+import type { LlmParams } from '@/types/node-parameters';
+import { ValidationResult, ValidationError } from '@/types/validation';
+import type { LlmMessage, MessageRole } from '@/Memory';
+import { autopilot } from '@/Autopilot';
+import { NodeHandler } from '@/engine/NodeHandler';
+import { EventCallback } from '@/types/emitters';
 
 export interface LLMUsage {
   prompt_tokens: number;

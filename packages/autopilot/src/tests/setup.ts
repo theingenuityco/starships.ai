@@ -40,7 +40,7 @@ global.console = mockConsole;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).createAgentMemory = (): AgentMemory => {
   const memory = new AgentMemory();
-  memory.addMessage('system', 'Test system prompt');
+  memory.addMessageToHistory({ role: 'system', content: 'Test system prompt' });
   return memory;
 };
 

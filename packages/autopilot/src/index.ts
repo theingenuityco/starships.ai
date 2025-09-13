@@ -18,11 +18,11 @@ export { Engine } from './engine/Engine';
 
 // Memory system
 export { Memory } from './Memory';
-export type { MemoryParams, MemoryState, LlmMessage, MessageRole } from './Memory';
+export type { MemoryState, LlmMessage, MessageRole } from './Memory';
 
 // Agent memory system
 export { AgentMemory } from './AgentMemory';
-export type { AgentIdentity, AgentMemoryParams, AgentMemoryState, AgentPurpose, AgentSpace } from './AgentMemory';
+export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from './AgentMemory';
 
 // ===== LLM SYSTEM =====
 // Core LLM class for AI model interactions

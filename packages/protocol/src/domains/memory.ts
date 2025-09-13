@@ -56,7 +56,7 @@ export interface CreateMemoryRequest {
 /**
  * Request to create a new agent memory
  */
-export interface CreateAgentMemoryRequest extends CreateMemoryRequest {
+export interface CreateAgentMemoryRequest {
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
@@ -66,14 +66,14 @@ export interface CreateAgentMemoryRequest extends CreateMemoryRequest {
 /**
  * Request to update a memory
  */
-export interface UpdateMemoryRequest extends Partial<CreateMemoryRequest> {
+export interface UpdateMemoryRequest {
   version?: string;
 }
 
 /**
  * Request to update an agent memory
  */
-export interface UpdateAgentMemoryRequest extends Partial<CreateAgentMemoryRequest> {
+export interface UpdateAgentMemoryRequest {
   version?: string;
 }
 

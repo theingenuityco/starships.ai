@@ -289,15 +289,8 @@ export class AgentService {
 
       // Execute agent with streaming-enabled execution
       const execution = await agent.execute({
-        currentNodeRef: undefined,
-        status: 'not_started',
-        executionResults: new Map(),
-        agentMemory: agent.getMemory(),
-        streaming: {
-          enabled: true,
-          streamId,
-          conversationId,
-          agentId,
+        state: {
+          memories: {},
         },
       });
 

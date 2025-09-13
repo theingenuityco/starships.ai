@@ -377,7 +377,7 @@ const DEFAULT_TEMPLATES: Array<
     icon: '🤖',
     previewPrompts: ['Help me plan my day', 'Explain quantum computing in simple terms', 'What are some healthy meal ideas?'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.7, 2000),
-    memory: createMemoryConfig('General Assistant', 'general', 'Assist users with general questions and provide helpful information', [
+    memoryState: createMemoryConfig('General Assistant', 'general', 'Assist users with general questions and provide helpful information', [
       'general knowledge',
       'conversation',
       'problem solving',
@@ -402,12 +402,12 @@ const DEFAULT_TEMPLATES: Array<
       'Check this SQL query for security issues',
     ],
     blueprint: createCodeReviewBlueprint(),
-    memory: createMemoryConfig('Code Reviewer', 'coding', 'Provide comprehensive, constructive code reviews to improve software quality', [
-      'software architecture',
-      'code quality',
-      'security practices',
-      'performance optimization',
-    ]),
+    memoryState: createMemoryConfig(
+      'Code Reviewer',
+      'coding',
+      'Provide comprehensive, constructive code reviews to improve software quality',
+      ['software architecture', 'code quality', 'security practices', 'performance optimization']
+    ),
     executionMode: 'workflow',
     timeout: 60000,
   },
@@ -428,12 +428,12 @@ const DEFAULT_TEMPLATES: Array<
       'Give me ideas for a sci-fi short story',
     ],
     blueprint: createCreativeWritingBlueprint(),
-    memory: createMemoryConfig('Creative Writer', 'creative', 'Create engaging, original content through a structured creative process', [
-      'storytelling',
-      'character development',
-      'creative writing techniques',
-      'content strategy',
-    ]),
+    memoryState: createMemoryConfig(
+      'Creative Writer',
+      'creative',
+      'Create engaging, original content through a structured creative process',
+      ['storytelling', 'character development', 'creative writing techniques', 'content strategy']
+    ),
     executionMode: 'workflow',
     timeout: 45000,
   },
@@ -450,7 +450,7 @@ const DEFAULT_TEMPLATES: Array<
     icon: '📊',
     previewPrompts: ['Analyze this sales data for trends', 'What statistical test should I use?', 'Help me interpret these survey results'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.4, 2500),
-    memory: createMemoryConfig(
+    memoryState: createMemoryConfig(
       'Data Analyst',
       'analysis',
       'Provide data analysis, statistical insights, and visualization recommendations',
@@ -472,7 +472,7 @@ const DEFAULT_TEMPLATES: Array<
     icon: '🎧',
     previewPrompts: ['I need help with my account', 'How do I return a product?', "My order hasn't arrived yet"],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.6, 2000),
-    memory: createMemoryConfig(
+    memoryState: createMemoryConfig(
       'Support Specialist',
       'support',
       'Resolve customer issues efficiently while maintaining high satisfaction levels',
@@ -499,7 +499,7 @@ const DEFAULT_TEMPLATES: Array<
       'What should I do first as a new captain?',
     ],
     blueprint: createStarshipNavigatorBlueprint(),
-    memory: createSibylMemoryConfig(),
+    memoryState: createSibylMemoryConfig(),
     executionMode: 'workflow',
     timeout: 45000,
   },

@@ -72,7 +72,7 @@ export class Engine {
   /**
    * Execute a workflow from start to completion
    */
-  async execute(initialExecution?: Execution): Promise<Execution> {
+  async execute(initialExecution?: Partial<Execution>): Promise<Execution> {
     this.execution = {
       status: initialExecution?.status || 'not_started',
       state: initialExecution?.state || {},

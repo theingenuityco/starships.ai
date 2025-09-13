@@ -137,7 +137,7 @@ export interface AgentParams {
   timeout?: number;
 
   // Memory system (required)
-  memory: AgentMemoryState;
+  memoryState: AgentMemoryState;
 
   // Blueprint execution
   blueprint: Blueprint;

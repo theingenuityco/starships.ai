@@ -102,7 +102,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  memory!: AgentMemoryState;
+  memoryState!: AgentMemoryState;
 
   @Expose()
   @Transformers.JsonTransform()
@@ -175,7 +175,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
         temperature: dataRecord.temperature,
         maxTokens: dataRecord.maxTokens,
         timeout: dataRecord.timeout ?? 30000,
-        memory: dataRecord.memory || {},
+        memoryState: dataRecord.memoryState || {},
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         category: dataRecord.category || 'general',
         usageCount: dataRecord.usageCount ?? 0,

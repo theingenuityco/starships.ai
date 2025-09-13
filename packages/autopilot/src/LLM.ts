@@ -303,12 +303,7 @@ export class LLM {
 
       return {
         status: 'completed',
-        data: {
-          body: reconstructedResponse,
-          llmResponse: primaryChoiceContent || choices[0].message.content,
-          model: model || this.params.model,
-          streaming: true,
-        },
+        data: reconstructedResponse,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
@@ -324,20 +319,10 @@ export class LLM {
   ): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     try {
       const responseData = await response.json();
-      const llmResponse = this.extractLlmResponse(responseData);
-
-      // Extract model from response data if available
-      const responseModel =
-        typeof responseData === 'object' && responseData !== null ? ((responseData as Record<string, unknown>).model as string) : undefined;
 
       return {
         status: 'completed',
-        data: {
-          body: responseData,
-          llmResponse,
-          model: responseModel || this.params.model,
-          streaming: false,
-        },
+        data: responseData,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Non-streaming processing failed';
@@ -458,7 +443,7 @@ export class LLM {
     // Only validate HTTP params if basic validation passes and we have an API key
     if (errors.length === 0 && hasApiKey) {
       try {
-        const httpRequest = new HttpRequest(this.buildHttpRequestParams());
+        const httpRequest = new HttpRequest(this.buildHttpRequestParams([]));
         const httpValidation = httpRequest.validate();
         if (!httpValidation.valid) {
           errors.push(...httpValidation.errors);

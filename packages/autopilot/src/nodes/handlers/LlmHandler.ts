@@ -67,7 +67,9 @@ export class LlmHandler extends BaseHandler {
 
       // Create LLM instance from the full parameters and execute
       const llm = new LLM(params);
-      const llmResult = await llm.execute(execution, streamingCallbacks);
+      const llmResult = await llm.execute({
+        streamingCallbacks,
+      });
 
       // Check if LLM execution was successful
       if (llmResult.status === 'completed') {
@@ -97,13 +99,9 @@ export class LlmHandler extends BaseHandler {
       errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Model is required'));
     }
 
-    if (!params.prompt) {
-      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Prompt is required'));
-    }
-
     // Only do comprehensive validation if basic fields are present
     // to avoid duplicate error messages
-    if (params.model && params.prompt) {
+    if (params.model) {
       // Use LLM class validation for comprehensive checking
       const llm = new LLM(params);
       const llmValidation = llm.validate();
@@ -111,7 +109,7 @@ export class LlmHandler extends BaseHandler {
       if (!llmValidation.valid) {
         llmValidation.errors.forEach((error) => {
           // Skip errors we already caught above
-          if (!error.includes('Model is required') && !error.includes('Prompt is required')) {
+          if (!error.includes('Model is required')) {
             errors.push(this.createValidationError('VALIDATION_FAILED', error));
           }
         });

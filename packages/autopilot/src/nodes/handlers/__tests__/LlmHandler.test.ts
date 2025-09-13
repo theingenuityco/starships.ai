@@ -7,13 +7,12 @@ import { Execution, LlmParams, Node } from '@/types';
 
 // Type definitions for test data structures
 interface LlmResponseData {
-  status?: number;
-  statusText?: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  url?: string;
-  llmResponse?: string;
-  model?: string;
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+  [key: string]: unknown;
 }
 
 // Mock LLM class
@@ -35,7 +34,6 @@ describe('LlmHandler', () => {
       description: 'LLM node for testing',
       parameters: {
         model: 'anthropic/claude-3.5-sonnet',
-        prompt: 'Hello, how are you?',
       } as LlmParams,
     };
 
@@ -64,21 +62,13 @@ describe('LlmHandler', () => {
       const mockLlmResult = {
         status: 'completed' as const,
         data: {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'content-type': 'application/json' },
-          body: {
-            choices: [
-              {
-                message: {
-                  content: 'Hello! I am doing well, thank you for asking.',
-                },
+          choices: [
+            {
+              message: {
+                content: 'Hello! I am doing well, thank you for asking.',
               },
-            ],
-          },
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          llmResponse: 'Hello! I am doing well, thank you for asking.',
-          model: 'anthropic/claude-3.5-sonnet',
+            },
+          ],
         },
       };
 
@@ -91,8 +81,7 @@ describe('LlmHandler', () => {
       expect(nodeResult?.error).toBeUndefined();
       expect(nodeResult?.nodeRef).toBe('llm-node');
       const resultData = nodeResult?.data as LlmResponseData;
-      expect(resultData.llmResponse).toBe('Hello! I am doing well, thank you for asking.');
-      expect(resultData.model).toBe('anthropic/claude-3.5-sonnet');
+      expect(resultData.choices[0].message.content).toBe('Hello! I am doing well, thank you for asking.');
     });
 
     it('should execute with full parameters', async () => {
@@ -100,15 +89,12 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'openai/gpt-4-turbo',
-          prompt: 'Explain quantum computing',
-          systemMessage: 'You are a helpful physics teacher',
           temperature: 0.8,
           maxTokens: 500,
           topP: 0.9,
           frequencyPenalty: 0.1,
           presencePenalty: 0.2,
           timeout: 30000,
-          stream: false,
         } as LlmParams,
       };
 
@@ -117,21 +103,13 @@ describe('LlmHandler', () => {
       const mockLlmResult = {
         status: 'completed' as const,
         data: {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'content-type': 'application/json' },
-          body: {
-            choices: [
-              {
-                message: {
-                  content: 'Quantum computing is a revolutionary technology...',
-                },
+          choices: [
+            {
+              message: {
+                content: 'Quantum computing is a revolutionary technology...',
               },
-            ],
-          },
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          llmResponse: 'Quantum computing is a revolutionary technology...',
-          model: 'openai/gpt-4-turbo',
+            },
+          ],
         },
       };
 
@@ -143,8 +121,7 @@ describe('LlmHandler', () => {
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const resultData = nodeResult?.data as LlmResponseData;
-      expect(resultData.llmResponse).toBe('Quantum computing is a revolutionary technology...');
-      expect(resultData.model).toBe('openai/gpt-4-turbo');
+      expect(resultData.choices[0].message.content).toBe('Quantum computing is a revolutionary technology...');
     });
 
     it('should handle system message correctly', async () => {
@@ -152,8 +129,6 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'What is AI?',
-          systemMessage: 'You are an expert AI researcher',
         } as LlmParams,
       };
 
@@ -162,21 +137,13 @@ describe('LlmHandler', () => {
       const mockLlmResult = {
         status: 'completed' as const,
         data: {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'content-type': 'application/json' },
-          body: {
-            choices: [
-              {
-                message: {
-                  content: 'AI stands for Artificial Intelligence...',
-                },
+          choices: [
+            {
+              message: {
+                content: 'AI stands for Artificial Intelligence...',
               },
-            ],
-          },
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          llmResponse: 'AI stands for Artificial Intelligence...',
-          model: 'anthropic/claude-3.5-sonnet',
+            },
+          ],
         },
       };
 
@@ -188,28 +155,20 @@ describe('LlmHandler', () => {
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const resultData = nodeResult?.data as LlmResponseData;
-      expect(resultData.llmResponse).toBe('AI stands for Artificial Intelligence...');
+      expect(resultData.choices[0].message.content).toBe('AI stands for Artificial Intelligence...');
     });
 
     it('should handle prompt only (no system message)', async () => {
       const mockLlmResult = {
         status: 'completed' as const,
         data: {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'content-type': 'application/json' },
-          body: {
-            choices: [
-              {
-                message: {
-                  content: 'Response',
-                },
+          choices: [
+            {
+              message: {
+                content: 'Response',
               },
-            ],
-          },
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          llmResponse: 'Response',
-          model: 'anthropic/claude-3.5-sonnet',
+            },
+          ],
         },
       };
 
@@ -221,7 +180,7 @@ describe('LlmHandler', () => {
       expect(nodeResult).toBeDefined();
       expect(nodeResult?.error).toBeUndefined();
       const resultData = nodeResult?.data as LlmResponseData;
-      expect(resultData.llmResponse).toBe('Response');
+      expect(resultData.choices[0].message.content).toBe('Response');
     });
 
     it('should extract LLM response from different response formats', async () => {
@@ -255,13 +214,13 @@ describe('LlmHandler', () => {
         const mockLlmResult = {
           status: 'completed' as const,
           data: {
-            status: 200,
-            statusText: 'OK',
-            headers: { 'content-type': 'application/json' },
-            body: {},
-            url: 'https://openrouter.ai/api/v1/chat/completions',
-            llmResponse: testCase.llmResponse,
-            model: 'anthropic/claude-3.5-sonnet',
+            choices: [
+              {
+                message: {
+                  content: testCase.llmResponse,
+                },
+              },
+            ],
           },
         };
 
@@ -271,7 +230,7 @@ describe('LlmHandler', () => {
 
         const nodeResult = result.results.get('llm-node');
         const resultData = nodeResult?.data as LlmResponseData;
-        expect(resultData.llmResponse).toBe(testCase.expected);
+        expect(resultData.choices[0].message.content).toBe(testCase.expected);
       }
     });
 
@@ -322,13 +281,13 @@ describe('LlmHandler', () => {
       const mockLlmResult = {
         status: 'completed' as const,
         data: {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'content-type': 'application/json' },
-          body: { choices: [{ message: { content: 'Response' } }] },
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          llmResponse: 'Response',
-          model: 'anthropic/claude-3.5-sonnet',
+          choices: [
+            {
+              message: {
+                content: 'Response',
+              },
+            },
+          ],
         },
       };
 
@@ -348,8 +307,6 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Hello, how are you?',
-          systemMessage: 'You are a helpful assistant',
         } as LlmParams,
       };
       const handlerWithSystemMessage = new LlmHandler(nodeWithSystemMessage);
@@ -366,15 +323,12 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Test prompt',
-          systemMessage: 'Test system message',
           temperature: 0.7,
           maxTokens: 1000,
           topP: 0.9,
           frequencyPenalty: 0.1,
           presencePenalty: 0.2,
           timeout: 30000,
-          stream: false,
         } as LlmParams,
       };
 
@@ -389,9 +343,8 @@ describe('LlmHandler', () => {
       const nodeWithoutModel: Node = {
         ...mockNode,
         parameters: {
-          // Remove model field
-          prompt: 'Hello, how are you?',
-        } as LlmParams,
+          // Remove model field - use unknown to bypass type check
+        } as unknown as LlmParams,
       };
 
       // Mock validation to return the expected error for missing model
@@ -414,41 +367,13 @@ describe('LlmHandler', () => {
       });
     });
 
-    it('should fail validation when prompt is missing', () => {
-      const nodeWithoutPrompt: Node = {
-        ...mockNode,
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          // Remove prompt field
-        } as LlmParams,
-      };
-
-      // Mock validation to return the expected error for missing prompt
-      MockedLLM.prototype.validate = jest.fn().mockReturnValue({
-        valid: false,
-        errors: ['Prompt is required'],
-      });
-
-      const handlerWithoutPrompt = new LlmHandler(nodeWithoutPrompt);
-
-      const result = handlerWithoutPrompt.validate();
-
-      expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0]).toEqual({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Prompt is required',
-        nodeRef: 'llm-node',
-        severity: 'error',
-      });
-    });
+    // Test removed since prompt is no longer a required field in LlmParams
 
     it('should fail validation for invalid temperature', () => {
       const nodeWithInvalidTemp: Node = {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Test prompt',
           temperature: 3.0, // Invalid: > 2
         } as LlmParams,
       };
@@ -477,7 +402,6 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Test prompt',
           maxTokens: 0, // Invalid: < 1
         } as LlmParams,
       };
@@ -506,7 +430,6 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Test prompt',
           topP: 1.5, // Invalid: > 1
         } as LlmParams,
       };
@@ -535,7 +458,6 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Test prompt',
           maxTokens: 5000, // High token count
         } as LlmParams,
       };
@@ -570,9 +492,7 @@ describe('LlmHandler', () => {
         ...mockNode,
         parameters: {
           model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Test prompt',
           timeout: 5000, // Low timeout
-          openrouterApiKey: 'test-api-key',
         } as LlmParams,
       };
       const handlerWithLowTimeout = new LlmHandler(nodeWithLowTimeout);
@@ -587,23 +507,22 @@ describe('LlmHandler', () => {
       });
     });
 
-    it('should fail validation for both missing model and prompt', () => {
+    it('should fail validation for missing model', () => {
       const nodeWithMissingFields: Node = {
         ...mockNode,
         parameters: {
           temperature: 0.7,
-        } as LlmParams,
+        } as unknown as LlmParams,
       };
       const handlerWithMissingFields = new LlmHandler(nodeWithMissingFields);
 
       const result = handlerWithMissingFields.validate();
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toHaveLength(2);
+      expect(result.errors).toHaveLength(1);
 
       const errorMessages = result.errors.map((e) => e.message);
       expect(errorMessages).toContain('Model is required');
-      expect(errorMessages).toContain('Prompt is required');
     });
   });
 
@@ -618,13 +537,13 @@ describe('LlmHandler', () => {
       const mockLlmResult = {
         status: 'completed' as const,
         data: {
-          status: 200,
-          statusText: 'OK',
-          headers: { 'content-type': 'application/json' },
-          body: { choices: [{ message: { content: 'Response' } }] },
-          url: 'https://openrouter.ai/api/v1/chat/completions',
-          llmResponse: 'Response',
-          model: 'anthropic/claude-3.5-sonnet',
+          choices: [
+            {
+              message: {
+                content: 'Response',
+              },
+            },
+          ],
         },
       };
 

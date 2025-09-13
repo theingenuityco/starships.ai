@@ -93,29 +93,20 @@ export class LLM {
 
     // Ensure streaming is enabled in request body
     if (httpParams.body) {
-      let bodyObj: Record<string, unknown>;
+      let body: Record<string, unknown>;
       if (typeof httpParams.body === 'string') {
-        bodyObj = JSON.parse(httpParams.body);
-      } else if (
-        typeof httpParams.body === 'object' &&
-        httpParams.body !== null &&
-        !(httpParams.body instanceof FormData) &&
-        !(httpParams.body instanceof URLSearchParams) &&
-        !(httpParams.body instanceof Blob) &&
-        !(httpParams.body instanceof ArrayBuffer) &&
-        !('byteLength' in httpParams.body) && // Exclude ArrayBufferView types
-        !('getReader' in httpParams.body) && // Exclude ReadableStream
-        !(Symbol.iterator in httpParams.body) && // Exclude iterables
-        !(Symbol.asyncIterator in httpParams.body) // Exclude async iterables
-      ) {
-        // It's a plain object that we can modify
-        bodyObj = httpParams.body as Record<string, unknown>;
+        // Parse JSON string body
+        body = JSON.parse(httpParams.body);
+      } else if (this.isPlainObject(httpParams.body)) {
+        // Use plain object directly
+        body = httpParams.body as unknown as Record<string, unknown>;
       } else {
-        // For binary data types, we can't modify them, so create a new object
-        bodyObj = { stream: true };
+        // For non-plain objects (binary data, streams, etc.), create new object
+        body = { stream: true };
       }
-      bodyObj.stream = true;
-      httpParams.body = JSON.stringify(bodyObj);
+
+      body.stream = true;
+      httpParams.body = JSON.stringify(body);
     }
 
     let fullResponse = '';

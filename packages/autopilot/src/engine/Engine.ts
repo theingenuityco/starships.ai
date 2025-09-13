@@ -18,6 +18,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   http_request: () => import('@/nodes/HttpRequest').then((m) => m.HttpRequest as NodeHandlerConstructor),
   llm: () => import('@/nodes/LLM').then((m) => m.LLM as NodeHandlerConstructor),
   user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
+  conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {
@@ -199,13 +200,33 @@ export class Engine {
       return null; // No outgoing edges, workflow complete
     }
 
-    // // If we have an edge condition, look for matching edge
-    // if (edgeCondition) {
-    //   const matchingEdge = outgoingEdges.find((edge) => edge.condition === edgeCondition);
-    //   if (matchingEdge) {
-    //     return this.blueprint.nodes.find((node) => node.ref === matchingEdge.to) || null;
-    //   }
-    // }
+    // Get the last execution result to check for conditional output
+    const lastResult = this.execution.results[this.execution.results.length - 1];
+    let edgeCondition: string | undefined;
+
+    // Check if last result was from a conditional node
+    if (lastResult?.data && typeof lastResult.data === 'object') {
+      const conditionalResult = lastResult.data as Record<string, unknown>;
+      if (conditionalResult.condition !== undefined) {
+        edgeCondition = String(conditionalResult.condition);
+      }
+    }
+
+    // If we have an edge condition, look for matching edge
+    if (edgeCondition) {
+      const matchingEdge = outgoingEdges.find((edge) => edge.condition === edgeCondition);
+      if (matchingEdge) {
+        return this.blueprint.nodes.find((node) => node.ref === matchingEdge.to) || null;
+      }
+
+      // For boolean conditions, also check for 'true'/'false' string matches
+      const boolMatchingEdge = outgoingEdges.find(
+        (edge) => (edge.condition === 'true' && edgeCondition === 'true') || (edge.condition === 'false' && edgeCondition === 'false')
+      );
+      if (boolMatchingEdge) {
+        return this.blueprint.nodes.find((node) => node.ref === boolMatchingEdge.to) || null;
+      }
+    }
 
     // Look for default edge (no condition)
     const defaultEdge = outgoingEdges.find((edge) => !edge.condition);

@@ -31,11 +31,20 @@ describe('Sophisticated Workflows', () => {
       evaluate: jest.fn().mockReturnValue(true),
     });
 
-    // Default fetch mock
+    // Default fetch mock with proper structure
+    const mockHeaders = new Map([['content-type', 'application/json']]);
+    mockHeaders.forEach = jest.fn((callback) => {
+      callback('application/json', 'content-type', mockHeaders);
+    });
+
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
+      statusText: 'OK',
+      url: 'https://api.example.com/test',
+      headers: mockHeaders,
       json: async () => ({ success: true }),
+      text: async () => '{"success":true}',
     });
   });
 
@@ -91,10 +100,19 @@ describe('Sophisticated Workflows', () => {
       });
 
       // Mock premium API response
+      const mockHeaders = new Map([['content-type', 'application/json']]);
+      mockHeaders.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders);
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/premium',
+        headers: mockHeaders,
         json: async () => ({ premium: true, features: ['advanced', 'priority'] }),
+        text: async () => '{"premium":true,"features":["advanced","priority"]}',
       });
 
       const eventCallback = jest.fn();
@@ -175,10 +193,19 @@ describe('Sophisticated Workflows', () => {
       });
 
       // Mock regular API response
+      const mockHeaders = new Map([['content-type', 'application/json']]);
+      mockHeaders.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders);
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/regular',
+        headers: mockHeaders,
         json: async () => ({ premium: false, features: ['basic'] }),
+        text: async () => '{"premium":false,"features":["basic"]}',
       });
 
       const engine = new Engine({
@@ -265,10 +292,19 @@ describe('Sophisticated Workflows', () => {
         evaluate: jest.fn().mockReturnValue('silver'),
       });
 
+      const mockHeaders = new Map([['content-type', 'application/json']]);
+      mockHeaders.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders);
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/silver',
+        headers: mockHeaders,
         json: async () => ({ tier: 'silver', benefits: ['support', 'discounts'] }),
+        text: async () => '{"tier":"silver","benefits":["support","discounts"]}',
       });
 
       const engine = new Engine({

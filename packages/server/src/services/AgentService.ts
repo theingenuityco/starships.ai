@@ -283,11 +283,7 @@ export class AgentService {
       agent.getEngine().setEmitter(this.agentStreamingService);
 
       // Execute agent with streaming-enabled execution
-      await agent.execute({
-        state: {
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        },
-      });
+      await agent.execute();
 
       const executionTime = Date.now() - startTime;
 

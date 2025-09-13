@@ -6,23 +6,13 @@
  * stateless execution engine (autopilot Workflow).
  */
 
-import { AgentMemory, Blueprint, Execution, Workflow } from '@starships/autopilot';
+import { AgentMemory, Blueprint, Execution, NodeResult, Workflow } from '@starships/autopilot';
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { WorkflowRepository } from '@starships/models';
 import type { CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowModel } from '@starships/protocol';
 
 export interface WorkflowOptions {
   includeMemory?: boolean;
-}
-
-export interface ExecuteWorkflowResponse {
-  response: any;
-  executionId: string;
-  status: 'completed' | 'failed' | 'timeout';
-  error?: {
-    message: string;
-    code?: string;
-  };
 }
 
 export interface WorkflowExecutionContext {
@@ -312,70 +302,31 @@ export class WorkflowService {
   /**
    * Execute workflow using WorkflowExecutionContext
    */
-  async executeWorkflow(context: WorkflowExecutionContext, options: WorkflowOptions = {}): Promise<ExecuteWorkflowResponse> {
+  async executeWorkflow(context: WorkflowExecutionContext, options: WorkflowOptions = {}): Promise<void> {
     const startTime = Date.now();
 
-    try {
-      // Get database workflow
-      const dbWorkflow = await this.workflowRepository.findById(context.workflowId);
-      if (!dbWorkflow) {
-        throw new NotFoundError('Workflow', context.workflowId);
-      }
-
-      // Create workflow instance
-      const workflow = await this.createWorkflowInstance(dbWorkflow, options);
-
-      console.log(`✅ [WORKFLOW-SERVICE] Executing workflow: ${dbWorkflow.name} (${context.workflowId})`);
-
-      // Create agent memory for execution context
-      const agentMemory = new AgentMemory();
-      agentMemory.addMessageToHistory({ role: 'system', content: 'Workflow execution context' });
-
-      // Create initial execution context
-      const initialExecution: Execution = {
-        currentNodeRef: undefined,
-        status: 'running',
-        results: new Map(),
-        state: {},
-        error: undefined,
-      };
-
-      // Execute workflow
-      const result = await workflow.execute(initialExecution);
-
-      // Track usage
-      await this.workflowRepository.incrementUsageCount(context.workflowId);
-
-      const executionTime = Date.now() - startTime;
-      console.log(`✅ [WORKFLOW-SERVICE] Workflow executed successfully in ${executionTime}ms`);
-
-      return {
-        response: result,
-        executionId: `exec-${Date.now()}`,
-        status: result.status === 'completed' ? 'completed' : 'failed',
-      };
-    } catch (error: any) {
-      const executionTime = Date.now() - startTime;
-
-      console.error(`[WORKFLOW-SERVICE] Workflow execution failed for ${context.workflowId}:`, error);
-
-      return {
-        response: null,
-        executionId: `failed-${Date.now()}`,
-        status: 'failed',
-        error: {
-          message: error.message || 'Unknown error occurred',
-          code: error.code || 'EXECUTION_ERROR',
-        },
-      };
+    // Get database workflow
+    const dbWorkflow = await this.workflowRepository.findById(context.workflowId);
+    if (!dbWorkflow) {
+      throw new NotFoundError('Workflow', context.workflowId);
     }
-  }
 
-  /**
-   * Test workflow execution
-   */
-  async testWorkflow(workflowId: string, testData: Record<string, unknown> = {}): Promise<ExecuteWorkflowResponse> {
-    return this.executeWorkflow({ workflowId, initialData: testData }, { includeMemory: false });
+    // Create workflow instance
+    const workflow = await this.createWorkflowInstance(dbWorkflow, options);
+
+    console.log(`✅ [WORKFLOW-SERVICE] Executing workflow: ${dbWorkflow.name} (${context.workflowId})`);
+
+    // Create agent memory for execution context
+    const agentMemory = new AgentMemory();
+    agentMemory.addMessageToHistory({ role: 'system', content: 'Workflow execution context' });
+
+    // Execute workflow
+    await workflow.execute();
+    // Track usage
+    await this.workflowRepository.incrementUsageCount(context.workflowId);
+
+    const executionTime = Date.now() - startTime;
+    console.log(`✅ [WORKFLOW-SERVICE] Workflow executed successfully in ${executionTime}ms`);
   }
 
   /**

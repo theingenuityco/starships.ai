@@ -92,8 +92,30 @@ export class LLM {
     const httpParams = this.buildHttpRequestParams(execution);
 
     // Ensure streaming is enabled in request body
-    if (httpParams.body && typeof httpParams.body === 'object') {
-      (httpParams.body as Record<string, unknown>).stream = true;
+    if (httpParams.body) {
+      let bodyObj: Record<string, unknown>;
+      if (typeof httpParams.body === 'string') {
+        bodyObj = JSON.parse(httpParams.body);
+      } else if (
+        typeof httpParams.body === 'object' &&
+        httpParams.body !== null &&
+        !(httpParams.body instanceof FormData) &&
+        !(httpParams.body instanceof URLSearchParams) &&
+        !(httpParams.body instanceof Blob) &&
+        !(httpParams.body instanceof ArrayBuffer) &&
+        !('byteLength' in httpParams.body) && // Exclude ArrayBufferView types
+        !('getReader' in httpParams.body) && // Exclude ReadableStream
+        !(Symbol.iterator in httpParams.body) && // Exclude iterables
+        !(Symbol.asyncIterator in httpParams.body) // Exclude async iterables
+      ) {
+        // It's a plain object that we can modify
+        bodyObj = httpParams.body as Record<string, unknown>;
+      } else {
+        // For binary data types, we can't modify them, so create a new object
+        bodyObj = { stream: true };
+      }
+      bodyObj.stream = true;
+      httpParams.body = JSON.stringify(bodyObj);
     }
 
     let fullResponse = '';
@@ -256,6 +278,7 @@ export class LLM {
     // Get API key from Autopilot singleton, fallback to parameters for backward compatibility
     const apiKey = autopilot.getOpenRouterApiKey();
 
+    // ! Query logic to get messages from state
     // Build messages array
     const messages: Array<{ role: string; content: string }> = [];
 
@@ -289,10 +312,9 @@ export class LLM {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body,
+      body: JSON.stringify(body),
       timeout: this.params.timeout || 60000,
-      retries: 1,
-      followRedirects: true,
+      redirect: 'follow',
     };
   }
 

@@ -56,33 +56,14 @@ export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf'
 
 /**
  * HTTP request node parameters for making HTTP calls
+ * Fully compatible with fetch RequestInit structure
  */
-export interface HttpRequestParams {
+export interface HttpRequestParams extends RequestInit {
+  // Required URL (not part of RequestInit as it's the first parameter to fetch)
   url: string;
-  method: HttpMethod;
-  headers?: Record<string, string>;
-  body?: string | object;
+
+  // Custom properties for convenience
   timeout?: number;
-  retries?: number;
-  followRedirects?: boolean;
-  authentication?: HttpAuthentication;
-}
-
-/**
- * HTTP methods supported by the HTTP request node
- */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
-
-/**
- * HTTP authentication configuration
- */
-export interface HttpAuthentication {
-  type: 'bearer' | 'basic' | 'api-key';
-  token?: string;
-  username?: string;
-  password?: string;
-  apiKey?: string;
-  headerName?: string; // for api-key type
 }
 
 /**

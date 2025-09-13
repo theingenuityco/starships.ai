@@ -204,103 +204,6 @@ describe('HttpRequestHandler', () => {
       });
     });
 
-    it('should fail validation for bearer auth without token', () => {
-      const nodeWithIncompleteAuth: Node = {
-        ...mockNode,
-        parameters: {
-          url: 'https://api.example.com/data',
-          method: 'GET',
-          authentication: {
-            type: 'bearer',
-          },
-        } as HttpRequestParams,
-      };
-
-      // Mock validation to return the expected error
-      MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
-        valid: false,
-        errors: ['Bearer token is required for bearer authentication'],
-      });
-
-      const handlerWithIncompleteAuth = new HttpRequestHandler(nodeWithIncompleteAuth);
-
-      const result = handlerWithIncompleteAuth.validate();
-
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual({
-        code: 'VALIDATION_FAILED',
-        message: 'Bearer token is required for bearer authentication',
-        nodeRef: 'http-request-node',
-        severity: 'error',
-      });
-    });
-
-    it('should fail validation for basic auth without credentials', () => {
-      const nodeWithIncompleteAuth: Node = {
-        ...mockNode,
-        parameters: {
-          url: 'https://api.example.com/data',
-          method: 'GET',
-          authentication: {
-            type: 'basic',
-            username: 'user',
-            // missing password
-          },
-        } as HttpRequestParams,
-      };
-
-      // Mock validation to return the expected error
-      MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
-        valid: false,
-        errors: ['Username and password are required for basic authentication'],
-      });
-
-      const handlerWithIncompleteAuth = new HttpRequestHandler(nodeWithIncompleteAuth);
-
-      const result = handlerWithIncompleteAuth.validate();
-
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual({
-        code: 'VALIDATION_FAILED',
-        message: 'Username and password are required for basic authentication',
-        nodeRef: 'http-request-node',
-        severity: 'error',
-      });
-    });
-
-    it('should fail validation for api-key auth without key or header', () => {
-      const nodeWithIncompleteAuth: Node = {
-        ...mockNode,
-        parameters: {
-          url: 'https://api.example.com/data',
-          method: 'GET',
-          authentication: {
-            type: 'api-key',
-            apiKey: 'key',
-            // missing headerName
-          },
-        } as HttpRequestParams,
-      };
-
-      // Mock validation to return the expected error
-      MockedHttpRequest.prototype.validate = jest.fn().mockReturnValue({
-        valid: false,
-        errors: ['API key and header name are required for API key authentication'],
-      });
-
-      const handlerWithIncompleteAuth = new HttpRequestHandler(nodeWithIncompleteAuth);
-
-      const result = handlerWithIncompleteAuth.validate();
-
-      expect(result.valid).toBe(false);
-      expect(result.errors).toContainEqual({
-        code: 'VALIDATION_FAILED',
-        message: 'API key and header name are required for API key authentication',
-        nodeRef: 'http-request-node',
-        severity: 'error',
-      });
-    });
-
     it('should warn about low timeout', () => {
       const nodeWithLowTimeout: Node = {
         ...mockNode,
@@ -327,27 +230,6 @@ describe('HttpRequestHandler', () => {
         message: 'Timeout should be at least 1000ms',
         nodeRef: 'http-request-node',
         severity: 'error',
-      });
-    });
-
-    it('should warn about high retry count', () => {
-      const nodeWithHighRetries: Node = {
-        ...mockNode,
-        parameters: {
-          url: 'https://api.example.com/data',
-          method: 'GET',
-          retries: 10,
-        } as HttpRequestParams,
-      };
-      const handlerWithHighRetries = new HttpRequestHandler(nodeWithHighRetries);
-
-      const result = handlerWithHighRetries.validate();
-
-      expect(result.valid).toBe(true);
-      expect(result.warnings).toContainEqual({
-        code: 'POTENTIAL_TIMEOUT',
-        message: 'High retry count may cause long execution times',
-        nodeRef: 'http-request-node',
       });
     });
   });

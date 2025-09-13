@@ -1,12 +1,11 @@
 /**
  * HttpRequest Class
  *
- * Executable HTTP request that handles external API calls using axios.
+ * Executable HTTP request that handles external API calls using native fetch.
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
 import { HttpRequestParams } from '@/types';
-import axios, { AxiosRequestConfig } from 'axios';
 
 export class HttpRequest {
   private params: HttpRequestParams;
@@ -15,8 +14,7 @@ export class HttpRequest {
     // Store HTTP request parameters with deep copy to avoid mutations
     this.params = {
       ...params,
-      headers: { ...params.headers },
-      authentication: params.authentication ? { ...params.authentication } : undefined,
+      headers: params.headers ? { ...params.headers } : undefined,
     };
   }
 
@@ -30,21 +28,21 @@ export class HttpRequest {
   /**
    * Get HTTP method
    */
-  getMethod(): string {
+  getMethod(): string | undefined {
     return this.params.method;
   }
 
   /**
    * Get request headers
    */
-  getHeaders(): Record<string, string> | undefined {
-    return this.params.headers ? { ...this.params.headers } : undefined;
+  getHeaders(): RequestInit['headers'] | undefined {
+    return this.params.headers;
   }
 
   /**
    * Get request body
    */
-  getBody(): string | object | undefined {
+  getBody(): RequestInit['body'] | undefined {
     return this.params.body;
   }
 
@@ -73,44 +71,112 @@ export class HttpRequest {
     try {
       console.log(`Executing HTTP ${this.params.method} request to: ${this.params.url}`);
 
-      // Build axios request configuration
-      const requestConfig: AxiosRequestConfig = {
-        method: this.params.method,
-        url: this.params.url,
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.params.headers,
-        },
-        timeout: this.params.timeout || 30000,
-        maxRedirects: this.params.followRedirects !== false ? 5 : 0,
+      // Setup headers - convert HeadersInit to Record<string, string>
+      let headers: Record<string, string> = {
+        'Content-Type': 'application/json',
       };
 
-      // Add authentication if provided
-      if (this.params.authentication) {
-        this.addAuthentication(requestConfig, this.params.authentication);
+      if (this.params.headers) {
+        if (this.params.headers instanceof Headers) {
+          // Convert Headers object to Record
+          this.params.headers.forEach((value, key) => {
+            headers[key] = value;
+          });
+        } else if (Array.isArray(this.params.headers)) {
+          // Convert [string, string][] to Record
+          for (const [key, value] of this.params.headers) {
+            headers[key] = value;
+          }
+        } else {
+          // It's already a Record<string, string>
+          headers = { ...headers, ...this.params.headers };
+        }
       }
 
-      // Add body for non-GET requests
-      if (this.params.method !== 'GET' && this.params.method !== 'HEAD' && this.params.body) {
-        requestConfig.data = this.params.body;
+      // Setup timeout with AbortController
+      const controller = new AbortController();
+      const timeout = this.params.timeout || 30000;
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      // Use the body directly from params (already in correct fetch format)
+      let body = this.params.body;
+      if (this.params.method !== 'GET' && this.params.method !== 'HEAD' && body) {
+        // Only stringify if it's a plain object (not FormData, URLSearchParams, etc.)
+        if (
+          typeof body === 'object' &&
+          !(body instanceof FormData) &&
+          !(body instanceof URLSearchParams) &&
+          !(body instanceof Blob) &&
+          !(body instanceof ArrayBuffer) &&
+          body !== null
+        ) {
+          body = JSON.stringify(body);
+        }
       }
+
+      // Build fetch options using all RequestInit properties from params
+      const fetchOptions = {
+        method: this.params.method,
+        headers,
+        body,
+        signal: controller.signal,
+        mode: this.params.mode,
+        credentials: this.params.credentials,
+        cache: this.params.cache,
+        redirect: this.params.redirect || ('follow' as const),
+        referrer: this.params.referrer,
+        referrerPolicy: this.params.referrerPolicy,
+        integrity: this.params.integrity,
+        keepalive: this.params.keepalive,
+      };
 
       // Execute request
-      const response = await axios(requestConfig);
+      const response = await fetch(this.params.url, fetchOptions);
+
+      // Clear timeout
+      clearTimeout(timeoutId);
+
+      // Parse response body
+      let responseBody: unknown;
+      const contentType = response.headers.get('content-type');
+
+      if (contentType?.includes('application/json')) {
+        try {
+          responseBody = await response.json();
+        } catch {
+          responseBody = await response.text();
+        }
+      } else {
+        responseBody = await response.text();
+      }
+
+      // Convert headers to object
+      const responseHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
 
       return {
         status: 'completed',
         data: {
           status: response.status,
           statusText: response.statusText,
-          headers: response.headers,
-          body: response.data,
-          url: response.config.url,
+          headers: responseHeaders,
+          body: responseBody,
+          url: response.url,
         },
       };
     } catch (error) {
       // Create more descriptive error message with context
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      let errorMessage = 'Unknown error';
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = `Request timeout after ${this.params.timeout || 30000}ms`;
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       const contextualError = new Error(`HTTP ${this.params.method} request to ${this.params.url} failed: ${errorMessage}`);
 
       // Preserve original error as cause if possible
@@ -122,34 +188,6 @@ export class HttpRequest {
         status: 'failed',
         error: contextualError,
       };
-    }
-  }
-
-  /**
-   * Add authentication to request configuration
-   */
-  private addAuthentication(config: AxiosRequestConfig, auth: HttpRequestParams['authentication']) {
-    if (!auth || !config.headers) return;
-
-    switch (auth.type) {
-      case 'bearer':
-        if (auth.token) {
-          config.headers['Authorization'] = `Bearer ${auth.token}`;
-        }
-        break;
-      case 'basic':
-        if (auth.username && auth.password) {
-          config.auth = {
-            username: auth.username,
-            password: auth.password,
-          };
-        }
-        break;
-      case 'api-key':
-        if (auth.apiKey && auth.headerName) {
-          config.headers[auth.headerName] = auth.apiKey;
-        }
-        break;
     }
   }
 
@@ -183,28 +221,6 @@ export class HttpRequest {
       errors.push(`Invalid HTTP method. Must be one of: ${validMethods.join(', ')}`);
     }
 
-    // Authentication validation
-    if (this.params.authentication) {
-      const auth = this.params.authentication;
-      switch (auth.type) {
-        case 'bearer':
-          if (!auth.token) {
-            errors.push('Bearer token is required for bearer authentication');
-          }
-          break;
-        case 'basic':
-          if (!auth.username || !auth.password) {
-            errors.push('Username and password are required for basic authentication');
-          }
-          break;
-        case 'api-key':
-          if (!auth.apiKey || !auth.headerName) {
-            errors.push('API key and header name are required for API key authentication');
-          }
-          break;
-      }
-    }
-
     // Timeout validation
     if (this.params.timeout !== undefined && this.params.timeout < 1000) {
       errors.push('Timeout should be at least 1000ms');
@@ -222,8 +238,6 @@ export class HttpRequest {
   clone(): HttpRequest {
     const clonedParams: HttpRequestParams = {
       ...this.params,
-      headers: this.params.headers ? { ...this.params.headers } : undefined,
-      authentication: this.params.authentication ? { ...this.params.authentication } : undefined,
     };
 
     return new HttpRequest(clonedParams);
@@ -236,13 +250,6 @@ export class HttpRequest {
     const updatedParams = {
       ...this.params,
       ...updates,
-      // Merge headers if both exist
-      headers: {
-        ...this.params.headers,
-        ...updates.headers,
-      },
-      // Use new authentication if provided, otherwise keep existing
-      authentication: updates.authentication || this.params.authentication,
     };
 
     return new HttpRequest(updatedParams);

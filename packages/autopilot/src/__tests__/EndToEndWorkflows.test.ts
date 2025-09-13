@@ -258,6 +258,12 @@ describe('End-to-End Workflow Execution', () => {
 
       const execution = engine.getExecution();
 
+      // Debug information
+      if (execution.status === 'failed') {
+        console.log('Execution failed with error:', execution.error);
+        console.log('Results:', execution.results);
+      }
+
       expect(execution.status).toBe('completed');
       expect(execution.state).toEqual({ initialized: true });
       expect(execution.results).toHaveLength(5);
@@ -512,16 +518,29 @@ describe('End-to-End Workflow Execution', () => {
       };
 
       // Mock positive analysis scenario
+      const mockHeaders1 = new Map([['content-type', 'application/json']]);
+      mockHeaders1.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders1);
+      });
+      const mockHeaders2 = new Map([['content-type', 'application/json']]);
+      mockHeaders2.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders2);
+      });
+
       mockFetch
         .mockResolvedValueOnce({
           // fetch-content
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.content.example.com/posts/123',
+          headers: mockHeaders1,
           json: async () => ({
             post_id: '123',
             content: 'This is a great product! I love using it.',
             author: 'user@example.com',
           }),
+          text: async () => '{"post_id":"123","content":"This is a great product! I love using it.","author":"user@example.com"}',
         })
         .mockResolvedValueOnce({
           // ai-analysis
@@ -555,7 +574,11 @@ describe('End-to-End Workflow Execution', () => {
           // approve-content
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.content.example.com/approve',
+          headers: mockHeaders2,
           json: async () => ({ approved: true, post_id: '123' }),
+          text: async () => '{"approved":true,"post_id":"123"}',
         });
 
       // Mock conditional to return 'approve'
@@ -657,45 +680,69 @@ describe('End-to-End Workflow Execution', () => {
       };
 
       // Mock successful pipeline execution
+      const createMockHeaders = () => {
+        const headers = new Map([['content-type', 'application/json']]);
+        headers.forEach = jest.fn((callback) => {
+          callback('application/json', 'content-type', headers);
+        });
+        return headers;
+      };
+
       mockFetch
         .mockResolvedValueOnce({
           // extract-data
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.data.example.com/extract',
+          headers: createMockHeaders(),
           json: async () => ({
             records: 1000,
             quality_score: 0.95,
             extraction_time: '2.3s',
           }),
+          text: async () => '{"records":1000,"quality_score":0.95,"extraction_time":"2.3s"}',
         })
         .mockResolvedValueOnce({
           // transform-data
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.data.example.com/transform',
+          headers: createMockHeaders(),
           json: async () => ({
             transformed: true,
             output_records: 1000,
             transform_time: '1.1s',
           }),
+          text: async () => '{"transformed":true,"output_records":1000,"transform_time":"1.1s"}',
         })
         .mockResolvedValueOnce({
           // load-data
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.warehouse.example.com/load',
+          headers: createMockHeaders(),
           json: async () => ({
             loaded: true,
             table: 'analytics_users',
             load_time: '0.8s',
           }),
+          text: async () => '{"loaded":true,"table":"analytics_users","load_time":"0.8s"}',
         })
         .mockResolvedValueOnce({
           // send-notification
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.notifications.example.com/send',
+          headers: createMockHeaders(),
           json: async () => ({
             notification_sent: true,
             recipients: ['admin@example.com'],
           }),
+          text: async () => '{"notification_sent":true,"recipients":["admin@example.com"]}',
         });
 
       // Mock validation to pass
@@ -709,6 +756,12 @@ describe('End-to-End Workflow Execution', () => {
       const endTime = Date.now();
 
       const execution = engine.getExecution();
+
+      // Debug information
+      if (execution.status === 'failed') {
+        console.log('Execution failed with error:', execution.error);
+        console.log('Results:', execution.results);
+      }
 
       expect(execution.status).toBe('completed');
       expect(execution.results).toHaveLength(7); // All 6 nodes + start + end

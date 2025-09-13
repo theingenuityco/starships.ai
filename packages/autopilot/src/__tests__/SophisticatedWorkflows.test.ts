@@ -731,7 +731,13 @@ describe('Sophisticated Workflows', () => {
           .fn()
           .mockResolvedValueOnce({
             done: false,
-            value: new TextEncoder().encode('data: {"choices":[{"delta":{"content":"This data shows positive trends"}}]}\n\n'),
+            value: new TextEncoder().encode(
+              'data: {"id":"test-123","object":"chat.completion.chunk","created":1234567890,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"delta":{"content":"This data shows positive trends"},"finish_reason":null}]}\n\n'
+            ),
+          })
+          .mockResolvedValueOnce({
+            done: false,
+            value: new TextEncoder().encode('data: [DONE]\n\n'),
           })
           .mockResolvedValueOnce({
             done: true,
@@ -741,6 +747,10 @@ describe('Sophisticated Workflows', () => {
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        url: 'https://openrouter.ai/api/v1/chat/completions',
+        headers: new Map([['content-type', 'text/event-stream']]),
         body: { getReader: () => mockReader },
       });
 

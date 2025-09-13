@@ -6,7 +6,7 @@
  */
 
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
-import { Blueprint, Execution, NodeResult, Node as WorkflowNode } from '@/types';
+import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 
 // Dynamic imports for handlers - pure lazy loading
@@ -60,7 +60,13 @@ export class Engine {
 
     // Load handler constructor dynamically each time
     const handlerConstructor = await loader();
-    return new handlerConstructor(node.parameters, this.eventCallback);
+
+    const handlerOptions = {
+      eventCallback: this.eventCallback,
+      execution: this.execution,
+    } as NodeHandlerOptions;
+
+    return new handlerConstructor(node.parameters, handlerOptions);
   }
 
   /**

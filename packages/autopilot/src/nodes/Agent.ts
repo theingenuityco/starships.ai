@@ -8,7 +8,7 @@
 
 import { AgentMemory } from '@/memory/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { AgentParams, NodeResult, ValidationResult, ValidationError } from '@/types';
+import { AgentParams, NodeResult, ValidationResult, ValidationError, NodeHandlerOptions } from '@/types';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
 
@@ -18,7 +18,7 @@ export class Agent implements NodeHandler {
   private engine: Engine;
   private eventCallback?: EventCallback;
 
-  constructor(params: AgentParams, eventCallback: EventCallback) {
+  constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
     this.params = structuredClone(params);
 
@@ -26,7 +26,7 @@ export class Agent implements NodeHandler {
     this.memory = new AgentMemory(this.params.memoryState);
 
     // Create engine - handles all node types internally
-    this.eventCallback = eventCallback;
+    this.eventCallback = options?.eventCallback;
 
     const engincConfig = {
       blueprint: this.params.blueprint,

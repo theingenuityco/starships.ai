@@ -8,7 +8,7 @@
  */
 
 import { HttpRequest } from '@/HttpRequest';
-import { Execution, HttpRequestParams, LlmParams } from '@/types';
+import { HttpRequestParams, LlmMessage, LlmParams } from '@/types';
 import { autopilot } from './Autopilot';
 
 export interface StreamingCallbacks {
@@ -34,13 +34,6 @@ export class LLM {
   }
 
   /**
-   * Get LLM prompt
-   */
-  getPrompt(): string {
-    return this.params.prompt;
-  }
-
-  /**
    * Get LLM parameters (read-only copy)
    */
   getParameters(): LlmParams {
@@ -55,22 +48,50 @@ export class LLM {
   }
 
   /**
-   * Execute the LLM request with streaming support
+   * Execute the LLM request with automatic streaming detection
    */
-  async execute(
-    execution?: Execution,
-    streamingCallbacks?: StreamingCallbacks
-  ): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
+  async execute(config?: {
+    messages?: LlmMessage[];
+    streamingCallbacks?: StreamingCallbacks;
+  }): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
     try {
-      console.log(`Executing LLM: ${this.params.model}${this.params.stream ? ' (streaming)' : ''}`);
+      console.log(`Executing LLM: ${this.params.model} (auto-streaming)`);
 
-      // Check if streaming is enabled - rely on execution context for streaming decisions
-      const isStreamingEnabled = this.params.stream;
+      const httpParams = this.buildHttpRequestParams(config?.messages || []);
 
-      if (isStreamingEnabled) {
-        return await this.executeWithStreaming(execution, streamingCallbacks);
+      // Always request streaming from OpenRouter
+      if (httpParams.body) {
+        let body: Record<string, unknown>;
+        if (typeof httpParams.body === 'string') {
+          body = JSON.parse(httpParams.body);
+        } else if (this.isPlainObject(httpParams.body)) {
+          body = httpParams.body as unknown as Record<string, unknown>;
+        } else {
+          body = {};
+        }
+        body.stream = true;
+        httpParams.body = JSON.stringify(body);
+      }
+
+      // Make the HTTP request
+      const response = await fetch(httpParams.url, {
+        method: httpParams.method,
+        headers: httpParams.headers as Record<string, string>,
+        body: httpParams.body,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Auto-detect streaming capability
+      const reader = response.body?.getReader();
+      if (reader) {
+        // Streaming is available - process as stream
+        return await this.processStreamingResponse(reader, config?.streamingCallbacks);
       } else {
-        return await this.executeWithoutStreaming(execution);
+        // Fallback to non-streaming
+        return await this.processNonStreamingResponse(response);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -83,52 +104,23 @@ export class LLM {
   }
 
   /**
-   * Execute LLM with streaming support
+   * Process streaming response from OpenRouter
    */
-  private async executeWithStreaming(
-    execution?: Execution,
+  private async processStreamingResponse(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
     streamingCallbacks?: StreamingCallbacks
   ): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
-    const httpParams = this.buildHttpRequestParams(execution);
-
-    // Ensure streaming is enabled in request body
-    if (httpParams.body) {
-      let body: Record<string, unknown>;
-      if (typeof httpParams.body === 'string') {
-        // Parse JSON string body
-        body = JSON.parse(httpParams.body);
-      } else if (this.isPlainObject(httpParams.body)) {
-        // Use plain object directly
-        body = httpParams.body as unknown as Record<string, unknown>;
-      } else {
-        // For non-plain objects (binary data, streams, etc.), create new object
-        body = { stream: true };
-      }
-
-      body.stream = true;
-      httpParams.body = JSON.stringify(body);
-    }
-
-    let fullResponse = '';
     let usage: unknown = null;
+    let model = '';
+    let id = '';
+    let object = 'chat.completion';
+    let created = Math.floor(Date.now() / 1000);
+
+    // Track multiple choices - Map<choiceIndex, {content: string, finishReason: string | null}>
+    const choicesMap = new Map<number, { content: string; finishReason: string | null }>();
+    let primaryChoiceContent = ''; // For backward compatibility with callbacks
 
     try {
-      // Use fetch for streaming instead of HttpRequest
-      const response = await fetch(httpParams.url, {
-        method: httpParams.method,
-        headers: httpParams.headers as Record<string, string>,
-        body: JSON.stringify(httpParams.body),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body reader available');
-      }
-
       const decoder = new TextDecoder();
       let buffer = ''; // Buffer to accumulate partial data
 
@@ -156,14 +148,46 @@ export class LLM {
 
             try {
               const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content || '';
 
-              if (content) {
-                fullResponse += content;
+              // Capture metadata from first chunk
+              if (parsed.id && !id) id = parsed.id;
+              if (parsed.model && !model) model = parsed.model;
+              if (parsed.created && !created) created = parsed.created;
+              if (parsed.object) object = parsed.object;
 
-                // Emit streaming chunk via callbacks if available
-                if (streamingCallbacks?.onChunk) {
-                  await streamingCallbacks.onChunk(content, fullResponse);
+              // Process all choices in this chunk
+              if (parsed.choices && Array.isArray(parsed.choices)) {
+                for (const choice of parsed.choices) {
+                  const choiceIndex = choice.index ?? 0;
+                  const content = choice.delta?.content || '';
+                  const finishReason = choice.finish_reason || null;
+
+                  // Initialize choice if not exists
+                  if (!choicesMap.has(choiceIndex)) {
+                    choicesMap.set(choiceIndex, { content: '', finishReason: null });
+                  }
+
+                  const choiceData = choicesMap.get(choiceIndex)!;
+
+                  // Append content
+                  if (content) {
+                    choiceData.content += content;
+
+                    // Update primary choice content for callbacks (use first choice)
+                    if (choiceIndex === 0) {
+                      primaryChoiceContent = choiceData.content;
+
+                      // Emit streaming chunk via callbacks if available
+                      if (streamingCallbacks?.onChunk) {
+                        await streamingCallbacks.onChunk(content, primaryChoiceContent);
+                      }
+                    }
+                  }
+
+                  // Update finish reason
+                  if (finishReason) {
+                    choiceData.finishReason = finishReason;
+                  }
                 }
               }
 
@@ -186,14 +210,45 @@ export class LLM {
           if (data !== '[DONE]') {
             try {
               const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content || '';
 
-              if (content) {
-                fullResponse += content;
+              // Capture metadata from final chunk
+              if (parsed.id && !id) id = parsed.id;
+              if (parsed.model && !model) model = parsed.model;
+              if (parsed.created && !created) created = parsed.created;
 
-                // Emit streaming chunk via callbacks if available
-                if (streamingCallbacks?.onChunk) {
-                  await streamingCallbacks.onChunk(content, fullResponse);
+              // Process all choices in final chunk
+              if (parsed.choices && Array.isArray(parsed.choices)) {
+                for (const choice of parsed.choices) {
+                  const choiceIndex = choice.index ?? 0;
+                  const content = choice.delta?.content || '';
+                  const finishReason = choice.finish_reason || null;
+
+                  // Initialize choice if not exists
+                  if (!choicesMap.has(choiceIndex)) {
+                    choicesMap.set(choiceIndex, { content: '', finishReason: null });
+                  }
+
+                  const choiceData = choicesMap.get(choiceIndex)!;
+
+                  // Append content
+                  if (content) {
+                    choiceData.content += content;
+
+                    // Update primary choice content for callbacks (use first choice)
+                    if (choiceIndex === 0) {
+                      primaryChoiceContent = choiceData.content;
+
+                      // Emit streaming chunk via callbacks if available
+                      if (streamingCallbacks?.onChunk) {
+                        await streamingCallbacks.onChunk(content, primaryChoiceContent);
+                      }
+                    }
+                  }
+
+                  // Update finish reason
+                  if (finishReason) {
+                    choiceData.finishReason = finishReason;
+                  }
                 }
               }
 
@@ -210,15 +265,48 @@ export class LLM {
 
       // Emit completion callback if available
       if (streamingCallbacks?.onComplete) {
-        await streamingCallbacks.onComplete(fullResponse);
+        await streamingCallbacks.onComplete(primaryChoiceContent);
       }
+
+      // Reconstruct OpenRouter response structure from streaming data
+      const choices = Array.from(choicesMap.entries())
+        .sort(([a], [b]) => a - b) // Sort by choice index
+        .map(([index, choiceData]) => ({
+          index,
+          message: {
+            role: 'assistant',
+            content: choiceData.content,
+          },
+          finish_reason: choiceData.finishReason || 'stop',
+        }));
+
+      // Ensure at least one choice exists
+      if (choices.length === 0) {
+        choices.push({
+          index: 0,
+          message: {
+            role: 'assistant',
+            content: '',
+          },
+          finish_reason: 'stop',
+        });
+      }
+
+      const reconstructedResponse = {
+        id: id || `chatcmpl-${Date.now()}`,
+        object,
+        created,
+        model: model || this.params.model,
+        choices,
+        usage,
+      };
 
       return {
         status: 'completed',
         data: {
-          llmResponse: fullResponse,
-          model: this.params.model,
-          usage,
+          body: reconstructedResponse,
+          llmResponse: primaryChoiceContent || choices[0].message.content,
+          model: model || this.params.model,
           streaming: true,
         },
       };
@@ -229,33 +317,33 @@ export class LLM {
   }
 
   /**
-   * Execute LLM without streaming (original logic)
+   * Process non-streaming response from OpenRouter
    */
-  private async executeWithoutStreaming(execution?: Execution): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
-    // Create HttpRequest instance with current execution context (for memory integration)
-    const httpRequest = new HttpRequest(this.buildHttpRequestParams(execution));
+  private async processNonStreamingResponse(
+    response: Response
+  ): Promise<{ status: 'completed' | 'failed'; data?: unknown; error?: Error }> {
+    try {
+      const responseData = await response.json();
+      const llmResponse = this.extractLlmResponse(responseData);
 
-    // Delegate to HttpRequest for execution
-    const httpResult = await httpRequest.execute();
-
-    // Check if HTTP request execution was successful
-    if (httpResult.status === 'completed' && httpResult.data) {
-      const llmResponse = this.extractLlmResponse(httpResult.data.body);
+      // Extract model from response data if available
+      const responseModel =
+        typeof responseData === 'object' && responseData !== null ? ((responseData as Record<string, unknown>).model as string) : undefined;
 
       return {
         status: 'completed',
         data: {
-          ...httpResult.data,
+          body: responseData,
           llmResponse,
-          model: this.params.model,
+          model: responseModel || this.params.model,
+          streaming: false,
         },
       };
-    } else {
-      // HTTP request execution failed
-      const errorMessage = httpResult.error?.message || 'LLM request failed';
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Non-streaming processing failed';
       return {
         status: 'failed',
-        error: new Error(`LLM request failed: ${errorMessage}`),
+        error: new Error(`LLM non-streaming execution failed: ${errorMessage}`),
       };
     }
   }
@@ -263,23 +351,11 @@ export class LLM {
   /**
    * Build HttpRequest parameters for OpenRouter API
    */
-  private buildHttpRequestParams(execution?: Execution): HttpRequestParams {
+  private buildHttpRequestParams(messages: LlmMessage[]): HttpRequestParams {
     const endpoint = 'https://openrouter.ai/api/v1/chat/completions';
 
     // Get API key from Autopilot singleton, fallback to parameters for backward compatibility
     const apiKey = autopilot.getOpenRouterApiKey();
-
-    // ! Query logic to get messages from state
-    // Build messages array
-    const messages: Array<{ role: string; content: string }> = [];
-
-    console.log({ execution }, 'HISTORICAL MESSAGES not getting appended');
-
-    // Add current prompt as user message
-    messages.push({
-      role: 'user',
-      content: this.params.prompt,
-    });
 
     // Build request body
     const body = {
@@ -290,7 +366,7 @@ export class LLM {
       top_p: this.params.topP || 1.0,
       frequency_penalty: this.params.frequencyPenalty || 0,
       presence_penalty: this.params.presencePenalty || 0,
-      stream: this.params.stream || false,
+      stream: true, // Always request streaming
       // OpenRouter specific optional parameters
       transforms: [], // Can be used for prompt transforms
       route: 'fallback', // Can be 'fallback' or specific routing
@@ -344,10 +420,6 @@ export class LLM {
     // Check LLM-specific required fields
     if (!this.params.model) {
       errors.push('Model is required');
-    }
-
-    if (!this.params.prompt) {
-      errors.push('Prompt is required');
     }
 
     // Check if API key is available from Autopilot singleton
@@ -425,5 +497,12 @@ export class LLM {
     };
 
     return new LLM(updatedParams);
+  }
+
+  /**
+   * Check if value is a plain object
+   */
+  private isPlainObject(obj: unknown): boolean {
+    return typeof obj === 'object' && obj !== null && obj.constructor === Object;
   }
 }

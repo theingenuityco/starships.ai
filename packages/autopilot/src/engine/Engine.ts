@@ -5,15 +5,15 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { NodeHandler, HandlerConstructor } from '@/engine/NodeHandler';
+import { NodeHandler, NodeHandlerConstructor } from '@/engine/NodeHandler';
 import { Blueprint, Execution, NodeResult, Node as WorkflowNode } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/emitters';
 
 // Dynamic imports for handlers - pure lazy loading
-const HANDLER_MAP: Record<string, () => Promise<HandlerConstructor>> = {
-  start: () => import('@/nodes/Start').then((m) => m.Start as HandlerConstructor),
-  end: () => import('@/nodes/End').then((m) => m.End as HandlerConstructor),
-  // agent: () => import('@/nodes/handlers/AgentHandler').then((m) => m.AgentHandler),
+const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
+  start: () => import('@/nodes/Start').then((m) => m.Start as NodeHandlerConstructor),
+  end: () => import('@/nodes/End').then((m) => m.End as NodeHandlerConstructor),
+  agent: () => import('@/nodes/Agent').then((m) => m.Agent as NodeHandlerConstructor),
   // conditional: () => import('@/nodes/handlers/ConditionalHandler').then((m) => m.ConditionalHandler),
   // user_prompt: () => import('@/nodes/handlers/PromptHandler').then((m) => m.PromptHandler),
   // output: () => import('@/nodes/handlers/OutputHandler').then((m) => m.OutputHandler),

@@ -7,7 +7,12 @@
 export type ExecutionState = Record<string, unknown>;
 
 /**
- * Workflow execution
+ * Engine execution status
+ */
+export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+/**
+ * Engine execution
  *
  * This interface is serializable and contains no callback functions.
  * Streaming is handled by the Engine's injected StreamingEmitter.
@@ -16,7 +21,7 @@ export interface Execution {
   currentNodeRef?: string;
   status: ExecutionStatus;
   state: ExecutionState;
-  results: Map<string, NodeResult>;
+  results: NodeResult[];
   error?: ExecutionError;
 }
 
@@ -26,21 +31,14 @@ export interface Execution {
 export interface NodeResult {
   nodeRef: string;
   data?: unknown;
-  error?: string;
-  nextEdgeCondition?: string;
-  metadata?: Record<string, unknown>;
+  error?: unknown;
 }
-
-/**
- * Workflow execution status
- */
-export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Workflow execution error
  */
 export interface ExecutionError {
-  code: WorkflowErrorCode;
+  code: ExecutionErrorCode;
   message: string;
   nodeRef?: string;
   details?: unknown;
@@ -52,7 +50,7 @@ export interface ExecutionError {
 /**
  * Workflow error codes
  */
-export type WorkflowErrorCode =
+export type ExecutionErrorCode =
   | 'NODE_EXECUTION_FAILED'
   | 'TIMEOUT_EXCEEDED'
   | 'USER_INPUT_TIMEOUT'

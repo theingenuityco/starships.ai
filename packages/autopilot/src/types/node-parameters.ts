@@ -131,7 +131,8 @@ export interface AgentParams {
 /**
  * Start and End node parameters
  */
-export type StartEndNodeParameters = Record<string, unknown>;
+export type StartParams = Record<string, unknown>;
+export type EndParams = Record<string, unknown>;
 
 /**
  * Union type for all workflow node parameters
@@ -144,4 +145,5 @@ export type NodeParameters =
   | HttpRequestParams
   | LlmParams
   | WorkflowParams
-  | StartEndNodeParameters;
+  | StartParams
+  | EndParams;

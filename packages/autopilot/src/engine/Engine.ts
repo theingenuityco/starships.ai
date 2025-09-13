@@ -117,6 +117,9 @@ export class Engine {
       };
 
       await this.emitEvent('workflow_failed');
+
+      // Re-throw error for tests that expect it
+      throw error;
     }
   }
 
@@ -143,7 +146,15 @@ export class Engine {
 
           currentNode = nextNode;
         } else {
-          throw new Error(`Node execution failed: ${result.error}`);
+          // Node failed - set workflow status to failed and break execution
+          this.execution.status = 'failed';
+          this.execution.error = {
+            code: 'SYSTEM_ERROR',
+            message: result.error instanceof Error ? result.error.message : String(result.error),
+            timestamp: new Date().toISOString(),
+            recoverable: false,
+          };
+          break;
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
@@ -155,7 +166,15 @@ export class Engine {
         };
         this.execution.results.push(failedResult);
 
-        throw error;
+        // Set workflow status to failed and break execution
+        this.execution.status = 'failed';
+        this.execution.error = {
+          code: 'SYSTEM_ERROR',
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+          recoverable: false,
+        };
+        break;
       }
     }
 
@@ -229,9 +248,16 @@ export class Engine {
         if (boolMatchingEdge) {
           return this.blueprint.nodes.find((node) => node.ref === boolMatchingEdge.to) || null;
         }
+      } else {
+        // No conditional result, use first edge without condition or first edge
+        const defaultEdge = outgoingEdges.find((edge) => !edge.condition) || outgoingEdges[0];
+        if (defaultEdge) {
+          return this.blueprint.nodes.find((node) => node.ref === defaultEdge.to) || null;
+        }
       }
     }
 
+    // If we get here, check if current node is an end node
     const currentNode = this.blueprint.nodes.find((node) => this.execution.currentNodeRef === node.ref);
     if (currentNode?.type !== 'end') {
       throw new Error(`Engine exited unexpectedly, at Node: ${currentNode?.ref}`);

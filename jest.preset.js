@@ -19,7 +19,6 @@ module.exports = {
     '^.+\\.ts$': [
       'ts-jest',
       {
-        isolatedModules: true,
         tsconfig: {
           paths: {
             '@/*': ['src/*'],

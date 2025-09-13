@@ -154,6 +154,7 @@ export class Engine {
             timestamp: new Date().toISOString(),
             recoverable: false,
           };
+          await this.emitEvent('workflow_failed');
           break;
         }
       } catch (error) {
@@ -174,6 +175,7 @@ export class Engine {
           timestamp: new Date().toISOString(),
           recoverable: false,
         };
+        await this.emitEvent('workflow_failed');
         break;
       }
     }
@@ -197,7 +199,7 @@ export class Engine {
       // Execute the node - this returns execution with result stored
       const data = await handler.execute();
       result.data = data;
-      this.emitEvent('node_started');
+      this.emitEvent('node_completed');
     } catch (error) {
       result.error = error;
       this.emitEvent('node_failed');

@@ -35,11 +35,20 @@ describe('End-to-End Workflow Execution', () => {
       evaluate: jest.fn().mockReturnValue(true),
     });
 
-    // Default fetch mock
+    // Default fetch mock with proper structure
+    const mockHeaders = new Map([['content-type', 'application/json']]);
+    mockHeaders.forEach = jest.fn((callback) => {
+      callback('application/json', 'content-type', mockHeaders);
+    });
+
     mockFetch.mockResolvedValue({
       ok: true,
       status: 200,
+      statusText: 'OK',
+      url: 'https://api.example.com/test',
+      headers: mockHeaders,
       json: async () => ({ success: true }),
+      text: async () => '{"success":true}',
     });
   });
 
@@ -203,16 +212,33 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
+      const mockHeaders1 = new Map([['content-type', 'application/json']]);
+      mockHeaders1.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders1);
+      });
+      const mockHeaders2 = new Map([['content-type', 'application/json']]);
+      mockHeaders2.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders2);
+      });
+
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/init',
+          headers: mockHeaders1,
           json: async () => ({ initialized: true, session_id: 'TEST-SESSION-123' }),
+          text: async () => '{"initialized":true,"session_id":"TEST-SESSION-123"}',
         })
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/update',
+          headers: mockHeaders2,
           json: async () => ({ updated: true, status: 'processing' }),
+          text: async () => '{"updated":true,"status":"processing"}',
         });
 
       mockJsonata.mockReturnValue({
@@ -285,12 +311,24 @@ describe('End-to-End Workflow Execution', () => {
       };
 
       // Mock fast API responses
+      const createMockHeaders = () => {
+        const headers = new Map([['content-type', 'application/json']]);
+        headers.forEach = jest.fn((callback) => {
+          callback('application/json', 'content-type', headers);
+        });
+        return headers;
+      };
+
       const mockResponses = Array(3)
         .fill(null)
         .map((_, i) => ({
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: `https://api.example.com/fast/${i + 1}`,
+          headers: createMockHeaders(),
           json: async () => ({ api: i + 1, response_time: '10ms' }),
+          text: async () => `{"api":${i + 1},"response_time":"10ms"}`,
         }));
 
       mockFetch.mockResolvedValueOnce(mockResponses[0]).mockResolvedValueOnce(mockResponses[1]).mockResolvedValueOnce(mockResponses[2]);
@@ -344,11 +382,20 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
+      const mockHeaders1 = new Map([['content-type', 'application/json']]);
+      mockHeaders1.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders1);
+      });
+
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/test',
+          headers: mockHeaders1,
           json: async () => ({ data: 'test response' }),
+          text: async () => '{"data":"test response"}',
         })
         .mockResolvedValueOnce({
           ok: true,

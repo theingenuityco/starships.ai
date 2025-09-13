@@ -10,7 +10,7 @@ import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOption
 
 export interface ConditionalResult {
   result: unknown;
-  condition: string | boolean;
+  condition: string | boolean | number | undefined;
 }
 
 export class Conditional implements NodeHandler {
@@ -47,10 +47,14 @@ export class Conditional implements NodeHandler {
       const result = await expression.evaluate(executionContext);
 
       // Convert result to boolean or string condition
-      let condition: string | boolean;
+      let condition: string | boolean | number | undefined;
       if (typeof result === 'boolean') {
         condition = result;
       } else if (typeof result === 'string') {
+        condition = result;
+      } else if (typeof result === 'number') {
+        condition = result;
+      } else if (result === undefined || result === null) {
         condition = result;
       } else {
         condition = Boolean(result);

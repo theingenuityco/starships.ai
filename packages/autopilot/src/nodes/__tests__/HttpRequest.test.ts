@@ -437,16 +437,27 @@ describe('HttpRequest Node Handler', () => {
       const params: HttpRequestParams = {
         url: 'https://api.example.com/slow',
         method: 'GET',
-        timeout: 1000,
+        timeout: 100, // Very short timeout for quick test
       };
 
-      // Mock fetch to never resolve (simulating slow response)
-      mockFetch.mockImplementationOnce(() => new Promise(() => {}));
+      // Mock fetch to delay longer than timeout
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                ok: true,
+                status: 200,
+                json: async () => ({ delayed: true }),
+              });
+            }, 200); // Longer than timeout
+          })
+      );
 
       const httpRequest = new HttpRequest(params);
 
-      await expect(httpRequest.execute()).rejects.toThrow('HTTP request timeout after 1000ms');
-    }, 5000);
+      await expect(httpRequest.execute()).rejects.toThrow('HTTP request timeout after 100ms');
+    }, 2000);
 
     it('should handle invalid URLs', async () => {
       const params: HttpRequestParams = {

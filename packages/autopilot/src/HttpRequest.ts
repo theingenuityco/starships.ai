@@ -42,7 +42,7 @@ export class HttpRequest {
   /**
    * Get request body
    */
-  getBody(): RequestInit['body'] | undefined {
+  getBody(): string | Record<string, unknown> | null | undefined {
     return this.params.body;
   }
 
@@ -100,18 +100,8 @@ export class HttpRequest {
 
       // Use the body directly from params (already in correct fetch format)
       let body = this.params.body;
-      if (this.params.method !== 'GET' && this.params.method !== 'HEAD' && body) {
-        // Only stringify if it's a plain object (not FormData, URLSearchParams, etc.)
-        if (
-          typeof body === 'object' &&
-          !(body instanceof FormData) &&
-          !(body instanceof URLSearchParams) &&
-          !(body instanceof Blob) &&
-          !(body instanceof ArrayBuffer) &&
-          body !== null
-        ) {
-          body = JSON.stringify(body);
-        }
+      if (typeof body === 'object' && body !== null) {
+        body = JSON.stringify(body);
       }
 
       // Build fetch options using all RequestInit properties from params

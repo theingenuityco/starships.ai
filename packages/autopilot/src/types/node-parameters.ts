@@ -58,9 +58,12 @@ export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf'
  * HTTP request node parameters for making HTTP calls
  * Fully compatible with fetch RequestInit structure
  */
-export interface HttpRequestParams extends RequestInit {
+export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
   // Required URL (not part of RequestInit as it's the first parameter to fetch)
   url: string;
+
+  // Overriding body to make it a string or object
+  body?: Record<string, unknown> | string | null;
 
   // Custom properties for convenience
   timeout?: number;

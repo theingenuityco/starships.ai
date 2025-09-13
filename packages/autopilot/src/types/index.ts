@@ -15,10 +15,12 @@ export type { Edge, NodeType } from './base';
 // ===== NODE PARAMETER TYPES =====
 // Node-specific parameter definitions
 export * from './node-parameters';
+export * from './node-handler';
 
 // ===== EXECUTION TYPES =====
 // Runtime execution state and context (includes streaming types)
 export * from './execution';
+export * from './events';
 
 // ===== VALIDATION TYPES =====
 // Validation and error reporting

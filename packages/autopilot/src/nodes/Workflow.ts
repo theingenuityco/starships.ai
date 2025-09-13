@@ -33,14 +33,9 @@ export class Workflow implements NodeHandler {
    * Execute the workflow with streaming support
    */
   async execute(): Promise<NodeResult[]> {
-    try {
-      // Execute workflow through engine - it will handle streaming if configured
-      await this.engine.execute();
-      return this.engine.getExecution().results;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Workflow execution failed: ${errorMessage}`);
-    }
+    // Execute workflow through engine - it will handle streaming if configured
+    await this.engine.execute();
+    return this.engine.getExecution().results;
   }
 
   /**

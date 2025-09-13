@@ -94,21 +94,21 @@ export class AgentMemory {
    * Get agent identity
    */
   getIdentity(): AgentIdentity | undefined {
-    return this.state.identity ? { ...this.state.identity } : undefined;
+    return this.state.identity ? structuredClone(this.state.identity) : undefined;
   }
 
   /**
    * Get agent purpose
    */
   getPurpose(): AgentPurpose | undefined {
-    return this.state.purpose ? { ...this.state.purpose } : undefined;
+    return this.state.purpose ? structuredClone(this.state.purpose) : undefined;
   }
 
   /**
    * Get agent space
    */
   getSpace(): AgentSpace | undefined {
-    return this.state.space ? { ...this.state.space } : undefined;
+    return this.state.space ? structuredClone(this.state.space) : undefined;
   }
 
   /**

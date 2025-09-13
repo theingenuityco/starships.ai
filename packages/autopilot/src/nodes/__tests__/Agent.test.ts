@@ -67,11 +67,11 @@ describe('Agent Node Handler', () => {
       const eventCallback = jest.fn();
       const agent = new Agent(params, { eventCallback });
 
-      const results = await agent.execute();
+      const execution = await agent.execute();
 
-      expect(results).toHaveLength(2);
-      expect(results[0].nodeRef).toBe('start');
-      expect(results[1].nodeRef).toBe('end');
+      expect(execution.results).toHaveLength(2);
+      expect(execution.results[0].nodeRef).toBe('start');
+      expect(execution.results[1].nodeRef).toBe('end');
     });
 
     it('should handle custom agent parameters', () => {

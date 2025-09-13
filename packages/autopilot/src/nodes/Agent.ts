@@ -39,13 +39,8 @@ export class Agent implements NodeHandler {
    * Execute the agent
    */
   async execute(): Promise<NodeResult[]> {
-    try {
-      await this.engine.execute();
-      return this.engine.getExecution().results;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Agent execution failed: ${errorMessage}`);
-    }
+    await this.engine.execute();
+    return this.engine.getExecution().results;
   }
 
   /**

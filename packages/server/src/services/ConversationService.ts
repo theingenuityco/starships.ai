@@ -108,6 +108,8 @@ export class ConversationService {
 
     // Execute agent conversation with streaming
     await this.agentService.replyToConversation(agent.id, data.conversationId);
+
+    // ! RETURN messages
   }
 
   /**

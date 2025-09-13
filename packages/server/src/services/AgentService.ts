@@ -49,6 +49,7 @@ export class AgentService {
   constructor() {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
+    // ! TRANSFER logic for callbacks into AgentService itself?
     this.agentStreamingService = new AgentStreamingService();
     this.conversationService = new ConversationService();
   }
@@ -69,7 +70,7 @@ export class AgentService {
       maxTokens: data.maxTokens,
       timeout: data.timeout || 30000,
       blueprint: data.blueprint,
-      memory: data.memory,
+      memoryState: data.memoryState,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -232,7 +233,7 @@ export class AgentService {
       temperature: agentModel.temperature,
       maxTokens: agentModel.maxTokens,
       timeout: agentModel.timeout,
-      memory: agentModel.memory,
+      memoryState: agentModel.memoryState,
       blueprint: agentModel.blueprint,
       metadata: {
         id: agentModel.id,
@@ -252,7 +253,7 @@ export class AgentService {
    * Handles complete conversation lifecycle with event monitoring and message creation
    */
 
-  async replyToConversation(agentId: string, conversationId: string): Promise<ConversationResponse> {
+  async replyToConversation(agentId: string, conversationId: string): Promise<void> {
     console.log('🚀 [AGENT-SERVICE] Starting streaming conversation execution:', {
       agentId,
       conversationId,
@@ -260,7 +261,7 @@ export class AgentService {
     });
 
     // Get agent from database
-    const agentModel = await this.agentRepository.findById(agentId);
+    const agentModel = await this.getAgent(agentId);
     if (!agentModel) {
       throw new NotFoundError('Agent', agentId);
     }
@@ -278,48 +279,23 @@ export class AgentService {
     try {
       // Create agent instance with enhanced options
       const agent = new Agent(agentModel);
-
       // Inject streaming service into agent's engine
       agent.getEngine().setEmitter(this.agentStreamingService);
 
-      // Add user message to memory
-      messages.forEach((message) => {
-        agent.addToMemory(message.role, message.content);
-      });
-
       // Execute agent with streaming-enabled execution
-      const execution = await agent.execute({
+      await agent.execute({
         state: {
-          memories: {},
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
         },
       });
-
-      // Extract response from execution result
-      const response = agentService.extractResponse(execution);
-
-      // Calculate usage statistics
-      const usage = agentService.calculateUsage(execution);
-
-      // Note: incrementUsageCount functionality is not available in the updated AgentRepository
-      // This would need to be implemented in the repository
 
       const executionTime = Date.now() - startTime;
 
       console.log('✅ [AGENT-SERVICE] Streaming conversation execution completed successfully:', {
-        responseLength: response.length,
         executionTime,
-        usageStats: usage,
       });
 
-      return {
-        source: 'agent',
-        content: response,
-        agentId: agentId,
-        usage: {
-          promptTokens: Math.floor(usage.totalTokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(usage.totalTokens * 0.3), // Estimate completion tokens
-        },
-      };
+      // ! RETURN messages here
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
         agentId,

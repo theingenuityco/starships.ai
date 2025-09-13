@@ -8,7 +8,7 @@
 
 import { AgentMemory } from '@/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { AgentParams, Blueprint, Edge, Execution, Node } from '@/types';
+import { AgentParams, Blueprint, Edge, Execution, LlmMessage, Node } from '@/types';
 
 export class Agent {
   private params: AgentParams;
@@ -101,7 +101,15 @@ export class Agent {
    */
   async execute(initialExecution?: Partial<Execution>): Promise<Execution> {
     try {
-      const result = await this.engine.execute(initialExecution);
+      const execution = {
+        ...initialExecution,
+        state: {
+          ...(initialExecution?.state || {}),
+          messages: [...this.memory.getMessageHistory(), ...((initialExecution?.state?.messages as LlmMessage[]) || [])],
+        },
+      } as Partial<Execution>;
+
+      const result = await this.engine.execute(execution);
       return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

@@ -176,15 +176,31 @@ const response = await httpRequest.execute();
 import { Conditional } from '@starships/autopilot';
 
 const conditionalParams = {
-  expression: '$.user.isPremium = true', // JSONata expression
+  expression: 'state.userLevel = "premium"', // JSONata expression against execution state
   timeout: 5000,
 };
 
-const eventCallback = (event) => console.log('Conditional event:', event);
-const conditional = new Conditional(conditionalParams, eventCallback);
+const conditional = new Conditional(conditionalParams, {
+  eventCallback: (event) => console.log('Conditional event:', event),
+  execution: currentExecution, // Access to workflow state and results
+});
 const result = await conditional.execute();
 console.log('Condition result:', result.condition); // true/false or string
 ```
+
+**JSONata Expression Context:**
+
+- `state` - Current workflow execution state
+- `results` - Previous node execution results
+- `status` - Workflow execution status
+- `currentNodeRef` - Currently executing node reference
+
+**Example expressions:**
+
+- `state.user.isPremium = true` - Check state value
+- `results[-1].data.isValid` - Check last executed node result
+- `results[$ ~> $filter(function($v) { $v.nodeRef = "user_check" })][-1].data.isValid` - Get most recent result from specific node
+- `status = "running"` - Check execution status
 
 ## Memory System
 

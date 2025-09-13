@@ -440,13 +440,13 @@ describe('HttpRequest Node Handler', () => {
         timeout: 1000,
       };
 
-      // Mock fetch to never resolve
+      // Mock fetch to never resolve (simulating slow response)
       mockFetch.mockImplementationOnce(() => new Promise(() => {}));
 
       const httpRequest = new HttpRequest(params);
 
       await expect(httpRequest.execute()).rejects.toThrow('HTTP request timeout after 1000ms');
-    }, 15000);
+    }, 5000);
 
     it('should handle invalid URLs', async () => {
       const params: HttpRequestParams = {
@@ -664,10 +664,19 @@ describe('HttpRequest Node Handler', () => {
   describe('Real-world Scenarios', () => {
     it('should handle REST API CRUD operations', async () => {
       // CREATE
+      const mockHeaders = new Map([['content-type', 'application/json']]);
+      mockHeaders.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders);
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 201,
+        statusText: 'Created',
+        url: 'https://api.example.com/items',
+        headers: mockHeaders,
         json: async () => ({ id: 1, name: 'Created Item' }),
+        text: async () => '{"id":1,"name":"Created Item"}',
       });
 
       const createParams: HttpRequestParams = {
@@ -679,7 +688,13 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(createParams);
       const created = await httpRequest.execute();
 
-      expect(created).toEqual({ id: 1, name: 'Created Item' });
+      expect(created).toEqual({
+        status: 201,
+        statusText: 'Created',
+        headers: { 'content-type': 'application/json' },
+        body: { id: 1, name: 'Created Item' },
+        url: 'https://api.example.com/items',
+      });
     });
 
     it('should handle webhook-style requests', async () => {

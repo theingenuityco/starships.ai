@@ -9,16 +9,6 @@ import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
 
 /**
- * Conditional node parameters for data-driven routing
- */
-export interface ConditionalParams {
-  sourceNodeId: string;
-  expression: string;
-  conditions: Record<string, string>;
-  defaultCondition?: string;
-}
-
-/**
  * User prompt node parameters for user interaction
  */
 export interface UserPromptParams {
@@ -30,16 +20,6 @@ export interface UserPromptParams {
 }
 
 /**
- * Output node parameters for final result generation
- */
-export interface OutputParams {
-  template: string;
-  sources: string[];
-  format: OutputFormat;
-  title?: string;
-}
-
-/**
  * User prompt choice definition
  */
 export interface UserPromptChoice {
@@ -48,11 +28,6 @@ export interface UserPromptChoice {
   description?: string;
   value: unknown;
 }
-
-/**
- * Output formats for workflow results
- */
-export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf' | 'csv';
 
 /**
  * HTTP request node parameters for making HTTP calls
@@ -138,13 +113,4 @@ export type EndParams = Record<string, unknown>;
 /**
  * Union type for all workflow node parameters
  */
-export type NodeParameters =
-  | AgentParams
-  | ConditionalParams
-  | UserPromptParams
-  | OutputParams
-  | HttpRequestParams
-  | LlmParams
-  | WorkflowParams
-  | StartParams
-  | EndParams;
+export type NodeParameters = AgentParams | UserPromptParams | HttpRequestParams | LlmParams | WorkflowParams | StartParams | EndParams;

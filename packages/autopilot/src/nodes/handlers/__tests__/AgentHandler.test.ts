@@ -32,7 +32,7 @@ describe('AgentHandler', () => {
         name: 'Customer Support Agent',
         description: 'Helps customers with inquiries',
         model: 'anthropic/claude-3.5-sonnet',
-        memory: {
+        memoryState: {
           identity: {
             name: 'Customer Support Agent',
             role: 'customer support representative',
@@ -93,7 +93,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Basic Agent',
         model: 'openai/gpt-4',
-        memory: {} as AgentMemoryState,
+        memoryState: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
       } as AgentParams;
 
@@ -166,7 +166,7 @@ describe('AgentHandler', () => {
       const minimalParams = {
         name: 'Test Agent',
         model: 'openai/gpt-4',
-        memory: {} as AgentMemoryState,
+        memoryState: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
       } as AgentParams;
 
@@ -287,7 +287,7 @@ describe('AgentHandler', () => {
       const paramsWithEmptyValues = {
         name: '',
         model: '',
-        memory: {} as AgentMemoryState,
+        memoryState: {} as AgentMemoryState,
         blueprint: global.createMockBlueprint(),
       } as AgentParams;
 

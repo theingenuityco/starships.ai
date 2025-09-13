@@ -115,7 +115,7 @@ export class Workflow {
   /**
    * Execute the workflow with streaming support
    */
-  async execute(initialExecution?: Execution): Promise<Execution> {
+  async execute(initialExecution?: Partial<Execution>): Promise<Execution> {
     try {
       // Execute workflow through engine - it will handle streaming if configured
       return await this.engine.execute(initialExecution);

@@ -18,16 +18,9 @@ export interface LlmMessage {
 }
 
 /**
- * Memory state configuration for base Memory class
- * Pure state container - messages are handled separately by Memory class
- */
-export type MemoryState = Record<string, unknown>;
-
-/**
  * Memory constructor parameters
  */
-export interface MemoryParams {
-  state?: MemoryState;
+export interface MemoryState {
   messages?: LlmMessage[];
 }
 
@@ -38,30 +31,28 @@ export interface MemoryParams {
  * but provides LLM-compatible format for external consumption
  */
 export class Memory {
-  protected messages: LlmMessage[] = [];
-  protected state: MemoryState = {};
+  protected state: MemoryState;
 
-  constructor(params: MemoryParams = {}) {
-    this.state = params.state || {};
-
-    // Initialize messages if provided
-    if (params.messages && params.messages.length > 0) {
-      params.messages.forEach((message) => {
-        this.addMessage(message.role, message.content);
-      });
-    }
+  constructor(initialState: MemoryState = {}) {
+    this.state = {
+      ...initialState,
+      messages: initialState?.messages || [],
+    };
   }
 
   /**
    * Add message to memory
    */
-  addMessage(role: 'system' | 'user' | 'assistant', content: string): void {
+  addMessage(message: LlmMessage): void {
+    const { content, role } = message;
     if (content && content.trim()) {
       const message: LlmMessage = {
         role,
         content: content.trim(),
       };
-      this.messages.push(message);
+      if (Array.isArray(this.state.messages)) {
+        this.state.messages.push(message);
+      }
     }
   }
 
@@ -69,14 +60,7 @@ export class Memory {
    * Get all messages
    */
   getMessages(): LlmMessage[] {
-    return [...this.messages];
-  }
-
-  /**
-   * Get all message entries (alias for getMessages)
-   */
-  getMessageEntries(): LlmMessage[] {
-    return this.getMessages();
+    return [...(this.state.messages || [])];
   }
 
   /**
@@ -84,54 +68,5 @@ export class Memory {
    */
   toMessages(): LlmMessage[] {
     return this.getMessages();
-  }
-
-  /**
-   * Clear all messages
-   */
-  clear(): void {
-    this.messages = [];
-  }
-
-  /**
-   * Get message count
-   */
-  getMessageCount(): number {
-    return this.messages.length;
-  }
-
-  /**
-   * Get messages by role
-   */
-  getMessagesByRole(role: 'system' | 'user' | 'assistant'): LlmMessage[] {
-    return this.messages.filter((msg) => msg.role === role);
-  }
-
-  /**
-   * Get last N messages
-   */
-  getLastMessages(count: number): LlmMessage[] {
-    return this.messages.slice(-count);
-  }
-
-  /**
-   * Clone memory instance
-   */
-  clone(): Memory {
-    const cloned = new Memory();
-    cloned.messages = this.messages.map((msg) => ({ ...msg }));
-    return cloned;
-  }
-
-  /**
-   * Get memory statistics
-   */
-  getStats(): { total: number; system: number; user: number; assistant: number } {
-    const stats = { total: 0, system: 0, user: 0, assistant: 0 };
-    this.messages.forEach((msg) => {
-      stats.total++;
-      stats[msg.role]++;
-    });
-    return stats;
   }
 }

@@ -5,7 +5,7 @@
  * Built on top of the base Memory class for LLM message management
  */
 
-import { Memory, LlmMessage, MemoryState, MemoryParams } from '@/Memory';
+import { LlmMessage } from '@/Memory';
 
 /**
  * Agent identity information
@@ -36,17 +36,11 @@ export interface AgentSpace {
 /**
  * Agent memory state configuration for AgentMemory class
  */
-export interface AgentMemoryState extends MemoryState {
+export interface AgentMemoryState {
   identity?: AgentIdentity;
   purpose?: AgentPurpose;
   space?: AgentSpace;
-}
-
-/**
- * Agent memory constructor parameters
- */
-export interface AgentMemoryParams extends MemoryParams {
-  state?: AgentMemoryState;
+  messageHistory?: LlmMessage[];
 }
 
 /**
@@ -54,12 +48,14 @@ export interface AgentMemoryParams extends MemoryParams {
  *
  * Sophisticated memory system for agents with structured context management
  */
-export class AgentMemory extends Memory {
-  protected state: AgentMemoryState = {};
+export class AgentMemory {
+  state: AgentMemoryState;
 
-  constructor(params: AgentMemoryParams = {}) {
-    // Call parent constructor first
-    super(params);
+  constructor(initialState: AgentMemoryState = {}) {
+    this.state = {
+      ...initialState,
+      messageHistory: initialState?.messageHistory || [],
+    };
   }
 
   /**
@@ -87,15 +83,11 @@ export class AgentMemory extends Memory {
    * Get message history
    */
   getMessageHistory(): LlmMessage[] {
-    return super.getMessageEntries();
+    return structuredClone(this.state.messageHistory) || [];
   }
 
-  /**
-   * Get conversation history (legacy compatibility)
-   * @deprecated Use getMessageHistory instead
-   */
-  getConversationHistory(): LlmMessage[] {
-    return this.getMessageHistory();
+  addMessageToHistory(message: LlmMessage): void {
+    this.state.messageHistory?.push(message);
   }
 
   /**
@@ -134,13 +126,8 @@ export class AgentMemory extends Memory {
       });
     }
 
-    // Add all other messages (excluding system messages we'll replace)
-    const nonSystemMessages = super.getMessages().filter((msg) => msg.role !== 'system');
-    messages.push(...nonSystemMessages);
-
-    // Add any remaining system messages that aren't part of structured context
-    const remainingSystemMessages = super.getMessages().filter((msg) => msg.role === 'system');
-    messages.push(...remainingSystemMessages);
+    const messageHistory = this.getMessageHistory();
+    messages.push(...messageHistory);
 
     return messages;
   }
@@ -186,74 +173,5 @@ export class AgentMemory extends Memory {
     }
 
     return parts.length > 0 ? parts.join('\n\n') : '';
-  }
-
-  /**
-   * Clear message history only
-   */
-  clearMessages(): void {
-    // Remove conversation messages but keep system messages
-    const systemMessages = super.getMessageEntries().filter((msg) => msg.role === 'system');
-    super.clear();
-    systemMessages.forEach((msg) => super.addMessage(msg.role, msg.content));
-  }
-
-  /**
-   * Clear conversation history only (legacy compatibility)
-   * @deprecated Use clearMessages instead
-   */
-  clearConversations(): void {
-    this.clearMessages();
-  }
-
-  /**
-   * Clear all memory
-   */
-  clear(): void {
-    super.clear();
-    this.state.identity = undefined;
-    this.state.purpose = undefined;
-    this.state.space = undefined;
-  }
-
-  /**
-   * Clone memory instance with all structured data
-   */
-  clone(): AgentMemory {
-    const cloned = new AgentMemory();
-    // Copy message entries with metadata
-    super.getMessageEntries().forEach((msg) => cloned.addMessage(msg.role, msg.content));
-    // Copy agent-specific data
-    cloned.state.identity = this.state.identity ? { ...this.state.identity } : undefined;
-    cloned.state.purpose = this.state.purpose ? { ...this.state.purpose } : undefined;
-    cloned.state.space = this.state.space ? { ...this.state.space } : undefined;
-    return cloned;
-  }
-
-  /**
-   * Get basic memory statistics (compatible with base class)
-   */
-  getStats(): { total: number; system: number; user: number; assistant: number } {
-    return super.getStats();
-  }
-
-  /**
-   * Get comprehensive agent memory statistics
-   */
-  getAgentStats(): {
-    messages: { total: number; system: number; user: number; assistant: number };
-    messageEntries: number;
-    hasIdentity: boolean;
-    hasPurpose: boolean;
-    hasSpace: boolean;
-  } {
-    const messageStats = super.getStats();
-    return {
-      messages: messageStats,
-      messageEntries: super.getMessageEntries().length,
-      hasIdentity: !!this.state.identity,
-      hasPurpose: !!this.state.purpose,
-      hasSpace: !!this.state.space,
-    };
   }
 }

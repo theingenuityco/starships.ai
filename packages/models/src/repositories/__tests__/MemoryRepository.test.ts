@@ -48,7 +48,6 @@ describe('MemoryRepository', () => {
         { role: 'user', content: 'Hello' },
         { role: 'assistant', content: 'Hi there!' },
       ],
-      context: { currentTopic: 'greeting' },
     },
     ...overrides,
   });
@@ -236,7 +235,6 @@ describe('MemoryRepository', () => {
       const complexInput = createMockCreateInput({
         state: {
           messages: [{ role: 'user', content: 'test' }],
-          metadata: { complex: { nested: 'data' } },
         },
       });
       const createdMemory = {

@@ -61,8 +61,8 @@ export class AgentHandler extends BaseHandler {
       errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Agent model is required'));
     }
 
-    if (!params.memory) {
-      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Agent memory is required'));
+    if (!params.memoryState) {
+      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Agent memoryState is required'));
     }
 
     if (!params.blueprint) {
@@ -70,7 +70,7 @@ export class AgentHandler extends BaseHandler {
     } else {
       // Only do comprehensive validation if basic fields are present
       // to avoid duplicate error messages
-      if (params.name && params.model && params.memory) {
+      if (params.name && params.model && params.memoryState) {
         // Use Agent class validation for comprehensive checking
         const agent = new Agent(params);
         const agentValidation = agent.validate();

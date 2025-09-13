@@ -121,7 +121,7 @@ export class AgentRepository extends BaseRepository {
           temperature: data.temperature,
           maxTokens: data.maxTokens,
           timeout: data.timeout,
-          memory: data.memory,
+          memoryState: data.memoryState,
           blueprint: data.blueprint,
 
           // Database-specific fields

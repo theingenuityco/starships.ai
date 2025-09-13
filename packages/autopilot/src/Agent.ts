@@ -6,10 +6,9 @@
  * Memory-first architecture with AgentMemory system.
  */
 
-import { AgentMemory, AgentMemoryState } from '@/AgentMemory';
+import { AgentMemory } from '@/AgentMemory';
 import { Engine } from '@/engine/Engine';
 import { AgentParams, Blueprint, Edge, Execution, Node } from '@/types';
-import { MessageRole } from './Memory';
 
 export class Agent {
   private params: AgentParams;
@@ -21,7 +20,7 @@ export class Agent {
     this.params = structuredClone(params);
 
     // Create AgentMemory instance from config
-    this.memory = new AgentMemory({ state: params.memory });
+    this.memory = new AgentMemory(this.params.memoryState);
 
     // Create engine - handles all node types internally
     this.engine = new Engine(this.params.blueprint);
@@ -53,13 +52,6 @@ export class Agent {
    */
   getEngine(): Engine {
     return this.engine;
-  }
-
-  /**
-   * Add content to agent memory
-   */
-  addToMemory(role: MessageRole, content: string): void {
-    this.memory.addMessage(role, content);
   }
 
   /**
@@ -107,7 +99,7 @@ export class Agent {
   /**
    * Execute the agent
    */
-  async execute(initialExecution?: Execution): Promise<Execution> {
+  async execute(initialExecution?: Partial<Execution>): Promise<Execution> {
     try {
       const result = await this.engine.execute(initialExecution);
       return result;
@@ -133,7 +125,7 @@ export class Agent {
     }
 
     // Check memory is present and valid
-    if (!this.params.memory) {
+    if (!this.params.memoryState) {
       errors.push('Agent memory is required');
     } else if (!this.memory || typeof this.memory.toMessages !== 'function') {
       errors.push('Invalid agent memory instance');
@@ -185,54 +177,5 @@ export class Agent {
       valid: errors.length === 0,
       errors,
     };
-  }
-
-  /**
-   * Clone agent with the same parameters and memory
-   */
-  clone(): Agent {
-    // Convert current memory back to state for cloning
-    const memoryState: AgentMemoryState = {
-      identity: this.memory.getIdentity(),
-      purpose: this.memory.getPurpose(),
-      space: this.memory.getSpace(),
-      messages: this.memory.getMessageHistory(),
-    };
-
-    const clonedParams: AgentParams = {
-      ...this.params,
-      memory: memoryState,
-      blueprint: {
-        ...this.params.blueprint,
-        nodes: (this.params.blueprint.nodes || []).map((node) => ({ ...node })),
-        edges: (this.params.blueprint.edges || []).map((edge) => ({ ...edge })),
-      },
-    };
-
-    return new Agent(clonedParams);
-  }
-
-  /**
-   * Update agent parameters
-   */
-  updateParameters(updates: Partial<AgentParams>): Agent {
-    // Convert current memory back to state if not being updated
-    const currentMemoryState: AgentMemoryState = {
-      identity: this.memory.getIdentity(),
-      purpose: this.memory.getPurpose(),
-      space: this.memory.getSpace(),
-      messages: this.memory.getMessageHistory(),
-    };
-
-    const updatedParams = {
-      ...this.params,
-      ...updates,
-      // Use provided memory state or current memory state
-      memory: updates.memory || currentMemoryState,
-      // Preserve blueprint if not being updated
-      blueprint: updates.blueprint || this.params.blueprint,
-    };
-
-    return new Agent(updatedParams);
   }
 }

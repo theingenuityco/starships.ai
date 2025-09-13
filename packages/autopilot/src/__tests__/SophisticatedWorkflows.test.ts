@@ -397,24 +397,44 @@ describe('Sophisticated Workflows', () => {
       };
 
       // Mock API responses
+      const createMockHeaders = () => {
+        const headers = new Map([['content-type', 'application/json']]);
+        headers.forEach = jest.fn((callback) => {
+          callback('application/json', 'content-type', headers);
+        });
+        return headers;
+      };
+
       mockFetch
         .mockResolvedValueOnce({
           // prep call
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/prep',
+          headers: createMockHeaders(),
           json: async () => ({ prepared: true, id: 'prep-123' }),
+          text: async () => '{"prepared":true,"id":"prep-123"}',
         })
         .mockResolvedValueOnce({
           // inner workflow call
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/inner',
+          headers: createMockHeaders(),
           json: async () => ({ inner: true, data: 'inner-data' }),
+          text: async () => '{"inner":true,"data":"inner-data"}',
         })
         .mockResolvedValueOnce({
           // finalize call
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/finalize',
+          headers: createMockHeaders(),
           json: async () => ({ finalized: true, result: 'success' }),
+          text: async () => '{"finalized":true,"result":"success"}',
         });
 
       const engine = new Engine({ blueprint: outerWorkflow });
@@ -572,30 +592,54 @@ describe('Sophisticated Workflows', () => {
       };
 
       // Mock sequence: data-prep -> validate (success) -> success handler -> process
+      const createMockHeaders = () => {
+        const headers = new Map([['content-type', 'application/json']]);
+        headers.forEach = jest.fn((callback) => {
+          callback('application/json', 'content-type', headers);
+        });
+        return headers;
+      };
+
       mockFetch
         .mockResolvedValueOnce({
           // data-prep
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/data-prep',
+          headers: createMockHeaders(),
           json: async () => ({ prepared: true, stage: 'ready' }),
+          text: async () => '{"prepared":true,"stage":"ready"}',
         })
         .mockResolvedValueOnce({
           // validate
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/validate',
+          headers: createMockHeaders(),
           json: async () => ({ valid: true, checks: 'passed' }),
+          text: async () => '{"valid":true,"checks":"passed"}',
         })
         .mockResolvedValueOnce({
           // success handler
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/success',
+          headers: createMockHeaders(),
           json: async () => ({ success: true, message: 'validation passed' }),
+          text: async () => '{"success":true,"message":"validation passed"}',
         })
         .mockResolvedValueOnce({
           // process
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/process',
+          headers: createMockHeaders(),
           json: async () => ({ processed: true, result: 'completed' }),
+          text: async () => '{"processed":true,"result":"completed"}',
         });
 
       // Mock conditionals to return success path
@@ -719,10 +763,19 @@ describe('Sophisticated Workflows', () => {
       };
 
       // Mock data fetch
+      const mockHeaders1 = new Map([['content-type', 'application/json']]);
+      mockHeaders1.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders1);
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/input-data',
+        headers: mockHeaders1,
         json: async () => ({ data: 'sample input for analysis', timestamp: Date.now() }),
+        text: async () => '{"data":"sample input for analysis","timestamp":1234567890}',
       });
 
       // Mock LLM streaming response for agent
@@ -755,10 +808,19 @@ describe('Sophisticated Workflows', () => {
       });
 
       // Mock positive action response
+      const mockHeaders2 = new Map([['content-type', 'application/json']]);
+      mockHeaders2.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders2);
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/positive-action',
+        headers: mockHeaders2,
         json: async () => ({ action: 'positive', applied: true }),
+        text: async () => '{"action":"positive","applied":true}',
       });
 
       // Mock conditional to return 'positive' (matching the positive analysis)
@@ -872,29 +934,45 @@ describe('Sophisticated Workflows', () => {
       };
 
       // Mock initial API failure, then successful retry
+      const createMockHeaders = () => {
+        const headers = new Map([['content-type', 'application/json']]);
+        headers.forEach = jest.fn((callback) => {
+          callback('application/json', 'content-type', headers);
+        });
+        return headers;
+      };
+
       mockFetch
         .mockRejectedValueOnce(new Error('Service unavailable')) // risky-api fails
         .mockResolvedValueOnce({
           // retry-api succeeds
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/unreliable-retry',
+          headers: createMockHeaders(),
           json: async () => ({ retry: true, data: 'recovered data' }),
+          text: async () => '{"retry":true,"data":"recovered data"}',
         })
         .mockResolvedValueOnce({
           // recovery-path
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: 'https://api.example.com/recovery',
+          headers: createMockHeaders(),
           json: async () => ({ recovered: true, status: 'handled' }),
+          text: async () => '{"recovered":true,"status":"handled"}',
         });
 
       // Mock conditionals: first false (error), second true (retry success)
       let conditionCallCount = 0;
-      mockJsonata.mockReturnValue({
+      mockJsonata.mockImplementation(() => ({
         evaluate: jest.fn().mockImplementation(() => {
           conditionCallCount++;
           return conditionCallCount === 1 ? false : true; // First fails, second succeeds
         }),
-      });
+      }));
 
       const engine = new Engine({ blueprint });
       await engine.execute();
@@ -956,10 +1034,19 @@ describe('Sophisticated Workflows', () => {
 
       // Mock all API calls to succeed quickly
       for (let i = 1; i <= 20; i++) {
+        const mockHeaders = new Map([['content-type', 'application/json']]);
+        mockHeaders.forEach = jest.fn((callback) => {
+          callback('application/json', 'content-type', mockHeaders);
+        });
+
         mockFetch.mockResolvedValueOnce({
           ok: true,
           status: 200,
+          statusText: 'OK',
+          url: `https://api.example.com/step-${i}`,
+          headers: mockHeaders,
           json: async () => ({ step: i, completed: true, timestamp: Date.now() }),
+          text: async () => `{"step":${i},"completed":true,"timestamp":${Date.now()}}`,
         });
       }
 

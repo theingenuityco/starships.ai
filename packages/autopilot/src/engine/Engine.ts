@@ -136,8 +136,9 @@ export class Engine {
 
         // Execute the node - this now returns updated execution with result stored
         const result = await this.executeNode(currentNode);
+
         if (!result.error) {
-          // Find next node
+          // Node succeeded - continue normal execution
           const nextNode = this.getNextNode();
 
           if (!nextNode) {
@@ -146,16 +147,24 @@ export class Engine {
 
           currentNode = nextNode;
         } else {
-          // Node failed - set workflow status to failed and break execution
-          this.execution.status = 'failed';
-          this.execution.error = {
-            code: 'SYSTEM_ERROR',
-            message: result.error instanceof Error ? result.error.message : String(result.error),
-            timestamp: new Date().toISOString(),
-            recoverable: false,
-          };
-          await this.emitEvent('workflow_failed');
-          break;
+          // Node failed - check if there's error recovery logic
+          const nextNode = this.getNextNode();
+
+          if (nextNode && this.hasErrorRecoveryPath(currentNode.ref)) {
+            // There's a next node and error recovery logic, continue execution
+            currentNode = nextNode;
+          } else {
+            // No error recovery - fail the workflow
+            this.execution.status = 'failed';
+            this.execution.error = {
+              code: 'SYSTEM_ERROR',
+              message: result.error instanceof Error ? result.error.message : String(result.error),
+              timestamp: new Date().toISOString(),
+              recoverable: false,
+            };
+            await this.emitEvent('workflow_failed');
+            break;
+          }
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
@@ -336,6 +345,28 @@ export class Engine {
 
   getExecution() {
     return this.execution;
+  }
+
+  /**
+   * Check if there are conditional nodes that can handle errors from the given node
+   */
+  private hasErrorRecoveryPath(nodeRef: string): boolean {
+    // Look for outgoing edges from this node
+    const outgoingEdges = this.blueprint.edges.filter((edge) => edge.from === nodeRef);
+
+    if (outgoingEdges.length === 0) {
+      return false;
+    }
+
+    // Check if any of the target nodes are conditional nodes
+    for (const edge of outgoingEdges) {
+      const targetNode = this.blueprint.nodes.find((node) => node.ref === edge.to);
+      if (targetNode && targetNode.type === 'conditional') {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

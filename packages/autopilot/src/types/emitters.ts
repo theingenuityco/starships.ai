@@ -11,7 +11,9 @@ import { Execution } from './execution';
 export interface LLMEvent {
   type: 'content_chunk' | 'content_complete';
   timestamp: string;
-  data: Record<string, unknown>;
+  data?: {
+    chunk?: Record<string, unknown>;
+  };
 }
 
 export type ExecutionEventType =
@@ -30,7 +32,7 @@ export type ExecutionEventType =
 export interface ExecutionEvent {
   type: ExecutionEventType;
   timestamp: string;
-  data: {
+  data?: {
     execution: Execution;
   };
 }

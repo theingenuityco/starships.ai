@@ -71,10 +71,10 @@ export class LlmHandler extends BaseHandler {
     const llm = new LLM(params);
     const llmValidation = llm.validate();
 
-    // Convert LLM validation results to handler format
+    // LLM validation already returns ValidationError objects, so pass them through
     return {
       valid: llmValidation.valid,
-      errors: llmValidation.errors.map((error) => this.createValidationError('VALIDATION_FAILED', error)),
+      errors: llmValidation.errors || [],
       warnings: [],
       suggestions: [],
     };

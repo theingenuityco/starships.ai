@@ -16,10 +16,10 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   agent: () => import('@/nodes/Agent').then((m) => m.Agent as NodeHandlerConstructor),
   workflow: () => import('@/nodes/Workflow').then((m) => m.Workflow as NodeHandlerConstructor),
   http_request: () => import('@/nodes/HttpRequest').then((m) => m.HttpRequest as NodeHandlerConstructor),
+  // llm: () => import('@/nodes/handlers/LlmHandler').then((m) => m.LlmHandler),
   // conditional: () => import('@/nodes/handlers/ConditionalHandler').then((m) => m.ConditionalHandler),
   // user_prompt: () => import('@/nodes/handlers/PromptHandler').then((m) => m.PromptHandler),
   // output: () => import('@/nodes/handlers/OutputHandler').then((m) => m.OutputHandler),
-  // llm: () => import('@/nodes/handlers/LlmHandler').then((m) => m.LlmHandler),
 };
 
 export interface EngineConfig {

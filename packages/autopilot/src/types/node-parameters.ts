@@ -75,6 +75,7 @@ export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
  */
 export interface LlmParams {
   model: string;
+  messages: { role: string; content: string }[];
   temperature?: number;
   maxTokens?: number;
   timeout?: number;

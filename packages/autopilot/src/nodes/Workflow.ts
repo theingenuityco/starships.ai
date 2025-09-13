@@ -7,7 +7,7 @@
  */
 
 import { Engine, EngineConfig } from '@/engine/Engine';
-import { NodeHandlerOptions, NodeResult, ValidationResult, WorkflowParams } from '@/types';
+import { Execution, NodeHandlerOptions, ValidationResult, WorkflowParams } from '@/types';
 import { ValidationError } from '@/types/validation';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
@@ -32,10 +32,10 @@ export class Workflow implements NodeHandler {
   /**
    * Execute the workflow with streaming support
    */
-  async execute(): Promise<NodeResult[]> {
+  async execute(): Promise<Execution> {
     // Execute workflow through engine - it will handle streaming if configured
     await this.engine.execute();
-    return this.engine.getExecution().results;
+    return this.engine.getExecution();
   }
 
   /**

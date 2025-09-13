@@ -8,7 +8,7 @@
 
 import { AgentMemory } from '@/memory/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { AgentParams, NodeResult, ValidationResult, ValidationError, NodeHandlerOptions } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, Execution } from '@/types';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
 
@@ -38,9 +38,9 @@ export class Agent implements NodeHandler {
   /**
    * Execute the agent
    */
-  async execute(): Promise<NodeResult[]> {
+  async execute(): Promise<Execution> {
     await this.engine.execute();
-    return this.engine.getExecution().results;
+    return this.engine.getExecution();
   }
 
   /**

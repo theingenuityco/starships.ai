@@ -5,7 +5,7 @@
  * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-import type { AgentMemoryState } from '@/AgentMemory';
+import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
 
 /**

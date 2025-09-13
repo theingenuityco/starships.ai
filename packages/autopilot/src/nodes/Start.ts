@@ -1,4 +1,4 @@
-import { NodeHandler } from '@/engine/NodeHandler';
+import { NodeHandler } from '@/types/node-handler';
 import { StartParams, ValidationResult } from '@/types';
 
 export class Start implements NodeHandler {

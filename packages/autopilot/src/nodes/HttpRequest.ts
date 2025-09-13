@@ -6,7 +6,7 @@
  */
 
 import { HttpRequestParams, ValidationResult, ValidationError } from '@/types';
-import { NodeHandler } from '@/engine/NodeHandler';
+import { NodeHandler } from '@/types/node-handler';
 
 export interface HttpResponse {
   status: number;

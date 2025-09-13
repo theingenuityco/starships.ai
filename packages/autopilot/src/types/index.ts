@@ -26,10 +26,10 @@ export * from './validation';
 
 // ===== MEMORY SYSTEM =====
 // Base memory types only (no classes)
-export type { LlmMessage } from '@/Memory';
+export type { LlmMessage } from '@/memory/Memory';
 
 // Agent memory types only (no classes)
-export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from '@/AgentMemory';
+export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from '@/memory/AgentMemory';
 
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)

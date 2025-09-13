@@ -9,8 +9,8 @@
 import { Engine, EngineConfig } from '@/engine/Engine';
 import { NodeResult, ValidationResult, WorkflowParams } from '@/types';
 import { ValidationError } from '@/types/validation';
-import { EventCallback } from '@/types/emitters';
-import { NodeHandler } from '@/engine/NodeHandler';
+import { EventCallback } from '@/types/events';
+import { NodeHandler } from '@/types/node-handler';
 
 export class Workflow implements NodeHandler {
   private params: WorkflowParams;

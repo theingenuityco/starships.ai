@@ -5,19 +5,22 @@
  * Uses BaseHandler pattern
  */
 
-import { BaseHandler } from '@/nodes/Handler';
-import { ConditionalParams, Execution, NodeResult, ValidationError, ValidationResult } from '@/types';
+import { NodeHandler } from '@/types/node-handler';
+import { ConditionalParams, NodeResult, ValidationError, ValidationResult } from '@/types';
 import jsonata from 'jsonata';
 
-export class ConditionalHandler extends BaseHandler {
-  readonly type = 'conditional';
+export class Conditional implements NodeHandler {
+  private params: ConditionalParams;
 
-  async execute(execution: Execution) {
-    const params = this.node.parameters as ConditionalParams;
+  constructor(params: ConditionalParams) {
+    this.params = params;
+  }
+
+  async execute(): Promise<> {
     // Get data from source node
-    const sourceResult = execution.results.get(params.sourceNodeId);
+    const sourceResult = execution.results.get(this.params.sourceNodeId);
     if (!sourceResult) {
-      throw new Error(`Source node ${params.sourceNodeId} not found in execution results`);
+      throw new Error(`Source node ${this.params.sourceNodeId} not found in execution results`);
     }
 
     try {
@@ -83,12 +86,6 @@ export class ConditionalHandler extends BaseHandler {
     return {
       valid: errors.length === 0,
       errors,
-      warnings: [],
-      suggestions: [],
     };
-  }
-
-  getIcon(): string {
-    return 'git-branch';
   }
 }

@@ -5,9 +5,9 @@
  * state management, error recovery, and user interaction coordination.
  */
 
-import { NodeHandler, NodeHandlerConstructor } from '@/engine/NodeHandler';
+import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
 import { Blueprint, Execution, NodeResult, Node as WorkflowNode } from '@/types';
-import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/emitters';
+import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
@@ -17,9 +17,8 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   workflow: () => import('@/nodes/Workflow').then((m) => m.Workflow as NodeHandlerConstructor),
   http_request: () => import('@/nodes/HttpRequest').then((m) => m.HttpRequest as NodeHandlerConstructor),
   llm: () => import('@/nodes/LLM').then((m) => m.LLM as NodeHandlerConstructor),
-  // conditional: () => import('@/nodes/handlers/ConditionalHandler').then((m) => m.ConditionalHandler),
-  // user_prompt: () => import('@/nodes/handlers/PromptHandler').then((m) => m.PromptHandler),
-  // output: () => import('@/nodes/handlers/OutputHandler').then((m) => m.OutputHandler),
+  user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
+  conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {

@@ -42,18 +42,3 @@ export type AutopilotEvent = ExecutionEvent | LLMEvent;
 export interface EventCallback {
   (event: AutopilotEvent): Promise<void>;
 }
-
-// /**
-//  * Interface for external streaming implementations
-//  */
-// export interface EngineEmitter {
-//   /**
-//    * Handle execution event from autopilot engine
-//    */
-//   emitExecutionEvent(event: ExecutionEvent): Promise<void>;
-
-//   /**
-//    * Check if streaming is currently enabled
-//    */
-//   isEnabled(): boolean;
-// }

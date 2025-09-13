@@ -7,10 +7,10 @@
 
 import type { LlmParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
-import type { LlmMessage, MessageRole } from '@/Memory';
+import type { LlmMessage, MessageRole } from '@/memory/Memory';
 import { autopilot } from '@/Autopilot';
-import { NodeHandler } from '@/engine/NodeHandler';
-import { EventCallback } from '@/types/emitters';
+import { NodeHandler } from '@/types/node-handler';
+import { EventCallback } from '@/types/events';
 
 export interface LLMUsage {
   prompt_tokens: number;

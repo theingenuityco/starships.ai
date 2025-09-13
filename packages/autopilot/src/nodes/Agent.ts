@@ -6,11 +6,11 @@
  * Memory-first architecture with AgentMemory system.
  */
 
-import { AgentMemory } from '@/AgentMemory';
+import { AgentMemory } from '@/memory/AgentMemory';
 import { Engine } from '@/engine/Engine';
 import { AgentParams, NodeResult, ValidationResult, ValidationError } from '@/types';
-import { EventCallback } from '@/types/emitters';
-import { NodeHandler } from '@/engine/NodeHandler';
+import { EventCallback } from '@/types/events';
+import { NodeHandler } from '@/types/node-handler';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;

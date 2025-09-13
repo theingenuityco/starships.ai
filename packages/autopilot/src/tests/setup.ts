@@ -2,7 +2,7 @@
  * Jest setup file for autopilot package tests
  */
 
-import { AgentMemory } from '@/AgentMemory';
+import { AgentMemory } from '@/memory/AgentMemory';
 import type { Blueprint, Execution, Node } from '@/types';
 
 // Mock nanoid for consistent ID generation in tests

@@ -105,6 +105,14 @@ export interface AgentParams {
 }
 
 /**
+ * Conditional node parameters for branching logic
+ */
+export interface ConditionalParams {
+  expression: string; // JSONata expression to evaluate
+  timeout?: number;
+}
+
+/**
  * Start and End node parameters
  */
 export type StartParams = Record<string, unknown>;
@@ -113,4 +121,12 @@ export type EndParams = Record<string, unknown>;
 /**
  * Union type for all workflow node parameters
  */
-export type NodeParameters = AgentParams | UserPromptParams | HttpRequestParams | LlmParams | WorkflowParams | StartParams | EndParams;
+export type NodeParameters =
+  | AgentParams
+  | UserPromptParams
+  | HttpRequestParams
+  | LlmParams
+  | WorkflowParams
+  | StartParams
+  | EndParams
+  | ConditionalParams;

@@ -170,6 +170,22 @@ const httpRequest = new HttpRequest(httpParams);
 const response = await httpRequest.execute();
 ```
 
+#### Conditional Node
+
+```typescript
+import { Conditional } from '@starships/autopilot';
+
+const conditionalParams = {
+  expression: '$.user.isPremium = true', // JSONata expression
+  timeout: 5000,
+};
+
+const eventCallback = (event) => console.log('Conditional event:', event);
+const conditional = new Conditional(conditionalParams, eventCallback);
+const result = await conditional.execute();
+console.log('Condition result:', result.condition); // true/false or string
+```
+
 ## Memory System
 
 Autopilot includes a simple memory system for managing AI interactions:
@@ -232,6 +248,7 @@ The engine supports these node types through dynamic loading:
 - **llm** - Large Language Model interactions via OpenRouter
 - **http_request** - HTTP API calls with full fetch API support
 - **user_prompt** - Interactive user input (implementation varies by platform)
+- **conditional** - JSONata expression evaluation for workflow branching
 
 ## API Reference
 
@@ -242,7 +259,7 @@ The engine supports these node types through dynamic loading:
 export { Engine } from '@starships/autopilot';
 
 // Node handlers
-export { Workflow, LLM, HttpRequest, Agent } from '@starships/autopilot';
+export { Workflow, LLM, HttpRequest, Agent, Conditional } from '@starships/autopilot';
 
 // Memory system
 export { Memory, AgentMemory } from '@starships/autopilot';

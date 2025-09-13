@@ -20,7 +20,6 @@ export interface ValidationError {
   message: string;
   nodeRef?: string;
   edgeRef?: string;
-  severity: 'error' | 'warning';
   details?: unknown;
 }
 

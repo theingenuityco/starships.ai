@@ -22,7 +22,7 @@ export interface NodeHandler {
 /**
  * Constructor type for handlers that accept the full node object
  */
-export type HandlerConstructor = new (params: NodeParameters, callback?: EventCallback) => NodeHandler;
+export type NodeHandlerConstructor = new (params: NodeParameters, callback?: EventCallback) => NodeHandler;
 
 // /**
 //  * Abstract base class for handlers with common functionality

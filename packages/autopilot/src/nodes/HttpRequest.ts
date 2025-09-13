@@ -60,61 +60,76 @@ export class HttpRequest implements NodeHandler {
     const timeout = this.params.timeout || 30000;
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    // Use the body directly from params (already in correct fetch format)
-    let body = this.params.body;
-    if (typeof body === 'object' && body !== null) {
-      body = JSON.stringify(body);
-    }
-
-    // Build fetch options using all RequestInit properties from params
-    const fetchOptions = {
-      method: this.params.method,
-      headers,
-      body,
-      signal: controller.signal,
-      mode: this.params.mode,
-      credentials: this.params.credentials,
-      cache: this.params.cache,
-      redirect: this.params.redirect || ('follow' as const),
-      referrer: this.params.referrer,
-      referrerPolicy: this.params.referrerPolicy,
-      integrity: this.params.integrity,
-      keepalive: this.params.keepalive,
-    };
-
-    // Execute request
-    const response = await fetch(this.params.url, fetchOptions);
-
-    // Clear timeout
-    clearTimeout(timeoutId);
-
-    // Parse response body
-    let responseBody: unknown;
-    const contentType = response.headers.get('content-type');
-
-    if (contentType?.includes('application/json')) {
-      try {
-        responseBody = await response.json();
-      } catch {
-        responseBody = await response.text();
+    try {
+      // Use the body directly from params (already in correct fetch format)
+      let body = this.params.body;
+      if (typeof body === 'object' && body !== null) {
+        body = JSON.stringify(body);
       }
-    } else {
-      responseBody = await response.text();
+
+      // Build fetch options using all RequestInit properties from params
+      const fetchOptions = {
+        method: this.params.method,
+        headers,
+        body,
+        signal: controller.signal,
+        mode: this.params.mode,
+        credentials: this.params.credentials,
+        cache: this.params.cache,
+        redirect: this.params.redirect || ('follow' as const),
+        referrer: this.params.referrer,
+        referrerPolicy: this.params.referrerPolicy,
+        integrity: this.params.integrity,
+        keepalive: this.params.keepalive,
+      };
+
+      try {
+        // Execute request with proper error handling
+        const response = await fetch(this.params.url, fetchOptions);
+
+        // Handle HTTP error status codes
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // Parse response body
+        let responseBody: unknown;
+        const contentType = response.headers.get('content-type');
+
+        if (contentType?.includes('application/json')) {
+          try {
+            responseBody = await response.json();
+          } catch {
+            responseBody = await response.text();
+          }
+        } else {
+          responseBody = await response.text();
+        }
+
+        // Convert headers to object
+        const responseHeaders: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
+        });
+
+        return {
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+          body: responseBody,
+          url: response.url,
+        };
+      } catch (error) {
+        // Handle fetch errors and timeout
+        if (controller.signal.aborted) {
+          throw new Error(`HTTP request timeout after ${timeout}ms`);
+        }
+        throw new Error(`HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    } finally {
+      // Always clear timeout to prevent open handles
+      clearTimeout(timeoutId);
     }
-
-    // Convert headers to object
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
-
-    return {
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders,
-      body: responseBody,
-      url: response.url,
-    };
   }
 
   /**

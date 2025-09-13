@@ -9,8 +9,11 @@ import type { ConditionalParams } from '@/types/node-parameters';
 import type { Execution } from '@/types';
 
 // Mock jsonata library
-const mockJsonata = jest.fn();
-jest.mock('jsonata', () => mockJsonata);
+jest.mock('jsonata');
+
+import jsonata from 'jsonata';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockJsonata = jsonata as jest.MockedFunction<any>;
 
 describe('Conditional Node Handler', () => {
   const mockExecution: Execution = {

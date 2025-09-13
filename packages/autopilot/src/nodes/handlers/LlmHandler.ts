@@ -1,134 +1,81 @@
 /**
  * LLM Node Handler
  *
- * Executes LLM with direct LLM class instantiation
- * Uses BaseHandler pattern
+ * Simple wrapper around LLM class - delegates all logic to LLM
+ * Handles only streaming emitter integration
  */
 
 import { LLM } from '@/LLM';
 import { BaseHandler } from '@/nodes/Handler';
-import { Execution, LlmParams, ValidationError, ValidationResult, ValidationWarning } from '@/types';
-import type { EngineEmitter } from '@/types/emitters';
+import { Execution, LlmParams, ValidationResult } from '@/types';
+import { EventCallback } from '@/types/emitters';
 
 export class LlmHandler extends BaseHandler {
   readonly type = 'llm';
-  private streamingEmitter?: EngineEmitter;
+  private eventCallback?: EventCallback;
 
   /**
    * Set streaming emitter for content streaming
    */
-  setStreamingEmitter(emitter?: EngineEmitter): void {
-    this.streamingEmitter = emitter;
+  setStreamingEmitter(cb?: EventCallback): void {
+    this.eventCallback = cb;
   }
 
   async execute(execution: Execution) {
     const params = this.node.parameters as LlmParams;
 
-    try {
-      console.log(`Executing LLM: ${params.model}`);
+    // Create LLM instance and execute - delegate all logic to LLM
+    const llm = new LLM(params);
+    const llmResult = await llm.execute({
+      streamingCallbacks: this.createStreamingCallbacks(execution, params),
+    });
 
-      // Create streaming callbacks if streaming emitter is available
-      const streamingCallbacks = this.streamingEmitter
-        ? {
-            onChunk: async (content: string, accumulated: string) => {
-              if (this.streamingEmitter) {
-                await this.streamingEmitter.emitExecutionEvent({
-                  type: 'content_chunk',
-                  execution,
-                  timestamp: new Date().toISOString(),
-                  content,
-                  contentMetadata: {
-                    accumulated,
-                    isComplete: false,
-                    nodeRef: this.node.ref,
-                    model: params.model,
-                  },
-                });
-              }
-            },
-            onComplete: async (finalContent: string) => {
-              if (this.streamingEmitter) {
-                await this.streamingEmitter.emitExecutionEvent({
-                  type: 'content_complete',
-                  execution,
-                  timestamp: new Date().toISOString(),
-                  content: finalContent,
-                  contentMetadata: {
-                    accumulated: finalContent,
-                    isComplete: true,
-                    nodeRef: this.node.ref,
-                    model: params.model,
-                  },
-                });
-              }
-            },
-          }
-        : undefined;
-
-      // Create LLM instance from the full parameters and execute
-      const llm = new LLM(params);
-      const llmResult = await llm.execute({
-        streamingCallbacks,
-      });
-
-      // Check if LLM execution was successful
-      if (llmResult.status === 'completed') {
-        const baseData = llmResult.data && typeof llmResult.data === 'object' ? (llmResult.data as Record<string, unknown>) : {};
-        return this.createSuccessResult(execution, {
-          ...baseData,
-          output: `LLM ${params.model} completed successfully`,
-        });
-      } else {
-        // LLM execution failed
-        const errorMessage = llmResult.error?.message || 'LLM execution failed';
-        return this.createErrorResult(execution, `LLM ${params.model} execution failed: ${errorMessage}`);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return this.createErrorResult(execution, `LLM ${params.model} execution failed: ${errorMessage}`);
+    // Simple result mapping - no additional logic
+    if (llmResult.status === 'completed') {
+      const baseData = llmResult.data && typeof llmResult.data === 'object' ? (llmResult.data as Record<string, unknown>) : {};
+      return this.createSuccessResult(execution, baseData);
+    } else {
+      return this.createErrorResult(execution, llmResult.error?.message || 'LLM execution failed');
     }
   }
 
-  validate(): ValidationResult {
-    const errors: ValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
-    const params = this.node.parameters as LlmParams;
-
-    // Check for required fields first
-    if (!params.model) {
-      errors.push(this.createValidationError('MISSING_REQUIRED_FIELD', 'Model is required'));
-    }
-
-    // Only do comprehensive validation if basic fields are present
-    // to avoid duplicate error messages
-    if (params.model) {
-      // Use LLM class validation for comprehensive checking
-      const llm = new LLM(params);
-      const llmValidation = llm.validate();
-
-      if (!llmValidation.valid) {
-        llmValidation.errors.forEach((error) => {
-          // Skip errors we already caught above
-          if (!error.includes('Model is required')) {
-            errors.push(this.createValidationError('VALIDATION_FAILED', error));
-          }
-        });
-      }
-    }
-
-    // Warnings for common issues
-    if (params.maxTokens && params.maxTokens > 4000) {
-      warnings.push(this.createValidationWarning('LARGE_WORKFLOW_SIZE', 'High token count may result in expensive API calls'));
-    }
-
-    if (params.timeout && params.timeout < 10000) {
-      warnings.push(this.createValidationWarning('POTENTIAL_TIMEOUT', 'LLM requests may take longer than the specified timeout'));
-    }
+  /**
+   * Create streaming callbacks for emitter integration
+   */
+  private createStreamingCallbacks(execution: Execution, params: LlmParams) {
+    if (!this.eventCallback) return undefined;
 
     return {
-      valid: errors.length === 0,
-      errors,
-      warnings,
+      onChunk: async (content: string, accumulated: string) => {
+        await this.eventCallback({
+          type: 'content_chunk',
+          execution,
+          timestamp: new Date().toISOString(),
+        });
+      },
+      onComplete: async (finalContent: string) => {
+        await this.eventCallback({
+          type: 'content_complete',
+          execution,
+          timestamp: new Date().toISOString(),
+          content: finalContent,
+        });
+      },
+    };
+  }
+
+  validate(): ValidationResult {
+    const params = this.node.parameters as LlmParams;
+
+    // Delegate validation entirely to LLM class
+    const llm = new LLM(params);
+    const llmValidation = llm.validate();
+
+    // Convert LLM validation results to handler format
+    return {
+      valid: llmValidation.valid,
+      errors: llmValidation.errors.map((error) => this.createValidationError('VALIDATION_FAILED', error)),
+      warnings: [],
       suggestions: [],
     };
   }

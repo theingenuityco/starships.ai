@@ -8,43 +8,50 @@
 
 import { Execution } from './execution';
 
+export interface LLMEvent {
+  type: 'content_chunk' | 'content_complete';
+  timestamp: string;
+  data: Record<string, unknown>;
+}
+
+export type ExecutionEventType =
+  | 'workflow_started'
+  | 'node_started'
+  | 'node_completed'
+  | 'node_failed'
+  | 'workflow_paused'
+  | 'workflow_resumed'
+  | 'workflow_completed'
+  | 'workflow_failed';
+
 /**
  * Events that can be emitted during workflow execution
  */
 export interface ExecutionEvent {
-  type:
-    | 'workflow_started'
-    | 'node_started'
-    | 'node_completed'
-    | 'node_failed'
-    | 'workflow_paused'
-    | 'workflow_resumed'
-    | 'workflow_completed'
-    | 'workflow_failed'
-    | 'content_chunk'
-    | 'content_complete';
-  execution: Execution;
+  type: ExecutionEventType;
   timestamp: string;
-  content?: string; // For streaming content chunks
-  contentMetadata?: {
-    accumulated?: string;
-    isComplete?: boolean;
-    nodeRef?: string;
-    model?: string;
+  data: {
+    execution: Execution;
   };
 }
 
-/**
- * Interface for external streaming implementations
- */
-export interface EngineEmitter {
-  /**
-   * Handle execution event from autopilot engine
-   */
-  emitExecutionEvent(event: ExecutionEvent): Promise<void>;
+export type AutopilotEvent = ExecutionEvent | LLMEvent;
 
-  /**
-   * Check if streaming is currently enabled
-   */
-  isEnabled(): boolean;
+export interface EventCallback {
+  (event: AutopilotEvent): Promise<void>;
 }
+
+// /**
+//  * Interface for external streaming implementations
+//  */
+// export interface EngineEmitter {
+//   /**
+//    * Handle execution event from autopilot engine
+//    */
+//   emitExecutionEvent(event: ExecutionEvent): Promise<void>;
+
+//   /**
+//    * Check if streaming is currently enabled
+//    */
+//   isEnabled(): boolean;
+// }

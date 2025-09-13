@@ -8,14 +8,17 @@
 
 import { AgentMemory } from '@/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { AgentParams, Blueprint, Edge, Execution, LlmMessage, Node } from '@/types';
+import { AgentParams, NodeResult, ValidationResult } from '@/types';
+import { EventCallback } from '@/types/emitters';
+import { NodeHandler } from '@/engine/NodeHandler';
 
-export class Agent {
+export class Agent implements NodeHandler {
   private params: AgentParams;
   private memory: AgentMemory;
   private engine: Engine;
+  private eventCallback?: EventCallback;
 
-  constructor(params: AgentParams) {
+  constructor(params: AgentParams, eventCallback: EventCallback) {
     // Store agent parameters
     this.params = structuredClone(params);
 
@@ -23,94 +26,22 @@ export class Agent {
     this.memory = new AgentMemory(this.params.memoryState);
 
     // Create engine - handles all node types internally
-    this.engine = new Engine(this.params.blueprint);
-  }
+    this.eventCallback = eventCallback;
 
-  /**
-   * Get agent name
-   */
-  getName(): string {
-    return this.params.name;
-  }
-
-  /**
-   * Get agent model
-   */
-  getModel(): string {
-    return this.params.model;
-  }
-
-  /**
-   * Get agent memory
-   */
-  getMemory(): AgentMemory {
-    return this.memory;
-  }
-
-  /**
-   * Get agent engine (for external configuration like streaming)
-   */
-  getEngine(): Engine {
-    return this.engine;
-  }
-
-  /**
-   * Get agent description
-   */
-  getDescription(): string | undefined {
-    return this.params.description;
-  }
-
-  /**
-   * Get agent parameters (read-only copy)
-   */
-  getParameters(): AgentParams {
-    return JSON.parse(JSON.stringify(this.params));
-  }
-
-  /**
-   * Get agent timeout
-   */
-  getTimeout(): number | undefined {
-    return this.params.timeout;
-  }
-
-  /**
-   * Get agent blueprint (read-only copy)
-   */
-  getBlueprint(): Blueprint {
-    return JSON.parse(JSON.stringify(this.params.blueprint));
-  }
-
-  /**
-   * Get agent nodes
-   */
-  getNodes(): Node[] {
-    return [...(this.params.blueprint.nodes || [])];
-  }
-
-  /**
-   * Get agent edges
-   */
-  getEdges(): Edge[] {
-    return [...(this.params.blueprint.edges || [])];
+    const engincConfig = {
+      blueprint: this.params.blueprint,
+      eventCallback: this.eventCallback,
+    };
+    this.engine = new Engine(engincConfig);
   }
 
   /**
    * Execute the agent
    */
-  async execute(initialExecution?: Partial<Execution>): Promise<Execution> {
+  async execute(): Promise<NodeResult[]> {
     try {
-      const execution = {
-        ...initialExecution,
-        state: {
-          ...(initialExecution?.state || {}),
-          messages: [...this.memory.getMessageHistory(), ...((initialExecution?.state?.messages as LlmMessage[]) || [])],
-        },
-      } as Partial<Execution>;
-
-      const result = await this.engine.execute(execution);
-      return result;
+      await this.engine.execute();
+      return this.engine.getExecution().results;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Agent execution failed: ${errorMessage}`);
@@ -120,7 +51,7 @@ export class Agent {
   /**
    * Validate agent structure and configuration
    */
-  validate(): { valid: boolean; errors: string[] } {
+  validate(): ValidationResult {
     const errors: string[] = [];
 
     // Check required agent fields

@@ -18,7 +18,6 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   http_request: () => import('@/nodes/HttpRequest').then((m) => m.HttpRequest as NodeHandlerConstructor),
   llm: () => import('@/nodes/LLM').then((m) => m.LLM as NodeHandlerConstructor),
   user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
-  conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {

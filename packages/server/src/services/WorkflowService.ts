@@ -329,7 +329,7 @@ export class WorkflowService {
 
       // Create agent memory for execution context
       const agentMemory = new AgentMemory();
-      agentMemory.addMessage('system', 'Workflow execution context');
+      agentMemory.addMessageToHistory({ role: 'system', content: 'Workflow execution context' });
 
       // Create initial execution context
       const initialExecution: Execution = {

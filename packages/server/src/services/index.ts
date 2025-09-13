@@ -10,7 +10,6 @@ export { UserService } from './UserService';
 
 // Core data management services
 export { ConversationService } from './ConversationService';
-export { MemoryService } from './MemoryService';
 export { MessageService } from './MessageService';
 
 // Migrated services from @starships/models

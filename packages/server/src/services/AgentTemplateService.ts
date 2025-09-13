@@ -532,7 +532,7 @@ export class AgentTemplateService {
         icon: '🤖',
         previewPrompts: ['Help me plan my day', 'Explain quantum computing in simple terms', 'What are some healthy meal ideas?'],
         blueprint: this.createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.7, 2000),
-        memory: this.createMemoryConfig(
+        memoryState: this.createMemoryConfig(
           'General Assistant',
           'general',
           'Assist users with general questions and provide helpful information',
@@ -561,7 +561,7 @@ export class AgentTemplateService {
           'Check this SQL query for security issues',
         ],
         blueprint: this.createCodeReviewBlueprint(),
-        memory: this.createMemoryConfig(
+        memoryState: this.createMemoryConfig(
           'Code Reviewer',
           'coding',
           'Provide comprehensive, constructive code reviews to improve software quality',
@@ -589,7 +589,7 @@ export class AgentTemplateService {
           'Give me ideas for a sci-fi short story',
         ],
         blueprint: this.createCreativeWritingBlueprint(),
-        memory: this.createMemoryConfig(
+        memoryState: this.createMemoryConfig(
           'Creative Writer',
           'creative',
           'Create engaging, original content through a structured creative process',
@@ -617,7 +617,7 @@ export class AgentTemplateService {
           'Help me interpret these survey results',
         ],
         blueprint: this.createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.4, 2500),
-        memory: this.createMemoryConfig(
+        memoryState: this.createMemoryConfig(
           'Data Analyst',
           'analysis',
           'Provide data analysis, statistical insights, and visualization recommendations',
@@ -641,7 +641,7 @@ export class AgentTemplateService {
         icon: '🎧',
         previewPrompts: ['I need help with my account', 'How do I return a product?', "My order hasn't arrived yet"],
         blueprint: this.createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.6, 2000),
-        memory: this.createMemoryConfig(
+        memoryState: this.createMemoryConfig(
           'Support Specialist',
           'support',
           'Resolve customer issues efficiently while maintaining high satisfaction levels',
@@ -670,7 +670,7 @@ export class AgentTemplateService {
           'What should I do first as a new captain?',
         ],
         blueprint: this.createStarshipNavigatorBlueprint(),
-        memory: this.createSibylMemoryConfig(),
+        memoryState: this.createSibylMemoryConfig(),
         executionMode: 'workflow',
         timeout: 45000,
       },

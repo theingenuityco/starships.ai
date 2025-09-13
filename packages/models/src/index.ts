@@ -20,7 +20,6 @@ export { BlueprintRepository } from './repositories/BlueprintRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EdgeRepository } from './repositories/EdgeRepository';
 export { ExecutionRepository } from './repositories/ExecutionRepository';
-export { MemoryRepository } from './repositories/MemoryRepository';
 export { MessageRepository } from './repositories/MessageRepository';
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 export { NodeRepository } from './repositories/NodeRepository';

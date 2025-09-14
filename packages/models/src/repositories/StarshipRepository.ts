@@ -14,7 +14,7 @@ export class StarshipRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
-        return result.map((record) => StarshipEntity.deserialize(record.s));
+        return result.map((record) => StarshipEntity.deserialize(record.s as unknown as Record<string, unknown>));
       },
       'findAll',
       'Starship'
@@ -27,7 +27,7 @@ export class StarshipRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id });
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.deserialize(starship) : null;
+        return starship ? StarshipEntity.deserialize(starship as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Starship',
@@ -44,7 +44,7 @@ export class StarshipRepository extends BaseRepository {
           { slug, ownerId }
         );
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.deserialize(starship) : null;
+        return starship ? StarshipEntity.deserialize(starship as unknown as Record<string, unknown>) : null;
       },
       'findBySlug',
       'Starship',
@@ -60,7 +60,7 @@ export class StarshipRepository extends BaseRepository {
           'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
           { ownerId }
         );
-        return result.map((record) => StarshipEntity.deserialize(record.s));
+        return result.map((record) => StarshipEntity.deserialize(record.s as unknown as Record<string, unknown>));
       },
       'findByOwner',
       'Starship'
@@ -68,21 +68,15 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'maxActiveMissions' | 'updatedAt' | 'slug'> & { slug?: string }
+    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'maxAgents' | 'updatedAt' | 'slug'> & { slug?: string }
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate using Entity
-        await StarshipEntity.validate(entity, 'create');
-
         const connection = this.getConnection();
         const now = new Date().toISOString();
 
         // Set maxAgents based on class (Scout: 3, Cruiser: 5, Draught: 10)
         const maxAgents = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 5 : 10;
-
-        // Set maxActiveMissions based on class (Scout: 3, Cruiser: 6, Draught: 10)
-        const maxActiveMissions = entity.class === 'scout' ? 3 : entity.class === 'cruiser' ? 6 : 10;
 
         // Generate unique slug if not provided
         const slug = entity.slug || (await this.generateUniqueSlug(entity.name, entity.ownerId));
@@ -91,11 +85,13 @@ export class StarshipRepository extends BaseRepository {
           ...entity,
           slug,
           maxAgents,
-          maxActiveMissions,
           status: entity.status || 'active', // Default to active
           createdAt: now,
           updatedAt: now,
         };
+
+        // Validate using Entity after all fields are populated
+        await StarshipEntity.validate(starshipData, 'create');
 
         // Transform using Entity
         const starshipEntity = StarshipEntity.deserialize(starshipData);
@@ -114,7 +110,7 @@ export class StarshipRepository extends BaseRepository {
           }
         );
 
-        return StarshipEntity.deserialize(starship);
+        return StarshipEntity.deserialize(starship as unknown as Record<string, unknown>);
       },
       'create',
       'Starship'
@@ -148,7 +144,7 @@ export class StarshipRepository extends BaseRepository {
         );
 
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.deserialize(starship) : null;
+        return starship ? StarshipEntity.deserialize(starship as unknown as Record<string, unknown>) : null;
       },
       'update',
       'Starship',
@@ -340,7 +336,7 @@ export class StarshipRepository extends BaseRepository {
     const connection = this.getConnection();
 
     let query = 'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId';
-    const params: Record<string, any> = { slug, ownerId };
+    const params: Record<string, unknown> = { slug, ownerId };
 
     if (excludeId) {
       query += ' AND s.id <> $excludeId';
@@ -496,13 +492,13 @@ export class StarshipRepository extends BaseRepository {
   }
 
   /** Get all memories for a starship using Neo4j relationships */
-  async getMemories(starshipId: string): Promise<any[]> {
+  async getMemories(starshipId: string): Promise<Record<string, unknown>[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
     const connection = this.getConnection();
-    const result = await connection.executeQuery<{ m: any }>(
+    const result = await connection.executeQuery<{ m: Record<string, unknown> }>(
       `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)
        RETURN m ORDER BY m.createdAt DESC`,
       { starshipId }
@@ -556,15 +552,15 @@ export class StarshipRepository extends BaseRepository {
   }
 
   /** Get all conversations for a starship using Neo4j relationships */
-  async getConversations(starshipId: string): Promise<any[]> {
+  async getConversations(starshipId: string): Promise<Record<string, unknown>[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
     const connection = this.getConnection();
-    const result = await connection.executeQuery<{ c: any }>(
+    const result = await connection.executeQuery<{ c: Record<string, unknown> }>(
       `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
-       RETURN c ORDER BY c.lastActivityAt DESC`,
+       RETURN c ORDER BY c.createdAt DESC`,
       { starshipId }
     );
 
@@ -596,16 +592,16 @@ export class StarshipRepository extends BaseRepository {
    * @param starshipId - The starship ID
    * @returns Array of active conversations
    */
-  async getActiveConversations(starshipId: string): Promise<any[]> {
+  async getActiveConversations(starshipId: string): Promise<Record<string, unknown>[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
     const connection = this.getConnection();
-    const result = await connection.executeQuery<{ c: any }>(
+    const result = await connection.executeQuery<{ c: Record<string, unknown> }>(
       `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
        WHERE c.status = 'active'
-       RETURN c ORDER BY c.lastActivityAt DESC`,
+       RETURN c ORDER BY c.createdAt DESC`,
       { starshipId }
     );
 

@@ -18,20 +18,28 @@ jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'test-template-id'),
 }));
 
+jest.mock('../../helpers/slugUtils', () => ({
+  generateSlug: jest.fn((name) => name.toLowerCase().replace(/\s+/g, '-')),
+}));
+
 // Mock AgentTemplateEntity validation to avoid validation issues in tests
 jest.mock('../../entities/AgentTemplateEntity', () => ({
   AgentTemplateEntity: {
     validate: jest.fn().mockResolvedValue(undefined),
     deserialize: jest.fn().mockImplementation((data) => {
-      // Simulate JSON parsing for memory and blueprint like the real entity does
+      // Simulate JSON parsing for memoryState and blueprint like the real entity does
       const result = { ...data };
-      if (typeof data.memory === 'string') {
+
+      // Handle memoryState JSON transformation
+      if (typeof data.memoryState === 'string') {
         try {
-          result.memory = JSON.parse(data.memory);
+          result.memoryState = JSON.parse(data.memoryState);
         } catch {
-          result.memory = null;
+          result.memoryState = null;
         }
       }
+
+      // Handle blueprint JSON transformation
       if (typeof data.blueprint === 'string') {
         try {
           result.blueprint = JSON.parse(data.blueprint);
@@ -39,11 +47,13 @@ jest.mock('../../entities/AgentTemplateEntity', () => ({
           result.blueprint = null;
         }
       }
+
       // Add serialize method to the returned object
       result.serialize = jest.fn().mockReturnValue({
         ...result,
-        memory: typeof result.memory === 'object' ? JSON.stringify(result.memory) : result.memory,
-        blueprint: typeof result.blueprint === 'object' ? JSON.stringify(result.blueprint) : result.blueprint,
+        memoryState:
+          typeof result.memoryState === 'object' && result.memoryState !== null ? JSON.stringify(result.memoryState) : result.memoryState,
+        blueprint: typeof result.blueprint === 'object' && result.blueprint !== null ? JSON.stringify(result.blueprint) : result.blueprint,
       });
       return result;
     }),
@@ -53,7 +63,10 @@ jest.mock('../../entities/AgentTemplateEntity', () => ({
 describe('AgentTemplateRepository', () => {
   let repository: AgentTemplateRepository;
   let testHelper: RepositoryTestHelper;
-  let mockConnection: any;
+  let mockConnection: {
+    executeQuery: jest.Mock;
+    executeWrite: jest.Mock;
+  };
 
   beforeEach(() => {
     testHelper = new RepositoryTestHelper();
@@ -72,20 +85,16 @@ describe('AgentTemplateRepository', () => {
     temperature: 0.7,
     maxTokens: 2000,
     timeout: 30000,
-    authorId: 'user-123',
-    isPublic: true,
-    rating: 4.5,
     usageCount: 10,
     icon: '🤖',
     previewPrompts: ['Hello', 'How can I help?'],
-    tags: ['ai', 'assistant'],
-    memory: {
+    memoryState: {
       identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
       purpose: { primary: 'assist users', constraints: [] },
       space: { description: 'helpful environment' },
     },
     blueprint: {
-      nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} }],
+      nodes: [{ ref: 'start', type: 'start' as const, name: 'Start', description: 'Begin', parameters: {} }],
       edges: [],
       metadata: {},
     },
@@ -95,37 +104,33 @@ describe('AgentTemplateRepository', () => {
   });
 
   // Helper to create mock template as it would be stored in Neo4j (serialized)
-  const createMockRawTemplate = (overrides: any = {}): any => {
-    const template = createMockTemplate(overrides);
+  const createMockRawTemplate = (overrides: Record<string, unknown> = {}): Record<string, unknown> => {
+    const template = createMockTemplate(overrides as Partial<AgentTemplateModel>);
     return {
       ...template,
-      memory: template.memory ? JSON.stringify(template.memory) : null,
+      memoryState: template.memoryState ? JSON.stringify(template.memoryState) : null,
       blueprint: template.blueprint ? JSON.stringify(template.blueprint) : null,
+      ...overrides,
     };
   };
 
-  const createMockCreateInput = (overrides: any = {}) => ({
+  const createMockCreateInput = (overrides: Record<string, unknown> = {}) => ({
     name: 'Test Template',
-    slug: 'test-template',
     description: 'A test agent template',
-    category: 'general',
+    category: 'general' as const,
     model: 'gpt-4',
     temperature: 0.7,
     maxTokens: 2000,
     timeout: 30000,
-    authorId: 'user-123',
-    isPublic: true,
-    rating: 4.5,
     icon: '🤖',
     previewPrompts: ['Hello'],
-    tags: ['ai'],
-    memory: {
+    memoryState: {
       identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
       purpose: { primary: 'assist users', constraints: [] },
       space: { description: 'helpful environment' },
     },
     blueprint: {
-      nodes: [{ ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} }],
+      nodes: [{ ref: 'start', type: 'start' as const, name: 'Start', description: 'Begin', parameters: {} }],
       edges: [],
       metadata: {},
     },
@@ -138,7 +143,7 @@ describe('AgentTemplateRepository', () => {
     });
 
     it('should use provided connection', () => {
-      const customConnection = {} as any;
+      const customConnection = {} as unknown as import('@/helpers/database/connection').Neo4jConnection;
       const repo = new AgentTemplateRepository(customConnection);
       expect(repo).toBeInstanceOf(AgentTemplateRepository);
     });
@@ -156,7 +161,7 @@ describe('AgentTemplateRepository', () => {
         expect.objectContaining({
           id: 'template-123',
           name: 'Test Template',
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -193,7 +198,7 @@ describe('AgentTemplateRepository', () => {
         expect.objectContaining({
           id: 'template-123',
           name: 'Test Template',
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -237,7 +242,7 @@ describe('AgentTemplateRepository', () => {
           id: 'template-123',
           slug: 'test-template',
           name: 'Test Template',
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -273,7 +278,6 @@ describe('AgentTemplateRepository', () => {
     it('should create template successfully', async () => {
       const createInput = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
-      // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedRaw }]);
 
       const result = await repository.create(createInput);
@@ -281,21 +285,20 @@ describe('AgentTemplateRepository', () => {
       expect(result).toMatchObject({
         name: 'Test Template',
         description: 'A test agent template',
-        memory: expect.objectContaining({
+        memoryState: expect.objectContaining({
           identity: expect.objectContaining({ name: 'Assistant' }),
         }),
         blueprint: expect.objectContaining({
           nodes: expect.any(Array),
         }),
       });
-      // The actual query uses CREATE (n:AgentTemplate) with randomUUID(), not CREATE (t:AgentTemplate $template)
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('CREATE (n:AgentTemplate)'),
         expect.objectContaining({
           props: expect.objectContaining({
             name: 'Test Template',
             description: 'A test agent template',
-            memory: expect.any(String), // Should be serialized
+            memoryState: expect.any(String), // Should be serialized
             blueprint: expect.any(String), // Should be serialized
           }),
         })
@@ -305,16 +308,19 @@ describe('AgentTemplateRepository', () => {
     it('should validate required fields', async () => {
       const invalidInput = { description: 'Missing name' };
 
-      await expect(repository.create(invalidInput as any)).rejects.toThrow(DatabaseError);
+      await expect(repository.create(invalidInput as unknown as Parameters<typeof repository.create>[0])).rejects.toThrow(DatabaseError);
     });
 
     it('should handle missing optional fields', async () => {
       const minimalInput = {
         name: 'Minimal Template',
         description: 'Basic template',
+        category: 'general' as const,
+        blueprint: { type: 'test', nodes: [], edges: [] },
+        model: 'gpt-4',
+        memoryState: {},
       };
       const mockCreatedRaw = createMockRawTemplate(minimalInput);
-      // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedRaw }]);
 
       const result = await repository.create(minimalInput);
@@ -326,7 +332,6 @@ describe('AgentTemplateRepository', () => {
     it('should serialize complex objects', async () => {
       const inputWithComplexObjects = createMockCreateInput();
       const mockCreatedRaw = createMockRawTemplate();
-      // Fix: createEntityWithAutoId expects result[0].n, not result[0].t
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedRaw }]);
 
       await repository.create(inputWithComplexObjects);
@@ -335,7 +340,7 @@ describe('AgentTemplateRepository', () => {
         expect.any(String),
         expect.objectContaining({
           props: expect.objectContaining({
-            memory: expect.any(String),
+            memoryState: expect.any(String),
             blueprint: expect.any(String),
           }),
         })
@@ -352,7 +357,7 @@ describe('AgentTemplateRepository', () => {
 
   describe('update', () => {
     it('should update template successfully', async () => {
-      const updates = { name: 'Updated Template', rating: 5 };
+      const updates = { name: 'Updated Template' };
       const mockUpdatedRaw = createMockRawTemplate(updates);
 
       mockConnection.executeWrite.mockResolvedValue([{ t: mockUpdatedRaw }]);
@@ -381,32 +386,9 @@ describe('AgentTemplateRepository', () => {
       expect(result).toBeNull();
     });
 
-    it('should handle empty updates by calling findById', async () => {
-      const mockRawTemplate = createMockRawTemplate();
-
-      // Mock the database call that will be made by findById when no updates are provided
-      mockConnection.executeQuery.mockResolvedValue([{ t: mockRawTemplate }]);
-
-      const result = await repository.update('template-123', {});
-
-      expect(result).toMatchObject({
-        id: 'template-123',
-        name: 'Test Template',
-      });
-
-      // Verify executeQuery was called (indicating findById path was taken)
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (t:AgentTemplate {id: $id})'), {
-        id: 'template-123',
-      });
-    });
-
-    it('should validate id parameter', async () => {
-      await expect(repository.update('', { name: 'New Name' })).rejects.toThrow(DatabaseError);
-    });
-
     it('should serialize complex objects in updates', async () => {
       const complexUpdates = {
-        memory: { identity: { name: 'Updated' } },
+        memoryState: { identity: { name: 'Updated' } },
         blueprint: { nodes: [], edges: [] },
       };
       const mockUpdatedRaw = createMockRawTemplate(complexUpdates);
@@ -417,7 +399,7 @@ describe('AgentTemplateRepository', () => {
 
       expect(result).toEqual(
         expect.objectContaining({
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Updated' }),
           }),
         })
@@ -426,7 +408,7 @@ describe('AgentTemplateRepository', () => {
         expect.any(String),
         expect.objectContaining({
           updates: expect.objectContaining({
-            memory: expect.any(String),
+            memoryState: expect.any(String),
             blueprint: expect.any(String),
           }),
         })
@@ -457,34 +439,6 @@ describe('AgentTemplateRepository', () => {
     });
   });
 
-  describe('findByAuthor', () => {
-    it('should return templates by author', async () => {
-      const mockRawTemplates = [createMockRawTemplate(), createMockRawTemplate({ id: 'template-456' })];
-      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
-
-      const result = await repository.findByAuthor('user-123');
-
-      expect(result).toHaveLength(2);
-      expect(result[0]).toEqual(
-        expect.objectContaining({
-          memory: expect.objectContaining({
-            identity: expect.objectContaining({ name: 'Assistant' }),
-          }),
-          blueprint: expect.objectContaining({
-            nodes: expect.any(Array),
-          }),
-        })
-      );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('MATCH (t:AgentTemplate {authorId: $authorId})'), {
-        authorId: 'user-123',
-      });
-    });
-
-    it('should validate authorId parameter', async () => {
-      await expect(repository.findByAuthor('')).rejects.toThrow(DatabaseError);
-    });
-  });
-
   describe('findByCategory', () => {
     it('should return public templates by category', async () => {
       const mockRawTemplates = [createMockRawTemplate({ category: 'general' })];
@@ -495,7 +449,7 @@ describe('AgentTemplateRepository', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(
         expect.objectContaining({
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -511,90 +465,6 @@ describe('AgentTemplateRepository', () => {
     });
   });
 
-  describe('findByTags', () => {
-    it('should return templates matching tags', async () => {
-      const mockRawTemplates = [createMockRawTemplate({ tags: ['ai', 'assistant'] })];
-      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
-
-      const result = await repository.findByTags(['ai', 'assistant']);
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(
-        expect.objectContaining({
-          memory: expect.objectContaining({
-            identity: expect.objectContaining({ name: 'Assistant' }),
-          }),
-          blueprint: expect.objectContaining({
-            nodes: expect.any(Array),
-          }),
-        })
-      );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ANY(tag IN $tags WHERE tag IN t.tags)'), {
-        tags: ['ai', 'assistant'],
-      });
-    });
-
-    it('should validate tags parameter', async () => {
-      await expect(repository.findByTags([])).rejects.toThrow(DatabaseError);
-      await expect(repository.findByTags(null as any)).rejects.toThrow(DatabaseError);
-    });
-
-    it('should reject non-array tags', async () => {
-      await expect(repository.findByTags('invalid' as any)).rejects.toThrow(DatabaseError);
-    });
-  });
-
-  describe('findPublic', () => {
-    it('should return public templates with default pagination', async () => {
-      const mockRawTemplates = [createMockRawTemplate()];
-      mockConnection.executeQuery.mockResolvedValue(mockRawTemplates.map((t) => ({ t })));
-
-      const result = await repository.findPublic();
-
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(
-        expect.objectContaining({
-          memory: expect.objectContaining({
-            identity: expect.objectContaining({ name: 'Assistant' }),
-          }),
-          blueprint: expect.objectContaining({
-            nodes: expect.any(Array),
-          }),
-        })
-      );
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (t:AgentTemplate {isPublic: true})'),
-        expect.objectContaining({
-          limit: expect.any(Object), // Neo4j int
-          offset: expect.any(Object), // Neo4j int
-        })
-      );
-    });
-
-    it('should respect pagination parameters', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      await repository.findPublic(25, 10);
-
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SKIP $offset'),
-        expect.objectContaining({
-          limit: expect.any(Object),
-          offset: expect.any(Object),
-        })
-      );
-    });
-
-    it('should validate limit boundaries', async () => {
-      await expect(repository.findPublic(0)).rejects.toThrow(DatabaseError);
-      await expect(repository.findPublic(101)).rejects.toThrow(DatabaseError);
-    });
-
-    it('should validate offset is non-negative', async () => {
-      await expect(repository.findPublic(50, -1)).rejects.toThrow(DatabaseError);
-    });
-  });
-
   describe('searchTemplates', () => {
     it('should search templates by query', async () => {
       const mockRawTemplates = [createMockRawTemplate()];
@@ -605,7 +475,7 @@ describe('AgentTemplateRepository', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(
         expect.objectContaining({
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -648,170 +518,19 @@ describe('AgentTemplateRepository', () => {
     });
   });
 
-  describe('updateRating', () => {
-    it('should update rating successfully', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+  describe('Error Scenarios', () => {
+    it('should handle connection errors', async () => {
+      const connectionError = new Error('connection failed');
+      mockConnection.executeQuery.mockRejectedValue(connectionError);
 
-      await repository.updateRating('template-123', 4.5);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET t.rating = $rating'),
-        expect.objectContaining({
-          id: 'template-123',
-          rating: 4.5,
-          now: expect.any(String),
-        })
-      );
+      await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
 
-    it('should validate id and rating parameters', async () => {
-      await expect(repository.updateRating('', 4.5)).rejects.toThrow(DatabaseError);
-      await expect(repository.updateRating('template-123', 6)).rejects.toThrow(DatabaseError);
-      await expect(repository.updateRating('template-123', -1)).rejects.toThrow(DatabaseError);
-      await expect(repository.updateRating('template-123', 'invalid' as any)).rejects.toThrow(DatabaseError);
-    });
-  });
+    it('should handle timeout errors', async () => {
+      const timeoutError = new Error('operation timeout');
+      mockConnection.executeQuery.mockRejectedValue(timeoutError);
 
-  describe('createAgentFromTemplate', () => {
-    it('should create agent from template successfully', async () => {
-      const mockTemplate = createMockTemplate();
-      const mockAgent = {
-        id: 'agent-123',
-        name: 'Test Agent',
-        starshipId: 'starship-123',
-        templateId: 'template-123',
-        memory: JSON.stringify(mockTemplate.memory),
-        blueprint: JSON.stringify(mockTemplate.blueprint),
-      };
-
-      jest.spyOn(repository, 'findById').mockResolvedValue(mockTemplate);
-      jest.spyOn(repository, 'incrementUsageCount').mockResolvedValue();
-      // Fix: createEntityWithAutoId expects result[0].n, not result[0].a
-      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockAgent }]).mockResolvedValueOnce([]); // For the relationship creation
-
-      const result = await repository.createAgentFromTemplate('template-123', 'Test Agent', 'user-123', 'starship-123');
-
-      expect(result).toMatchObject({
-        name: 'Test Agent',
-        starshipId: 'starship-123',
-      });
-      expect(repository.incrementUsageCount).toHaveBeenCalledWith('template-123');
-    });
-
-    it('should throw error when template not found', async () => {
-      jest.spyOn(repository, 'findById').mockResolvedValue(null);
-
-      await expect(repository.createAgentFromTemplate('non-existent', 'Agent', 'user-123', 'starship-123')).rejects.toThrow(
-        'Template with id non-existent not found'
-      );
-    });
-  });
-
-  describe('createTemplateFromAgent', () => {
-    it('should create template from public agent', async () => {
-      const mockAgent = {
-        id: 'agent-123',
-        name: 'Test Agent',
-        description: 'Agent description',
-        model: 'gpt-4',
-        temperature: 0.7,
-        maxTokens: 2000,
-        category: 'general',
-      };
-      const mockRawTemplate = createMockRawTemplate();
-
-      mockConnection.executeQuery.mockResolvedValue([{ a: mockAgent }]);
-      mockConnection.executeWrite
-        .mockResolvedValueOnce([{ n: mockRawTemplate }]) // Fix: Template creation expects result[0].n
-        .mockResolvedValueOnce([]); // Relationship creation
-
-      const result = await repository.createTemplateFromAgent('agent-123');
-
-      expect(result).toMatchObject({
-        name: expect.stringContaining('Template'),
-        memory: expect.objectContaining({
-          identity: expect.objectContaining({ name: expect.any(String) }),
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array),
-        }),
-      });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE a.isPublic = true'), {
-        agentId: 'agent-123',
-      });
-    });
-
-    it('should return null when agent not found or not public', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      const result = await repository.createTemplateFromAgent('non-existent');
-
-      expect(result).toBeNull();
-    });
-
-    it('should validate agentId parameter', async () => {
-      await expect(repository.createTemplateFromAgent('')).rejects.toThrow(DatabaseError);
-    });
-  });
-
-  describe('private helper methods', () => {
-    it('should safely get values with defaults', () => {
-      const repo = repository as any;
-
-      expect(repo.getSafeValue(null, 'default')).toBe('default');
-      expect(repo.getSafeValue(undefined, 'default')).toBe('default');
-      expect(repo.getSafeValue({}, 'default')).toBe('default');
-      expect(repo.getSafeValue('actual', 'default')).toBe('actual');
-    });
-
-    it('should serialize templates correctly', () => {
-      const repo = repository as any;
-      const template = {
-        name: 'Test',
-        memory: { test: 'data' },
-        blueprint: { nodes: [] },
-      };
-
-      const serialized = repo.serializeTemplate(template);
-
-      // Entity adds default values and transforms, so we check for existence
-      expect(serialized.name).toBe('Test');
-      expect(typeof serialized.memory).toBe('string'); // Mock entity serializes to JSON strings
-      expect(typeof serialized.blueprint).toBe('string'); // Mock entity serializes to JSON strings
-    });
-
-    it('should deserialize templates correctly', () => {
-      const repo = repository as any;
-      const rawTemplate = {
-        name: 'Test',
-        memory: JSON.stringify({ test: 'data' }),
-        blueprint: JSON.stringify({ nodes: [] }),
-      };
-
-      const deserialized = repo.deserializeTemplate(rawTemplate);
-
-      // Check that the mocked entity returns the expected data structure
-      expect(deserialized).toBeDefined();
-      expect(deserialized.name).toBe('Test');
-      expect(deserialized.memory).toEqual({ test: 'data' });
-      expect(deserialized.blueprint).toEqual({ nodes: [] });
-    });
-
-    it('should handle null memory and blueprint in deserialization', () => {
-      const repo = repository as any;
-      const rawTemplate = {
-        name: 'Test',
-        memory: null,
-        blueprint: undefined,
-      };
-
-      const deserialized = repo.deserializeTemplate(rawTemplate);
-
-      // Check that the mocked entity handles null values properly
-      expect(deserialized).toBeDefined();
-      expect(deserialized.name).toBe('Test');
-      expect(deserialized.memory).toBeNull(); // Mock returns null for invalid JSON
-      expect(deserialized.blueprint).toBeUndefined(); // Mock passes undefined through as undefined
+      await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
   });
 });

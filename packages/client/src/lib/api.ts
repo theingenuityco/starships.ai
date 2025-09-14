@@ -249,12 +249,7 @@ api.interceptors.request.use(
     console.log('[API] Request interceptor running for:', config.url, 'at', new Date().toISOString())
 
     // Check if this is an authenticated endpoint
-    const requiresAuth =
-      config.url?.includes('/api/v1/starships') ||
-      config.url?.includes('/api/v1/agents') ||
-      config.url?.includes('/api/v1/users') ||
-      config.url?.includes('/api/v1/conversations') ||
-      config.url?.includes('/api/v1/missions')
+    const requiresAuth = config.url?.includes('/api/v1/starships') || config.url?.includes('/api/v1/agents') || config.url?.includes('/api/v1/users') || config.url?.includes('/api/v1/conversations')
 
     if (requiresAuth) {
       console.log('[API] Authenticated endpoint detected, waiting for token provider...')
@@ -492,7 +487,7 @@ export const agentAPI = {
     console.log('[API] Creating new agent:', agent.name)
     const data = await api.post('/api/v1/agents', agent).then(res => {
       const agent = extractResponseData<Agent>(res)
-      console.log('[API] Agent created successfully:', agent.id, 'authorId:', agent.authorId)
+      console.log('[API] Agent created successfully:', agent.id)
       return agent
     })
     console.log('[API] Invalidating agent caches after creation')
@@ -512,7 +507,7 @@ export const agentAPI = {
   },
 
   // Enhanced query methods with caching
-  getByCategory: async (category: Agent['category']): Promise<Agent[]> => {
+  getByCategory: async (category: 'general' | 'coding' | 'creative' | 'analysis' | 'support'): Promise<Agent[]> => {
     const cacheKey = CACHE_KEYS.AGENTS_BY_CATEGORY(category)
     const cached = apiCache.get<Agent[]>(cacheKey)
     if (cached) {

@@ -7,13 +7,28 @@
  */
 
 /**
+ * Simple response-like object interface for extracting error info
+ */
+interface ResponseLike {
+  data?: { error?: ErrorData };
+  error?: ErrorData;
+  status?: number;
+}
+
+interface ErrorData {
+  message?: string;
+  code?: string;
+  details?: unknown;
+}
+
+/**
  * Base application error with only essential properties
  */
 export class AppError extends Error {
   readonly code: string;
   readonly statusCode: number;
   readonly category: string;
-  readonly details?: any;
+  readonly details?: unknown;
   readonly cause?: Error;
 
   constructor(
@@ -21,7 +36,7 @@ export class AppError extends Error {
     code: string,
     statusCode: number,
     options?: {
-      details?: any;
+      details?: unknown;
       cause?: Error;
     }
   ) {
@@ -49,7 +64,7 @@ export class AppError extends Error {
   /**
    * Convert to JSON for API responses and logging
    */
-  toJSON(): Record<string, any> {
+  toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       message: this.message,
@@ -65,7 +80,7 @@ export class AppError extends Error {
   /**
    * Convert to API response format
    */
-  toResponse(): { error: { code: string; message: string; details?: any } } {
+  toResponse(): { error: { code: string; message: string; details?: unknown } } {
     return {
       error: {
         code: this.code,
@@ -86,7 +101,7 @@ export class AppError extends Error {
 export class ValidationError extends AppError {
   readonly field?: string;
 
-  constructor(message: string, field?: string, details?: any, cause?: Error) {
+  constructor(message: string, field?: string, details?: unknown, cause?: Error) {
     super(message, 'VALIDATION_ERROR', 400, { details, cause });
     this.field = field;
   }
@@ -227,7 +242,7 @@ export class ServiceError extends AppError {
 /**
  * Create a generic error with automatic categorization
  */
-export function createError(message: string, statusCode = 500, details?: any): AppError {
+export function createError(message: string, statusCode = 500, details?: unknown): AppError {
   const code = statusCode < 500 ? 'CLIENT_ERROR' : 'SERVER_ERROR';
   return new AppError(message, code, statusCode, { details });
 }
@@ -272,14 +287,14 @@ export function getErrorMessage(error: unknown): string {
 /**
  * Check if error is an application error
  */
-export function isAppError(error: any): error is AppError {
+export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }
 
 /**
  * Extract error for API response
  */
-export function toApiError(error: unknown): { error: { code: string; message: string; details?: any } } {
+export function toApiError(error: unknown): { error: { code: string; message: string; details?: unknown } } {
   if (error instanceof AppError) {
     return error.toResponse();
   }
@@ -296,7 +311,7 @@ export function toApiError(error: unknown): { error: { code: string; message: st
 /**
  * Create error from HTTP response
  */
-export function fromApiResponse(response: any): AppError {
+export function fromApiResponse(response: ResponseLike): AppError {
   const errorData = response?.data?.error || response?.error;
   const message = errorData?.message || 'API request failed';
   const statusCode = response?.status || 500;

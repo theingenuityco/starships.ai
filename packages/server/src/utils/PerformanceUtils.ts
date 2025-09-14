@@ -20,7 +20,7 @@ interface DebouncedFunction<T extends any[]> {
  * the specified delay has passed since the last invocation
  */
 export function debounce<T extends any[]>(func: (...args: T) => Promise<any>, delay: number): DebouncedFunction<T> {
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   let latestArgs: T;
   let latestResolve: (value: any) => void;
   let latestReject: (reason?: any) => void;

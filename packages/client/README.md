@@ -1,6 +1,6 @@
 # @starships/client
 
-Modern Next.js frontend application for starships.ai platform providing mission control interface, starship management, and AI agent interaction, built with Next.js 15, TypeScript, and shadcn/ui.
+Modern Next.js frontend application for starships.ai platform providing starship management, AI agent interaction, and workflow orchestration, built with Next.js 15, TypeScript, and shadcn/ui.
 
 ## 🚀 Quick Start
 
@@ -33,7 +33,7 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 
 - ✅ **Real-time Streaming**: Server-Sent Events (SSE) for live AI agent responses with visual streaming indicators
 - ✅ **Clean Navigation Architecture**: Extracted from command-deck spaghetti into dedicated components
-- ✅ **Command Deck**: Mission control dashboard with comprehensive controls
+- ✅ **Command Dashboard**: Comprehensive control interface for starship management
 - ✅ **Responsive Design**: Mobile-first with adaptive layouts
 - ✅ **Modern UI**: shadcn/ui components with glassmorphism effects
 - ✅ **Type Safety**: Full TypeScript with strict mode
@@ -50,8 +50,7 @@ src/
 │   ├── ship/[slug]/             # Individual starship interface
 │   │   ├── layout.tsx           # Ship-specific layout
 │   │   ├── conversations/       # Chat and communication
-│   │   ├── crew/                # Agent management
-│   │   └── missions/            # Mission orchestration
+│   │   └── crew/                # Agent management
 │   ├── starships/create/        # Starship creation flow
 │   ├── waitlist/page.tsx        # Waitlist management
 │   └── api/                     # API route handlers
@@ -61,7 +60,6 @@ src/
 │   ├── conversation/            # Chat and messaging interface
 │   ├── crew/                    # Agent deployment and management
 │   ├── layout/                  # Layout components
-│   ├── missions/                # Mission management interface
 │   ├── navigation/              # Navigation system
 │   ├── starships/               # Starship creation and management
 │   ├── ui/                      # shadcn/ui components
@@ -151,8 +149,6 @@ Built with [shadcn/ui](https://ui.shadcn.com/) components:
 - **Ship Interface**: `/ship/[slug]` - Individual starship control panel
   - `/ship/[slug]/conversations` - Chat and communication interface
   - `/ship/[slug]/crew` - Agent deployment and management
-  - `/ship/[slug]/missions` - Mission orchestration and tracking
-  - `/ship/[slug]/missions/[missionId]` - Individual mission details
 - **Starship Creation**: `/starships/create` - New starship creation flow
   - `/starships/create/success` - Post-creation success page
   - `/starships/create/cancel` - Creation cancellation handling

@@ -1,142 +1,144 @@
-import type { ConversationResponse, StreamingChunk, StreamingError } from '@starships/protocol';
+import type { StreamingDeltaChunk, StreamingError } from '@starships/protocol';
 import type { Response } from 'express';
+
+interface ConversationResponse {
+  source: 'agent';
+  content: string;
+  agentId: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+  };
+}
+
+interface ConnectionInfo {
+  res: Response;
+  heartbeatInterval: ReturnType<typeof setInterval>;
+  connectedAt: Date;
+}
 
 /**
  * Streaming Service using Server-Sent Events (SSE)
- * Manages SSE streaming connections for real-time communication
- * Uses singleton pattern to share connections across requests
+ * Handles multiple concurrent streaming connections for real-time communication
  */
 export class StreamingService {
-  private static instance: StreamingService;
-  private connections = new Map<string, Response>();
-  private heartbeatIntervals = new Map<string, NodeJS.Timeout>();
-
-  constructor() {
-    // Public constructor following service pattern
-  }
+  private connections: Map<string, ConnectionInfo> = new Map();
 
   /**
-   * Get singleton instance
-   */
-  static getInstance(): StreamingService {
-    if (!StreamingService.instance) {
-      StreamingService.instance = new StreamingService();
-    }
-    return StreamingService.instance;
-  }
-
-  /**
-   * Add new streaming connection
+   * Add new streaming connection (supports multiple concurrent connections)
    */
   addConnection(streamId: string, res: Response): void {
+    // Close any existing connection for this streamId
+    this.closeConnection(streamId);
+
     // Set up SSE headers
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control',
-      'X-Accel-Buffering': 'no', // Disable nginx buffering for real-time streaming
     });
 
     // Send connection confirmation
-    this.sendEvent(res, 'connection', { streamId, status: 'connected' });
+    this.sendEventToStream(streamId, res, 'connection', { streamId, status: 'connected' });
 
-    // Store connection
-    this.connections.set(streamId, res);
-    console.log(`[StreamingService] Client connected to stream: ${streamId}`);
-
-    // Handle connection close
-    res.on('close', () => {
-      this.removeConnection(streamId);
-    });
-
-    res.on('error', (error) => {
-      console.error(`[StreamingService] Stream error for ${streamId}:`, error);
-      this.removeConnection(streamId);
-    });
-
-    // Send heartbeat every 30 seconds to keep connection alive
-    const heartbeat = setInterval(() => {
+    // Create heartbeat interval for this connection
+    const heartbeatInterval = setInterval(() => {
       if (this.connections.has(streamId)) {
-        this.sendEvent(res, 'heartbeat', { timestamp: new Date().toISOString() });
-      } else {
-        clearInterval(heartbeat);
+        this.sendEventToStream(streamId, res, 'heartbeat', { timestamp: new Date().toISOString() });
       }
     }, 30000);
 
-    this.heartbeatIntervals.set(streamId, heartbeat);
+    // Store connection info
+    this.connections.set(streamId, {
+      res,
+      heartbeatInterval,
+      connectedAt: new Date(),
+    });
+
+    // Handle connection close
+    res.on('close', () => {
+      console.log(`[StreamingService] Streaming disconnected ${streamId}`);
+      this.cleanupConnection(streamId);
+    });
+
+    res.on('error', (error) => {
+      console.error(`[StreamingService] Streaming errored ${streamId}`, error);
+      this.cleanupConnection(streamId);
+    });
+
+    console.log(`[StreamingService] New connection added: ${streamId}`);
   }
 
   /**
-   * Remove connection and cleanup
+   * Broadcast delta chunk to a specific stream
    */
-  private removeConnection(streamId: string): void {
-    this.connections.delete(streamId);
-
-    const heartbeat = this.heartbeatIntervals.get(streamId);
-    if (heartbeat) {
-      clearInterval(heartbeat);
-      this.heartbeatIntervals.delete(streamId);
+  async broadcastDelta(streamId: string, delta: StreamingDeltaChunk): Promise<void> {
+    const connection = this.connections.get(streamId);
+    if (connection && !connection.res.destroyed) {
+      this.sendEventToStream(streamId, connection.res, 'delta', delta);
     }
-
-    console.log(`[StreamingService] Client disconnected from stream: ${streamId}`);
   }
 
   /**
-   * Broadcast chunk to specific stream
+   * Broadcast delta chunk to all active streams
    */
-  async broadcastChunk(streamId: string, chunk: StreamingChunk): Promise<void> {
-    const res = this.connections.get(streamId);
-    if (res && !res.destroyed) {
-      this.sendEvent(res, 'chunk', chunk);
-    }
+  async broadcastDeltaToAll(delta: StreamingDeltaChunk): Promise<void> {
+    const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastDelta(streamId, delta));
+    await Promise.all(broadcastPromises);
   }
 
   /**
-   * Broadcast complete message object to specific stream
+   * Broadcast complete message object to a specific stream
    */
   async broadcastMessage(streamId: string, message: any): Promise<void> {
-    const res = this.connections.get(streamId);
-    if (res && !res.destroyed) {
-      this.sendEvent(res, 'message', message);
+    const connection = this.connections.get(streamId);
+    if (connection && !connection.res.destroyed) {
+      this.sendEventToStream(streamId, connection.res, 'message', message);
     }
   }
 
   /**
-   * Broadcast completion to specific stream
+   * Broadcast complete message object to all active streams
+   */
+  async broadcastMessageToAll(message: any): Promise<void> {
+    const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastMessage(streamId, message));
+    await Promise.all(broadcastPromises);
+  }
+
+  /**
+   * Broadcast completion to a specific stream
    */
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {
-    const res = this.connections.get(streamId);
-    if (res && !res.destroyed) {
-      this.sendEvent(res, 'complete', finalResponse);
+    const connection = this.connections.get(streamId);
+    if (connection && !connection.res.destroyed) {
+      this.sendEventToStream(streamId, connection.res, 'complete', finalResponse);
 
       // Close connection gracefully after completion
       setTimeout(() => {
-        this.closeStream(streamId);
+        this.closeConnection(streamId);
       }, 1000);
     }
   }
 
   /**
-   * Broadcast error to specific stream
+   * Broadcast error to a specific stream
    */
   async broadcastError(streamId: string, error: StreamingError): Promise<void> {
-    const res = this.connections.get(streamId);
-    if (res && !res.destroyed) {
-      this.sendEvent(res, 'error', error);
+    const connection = this.connections.get(streamId);
+    if (connection && !connection.res.destroyed) {
+      this.sendEventToStream(streamId, connection.res, 'error', error);
 
       // Close connection after error
       setTimeout(() => {
-        this.closeStream(streamId);
+        this.closeConnection(streamId);
       }, 1000);
     }
   }
 
   /**
-   * Send Server-Sent Event
+   * Send Server-Sent Event to a specific stream
    */
-  private sendEvent(res: Response, event: string, data: any): void {
+  private sendEventToStream(streamId: string, res: Response, event: string, data: any): void {
     try {
       if (res.destroyed || res.writableEnded) {
         return;
@@ -146,93 +148,105 @@ export class StreamingService {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
 
       // Force flush to prevent buffering and ensure real-time streaming
-      // In Node.js, we need to call flushHeaders() and access the underlying socket
       try {
         if (!res.headersSent) {
           res.flushHeaders();
         }
-        // Force the underlying socket to flush if available
-        const socket = (res as any).socket;
-        if (socket && typeof socket.flush === 'function') {
-          socket.flush();
-        }
       } catch (flushError) {
         // Ignore flush errors to prevent breaking the stream
-        console.debug('[StreamingService] Flush failed:', flushError);
+        console.debug(`[StreamingService] Flush failed for ${streamId}:`, flushError);
       }
     } catch (error) {
-      console.error('[StreamingService] Failed to send event:', error);
+      console.error(`[StreamingService] Failed to send event to ${streamId}:`, error);
     }
   }
 
   /**
-   * Close specific stream
+   * Close a specific connection or all connections
    */
-  closeStream(streamId: string): void {
-    const res = this.connections.get(streamId);
-    if (res && !res.destroyed) {
-      try {
-        res.end();
-      } catch (error) {
-        // Ignore errors when closing
+  closeConnection(streamId?: string): void {
+    if (streamId) {
+      // Close specific connection
+      const connection = this.connections.get(streamId);
+      if (connection && !connection.res.destroyed) {
+        try {
+          connection.res.end();
+        } catch (error) {
+          // Ignore errors when closing
+        }
       }
+      this.cleanupConnection(streamId);
+    } else {
+      // Close all connections
+      this.closeAllConnections();
     }
-    this.removeConnection(streamId);
   }
 
   /**
-   * Get active connections count
+   * Close all connections
    */
-  getActiveConnectionsCount(): number {
+  closeAllConnections(): void {
+    for (const streamId of this.connections.keys()) {
+      this.closeConnection(streamId);
+    }
+  }
+
+  /**
+   * Cleanup specific connection state
+   */
+  private cleanupConnection(streamId: string): void {
+    const connection = this.connections.get(streamId);
+
+    if (connection) {
+      if (connection.heartbeatInterval) {
+        clearInterval(connection.heartbeatInterval);
+      }
+
+      this.connections.delete(streamId);
+      console.log(`[StreamingService] Cleaned up connection: ${streamId}`);
+    }
+  }
+
+  /**
+   * Check if there's an active connection for a specific stream
+   */
+  isActive(streamId?: string): boolean {
+    if (streamId) {
+      const connection = this.connections.get(streamId);
+      return connection !== undefined && !connection.res.destroyed && !connection.res.writableEnded;
+    }
+
+    // Check if any connection is active
+    return Array.from(this.connections.values()).some((connection) => !connection.res.destroyed && !connection.res.writableEnded);
+  }
+
+  /**
+   * Get all active stream IDs
+   */
+  getActiveStreamIds(): string[] {
+    return Array.from(this.connections.keys()).filter((streamId) => this.isActive(streamId));
+  }
+
+  /**
+   * Get connection count
+   */
+  getConnectionCount(): number {
     return this.connections.size;
   }
 
   /**
-   * Get active stream IDs
+   * Get connection info for a specific stream
    */
-  getActiveStreamIds(): string[] {
-    return Array.from(this.connections.keys());
-  }
-
-  /**
-   * Check if stream is active
-   */
-  isStreamActive(streamId: string): boolean {
-    const res = this.connections.get(streamId);
-    return res !== undefined && !res.destroyed && !res.writableEnded;
-  }
-
-  /**
-   * Cleanup inactive connections
-   */
-  cleanup(): void {
-    const inactiveStreams: string[] = [];
-
-    this.connections.forEach((res, streamId) => {
-      if (res.destroyed || res.writableEnded) {
-        inactiveStreams.push(streamId);
-      }
-    });
-
-    inactiveStreams.forEach((streamId) => {
-      this.removeConnection(streamId);
-    });
-
-    if (inactiveStreams.length > 0) {
-      console.log(`[StreamingService] Cleaned up ${inactiveStreams.length} inactive connections`);
+  getConnectionInfo(streamId: string): { connectedAt: Date; active: boolean } | null {
+    const connection = this.connections.get(streamId);
+    if (!connection) {
+      return null;
     }
-  }
 
-  /**
-   * Shutdown all connections
-   */
-  shutdown(): void {
-    this.connections.forEach((res, streamId) => {
-      this.closeStream(streamId);
-    });
-    this.connections.clear();
-    this.heartbeatIntervals.clear();
-    console.log('[StreamingService] All connections closed');
+    return {
+      connectedAt: connection.connectedAt,
+      active: !connection.res.destroyed && !connection.res.writableEnded,
+    };
   }
 
   /**

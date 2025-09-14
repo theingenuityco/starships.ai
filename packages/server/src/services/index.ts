@@ -10,14 +10,10 @@ export { UserService } from './UserService';
 
 // Core data management services
 export { ConversationService } from './ConversationService';
-export { MemoryService } from './MemoryService';
 export { MessageService } from './MessageService';
 
 // Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';
-
-// Mission services
-export { MissionOrchestratorService } from './MissionOrchestratorService';
 
 // Workflow services
 export { WorkflowService } from './WorkflowService';

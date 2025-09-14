@@ -12,10 +12,10 @@ export class NodeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createNode');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
         if (!nodeData?.type || !nodeData?.name) {
-          this.handleValidationError([{ field: 'nodeData', message: 'type and name are required' }], 'createNode');
+          this.handleValidationError([{ field: 'nodeData', message: 'type and name are required' }]);
         }
 
         const connection = this.getConnection();
@@ -26,7 +26,7 @@ export class NodeRepository extends BaseRepository {
         });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId, 'createNode');
+          this.handleNotFound('Blueprint', blueprintId);
         }
 
         // Prepare node data with serialized parameters
@@ -67,20 +67,17 @@ export class NodeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'createNodes');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
 
         if (!Array.isArray(nodesData) || nodesData.length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'nodesData',
-                message: 'At least one node is required',
-                value: nodesData,
-              },
-            ],
-            'createNodes'
-          );
+          this.handleValidationError([
+            {
+              field: 'nodesData',
+              message: 'At least one node is required',
+              value: nodesData,
+            },
+          ]);
         }
 
         const connection = this.getConnection();
@@ -91,14 +88,14 @@ export class NodeRepository extends BaseRepository {
         });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId, 'createNodes');
+          this.handleNotFound('Blueprint', blueprintId);
         }
 
         const nodes: NodeModel[] = [];
         const idMapping = new Map<string, string>();
 
         for (const nodeData of nodesData) {
-          const { aiId, ...nodeWithoutAiId } = nodeData as any;
+          const { aiId, ...nodeWithoutAiId } = nodeData as Omit<NodeModel, 'id'> & { aiId?: string };
 
           // Prepare node data with serialized parameters
           const nodeProps = {
@@ -153,7 +150,7 @@ export class NodeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'getNodesByBlueprintId');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -192,7 +189,7 @@ export class NodeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!nodeId) {
-          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }], 'getNodeById');
+          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -229,19 +226,16 @@ export class NodeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!nodeId) {
-          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }], 'updateNode');
+          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }]);
         }
 
         if (!updates || Object.keys(updates).length === 0) {
-          this.handleValidationError(
-            [
-              {
-                field: 'updates',
-                message: 'At least one field must be provided for update',
-              },
-            ],
-            'updateNode'
-          );
+          this.handleValidationError([
+            {
+              field: 'updates',
+              message: 'At least one field must be provided for update',
+            },
+          ]);
         }
 
         const connection = this.getConnection();
@@ -250,12 +244,12 @@ export class NodeRepository extends BaseRepository {
         const existingResult = await connection.executeQuery<{ n: NodeModel }>('MATCH (n:Node {id: $nodeId}) RETURN n', { nodeId });
 
         if (!existingResult || existingResult.length === 0) {
-          this.handleNotFound('Node', nodeId, 'updateNode');
+          this.handleNotFound('Node', nodeId);
         }
 
         // Build SET clause dynamically
         const setClause: string[] = [];
-        const params: any = { nodeId };
+        const params: Record<string, unknown> = { nodeId };
 
         if (updates.name !== undefined) {
           setClause.push('n.name = $name');
@@ -328,7 +322,7 @@ export class NodeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!nodeId) {
-          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }], 'deleteNode');
+          this.handleValidationError([{ field: 'nodeId', message: 'nodeId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -337,7 +331,7 @@ export class NodeRepository extends BaseRepository {
         const existingResult = await connection.executeQuery<{ n: NodeModel }>('MATCH (n:Node {id: $nodeId}) RETURN n', { nodeId });
 
         if (!existingResult || existingResult.length === 0) {
-          this.handleNotFound('Node', nodeId, 'deleteNode');
+          this.handleNotFound('Node', nodeId);
         }
 
         // Delete the node and all its relationships
@@ -356,7 +350,7 @@ export class NodeRepository extends BaseRepository {
       async () => {
         // Basic validation - entities handle detailed validation
         if (!blueprintId) {
-          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }], 'deleteNodesByBlueprintId');
+          this.handleValidationError([{ field: 'blueprintId', message: 'blueprintId is required' }]);
         }
 
         const connection = this.getConnection();
@@ -367,7 +361,7 @@ export class NodeRepository extends BaseRepository {
         });
 
         if (!blueprintCheck || blueprintCheck.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId, 'deleteNodesByBlueprintId');
+          this.handleNotFound('Blueprint', blueprintId);
         }
 
         // Delete all nodes belonging to the blueprint

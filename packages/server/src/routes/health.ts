@@ -5,7 +5,7 @@
  * Provides detailed system status, dependency health, and performance metrics.
  */
 
-import { handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { AgentRepository, getConnection, logger, StarshipRepository, UserRepository } from '@starships/models';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -165,9 +165,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    if (!handleCommonError(error, res, 'health check')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Health check system failure', 503);
-    }
+    handleError(error, res, 'health check');
   }
 });
 
@@ -318,9 +316,7 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
       },
     });
 
-    if (!handleCommonError(error, res, 'detailed health check')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Health check system failure', 503);
-    }
+    handleError(error, res, 'detailed health check');
   }
 });
 
@@ -344,9 +340,7 @@ router.get('/health/ready', async (req: Request, res: Response): Promise<void> =
       error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
-    if (!handleCommonError(error, res, 'readiness check')) {
-      sendError(res, 'SERVICE_UNAVAILABLE', error instanceof Error ? error.message : 'System not ready', 503);
-    }
+    handleError(error, res, 'readiness check');
   }
 });
 
@@ -402,9 +396,7 @@ router.get('/health/metrics', (req: Request, res: Response): void => {
       error: { message: error instanceof Error ? error.message : 'Unknown error' },
     });
 
-    if (!handleCommonError(error, res, 'metrics collection')) {
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to collect metrics');
-    }
+    handleError(error, res, 'metrics collection');
   }
 });
 

@@ -10,26 +10,25 @@ export type { Blueprint, Node } from './blueprint';
 
 // ===== BASE TYPES =====
 // Shared base types (Edge, NodeType, BaseNodeParameters)
-export type { BaseNodeParameters, Edge, NodeType } from './base';
+export type { Edge, NodeType } from './base';
 
 // ===== NODE PARAMETER TYPES =====
 // Node-specific parameter definitions
 export * from './node-parameters';
+export * from './node-handler';
 
 // ===== EXECUTION TYPES =====
 // Runtime execution state and context (includes streaming types)
 export * from './execution';
+export * from './events';
 
 // ===== VALIDATION TYPES =====
 // Validation and error reporting
 export * from './validation';
-
-// ===== MEMORY SYSTEM =====
-// Base memory types only (no classes)
-export type { Message } from '@/Memory';
+export * from './llm';
 
 // Agent memory types only (no classes)
-export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from '@/AgentMemory';
+export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from '@/memory/AgentMemory';
 
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)

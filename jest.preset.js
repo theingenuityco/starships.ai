@@ -14,17 +14,19 @@ module.exports = {
 
   transformIgnorePatterns: ['node_modules/(?!(@starships)/)'],
 
-  // Configure ts-jest to handle TypeScript compilation with path mappings
-  globals: {
-    'ts-jest': {
-      isolatedModules: true,
-      tsconfig: {
-        paths: {
-          '@/*': ['src/*'],
-          '@starships/*': ['../*/src'],
+  // Modern ts-jest configuration
+  transform: {
+    '^.+\\.ts$': [
+      'ts-jest',
+      {
+        tsconfig: {
+          paths: {
+            '@/*': ['src/*'],
+            '@starships/*': ['../*/src'],
+          },
         },
       },
-    },
+    ],
   },
 
   testTimeout: 10000,

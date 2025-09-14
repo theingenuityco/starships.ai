@@ -442,7 +442,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     const paginationMeta = createPaginationMeta(page, limit, conversationWithMessages.messages.length);
     sendSuccess(res, conversationWithMessages, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching conversation details');
+    handleError(error, res, 'fetching conversation details');
   }
 });
 ```
@@ -934,7 +934,6 @@ Standardized patterns across layers make the codebase predictable and easier for
 
 - **Conversations**: Complete implementation following all 6 layers
 - **Starships**: Complete implementation following all 6 layers
-- **Missions**: Complete implementation following all 6 layers
 - **Users**: Complete implementation following all 6 layers
 - **Messages**: Complete implementation following all 6 layers
 - **Agents**: Complete implementation following all 6 layers
@@ -982,12 +981,11 @@ The layered architecture migration is now **fully complete** with all entities p
 3. [`AgentEntity`](packages/models/src/entities/AgentEntity.ts) ✅
 4. [`UserEntity`](packages/models/src/entities/UserEntity.ts) ✅
 5. [`MessageEntity`](packages/models/src/entities/MessageEntity.ts) ✅
-6. [`MissionEntity`](packages/models/src/entities/MissionEntity.ts) ✅
-7. [`BlueprintEntity`](packages/models/src/entities/BlueprintEntity.ts) ✅
-8. [`WorkflowEntity`](packages/models/src/entities/WorkflowEntity.ts) ✅
-9. [`ExecutionEntity`](packages/models/src/entities/ExecutionEntity.ts) ✅
-10. [`AgentTemplateEntity`](packages/models/src/entities/AgentTemplateEntity.ts) ✅ **NEW**
-11. [`NativeToolApiKeyEntity`](packages/models/src/entities/NativeToolApiKeyEntity.ts) ✅ **NEW**
+6. [`BlueprintEntity`](packages/models/src/entities/BlueprintEntity.ts) ✅
+7. [`WorkflowEntity`](packages/models/src/entities/WorkflowEntity.ts) ✅
+8. [`ExecutionEntity`](packages/models/src/entities/ExecutionEntity.ts) ✅
+9. [`AgentTemplateEntity`](packages/models/src/entities/AgentTemplateEntity.ts) ✅ **NEW**
+10. [`NativeToolApiKeyEntity`](packages/models/src/entities/NativeToolApiKeyEntity.ts) ✅ **NEW**
 
 ### **Architecture Compliance: 100/100** 🎯
 

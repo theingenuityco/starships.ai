@@ -291,16 +291,11 @@ function createSibylMemoryConfig(): AgentMemoryState {
       name: 'Sibyl',
       role: 'Starship Navigator and First Officer',
       personality: 'Knowledgeable, welcoming, and expert at guiding new captains through their starship journey',
-      expertise: ['starship operations', 'crew management', 'mission planning', 'system configuration', 'onboarding guidance'],
+      expertise: ['starship operations', 'crew management', 'system configuration', 'onboarding guidance'],
     },
     purpose: {
       primary: 'Guide new captains through starship setup, operations, and help them get started on their journey',
-      secondary: [
-        'Explain starship features',
-        'Help configure agents and crew',
-        'Assist with mission planning',
-        'Provide operational guidance',
-      ],
+      secondary: ['Explain starship features', 'Help configure agents and crew', 'Provide operational guidance'],
       constraints: [
         'Prioritize safety and best practices',
         'Ensure smooth onboarding experience',
@@ -361,35 +356,25 @@ function createMemoryConfig(name: string, category: string, description: string,
 }
 
 // Default templates configuration
-const DEFAULT_TEMPLATES: Array<
-  Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> & {
-    blueprint?: Blueprint;
-    memory?: AgentMemoryState;
-    executionMode?: 'simple' | 'workflow';
-    timeout?: number;
-  }
-> = [
+const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>> = [
   {
     name: 'General Assistant',
     slug: 'general-assistant',
     description: 'A helpful general-purpose assistant powered by autopilot workflows for enhanced capabilities.',
     category: 'general',
-    tags: ['general', 'helpful', 'assistant', 'versatile', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.7,
     maxTokens: 2000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.5,
+
     icon: '🤖',
     previewPrompts: ['Help me plan my day', 'Explain quantum computing in simple terms', 'What are some healthy meal ideas?'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.7, 2000),
-    memory: createMemoryConfig('General Assistant', 'general', 'Assist users with general questions and provide helpful information', [
+    memoryState: createMemoryConfig('General Assistant', 'general', 'Assist users with general questions and provide helpful information', [
       'general knowledge',
       'conversation',
       'problem solving',
     ]),
-    executionMode: 'simple',
     timeout: 30000,
   },
   {
@@ -397,13 +382,11 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'code-reviewer',
     description: 'An expert code reviewer with advanced autopilot workflows for comprehensive code analysis and improvement suggestions.',
     category: 'coding',
-    tags: ['programming', 'code-review', 'debugging', 'best-practices', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.3,
     maxTokens: 3000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.8,
+
     icon: '🔍',
     previewPrompts: [
       'Review this JavaScript function for bugs',
@@ -411,13 +394,12 @@ const DEFAULT_TEMPLATES: Array<
       'Check this SQL query for security issues',
     ],
     blueprint: createCodeReviewBlueprint(),
-    memory: createMemoryConfig('Code Reviewer', 'coding', 'Provide comprehensive, constructive code reviews to improve software quality', [
-      'software architecture',
-      'code quality',
-      'security practices',
-      'performance optimization',
-    ]),
-    executionMode: 'workflow',
+    memoryState: createMemoryConfig(
+      'Code Reviewer',
+      'coding',
+      'Provide comprehensive, constructive code reviews to improve software quality',
+      ['software architecture', 'code quality', 'security practices', 'performance optimization']
+    ),
     timeout: 60000,
   },
   {
@@ -425,13 +407,11 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'creative-writer',
     description: 'A creative writing assistant with structured autopilot workflows for ideation, planning, and content creation.',
     category: 'creative',
-    tags: ['writing', 'storytelling', 'creative', 'content', 'fiction', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.8,
     maxTokens: 2500,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.6,
+
     icon: '✍️',
     previewPrompts: [
       'Help me develop a character for my story',
@@ -439,13 +419,12 @@ const DEFAULT_TEMPLATES: Array<
       'Give me ideas for a sci-fi short story',
     ],
     blueprint: createCreativeWritingBlueprint(),
-    memory: createMemoryConfig('Creative Writer', 'creative', 'Create engaging, original content through a structured creative process', [
-      'storytelling',
-      'character development',
-      'creative writing techniques',
-      'content strategy',
-    ]),
-    executionMode: 'workflow',
+    memoryState: createMemoryConfig(
+      'Creative Writer',
+      'creative',
+      'Create engaging, original content through a structured creative process',
+      ['storytelling', 'character development', 'creative writing techniques', 'content strategy']
+    ),
     timeout: 45000,
   },
   {
@@ -453,23 +432,20 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'data-analyst',
     description: 'An analytical assistant powered by autopilot for data interpretation, visualization, and insights.',
     category: 'analysis',
-    tags: ['data', 'analysis', 'statistics', 'insights', 'visualization', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.4,
     maxTokens: 2500,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.7,
+
     icon: '📊',
     previewPrompts: ['Analyze this sales data for trends', 'What statistical test should I use?', 'Help me interpret these survey results'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.4, 2500),
-    memory: createMemoryConfig(
+    memoryState: createMemoryConfig(
       'Data Analyst',
       'analysis',
       'Provide data analysis, statistical insights, and visualization recommendations',
       ['statistics', 'data interpretation', 'visualization', 'pattern recognition']
     ),
-    executionMode: 'simple',
     timeout: 35000,
   },
   {
@@ -477,23 +453,20 @@ const DEFAULT_TEMPLATES: Array<
     slug: 'customer-support',
     description: 'A friendly customer support assistant with autopilot-powered workflows for issue resolution.',
     category: 'support',
-    tags: ['customer-service', 'support', 'help', 'professional', 'problem-solving', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.6,
     maxTokens: 2000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.4,
+
     icon: '🎧',
     previewPrompts: ['I need help with my account', 'How do I return a product?', "My order hasn't arrived yet"],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.6, 2000),
-    memory: createMemoryConfig(
+    memoryState: createMemoryConfig(
       'Support Specialist',
       'support',
       'Resolve customer issues efficiently while maintaining high satisfaction levels',
       ['troubleshooting', 'customer service', 'product knowledge', 'communication']
     ),
-    executionMode: 'simple',
     timeout: 30000,
   },
   {
@@ -502,13 +475,11 @@ const DEFAULT_TEMPLATES: Array<
     description:
       'Your expert starship navigator and first officer who helps new captains get started, configure their crew, and begin their journey.',
     category: 'general',
-    tags: ['starship', 'navigator', 'onboarding', 'guide', 'first-officer', 'autopilot'],
+
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.5,
     maxTokens: 2000,
-    authorId: 'system',
-    isPublic: true,
-    rating: 4.6,
+
     icon: '🧙‍♀️',
     previewPrompts: [
       'Help me set up my new starship',
@@ -516,8 +487,7 @@ const DEFAULT_TEMPLATES: Array<
       'What should I do first as a new captain?',
     ],
     blueprint: createStarshipNavigatorBlueprint(),
-    memory: createSibylMemoryConfig(),
-    executionMode: 'workflow',
+    memoryState: createSibylMemoryConfig(),
     timeout: 45000,
   },
 ];
@@ -552,11 +522,7 @@ export async function seedAgentTemplates(): Promise<void> {
           logger.debug(`Agent template already exists: ${template.name} (slug: ${template.slug})`);
         } else {
           // Create the template
-          await templateRepo.create({
-            ...template,
-            usageCount: 0,
-            updatedAt: new Date().toISOString(),
-          });
+          await templateRepo.create(template);
           addedCount++;
           logger.info(`Agent template created: ${template.name} (slug: ${template.slug})`);
         }

@@ -1,8 +1,9 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationSourceType, MessageModel, CreateMessageRequest } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, MessageModel, StreamingDeltaChunk } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
+import { safeApplyDeltas } from '@/lib/jsonPatch'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -19,6 +20,17 @@ interface ClientMessage extends MessageModel {
   error?: boolean
 }
 
+// Create message request interface (local definition since it's not in protocol)
+interface CreateMessageRequest {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  conversationId?: string
+  agentId?: string
+  starshipId?: string
+  messageType?: 'user_input' | 'agent_response' | 'system_notification' | 'system_instruction' | 'workflow_output' | 'error'
+  stream?: boolean
+}
+
 // Streaming state interface
 interface StreamingState {
   status: 'idle' | 'connecting' | 'streaming' | 'complete' | 'error'
@@ -26,6 +38,7 @@ interface StreamingState {
   content: string
   error: any
   lastUpdate?: number
+  version?: number
 }
 
 // Centralized query keys
@@ -74,7 +87,7 @@ export function useConversation(conversationId: string | null) {
           lastActivityAt: string
         }>
       > = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
-        params: { limit: 100, page: 1, orderBy: 'timestamp', orderDirection: 'desc' },
+        params: { limit: 100, page: 1, orderBy: 'createdAt', orderDirection: 'desc' },
       })
 
       return {
@@ -91,7 +104,54 @@ export function useConversation(conversationId: string | null) {
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
     (data: any) => {
-      // Content chunks (incremental text)
+      // JSON Patch events (RFC6902 delta updates)
+      if (data.type === 'patch' && data.patch && Array.isArray(data.patch)) {
+        console.log('[STREAMING] Received patch:', data.patch, 'version:', data.version)
+
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'streaming',
+          isStreaming: true,
+          lastUpdate: Date.now(),
+          version: data.version || prev.version,
+        }))
+
+        // Apply JSON patch to messages array
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          if (!old) {
+            // Initialize with empty messages array if no data exists
+            const initialData = { messages: [], total: 0, conversationId: conversationId! }
+            const deltaResult = safeApplyDeltas(initialData.messages, [data as StreamingDeltaChunk])
+
+            if (deltaResult.success && deltaResult.result) {
+              return {
+                ...initialData,
+                messages: deltaResult.result,
+                total: Array.isArray(deltaResult.result) ? deltaResult.result.length : 0,
+              }
+            }
+            return initialData
+          }
+
+          // Apply patch to existing messages
+          const deltaResult = safeApplyDeltas(old.messages || [], [data as StreamingDeltaChunk])
+
+          if (deltaResult.success && deltaResult.result) {
+            return {
+              ...old,
+              messages: deltaResult.result,
+              total: Array.isArray(deltaResult.result) ? deltaResult.result.length : old.total,
+              lastActivityAt: new Date().toISOString(),
+            }
+          } else {
+            console.error('[STREAMING] Failed to apply delta:', deltaResult.error)
+            return old // Return unchanged data on patch failure
+          }
+        })
+        return
+      }
+
+      // Legacy content chunks (incremental text) - kept for backward compatibility
       if (data.type === 'content') {
         setStreamingState(prev => ({
           ...prev,
@@ -259,6 +319,7 @@ export function useConversation(conversationId: string | null) {
 
                         try {
                           const parsed = JSON.parse(eventData)
+                          console.log('[STREAMING] Received SSE event:', parsed.op ? 'delta' : parsed.type || 'unknown', parsed)
                           handleStreamingEvent(parsed)
                         } catch (parseError) {
                           console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
@@ -277,21 +338,11 @@ export function useConversation(conversationId: string | null) {
               // Resolve with the user message
               resolve({
                 id: `user-${Date.now()}`,
-                timestamp: new Date().toISOString(),
                 role: data.role,
                 content: data.content,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                version: '1.0.0',
-                starshipId: data.starshipId,
-                agentId: data.agentId,
-                conversationId: data.conversationId,
-                threadDepth: data.threadDepth || 0,
-                processingStatus: data.processingStatus || 'completed',
                 messageType: data.messageType || 'user_input',
-                importance: data.importance || 'medium',
-                contentLength: data.content.length,
-                hasAttachments: data.hasAttachments || false,
               } as ClientMessage)
             } catch (error) {
               reject(error)
@@ -320,21 +371,11 @@ export function useConversation(conversationId: string | null) {
       // Optimistically add the user message
       const tempMessage: ClientMessage = {
         id: `temp-${Date.now()}`,
-        timestamp: new Date().toISOString(),
         role: variables.role,
         content: variables.content,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        starshipId: variables.starshipId,
-        agentId: variables.agentId,
-        conversationId: variables.conversationId,
-        threadDepth: variables.threadDepth || 0,
-        processingStatus: variables.processingStatus || 'pending',
         messageType: variables.messageType || 'user_input',
-        importance: variables.importance || 'medium',
-        contentLength: variables.content.length,
-        hasAttachments: variables.hasAttachments || false,
         sending: true,
       }
 
@@ -362,7 +403,7 @@ export function useConversation(conversationId: string | null) {
           return {
             ...old,
             messages,
-            lastActivityAt: result.timestamp,
+            lastActivityAt: result.createdAt,
           }
         })
       } else {
@@ -420,7 +461,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { source: ConversationSourceType; metadata?: Record<string, unknown>; starshipId?: string }): Promise<ConversationModel> => {
+    mutationFn: async (data: { title: string; starshipId?: string }): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },
@@ -529,43 +570,23 @@ export function useDeleteMessage() {
       return response.data.data
     },
     onMutate: async messageId => {
-      // Get message details to know which caches to update
-      const message = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.detail(messageId)) as MessageModel | undefined
-
-      if (message?.conversationId) {
-        await queryClient.cancelQueries({
-          queryKey: CONVERSATION_QUERY_KEYS.messages(message.conversationId),
-        })
-
-        // Optimistically remove the message
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(message.conversationId), (old: any) => {
-          if (!old) return old
-          return {
-            ...old,
-            messages: old.messages.filter((msg: MessageModel) => msg.id !== messageId),
-            total: Math.max(0, old.total - 1),
-          }
-        })
-      }
-
-      return { message }
+      // Since MessageModel no longer has conversationId, we need to find it from the messages cache
+      // This is not ideal but necessary with the current simplified model
+      return { messageId }
     },
     onSuccess: (data, messageId, context) => {
-      if (context?.message?.conversationId) {
-        // Invalidate to refresh from server
-        queryClient.invalidateQueries({
-          queryKey: CONVERSATION_QUERY_KEYS.messages(context.message.conversationId),
-        })
-      }
+      // Invalidate all message queries to ensure consistency
+      // This is less efficient but necessary without conversationId on messages
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+      })
       toast.success('Message deleted successfully!')
     },
     onError: (error: any, messageId, context) => {
-      // Rollback optimistic deletion if we have the message data
-      if (context?.message?.conversationId) {
-        queryClient.invalidateQueries({
-          queryKey: CONVERSATION_QUERY_KEYS.messages(context.message.conversationId),
-        })
-      }
+      // Invalidate all message queries to ensure consistency
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+      })
 
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete message'
       toast.error('Failed to delete message', {
@@ -598,10 +619,6 @@ export function useUpdateConversationStatus() {
 
       // Invalidate related queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(variables.conversationId) })
-
-      if (updatedConversation.starshipId) {
-        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(updatedConversation.starshipId) })
-      }
 
       toast.success(`Conversation ${variables.status} successfully!`)
     },

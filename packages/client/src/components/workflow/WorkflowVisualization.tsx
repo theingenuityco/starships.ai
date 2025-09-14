@@ -9,10 +9,9 @@ import type { WorkflowModel, AgentModel } from '@starships/protocol'
 // Client-side workflow types for compatibility
 type WorkflowDSL = WorkflowModel | any
 type WorkflowDSLNode = any
-type MissionWorkflow = any
 
 export interface WorkflowVisualizationProps {
-  workflow: WorkflowDSL | MissionWorkflow
+  workflow: WorkflowDSL
   agents?: Record<string, AgentModel>
   currentNodeId?: string
   onNodeClick?: (nodeId: string) => void
@@ -137,7 +136,17 @@ const CustomNode: React.FC<{ data: FlowNode['data'] }> = ({ data }) => {
               <User className="w-3 h-3 text-purple-500" />
               <span className="font-medium text-purple-600 dark:text-purple-400">{data.agent.name}</span>
             </div>
-            {data.agent.category && <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 text-xs rounded w-fit">{data.agent.category}</span>}
+            <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300 text-xs rounded w-fit">
+              {data.agent.name.toLowerCase().includes('support')
+                ? 'support'
+                : data.agent.name.toLowerCase().includes('data') || data.agent.name.toLowerCase().includes('analyst')
+                  ? 'analysis'
+                  : data.agent.name.toLowerCase().includes('creative')
+                    ? 'creative'
+                    : data.agent.name.toLowerCase().includes('code') || data.agent.name.toLowerCase().includes('coding')
+                      ? 'coding'
+                      : 'general'}
+            </span>
           </div>
         )}
 
@@ -244,7 +253,7 @@ const traverseWorkflowGraph = (workflowNodes: WorkflowDSLNode[], workflowEdges: 
 }
 
 // Convert workflow to React Flow format
-const convertToFlowData = (workflow: WorkflowDSL | MissionWorkflow, currentNodeId?: string, agents?: Record<string, AgentModel>) => {
+const convertToFlowData = (workflow: WorkflowDSL, currentNodeId?: string, agents?: Record<string, AgentModel>) => {
   const nodes: FlowNode[] = []
   const edges: Edge[] = []
 

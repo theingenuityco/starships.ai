@@ -24,12 +24,10 @@ import agentTemplateRoutes from '@/routes/agent-templates';
 import agentRoutes from '@/routes/agents';
 import authRoutes from '@/routes/auth';
 import conversationRoutes from '@/routes/conversations';
-import memoryRoutes from '@/routes/memory';
 import messageRoutes from '@/routes/messages';
 import starshipRoutes from '@/routes/starships';
 import userRoutes from '@/routes/users';
 // import expeditionRoutes from '@/routes/expeditions';
-import missionRoutes from '@/routes/missions';
 import nativeApiKeysRoutes from '@/routes/native-api-keys';
 import waitlistRoutes from '@/routes/waitlist';
 import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
@@ -111,10 +109,8 @@ app.use('/api/v1', agentRoutes);
 app.use('/api/v1', agentTemplateRoutes);
 app.use('/api/v1', conversationRoutes);
 app.use('/api/v1', messageRoutes);
-app.use('/api/v1', memoryRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
-app.use('/api/v1', missionRoutes);
 //
 app.use('/api', nativeApiKeysRoutes);
 

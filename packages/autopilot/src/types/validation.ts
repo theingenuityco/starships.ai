@@ -9,9 +9,7 @@
  */
 export interface ValidationResult {
   valid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-  suggestions: ValidationSuggestion[];
+  errors?: ValidationError[];
 }
 
 /**
@@ -22,29 +20,7 @@ export interface ValidationError {
   message: string;
   nodeRef?: string;
   edgeRef?: string;
-  severity: 'error' | 'warning';
   details?: unknown;
-}
-
-/**
- * Validation warning details
- */
-export interface ValidationWarning {
-  code: ValidationWarningCode;
-  message: string;
-  nodeRef?: string;
-  edgeRef?: string;
-  suggestion?: string;
-}
-
-/**
- * Validation suggestion details
- */
-export interface ValidationSuggestion {
-  type: 'optimization' | 'improvement' | 'best_practice';
-  message: string;
-  impact: 'low' | 'medium' | 'high';
-  nodeRef?: string;
 }
 
 /**
@@ -65,16 +41,3 @@ export type ValidationErrorCode =
   | 'EXCEEDS_MAX_EDGES'
   | 'INVALID_JSONATA_EXPRESSION'
   | 'VALIDATION_FAILED';
-
-/**
- * Validation warning codes
- */
-export type ValidationWarningCode =
-  | 'LONG_EXECUTION_PATH'
-  | 'NO_ERROR_HANDLING'
-  | 'MISSING_DESCRIPTIONS'
-  | 'UNBALANCED_WORKLOAD'
-  | 'NO_QUALITY_GATES'
-  | 'POTENTIAL_TIMEOUT'
-  | 'COMPLEX_CONDITIONALS'
-  | 'LARGE_WORKFLOW_SIZE';

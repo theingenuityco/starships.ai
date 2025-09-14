@@ -1,6 +1,6 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { BlueprintService } from '@/services/BlueprintService';
-import { createPaginationMeta, handleCommonError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z, ZodError } from 'zod';
@@ -96,7 +96,7 @@ router.get('/blueprints', jwtAuthMiddleware, async (req: Request, res: Response)
     const paginationMeta = createPaginationMeta(page, limit, blueprints.length);
     sendSuccess(res, paginatedBlueprints, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching blueprints');
+    handleError(error, res, 'fetching blueprints');
   }
 });
 
@@ -128,7 +128,7 @@ router.get('/blueprints/:blueprintId', jwtAuthMiddleware, async (req: Request, r
 
     sendSuccess(res, blueprint, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching blueprint details');
+    handleError(error, res, 'fetching blueprint details');
   }
 });
 
@@ -162,7 +162,7 @@ router.post('/blueprints', jwtAuthMiddleware, async (req: Request, res: Response
 
     sendSuccess(res, blueprint, 201);
   } catch (error) {
-    handleCommonError(error, res, 'creating blueprint');
+    handleError(error, res, 'creating blueprint');
   }
 });
 
@@ -209,7 +209,7 @@ router.put('/blueprints/:blueprintId', jwtAuthMiddleware, async (req: Request, r
 
     sendSuccess(res, updatedBlueprint, 200);
   } catch (error) {
-    handleCommonError(error, res, 'updating blueprint');
+    handleError(error, res, 'updating blueprint');
   }
 });
 
@@ -242,7 +242,7 @@ router.delete('/blueprints/:blueprintId', jwtAuthMiddleware, async (req: Request
 
     sendSuccess(res, { message: 'Blueprint deleted successfully' }, 200);
   } catch (error) {
-    handleCommonError(error, res, 'deleting blueprint');
+    handleError(error, res, 'deleting blueprint');
   }
 });
 
@@ -276,7 +276,7 @@ router.get('/blueprints/category/:category', jwtAuthMiddleware, async (req: Requ
     const paginationMeta = createPaginationMeta(page, limit, allBlueprints.length);
     sendSuccess(res, blueprints, 200, paginationMeta);
   } catch (error) {
-    handleCommonError(error, res, 'fetching blueprints by category');
+    handleError(error, res, 'fetching blueprints by category');
   }
 });
 
@@ -318,7 +318,7 @@ router.post('/blueprints/:blueprintId/clone', jwtAuthMiddleware, async (req: Req
 
     sendSuccess(res, clonedBlueprint, 201);
   } catch (error) {
-    handleCommonError(error, res, 'cloning blueprint');
+    handleError(error, res, 'cloning blueprint');
   }
 });
 
@@ -349,7 +349,7 @@ router.get('/blueprints/popular', jwtAuthMiddleware, async (req: Request, res: R
 
     sendSuccess(res, popularBlueprints, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching popular blueprints');
+    handleError(error, res, 'fetching popular blueprints');
   }
 });
 
@@ -373,7 +373,7 @@ router.post('/blueprints/:blueprintId/track-usage', jwtAuthMiddleware, async (re
 
     sendSuccess(res, { message: 'Blueprint usage tracked successfully' }, 200);
   } catch (error) {
-    handleCommonError(error, res, 'tracking blueprint usage');
+    handleError(error, res, 'tracking blueprint usage');
   }
 });
 
@@ -405,7 +405,7 @@ router.get('/blueprints/:blueprintId/stats', jwtAuthMiddleware, async (req: Requ
 
     sendSuccess(res, stats, 200);
   } catch (error) {
-    handleCommonError(error, res, 'fetching blueprint statistics');
+    handleError(error, res, 'fetching blueprint statistics');
   }
 });
 
@@ -429,7 +429,7 @@ router.post('/blueprints/:blueprintId/validate', jwtAuthMiddleware, async (req: 
 
     sendSuccess(res, validation, 200);
   } catch (error) {
-    handleCommonError(error, res, 'validating blueprint structure');
+    handleError(error, res, 'validating blueprint structure');
   }
 });
 

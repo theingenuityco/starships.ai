@@ -7,7 +7,7 @@ TypeScript protocol definitions and contracts for the starships.ai platform. Thi
 The protocol package serves as the single source of truth for:
 
 - **API Contracts** - Interface definitions for cross-service communication
-- **Collection Types** - Database collection types (Starship, Mission, Agent, etc.)
+- **Collection Types** - Database collection types (Starship, Agent, Workflow, etc.)
 - **Event Types** - Communication protocol types
 - **Request/Response Types** - HTTP API input/output structures
 
@@ -24,7 +24,6 @@ pnpm add @starships/protocol
 ```typescript
 import {
   Starship,
-  Mission,
   Agent,
   AgentTemplate,
   User,
@@ -46,7 +45,6 @@ import {
 - [`Agent`](src/domains/agent.ts) - AI agent configurations and deployment management
 - [`AgentTemplate`](src/domains/agent-template.ts) - Reusable agent configurations
 - [`Starship`](src/domains/starship.ts) - Starship management with billing integration
-- [`Mission`](src/domains/mission.ts) - Mission orchestration with workflow execution
 - [`User`](src/domains/user.ts) - User management and authentication
 - [`Workflow`](src/domains/workflow.ts) - Workflow execution definitions
 - [`Blueprint`](src/domains/blueprint.ts) - Workflow blueprint specifications
@@ -75,7 +73,7 @@ import { ApiResponse, ApiError } from '@starships/protocol';
 ### Type Usage Examples
 
 ```typescript
-import { Starship, Agent, Mission } from '@starships/protocol';
+import { Starship, Agent } from '@starships/protocol';
 
 // Using domain types for data modeling
 const starship: Starship = {
@@ -86,7 +84,6 @@ const starship: Starship = {
   class: 'cruiser',
   status: 'active',
   maxAgents: 6,
-  maxActiveExpeditions: 5,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
 };
@@ -114,7 +111,6 @@ src/
 ├── domains/                # Database domain types
 │   ├── agent.ts            # AI agent configurations and deployment
 │   ├── starship.ts         # Starship management
-│   ├── mission.ts          # Mission orchestration
 │   ├── agent-template.ts   # Agent templates
 │   ├── user.ts             # User management
 │   ├── workflow.ts         # Workflow execution
@@ -136,15 +132,15 @@ This package is imported across the entire starships.ai platform:
 All exports use strict TypeScript with comprehensive type definitions:
 
 ```typescript
-// Mission with full type safety
-const mission: Mission = {
-  id: 'mission-123',
+// Workflow with full type safety
+const workflow: Workflow = {
+  id: 'workflow-123',
   starshipId: 'starship-456',
-  name: 'Market Research',
-  description: 'Analyze competitor landscape',
-  status: 'active', // Type: MissionStatus
-  phase: 'analysis', // Type: MissionPhase
-  agentIds: ['agent-1'],
+  name: 'Market Research Workflow',
+  description: 'Analyze competitor landscape using AI agents',
+  status: 'active',
+  nodes: [],
+  edges: [],
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
   createdBy: 'user-789',

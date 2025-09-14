@@ -1,7 +1,8 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { ConversationModel } from '@starships/protocol';
+import type { AgentModel, Conversation, ConversationModel, MessageModel, StarshipModel } from '@starships/protocol';
 import { ConversationEntity } from '../entities/ConversationEntity';
+import { MessageEntity } from '../entities/MessageEntity';
 
 export class ConversationRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -12,10 +13,8 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ c: ConversationModel }>(
-          'MATCH (c:Conversation) RETURN c ORDER BY c.lastActivityAt DESC'
-        );
-        return result.map((record) => ConversationEntity.deserialize(record.c));
+        const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
+        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
       },
       'findAll',
       'Conversation'
@@ -27,7 +26,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0 ? ConversationEntity.deserialize(result[0].c) : null;
+        return result.length > 0 ? ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Conversation',
@@ -35,39 +34,39 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'>, starshipId?: string): Promise<ConversationModel> {
+  async create(entity: Conversation & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
         // Use lean validation from ConversationEntity
         await ConversationEntity.validate(entity, 'create');
 
-        const connection = this.getConnection();
         const now = new Date().toISOString();
+
+        const { starshipId, agentId, ...conversationInput } = entity;
 
         // Prepare conversation data with defaults and validation
         const conversationEntity = ConversationEntity.deserialize({
-          ...entity,
+          ...conversationInput,
           createdAt: now,
-          lastActivityAt: entity.lastActivityAt || now,
-          messageCount: entity.messageCount || 0,
-          totalTokens: entity.totalTokens || 0,
           status: entity.status || 'active',
         });
 
         const conversationData = conversationEntity.serialize();
         // Remove id since it will be auto-generated
-        delete conversationData.id;
+        delete (conversationData as { id?: string }).id;
 
         // Use BaseRepository serialization (the conversationData is already properly prepared)
         const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
 
         // Create relationship with starship if starshipId is provided
-        if (starshipId) {
-          await this.linkToStarship(result.id, starshipId);
+        await this.linkToStarship(result.id, starshipId);
+
+        if (agentId) {
+          await this.linkToAgent(result.id, agentId);
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result);
+        return ConversationEntity.deserialize(result as unknown as Record<string, unknown>);
       },
       'create',
       'Conversation'
@@ -85,30 +84,10 @@ export class ConversationRepository extends BaseRepository {
         const params: Record<string, unknown> = { id };
 
         // Handle updatable fields with proper serialization
-        if (updates.lastActivityAt !== undefined) {
-          setFields.push('c.lastActivityAt = $lastActivityAt');
-          params.lastActivityAt = updates.lastActivityAt;
-        }
-        if (updates.messageCount !== undefined) {
-          setFields.push('c.messageCount = $messageCount');
-          params.messageCount = updates.messageCount;
-        }
-        if (updates.totalTokens !== undefined) {
-          setFields.push('c.totalTokens = $totalTokens');
-          params.totalTokens = updates.totalTokens;
-        }
         if (updates.status !== undefined) {
           setFields.push('c.status = $status');
           params.status = updates.status;
         }
-        if (updates.metadata !== undefined) {
-          setFields.push('c.metadata = $metadata');
-          // Use ConversationEntity to handle metadata serialization
-          const tempEntity = ConversationEntity.deserialize({ metadata: updates.metadata });
-          const serialized = tempEntity.serialize();
-          params.metadata = serialized.metadata;
-        }
-
         if (setFields.length === 0) {
           return this.findById(id);
         }
@@ -125,11 +104,11 @@ export class ConversationRepository extends BaseRepository {
         );
 
         if (result.length === 0) {
-          this.handleNotFound('Conversation', id, 'update');
+          this.handleNotFound('Conversation', id);
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result[0].c);
+        return ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>);
       },
       'update',
       'Conversation',
@@ -163,10 +142,10 @@ export class ConversationRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>(
           `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
-           RETURN c ORDER BY c.lastActivityAt DESC`,
+           RETURN c ORDER BY c.createdAt DESC`,
           { starshipId }
         );
-        return result.map((record) => ConversationEntity.deserialize(record.c));
+        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
       },
       'findByStarship',
       'Conversation'
@@ -176,22 +155,16 @@ export class ConversationRepository extends BaseRepository {
   /**
    * Get the starship associated with a conversation using Neo4j relationships
    */
-  async getConversationStarship(conversationId: string): Promise<{ id: string; name: string; slug: string } | null> {
+  async getConversationStarship(conversationId: string): Promise<StarshipModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ starship: { id: string; name: string; slug: string } }>(
+        const result = await connection.executeQuery<{ starship: StarshipModel }>(
           `MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})
            RETURN starship`,
           { conversationId }
         );
-        return result.length > 0
-          ? {
-              id: result[0].starship.id,
-              name: result[0].starship.name,
-              slug: result[0].starship.slug,
-            }
-          : null;
+        return result.length > 0 ? result[0].starship : null;
       },
       'getConversationStarship',
       'Conversation'
@@ -245,20 +218,20 @@ export class ConversationRepository extends BaseRepository {
     conversationId: string,
     orderBy: 'timestamp' | 'created_at' = 'timestamp',
     orderDirection: 'asc' | 'desc' = 'asc'
-  ): Promise<any[]> {
+  ): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
         const orderField = orderBy === 'timestamp' ? 'm.timestamp' : 'm.createdAt';
         const direction = orderDirection.toUpperCase();
 
-        const result = await connection.executeQuery<{ m: any }>(
+        const result = await connection.executeQuery<{ m: MessageModel }>(
           `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
            RETURN m ORDER BY ${orderField} ${direction}`,
           { conversationId }
         );
 
-        return result.map((record) => record.m);
+        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
       },
       'getConversationMessages',
       'Conversation'
@@ -266,108 +239,61 @@ export class ConversationRepository extends BaseRepository {
   }
 
   /**
-   * Update conversation statistics when messages are added/removed
+   * Create relationship between existing conversation and agent
    */
-  async updateMessageStats(conversationId: string): Promise<void> {
+  async linkToAgent(conversationId: string, agentId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
         await connection.executeWrite(
-          `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
-           WITH c, count(m) as messageCount, sum(m.tokenCount) as totalTokens, max(m.timestamp) as lastActivity
-           SET c.messageCount = messageCount,
-               c.totalTokens = COALESCE(totalTokens, 0),
-               c.lastActivityAt = COALESCE(lastActivity, c.lastActivityAt),
-               c.updatedAt = $updatedAt`,
+          `MATCH (c:Conversation {id: $conversationId}), (a:Agent {id: $agentId})
+           CREATE (c)-[:INVOLVES_AGENT {key: $key, linkedAt: $timestamp}]->(a)`,
           {
             conversationId,
-            updatedAt: new Date().toISOString(),
+            agentId,
+            key: `${conversationId}_${agentId}`,
+            timestamp: new Date().toISOString(),
           }
         );
       },
-      'updateMessageStats',
+      'linkToAgent',
       'Conversation'
     );
   }
 
   /**
-   * Delete all messages in a conversation via relationships
+   * Remove relationship between conversation and agent
    */
-  async deleteAllMessages(conversationId: string): Promise<{ deletedCount: number }> {
+  async unlinkFromAgent(conversationId: string, agentId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          `MATCH (c:Conversation {id: $conversationId})-[r:HAS_MESSAGE]->(m:Message)
-           DETACH DELETE m, r
-           RETURN count(m) as deletedCount`,
-          { conversationId }
+        await connection.executeWrite(
+          `MATCH (c:Conversation {id: $conversationId})-[r:INVOLVES_AGENT]->(a:Agent {id: $agentId})
+           DELETE r`,
+          { conversationId, agentId }
         );
-
-        // Update conversation stats after deleting messages
-        await this.updateMessageStats(conversationId);
-
-        return {
-          deletedCount: result[0]?.deletedCount || 0,
-        };
       },
-      'deleteAllMessages',
+      'unlinkFromAgent',
       'Conversation'
     );
   }
 
   /**
-   * Get conversation statistics using Neo4j relationships
+   * Get all agents involved in a conversation using Neo4j relationships
    */
-  async getConversationStats(conversationId: string): Promise<{
-    messageCount: number;
-    totalTokens: number;
-    byRole: { system: number; user: number; assistant: number };
-    lastMessageAt: string | null;
-  }> {
+  async getConversationAgents(conversationId: string): Promise<AgentModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{
-          messageCount: number;
-          totalTokens: number;
-          roles: string[];
-          lastMessageAt: string;
-        }>(
-          `MATCH (c:Conversation {id: $conversationId})-[:HAS_MESSAGE]->(m:Message)
-           RETURN count(m) as messageCount,
-                  sum(m.tokenCount) as totalTokens,
-                  collect(m.role) as roles,
-                  max(m.timestamp) as lastMessageAt`,
+        const result = await connection.executeQuery<{ a: AgentModel }>(
+          `MATCH (c:Conversation {id: $conversationId})-[:INVOLVES_AGENT]->(a:Agent)
+           RETURN a`,
           { conversationId }
         );
-
-        const record = result[0];
-        if (!record || record.messageCount === 0) {
-          return {
-            messageCount: 0,
-            totalTokens: 0,
-            byRole: { system: 0, user: 0, assistant: 0 },
-            lastMessageAt: null,
-          };
-        }
-
-        // Count by role
-        const byRole = { system: 0, user: 0, assistant: 0 };
-        record.roles.forEach((role: string) => {
-          if (Object.prototype.hasOwnProperty.call(byRole, role)) {
-            byRole[role as keyof typeof byRole]++;
-          }
-        });
-
-        return {
-          messageCount: Number(record.messageCount),
-          totalTokens: Number(record.totalTokens) || 0,
-          byRole,
-          lastMessageAt: record.lastMessageAt,
-        };
+        return result.map((record) => record.a);
       },
-      'getConversationStats',
+      'getConversationAgents',
       'Conversation'
     );
   }

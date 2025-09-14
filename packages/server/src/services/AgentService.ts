@@ -6,31 +6,28 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent, EventCallback, ExecutionEvent } from '@starships/autopilot';
-import { createError, NotFoundError, ValidationError } from '@starships/errors';
+import { Agent, AgentParams } from '@starships/autopilot';
+import { NotFoundError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
-import type { AgentModel, ConversationRequest, ConversationResponse, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
-import { AutopilotStreamService } from './AutopilotStreamService';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 
-// LLM response data structure from autopilot LLM class
-interface LlmResponseData {
-  status?: number;
-  statusText?: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-  url?: string;
-  llmResponse?: string;
-  model?: string;
+export interface ConversationRequest {
+  agentId: string;
+  userId: string;
+  message: string;
+  conversationId?: string;
 }
 
-export interface AgentOptions {
-  includeMemory?: boolean;
-  conversationId?: string;
-  userId?: string;
-  loadConversationHistory?: boolean;
-  eventCallback?: EventCallback;
+export interface ConversationResponse {
+  source: 'agent';
+  content: string;
+  agentId: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+  };
 }
 
 export interface ConversationStreamingRequest extends ConversationRequest {
@@ -55,75 +52,49 @@ export class AgentService {
   // ============================================================================
 
   /**
-   * Create a new agent and return as Agent instance
+   * Create a new agent and return as AgentModel
    */
-  async createAgent(request: CreateAgentRequest, options: AgentOptions = {}): Promise<Agent> {
-    // Create agent with default blueprint and memory if none provided
+  async createAgent(data: CreateAgentRequest & { starshipId: string }): Promise<AgentModel> {
     const agentData = {
-      ...request,
-      blueprint: request.blueprint || this.createDefaultBlueprint(request),
-      memory: request.memory || this.createDefaultMemoryConfig(request),
-      timeout: request.timeout || 30000,
-      version: '1.0.0', // Default version for all new agents
+      name: data.name,
+      description: data.description,
+      model: data.model,
+      temperature: data.temperature,
+      maxTokens: data.maxTokens,
+      timeout: data.timeout || 30000,
+      blueprint: data.blueprint,
+      memoryState: data.memoryState,
     };
 
-    // Entity validation and transformation is now handled in the repository layer
-    const dbAgent = await this.agentRepository.create(agentData);
-    return await this.createAgentInstance(dbAgent, options);
+    return await this.agentRepository.create(agentData, data.starshipId);
   }
 
   /**
-   * Get agent by ID as Agent instance
+   * Update agent and return as AgentModel
    */
-  async getAgent(agentId: string, options: AgentOptions = {}): Promise<Agent | null> {
-    const dbAgent = await this.agentRepository.findById(agentId);
-    if (!dbAgent) {
-      return null;
-    }
-    return await this.createAgentInstance(dbAgent, options);
+  async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
+    return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
   }
 
   /**
-   * Get all agents as Agent instances
+   * Get agent by ID as AgentModel
    */
-  async getAllAgents(options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findAll();
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
+  async getAgent(agentId: string): Promise<AgentModel | null> {
+    return await this.agentRepository.findById(agentId);
   }
 
   /**
-   * Get agents by starship as Agent instances
+   * Get agents by starship as AgentModel array
    */
-  async getAgentsByStarship(starshipId: string, options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findByStarshipId(starshipId);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
+  async getAgentsByStarship(starshipId: string): Promise<AgentModel[]> {
+    return await this.agentRepository.findByStarship(starshipId);
   }
 
   /**
-   * Get agents by user as Agent instances
+   * Search agents and return as AgentModel array
    */
-  async getAgentsByUser(userId: string, options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findByAuthor(userId);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  /**
-   * Update agent and return as Agent instance
-   */
-  async updateAgent(agentId: string, updates: UpdateAgentRequest, options: AgentOptions = {}): Promise<Agent | null> {
-    // Validate blueprint if being updated
-    if (updates.blueprint) {
-      const validation = this.validateBlueprint(updates.blueprint);
-      if (!validation.valid) {
-        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
-      }
-    }
-
-    const dbAgent = await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
-    if (!dbAgent) {
-      return null;
-    }
-    return await this.createAgentInstance(dbAgent, options);
+  async searchAgents(query: string): Promise<AgentModel[]> {
+    return await this.agentRepository.searchAgents(query);
   }
 
   /**
@@ -131,160 +102,6 @@ export class AgentService {
    */
   async deleteAgent(agentId: string): Promise<boolean> {
     return await this.agentRepository.delete(agentId);
-  }
-
-  /**
-   * Deploy agent to starship
-   */
-  async deployAgent(agentId: string, starshipId: string): Promise<void> {
-    await this.agentRepository.updateStarshipId(agentId, starshipId);
-  }
-
-  /**
-   * Search agents and return as Agent instances
-   */
-  async searchAgents(query: string, options: AgentOptions = {}): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.searchAgents(query);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  /**
-   * Get agents with filters as Agent instances
-   */
-  async getAgentsWithFilters(
-    filters: {
-      category?: string;
-      tags?: string[];
-      isPublic?: boolean;
-      authorId?: string;
-      starshipClass?: 'scout' | 'cruiser';
-    },
-    options: AgentOptions = {}
-  ): Promise<Agent[]> {
-    const dbAgents = await this.agentRepository.findWithFilters(filters);
-    return Promise.all(dbAgents.map((dbAgent) => this.createAgentInstance(dbAgent, options)));
-  }
-
-  // ============================================================================
-  // AGENT DATA MANAGEMENT APIs (for Routes Layer)
-  // ============================================================================
-
-  /**
-   * Create a new agent and return as AgentModel (for routes layer)
-   */
-  async createAgentModel(request: CreateAgentRequest & { authorId: string }): Promise<AgentModel> {
-    // Create agent with default blueprint and memory if none provided
-    const agentData = {
-      ...request,
-      blueprint: request.blueprint || this.createDefaultBlueprint(request),
-      memory: request.memory || this.createDefaultMemoryConfig(request),
-      timeout: request.timeout || 30000,
-      version: '1.0.0', // Default version for all new agents
-    };
-
-    // Entity validation and transformation is now handled in the repository layer
-    return await this.agentRepository.create(agentData);
-  }
-
-  /**
-   * Get agent by ID as AgentModel (for routes layer)
-   */
-  async getAgentModel(agentId: string): Promise<AgentModel | null> {
-    return await this.agentRepository.findById(agentId);
-  }
-
-  /**
-   * Update agent and return as AgentModel (for routes layer)
-   */
-  async updateAgentModel(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
-    // Validate blueprint if being updated
-    if (updates.blueprint) {
-      const validation = this.validateBlueprint(updates.blueprint);
-      if (!validation.valid) {
-        throw new ValidationError(`Invalid blueprint: ${validation.errors.join(', ')}`);
-      }
-    }
-
-    return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
-  }
-
-  /**
-   * Get agents by starship as AgentModel array (for routes layer)
-   */
-  async getAgentModelsByStarship(starshipId: string): Promise<AgentModel[]> {
-    return await this.agentRepository.findByStarshipId(starshipId);
-  }
-
-  /**
-   * Get agents by user as AgentModel array (for routes layer)
-   */
-  async getAgentModelsByUser(userId: string): Promise<AgentModel[]> {
-    return await this.agentRepository.findByAuthor(userId);
-  }
-
-  /**
-   * Get agents by category as AgentModel array (for routes layer)
-   */
-  async getAgentModelsByCategory(category: string): Promise<AgentModel[]> {
-    return await this.agentRepository.findByCategory(category);
-  }
-
-  /**
-   * Get public agents as AgentModel array (for routes layer)
-   */
-  async getPublicAgentModels(limit: number = 50, offset: number = 0): Promise<AgentModel[]> {
-    return await this.agentRepository.findPublic(limit, offset);
-  }
-
-  /**
-   * Search agents and return as AgentModel array (for routes layer)
-   */
-  async searchAgentModels(query: string): Promise<AgentModel[]> {
-    return await this.agentRepository.searchAgents(query);
-  }
-
-  /**
-   * Get agents with filters as AgentModel array (for routes layer)
-   */
-  async getAgentModelsWithFilters(filters: {
-    category?: string;
-    tags?: string[];
-    isPublic?: boolean;
-    authorId?: string;
-    starshipClass?: 'scout' | 'cruiser';
-  }): Promise<AgentModel[]> {
-    return await this.agentRepository.findWithFilters(filters);
-  }
-
-  /**
-   * Rate an agent (for routes layer)
-   */
-  async rateAgent(agentId: string, rating: number): Promise<void> {
-    // Business validation
-    if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-      throw new ValidationError('Rating must be a number between 1 and 5', 'rating');
-    }
-
-    // Check if agent exists first
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    await this.agentRepository.updateRating(agentId, rating);
-  }
-
-  /**
-   * Track agent usage (for routes layer)
-   */
-  async trackAgentUsage(agentId: string): Promise<void> {
-    // Check if agent exists first
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    await this.agentRepository.incrementUsageCount(agentId);
   }
 
   /**
@@ -297,1036 +114,126 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
 
-    // TODO: Add business validation for starship existence and user access
-    return await this.agentRepository.update(agentId, { starshipId } as Partial<AgentModel>);
+    return await this.agentRepository.updateStarship(agentId, starshipId);
   }
 
   /**
-   * Get agent analytics (for routes layer)
+   * Get all agents with optional pagination
    */
-  async getAgentAnalytics(agentId: string): Promise<{
-    id: string;
-    name: string;
-    usageCount: number;
-    rating: number;
-    createdAt: string;
-    updatedAt: string;
-    category: string;
-    isPublic: boolean;
-  } | null> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      return null;
+  async getAllAgents(limit?: number, offset?: number): Promise<AgentModel[]> {
+    const allAgents = await this.agentRepository.findAll();
+
+    // Apply pagination if specified
+    if (limit !== undefined && offset !== undefined) {
+      return allAgents.slice(offset, offset + limit);
     }
 
-    return {
-      id: agent.id,
-      name: agent.name,
-      usageCount: agent.usageCount || 0,
-      rating: (agent as any).rating || 0,
-      createdAt: agent.createdAt,
-      updatedAt: agent.updatedAt,
-      category: agent.category,
-      isPublic: agent.isPublic || false,
+    return allAgents;
+  }
+
+  /**
+   * Get agents with pagination metadata
+   */
+  async getAgentsWithPagination(
+    page: number = 1,
+    limit: number = 50
+  ): Promise<{
+    agents: AgentModel[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      has_next: boolean;
+      has_prev: boolean;
     };
-  }
-
-  // ============================================================================
-  // AGENT EXECUTION APIs
-  // ============================================================================
-
-  /**
-   * Execute conversation with agent using ConversationRequest format with streaming support
-   * Handles complete conversation lifecycle with event monitoring and message creation
-   */
-  static async executeConversationWithStreaming(request: ConversationStreamingRequest): Promise<ConversationResponse> {
-    const { agentId, userId, message, conversationId, streamId, streamingService } = request;
-
-    if (!agentId) {
-      throw new ValidationError('agentId is required for conversation execution', 'agentId');
-    }
-
-    if (!streamId) {
-      throw new ValidationError('streamId is required for streaming conversation execution', 'streamId');
-    }
-
-    console.log('🚀 [AGENT-SERVICE] Starting streaming conversation execution:', {
-      agentId,
-      userId,
-      message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
-      conversationId,
-      streamId,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Get agent from database
-    const agentRepo = new AgentRepository();
-    const dbAgent = await agentRepo.findById(agentId);
-
-    if (!dbAgent) {
-      console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
-      id: dbAgent.id,
-      name: dbAgent.name,
-      model: dbAgent.model,
-      executionMode: dbAgent.executionMode || 'simple',
-      hasBlueprint: !!dbAgent.blueprint,
-      starshipId: dbAgent.starshipId,
-    });
-
-    const startTime = Date.now();
-    const agentService = new AgentService();
-
-    try {
-      // Create event handler with MessageService to add messages on each node completion
-      const eventHandler = AgentService.createEventHandler({
-        agentId: agentId,
-        conversationId: conversationId,
-        userId: userId,
-        starshipId: dbAgent.starshipId,
-        messageService: agentService.messageService,
-        streamingService: streamingService,
-        streamId: streamId,
-      });
-
-      // Create agent instance with enhanced options
-      const agent = await agentService.createAgentInstance(dbAgent, {
-        includeMemory: true,
-        userId: userId,
-        conversationId: conversationId,
-        loadConversationHistory: true,
-        eventCallback: eventHandler,
-      });
-
-      // Create and inject streaming service
-      const autopilotStreamService = new AutopilotStreamService(streamingService, streamId, conversationId || 'unknown', agentId);
-
-      // Inject streaming service into agent's engine
-      agent.getEngine().setStreamingEmitter(autopilotStreamService);
-
-      // Add user message to memory
-      agent.addToMemory('user', message);
-
-      // Execute agent with streaming-enabled execution
-      const execution = await agent.execute(
-        {
-          currentNodeRef: undefined,
-          status: 'not_started',
-          executionResults: new Map(),
-          agentMemory: agent.getMemory(),
-          streaming: {
-            enabled: true,
-            streamId,
-            conversationId,
-            agentId,
-          },
-        },
-        eventHandler
-      );
-
-      // Extract response from execution result
-      const response = agentService.extractResponse(execution);
-
-      // Calculate usage statistics
-      const usage = agentService.calculateUsage(execution);
-
-      // Update agent usage count
-      await agentRepo.incrementUsageCount(agentId);
-
-      const executionTime = Date.now() - startTime;
-
-      console.log('✅ [AGENT-SERVICE] Streaming conversation execution completed successfully:', {
-        responseLength: response.length,
-        executionTime,
-        usageStats: usage,
-      });
-
-      return {
-        source: 'agent',
-        content: response,
-        agentId: agentId,
-        usage: {
-          promptTokens: Math.floor(usage.totalTokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(usage.totalTokens * 0.3), // Estimate completion tokens
-        },
-      };
-    } catch (error) {
-      console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
-        agentId,
-        userId,
-        streamId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      // Create error message in conversation
-      await agentService.createErrorResponse(error as Error, {
-        agentId,
-        userId,
-        conversationId,
-        starshipId: dbAgent.starshipId,
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Execute conversation with agent using ConversationRequest format
-   * Handles complete conversation lifecycle with event monitoring and message creation
-   */
-  static async executeConversation(request: ConversationRequest): Promise<ConversationResponse> {
-    const { agentId, userId, message, conversationId } = request;
-
-    if (!agentId) {
-      throw new ValidationError('agentId is required for conversation execution', 'agentId');
-    }
-
-    console.log('🚀 [AGENT-SERVICE] Starting conversation execution:', {
-      agentId,
-      userId,
-      message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
-      conversationId,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Get agent from database
-    const agentRepo = new AgentRepository();
-    const dbAgent = await agentRepo.findById(agentId);
-
-    if (!dbAgent) {
-      console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
-      id: dbAgent.id,
-      name: dbAgent.name,
-      model: dbAgent.model,
-      executionMode: dbAgent.executionMode || 'simple',
-      hasBlueprint: !!dbAgent.blueprint,
-      starshipId: dbAgent.starshipId,
-    });
-
-    const startTime = Date.now();
-    const agentService = new AgentService();
-
-    try {
-      // Create event handler with MessageService to add messages on each node completion
-      const eventHandler = AgentService.createEventHandler({
-        agentId: agentId,
-        conversationId: conversationId,
-        userId: userId,
-        starshipId: dbAgent.starshipId,
-        messageService: agentService.messageService,
-      });
-
-      // Create agent instance with enhanced options
-      const agent = await agentService.createAgentInstance(dbAgent, {
-        includeMemory: true,
-        userId: userId,
-        conversationId: conversationId,
-        loadConversationHistory: true,
-        eventCallback: eventHandler,
-      });
-
-      // Add user message to memory
-      agent.addToMemory('user', message);
-
-      // Execute agent with event monitoring
-      const execution = await agent.execute(undefined, eventHandler);
-
-      // Extract response from execution result
-      const response = agentService.extractResponse(execution);
-
-      // Calculate usage statistics
-      const usage = agentService.calculateUsage(execution);
-
-      // Update agent usage count
-      await agentRepo.incrementUsageCount(agentId);
-
-      const executionTime = Date.now() - startTime;
-
-      console.log('✅ [AGENT-SERVICE] Conversation execution completed successfully:', {
-        responseLength: response.length,
-        executionTime,
-        usageStats: usage,
-      });
-
-      return {
-        source: 'agent',
-        content: response,
-        agentId: agentId,
-        usage: {
-          promptTokens: Math.floor(usage.totalTokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(usage.totalTokens * 0.3), // Estimate completion tokens
-        },
-      };
-    } catch (error) {
-      console.error('❌ [AGENT-SERVICE] Conversation execution failed:', {
-        agentId,
-        userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      // Create error message in conversation
-      await agentService.createErrorResponse(error as Error, {
-        agentId,
-        userId,
-        conversationId,
-        starshipId: dbAgent.starshipId,
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Test agent configuration without executing
-   */
-  static async validateAgent(agentId: string): Promise<{
-    valid: boolean;
-    errors: string[];
-    warnings: string[];
   }> {
-    try {
-      const agentRepo = new AgentRepository();
-      const dbAgent = await agentRepo.findById(agentId);
+    const allAgents = await this.agentRepository.findAll();
+    const total = allAgents.length;
+    const offset = (page - 1) * limit;
+    const paginatedAgents = allAgents.slice(offset, offset + limit);
 
-      if (!dbAgent) {
-        return {
-          valid: false,
-          errors: [`Agent ${agentId} not found`],
-          warnings: [],
-        };
-      }
-
-      // Basic validation - AgentService handles detailed validation internally
-      if (!dbAgent.name || !dbAgent.model) {
-        return {
-          valid: false,
-          errors: ['Agent name and model are required'],
-          warnings: [],
-        };
-      }
-
-      const warnings: string[] = [];
-
-      // Add warnings for potential issues
-      if (!dbAgent.blueprint && dbAgent.executionMode === 'workflow') {
-        warnings.push('Agent is set to workflow mode but has no blueprint defined');
-      }
-
-      if (!dbAgent.starshipId) {
-        warnings.push('Agent is not assigned to any starship');
-      }
-
-      return {
-        valid: true,
-        errors: [],
-        warnings,
-      };
-    } catch (error) {
-      return {
-        valid: false,
-        errors: [error instanceof Error ? error.message : 'Unknown validation error'],
-        warnings: [],
-      };
-    }
-  }
-
-  /**
-   * Register event callback for agent execution monitoring with message creation
-   */
-  static createEventHandler(context: {
-    agentId: string;
-    conversationId?: string;
-    userId?: string;
-    starshipId?: string;
-    messageService?: MessageService;
-    streamingService?: any;
-    streamId?: string;
-  }): EventCallback {
-    return async (event: ExecutionEvent) => {
-      console.log(`[AGENT-SERVICE] Event: ${event.type}`, {
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        userId: context.userId,
-        currentNode: event.execution.currentNodeRef,
-        status: event.execution.status,
-        timestamp: event.timestamp,
-        streaming: !!context.streamingService,
-      });
-
-      // Add custom event handling logic here based on event type
-      switch (event.type) {
-        case 'workflow_started':
-          console.log(`[AGENT-SERVICE] Workflow started for agent ${context.agentId}`);
-          await AgentService.handleWorkflowStarted(event, context);
-          break;
-        case 'node_started':
-          console.log(`[AGENT-SERVICE] Node ${event.execution.currentNodeRef} started`);
-          await AgentService.handleNodeStarted(event, context);
-          break;
-        case 'node_completed':
-          console.log(`[AGENT-SERVICE] Node ${event.execution.currentNodeRef} completed`);
-          await AgentService.handleNodeCompleted(event, context);
-          break;
-        case 'workflow_completed':
-          console.log(`[AGENT-SERVICE] Workflow completed for agent ${context.agentId}`);
-          await AgentService.handleWorkflowCompleted(event, context);
-          break;
-        case 'workflow_failed':
-          console.error(`[AGENT-SERVICE] Workflow failed for agent ${context.agentId}:`, event.execution.error);
-          await AgentService.handleWorkflowFailed(event, context);
-          break;
-        default:
-          break;
-      }
-    };
-  }
-
-  /**
-   * Handle workflow started event
-   */
-  private static async handleWorkflowStarted(
-    event: ExecutionEvent,
-    context: {
-      agentId: string;
-      conversationId?: string;
-      userId?: string;
-      starshipId?: string;
-      messageService?: MessageService;
-      streamingService?: any;
-      streamId?: string;
-    }
-  ): Promise<void> {
-    if (!context.conversationId || !context.starshipId || !context.messageService) {
-      return;
-    }
-
-    try {
-      const messageData = {
-        role: 'system' as const,
-        content: `🚀 Agent workflow started`,
-        starshipId: context.starshipId,
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        messageType: 'system_message' as const,
-        importance: 'low' as const,
-        processingStatus: 'completed' as const,
-        metadata: {
-          event: 'workflow_started',
-          timestamp: event.timestamp,
-        },
-      };
-
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-workflow-started`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
-      await context.messageService.createMessage(messageData);
-    } catch (error) {
-      console.error(`[AGENT-SERVICE] Failed to create workflow_started message:`, error);
-    }
-  }
-
-  /**
-   * Handle node started event
-   */
-  private static async handleNodeStarted(
-    event: ExecutionEvent,
-    context: {
-      agentId: string;
-      conversationId?: string;
-      userId?: string;
-      starshipId?: string;
-      messageService?: MessageService;
-      streamingService?: any;
-      streamId?: string;
-    }
-  ): Promise<void> {
-    if (!context.conversationId || !context.starshipId || !context.messageService) {
-      return;
-    }
-
-    try {
-      const messageData = {
-        role: 'system' as const,
-        content: `⏳ Starting node: ${event.execution.currentNodeRef}`,
-        starshipId: context.starshipId,
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        messageType: 'system_message' as const,
-        importance: 'low' as const,
-        processingStatus: 'completed' as const,
-        metadata: {
-          event: 'node_started',
-          nodeRef: event.execution.currentNodeRef,
-          timestamp: event.timestamp,
-        },
-      };
-
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-node-started-${event.execution.currentNodeRef}`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
-      await context.messageService.createMessage(messageData);
-    } catch (error) {
-      console.error(`[AGENT-SERVICE] Failed to create node_started message:`, error);
-    }
-  }
-
-  /**
-   * Handle node completed event - This is where each node completion creates a message
-   */
-  private static async handleNodeCompleted(
-    event: ExecutionEvent,
-    context: {
-      agentId: string;
-      conversationId?: string;
-      userId?: string;
-      starshipId?: string;
-      messageService?: MessageService;
-      streamingService?: any;
-      streamId?: string;
-    }
-  ): Promise<void> {
-    if (!context.conversationId || !context.starshipId || !context.messageService) {
-      return;
-    }
-
-    try {
-      // Get the node result from execution
-      const nodeResult = event.execution.executionResults.get(event.execution.currentNodeRef || '');
-      const nodeResultData = nodeResult?.data || {};
-      const currentNodeRef = event.execution.currentNodeRef || '';
-
-      // Check if nodeResult exists and has no error, then create assistant message with LLM response
-      if (nodeResult && !nodeResult.error && nodeResult.data) {
-        // Type the data as LLM response structure from autopilot LLM class
-        const llmData = nodeResult.data as LlmResponseData;
-
-        // Extract the actual LLM response content from the proper field
-        const llmResponseContent = llmData.llmResponse;
-
-        // Create assistant message with LLM response if we have content
-        if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
-          const assistantMessageData = {
-            role: 'assistant' as const,
-            content: llmResponseContent.trim(),
-            starshipId: context.starshipId,
-            agentId: context.agentId,
-            conversationId: context.conversationId,
-            messageType: 'agent_response' as const,
-            importance: 'high' as const,
-            processingStatus: 'completed' as const,
-            metadata: {
-              event: 'llm_response',
-              nodeRef: currentNodeRef,
-              model: llmData.model,
-              timestamp: event.timestamp,
-            },
-          };
-
-          // For streaming: broadcast assistant message object
-          if (context.streamingService && context.streamId) {
-            const tempMessage = {
-              id: `temp-${Date.now()}-assistant-${currentNodeRef}`,
-              ...assistantMessageData,
-              timestamp: event.timestamp,
-              createdAt: event.timestamp,
-              updatedAt: event.timestamp,
-              version: '1.0.0',
-              threadDepth: 0,
-              contentLength: assistantMessageData.content.length,
-              hasAttachments: false,
-              streaming: true,
-            };
-            await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-          }
-
-          // Always create database message
-          await context.messageService.createMessage(assistantMessageData);
-        }
-      }
-
-      // Create system message for node completion tracking (for all nodes)
-      const completionMessageData = {
-        role: 'system' as const,
-        content: `✅ Completed node: ${currentNodeRef}`,
-        starshipId: context.starshipId,
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        messageType: 'system_message' as const,
-        importance: 'low' as const,
-        processingStatus: 'completed' as const,
-        metadata: {
-          event: 'node_completed',
-          nodeRef: currentNodeRef,
-          nodeResult: nodeResultData,
-          timestamp: event.timestamp,
-        },
-      };
-
-      // For streaming: broadcast completion message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-completed-${currentNodeRef}`,
-          ...completionMessageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: completionMessageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
-      await context.messageService.createMessage(completionMessageData);
-    } catch (error) {
-      console.error(`[AGENT-SERVICE] Failed to create node_completed message:`, error);
-    }
-  }
-
-  /**
-   * Handle workflow completed event
-   */
-  private static async handleWorkflowCompleted(
-    event: ExecutionEvent,
-    context: {
-      agentId: string;
-      conversationId?: string;
-      userId?: string;
-      starshipId?: string;
-      messageService?: MessageService;
-      streamingService?: any;
-      streamId?: string;
-    }
-  ): Promise<void> {
-    if (!context.conversationId || !context.starshipId || !context.messageService) {
-      return;
-    }
-
-    try {
-      const messageData = {
-        role: 'system' as const,
-        content: `🎉 Agent workflow completed successfully`,
-        starshipId: context.starshipId,
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        messageType: 'system_message' as const,
-        importance: 'medium' as const,
-        processingStatus: 'completed' as const,
-        metadata: {
-          event: 'workflow_completed',
-          timestamp: event.timestamp,
-          executionResults: Array.from(event.execution.executionResults.keys()),
-        },
-      };
-
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-workflow-completed`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
-      await context.messageService.createMessage(messageData);
-    } catch (error) {
-      console.error(`[AGENT-SERVICE] Failed to create workflow_completed message:`, error);
-    }
-  }
-
-  /**
-   * Handle workflow failed event
-   */
-  private static async handleWorkflowFailed(
-    event: ExecutionEvent,
-    context: {
-      agentId: string;
-      conversationId?: string;
-      userId?: string;
-      starshipId?: string;
-      messageService?: MessageService;
-      streamingService?: any;
-      streamId?: string;
-    }
-  ): Promise<void> {
-    if (!context.conversationId || !context.starshipId || !context.messageService) {
-      return;
-    }
-
-    try {
-      const messageData = {
-        role: 'system' as const,
-        content: `❌ Agent workflow failed: ${event.execution.error?.message || 'Unknown error'}`,
-        starshipId: context.starshipId,
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        messageType: 'error' as const,
-        importance: 'high' as const,
-        processingStatus: 'completed' as const,
-        metadata: {
-          event: 'workflow_failed',
-          error: event.execution.error,
-          timestamp: event.timestamp,
-        },
-      };
-
-      // For streaming: broadcast message object
-      if (context.streamingService && context.streamId) {
-        const tempMessage = {
-          id: `temp-${Date.now()}-workflow-failed`,
-          ...messageData,
-          timestamp: event.timestamp,
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-          version: '1.0.0',
-          threadDepth: 0,
-          contentLength: messageData.content.length,
-          hasAttachments: false,
-          streaming: true,
-        };
-        await context.streamingService.broadcastMessage(context.streamId, tempMessage);
-      }
-
-      // Always create database message
-      await context.messageService.createMessage(messageData);
-    } catch (error) {
-      console.error(`[AGENT-SERVICE] Failed to create workflow_failed message:`, error);
-    }
-  }
-
-  /**
-   * Create error response using raw error message
-   */
-  async createErrorResponse(
-    error: Error,
-    context: {
-      agentId: string;
-      userId?: string;
-      conversationId?: string;
-      starshipId: string;
-    }
-  ): Promise<ConversationResponse> {
-    const errorMessage = error.message;
-    const errorStack = error.stack;
-
-    // Create raw error message via message service
-    if (context.conversationId) {
-      await this.messageService.createMessage({
-        role: 'system',
-        content: errorMessage,
-        starshipId: context.starshipId,
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        messageType: 'error',
-        importance: 'high',
-        processingStatus: 'completed',
-        metadata: {
-          errorMessage,
-          errorStack,
-          timestamp: new Date().toISOString(),
-        },
-      });
-    }
-
-    // Return raw error response
     return {
-      source: 'agent',
-      content: errorMessage,
-      agentId: context.agentId,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
+      agents: paginatedAgents,
+      pagination: {
+        page,
+        limit,
+        total,
+        has_next: offset + limit < total,
+        has_prev: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Validate starship access for a user
+   */
+  async validateStarshipAccess(starshipId: string, userId: string): Promise<boolean> {
+    const { StarshipRepository } = await import('@starships/models');
+    const starshipRepository = new StarshipRepository();
+    const starship = await starshipRepository.findById(starshipId);
+
+    if (!starship) {
+      throw new NotFoundError('Starship', starshipId);
+    }
+
+    return starship.ownerId === userId;
+  }
+
+  /**
+   * Get agents by starship with access control
+   */
+  async getAgentsByStarshipWithAccess(
+    starshipId: string,
+    userId: string,
+    page: number = 1,
+    limit: number = 50
+  ): Promise<{ agents: AgentModel[]; total: number; pagination: any }> {
+    // Validate access first
+    await this.validateStarshipAccess(starshipId, userId);
+
+    // Get all agents for the starship
+    const allAgents = await this.getAgentsByStarship(starshipId);
+
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const paginatedAgents = allAgents.slice(startIndex, startIndex + limit);
+
+    return {
+      agents: paginatedAgents,
+      total: allAgents.length,
+      pagination: {
+        page,
+        limit,
+        total: allAgents.length,
+        has_next: startIndex + limit < allAgents.length,
+        has_prev: page > 1,
       },
     };
   }
 
   // ============================================================================
-  // PRIVATE HELPER METHODS
+  // MODEL ↔ INSTANCE CONVERSION METHODS
   // ============================================================================
 
   /**
-   * Convert database agent to agent instance
+   * Convert AgentModel to Agent instance, storing model ID in instance metadata
    */
-  private async createAgentInstance(dbAgent: AgentModel, options: AgentOptions): Promise<Agent> {
-    // Get or create blueprint - ensure it has proper nodes and edges arrays
-    let blueprint = dbAgent.blueprint;
-    if (!blueprint || !blueprint.nodes || !blueprint.edges) {
-      blueprint = this.createDefaultBlueprint(dbAgent);
-    }
-
-    // Create default memory config if missing
-    const memoryConfig = dbAgent.memory || {
-      identity: {
-        name: dbAgent.name as string,
-        role: this.getRoleFromCategory(dbAgent.category as string),
-        expertise: dbAgent.tags as string[],
-      },
-      purpose: {
-        primary: (dbAgent.description as string) || `Assist users as a ${dbAgent.category} agent`,
-        constraints: ['Be helpful and accurate', 'Follow ethical guidelines'],
-      },
-      space: {
-        description: `Professional ${dbAgent.category} assistance environment. Focused on providing accurate and helpful responses.`,
-      },
-    };
-
-    // Create autopilot agent parameters
+  async toInstance(agentModel: AgentModel): Promise<Agent> {
     const agentParams = {
-      name: dbAgent.name as string,
-      description: dbAgent.description as string,
-      model: dbAgent.model as string,
-      memory: memoryConfig, // Pass the AgentMemoryConfig
-      blueprint: blueprint,
-      temperature: dbAgent.temperature as number,
-      maxTokens: dbAgent.maxTokens as number,
-      timeout: (dbAgent.timeout as number) || 30000,
-    };
-
-    return new Agent(agentParams);
-  }
-
-  /**
-   * Extract response from autopilot agent execution result
-   */
-  private extractResponse(executionResult: any): string {
-    if (executionResult.status !== 'completed') {
-      throw createError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`, 500);
-    }
-
-    // Look for LLM response in execution results
-    const results = Array.from(executionResult.executionResults.values()) as any[];
-
-    // Find the last successful LLM response
-    for (let i = results.length - 1; i >= 0; i--) {
-      const result = results[i] as any;
-      if (!result.error && result.data) {
-        // Check for different response formats
-        if (typeof result.data === 'string') {
-          return result.data;
-        }
-        if (result.data.content) {
-          return result.data.content;
-        }
-        if (result.data.response) {
-          return result.data.response;
-        }
-        if (result.data.output) {
-          return result.data.output;
-        }
-      }
-    }
-
-    // Fallback: return a generic response
-    return "I've processed your request successfully, but couldn't generate a specific response.";
-  }
-
-  /**
-   * Calculate usage statistics from execution result
-   */
-  private calculateUsage(executionResult: any): any {
-    // Extract usage information from execution results
-    const results = Array.from(executionResult.executionResults.values()) as any[];
-    let totalTokens = 0;
-    let totalCost = 0;
-
-    for (const result of results) {
-      if (result.data?.usage) {
-        totalTokens += result.data.usage.totalTokens || 0;
-        totalCost += result.data.usage.cost || 0;
-      }
-    }
-
-    return {
-      totalTokens: totalTokens,
-      cost: totalCost,
-      modelCalls: results.filter((r: any) => !r.error).length,
-    };
-  }
-
-  /**
-   * Create default blueprint for simple chat agents
-   */
-  private createDefaultBlueprint(dbAgent: AgentModel | CreateAgentRequest): any {
-    return {
-      nodes: [
-        {
-          ref: 'start',
-          type: 'start',
-          name: 'Start',
-          description: 'Begin conversation',
-          parameters: {},
-        },
-        {
-          ref: 'llm-response',
-          type: 'llm',
-          name: 'Generate Response',
-          description: 'Process user input and generate response',
-          parameters: {
-            model: dbAgent.model,
-            prompt: 'Respond to the user based on the conversation context and your system instructions.',
-            temperature: dbAgent.temperature || 0.7,
-            maxTokens: dbAgent.maxTokens || 2000,
-            timeout: 30000,
-            stream: true, // Enable streaming for all LLM nodes
-          },
-        },
-        {
-          ref: 'end',
-          type: 'end',
-          name: 'End',
-          description: 'Complete conversation',
-          parameters: {},
-        },
-      ],
-      edges: [
-        {
-          ref: 'edge-1',
-          from: 'start',
-          to: 'llm-response',
-        },
-        {
-          ref: 'edge-2',
-          from: 'llm-response',
-          to: 'end',
-        },
-      ],
+      name: agentModel.name,
+      description: agentModel.description,
+      model: agentModel.model,
+      temperature: agentModel.temperature,
+      maxTokens: agentModel.maxTokens,
+      timeout: agentModel.timeout,
+      memoryState: agentModel.memoryState,
+      blueprint: agentModel.blueprint,
       metadata: {
-        version: '1.0',
-        type: 'simple-chat',
-        generated: true,
-        agentId: 'id' in dbAgent ? dbAgent.id : 'new-agent',
-        createdAt: new Date().toISOString(),
+        id: agentModel.id,
       },
-    };
-  }
+    } as AgentParams;
+    const agentInstance = new Agent(agentParams);
 
-  /**
-   * Validate blueprint structure
-   */
-  private validateBlueprint(blueprint: any): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
-
-    if (!blueprint.nodes || !Array.isArray(blueprint.nodes)) {
-      errors.push('Blueprint must have a nodes array');
-      return { valid: false, errors };
-    }
-
-    if (!blueprint.edges || !Array.isArray(blueprint.edges)) {
-      errors.push('Blueprint must have an edges array');
-      return { valid: false, errors };
-    }
-
-    // Check for start node
-    const hasStartNode = blueprint.nodes.some((node: any) => node.type === 'start');
-    if (!hasStartNode) {
-      errors.push('Blueprint must have a start node');
-    }
-
-    // Check for end node
-    const hasEndNode = blueprint.nodes.some((node: any) => node.type === 'end');
-    if (!hasEndNode) {
-      errors.push('Blueprint must have an end node');
-    }
-
-    // Validate edge references
-    const nodeRefs = new Set(blueprint.nodes.map((n: any) => n.ref));
-    for (const edge of blueprint.edges) {
-      if (!nodeRefs.has(edge.from)) {
-        errors.push(`Edge references non-existent node: ${edge.from}`);
-      }
-      if (!nodeRefs.has(edge.to)) {
-        errors.push(`Edge references non-existent node: ${edge.to}`);
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  }
-
-  /**
-   * Create default memory configuration for agents
-   */
-  private createDefaultMemoryConfig(request: CreateAgentRequest): any {
-    return {
-      identity: {
-        name: request.name,
-        role: this.getRoleFromCategory(request.category),
-        expertise: [], // No tags by default
-      },
-      purpose: {
-        primary: request.description || `Assist users as a ${request.category} agent`,
-        constraints: ['Be helpful and accurate', 'Follow ethical guidelines'],
-      },
-      space: {
-        description: `Professional ${request.category} assistance environment. Focused on providing accurate and helpful responses.`,
-      },
-    };
-  }
-
-  /**
-   * Helper: Get role from agent category
-   */
-  private getRoleFromCategory(category: string): string {
-    const roles = {
-      general: 'General Assistant',
-      coding: 'Software Developer',
-      creative: 'Creative Assistant',
-      analysis: 'Data Analyst',
-      support: 'Support Specialist',
-    };
-    return roles[category as keyof typeof roles] || 'AI Assistant';
+    return agentInstance;
   }
 }

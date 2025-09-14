@@ -7,11 +7,11 @@ import { ConflictError, DatabaseError, NotFoundError, ValidationError } from '@s
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,
-  log: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  debug: jest.fn(),
-  info: jest.fn(),
+  log: jest.fn() as jest.MockedFunction<typeof console.log>,
+  warn: jest.fn() as jest.MockedFunction<typeof console.warn>,
+  error: jest.fn() as jest.MockedFunction<typeof console.error>,
+  debug: jest.fn() as jest.MockedFunction<typeof console.debug>,
+  info: jest.fn() as jest.MockedFunction<typeof console.info>,
 };
 
 // Mock neo4j driver for database operations
@@ -24,10 +24,10 @@ const mockDriver = {
 };
 
 // Global test utilities
-(global as any).createMockDriver = () => mockDriver;
+(global as Record<string, unknown>).createMockDriver = () => mockDriver;
 
 // Mock user data
-(global as any).createMockUser = (overrides: any = {}) => ({
+(global as Record<string, unknown>).createMockUser = (overrides: Record<string, unknown> = {}) => ({
   id: 'user-123',
   username: 'testuser',
   email: 'test@example.com',
@@ -37,14 +37,13 @@ const mockDriver = {
 });
 
 // Mock starship data
-(global as any).createMockStarship = (overrides: any = {}) => ({
+(global as Record<string, unknown>).createMockStarship = (overrides: Record<string, unknown> = {}) => ({
   id: 'starship-123',
   name: 'Test Starship',
   slug: 'test-starship',
   ownerId: 'user-123',
   class: 'scout',
   maxAgents: 3,
-  maxActiveMissions: 3,
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
@@ -52,7 +51,7 @@ const mockDriver = {
 });
 
 // Mock agent data
-(global as any).createMockAgent = (overrides: any = {}) => ({
+(global as Record<string, unknown>).createMockAgent = (overrides: Record<string, unknown> = {}) => ({
   id: 'agent-123',
   name: 'Test Agent',
   description: 'A test agent',
@@ -67,20 +66,17 @@ const mockDriver = {
 });
 
 // Mock conversation data
-(global as any).createMockConversation = (overrides: any = {}) => ({
+(global as Record<string, unknown>).createMockConversation = (overrides: Record<string, unknown> = {}) => ({
   id: 'conversation-123',
-  lastActivityAt: '2024-01-01T00:00:00.000Z',
-  messageCount: 0,
-  totalTokens: 0,
+  title: 'Test Conversation',
   status: 'active',
-  metadata: {},
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',
   ...overrides,
 });
 
 // Mock message data
-(global as any).createMockMessage = (overrides: any = {}) => ({
+(global as Record<string, unknown>).createMockMessage = (overrides: Record<string, unknown> = {}) => ({
   id: 'message-123',
   conversationId: 'conversation-123',
   role: 'user',
@@ -91,7 +87,7 @@ const mockDriver = {
 });
 
 // Mock workflow/blueprint data
-(global as any).createMockBlueprint = (overrides: any = {}) => ({
+(global as Record<string, unknown>).createMockBlueprint = (overrides: Record<string, unknown> = {}) => ({
   id: 'blueprint-123',
   name: 'Test Blueprint',
   description: 'A test blueprint',
@@ -106,7 +102,7 @@ const mockDriver = {
 });
 
 // Mock execution data
-(global as any).createMockExecution = (overrides: any = {}) => ({
+(global as Record<string, unknown>).createMockExecution = (overrides: Record<string, unknown> = {}) => ({
   id: 'execution-123',
   blueprintId: 'blueprint-123',
   starshipId: 'starship-123',
@@ -119,30 +115,21 @@ const mockDriver = {
   ...overrides,
 });
 
-// Mock mission data
-(global as any).createMockMission = (overrides: any = {}) => ({
-  id: 'mission-123',
-  title: 'Test Mission',
-  description: 'A test mission',
-  status: 'active',
-  starshipId: 'starship-123',
-  userId: 'user-123',
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
-  ...overrides,
-});
-
 // Error creation helpers
-(global as any).createValidationError = (message = 'Validation failed', field = 'testField') => new ValidationError(message, field);
+(global as Record<string, unknown>).createValidationError = (message = 'Validation failed', field = 'testField') =>
+  new ValidationError(message, field);
 
-(global as any).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') => new NotFoundError(entityType, entityId);
+(global as Record<string, unknown>).createNotFoundError = (entityType = 'TestEntity', entityId = 'test-123') =>
+  new NotFoundError(entityType, entityId);
 
-(global as any).createDatabaseError = (message = 'Database operation failed', operation = 'test') => new DatabaseError(operation);
+(global as Record<string, unknown>).createDatabaseError = (operation = 'test') => new DatabaseError(operation);
 
-(global as any).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') => new ConflictError(message);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+(global as Record<string, unknown>).createConflictError = (message = 'Resource conflict', conflictType = 'duplicate') =>
+  new ConflictError(message);
 
 // Mock database session with common patterns
-(global as any).createMockDatabaseSession = () => {
+(global as Record<string, unknown>).createMockDatabaseSession = () => {
   const session = {
     run: jest.fn(),
     close: jest.fn(),
@@ -166,28 +153,30 @@ const mockDriver = {
 };
 
 // Mock repository error scenarios
-(global as any).mockRepositoryError = (session: any, errorType: string) => {
+(global as Record<string, unknown>).mockRepositoryError = (session: Record<string, unknown>, errorType: string) => {
+  const mockSession = session as { run: { mockRejectedValue: (error: Error) => void } };
   switch (errorType) {
     case 'constraint':
-      session.run.mockRejectedValue(new Error('constraint violation'));
+      mockSession.run.mockRejectedValue(new Error('constraint violation'));
       break;
     case 'connection':
-      session.run.mockRejectedValue(new Error('connection failed'));
+      mockSession.run.mockRejectedValue(new Error('connection failed'));
       break;
     case 'timeout':
-      session.run.mockRejectedValue(new Error('operation timeout'));
+      mockSession.run.mockRejectedValue(new Error('operation timeout'));
       break;
     case 'query':
-      session.run.mockRejectedValue(new Error('syntax error in query'));
+      mockSession.run.mockRejectedValue(new Error('syntax error in query'));
       break;
     default:
-      session.run.mockRejectedValue(new Error('unknown database error'));
+      mockSession.run.mockRejectedValue(new Error('unknown database error'));
   }
 };
 
 // Mock successful repository operations
-(global as any).mockRepositorySuccess = (session: any, data: any) => {
-  session.run.mockResolvedValue({
+(global as Record<string, unknown>).mockRepositorySuccess = (session: Record<string, unknown>, data: unknown) => {
+  const mockSession = session as { run: { mockResolvedValue: (value: unknown) => void } };
+  mockSession.run.mockResolvedValue({
     records: data ? [{ get: () => data }] : [],
   });
 };

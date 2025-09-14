@@ -5,62 +5,18 @@
  * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-import type { AgentMemoryState } from '@/AgentMemory';
-import type { BaseBlueprint, BaseNodeParameters } from '@/types/base';
-
-/**
- * Agent-specific node parameters
- * Contains full agent configuration for workflow execution
- */
-export interface AgentNodeParameters extends BaseNodeParameters {
-  // Core agent identity
-  name: string;
-  description?: string;
-
-  // LLM configuration
-  model: string;
-  temperature?: number;
-  maxTokens?: number;
-
-  // Execution parameters
-  timeout?: number;
-
-  // Memory system (required)
-  memory: AgentMemoryState;
-
-  // Blueprint execution
-  blueprint: BaseBlueprint;
-}
-
-/**
- * Conditional node parameters for data-driven routing
- */
-export interface ConditionalNodeParameters extends BaseNodeParameters {
-  sourceNodeId: string;
-  expression: string;
-  conditions: Record<string, string>;
-  defaultCondition?: string;
-}
+import type { AgentMemoryState } from '@/memory/AgentMemory';
+import { Blueprint } from './blueprint';
 
 /**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptNodeParameters extends BaseNodeParameters {
+export interface UserPromptParams {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string;
   timeout?: number;
   required?: boolean;
-}
-
-/**
- * Output node parameters for final result generation
- */
-export interface OutputNodeParameters extends BaseNodeParameters {
-  template: string;
-  sources: string[];
-  format: OutputFormat;
-  title?: string;
 }
 
 /**
@@ -74,52 +30,30 @@ export interface UserPromptChoice {
 }
 
 /**
- * Output formats for workflow results
- */
-export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf' | 'csv';
-
-/**
  * HTTP request node parameters for making HTTP calls
+ * Fully compatible with fetch RequestInit structure
  */
-export interface HttpRequestNodeParameters extends BaseNodeParameters {
+export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
+  // Required URL (not part of RequestInit as it's the first parameter to fetch)
   url: string;
-  method: HttpMethod;
-  headers?: Record<string, string>;
-  body?: string | object;
+
+  // Overriding body to make it a string or object
+  body?: Record<string, unknown> | string | null;
+
+  // Custom properties for convenience
   timeout?: number;
-  retries?: number;
-  followRedirects?: boolean;
-  authentication?: HttpAuthentication;
-}
-
-/**
- * HTTP methods supported by the HTTP request node
- */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
-
-/**
- * HTTP authentication configuration
- */
-export interface HttpAuthentication {
-  type: 'bearer' | 'basic' | 'api-key';
-  token?: string;
-  username?: string;
-  password?: string;
-  apiKey?: string;
-  headerName?: string; // for api-key type
 }
 
 /**
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
  */
-export interface LlmNodeParameters extends BaseNodeParameters {
+export interface LlmParams {
   model: string;
-  prompt: string;
+  messages: { role: string; content: string }[];
   temperature?: number;
   maxTokens?: number;
   timeout?: number;
-  stream?: boolean;
   topP?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
@@ -128,25 +62,71 @@ export interface LlmNodeParameters extends BaseNodeParameters {
 /**
  * Workflow node parameters for executing embedded blueprints
  */
-export interface WorkflowNodeParameters extends BaseNodeParameters {
-  blueprint: BaseBlueprint;
+export interface WorkflowParams {
+  // Core agent identity
+  name: string;
+  description?: string;
+
+  // Execution parameters
+  timeout?: number;
+
+  // Blueprint execution
+  blueprint: Blueprint;
+
+  // Metadata
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Agent-specific node parameters
+ * Contains full agent configuration for workflow execution
+ */
+export interface AgentParams {
+  // Core agent identity
+  name: string;
+  description?: string;
+
+  // LLM configuration
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
+
+  // Execution parameters
+  timeout?: number;
+
+  // Memory system (required)
+  memoryState: AgentMemoryState;
+
+  // Blueprint execution
+  blueprint: Blueprint;
+
+  // Metadata
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Conditional node parameters for branching logic
+ */
+export interface ConditionalParams {
+  expression: string; // JSONata expression to evaluate
   timeout?: number;
 }
 
 /**
- * Start and End node parameters (empty but extends base)
+ * Start and End node parameters
  */
-export type StartEndNodeParameters = BaseNodeParameters;
+export type StartParams = Record<string, unknown>;
+export type EndParams = Record<string, unknown>;
 
 /**
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
-  | AgentNodeParameters
-  | ConditionalNodeParameters
-  | UserPromptNodeParameters
-  | OutputNodeParameters
-  | HttpRequestNodeParameters
-  | LlmNodeParameters
-  | WorkflowNodeParameters
-  | StartEndNodeParameters;
+  | AgentParams
+  | UserPromptParams
+  | HttpRequestParams
+  | LlmParams
+  | WorkflowParams
+  | StartParams
+  | EndParams
+  | ConditionalParams;

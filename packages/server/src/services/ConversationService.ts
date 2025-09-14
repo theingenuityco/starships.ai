@@ -1,10 +1,9 @@
-import { AgentService } from '@/services';
 import { MessageService } from '@/services/MessageService';
-import { Agent, AutopilotEvent, ExecutionEvent } from '@starships/autopilot';
-import { LLMResponse } from '@starships/autopilot/src/nodes/LLM';
+import { Agent, AutopilotEvent, LLMResponse } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
+// import { StreamingService } from './StreamingService';
 
 /**
  * Clean conversation service with proper error handling
@@ -12,12 +11,11 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 export class ConversationService {
   private conversationRepository: ConversationRepository;
   private messageService: MessageService;
-  private agentService: AgentService;
+  // private streamingService: StreamingService;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
-    this.agentService = new AgentService();
   }
 
   /**
@@ -111,7 +109,7 @@ export class ConversationService {
     return this.conversationRepository.delete(conversationId);
   }
 
-  async addMessage(data: Message & { conversationId: string }): Promise<void> {
+  async addConversationMessage(data: Message & { conversationId: string }): Promise<void> {
     // Save user message to database
     await this.messageService.createMessage({
       conversationId: data.conversationId,
@@ -178,90 +176,60 @@ export class ConversationService {
     }
   }
 
-  eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+  async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
     switch (event.type) {
       case 'node_completed': {
+        console.log('save messages in db');
+        break;
         // Check if this is an LLM node with response content
-        const nodeResult = event.execution.results.get(event.execution.currentNodeRef || '');
-        if (nodeResult && !nodeResult.error && nodeResult.data) {
-          const llmData = nodeResult.data as LLMResponse;
-          const llmResponseContent = llmData.llmResponse;
+        // const nodeResult = event.data.execution.results.get(event.execution.currentNodeRef || '');
+        // if (nodeResult && !nodeResult.error && nodeResult.data) {
+        //   const llmData = nodeResult.data as LLMResponse;
+        //   const llmResponseContent = llmData;
 
-          if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
-            // Return assistant message with LLM response
-            return {
-              id: messageId,
-              role: 'assistant',
-              content: llmResponseContent.trim(),
-              messageType: 'agent_response',
-              createdAt: event.timestamp,
-              updatedAt: event.timestamp,
-            };
-          }
-        }
+        //   if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
+        //     // Return assistant message with LLM response
+        //     return {
+        //       id: messageId,
+        //       role: 'assistant',
+        //       content: llmResponseContent.trim(),
+        //       messageType: 'agent_response',
+        //       createdAt: event.timestamp,
+        //       updatedAt: event.timestamp,
+        //     };
+        //   }
+        // }
 
-        // Fallback to system completion message
-        return {
-          id: messageId,
-          role: 'system',
-          content: `✅ Completed node: ${event.execution.currentNodeRef}`,
-          messageType: 'system_notification',
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-        };
+        // // Fallback to system completion message
+        // return {
+        //   id: messageId,
+        //   role: 'system',
+        //   content: `✅ Completed node: ${event.execution.currentNodeRef}`,
+        //   messageType: 'system_notification',
+        //   createdAt: event.timestamp,
+        //   updatedAt: event.timestamp,
+        // };
       }
 
       case 'workflow_completed':
-        return {
-          id: messageId,
-          role: 'system',
-          content: '🎉 Agent workflow completed successfully',
-          messageType: 'system_notification',
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-        };
+        console.log('completed');
+        break;
+      // return {
+      //   id: messageId,
+      //   role: 'system',
+      //   content: '🎉 Agent workflow completed successfully',
+      //   messageType: 'system_notification',
+      //   createdAt: event.timestamp,
+      //   updatedAt: event.timestamp,
+      // };
+
+      case 'content_chunk':
+        console.log('chunk', event.data);
+        break;
 
       case 'content_complete':
-        return {
-          id: messageId,
-          role: 'assistant',
-          content: event.content || '',
-          messageType: 'agent_response',
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-        };
-
-      case 'workflow_paused':
-        return {
-          id: messageId,
-          role: 'system',
-          content: '⏸️ Workflow execution paused',
-          messageType: 'system_notification',
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-        };
-
-      case 'workflow_resumed':
-        return {
-          id: messageId,
-          role: 'system',
-          content: '▶️ Workflow execution resumed',
-          messageType: 'system_notification',
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-        };
-
-      default:
-        return {
-          id: messageId,
-          role: 'system',
-          content: `Unknown event: ${event.type}`,
-          messageType: 'system_notification',
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-        };
+        console.log('chunk complete');
+        break;
     }
   }
 }

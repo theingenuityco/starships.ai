@@ -29,6 +29,10 @@ export class Workflow implements NodeHandler {
     this.engine = new Engine(engineConfig);
   }
 
+  getParams(): WorkflowParams {
+    return this.params;
+  }
+
   /**
    * Execute the workflow with streaming support
    */

@@ -1,7 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { MessageService } from '@/services';
 import { ConversationService } from '@/services/ConversationService';
-import { MemoryService } from '@/services/MemoryService';
 import { StreamingService } from '@/services/StreamingService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
@@ -62,19 +60,13 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       streamingService.addConnection(conversationId, res);
 
       // Send existing messages after connection is established
-      const messageService = new MessageService();
-      const conversationData = await messageService.getConversation({
-        conversationId,
-        limit: 1000, // Get all existing messages
-        offset: 0,
-        orderBy: 'timestamp',
-        orderDirection: 'desc', // Consistent with API mode
-      });
+      const conversationService = new ConversationService();
+      const conversationMessages = await conversationService.getConversationMessages(conversationId);
 
-      if (conversationData && conversationData.messages.length > 0) {
+      if (conversationMessages.length > 0) {
         // Send existing messages via StreamingService
-        for (const message of conversationData.messages) {
-          await streamingService.broadcastMessage(conversationId);
+        for (const message of conversationMessages) {
+          await streamingService.broadcastMessage(conversationId, message);
         }
       }
 
@@ -85,8 +77,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Validate pagination parameters
       const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
       if (!paginationValidation) return;
-
-      const { page, limit } = paginationValidation;
 
       // Validate query parameters for ordering
       const orderValidation = validateData(
@@ -101,14 +91,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       if (!orderValidation) return;
 
       // Delegate to service layer
-      const messageService = new MessageService();
-      const conversationData = await messageService.getConversation({
+      const conversationService = new ConversationService();
+      const conversationData = await conversationService.getConversationMessages(
         conversationId,
-        limit,
-        offset: (page - 1) * limit,
-        orderBy: orderValidation.orderBy,
-        orderDirection: orderValidation.orderDirection,
-      });
+        orderValidation.orderBy,
+        orderValidation.orderDirection
+      );
 
       if (!conversationData) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
@@ -118,8 +106,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         return;
       }
 
-      const paginationMeta = createPaginationMeta(page, limit, conversationData.total);
-      sendSuccess(res, conversationData, 200, paginationMeta);
+      sendSuccess(res, conversationData, 200);
     }
   } catch (error) {
     handleError(error, res, 'fetching conversation messages');
@@ -138,8 +125,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     // Validate request body
     const bodyValidation = validateData(
       z.object({
-        agentId: z.string().min(1, 'agentId is required'),
-        message: z.string().min(1, 'message is required'),
+        content: z.string().min(1, 'content is required'),
       }),
       req.body,
       res,
@@ -148,8 +134,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     if (!bodyValidation) return;
 
     const { conversationId } = paramValidation;
-    const { agentId, message } = bodyValidation;
-    const userId = req.user!.id;
+    const { content } = bodyValidation;
 
     // Detect streaming request via Accept header
     const wantsStreaming = req.get('Accept')?.includes('text/event-stream');
@@ -164,65 +149,28 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
 
       // Process conversation with streaming (async - don't await)
       // Using conversationId as stream identifier - much simpler!
-      conversationService
-        .addMessage({
-          conversationId,
-          agentId,
-          userId,
-          message,
-        })
-        .catch((error: any) => {
-          console.error('❌ [UNIFIED STREAMING] Processing failed:', error);
-          // Error will be handled by the streaming service and conversation service
-        });
+      conversationService.addConversationMessage({
+        conversationId,
+        content,
+        role: 'user',
+        messageType: 'user_input',
+      });
 
       // Return early to keep connection open (similar to GET endpoint)
       return;
     } else {
       // Handle regular JSON response
-      const result = await conversationService.addMessage({
+      const result = await conversationService.addConversationMessage({
         conversationId,
-        agentId,
-        userId,
-        message,
+        content,
+        role: 'user',
+        messageType: 'user_input',
       });
 
       sendSuccess(res, result);
     }
   } catch (error) {
     handleError(error, res, 'processing conversation message');
-  }
-});
-
-/**
- * DELETE /conversations/:conversationId/memory - Clear conversation memory
- */
-router.delete('/conversations/:conversationId/memory', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate conversationId parameter
-    const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
-    if (!paramValidation) return;
-
-    const { conversationId } = paramValidation;
-
-    // Verify conversation exists
-    const conversationService = new ConversationService();
-    const conversation = await conversationService.getConversationById(conversationId);
-    if (!conversation) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
-        resource: 'conversation',
-        id: conversationId,
-      });
-      return;
-    }
-
-    // Clear conversation memory using service layer
-    const memoryService = new MemoryService();
-    await memoryService.clearConversationSessionMemory(conversationId);
-
-    sendSuccess(res, { message: 'Conversation memory cleared successfully' }, 200);
-  } catch (error) {
-    handleError(error, res, 'clearing conversation memory');
   }
 });
 
@@ -235,18 +183,13 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     const paramValidation = validateData(z.object({ conversationId: NanoidSchema }), req.params, res, 'conversation parameter');
     if (!paramValidation) return;
 
-    // Validate pagination query parameters
-    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
-    if (!paginationValidation) return;
-
     const { conversationId } = paramValidation;
-    const { page, limit } = paginationValidation;
 
     // Use service layer for consistent data access
     const conversationService = new ConversationService();
-    const conversationWithMessages = await conversationService.getConversationWithMessages(conversationId, limit, (page - 1) * limit);
+    const conversation = await conversationService.getConversationById(conversationId);
 
-    if (!conversationWithMessages) {
+    if (!conversation) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
         resource: 'conversation',
         id: conversationId,
@@ -254,8 +197,7 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       return;
     }
 
-    const paginationMeta = createPaginationMeta(page, limit, conversationWithMessages.messages.length);
-    sendSuccess(res, conversationWithMessages, 200, paginationMeta);
+    sendSuccess(res, conversation, 200);
   } catch (error) {
     handleError(error, res, 'fetching conversation details');
   }
@@ -289,44 +231,6 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
     sendSuccess(res, conversations, 200, paginationMeta);
   } catch (error) {
     handleError(error, res, 'fetching starship conversations');
-  }
-});
-
-/**
- * GET /users/:userId/conversations - Get conversations for user
- */
-router.get('/users/:userId/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate userId parameter
-    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
-    if (!paramValidation) return;
-
-    // Validate pagination query parameters
-    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
-    if (!paginationValidation) return;
-
-    const { userId: targetUserId } = paramValidation;
-    const { page, limit } = paginationValidation;
-    const userId = req.user!.id;
-
-    // Users can only access their own conversations
-    if (targetUserId !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied', 403);
-      return;
-    }
-
-    // Use service layer to get conversations by user
-    const conversationService = new ConversationService();
-    const allConversations = await conversationService.getConversationsByUser(targetUserId);
-
-    // Apply pagination
-    const offset = (page - 1) * limit;
-    const conversations = allConversations.slice(offset, offset + limit);
-
-    const paginationMeta = createPaginationMeta(page, limit, allConversations.length);
-    sendSuccess(res, conversations, 200, paginationMeta);
-  } catch (error) {
-    handleError(error, res, 'fetching user conversations');
   }
 });
 

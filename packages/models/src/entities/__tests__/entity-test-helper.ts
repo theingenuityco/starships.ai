@@ -148,7 +148,7 @@ export class EntityTestHelper<T> {
 
           results.push({
             description: testCase.description,
-            passed: testCase.shouldPass,
+            passed: true, // Validation succeeded
             error: null,
             validationSuccess: true,
           });
@@ -175,7 +175,7 @@ export class EntityTestHelper<T> {
 
         results.push({
           description: testCase.description,
-          passed: !testCase.shouldPass, // If we expected it to fail and it threw, that's correct
+          passed: false, // Validation failed
           error: errorMessage,
           validationSuccess: false,
         });

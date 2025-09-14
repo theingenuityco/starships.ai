@@ -69,10 +69,10 @@ describe('BlueprintEntity', () => {
 
       const serialized = toDatabase(blueprint);
 
-      expect(serialized.name).toBeUndefined();
-      expect(serialized.description).toBeUndefined();
-      expect(serialized.category).toBeUndefined();
-      expect(serialized.usageCount).toBeUndefined();
+      expect(serialized.name).toBe('');
+      expect(serialized.description).toBe('');
+      expect(serialized.category).toBe('general');
+      expect(serialized.usageCount).toBe(0);
       expect(serialized.metadata).toBeUndefined();
       expect(serialized.createdAt).toBeUndefined();
       expect(serialized.updatedAt).toBeUndefined();

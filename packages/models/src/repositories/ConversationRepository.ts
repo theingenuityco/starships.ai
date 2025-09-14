@@ -42,9 +42,11 @@ export class ConversationRepository extends BaseRepository {
 
         const now = new Date().toISOString();
 
+        const { starshipId, agentId, ...conversationInput } = entity;
+
         // Prepare conversation data with defaults and validation
         const conversationEntity = ConversationEntity.deserialize({
-          ...entity,
+          ...conversationInput,
           createdAt: now,
           status: entity.status || 'active',
         });
@@ -57,10 +59,10 @@ export class ConversationRepository extends BaseRepository {
         const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
 
         // Create relationship with starship if starshipId is provided
-        await this.linkToStarship(result.id, entity.starshipId);
+        await this.linkToStarship(result.id, starshipId);
 
-        if (entity.agentId) {
-          await this.linkToAgent(result.id, entity.agentId);
+        if (agentId) {
+          await this.linkToAgent(result.id, agentId);
         }
 
         // Use ConversationEntity for consistent mapping

@@ -6,8 +6,10 @@
  */
 
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
-import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode } from '@/types';
+import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode, NodeParameters } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
+import { ParamProcessor } from './ParamProcessor';
+import { TransformProcessor } from './TransformProcessor';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
@@ -34,6 +36,8 @@ export class Engine {
   private blueprint: Blueprint;
   private execution: Execution;
   private eventCallback?: EventCallback;
+  private paramProcessor: ParamProcessor;
+  private transformProcessor: TransformProcessor;
 
   constructor(config: EngineConfig) {
     this.blueprint = config.blueprint;
@@ -47,12 +51,14 @@ export class Engine {
 
     this.execution = initialExecution;
     this.eventCallback = config.eventCallback;
+    this.paramProcessor = new ParamProcessor();
+    this.transformProcessor = new TransformProcessor();
   }
 
   /**
    * Create handler instance for a node with pure dynamic loading
    */
-  async createHandler(node: WorkflowNode): Promise<NodeHandler> {
+  async createHandler(node: WorkflowNode, resolvedParams: NodeParameters): Promise<NodeHandler> {
     const loader = HANDLER_MAP[node.type];
     if (!loader) {
       throw new Error(`No handler available for node type: ${node.type}`);
@@ -66,7 +72,7 @@ export class Engine {
       execution: this.execution,
     } as NodeHandlerOptions;
 
-    return new handlerConstructor(node.parameters, handlerOptions);
+    return new handlerConstructor(resolvedParams, handlerOptions);
   }
 
   /**
@@ -194,7 +200,7 @@ export class Engine {
   }
 
   /**
-   * Execute a single node with lazy loading
+   * Execute a single node with template resolution and transforms
    */
   private async executeNode(node: WorkflowNode): Promise<NodeResult> {
     this.emitEvent('node_started');
@@ -202,19 +208,31 @@ export class Engine {
     const result = {
       nodeRef: node.ref,
     } as NodeResult;
+
     try {
-      // Create handler instance with parameters (now async)
-      const handler = await this.createHandler(node);
-      // Execute the node - this returns execution with result stored
+      // Step 1: Resolve template expressions in parameters
+      const resolvedParams = (await this.paramProcessor.resolveTemplates(node.parameters, this.execution)) as NodeParameters;
+
+      // Step 2: Create handler instance with resolved parameters
+      const handler = await this.createHandler(node, resolvedParams);
+
+      // Step 3: Execute the node
       const data = await handler.execute();
       result.data = data;
+
+      // Step 4: Apply transforms after successful execution
+      const nodeParams = node.parameters as { transform?: string | string[] };
+      if (nodeParams.transform) {
+        await this.transformProcessor.applyTransforms(nodeParams.transform, this.execution, result);
+      }
+
       this.emitEvent('node_completed');
     } catch (error) {
       result.error = error;
       this.emitEvent('node_failed');
     }
-    this.execution.results.push(result);
 
+    this.execution.results.push(result);
     return result;
   }
 
@@ -289,14 +307,38 @@ export class Engine {
 
     // Check that all node types have available handlers
     const unsupportedNodes = [];
+    const validationErrors: string[] = [];
+
     for (const node of blueprint.nodes) {
       if (!(node.type in HANDLER_MAP)) {
         unsupportedNodes.push({ ref: node.ref, type: node.type });
+        continue;
+      }
+
+      // Validate template expressions in parameters
+      const templateValidation = this.paramProcessor.validateTemplateExpressions(node.parameters);
+      if (!templateValidation.valid) {
+        const errorMessages = templateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+        validationErrors.push(...errorMessages);
+      }
+
+      // Validate transform expressions if present
+      const nodeParams = node.parameters as { transform?: string | string[] };
+      if (nodeParams.transform) {
+        const transformValidation = this.transformProcessor.validateTransforms(nodeParams.transform);
+        if (!transformValidation.valid) {
+          const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+          validationErrors.push(...errorMessages);
+        }
       }
     }
 
     if (unsupportedNodes.length > 0) {
       throw new Error(`Unsupported node types: ${unsupportedNodes.map((n) => n.type).join(', ')}`);
+    }
+
+    if (validationErrors.length > 0) {
+      throw new Error(`Template/Transform validation failed:\n${validationErrors.join('\n')}`);
     }
   }
 

@@ -9,9 +9,16 @@ import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
 
 /**
+ * Base parameters interface that all node parameters extend from
+ */
+export interface BaseParams {
+  transform?: string | string[];
+}
+
+/**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptParams {
+export interface UserPromptParams extends BaseParams {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string;
@@ -33,7 +40,7 @@ export interface UserPromptChoice {
  * HTTP request node parameters for making HTTP calls
  * Fully compatible with fetch RequestInit structure
  */
-export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
+export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'> {
   // Required URL (not part of RequestInit as it's the first parameter to fetch)
   url: string;
 
@@ -48,7 +55,7 @@ export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
  */
-export interface LlmParams {
+export interface LlmParams extends BaseParams {
   model: string;
   messages: { role: string; content: string }[];
   temperature?: number;
@@ -62,7 +69,7 @@ export interface LlmParams {
 /**
  * Workflow node parameters for executing embedded blueprints
  */
-export interface WorkflowParams {
+export interface WorkflowParams extends BaseParams {
   // Core agent identity
   name: string;
   description?: string;
@@ -81,7 +88,7 @@ export interface WorkflowParams {
  * Agent-specific node parameters
  * Contains full agent configuration for workflow execution
  */
-export interface AgentParams {
+export interface AgentParams extends BaseParams {
   // Core agent identity
   name: string;
   description?: string;
@@ -107,7 +114,7 @@ export interface AgentParams {
 /**
  * Conditional node parameters for branching logic
  */
-export interface ConditionalParams {
+export interface ConditionalParams extends BaseParams {
   expression: string; // JSONata expression to evaluate
   timeout?: number;
 }
@@ -115,8 +122,13 @@ export interface ConditionalParams {
 /**
  * Start and End node parameters
  */
-export type StartParams = Record<string, unknown>;
-export type EndParams = Record<string, unknown>;
+export interface StartParams extends BaseParams {
+  [key: string]: unknown;
+}
+
+export interface EndParams extends BaseParams {
+  [key: string]: unknown;
+}
 
 /**
  * Union type for all workflow node parameters

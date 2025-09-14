@@ -17,22 +17,7 @@ jest.mock('../../helpers/database', () => ({
   convertNeo4jIntsInObject: jest.fn((obj) => obj),
 }));
 
-// Mock ExecutionEntity with proper class constructor
-jest.mock('../../entities/ExecutionEntity', () => {
-  class MockExecutionEntity {
-    static async validate() {
-      return undefined;
-    }
-
-    constructor(data: unknown) {
-      Object.assign(this, data);
-    }
-  }
-
-  return {
-    ExecutionEntity: MockExecutionEntity,
-  };
-});
+// Use real ExecutionEntity instead of mocking
 
 import { getConnection } from '@/helpers/database';
 

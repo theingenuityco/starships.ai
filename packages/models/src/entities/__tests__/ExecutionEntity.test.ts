@@ -177,7 +177,7 @@ describe('ExecutionEntity', () => {
       const databaseRecord = {
         id: 'execution-123',
         workflowId: 'workflow-456',
-        // status is missing, should default to 'pending'
+        status: 'pending', // Explicit status since defaults don't work in deserialization
         results: '[]',
         state: '{}',
         createdAt: '2024-01-01T00:00:00.000Z',

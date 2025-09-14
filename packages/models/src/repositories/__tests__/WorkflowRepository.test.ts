@@ -20,33 +20,7 @@ jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
 }));
 
-// Mock WorkflowEntity with proper class constructor
-jest.mock('../../entities/WorkflowEntity', () => {
-  class MockWorkflowEntity {
-    blueprint?: unknown;
-
-    static async validate() {
-      return undefined;
-    }
-
-    constructor(data: unknown) {
-      Object.assign(this, data);
-
-      // Handle blueprint JSON transformation
-      if (this.blueprint !== undefined && typeof this.blueprint === 'string') {
-        try {
-          this.blueprint = JSON.parse(this.blueprint);
-        } catch {
-          this.blueprint = null;
-        }
-      }
-    }
-  }
-
-  return {
-    WorkflowEntity: MockWorkflowEntity,
-  };
-});
+// Use real WorkflowEntity instead of mocking
 
 describe('WorkflowRepository', () => {
   let repository: WorkflowRepository;

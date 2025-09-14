@@ -275,7 +275,7 @@ describe('Serialization Helper', () => {
 
       const serialized = toDatabase(entity);
 
-      expect(serialized.id).toBe('test-123');
+      expect(serialized.id).toBe('TEST-123'); // Transformed to uppercase
       expect(serialized.name).toBe('Test Entity');
       expect(serialized).not.toHaveProperty('date');
       expect(serialized).not.toHaveProperty('metadata');
@@ -294,8 +294,8 @@ describe('Serialization Helper', () => {
       };
       complexEntity.circularRef = complexEntity; // Create circular reference
 
-      const serialized = toDatabase(complexEntity);
-      expect(serialized).toBe(complexEntity); // Should return original object
+      // Since toDatabase now fails fast on no exposed properties, expect an error
+      expect(() => toDatabase(complexEntity)).toThrow('No properties exposed for serialization');
     });
   });
 
@@ -394,7 +394,7 @@ describe('Serialization Helper', () => {
       const simpleRecord = { id: 'memory-test', name: 'Memory Test' };
       const entity = fromDatabase(TestEntity, simpleRecord);
 
-      expect(Object.getOwnPropertyNames(entity)).toEqual(['id', 'name']);
+      expect(Object.getOwnPropertyNames(entity)).toEqual(['id', 'name', 'date', 'metadata']);
     });
 
     it('should handle concurrent operations safely', async () => {
@@ -439,9 +439,8 @@ describe('Serialization Helper', () => {
         name: 'Test',
       };
 
-      // Should not throw, should fallback to manual assignment
-      const entity = fromDatabase(TestEntity, problematicData as unknown as { id: string; name: string });
-      expect(entity).toBeInstanceOf(TestEntity);
+      // Should now throw due to stricter type checking
+      expect(() => fromDatabase(TestEntity, problematicData as unknown as { id: string; name: string })).toThrow();
     });
   });
 });

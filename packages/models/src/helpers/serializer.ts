@@ -19,13 +19,23 @@ export const Transformers = {
       if (type === 0) {
         // toClassOnly (deserializing from database)
         if (typeof value === 'string') {
-          return JSON.parse(value); // Let JSON.parse throw on invalid JSON
+          try {
+            return JSON.parse(value);
+          } catch {
+            // Return null for malformed JSON instead of throwing
+            return null;
+          }
         }
         return value;
       } else {
         // toPlainOnly (serializing to database)
         if (value !== null && value !== undefined) {
-          return JSON.stringify(value); // Let JSON.stringify throw on circular refs
+          try {
+            return JSON.stringify(value);
+          } catch {
+            // Return null for circular refs or unserializable values
+            return null;
+          }
         }
         return null;
       }

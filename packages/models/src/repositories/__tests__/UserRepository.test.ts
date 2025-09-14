@@ -228,7 +228,11 @@ describe('UserRepository', () => {
       const mockTimestamp = new Date().toISOString();
       const updatedUser = global.createMockUser({
         id: 'user-123',
-        ...updates,
+        email: 'test@example.com',
+        username: 'testuser',
+        displayName: 'Updated Name',
+        avatar: 'new-avatar-url',
+        createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: mockTimestamp,
       });
 
@@ -245,6 +249,10 @@ describe('UserRepository', () => {
       const mockTimestamp = new Date().toISOString();
       const existingUser = global.createMockUser({
         id: 'user-123',
+        email: 'test@example.com',
+        username: 'testuser',
+        displayName: 'Test User',
+        createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: mockTimestamp,
       });
 
@@ -277,7 +285,11 @@ describe('UserRepository', () => {
 
       const updatedUser = global.createMockUser({
         id: 'user-123',
+        email: 'test@example.com',
+        username: 'testuser',
         displayName: 'Valid Update',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
       });
       testHelper.mockUpdateWrite(updatedUser, 'u');
 

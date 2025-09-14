@@ -97,8 +97,9 @@ export class BlueprintEntity implements BlueprintModel {
         category: dataRecord.category || 'general',
         usageCount: dataRecord.usageCount ?? 0,
         metadata: dataRecord.metadata || {},
-        nodes: dataRecord.nodes || [],
-        edges: dataRecord.edges || [],
+        // Don't provide defaults for required arrays - let validation fail if missing
+        nodes: dataRecord.nodes,
+        edges: dataRecord.edges,
         ...dataRecord,
       });
     } else {

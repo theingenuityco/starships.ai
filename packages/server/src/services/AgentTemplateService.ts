@@ -71,9 +71,31 @@ export class AgentTemplateService {
       throw new ValidationError('Agent name is required', 'agentName');
     }
 
-    // Note: createAgentFromTemplate method is not available in the updated AgentTemplateRepository
-    // This would need to be implemented
-    throw new Error('createAgentFromTemplate method not implemented in repository');
+    // Get the template to use as a base
+    const template = await this.templateRepository.findById(templateId);
+    if (!template) {
+      throw new NotFoundError('Template', templateId);
+    }
+
+    // Create agent data based on the template
+    const agentData = {
+      name: agentName.trim(),
+      description: template.description,
+      model: template.model,
+      temperature: template.temperature,
+      maxTokens: template.maxTokens,
+      timeout: template.timeout || 30000,
+      memoryState: template.memoryState,
+      blueprint: template.blueprint,
+    };
+
+    // Create the agent using the repository
+    const agent = await this.agentRepository.create(agentData, starshipId);
+
+    // Increment the template usage count
+    await this.templateRepository.incrementUsageCount(templateId);
+
+    return agent;
   }
 
   async createTemplateFromAgent(agentId: string): Promise<AgentTemplateModel | null> {

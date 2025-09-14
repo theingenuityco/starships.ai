@@ -356,12 +356,25 @@ describe('LLMTransformers', () => {
       expect(instanceUndefined.temperature).toBeNull();
     });
 
-    it('should throw error for invalid temperature values', () => {
-      const testCases = ['not-a-number', 'invalid', 3.0, -1.0];
-
-      testCases.forEach((input) => {
+    it('should handle invalid temperature values properly', () => {
+      // These should throw because they can't be parsed as numbers
+      const invalidCases = ['not-a-number', 'invalid'];
+      invalidCases.forEach((input) => {
         const plain = { temperature: input };
         expect(() => plainToInstance(LLMTestEntity, plain)).toThrow();
+      });
+
+      // These should be clamped to valid range [0, 2]
+      const clampingCases = [
+        { input: 3.0, expected: 2.0 },
+        { input: -1.0, expected: 0.0 },
+        { input: 5.5, expected: 2.0 },
+        { input: -0.5, expected: 0.0 },
+      ];
+      clampingCases.forEach(({ input, expected }) => {
+        const plain = { temperature: input };
+        const instance = plainToInstance(LLMTestEntity, plain);
+        expect(instance.temperature).toBe(expected);
       });
     });
   });

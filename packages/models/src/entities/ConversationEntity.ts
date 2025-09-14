@@ -37,7 +37,6 @@ export class ConversationEntity implements ConversationModel {
   title!: string;
 
   @Expose()
-  @Transform(({ value }) => value || 'active')
   @IsIn(['active', 'paused', 'completed', 'archived'])
   status!: 'active' | 'paused' | 'completed' | 'archived';
 

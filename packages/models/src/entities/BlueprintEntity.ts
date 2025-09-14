@@ -34,26 +34,23 @@ export class BlueprintEntity implements BlueprintModel {
   updatedAt?: string;
 
   @Expose()
-  @Transform(({ value }) => value || '')
   @IsOptional()
   @IsString()
   @Length(1, 255)
   name?: string;
 
   @Expose()
-  @Transform(({ value }) => value || '')
   @IsOptional()
   @IsString()
   description?: string;
 
   @Expose()
-  @Transform(({ value }) => value || 'general')
   @IsOptional()
   @IsIn(['general', 'workflow', 'automation', 'integration', 'analysis'])
   category?: string;
 
   @Expose()
-  @Transformers.NumberTransform(0)
+  @Transformers.NumberTransform()
   @IsOptional()
   @IsNumber()
   @Min(0)

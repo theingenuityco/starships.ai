@@ -33,31 +33,19 @@ class DateTestEntity {
 class ArrayTestEntity {
   @Expose()
   @Transformers.ArrayTransform()
-  defaultArray?: unknown[];
-
-  @Expose()
-  @Transformers.ArrayTransform(['default'])
-  customDefaultArray?: unknown[];
+  testArray?: unknown[];
 }
 
 class NumberTestEntity {
   @Expose()
   @Transformers.NumberTransform()
-  defaultNumber?: number;
-
-  @Expose()
-  @Transformers.NumberTransform(100)
-  customDefaultNumber?: number;
+  testNumber?: number;
 }
 
 class BooleanTestEntity {
   @Expose()
   @Transformers.BooleanTransform()
-  defaultBoolean?: boolean;
-
-  @Expose()
-  @Transformers.BooleanTransform(true)
-  customDefaultBoolean?: boolean;
+  testBoolean?: boolean;
 }
 
 class LLMTestEntity {
@@ -214,130 +202,123 @@ describe('Transformers', () => {
   describe('ArrayTransform', () => {
     it('should preserve arrays', () => {
       const array = [1, 2, 3];
-      const plain = { defaultArray: array, customDefaultArray: ['a', 'b'] };
+      const plain = { testArray: array };
 
       const instance = plainToInstance(ArrayTestEntity, plain);
 
-      expect(instance.defaultArray).toEqual(array);
-      expect(instance.customDefaultArray).toEqual(['a', 'b']);
+      expect(instance.testArray).toEqual(array);
     });
 
-    it('should return default array for null values', () => {
-      const plain = { defaultArray: null, customDefaultArray: null };
+    it('should handle null and undefined values', () => {
+      const plainNull = { testArray: null };
+      const plainUndefined = { testArray: undefined };
 
-      const instance = plainToInstance(ArrayTestEntity, plain);
+      const instanceNull = plainToInstance(ArrayTestEntity, plainNull);
+      const instanceUndefined = plainToInstance(ArrayTestEntity, plainUndefined);
 
-      expect(instance.defaultArray).toEqual([]);
-      expect(instance.customDefaultArray).toEqual(['default']);
+      expect(instanceNull.testArray).toBeNull();
+      expect(instanceUndefined.testArray).toBeNull();
     });
 
-    it('should return default array for undefined values', () => {
-      const plain = { defaultArray: undefined, customDefaultArray: undefined };
+    it('should throw error for non-array values', () => {
+      const plain = { testArray: 'not-array' };
 
-      const instance = plainToInstance(ArrayTestEntity, plain);
-
-      expect(instance.defaultArray).toEqual([]);
-      expect(instance.customDefaultArray).toEqual(['default']);
-    });
-
-    it('should return default for non-array values', () => {
-      const plain = {
-        defaultArray: 'not-array',
-        customDefaultArray: 'also-not-array',
-      };
-
-      const instance = plainToInstance(ArrayTestEntity, plain);
-
-      expect(instance.defaultArray).toEqual([]);
-      expect(instance.customDefaultArray).toEqual(['default']);
+      expect(() => plainToInstance(ArrayTestEntity, plain)).toThrow('Expected array but received: string');
     });
   });
 
   describe('NumberTransform', () => {
     it('should convert string numbers to numbers', () => {
-      const plain = {
-        defaultNumber: '42',
-        customDefaultNumber: '123.5',
-      };
-
+      const plain = { testNumber: '42' };
       const instance = plainToInstance(NumberTestEntity, plain);
 
-      expect(instance.defaultNumber).toBe(42);
-      expect(instance.customDefaultNumber).toBe(123.5);
+      expect(instance.testNumber).toBe(42);
     });
 
     it('should preserve existing numbers', () => {
-      const plain = {
-        defaultNumber: 42,
-        customDefaultNumber: -17.5,
-      };
-
+      const plain = { testNumber: 42 };
       const instance = plainToInstance(NumberTestEntity, plain);
 
-      expect(instance.defaultNumber).toBe(42);
-      expect(instance.customDefaultNumber).toBe(-17.5);
+      expect(instance.testNumber).toBe(42);
     });
 
-    it('should return default for invalid numbers', () => {
-      const plain = {
-        defaultNumber: 'not-a-number',
-        customDefaultNumber: 'also-invalid',
-      };
+    it('should handle null and undefined values', () => {
+      const plainNull = { testNumber: null };
+      const plainUndefined = { testNumber: undefined };
 
-      const instance = plainToInstance(NumberTestEntity, plain);
+      const instanceNull = plainToInstance(NumberTestEntity, plainNull);
+      const instanceUndefined = plainToInstance(NumberTestEntity, plainUndefined);
 
-      expect(instance.defaultNumber).toBe(0);
-      expect(instance.customDefaultNumber).toBe(100);
+      expect(instanceNull.testNumber).toBeNull();
+      expect(instanceUndefined.testNumber).toBeNull();
+    });
+
+    it('should throw error for invalid numbers', () => {
+      const plain = { testNumber: 'not-a-number' };
+
+      expect(() => plainToInstance(NumberTestEntity, plain)).toThrow('Cannot convert string to number: not-a-number');
+    });
+
+    it('should throw error for NaN and Infinity', () => {
+      const plainNaN = { testNumber: NaN };
+      const plainInfinity = { testNumber: Infinity };
+
+      expect(() => plainToInstance(NumberTestEntity, plainNaN)).toThrow('Invalid number value: NaN');
+      expect(() => plainToInstance(NumberTestEntity, plainInfinity)).toThrow('Invalid number value: Infinity');
     });
   });
 
   describe('BooleanTransform', () => {
     it('should preserve boolean values', () => {
-      const plain = {
-        defaultBoolean: true,
-        customDefaultBoolean: false,
-      };
+      const plainTrue = { testBoolean: true };
+      const plainFalse = { testBoolean: false };
 
-      const instance = plainToInstance(BooleanTestEntity, plain);
+      const instanceTrue = plainToInstance(BooleanTestEntity, plainTrue);
+      const instanceFalse = plainToInstance(BooleanTestEntity, plainFalse);
 
-      expect(instance.defaultBoolean).toBe(true);
-      expect(instance.customDefaultBoolean).toBe(false);
+      expect(instanceTrue.testBoolean).toBe(true);
+      expect(instanceFalse.testBoolean).toBe(false);
     });
 
-    it('should return default for null values', () => {
-      const plain = {
-        defaultBoolean: null,
-        customDefaultBoolean: null,
-      };
+    it('should handle null and undefined values', () => {
+      const plainNull = { testBoolean: null };
+      const plainUndefined = { testBoolean: undefined };
 
-      const instance = plainToInstance(BooleanTestEntity, plain);
+      const instanceNull = plainToInstance(BooleanTestEntity, plainNull);
+      const instanceUndefined = plainToInstance(BooleanTestEntity, plainUndefined);
 
-      expect(instance.defaultBoolean).toBe(false);
-      expect(instance.customDefaultBoolean).toBe(true);
+      expect(instanceNull.testBoolean).toBeNull();
+      expect(instanceUndefined.testBoolean).toBeNull();
     });
 
-    it('should convert truthy values to true', () => {
-      const plain = {
-        defaultBoolean: 'true',
-        customDefaultBoolean: 1,
-      };
+    it('should convert explicit string representations', () => {
+      const plainTrue = { testBoolean: 'true' };
+      const plainFalse = { testBoolean: 'false' };
 
-      const instance = plainToInstance(BooleanTestEntity, plain);
+      const instanceTrue = plainToInstance(BooleanTestEntity, plainTrue);
+      const instanceFalse = plainToInstance(BooleanTestEntity, plainFalse);
 
-      expect(instance.defaultBoolean).toBe(true);
-      expect(instance.customDefaultBoolean).toBe(true);
+      expect(instanceTrue.testBoolean).toBe(true);
+      expect(instanceFalse.testBoolean).toBe(false);
     });
 
-    it('should convert falsy values to false', () => {
-      const plain = {
-        defaultBoolean: '',
-        customDefaultBoolean: 0,
-      };
+    it('should convert explicit numeric representations', () => {
+      const plainOne = { testBoolean: 1 };
+      const plainZero = { testBoolean: 0 };
 
-      const instance = plainToInstance(BooleanTestEntity, plain);
+      const instanceOne = plainToInstance(BooleanTestEntity, plainOne);
+      const instanceZero = plainToInstance(BooleanTestEntity, plainZero);
 
-      expect(instance.defaultBoolean).toBe(false);
-      expect(instance.customDefaultBoolean).toBe(false);
+      expect(instanceOne.testBoolean).toBe(true);
+      expect(instanceZero.testBoolean).toBe(false);
+    });
+
+    it('should throw error for ambiguous values', () => {
+      const plainAmbiguous = { testBoolean: 'maybe' };
+      const plainNumber = { testBoolean: 2 };
+
+      expect(() => plainToInstance(BooleanTestEntity, plainAmbiguous)).toThrow('Cannot convert string to boolean: maybe');
+      expect(() => plainToInstance(BooleanTestEntity, plainNumber)).toThrow('Cannot convert number to boolean: 2');
     });
   });
 });

@@ -100,33 +100,38 @@ export function fromDatabaseArray<T>(entityClass: new () => T, dataArray: unknow
  */
 export function toDatabase(entity: unknown): Record<string, unknown> {
   if (!entity || typeof entity !== 'object') {
-    throw new Error('Entity must be a valid object');
+    throw new Error('Entity must be a valid object for serialization');
   }
 
-  try {
-    // Use instanceToPlain to apply @Transform decorators for serialization
-    const serialized = instanceToPlain(entity, {
-      strategy: 'excludeAll', // Only serialize @Expose decorated properties
-      excludeExtraneousValues: true,
-      enableImplicitConversion: false,
-    });
+  // Use instanceToPlain to apply @Transform decorators for serialization
+  const serialized = instanceToPlain(entity, {
+    strategy: 'excludeAll', // Only serialize @Expose decorated properties
+    excludeExtraneousValues: true,
+    enableImplicitConversion: false,
+  });
 
-    // If serialized object is empty or null, return the original object
-    if (!serialized || Object.keys(serialized).length === 0) {
-      return entity as Record<string, unknown>;
-    }
-
-    // Remove undefined properties from serialized object
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(serialized)) {
-      if (value !== undefined) {
-        result[key] = value;
-      }
-    }
-
-    return result;
-  } catch {
-    // Handle circular references - return original object as-is
-    return entity as Record<string, unknown>;
+  // Fail fast if serialization produces no result
+  if (!serialized || typeof serialized !== 'object') {
+    throw new Error(`Serialization failed for entity: ${entity.constructor?.name || 'Unknown'}`);
   }
+
+  // Fail fast if no properties are exposed for serialization
+  if (Object.keys(serialized).length === 0) {
+    throw new Error(`No properties exposed for serialization in entity: ${entity.constructor?.name || 'Unknown'}`);
+  }
+
+  // Remove undefined properties from serialized object
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(serialized)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+
+  // Fail fast if all properties were undefined
+  if (Object.keys(result).length === 0) {
+    throw new Error(`All exposed properties are undefined in entity: ${entity.constructor?.name || 'Unknown'}`);
+  }
+
+  return result;
 }

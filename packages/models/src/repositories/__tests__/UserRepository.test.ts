@@ -159,10 +159,11 @@ describe('UserRepository', () => {
         avatar: 'avatar-url',
       };
 
+      const mockTimestamp = new Date().toISOString();
       const createdUser = {
         ...userData,
         id: 'generated-test-id-123',
-        createdAt: expect.any(String),
+        createdAt: mockTimestamp,
       };
 
       testHelper.mockMergeWrite(createdUser);
@@ -177,6 +178,7 @@ describe('UserRepository', () => {
           email: 'test@example.com',
           username: 'testuser',
           displayName: 'Test User',
+          createdAt: expect.any(String),
         })
       );
     });
@@ -223,10 +225,11 @@ describe('UserRepository', () => {
         avatar: 'new-avatar-url',
       };
 
+      const mockTimestamp = new Date().toISOString();
       const updatedUser = global.createMockUser({
         id: 'user-123',
         ...updates,
-        updatedAt: expect.any(String),
+        updatedAt: mockTimestamp,
       });
 
       testHelper.mockUpdateWrite(updatedUser, 'u');
@@ -239,9 +242,10 @@ describe('UserRepository', () => {
     });
 
     it('should return existing user when no updates provided', async () => {
+      const mockTimestamp = new Date().toISOString();
       const existingUser = global.createMockUser({
         id: 'user-123',
-        updatedAt: expect.any(String),
+        updatedAt: mockTimestamp,
       });
 
       testHelper.mockUpdateWrite(existingUser, 'u');
@@ -402,10 +406,11 @@ describe('UserRepository', () => {
 
       testHelper.mockFindQuery(null, 'u');
 
+      const mockTimestamp = new Date().toISOString();
       const createdUser = {
         ...userData,
         id: 'generated-test-id-123',
-        createdAt: expect.any(String),
+        createdAt: mockTimestamp,
       };
       testHelper.mockMergeWrite(createdUser);
 
@@ -420,6 +425,7 @@ describe('UserRepository', () => {
           email: 'new@example.com',
           username: 'newuser',
           displayName: 'New User',
+          createdAt: expect.any(String),
         })
       );
     });
@@ -431,10 +437,11 @@ describe('UserRepository', () => {
         avatar: 'new-avatar-url',
       };
 
+      const mockTimestamp = new Date().toISOString();
       const updatedUser = {
         id: userId,
         ...updates,
-        updatedAt: expect.any(String),
+        updatedAt: mockTimestamp,
       };
 
       testHelper.mockUpdateWrite(updatedUser, 'u');

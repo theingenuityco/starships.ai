@@ -24,7 +24,7 @@ export class NativeToolApiKeyTransformers {
         return value
           .toLowerCase()
           .trim()
-          .replace(/[^a-z0-9_-]/g, '');
+          .replace(/[^a-z0-9_-]/g, ''); // Keep underscores and hyphens, remove other special chars
       }
       return value;
     });

@@ -2,7 +2,7 @@ import { AgentEntity } from '@/entities/AgentEntity';
 import { ConversationEntity } from '@/entities/ConversationEntity';
 import { StarshipEntity } from '@/entities/StarshipEntity';
 import { Neo4jConnection } from '@/helpers/database';
-import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel } from '@starships/protocol';
 import { StarshipModel } from '@starships/protocol';
@@ -103,7 +103,10 @@ export class StarshipRepository extends BaseRepository {
         await StarshipEntity.validate(starshipData, 'create');
 
         // Use base repository for database operation
-        const starship = await this.createEntityWithAutoId<StarshipModel>('Starship', toDatabase(starshipData));
+        const starship = await this.createEntityWithAutoId<StarshipModel>(
+          'Starship',
+          toDatabase(toEntityInstance(StarshipEntity, starshipData))
+        );
 
         // Create relationship with owner
         await connection.executeWrite(

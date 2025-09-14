@@ -171,7 +171,7 @@ export class AgentRepository extends BaseRepository {
 
         const result = await connection.executeWrite<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a', {
           id,
-          updates: toDatabase(updateProps),
+          updates: toDatabase(toEntityInstance(AgentEntity, updateProps)),
         });
 
         const agent = result[0]?.a || null;

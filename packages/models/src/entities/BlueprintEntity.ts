@@ -46,7 +46,7 @@ export class BlueprintEntity implements BlueprintModel {
 
   @Expose()
   @IsOptional()
-  @IsIn(['general', 'workflow', 'automation', 'integration', 'analysis'])
+  @IsIn(['general', 'workflow', 'automation', 'integration', 'analysis', 'test'])
   category?: string;
 
   @Expose()
@@ -105,7 +105,7 @@ export class BlueprintEntity implements BlueprintModel {
     const errors = await validate(entity, {
       skipMissingProperties: operation === 'update',
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: true, // Maintain strict validation
     });
 
     if (errors.length > 0) {

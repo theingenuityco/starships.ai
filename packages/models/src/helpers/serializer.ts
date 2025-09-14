@@ -12,7 +12,7 @@ import 'reflect-metadata';
  */
 export const Transformers = {
   /**
-   * Transform JSON string to object and vice versa - fails on invalid JSON
+   * Transform JSON string to object and vice versa - strict validation
    */
   JsonTransform: () =>
     Transform(({ value, type }) => {
@@ -22,8 +22,8 @@ export const Transformers = {
           try {
             return JSON.parse(value);
           } catch {
-            // Return null for malformed JSON instead of throwing
-            return null;
+            // Throw error for malformed JSON to maintain strict validation
+            throw new Error(`Invalid JSON string: ${value}`);
           }
         }
         return value;
@@ -161,46 +161,55 @@ export const LLMTransformers = {
         throw new Error(`Invalid temperature value: ${value}`);
       }
 
-      // Clamp temperature to valid range instead of throwing
-      return Math.max(0, Math.min(2, temp));
+      // Throw for out-of-range values to maintain strict validation
+      if (temp < 0 || temp > 2) {
+        throw new Error(`Temperature must be between 0 and 2, got: ${temp}`);
+      }
+
+      return temp;
     });
   },
 
   /**
-   * Transform maxTokens with validation - clamps to reasonable limits
+   * Transform maxTokens with validation - returns undefined for invalid values
    */
   MaxTokensTransform: () => {
     return Transform(({ value }) => {
-      if (value == null || value === undefined) return null;
+      if (value == null || value === undefined) return undefined;
 
       const tokens = typeof value === 'string' ? parseInt(value, 10) : value;
       if (isNaN(tokens) || !Number.isInteger(tokens)) {
-        throw new Error(`Invalid maxTokens value: ${value}`);
+        return undefined;
       }
 
       if (tokens < 1) {
-        throw new Error(`maxTokens must be positive, got: ${tokens}`);
+        return undefined;
       }
 
-      // Clamp maxTokens to reasonable limit instead of throwing
+      // Clamp maxTokens to reasonable limit
       return Math.min(100000, tokens);
     });
   },
 
   /**
-   * Transform timeout with validation - clamps to reasonable limits
+   * Transform timeout with validation - returns default for invalid values
    */
   TimeoutTransform: () => {
     return Transform(({ value }) => {
-      if (value == null || value === undefined) return null;
+      if (value == null || value === undefined) return 30000;
 
       const timeout = typeof value === 'string' ? parseInt(value, 10) : value;
       if (isNaN(timeout) || !Number.isInteger(timeout)) {
-        throw new Error(`Invalid timeout value: ${value}`);
+        return 30000;
       }
 
-      // Clamp timeout to reasonable limits instead of throwing
-      return Math.max(1000, Math.min(300000, timeout));
+      // Return default for values below minimum
+      if (timeout < 1000) {
+        return 30000;
+      }
+
+      // Clamp timeout to reasonable limits
+      return Math.min(300000, timeout);
     });
   },
 };

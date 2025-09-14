@@ -84,11 +84,13 @@ export class ExecutionEntity implements ExecutionModel {
   // Properties from the Execution interface that may not be persisted
   @Expose()
   @Transformers.JsonTransform()
-  results!: NodeResult[];
+  @IsOptional()
+  results?: NodeResult[];
 
   @Expose()
   @Transformers.JsonTransform()
-  state!: Record<string, unknown>;
+  @IsOptional()
+  state?: Record<string, unknown>;
 
   /**
    * Simple validation function using class-validator
@@ -116,9 +118,8 @@ export class ExecutionEntity implements ExecutionModel {
         startTime: dataRecord.startTime,
         endTime: dataRecord.endTime,
         pausedAt: dataRecord.pausedAt,
-        executionResults: dataRecord.results,
-        agentMemory: dataRecord.agentMemory,
-        ...dataRecord,
+        results: dataRecord.results || [],
+        state: dataRecord.state || {},
       });
     } else {
       // For update operations, only validate provided fields

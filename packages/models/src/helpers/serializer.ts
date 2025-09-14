@@ -12,32 +12,19 @@ import 'reflect-metadata';
  */
 export const Transformers = {
   /**
-   * Transform JSON string to object and vice versa - strict validation
+   * Transform JSON string to object and vice versa - lean and strict
    */
   JsonTransform: () =>
     Transform(({ value, type }) => {
       if (type === 0) {
-        // toClassOnly (deserializing from database)
+        // toClassOnly (deserializing from database) - parse strings only
         if (typeof value === 'string') {
-          try {
-            return JSON.parse(value);
-          } catch {
-            // Throw error for malformed JSON to maintain strict validation
-            throw new Error(`Invalid JSON string: ${value}`);
-          }
+          return JSON.parse(value); // Let JSON.parse throw on invalid JSON
         }
-        return value;
+        return value; // Pass through non-strings as-is
       } else {
-        // toPlainOnly (serializing to database)
-        if (value !== null && value !== undefined) {
-          try {
-            return JSON.stringify(value);
-          } catch {
-            // Return null for circular refs or unserializable values
-            return null;
-          }
-        }
-        return null;
+        // toPlainOnly (serializing to database) - stringify everything
+        return JSON.stringify(value); // Let JSON.stringify throw on circular refs
       }
     }),
 

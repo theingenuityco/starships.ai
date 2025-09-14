@@ -356,14 +356,7 @@ function createMemoryConfig(name: string, category: string, description: string,
 }
 
 // Default templates configuration
-const DEFAULT_TEMPLATES: Array<
-  Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> & {
-    blueprint?: Blueprint;
-    memory?: AgentMemoryState;
-    executionMode?: 'simple' | 'workflow';
-    timeout?: number;
-  }
-> = [
+const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>> = [
   {
     name: 'General Assistant',
     slug: 'general-assistant',
@@ -382,7 +375,6 @@ const DEFAULT_TEMPLATES: Array<
       'conversation',
       'problem solving',
     ]),
-    executionMode: 'simple',
     timeout: 30000,
   },
   {
@@ -408,7 +400,6 @@ const DEFAULT_TEMPLATES: Array<
       'Provide comprehensive, constructive code reviews to improve software quality',
       ['software architecture', 'code quality', 'security practices', 'performance optimization']
     ),
-    executionMode: 'workflow',
     timeout: 60000,
   },
   {
@@ -434,7 +425,6 @@ const DEFAULT_TEMPLATES: Array<
       'Create engaging, original content through a structured creative process',
       ['storytelling', 'character development', 'creative writing techniques', 'content strategy']
     ),
-    executionMode: 'workflow',
     timeout: 45000,
   },
   {
@@ -456,7 +446,6 @@ const DEFAULT_TEMPLATES: Array<
       'Provide data analysis, statistical insights, and visualization recommendations',
       ['statistics', 'data interpretation', 'visualization', 'pattern recognition']
     ),
-    executionMode: 'simple',
     timeout: 35000,
   },
   {
@@ -478,7 +467,6 @@ const DEFAULT_TEMPLATES: Array<
       'Resolve customer issues efficiently while maintaining high satisfaction levels',
       ['troubleshooting', 'customer service', 'product knowledge', 'communication']
     ),
-    executionMode: 'simple',
     timeout: 30000,
   },
   {
@@ -500,7 +488,6 @@ const DEFAULT_TEMPLATES: Array<
     ],
     blueprint: createStarshipNavigatorBlueprint(),
     memoryState: createSibylMemoryConfig(),
-    executionMode: 'workflow',
     timeout: 45000,
   },
 ];
@@ -535,9 +522,7 @@ export async function seedAgentTemplates(): Promise<void> {
           logger.debug(`Agent template already exists: ${template.name} (slug: ${template.slug})`);
         } else {
           // Create the template
-          await templateRepo.create({
-            ...template,
-          });
+          await templateRepo.create(template);
           addedCount++;
           logger.info(`Agent template created: ${template.name} (slug: ${template.slug})`);
         }

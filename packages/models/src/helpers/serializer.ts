@@ -45,8 +45,7 @@ export const Transformers = {
     Transform(({ value, type }) => {
       if (type === 0) {
         // toClassOnly (deserializing) - keep as ISO string for entities
-        if (value === null) return null;
-        if (value === undefined) return undefined;
+        if (value === null || value === undefined) return null;
         if (!value) return null;
         if (value instanceof Date) return value.toISOString();
         if (typeof value === 'string') {
@@ -66,8 +65,7 @@ export const Transformers = {
         }
       } else {
         // toPlainOnly (serializing)
-        if (value === null) return null;
-        if (value === undefined) return undefined;
+        if (value === null || value === undefined) return null;
         if (!value) return null;
         return value instanceof Date ? value.toISOString() : value;
       }

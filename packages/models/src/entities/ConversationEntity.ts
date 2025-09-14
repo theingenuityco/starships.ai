@@ -46,7 +46,7 @@ export class ConversationEntity implements ConversationModel {
    * This replaces the complex ConversationValidation class with a lean solution
    */
   static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new Error('Data must be an object');
     }
     const dataRecord = data as Record<string, unknown>;
@@ -58,7 +58,7 @@ export class ConversationEntity implements ConversationModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt,
-        title: dataRecord.title || 'Untitled Conversation',
+        title: dataRecord.title, // Don't provide default during validation
         status: dataRecord.status || 'active',
         ...dataRecord,
       });

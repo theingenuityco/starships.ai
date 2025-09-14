@@ -39,16 +39,37 @@ export const Transformers = {
     }),
 
   /**
-   * Transform date string to Date object and vice versa
+   * Transform date to ensure ISO string format for entities
    */
   DateTransform: () =>
     Transform(({ value, type }) => {
       if (type === 0) {
-        // toClassOnly (deserializing)
-        return value ? new Date(value) : null;
+        // toClassOnly (deserializing) - keep as ISO string for entities
+        if (value === null) return null;
+        if (value === undefined) return undefined;
+        if (!value) return null;
+        if (value instanceof Date) return value.toISOString();
+        if (typeof value === 'string') {
+          // Handle potential non-ISO string dates by converting through Date
+          try {
+            const date = new Date(value);
+            return date.toISOString();
+          } catch {
+            return value; // If conversion fails, return original
+          }
+        }
+        // Handle other types (numbers, etc.)
+        try {
+          return new Date(value).toISOString();
+        } catch {
+          return null;
+        }
       } else {
         // toPlainOnly (serializing)
-        return value instanceof Date ? value.toISOString() : value ? new Date(value).toISOString() : null;
+        if (value === null) return null;
+        if (value === undefined) return undefined;
+        if (!value) return null;
+        return value instanceof Date ? value.toISOString() : value;
       }
     }),
 

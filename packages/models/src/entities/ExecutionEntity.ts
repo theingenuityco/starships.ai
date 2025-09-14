@@ -39,7 +39,7 @@ export class ExecutionEntity implements ExecutionModel {
 
   @Expose()
   @Transform(({ value }) => value || 'pending')
-  @IsIn(['not_started', 'running', 'paused', 'completed', 'failed', 'cancelled'])
+  @IsIn(['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'])
   status!: ExecutionStatus;
 
   @Expose()
@@ -108,7 +108,7 @@ export class ExecutionEntity implements ExecutionModel {
         workflowId: dataRecord.workflowId,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        status: dataRecord.status || 'not_started',
+        status: dataRecord.status || 'pending',
         currentNodeRef: dataRecord.currentNodeRef,
         executionData: dataRecord.executionData,
         error: dataRecord.error,

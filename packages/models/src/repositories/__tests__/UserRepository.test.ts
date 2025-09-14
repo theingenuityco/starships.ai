@@ -16,20 +16,21 @@ jest.mock('@/helpers/database', () => ({
   getConnection: jest.fn(),
 }));
 
-// Mock UserEntity with proper static methods
-jest.mock('@/entities/UserEntity', () => ({
-  UserEntity: {
-    validate: jest.fn().mockResolvedValue(undefined),
-    deserialize: jest.fn().mockImplementation((data) => {
-      // Always add serialize method for entities
-      return {
-        ...data,
-        serialize: jest.fn().mockReturnValue(data),
-      };
-    }),
-    generateUsernameFromEmail: jest.fn((email) => email.split('@')[0]),
-  },
-}));
+// Mock UserEntity with proper class constructor and jest functions
+jest.mock('@/entities/UserEntity', () => {
+  class MockUserEntity {
+    static validate = jest.fn().mockResolvedValue(undefined);
+    static generateUsernameFromEmail = jest.fn((email: string) => email.split('@')[0]);
+
+    constructor(data: unknown) {
+      Object.assign(this, data);
+    }
+  }
+
+  return {
+    UserEntity: MockUserEntity,
+  };
+});
 
 import { UserEntity } from '@/entities/UserEntity';
 import { UserRepository } from '../UserRepository';
@@ -37,37 +38,14 @@ import { UserRepository } from '../UserRepository';
 describe('UserRepository', () => {
   let repository: UserRepository;
   let testHelper: RepositoryTestHelper;
-  let mockUserEntity: {
-    validate: jest.MockedFunction<(data: unknown, operation?: string) => Promise<void>>;
-    deserialize: jest.MockedFunction<(data: Record<string, unknown>) => UserModel>;
-    generateUsernameFromEmail: jest.MockedFunction<(email: string) => string>;
-  };
 
   beforeEach(() => {
     testHelper = new RepositoryTestHelper();
     repository = new UserRepository();
-    mockUserEntity = UserEntity as unknown as {
-      validate: jest.MockedFunction<(data: unknown, operation?: string) => Promise<void>>;
-      deserialize: jest.MockedFunction<(data: Record<string, unknown>) => UserModel>;
-      generateUsernameFromEmail: jest.MockedFunction<(email: string) => string>;
-    };
 
     // Reset mocks
     testHelper.reset();
-    mockUserEntity.validate.mockClear();
-    mockUserEntity.deserialize.mockClear();
-    mockUserEntity.generateUsernameFromEmail.mockClear();
-
-    // Reset default implementations
-    mockUserEntity.validate.mockResolvedValue(undefined);
-    mockUserEntity.deserialize.mockImplementation((data: Record<string, unknown>) => {
-      // Always add serialize method for entities
-      return {
-        ...data,
-        serialize: jest.fn().mockReturnValue(data),
-      } as unknown as UserModel;
-    });
-    mockUserEntity.generateUsernameFromEmail.mockImplementation((email: string) => email.split('@')[0]);
+    jest.clearAllMocks();
   });
 
   describe('constructor', () => {
@@ -183,7 +161,7 @@ describe('UserRepository', () => {
 
       const result = await repository.create(userData);
 
-      expect(mockUserEntity.validate).toHaveBeenCalledWith(userData, 'create');
+      expect(UserEntity.validate).toHaveBeenCalledWith(userData, 'create');
       expect(result).toEqual(expect.objectContaining(createdUser));
     });
 
@@ -193,10 +171,10 @@ describe('UserRepository', () => {
         // Missing email
       };
 
-      mockUserEntity.validate.mockRejectedValueOnce(new Error('Email is required for user creation'));
+      (UserEntity.validate as jest.Mock).mockRejectedValueOnce(new Error('Email is required for user creation'));
 
       await expect(repository.create(incompleteData as unknown as Omit<UserModel, 'id' | 'createdAt'>)).rejects.toThrow(DatabaseError);
-      expect(mockUserEntity.validate).toHaveBeenCalledWith(incompleteData, 'create');
+      expect(UserEntity.validate).toHaveBeenCalledWith(incompleteData, 'create');
     });
 
     it('should handle merge operation for existing email', async () => {
@@ -216,7 +194,7 @@ describe('UserRepository', () => {
 
       const result = await repository.create(userData);
 
-      expect(mockUserEntity.validate).toHaveBeenCalledWith(userData, 'create');
+      expect(UserEntity.validate).toHaveBeenCalledWith(userData, 'create');
       expect(result.email).toBe('updated@example.com');
       expect(result.displayName).toBe('Updated Name');
     });
@@ -239,7 +217,7 @@ describe('UserRepository', () => {
 
       const result = await repository.update('user-123', updates);
 
-      expect(mockUserEntity.validate).toHaveBeenCalledWith(updates, 'update');
+      expect(UserEntity.validate).toHaveBeenCalledWith(updates, 'update');
       expect(result).toEqual(expect.objectContaining(updatedUser));
     });
 
@@ -253,7 +231,7 @@ describe('UserRepository', () => {
 
       const result = await repository.update('user-123', {});
 
-      expect(mockUserEntity.validate).not.toHaveBeenCalled();
+      expect(UserEntity.validate).not.toHaveBeenCalled();
       // Even with empty updates, updatedAt is still set, so it uses executeWrite
       expect(testHelper.mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('SET u.updatedAt = $updatedAt'),
@@ -266,7 +244,7 @@ describe('UserRepository', () => {
       testHelper.mockUpdateWrite(null);
 
       await expect(repository.update('non-existent', { displayName: 'New Name' })).rejects.toThrow(NotFoundError);
-      expect(mockUserEntity.validate).toHaveBeenCalledWith({ displayName: 'New Name' }, 'update');
+      expect(UserEntity.validate).toHaveBeenCalledWith({ displayName: 'New Name' }, 'update');
     });
 
     it('should filter out protected fields from updates', async () => {

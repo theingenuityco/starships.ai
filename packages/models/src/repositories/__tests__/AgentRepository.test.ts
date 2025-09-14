@@ -13,16 +13,11 @@ jest.mock('../../helpers/database', () => ({
   convertNeo4jIntsInArray: jest.fn((arr) => arr),
 }));
 
-// Mock AgentEntity with proper static methods
-jest.mock('../../entities/AgentEntity', () => ({
-  AgentEntity: {
-    validate: jest.fn().mockResolvedValue(undefined),
-    deserialize: jest.fn().mockImplementation((data) => ({
-      ...data,
-      serialize: jest.fn().mockReturnValue(data),
-    })),
-  },
-}));
+// Import real AgentEntity and only mock its validation method
+import { AgentEntity } from '@/entities/AgentEntity';
+
+// Mock only the validate method to avoid validation in tests
+jest.spyOn(AgentEntity, 'validate').mockResolvedValue(undefined);
 
 // Mock uuid
 jest.mock('uuid', () => ({
@@ -307,7 +302,7 @@ describe('AgentRepository', () => {
         expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count', {
           starshipId: 'starship-456',
         });
-        expect(result).toEqual({ id: 'agent-123' });
+        expect(result).toMatchObject({ id: 'agent-123' });
       });
 
       it('should throw error when starship not found', async () => {

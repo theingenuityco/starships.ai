@@ -18,16 +18,22 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-// Mock ConversationEntity with proper static methods
-jest.mock('../../entities/ConversationEntity', () => ({
-  ConversationEntity: {
-    validate: jest.fn().mockResolvedValue(undefined),
-    deserialize: jest.fn().mockImplementation((data) => ({
-      ...data,
-      serialize: jest.fn().mockReturnValue(data),
-    })),
-  },
-}));
+// Mock ConversationEntity with proper class constructor
+jest.mock('../../entities/ConversationEntity', () => {
+  class MockConversationEntity {
+    static async validate() {
+      return undefined;
+    }
+
+    constructor(data: unknown) {
+      Object.assign(this, data);
+    }
+  }
+
+  return {
+    ConversationEntity: MockConversationEntity,
+  };
+});
 
 import { getConnection } from '@/helpers/database';
 
@@ -289,7 +295,7 @@ describe('ConversationRepository', () => {
         expect.stringContaining('MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})'),
         { conversationId: 'conv-123' }
       );
-      expect(result).toEqual(mockStarship);
+      expect(result).toMatchObject(mockStarship);
     });
 
     it('should return null when conversation has no associated starship', async () => {

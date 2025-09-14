@@ -144,20 +144,32 @@ export class UserEntity implements UserModel {
   stripeCustomerId?: string;
 
   /**
-   * Static factory method for creating UserEntity from raw data
+   * Creates a validated entity from API request data
+   * Use this when receiving data from API requests that need validation and transformation
    */
-  static deserialize(data: Record<string, unknown>): UserEntity {
-    return plainToInstance(UserEntity, data, {
+  static createFromRequest(data: Record<string, unknown>): UserEntity {
+    const entity = new UserEntity();
+    Object.assign(entity, data);
+    return entity;
+  }
+
+  /**
+   * Converts entity to database storage format
+   * Transforms complex objects to JSON strings for Neo4j storage
+   */
+  toDatabaseFormat(): Record<string, unknown> {
+    return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
   }
 
   /**
-   * Instance method for converting entity to plain object for storage
+   * Creates entity from database record
+   * Transforms JSON strings back to complex objects for API responses
    */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
+  static fromDatabaseRecord(data: Record<string, unknown>): UserEntity {
+    return plainToInstance(UserEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
@@ -264,7 +276,7 @@ export class UserEntity implements UserModel {
    * Helper method to get safe user data (without sensitive fields)
    */
   toSafeObject(): Omit<UserModel, 'password'> {
-    const serialized = this.serialize();
+    const serialized = this.toDatabaseFormat();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...safeData } = serialized;
     return safeData as Omit<UserModel, 'password'>;

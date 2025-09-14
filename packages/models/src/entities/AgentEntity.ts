@@ -80,20 +80,32 @@ export class AgentEntity implements AgentModel {
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
 
   /**
-   * Static factory method for creating AgentEntity from raw data
+   * Creates a validated entity from API request data
+   * Use this when receiving data from API requests that need validation and transformation
    */
-  static deserialize(data: Record<string, unknown>): AgentEntity {
-    return plainToInstance(AgentEntity, data, {
+  static createFromRequest(data: Record<string, unknown>): AgentEntity {
+    const entity = new AgentEntity();
+    Object.assign(entity, data);
+    return entity;
+  }
+
+  /**
+   * Converts entity to database storage format
+   * Transforms complex objects (blueprint, memoryState) to JSON strings for Neo4j storage
+   */
+  toDatabaseFormat(): Record<string, unknown> {
+    return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
   }
 
   /**
-   * Instance method for converting entity to plain object for storage
+   * Creates entity from database record
+   * Transforms JSON strings back to complex objects for API responses
    */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
+  static fromDatabaseRecord(data: Record<string, unknown>): AgentEntity {
+    return plainToInstance(AgentEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });

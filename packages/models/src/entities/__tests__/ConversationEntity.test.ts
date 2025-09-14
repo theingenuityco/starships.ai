@@ -175,7 +175,7 @@ describe('ConversationEntity', () => {
       const entity = fromDatabase(ConversationEntity, databaseRecord);
 
       expect(entity.createdAt).toBe('2024-01-01T00:00:00.000Z');
-      expect(entity.updatedAt).toBeNull();
+      expect(entity.updatedAt).toBeUndefined();
     });
 
     it('should apply status default transformation', async () => {

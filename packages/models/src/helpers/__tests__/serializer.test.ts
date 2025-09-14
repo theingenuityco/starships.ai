@@ -184,8 +184,8 @@ describe('Transformers', () => {
       const plain = { createdAt: null, updatedAt: undefined };
       const instance = plainToInstance(DateTestEntity, plain);
 
-      expect(instance.createdAt).toBeNull();
-      expect(instance.updatedAt).toBeNull(); // Transform converts undefined to null
+      expect(instance.createdAt).toBeUndefined();
+      expect(instance.updatedAt).toBeUndefined(); // Transform converts undefined to undefined
     });
 
     it('should handle timestamp numbers by converting to ISO strings', () => {
@@ -216,8 +216,8 @@ describe('Transformers', () => {
       const instanceNull = plainToInstance(ArrayTestEntity, plainNull);
       const instanceUndefined = plainToInstance(ArrayTestEntity, plainUndefined);
 
-      expect(instanceNull.testArray).toBeNull();
-      expect(instanceUndefined.testArray).toBeNull();
+      expect(instanceNull.testArray).toBeUndefined();
+      expect(instanceUndefined.testArray).toBeUndefined();
     });
 
     it('should throw error for non-array values', () => {

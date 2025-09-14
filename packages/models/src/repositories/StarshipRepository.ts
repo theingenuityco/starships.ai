@@ -1,3 +1,5 @@
+import { AgentEntity } from '@/entities/AgentEntity';
+import { ConversationEntity } from '@/entities/ConversationEntity';
 import { StarshipEntity } from '@/entities/StarshipEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
@@ -180,7 +182,7 @@ export class StarshipRepository extends BaseRepository {
        RETURN a ORDER BY a.name`,
       { starshipId }
     );
-    return result.map((record) => record.a);
+    return result.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>));
   }
 
   async deployAgent(starshipId: string, agentId: string): Promise<boolean> {
@@ -367,7 +369,8 @@ export class StarshipRepository extends BaseRepository {
       { subscriptionId }
     );
 
-    return result[0]?.starship || null;
+    if (!result[0]?.starship) return null;
+    return StarshipEntity.fromDatabaseRecord(result[0].starship as unknown as Record<string, unknown>);
   }
 
   async updateSubscription(
@@ -440,7 +443,8 @@ export class StarshipRepository extends BaseRepository {
       'MATCH (s:Starship {stripeCustomerId: $customerId}) RETURN s LIMIT 1',
       { customerId }
     );
-    return result[0]?.s || null;
+    if (!result[0]?.s) return null;
+    return StarshipEntity.fromDatabaseRecord(result[0].s as unknown as Record<string, unknown>);
   }
 
   /** Find all pending payment starships older than specified hours */
@@ -450,14 +454,14 @@ export class StarshipRepository extends BaseRepository {
 
     const result = await connection.executeQuery<{ s: StarshipModel }>(
       `MATCH (s:Starship)
-       WHERE s.status = 'pending_payment' 
+       WHERE s.status = 'pending_payment'
        AND s.createdAt < $cutoffTime
        RETURN s
        ORDER BY s.createdAt DESC`,
       { cutoffTime }
     );
 
-    return result.map((record) => record.s);
+    return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s as unknown as Record<string, unknown>));
   }
 
   /** Clean up abandoned pending starships */
@@ -564,7 +568,7 @@ export class StarshipRepository extends BaseRepository {
       { starshipId }
     );
 
-    return result.map((record) => record.c);
+    return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c as Record<string, unknown>).toDatabaseFormat());
   }
 
   /**
@@ -605,7 +609,7 @@ export class StarshipRepository extends BaseRepository {
       { starshipId }
     );
 
-    return result.map((record) => record.c);
+    return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c as Record<string, unknown>).toDatabaseFormat());
   }
 
   /**

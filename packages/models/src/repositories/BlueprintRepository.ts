@@ -6,7 +6,7 @@
  */
 
 import { Neo4jConnection } from '@/helpers/database';
-import { fromDatabase, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { NodeRepository } from '@/repositories/NodeRepository';
@@ -62,7 +62,9 @@ export class BlueprintRepository extends BaseRepository {
           metadata: request.metadata || {},
         };
 
-        const blueprint = await this.createEntityWithAutoId<BlueprintModel>('Blueprint', toDatabase(blueprintData));
+        // Create entity instance from plain object, then serialize
+        const blueprintEntity = toEntityInstance(BlueprintEntity, blueprintData);
+        const blueprint = await this.createEntityWithAutoId<BlueprintModel>('Blueprint', toDatabase(blueprintEntity));
 
         // Create nodes using NodeRepository
         const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprint.id, request.nodes);

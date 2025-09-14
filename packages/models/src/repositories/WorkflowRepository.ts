@@ -1,5 +1,5 @@
 import { Neo4jConnection } from '@/helpers/database';
-import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { WorkflowModel } from '@starships/protocol';
 import { WorkflowEntity } from '../entities/WorkflowEntity';
@@ -65,8 +65,9 @@ export class WorkflowRepository extends BaseRepository {
           },
         };
 
-        // Use BaseRepository serialization
-        const result = await this.createEntityWithAutoId<WorkflowModel>('Workflow', toDatabase(workflowData));
+        // Create entity instance from plain object, then serialize
+        const workflowEntity = toEntityInstance(WorkflowEntity, workflowData);
+        const result = await this.createEntityWithAutoId<WorkflowModel>('Workflow', toDatabase(workflowEntity));
 
         // Create relationship with starship if starshipId is provided
         if (result.starshipId) {
@@ -134,8 +135,9 @@ export class WorkflowRepository extends BaseRepository {
         }
         if (updates.blueprint !== undefined) {
           setFields.push('w.blueprint = $blueprint');
-          // Use toDatabase to handle blueprint serialization
-          const serialized = toDatabase({ blueprint: updates.blueprint });
+          // Create entity instance to handle blueprint serialization
+          const blueprintEntity = toEntityInstance(WorkflowEntity, { blueprint: updates.blueprint });
+          const serialized = toDatabase(blueprintEntity);
           params.blueprint = serialized.blueprint;
         }
         if (updates.starshipId !== undefined) {

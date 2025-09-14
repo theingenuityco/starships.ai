@@ -1,5 +1,5 @@
 import { Neo4jConnection } from '@/helpers/database';
-import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel, Conversation, ConversationModel, MessageModel, StarshipModel } from '@starships/protocol';
 import { AgentEntity } from '../entities/AgentEntity';
@@ -56,8 +56,9 @@ export class ConversationRepository extends BaseRepository {
           status: entity.status || 'active',
         };
 
-        // Use BaseRepository serialization
-        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', toDatabase(conversationData));
+        // Create entity instance from plain object, then serialize
+        const conversationEntity = toEntityInstance(ConversationEntity, conversationData);
+        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', toDatabase(conversationEntity));
 
         // Create relationship with starship if starshipId is provided
         await this.linkToStarship(result.id, starshipId);

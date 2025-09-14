@@ -1,6 +1,6 @@
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
-import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest } from '@starships/protocol';
@@ -103,8 +103,9 @@ export class AgentTemplateRepository extends BaseRepository {
           updatedAt: now,
         };
 
-        // Use base repository for database operation
-        const template = await this.createEntityWithAutoId<AgentTemplateModel>('AgentTemplate', toDatabase(templateProps));
+        // Create entity instance from plain object, then serialize
+        const templateEntity = toEntityInstance(AgentTemplateEntity, templateProps);
+        const template = await this.createEntityWithAutoId<AgentTemplateModel>('AgentTemplate', toDatabase(templateEntity));
 
         // Transform database result back to domain model
         return fromDatabase(AgentTemplateEntity, template);

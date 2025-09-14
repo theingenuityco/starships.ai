@@ -143,7 +143,6 @@ describe('ConversationRepository', () => {
         id: 'test-nanoid-123',
         title: 'Test Conversation',
         status: 'active',
-        starshipId: 'starship-123',
       });
       expect(result.createdAt).toBeDefined();
       expect(result.updatedAt).toBeDefined();

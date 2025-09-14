@@ -52,18 +52,9 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
           id: `streaming-content-${Date.now()}`,
           content: streamingContent,
           role: 'assistant' as const,
-          timestamp: new Date().toISOString(),
-          conversationId: conversationId || '',
-          starshipId: starshipId || '',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          version: '1.0.0',
-          threadDepth: 0,
-          processingStatus: 'streaming' as const,
           messageType: 'agent_response' as const,
-          importance: 'medium' as const,
-          contentLength: streamingContent.length,
-          hasAttachments: false,
           streaming: true,
         }
 
@@ -72,9 +63,9 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
       }
     }
 
-    // Sort messages by timestamp to ensure consistent ordering
+    // Sort messages by createdAt to ensure consistent ordering
     // This handles both API messages and dynamically added messages (user/streaming)
-    return combinedMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    return combinedMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
   }, [messages, isStreaming, streamingContent, conversationId, starshipId])
 
   // Message selection state
@@ -269,44 +260,32 @@ function MessageBubble({
   })
 
   const getImportanceBadge = () => {
-    if (!message.importance || message.importance === 'low') return null
-
-    const colors = {
-      medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      high: 'bg-orange-100 text-orange-800 border-orange-200',
-      critical: 'bg-red-100 text-red-800 border-red-200',
-    }
-
-    return (
-      <Badge variant="outline" className={cn('text-xs', colors[message.importance])}>
-        {message.importance}
-      </Badge>
-    )
+    // Importance property no longer exists in simplified MessageModel
+    return null
   }
 
   const getProcessingStatus = () => {
-    if (!message.processingStatus || message.processingStatus === 'completed') return null
-
-    const statusIcons = {
-      pending: <Clock className="w-3 h-3" />,
-      processing: <Loader2 className="w-3 h-3 animate-spin" />,
-      streaming: <Loader2 className="w-3 h-3 animate-spin" />,
-      failed: <XCircle className="w-3 h-3 text-destructive" />,
+    // Show streaming indicator for streaming messages
+    if (message.streaming) {
+      return (
+        <div className="flex items-center gap-1 text-green-600">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span className="text-xs">streaming</span>
+        </div>
+      )
     }
 
-    const statusColors = {
-      pending: 'text-muted-foreground',
-      processing: 'text-blue-600',
-      streaming: 'text-green-600',
-      failed: 'text-destructive',
+    // Show sending indicator for sending messages
+    if (message.sending) {
+      return (
+        <div className="flex items-center gap-1 text-blue-600">
+          <Loader2 className="w-3 h-3 animate-spin" />
+          <span className="text-xs">sending</span>
+        </div>
+      )
     }
 
-    return (
-      <div className={cn('flex items-center gap-1', statusColors[message.processingStatus])}>
-        {statusIcons[message.processingStatus]}
-        <span className="text-xs capitalize">{message.processingStatus}</span>
-      </div>
-    )
+    return null
   }
 
   const getRoleIcon = () => {
@@ -316,18 +295,12 @@ function MessageBubble({
   }
 
   const getMetadata = () => {
+    // Metadata properties no longer exist in simplified MessageModel
     const items = []
 
-    if (message.tokenCount) {
-      items.push(`${message.tokenCount} tokens`)
-    }
-
-    if (message.processingTimeMs && message.processingTimeMs > 0) {
-      items.push(`${message.processingTimeMs}ms`)
-    }
-
-    if (message.hasAttachments) {
-      items.push('Has attachments')
+    // Show message type if it's not a standard user/assistant message
+    if (message.messageType && message.messageType !== 'user_input' && message.messageType !== 'agent_response') {
+      items.push(message.messageType.replace('_', ' '))
     }
 
     return items.length > 0 ? items.join(' • ') : null
@@ -335,13 +308,7 @@ function MessageBubble({
 
   return (
     <div
-      className={cn(
-        'flex gap-2 sm:gap-3 group opacity-100',
-        isUser ? 'justify-end' : 'justify-start',
-        message.threadDepth ? `ml-${Math.min(message.threadDepth * 2, 8)} sm:ml-${Math.min(message.threadDepth * 4, 16)}` : '',
-        isSelected && 'selection-highlight rounded-lg p-2',
-        isHighlighted && 'ring-2 ring-primary/50'
-      )}
+      className={cn('flex gap-2 sm:gap-3 group opacity-100', isUser ? 'justify-end' : 'justify-start', isSelected && 'selection-highlight rounded-lg p-2', isHighlighted && 'ring-2 ring-primary/50')}
       {...accessibilityProps}
     >
       {/* Selection checkbox */}
@@ -377,11 +344,10 @@ function MessageBubble({
             </Button>
           )}
 
-          {/* Message header with importance and status */}
+          {/* Message header with status */}
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
             {getImportanceBadge()}
             {getProcessingStatus()}
-            {message.hasAttachments && <Paperclip className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-muted-foreground" />}
           </div>
 
           {/* Message content */}
@@ -389,7 +355,7 @@ function MessageBubble({
 
           {/* Message footer */}
           <div className="flex items-center justify-between mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-current/10">
-            <div className="text-xs opacity-70 message-timestamp">{new Date(message.timestamp).toLocaleTimeString()}</div>
+            <div className="text-xs opacity-70 message-timestamp">{new Date(message.createdAt).toLocaleTimeString()}</div>
 
             {/* Metadata */}
             {getMetadata() && (
@@ -399,22 +365,12 @@ function MessageBubble({
               </div>
             )}
           </div>
-
-          {/* Threading indicator */}
-          {message.parentMessageId && <div className="absolute -left-3 top-1/2 w-6 h-0.5 bg-border"></div>}
         </div>
 
         {/* Message Reactions */}
         <MessageReactions messageId={message.id} reactions={reactions} onAddReaction={onAddReaction} onRemoveReaction={onRemoveReaction} className="mt-2" />
 
-        {/* Thread replies indicator */}
-        {message.threadDepth === 0 && message.parentMessageId && (
-          <Button variant="ghost" size="sm" className="mt-1 h-5 sm:h-6 px-2 text-xs text-muted-foreground focus-visible-ring">
-            <MessageSquare className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
-            <span className="hidden sm:inline">View thread</span>
-            <span className="sm:hidden">Thread</span>
-          </Button>
-        )}
+        {/* Thread replies indicator - removed as threading properties no longer exist */}
       </div>
 
       {isUser && <div className="flex-shrink-0 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-primary/10 flex items-center justify-center">{getRoleIcon()}</div>}

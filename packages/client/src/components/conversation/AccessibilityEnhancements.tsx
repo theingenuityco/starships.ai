@@ -75,7 +75,7 @@ export function AccessibilityEnhancements({ messages, onNavigateMessage, onSelec
 
   const announceMessage = (message: MessageModel) => {
     const role = message.role === 'user' ? 'You' : 'Assistant'
-    const time = new Date(message.timestamp).toLocaleTimeString()
+    const time = new Date(message.createdAt).toLocaleTimeString()
     setAnnounceText(`${role} said: ${message.content.substring(0, 100)}... at ${time}`)
   }
 
@@ -113,7 +113,7 @@ interface MessageAccessibilityProps {
 
 export function MessageAccessibility({ message, index, isSelected, isFocused, totalMessages }: MessageAccessibilityProps) {
   const role = message.role === 'user' ? 'You' : 'Assistant'
-  const time = new Date(message.timestamp).toLocaleString()
+  const time = new Date(message.createdAt).toLocaleString()
 
   return {
     'aria-label': `Message ${index + 1} of ${totalMessages} from ${role} at ${time}`,

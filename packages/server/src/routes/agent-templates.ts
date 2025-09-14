@@ -15,14 +15,7 @@ const PaginationSchema = z.object({
 });
 
 const CreateAgentFromTemplateSchema = z.object({
-  agentName: z
-    .string()
-    .min(1, 'Agent name is required and must be a non-empty string')
-    .max(255, 'Agent name must be less than 255 characters'),
-  starshipId: z
-    .string()
-    .regex(/^([a-z0-9]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug')
-    .optional(),
+  starshipId: z.string().regex(/^([a-z0-9]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug'),
 });
 
 // Helper function for Zod validation
@@ -140,7 +133,7 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     const bodyValidation = validateData(CreateAgentFromTemplateSchema, req.body, res, 'request body');
     if (!bodyValidation) return;
 
-    const { agentName, starshipId } = bodyValidation;
+    const { starshipId } = bodyValidation;
 
     const templateService = getAgentTemplateService();
     if (!templateService) {
@@ -158,70 +151,41 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
       return;
     }
 
-    // Determine the target starship ID
-    let targetStarshipId = starshipId;
+    // Validate provided starshipId exists and belongs to user using service layer
+    try {
+      const starship = await templateService.validateStarshipAccess(starshipId, userId);
+      console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${starshipId}) for agent creation`);
+    } catch (starshipError: any) {
+      console.error('[TEMPLATE] Error validating starship access:', {
+        starshipId: starshipId,
+        errorName: starshipError?.name,
+        errorMessage: starshipError?.message,
+        fullError: starshipError,
+      });
 
-    // If no starshipId provided, get user's first active starship as fallback
-    if (!targetStarshipId) {
-      try {
-        const activeStarship = await templateService.findUserActiveStarship(userId);
-
-        if (!activeStarship) {
-          sendError(res, 'VALIDATION_ERROR', 'No starship specified and no active starships found', 400, {
-            details: 'Please provide a starshipId or create an active starship first',
-          });
-          return;
-        }
-
-        targetStarshipId = activeStarship.id;
-        console.log(`[TEMPLATE] Using fallback starship "${activeStarship.name}" (${targetStarshipId}) for agent creation`);
-      } catch (starshipError) {
-        console.error('[TEMPLATE] Error finding user starships:', starshipError);
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to determine target starship', 500, {
-          details: 'Could not retrieve user starships to create agent',
+      if (starshipError?.name === 'NotFoundError') {
+        sendError(res, 'RESOURCE_NOT_FOUND', starshipError.message || 'Starship not found', 404, {
+          resource: 'starship',
+          id: starshipId,
+          hint: 'Please ensure you have access to a starship before creating agents',
         });
-        return;
-      }
-    } else {
-      // Validate provided starshipId exists and belongs to user using service layer
-      try {
-        const starship = await templateService.validateStarshipAccess(targetStarshipId, userId);
-        console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${targetStarshipId}) for agent creation`);
-      } catch (starshipError: any) {
-        console.error('[TEMPLATE] Error validating starship access:', {
-          starshipId: targetStarshipId,
-          userId,
-          errorName: starshipError?.name,
-          errorMessage: starshipError?.message,
-          fullError: starshipError,
+      } else if (starshipError?.name === 'ValidationError') {
+        sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
+          details: 'You do not have permission to create agents on this starship',
         });
-
-        if (starshipError?.name === 'NotFoundError') {
-          sendError(res, 'RESOURCE_NOT_FOUND', starshipError.message || 'Starship not found', 404, {
-            resource: 'starship',
-            id: targetStarshipId,
-            hint: 'Please ensure you have access to a starship before creating agents',
-          });
-        } else if (starshipError?.name === 'ValidationError') {
-          sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
-            details: 'You do not have permission to create agents on this starship',
-          });
-        } else {
-          sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate starship', 500, {
-            details: 'Could not verify starship ownership and existence',
-          });
-        }
-        return;
+      } else {
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate starship', 500, {
+          details: 'Could not verify starship ownership and existence',
+        });
       }
+      return;
     }
 
     // Create agent from template with validated starship ID
-    const agent = await templateService.createAgentFromTemplate(templateId, agentName.trim(), userId, targetStarshipId);
+    const agent = await templateService.createAgentFromTemplate(templateId, starshipId);
 
     // Log the creation for audit purposes
-    console.log(
-      `[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${userId} on starship ${targetStarshipId}`
-    );
+    console.log(`[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${userId} on starship ${starshipId}`);
 
     sendSuccess(res, agent, 201);
   } catch (error) {

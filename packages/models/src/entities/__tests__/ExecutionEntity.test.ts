@@ -78,12 +78,12 @@ describe('ExecutionEntity', () => {
       const serialized = toDatabase(execution);
 
       expect(serialized.currentNodeRef).toBeUndefined();
-      expect(serialized.executionData).toBeUndefined();
-      expect(serialized.error).toBeUndefined();
-      expect(serialized.result).toBeUndefined();
-      expect(serialized.startTime).toBeUndefined();
-      expect(serialized.endTime).toBeUndefined();
-      expect(serialized.pausedAt).toBeUndefined();
+      expect(serialized.executionData).toBeNull(); // JsonTransform returns null for undefined
+      expect(serialized.error).toBeNull(); // JsonTransform returns null for undefined
+      expect(serialized.result).toBeNull(); // JsonTransform returns null for undefined
+      expect(serialized.startTime).toBeNull(); // DateTransform returns null for undefined
+      expect(serialized.endTime).toBeNull(); // DateTransform returns null for undefined
+      expect(serialized.pausedAt).toBeNull(); // DateTransform returns null for undefined
       expect(serialized.results).toBe('[]');
       expect(serialized.state).toBe('{}');
     });

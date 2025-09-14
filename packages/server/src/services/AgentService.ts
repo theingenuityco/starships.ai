@@ -6,14 +6,12 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent, AgentParams, ExecutionEvent } from '@starships/autopilot';
-import { createError, NotFoundError, ValidationError } from '@starships/errors';
+import { Agent, AgentParams } from '@starships/autopilot';
+import { NotFoundError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
-import { AgentStreamingService } from './AgentStreamingService';
-import { ConversationService } from './ConversationService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -43,15 +41,10 @@ export interface ConversationStreamingRequest extends ConversationRequest {
 export class AgentService {
   private agentRepository: AgentRepository;
   private messageService: MessageService;
-  private conversationService: ConversationService;
-  private agentStreamingService: AgentStreamingService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
-    // ! TRANSFER logic for callbacks into AgentService itself?
-    this.agentStreamingService = new AgentStreamingService();
-    this.conversationService = new ConversationService();
   }
 
   // ============================================================================
@@ -242,203 +235,5 @@ export class AgentService {
     const agentInstance = new Agent(agentParams);
 
     return agentInstance;
-  }
-
-  /**
-   * Execute conversation with agent using ConversationRequest format
-   * Handles complete conversation lifecycle with event monitoring and message creation
-   */
-  static async executeConversation(request: ConversationRequest): Promise<ConversationResponse> {
-    const { agentId, userId, message, conversationId } = request;
-
-    if (!agentId) {
-      throw new ValidationError('agentId is required for conversation execution', 'agentId');
-    }
-
-    console.log('🚀 [AGENT-SERVICE] Starting conversation execution:', {
-      agentId,
-      userId,
-      message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
-      conversationId,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Get agent from database
-    const agentRepo = new AgentRepository();
-    const agentModel = await agentRepo.findById(agentId);
-
-    if (!agentModel) {
-      console.error('❌ [AGENT-SERVICE] Agent not found:', agentId);
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    console.log('✅ [AGENT-SERVICE] Database agent loaded:', {
-      id: agentModel.id,
-      name: agentModel.name,
-      model: agentModel.model,
-      hasBlueprint: !!agentModel.blueprint,
-    });
-
-    const startTime = Date.now();
-    const agentService = new AgentService();
-
-    try {
-      // Create agent instance with enhanced options
-      const agent = new Agent(agentModel);
-
-      // Add user message to memory
-      agent.addToMemory('user', message);
-
-      // Execute agent with event monitoring
-      const execution = await agent.execute();
-
-      // Extract response from execution result
-      const response = agentService.extractResponse(execution);
-
-      // Calculate usage statistics
-      const usage = agentService.calculateUsage(execution);
-
-      // Note: incrementUsageCount functionality is not available in the updated AgentRepository
-      // This would need to be implemented in the repository
-
-      const executionTime = Date.now() - startTime;
-
-      console.log('✅ [AGENT-SERVICE] Conversation execution completed successfully:', {
-        responseLength: response.length,
-        executionTime,
-        usageStats: usage,
-      });
-
-      return {
-        source: 'agent',
-        content: response,
-        agentId: agentId,
-        usage: {
-          promptTokens: Math.floor(usage.totalTokens * 0.7), // Estimate prompt tokens
-          completionTokens: Math.floor(usage.totalTokens * 0.3), // Estimate completion tokens
-        },
-      };
-    } catch (error) {
-      console.error('❌ [AGENT-SERVICE] Conversation execution failed:', {
-        agentId,
-        userId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      // Create error message in conversation
-      await agentService.createErrorResponse(error as Error, {
-        agentId,
-        userId,
-        conversationId,
-        starshipId: 'unknown', // starshipId property no longer exists on AgentModel
-      });
-
-      throw error;
-    }
-  }
-
-  /**
-   * Create error response using raw error message
-   */
-  async createErrorResponse(
-    error: Error,
-    context: {
-      agentId: string;
-      userId?: string;
-      conversationId?: string;
-      starshipId: string;
-    }
-  ): Promise<ConversationResponse> {
-    const errorMessage = error.message;
-    const errorStack = error.stack;
-
-    // Create raw error message via message service
-    if (context.conversationId) {
-      await this.messageService.createMessage({
-        role: 'system',
-        content: errorMessage,
-        starshipId: context.starshipId,
-        agentId: context.agentId,
-        conversationId: context.conversationId,
-        messageType: 'error',
-        importance: 'high',
-        processingStatus: 'completed',
-        metadata: {
-          errorMessage,
-          errorStack,
-          timestamp: new Date().toISOString(),
-        },
-      });
-    }
-
-    // Return raw error response
-    return {
-      source: 'agent',
-      content: errorMessage,
-      agentId: context.agentId,
-      usage: {
-        promptTokens: 0,
-        completionTokens: 0,
-      },
-    };
-  }
-
-  /**
-   * Extract response from autopilot agent execution result
-   */
-  private extractResponse(executionResult: any): string {
-    if (executionResult.status !== 'completed') {
-      throw createError(`Agent execution failed: ${executionResult.error?.message || 'Unknown error'}`, 500);
-    }
-
-    // Look for LLM response in execution results
-    const results = Array.from(executionResult.results.values()) as any[];
-
-    // Find the last successful LLM response
-    for (let i = results.length - 1; i >= 0; i--) {
-      const result = results[i] as any;
-      if (!result.error && result.data) {
-        // Check for different response formats
-        if (typeof result.data === 'string') {
-          return result.data;
-        }
-        if (result.data.content) {
-          return result.data.content;
-        }
-        if (result.data.response) {
-          return result.data.response;
-        }
-        if (result.data.output) {
-          return result.data.output;
-        }
-      }
-    }
-
-    // Fallback: return a generic response
-    return "I've processed your request successfully, but couldn't generate a specific response.";
-  }
-
-  /**
-   * Calculate usage statistics from execution result
-   */
-  private calculateUsage(executionResult: any): any {
-    // Extract usage information from execution results
-    const results = Array.from(executionResult.results.values()) as any[];
-    let totalTokens = 0;
-    let totalCost = 0;
-
-    for (const result of results) {
-      if (result.data?.usage) {
-        totalTokens += result.data.usage.totalTokens || 0;
-        totalCost += result.data.usage.cost || 0;
-      }
-    }
-
-    return {
-      totalTokens: totalTokens,
-      cost: totalCost,
-      modelCalls: results.filter((r: any) => !r.error).length,
-    };
   }
 }

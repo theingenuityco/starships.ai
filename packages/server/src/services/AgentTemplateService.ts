@@ -53,11 +53,7 @@ export class AgentTemplateService {
     return this.templateRepository.delete(id);
   }
 
-  async createAgentFromTemplate(templateId: string, agentName: string, authorId: string, starshipId: string): Promise<AgentModel> {
-    if (!agentName.trim()) {
-      throw new ValidationError('Agent name is required', 'agentName');
-    }
-
+  async createAgentFromTemplate(templateId: string, starshipId: string): Promise<AgentModel> {
     // Get the template to use as a base
     const template = await this.templateRepository.findById(templateId);
     if (!template) {
@@ -66,7 +62,7 @@ export class AgentTemplateService {
 
     // Create agent data based on the template
     const agentData = {
-      name: agentName.trim(),
+      name: template.name,
       description: template.description,
       model: template.model,
       temperature: template.temperature,
@@ -89,18 +85,6 @@ export class AgentTemplateService {
   // BUSINESS LOGIC METHODS FOR ROUTES LAYER
   // ============================================================================
 
-  /**
-   * Find user's active starship for agent template creation
-   */
-  async findUserActiveStarship(userId: string): Promise<StarshipModel | null> {
-    const userStarships = await this.starshipRepository.findByOwner(userId);
-    const activeStarship = userStarships.find((ship) => ship.status === 'active');
-    return activeStarship || null;
-  }
-
-  /**
-   * Validate starship exists and user has access
-   */
   async validateStarshipAccess(starshipId: string, userId: string): Promise<StarshipModel> {
     // First try to find by ID
     let starship = await this.starshipRepository.findById(starshipId);

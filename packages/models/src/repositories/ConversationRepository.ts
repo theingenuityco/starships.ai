@@ -1,8 +1,10 @@
 import { Neo4jConnection } from '@/helpers/database';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel, Conversation, ConversationModel, MessageModel, StarshipModel } from '@starships/protocol';
+import { AgentEntity } from '../entities/AgentEntity';
 import { ConversationEntity } from '../entities/ConversationEntity';
 import { MessageEntity } from '../entities/MessageEntity';
+import { StarshipEntity } from '../entities/StarshipEntity';
 
 export class ConversationRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -163,7 +165,9 @@ export class ConversationRepository extends BaseRepository {
            RETURN starship`,
           { conversationId }
         );
-        return result.length > 0 ? result[0].starship : null;
+        if (result.length === 0) return null;
+
+        return StarshipEntity.fromDatabaseRecord(result[0].starship as unknown as Record<string, unknown>);
       },
       'getConversationStarship',
       'Conversation'
@@ -290,7 +294,8 @@ export class ConversationRepository extends BaseRepository {
            RETURN a`,
           { conversationId }
         );
-        return result.map((record) => record.a);
+
+        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>));
       },
       'getConversationAgents',
       'Conversation'

@@ -93,10 +93,10 @@ export class AgentRepository extends BaseRepository {
         );
 
         if (!result[0].a) {
-          this.handleNotFound('Starship', starshipId);
+          this.handleNotFound('Agent', agentId);
         }
 
-        return result[0].a;
+        return AgentEntity.fromDatabaseRecord(result[0].a as unknown as Record<string, unknown>);
       },
       'updateStarshipId',
       'Agent',

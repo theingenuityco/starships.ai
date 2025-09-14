@@ -79,13 +79,10 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Create user
+    // Create user (password will be hashed in UserService)
     const user = await UserService.createUser({
       email,
-      password: hashedPassword,
+      password, // Pass plain password - UserService will hash it
       name,
       displayName: name,
       username: email.split('@')[0],

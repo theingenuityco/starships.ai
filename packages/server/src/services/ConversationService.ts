@@ -119,7 +119,7 @@ export class ConversationService {
     });
 
     const agentModels = await this.getConversationAgents(data.conversationId);
-    if (agentModels.length < 0) {
+    if (agentModels.length < 1) {
       throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
     }
     // only first agent for now

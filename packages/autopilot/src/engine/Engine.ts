@@ -282,7 +282,7 @@ export class Engine {
    */
   private async validateForExecution(blueprint: Blueprint): Promise<void> {
     // Check for start node
-    const startNode = this.getStartNode();
+    const startNode = this.blueprint?.nodes?.find((node) => node.type === 'start') || null;
     if (!startNode) {
       throw new Error('Workflow must have a start node');
     }

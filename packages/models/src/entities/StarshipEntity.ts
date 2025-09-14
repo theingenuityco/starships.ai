@@ -122,20 +122,32 @@ export class StarshipEntity implements StarshipModel {
   stripeCustomerId?: string;
 
   /**
-   * Static factory method for creating StarshipEntity from raw data
+   * Creates a validated entity from API request data
+   * Use this when receiving data from API requests that need validation and transformation
    */
-  static deserialize(data: Record<string, unknown>): StarshipEntity {
-    return plainToInstance(StarshipEntity, data, {
+  static createFromRequest(data: Record<string, unknown>): StarshipEntity {
+    const entity = new StarshipEntity();
+    Object.assign(entity, data);
+    return entity;
+  }
+
+  /**
+   * Converts entity to database storage format
+   * Transforms complex objects to JSON strings for Neo4j storage
+   */
+  toDatabaseFormat(): Record<string, unknown> {
+    return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
   }
 
   /**
-   * Instance method for converting entity to plain object for storage
+   * Creates entity from database record
+   * Transforms JSON strings back to complex objects for API responses
    */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
+  static fromDatabaseRecord(data: Record<string, unknown>): StarshipEntity {
+    return plainToInstance(StarshipEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });

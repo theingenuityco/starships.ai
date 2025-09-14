@@ -14,7 +14,7 @@ export class StarshipRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
-        return result.map((record) => StarshipEntity.deserialize(record.s as unknown as Record<string, unknown>));
+        return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s as unknown as Record<string, unknown>));
       },
       'findAll',
       'Starship'
@@ -27,7 +27,7 @@ export class StarshipRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id });
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.deserialize(starship as unknown as Record<string, unknown>) : null;
+        return starship ? StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Starship',
@@ -44,7 +44,7 @@ export class StarshipRepository extends BaseRepository {
           { slug, ownerId }
         );
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.deserialize(starship as unknown as Record<string, unknown>) : null;
+        return starship ? StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>) : null;
       },
       'findBySlug',
       'Starship',
@@ -60,7 +60,7 @@ export class StarshipRepository extends BaseRepository {
           'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
           { ownerId }
         );
-        return result.map((record) => StarshipEntity.deserialize(record.s as unknown as Record<string, unknown>));
+        return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s as unknown as Record<string, unknown>));
       },
       'findByOwner',
       'Starship'
@@ -93,11 +93,11 @@ export class StarshipRepository extends BaseRepository {
         // Validate using Entity after all fields are populated
         await StarshipEntity.validate(starshipData, 'create');
 
-        // Transform using Entity
-        const starshipEntity = StarshipEntity.deserialize(starshipData);
+        // Create entity from request data and convert to database format
+        const starshipEntity = StarshipEntity.createFromRequest(starshipData);
 
         // Use base repository for database operation
-        const starship = await this.createEntityWithAutoId<StarshipModel>('Starship', starshipEntity.serialize());
+        const starship = await this.createEntityWithAutoId<StarshipModel>('Starship', starshipEntity.toDatabaseFormat());
 
         // Create relationship with owner
         await connection.executeWrite(
@@ -110,7 +110,7 @@ export class StarshipRepository extends BaseRepository {
           }
         );
 
-        return StarshipEntity.deserialize(starship as unknown as Record<string, unknown>);
+        return StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>);
       },
       'create',
       'Starship'
@@ -144,7 +144,7 @@ export class StarshipRepository extends BaseRepository {
         );
 
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.deserialize(starship as unknown as Record<string, unknown>) : null;
+        return starship ? StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>) : null;
       },
       'update',
       'Starship',

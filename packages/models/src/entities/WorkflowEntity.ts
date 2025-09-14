@@ -126,22 +126,32 @@ export class WorkflowEntity implements WorkflowModel {
   starshipId?: string;
 
   /**
-   * Deserialize database record into WorkflowEntity
-   * Converts raw database records to fully typed and validated WorkflowEntity instances
+   * Creates a validated entity from API request data
+   * Use this when receiving data from API requests that need validation and transformation
    */
-  static deserialize(data: Record<string, unknown>): WorkflowEntity {
-    return plainToInstance(WorkflowEntity, data, {
+  static createFromRequest(data: Record<string, unknown>): WorkflowEntity {
+    const entity = new WorkflowEntity();
+    Object.assign(entity, data);
+    return entity;
+  }
+
+  /**
+   * Converts entity to database storage format
+   * Transforms complex objects (blueprint) to JSON strings for Neo4j storage
+   */
+  toDatabaseFormat(): Record<string, unknown> {
+    return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
   }
 
   /**
-   * Serialize WorkflowEntity to database record
-   * Converts entity instance to plain object suitable for database storage
+   * Creates entity from database record
+   * Transforms JSON strings back to complex objects for API responses
    */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
+  static fromDatabaseRecord(data: Record<string, unknown>): WorkflowEntity {
+    return plainToInstance(WorkflowEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });

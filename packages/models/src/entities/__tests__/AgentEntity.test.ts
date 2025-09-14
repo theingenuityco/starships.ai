@@ -103,7 +103,7 @@ describe('AgentEntity', () => {
       expect(entity.blueprint).toEqual({ nodes: [], edges: [] });
     });
 
-    it('should handle malformed JSON in database record', async () => {
+    it('should throw on malformed JSON in database record', async () => {
       const databaseRecord = {
         id: 'agent-123',
         name: 'Test Agent',
@@ -115,11 +115,7 @@ describe('AgentEntity', () => {
         blueprint: '{"invalid": json}',
       };
 
-      const entity = fromDatabase(AgentEntity, databaseRecord);
-
-      expect(entity).toBeInstanceOf(AgentEntity);
-      expect(entity.memoryState).toBeNull();
-      expect(entity.blueprint).toBeNull();
+      expect(() => fromDatabase(AgentEntity, databaseRecord)).toThrow();
     });
 
     it('should deserialize array of database records', async () => {

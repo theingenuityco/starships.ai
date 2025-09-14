@@ -271,7 +271,7 @@ describe('UserRepository', () => {
     it('should filter out protected fields from updates', async () => {
       const updates = {
         id: 'should-be-ignored',
-        createdAt: 'should-be-ignored',
+        createdAt: '2024-01-01T00:00:00.000Z', // Valid date but should be ignored
         displayName: 'Valid Update',
       };
 

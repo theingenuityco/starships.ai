@@ -36,7 +36,7 @@ export const Transformers = {
     Transform(({ value, type }) => {
       if (type === 0) {
         // toClassOnly (deserializing) - ensure consistent ISO string format
-        if (value === null || value === undefined) return null;
+        if (value === null || value === undefined) return undefined;
         if (value instanceof Date) {
           if (isNaN(value.getTime())) {
             throw new Error('Invalid Date object encountered during deserialization');
@@ -61,7 +61,7 @@ export const Transformers = {
         throw new Error(`Unsupported date value type: ${typeof value}`);
       } else {
         // toPlainOnly (serializing)
-        if (value === null || value === undefined) return null;
+        if (value === null || value === undefined) return undefined;
         if (value instanceof Date) {
           if (isNaN(value.getTime())) {
             throw new Error('Invalid Date object encountered during serialization');

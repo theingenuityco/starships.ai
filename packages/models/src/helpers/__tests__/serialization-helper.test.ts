@@ -5,7 +5,7 @@
  * that provide standardized entity transformation.
  */
 
-import { fromDatabase, toDatabase, fromDatabaseArray, createFromDatabaseRecord } from '@/helpers/serialization-helper';
+import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { AgentEntity } from '@/entities/AgentEntity';
 import { UserEntity } from '@/entities/UserEntity';
 import { ConversationEntity } from '@/entities/ConversationEntity';
@@ -296,26 +296,6 @@ describe('Serialization Helper', () => {
 
       const serialized = toDatabase(complexEntity);
       expect(serialized).toBe(complexEntity); // Should return original object
-    });
-  });
-
-  describe('createFromDatabaseRecord (backward compatibility)', () => {
-    it('should work as alias for fromDatabase', () => {
-      const databaseRecord = {
-        id: 'test-123',
-        name: 'Test Entity',
-      };
-
-      const entity = createFromDatabaseRecord(TestEntity, databaseRecord);
-
-      expect(entity).toBeInstanceOf(TestEntity);
-      expect(entity.id).toBe('TEST-123');
-      expect(entity.name).toBe('Test Entity');
-    });
-
-    it('should have same error handling as fromDatabase', () => {
-      expect(() => createFromDatabaseRecord(TestEntity, null)).toThrow();
-      expect(() => createFromDatabaseRecord(TestEntity, 'invalid')).toThrow();
     });
   });
 

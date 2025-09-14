@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { Blueprint } from '@starships/autopilot';
 import type { WorkflowModel } from '@starships/protocol';
-import { Expose, Transform } from 'class-transformer';
+import { Expose } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -29,7 +29,6 @@ import {
 export class WorkflowEntity implements WorkflowModel {
   [key: string]: unknown;
   @Expose()
-  @Transform(({ value }) => value)
   @IsString()
   @Length(1, 255)
   id!: string;
@@ -45,42 +44,36 @@ export class WorkflowEntity implements WorkflowModel {
   updatedAt!: string;
 
   @Expose()
-  @Transform(({ value }) => value)
   @IsString()
   @Length(1, 255)
   name!: string;
 
   @Expose()
-  @Transform(({ value }) => value)
   @IsString()
   @Length(1, 255)
   authorId!: string;
 
   @Expose()
-  @Transform(({ value }) => value || '')
   @IsOptional()
   @IsString()
   description?: string;
 
   @Expose()
-  @Transform(({ value }) => value || 'general')
   @IsString()
   @IsIn(['general', 'data-processing', 'automation', 'integration', 'analysis'])
   category!: string;
 
   @Expose()
-  @Transform(({ value }) => value || '1.0.0')
   @IsString()
   version!: string;
 
   @Expose()
-  @Transformers.NumberTransform(0)
+  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
   usageCount!: number;
 
   @Expose()
-  @Transform(({ value }) => (value !== undefined ? value : false))
   @IsBoolean()
   isPublic!: boolean;
 
@@ -97,7 +90,6 @@ export class WorkflowEntity implements WorkflowModel {
   rating?: number;
 
   @Expose()
-  @Transform(({ value }) => value || 'workflow')
   @IsIn(['simple', 'workflow'])
   executionMode!: 'simple' | 'workflow';
 
@@ -108,7 +100,7 @@ export class WorkflowEntity implements WorkflowModel {
   allowedStarshipClasses?: string[];
 
   @Expose()
-  @Transformers.NumberTransform(30000)
+  @Transformers.NumberTransform()
   @IsOptional()
   @IsNumber()
   @Min(1000)
@@ -119,7 +111,6 @@ export class WorkflowEntity implements WorkflowModel {
   blueprint!: Blueprint;
 
   @Expose()
-  @Transform(({ value }) => value)
   @IsOptional()
   @IsString()
   @Length(1, 255)

@@ -6,9 +6,8 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
-import { Expose, instanceToPlain, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
@@ -121,36 +120,6 @@ export class StarshipEntity implements StarshipModel {
   @IsString()
   @Length(1, 255)
   stripeCustomerId?: string;
-
-  /**
-   * Creates a validated entity from API request data
-   * Use this when receiving data from API requests that need validation and transformation
-   */
-  static createFromRequest(data: Record<string, unknown>): StarshipEntity {
-    const entity = new StarshipEntity();
-    Object.assign(entity, data);
-    return entity;
-  }
-
-  /**
-   * Converts entity to database storage format
-   * Transforms complex objects to JSON strings for Neo4j storage
-   */
-  toDatabaseFormat(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Creates entity from database record
-   * Transforms JSON strings back to complex objects for API responses
-   * Uses safe deserialization with proper error handling
-   */
-  static fromDatabaseRecord(data: unknown): StarshipEntity {
-    return createFromDatabaseRecord(StarshipEntity, data);
-  }
 
   /**
    * Simple validation function using class-validator

@@ -1,5 +1,6 @@
 import { MessageEntity } from '@/entities/MessageEntity';
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { Message, MessageModel } from '@starships/protocol';
 
@@ -16,7 +17,10 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) RETURN m ORDER BY m.timestamp DESC');
-        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m));
+        return fromDatabaseArray(
+          MessageEntity,
+          result.map((record) => record.m)
+        );
       },
       'findAll',
       'Message'
@@ -29,7 +33,7 @@ export class MessageRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id RETURN m', { id });
         const message = result[0]?.m || null;
-        return message ? MessageEntity.fromDatabaseRecord(message) : null;
+        return message ? fromDatabase(MessageEntity, message) : null;
       },
       'findById',
       'Message',
@@ -52,7 +56,10 @@ export class MessageRepository extends BaseRepository {
         cypher += ' RETURN m ORDER BY m.timestamp DESC';
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m));
+        return fromDatabaseArray(
+          MessageEntity,
+          result.map((record) => record.m)
+        );
       },
       'findByRole',
       'Message'
@@ -80,15 +87,13 @@ export class MessageRepository extends BaseRepository {
           messageType: entity.messageType || 'user_input',
         };
 
-        // Create entity from request data and convert to database format
-        const messageEntity = MessageEntity.createFromRequest(messageData);
         // Use base repository for database operation
-        const result = await this.createEntityWithAutoId<MessageModel>('Message', messageEntity.toDatabaseFormat());
+        const result = await this.createEntityWithAutoId<MessageModel>('Message', toDatabase(messageData));
 
         // Create explicit Neo4j relationship with conversation if conversationId is provided
         await this.linkToConversation(result.id, conversationId);
 
-        return MessageEntity.fromDatabaseRecord(result);
+        return fromDatabase(MessageEntity, result);
       },
       'create',
       'Message'
@@ -106,16 +111,13 @@ export class MessageRepository extends BaseRepository {
           updatedAt: new Date().toISOString(),
         };
 
-        // Create entity from update data and convert to database format
-        const updateEntity = MessageEntity.createFromRequest(updateProps);
-
         const result = await connection.executeWrite<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id SET m += $updates RETURN m', {
           id,
-          updates: updateEntity.toDatabaseFormat(),
+          updates: toDatabase(updateProps),
         });
 
         const message = result[0]?.m || null;
-        return message ? MessageEntity.fromDatabaseRecord(message) : null;
+        return message ? fromDatabase(MessageEntity, message) : null;
       },
       'update',
       'Message',

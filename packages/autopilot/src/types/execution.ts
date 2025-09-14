@@ -4,20 +4,15 @@
  * Types related to workflow execution runtime state and context
  */
 
-import type { AgentMemory } from '@/AgentMemory';
+export type ExecutionState = Record<string, unknown>;
 
 /**
- * Streaming options for workflow execution
+ * Engine execution status
  */
-export interface StreamingOptions {
-  enabled?: boolean;
-  streamId?: string;
-  conversationId?: string;
-  agentId?: string;
-}
+export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
- * Workflow execution state
+ * Engine execution
  *
  * This interface is serializable and contains no callback functions.
  * Streaming is handled by the Engine's injected StreamingEmitter.
@@ -25,11 +20,9 @@ export interface StreamingOptions {
 export interface Execution {
   currentNodeRef?: string;
   status: ExecutionStatus;
-  executionResults: Map<string, NodeResult>;
+  state: ExecutionState;
+  results: NodeResult[];
   error?: ExecutionError;
-  agentMemory: AgentMemory;
-  // Streaming configuration (serializable)
-  streaming?: StreamingOptions;
 }
 
 /**
@@ -38,21 +31,14 @@ export interface Execution {
 export interface NodeResult {
   nodeRef: string;
   data?: unknown;
-  error?: string;
-  nextEdgeCondition?: string;
-  metadata?: Record<string, unknown>;
+  error?: unknown;
 }
-
-/**
- * Workflow execution status
- */
-export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
  * Workflow execution error
  */
 export interface ExecutionError {
-  code: WorkflowErrorCode;
+  code: ExecutionErrorCode;
   message: string;
   nodeRef?: string;
   details?: unknown;
@@ -64,7 +50,7 @@ export interface ExecutionError {
 /**
  * Workflow error codes
  */
-export type WorkflowErrorCode =
+export type ExecutionErrorCode =
   | 'NODE_EXECUTION_FAILED'
   | 'TIMEOUT_EXCEEDED'
   | 'USER_INPUT_TIMEOUT'

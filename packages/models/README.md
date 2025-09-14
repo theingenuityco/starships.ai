@@ -44,7 +44,7 @@ const starships = await starshipRepo.findAll();
 - **Workflows**: DAG-based automation blueprints with execution history
 - **Users**: Authentication and authorization management
 - **Agent Templates**: Reusable agent configurations for rapid deployment
-- **Conversations**: Communication logs with structured metadata
+- **Conversations**: Communication logs with agent relationships and structured metadata
 - **Native Tools**: Encrypted API key management for external tool integration
 
 ### Direct Repository Usage
@@ -80,22 +80,22 @@ try {
 
 ## Available Repositories
 
-| Repository                     | Purpose                                                  |
-| ------------------------------ | -------------------------------------------------------- |
-| **StarshipRepository**         | Starship CRUD, agent deployment, subscription management |
-| **AgentRepository**            | Agent lifecycle management and template instantiation    |
-| **AgentTemplateRepository**    | Reusable agent configurations and marketplace            |
-| **UserRepository**             | User accounts, authentication, and profiles              |
-| **ConversationRepository**     | Chat history and communication logs                      |
-| **WorkflowRepository**         | Workflow definitions, execution, and history             |
-| **BlueprintRepository**        | Workflow blueprint storage and versioning                |
-| **ExecutionRepository**        | Workflow execution tracking and results                  |
-| **NodeRepository**             | Workflow node definitions and parameters                 |
-| **EdgeRepository**             | Workflow edge connections and routing                    |
-| **MemoryRepository**           | Agent memory and conversation context                    |
-| **MessageRepository**          | Individual message storage and retrieval                 |
-| **NativeToolApiKeyRepository** | Encrypted API key management for external tools          |
-| **WaitlistRepository**         | Early access user onboarding queue                       |
+| Repository                     | Purpose                                                   |
+| ------------------------------ | --------------------------------------------------------- |
+| **StarshipRepository**         | Starship CRUD, agent deployment, subscription management  |
+| **AgentRepository**            | Agent lifecycle management and template instantiation     |
+| **AgentTemplateRepository**    | Reusable agent configurations and marketplace             |
+| **UserRepository**             | User accounts, authentication, and profiles               |
+| **ConversationRepository**     | Chat history, agent relationships, and communication logs |
+| **WorkflowRepository**         | Workflow definitions, execution, and history              |
+| **BlueprintRepository**        | Workflow blueprint storage and versioning                 |
+| **ExecutionRepository**        | Workflow execution tracking and results                   |
+| **NodeRepository**             | Workflow node definitions and parameters                  |
+| **EdgeRepository**             | Workflow edge connections and routing                     |
+| **MemoryRepository**           | Agent memory and conversation context                     |
+| **MessageRepository**          | Individual message storage and retrieval                  |
+| **NativeToolApiKeyRepository** | Encrypted API key management for external tools           |
+| **WaitlistRepository**         | Early access user onboarding queue                        |
 
 ## Database Management
 
@@ -214,6 +214,28 @@ await workflowRepo.updateStarshipId(workflow.id, 'starship-456');
 
 // Find workflows by category
 const automationWorkflows = await workflowRepo.findByCategory('automation');
+```
+
+### Conversation-Agent Relationships
+
+```typescript
+import { ConversationRepository, AgentRepository } from '@starships/models';
+
+const conversationRepo = new ConversationRepository();
+const agentRepo = new AgentRepository();
+
+// Link an agent to a conversation
+await conversationRepo.linkToAgent('conversation-123', 'agent-456');
+
+// Get all agents involved in a conversation
+const agents = await conversationRepo.getConversationAgents('conversation-123');
+
+// Get all conversations involving a specific agent
+const conversations = await conversationRepo.findByAgent('agent-456');
+const agentConversations = await agentRepo.getAgentConversations('agent-456');
+
+// Remove relationship
+await conversationRepo.unlinkFromAgent('conversation-123', 'agent-456');
 ```
 
 ## Serialization System

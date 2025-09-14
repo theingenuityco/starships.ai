@@ -70,7 +70,7 @@ export class AgentTemplateRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         // validate using data
-        AgentTemplateEntity.validate(data);
+        await AgentTemplateEntity.validate(data, 'create');
 
         const now = new Date().toISOString();
 
@@ -90,7 +90,7 @@ export class AgentTemplateRepository extends BaseRepository {
           timeout: data.timeout,
           icon: data.icon,
           previewPrompts: data.previewPrompts,
-          memory: data.memory,
+          memoryState: data.memoryState,
           blueprint: data.blueprint,
           usageCount: 0,
 
@@ -116,6 +116,8 @@ export class AgentTemplateRepository extends BaseRepository {
   async update(id: string, updates: UpdateAgentTemplateRequest): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        await AgentTemplateEntity.validate(updates, 'update');
+
         const connection = this.getConnection();
         const updateProps = {
           ...updates,

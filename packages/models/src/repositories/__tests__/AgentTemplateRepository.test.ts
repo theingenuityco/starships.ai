@@ -27,15 +27,19 @@ jest.mock('../../entities/AgentTemplateEntity', () => ({
   AgentTemplateEntity: {
     validate: jest.fn().mockResolvedValue(undefined),
     deserialize: jest.fn().mockImplementation((data) => {
-      // Simulate JSON parsing for memory and blueprint like the real entity does
+      // Simulate JSON parsing for memoryState and blueprint like the real entity does
       const result = { ...data };
-      if (typeof data.memory === 'string') {
+
+      // Handle memoryState JSON transformation
+      if (typeof data.memoryState === 'string') {
         try {
-          result.memory = JSON.parse(data.memory);
+          result.memoryState = JSON.parse(data.memoryState);
         } catch {
-          result.memory = null;
+          result.memoryState = null;
         }
       }
+
+      // Handle blueprint JSON transformation
       if (typeof data.blueprint === 'string') {
         try {
           result.blueprint = JSON.parse(data.blueprint);
@@ -43,11 +47,13 @@ jest.mock('../../entities/AgentTemplateEntity', () => ({
           result.blueprint = null;
         }
       }
+
       // Add serialize method to the returned object
       result.serialize = jest.fn().mockReturnValue({
         ...result,
-        memory: typeof result.memory === 'object' ? JSON.stringify(result.memory) : result.memory,
-        blueprint: typeof result.blueprint === 'object' ? JSON.stringify(result.blueprint) : result.blueprint,
+        memoryState:
+          typeof result.memoryState === 'object' && result.memoryState !== null ? JSON.stringify(result.memoryState) : result.memoryState,
+        blueprint: typeof result.blueprint === 'object' && result.blueprint !== null ? JSON.stringify(result.blueprint) : result.blueprint,
       });
       return result;
     }),
@@ -82,7 +88,7 @@ describe('AgentTemplateRepository', () => {
     usageCount: 10,
     icon: '🤖',
     previewPrompts: ['Hello', 'How can I help?'],
-    memory: {
+    memoryState: {
       identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
       purpose: { primary: 'assist users', constraints: [] },
       space: { description: 'helpful environment' },
@@ -102,7 +108,7 @@ describe('AgentTemplateRepository', () => {
     const template = createMockTemplate(overrides as Partial<AgentTemplateModel>);
     return {
       ...template,
-      memory: template.memory ? JSON.stringify(template.memory) : null,
+      memoryState: template.memoryState ? JSON.stringify(template.memoryState) : null,
       blueprint: template.blueprint ? JSON.stringify(template.blueprint) : null,
       ...overrides,
     };
@@ -118,7 +124,7 @@ describe('AgentTemplateRepository', () => {
     timeout: 30000,
     icon: '🤖',
     previewPrompts: ['Hello'],
-    memory: {
+    memoryState: {
       identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
       purpose: { primary: 'assist users', constraints: [] },
       space: { description: 'helpful environment' },
@@ -155,7 +161,7 @@ describe('AgentTemplateRepository', () => {
         expect.objectContaining({
           id: 'template-123',
           name: 'Test Template',
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -192,7 +198,7 @@ describe('AgentTemplateRepository', () => {
         expect.objectContaining({
           id: 'template-123',
           name: 'Test Template',
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -236,7 +242,7 @@ describe('AgentTemplateRepository', () => {
           id: 'template-123',
           slug: 'test-template',
           name: 'Test Template',
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -279,7 +285,7 @@ describe('AgentTemplateRepository', () => {
       expect(result).toMatchObject({
         name: 'Test Template',
         description: 'A test agent template',
-        memory: expect.objectContaining({
+        memoryState: expect.objectContaining({
           identity: expect.objectContaining({ name: 'Assistant' }),
         }),
         blueprint: expect.objectContaining({
@@ -292,7 +298,7 @@ describe('AgentTemplateRepository', () => {
           props: expect.objectContaining({
             name: 'Test Template',
             description: 'A test agent template',
-            memory: expect.any(String), // Should be serialized
+            memoryState: expect.any(String), // Should be serialized
             blueprint: expect.any(String), // Should be serialized
           }),
         })
@@ -312,7 +318,7 @@ describe('AgentTemplateRepository', () => {
         category: 'general' as const,
         blueprint: { type: 'test', nodes: [], edges: [] },
         model: 'gpt-4',
-        memory: { data: 'test' },
+        memoryState: {},
       };
       const mockCreatedRaw = createMockRawTemplate(minimalInput);
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedRaw }]);
@@ -334,7 +340,7 @@ describe('AgentTemplateRepository', () => {
         expect.any(String),
         expect.objectContaining({
           props: expect.objectContaining({
-            memory: expect.any(String),
+            memoryState: expect.any(String),
             blueprint: expect.any(String),
           }),
         })
@@ -382,7 +388,7 @@ describe('AgentTemplateRepository', () => {
 
     it('should serialize complex objects in updates', async () => {
       const complexUpdates = {
-        memory: { identity: { name: 'Updated' } },
+        memoryState: { identity: { name: 'Updated' } },
         blueprint: { nodes: [], edges: [] },
       };
       const mockUpdatedRaw = createMockRawTemplate(complexUpdates);
@@ -393,7 +399,7 @@ describe('AgentTemplateRepository', () => {
 
       expect(result).toEqual(
         expect.objectContaining({
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Updated' }),
           }),
         })
@@ -402,7 +408,7 @@ describe('AgentTemplateRepository', () => {
         expect.any(String),
         expect.objectContaining({
           updates: expect.objectContaining({
-            memory: expect.any(String),
+            memoryState: expect.any(String),
             blueprint: expect.any(String),
           }),
         })
@@ -443,7 +449,7 @@ describe('AgentTemplateRepository', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(
         expect.objectContaining({
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({
@@ -469,7 +475,7 @@ describe('AgentTemplateRepository', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(
         expect.objectContaining({
-          memory: expect.objectContaining({
+          memoryState: expect.objectContaining({
             identity: expect.objectContaining({ name: 'Assistant' }),
           }),
           blueprint: expect.objectContaining({

@@ -72,7 +72,7 @@ export class AgentEntity implements AgentModel {
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  memory!: AgentMemoryState; // AgentMemoryState - keeping flexible for now
+  memoryState!: AgentMemoryState; // AgentMemoryState - keeping flexible for now
 
   @Expose()
   @Transformers.JsonTransform()
@@ -122,7 +122,7 @@ export class AgentEntity implements AgentModel {
         temperature: dataRecord.temperature,
         maxTokens: dataRecord.maxTokens,
         timeout: dataRecord.timeout ?? 30000,
-        memory: dataRecord.memory || {},
+        memoryState: dataRecord.memoryState || {},
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         ...dataRecord,
       });

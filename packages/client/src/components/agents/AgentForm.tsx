@@ -27,15 +27,14 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     model: agent?.model || 'gpt-4',
     temperature: agent?.temperature,
     maxTokens: agent?.maxTokens,
-    memory: agent?.memory || {
-      shortTermMemory: [],
-      longTermMemory: [],
-      emotionalState: {
-        currentMood: 'neutral',
-        intensity: 0.5,
-        previousMoods: [],
+    memoryState: agent?.memoryState || {
+      identity: {
+        name: '',
+        role: '',
       },
-      context: {},
+      purpose: {
+        primary: '',
+      },
     },
     blueprint: agent?.blueprint || {
       nodes: [],

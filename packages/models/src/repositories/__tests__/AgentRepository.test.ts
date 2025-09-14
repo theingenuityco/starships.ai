@@ -128,7 +128,7 @@ describe('AgentRepository', () => {
         temperature: 0.7,
         maxTokens: 1000,
         timeout: 30000,
-        memory: { data: 'test' },
+        memoryState: {},
         blueprint: { type: 'test', nodes: [], edges: [] },
       };
 
@@ -141,7 +141,7 @@ describe('AgentRepository', () => {
           temperature: 0.7,
           maxTokens: 1000,
           timeout: 30000,
-          memory: { data: 'test' },
+          memoryState: {},
           blueprint: { type: 'test', nodes: [], edges: [] },
           createdAt: expect.any(String),
           updatedAt: expect.any(String),
@@ -160,7 +160,7 @@ describe('AgentRepository', () => {
           expect.objectContaining({
             props: expect.objectContaining({
               name: 'Test Agent',
-              memory: { data: 'test' },
+              memoryState: {},
               blueprint: { type: 'test', nodes: [], edges: [] },
             }),
           })
@@ -190,7 +190,7 @@ describe('AgentRepository', () => {
           temperature: 0.7,
           maxTokens: 1000,
           timeout: 30000,
-          memory: { data: 'test' },
+          memoryState: {},
           blueprint: { type: 'test', nodes: [], edges: [] },
           createdAt: expect.any(String),
           updatedAt: expect.any(String),

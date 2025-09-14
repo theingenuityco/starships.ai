@@ -85,7 +85,7 @@ export const Transformers = {
    */
   ArrayTransform: () =>
     Transform(({ value }) => {
-      if (value === null || value === undefined) return null;
+      if (value === null || value === undefined) return undefined;
       if (Array.isArray(value)) return value;
       throw new Error(`Expected array but received: ${typeof value}`);
     }),
@@ -95,7 +95,7 @@ export const Transformers = {
    */
   NumberTransform: () =>
     Transform(({ value }) => {
-      if (value === null || value === undefined) return null;
+      if (value === null || value === undefined) return undefined;
       if (typeof value === 'number') {
         if (isNaN(value) || !isFinite(value)) {
           throw new Error(`Invalid number value: ${value}`);
@@ -117,7 +117,7 @@ export const Transformers = {
    */
   BooleanTransform: () =>
     Transform(({ value }) => {
-      if (value === null || value === undefined) return null;
+      if (value === null || value === undefined) return undefined;
       if (typeof value === 'boolean') return value;
       // Allow explicit string representations
       if (typeof value === 'string') {
@@ -141,7 +141,7 @@ export const LLMTransformers = {
    */
   TemperatureTransform: () => {
     return Transform(({ value }) => {
-      if (value == null || value === undefined) return null;
+      if (value == null || value === undefined) return undefined;
 
       const temp = typeof value === 'string' ? parseFloat(value) : value;
       if (isNaN(temp)) {

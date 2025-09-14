@@ -15,6 +15,7 @@ import {
   IsIn,
   IsISO8601,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Length,
@@ -108,6 +109,7 @@ export class WorkflowEntity implements WorkflowModel {
 
   @Expose()
   @Transformers.JsonTransform()
+  @IsObject()
   blueprint!: Blueprint;
 
   @Expose()
@@ -157,7 +159,7 @@ export class WorkflowEntity implements WorkflowModel {
     const errors = await validate(entity, {
       skipMissingProperties: operation === 'update',
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: true, // Maintain strict validation
     });
 
     if (errors.length > 0) {

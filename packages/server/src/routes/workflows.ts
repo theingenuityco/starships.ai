@@ -84,7 +84,7 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
     if (!queryValidation) return;
 
     const { page, limit } = paginationValidation;
-    const { category, authorId, starshipId, isPublic, tags, starshipClass } = queryValidation;
+    const { category, authorId, isPublic, tags, starshipClass } = queryValidation;
 
     // Use service layer for business logic (static methods for API responses)
     let workflows;
@@ -101,7 +101,7 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
       });
       // Convert Workflow instances to WorkflowModel for API response
       workflows = workflows.map((w) => {
-        const params = w.getParameters();
+        const params = w.getParams();
         return {
           name: params?.name || 'Unnamed Workflow',
           // Add other required WorkflowModel fields
@@ -115,7 +115,7 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
       const workflowService = new WorkflowService();
       const workflowInstances = await workflowService.getAllWorkflows();
       workflows = workflowInstances.map((w) => {
-        const params = w.getParameters();
+        const params = w.getParams();
         return {
           name: params?.name || 'Unnamed Workflow',
           // Add other required WorkflowModel fields
@@ -195,13 +195,10 @@ router.post('/workflows', jwtAuthMiddleware, async (req: Request, res: Response)
     );
     if (!bodyValidation) return;
 
-    const userId = req.user!.id;
-
     // Use service layer for business logic
     const workflow = await WorkflowService.createWorkflow({
       ...bodyValidation,
-      authorId: userId,
-    } as any); // Cast to avoid type error since authorId will be added to the interface
+    }); // Cast to avoid type error since authorId will be added to the interface
 
     sendSuccess(res, workflow, 201);
   } catch (error) {

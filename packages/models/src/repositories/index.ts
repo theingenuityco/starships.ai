@@ -4,7 +4,6 @@ export { BlueprintRepository } from './BlueprintRepository';
 export { ConversationRepository } from './ConversationRepository';
 export { EdgeRepository } from './EdgeRepository';
 export { ExecutionRepository } from './ExecutionRepository';
-export { MemoryRepository } from './MemoryRepository';
 export { MessageRepository } from './MessageRepository';
 export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 export { NodeRepository } from './NodeRepository';

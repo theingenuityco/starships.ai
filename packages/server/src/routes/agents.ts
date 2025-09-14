@@ -230,34 +230,8 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
     const bodyValidation = validateData(CreateAgentSchema, req.body, res, 'agent creation data');
     if (!bodyValidation) return;
 
-    const userId = req.user!.id;
-
-    // TODO: Add validation to ensure starshipId references valid, accessible starship
-
-    // Prepare agent data with required properties and defaults
-    const agentData = {
-      name: bodyValidation.name,
-      description: bodyValidation.description,
-      model: bodyValidation.model || 'gpt-3.5-turbo', // Default model
-      temperature: bodyValidation.temperature,
-      maxTokens: bodyValidation.maxTokens,
-      timeout: bodyValidation.timeout || 30000,
-      memory: {}, // Default empty memory object
-      blueprint: {
-        nodes: [
-          { ref: 'start', type: 'start' as const, name: 'Start', description: 'Start node', parameters: {} },
-          { ref: 'end', type: 'end' as const, name: 'End', description: 'End node', parameters: {} },
-        ],
-        edges: [{ ref: 'start-to-end', from: 'start', to: 'end' }],
-        metadata: { version: '1.0' },
-      },
-      starshipId: bodyValidation.starshipId,
-    };
-
-    console.log(`[AGENTS] Creating agent with starshipId: ${agentData.starshipId} for user: ${userId}`);
-
     const agentService = new AgentService();
-    const agent = await agentService.createAgent(agentData);
+    const agent = await agentService.createAgent(req.body);
     console.log(`[AGENTS] Agent created successfully: ${agent.id}`);
 
     sendSuccess(res, agent, 201);

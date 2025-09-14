@@ -5,7 +5,7 @@
 import { Neo4jConnection, getConnection } from '@/helpers/database';
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { DatabaseError } from '@starships/errors';
-import type { MessageModel, CreateMessageRequest } from '@starships/protocol';
+import type { MessageModel } from '@starships/protocol';
 
 // Mock dependencies
 jest.mock('../../helpers/database/connection');
@@ -38,46 +38,19 @@ describe('MessageRepository', () => {
 
   const createMockMessage = (overrides: Partial<MessageModel> = {}): MessageModel => ({
     id: 'message-123',
-    timestamp: '2024-01-01T00:00:00.000Z',
     role: 'user',
     content: 'Hello, world!',
-    metadata: { source: 'chat' },
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
-    version: '1.0.0',
-    starshipId: 'starship-123',
-    agentId: 'agent-123',
-    memoryId: 'memory-123',
-    conversationId: 'conversation-123',
-    parentMessageId: undefined,
-    threadDepth: 0,
-    processingStatus: 'completed' as const,
-    processingMetadata: { duration: 1500 },
     messageType: 'user_input' as const,
-    importance: 'medium' as const,
-    contentHash: 'abc123',
-    contentLength: 13,
-    hasAttachments: false,
-    tokenCount: 10,
-    processingTimeMs: 1500,
     ...overrides,
   });
 
-  const createMockCreateInput = (overrides: Partial<CreateMessageRequest> = {}) => ({
-    timestamp: '2024-01-01T00:00:00.000Z',
+  const createMockCreateInput = (overrides: Partial<Omit<MessageModel, 'id' | 'createdAt' | 'updatedAt'>> = {}) => ({
     role: 'user' as const,
     content: 'Hello, world!',
-    starshipId: 'starship-123',
-    agentId: 'agent-123',
-    memoryId: 'memory-123',
-    conversationId: 'conversation-123',
-    version: '1.0.0',
-    threadDepth: 0,
-    processingStatus: 'pending' as const,
     messageType: 'user_input' as const,
-    importance: 'medium' as const,
-    contentLength: 13,
-    hasAttachments: false,
+    conversationId: 'conversation-123',
     ...overrides,
   });
 
@@ -142,79 +115,6 @@ describe('MessageRepository', () => {
     });
   });
 
-  describe('findByStarshipId', () => {
-    it('should return messages for starship', async () => {
-      const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
-
-      const result = await repository.findByStarshipId('starship-123');
-
-      expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.starshipId = $starshipId'), {
-        starshipId: 'starship-123',
-      });
-    });
-  });
-
-  describe('findByAgentId', () => {
-    it('should return messages for agent', async () => {
-      const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
-
-      const result = await repository.findByAgentId('agent-123');
-
-      expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.agentId = $agentId'), {
-        agentId: 'agent-123',
-      });
-    });
-  });
-
-  describe('findByMemoryId', () => {
-    it('should return messages for memory ordered chronologically', async () => {
-      const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
-
-      const result = await repository.findByMemoryId('memory-123');
-
-      expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp ASC'), {
-        memoryId: 'memory-123',
-      });
-    });
-  });
-
-  describe('findByConversationId', () => {
-    it('should return conversation messages without pagination', async () => {
-      const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
-
-      const result = await repository.findByConversationId('conversation-123');
-
-      expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.conversationId = $conversationId'), {
-        conversationId: 'conversation-123',
-      });
-    });
-
-    it('should return conversation messages with pagination', async () => {
-      const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
-
-      const result = await repository.findByConversationId('conversation-123', 10, 5);
-
-      expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SKIP $offset LIMIT $limit'),
-        expect.objectContaining({
-          conversationId: 'conversation-123',
-          limit: expect.any(Object), // Neo4j int
-          offset: expect.any(Object), // Neo4j int
-        })
-      );
-    });
-  });
-
   describe('findByRole', () => {
     it('should return messages by role', async () => {
       const mockMessages = [createMockMessage({ role: 'assistant' })];
@@ -251,7 +151,7 @@ describe('MessageRepository', () => {
       expect(result).toMatchObject({
         role: 'user',
         content: 'Hello, world!',
-        contentLength: 13,
+        messageType: 'user_input',
       });
       expect(mockConnection.executeWrite).toHaveBeenCalledWith(
         expect.stringContaining('CREATE (n:Message)'),
@@ -259,14 +159,14 @@ describe('MessageRepository', () => {
           props: expect.objectContaining({
             role: 'user',
             content: 'Hello, world!',
-            contentLength: 13,
+            messageType: 'user_input',
           }),
         })
       );
     });
 
     it('should validate required fields', async () => {
-      const invalidInput = { content: 'Hello' }; // Missing role and starshipId
+      const invalidInput = { content: 'Hello' }; // Missing role
 
       await expect(repository.create(invalidInput as never)).rejects.toThrow(DatabaseError);
     });
@@ -277,51 +177,19 @@ describe('MessageRepository', () => {
       await expect(repository.create(invalidRole)).rejects.toThrow(DatabaseError);
     });
 
-    it('should use default values for optional fields', async () => {
-      const minimalInput = {
-        timestamp: '2024-01-01T00:00:00.000Z',
+    it('should use default messageType when not provided', async () => {
+      const inputWithoutMessageType = {
+        conversationId: 'conversation-123',
         role: 'user' as const,
         content: 'Test message',
-        starshipId: 'starship-123',
-        version: '1.0.0',
-        threadDepth: 0,
-        processingStatus: 'pending' as const,
         messageType: 'user_input' as const,
-        importance: 'medium' as const,
-        contentLength: 12,
-        hasAttachments: false,
       };
-      const mockCreated = createMockMessage(minimalInput);
+      const mockCreated = createMockMessage(inputWithoutMessageType);
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
-      const result = await repository.create(minimalInput);
+      const result = await repository.create(inputWithoutMessageType);
 
-      expect(result.threadDepth).toBe(0);
-      expect(result.processingStatus).toBe('pending');
       expect(result.messageType).toBe('user_input');
-      expect(result.importance).toBe('medium');
-      expect(result.hasAttachments).toBe(false);
-    });
-
-    it('should serialize complex metadata', async () => {
-      const inputWithMetadata = createMockCreateInput({
-        metadata: { complex: { nested: 'data' } },
-        processingMetadata: { tokens: 150 },
-      });
-      const mockCreated = createMockMessage(inputWithMetadata);
-      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
-
-      await repository.create(inputWithMetadata);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (n:Message)'),
-        expect.objectContaining({
-          props: expect.objectContaining({
-            content: 'Hello, world!',
-            role: 'user',
-          }),
-        })
-      );
     });
 
     it('should handle database errors', async () => {
@@ -333,7 +201,7 @@ describe('MessageRepository', () => {
 
   describe('update', () => {
     it('should update message successfully', async () => {
-      const updates = { content: 'Updated content', processingStatus: 'completed' as const };
+      const updates = { content: 'Updated content' };
       const mockUpdated = createMockMessage(updates);
 
       mockConnection.executeWrite.mockResolvedValue([{ m: mockUpdated }]);
@@ -347,7 +215,6 @@ describe('MessageRepository', () => {
           id: 'message-123',
           updates: expect.objectContaining({
             content: 'Updated content',
-            contentLength: 15, // Should be calculated
           }),
         })
       );
@@ -359,42 +226,6 @@ describe('MessageRepository', () => {
       const result = await repository.update('non-existent', { content: 'New content' });
 
       expect(result).toBeNull();
-    });
-
-    it('should update contentLength when content is updated', async () => {
-      const updates = { content: 'New longer content message' };
-      mockConnection.executeWrite.mockResolvedValue([{ m: createMockMessage(updates) }]);
-
-      await repository.update('message-123', updates);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          updates: expect.objectContaining({
-            contentLength: 26, // Length of new content
-          }),
-        })
-      );
-    });
-
-    it('should serialize complex fields in updates', async () => {
-      const complexUpdates = {
-        metadata: { updated: true },
-        processingMetadata: { newField: 'value' },
-      };
-      mockConnection.executeWrite.mockResolvedValue([{ m: createMockMessage(complexUpdates) }]);
-
-      await repository.update('message-123', complexUpdates);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET m += $updates'),
-        expect.objectContaining({
-          id: 'message-123',
-          updates: expect.objectContaining({
-            updatedAt: expect.any(String),
-          }),
-        })
-      );
     });
 
     it('should handle database errors', async () => {
@@ -429,319 +260,56 @@ describe('MessageRepository', () => {
     });
   });
 
-  describe('getMessageThread', () => {
-    it('should return thread with root message only when no parents/children', async () => {
-      const rootMessage = createMockMessage({ parentMessageId: undefined });
-      jest.spyOn(repository, 'findById').mockResolvedValue(rootMessage);
-      mockConnection.executeQuery.mockResolvedValue([]); // No children
+  describe('linkToConversation', () => {
+    it('should create relationship between message and conversation', async () => {
+      mockConnection.executeWrite.mockResolvedValue([]);
 
-      const result = await repository.getMessageThread('message-123');
+      await repository.linkToConversation('message-123', 'conversation-456');
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(rootMessage);
-    });
-
-    it('should return empty array when root message not found', async () => {
-      jest.spyOn(repository, 'findById').mockResolvedValue(null);
-
-      const result = await repository.getMessageThread('non-existent');
-
-      expect(result).toEqual([]);
-    });
-
-    it('should include parent messages when requested', async () => {
-      const rootMessage = createMockMessage({ parentMessageId: 'parent-123' });
-      const parentMessage = createMockMessage({ id: 'parent-123', parentMessageId: undefined });
-
-      jest
-        .spyOn(repository, 'findById')
-        .mockResolvedValueOnce(rootMessage) // Root message
-        .mockResolvedValueOnce(parentMessage); // Parent message
-
-      mockConnection.executeQuery.mockResolvedValue([]); // No children
-
-      const result = await repository.getMessageThread('message-123', true, false);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('parent-123'); // Parent should be first
-      expect(result[1].id).toBe('message-123'); // Root should be second
-    });
-
-    it('should include child messages when requested', async () => {
-      const rootMessage = createMockMessage({ parentMessageId: undefined });
-      const childMessage = createMockMessage({ id: 'child-123', parentMessageId: 'message-123' });
-
-      jest.spyOn(repository, 'findById').mockResolvedValue(rootMessage);
-      mockConnection.executeQuery.mockResolvedValue([{ m: childMessage }]);
-
-      const result = await repository.getMessageThread('message-123', false, true);
-
-      expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('message-123'); // Root first
-      expect(result[1].id).toBe('child-123'); // Child second
-    });
-
-    it('should respect maxDepth parameter', async () => {
-      const rootMessage = createMockMessage({ parentMessageId: 'parent-123' });
-
-      jest.spyOn(repository, 'findById').mockResolvedValue(rootMessage);
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      const result = await repository.getMessageThread('message-123', true, true, 0);
-
-      expect(result).toHaveLength(1); // Only root, no traversal due to maxDepth=0
-    });
-  });
-
-  describe('searchMessages', () => {
-    it('should search messages by content', async () => {
-      const mockMessages = [createMockMessage({ content: 'search term found' })];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
-
-      const result = await repository.searchMessages('search term');
-
-      expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.content CONTAINS $query'), {
-        query: 'search term',
-      });
-    });
-
-    it('should apply all filters', async () => {
-      const filters = {
-        starshipId: 'starship-123',
-        agentId: 'agent-123',
-        memoryId: 'memory-123',
-        conversationId: 'conversation-123',
-        role: 'user' as const,
-        messageType: 'user_input',
-        importance: 'high',
-        dateFrom: '2024-01-01T00:00:00.000Z',
-        dateTo: '2024-01-02T00:00:00.000Z',
-        limit: 20,
-        offset: 10,
-      };
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      await repository.searchMessages('test', filters);
-
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SKIP $offset LIMIT $limit'),
-        expect.objectContaining({
-          query: 'test',
-          starshipId: 'starship-123',
-          agentId: 'agent-123',
-          role: 'user',
-          limit: expect.any(Object),
-          offset: expect.any(Object),
-        })
-      );
-    });
-
-    it('should use default limit when not specified', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      await repository.searchMessages('test');
-
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('LIMIT 100'), { query: 'test' });
-    });
-  });
-
-  describe('getConversationMessages', () => {
-    it('should return conversation messages with default ordering', async () => {
-      const mockMessages = [createMockMessage()];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
-
-      const result = await repository.getConversationMessages('conversation-123');
-
-      expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp ASC'), {
-        conversationId: 'conversation-123',
-      });
-    });
-
-    it('should respect custom ordering parameters', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      await repository.getConversationMessages('conversation-123', 'created_at', 'desc');
-
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.createdAt DESC'), {
-        conversationId: 'conversation-123',
-      });
-    });
-  });
-
-  describe('bulkDelete', () => {
-    it('should delete multiple messages and return stats', async () => {
-      const messageIds = ['msg-1', 'msg-2', 'msg-3'];
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 3 }]);
-
-      const result = await repository.bulkDelete(messageIds);
-
-      expect(result).toEqual({
-        processed: 3,
-        failed: 0,
-        errors: [],
-      });
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id IN $messageIds'), { messageIds });
-    });
-
-    it('should handle partial deletion', async () => {
-      const messageIds = ['msg-1', 'msg-2', 'msg-3'];
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 2 }]);
-
-      const result = await repository.bulkDelete(messageIds);
-
-      expect(result).toEqual({
-        processed: 2,
-        failed: 1,
-        errors: [],
-      });
-    });
-
-    it('should handle empty message list', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 0 }]);
-
-      const result = await repository.bulkDelete([]);
-
-      expect(result).toEqual({
-        processed: 0,
-        failed: 0,
-        errors: [],
-      });
-    });
-  });
-
-  describe('getMessageStats', () => {
-    it('should return message statistics', async () => {
-      const mockStatsResult = {
-        total: 100,
-        roles: ['user', 'user', 'assistant', 'system'],
-        messageTypes: ['user_input', 'user_input', 'assistant_response', 'system'],
-        importances: ['medium', 'high', 'medium', 'low'],
-        avgContentLength: 150.5,
-        avgProcessingTime: 1200.75,
-      };
-      mockConnection.executeQuery.mockResolvedValue([mockStatsResult]);
-
-      const result = await repository.getMessageStats();
-
-      expect(result).toEqual({
-        total: 100,
-        byRole: { system: 1, user: 2, assistant: 1 },
-        byType: { user_input: 2, assistant_response: 1, system: 1 },
-        byImportance: { medium: 2, high: 1, low: 1 },
-        averageContentLength: 150.5,
-        averageProcessingTime: 1200.75,
-      });
-    });
-
-    it('should apply filters to stats query', async () => {
-      const filters = {
-        starshipId: 'starship-123',
-        agentId: 'agent-123',
-        dateFrom: '2024-01-01T00:00:00.000Z',
-        dateTo: '2024-01-02T00:00:00.000Z',
-      };
-      mockConnection.executeQuery.mockResolvedValue([
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
+        expect.stringContaining('MATCH (c:Conversation {id: $conversationId}), (m:Message {id: $messageId})'),
         {
-          total: 5,
-          roles: ['user'],
-          messageTypes: ['user_input'],
-          importances: ['medium'],
-          avgContentLength: 100,
-          avgProcessingTime: null,
-        },
-      ]);
-
-      const result = await repository.getMessageStats(filters);
-
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND m.starshipId = $starshipId'),
-        expect.objectContaining(filters)
+          conversationId: 'conversation-456',
+          messageId: 'message-123',
+          key: 'conversation-456_message-123',
+        }
       );
-      expect(result.averageProcessingTime).toBeUndefined();
-    });
-
-    it('should return default stats when no messages found', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      const result = await repository.getMessageStats();
-
-      expect(result).toEqual({
-        total: 0,
-        byRole: { system: 0, user: 0, assistant: 0 },
-        byType: {},
-        byImportance: {},
-        averageContentLength: 0,
-      });
     });
   });
 
-  describe('serialization/deserialization', () => {
-    it('should serialize complex fields correctly', () => {
-      const message = createMockMessage({
-        metadata: { complex: 'data' },
-        processingMetadata: { tokens: 100 },
-      });
+  describe('unlinkFromConversation', () => {
+    it('should remove relationship between message and conversation', async () => {
+      mockConnection.executeWrite.mockResolvedValue([]);
 
-      // Serialization is now handled by MessageEntity
-      const entity = { ...message };
-      const serialized = entity;
+      await repository.unlinkFromConversation('message-123');
 
-      // Entity keeps objects as-is, doesn't stringify
-      expect(typeof serialized.metadata).toBe('object');
-      expect(typeof serialized.processingMetadata).toBe('object');
+      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
+        expect.stringContaining('MATCH (c:Conversation)-[r:HAS_MESSAGE]->(m:Message {id: $messageId})'),
+        { messageId: 'message-123' }
+      );
+    });
+  });
+
+  describe('getMessageConversation', () => {
+    it('should return conversation associated with message', async () => {
+      const mockConversation = { id: 'conversation-123', title: 'Test Conversation', status: 'active' };
+      mockConnection.executeQuery.mockResolvedValue([{ c: mockConversation }]);
+
+      const result = await repository.getMessageConversation('message-123');
+
+      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
+        expect.stringContaining('MATCH (c:Conversation)-[:HAS_MESSAGE]->(m:Message {id: $messageId})'),
+        { messageId: 'message-123' }
+      );
+      expect(result).toEqual(mockConversation);
     });
 
-    it('should deserialize complex fields correctly', () => {
-      const rawMessage = {
-        id: 'message-123',
-        content: 'Test',
-        metadata: JSON.stringify({ complex: 'data' }),
-        processingMetadata: JSON.stringify({ tokens: 100 }),
-      };
+    it('should return null when message has no associated conversation', async () => {
+      mockConnection.executeQuery.mockResolvedValue([]);
 
-      // Deserialization is now handled by MessageEntity
-      const deserialized = rawMessage;
+      const result = await repository.getMessageConversation('message-123');
 
-      // Entity handles JSON parsing automatically
-      expect(typeof deserialized.metadata).toBe('string');
-      expect(typeof deserialized.processingMetadata).toBe('string');
-    });
-
-    it('should handle null/undefined complex fields', () => {
-      const rawMessage = {
-        id: 'message-123',
-        content: 'Test',
-        metadata: null,
-        processingMetadata: undefined,
-      };
-
-      // Deserialization is now handled by MessageEntity
-      const deserialized = rawMessage;
-
-      expect(deserialized.metadata).toBeNull();
-      expect(deserialized.processingMetadata).toBeUndefined();
-    });
-
-    it('should handle invalid JSON gracefully', () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-      const rawMessage = {
-        id: 'message-123',
-        content: 'Test',
-        metadata: 'invalid-json{',
-        processingMetadata: '{"incomplete": }',
-      };
-
-      // Deserialization is now handled by MessageEntity - invalid JSON strings remain as strings
-      const deserialized = rawMessage;
-
-      expect(deserialized.metadata).toBe('invalid-json{');
-      expect(deserialized.processingMetadata).toBe('{"incomplete": }');
-      // MessageEntity doesn't log warnings for invalid JSON during deserialization
-      // expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to deserialize message'), expect.any(Error));
-
-      consoleSpy.mockRestore();
+      expect(result).toBeNull();
     });
   });
 
@@ -749,12 +317,12 @@ describe('MessageRepository', () => {
     it('should handle very long messages', async () => {
       const longContent = 'x'.repeat(10000);
       const createInput = createMockCreateInput({ content: longContent });
-      const mockCreated = createMockMessage({ content: longContent, contentLength: 10000 });
+      const mockCreated = createMockMessage({ content: longContent });
       mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
 
       const result = await repository.create(createInput);
 
-      expect(result.contentLength).toBe(10000);
+      expect(result.content).toBe(longContent);
     });
 
     it('should handle special characters in content', async () => {
@@ -768,45 +336,10 @@ describe('MessageRepository', () => {
       expect(result.content).toBe(specialContent);
     });
 
-    it('should handle messages with all optional fields', async () => {
-      const fullMessage = createMockCreateInput({
-        parentMessageId: 'parent-123',
-        threadDepth: 3,
-        processingStatus: 'processing',
-        messageType: 'system_message',
-        importance: 'critical',
-        contentHash: 'hash123',
-        hasAttachments: true,
-        tokenCount: 500,
-        processingTimeMs: 2500,
-      });
-      const mockCreated = createMockMessage(fullMessage);
-      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
+    it('should validate messageType enum', async () => {
+      const invalidMessageType = createMockCreateInput({ messageType: 'invalid_type' as 'user_input' });
 
-      const result = await repository.create(fullMessage);
-
-      expect(result).toMatchObject({
-        threadDepth: 3,
-        processingStatus: 'processing',
-        messageType: 'system_message',
-        importance: 'critical',
-        hasAttachments: true,
-      });
-    });
-
-    it('should handle deep message threads', async () => {
-      const deepParentChain = Array.from({ length: 15 }, (_, i) =>
-        createMockMessage({ id: `msg-${i}`, parentMessageId: i > 0 ? `msg-${i - 1}` : undefined })
-      );
-
-      jest.spyOn(repository, 'findById').mockImplementation(async (id) => deepParentChain.find((m) => m.id === id) || null);
-
-      mockConnection.executeQuery.mockResolvedValue([]);
-
-      const result = await repository.getMessageThread('msg-14', true, false, 10);
-
-      // Should limit to maxDepth
-      expect(result.length).toBeLessThanOrEqual(11); // root + 10 parents max
+      await expect(repository.create(invalidMessageType)).rejects.toThrow(DatabaseError);
     });
   });
 });

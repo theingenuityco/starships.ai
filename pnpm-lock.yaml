@@ -70,9 +70,6 @@ importers:
 
   packages/autopilot:
     dependencies:
-      axios:
-        specifier: ^1.11.0
-        version: 1.11.0
       jsonata:
         specifier: ^2.0.3
         version: 2.1.0

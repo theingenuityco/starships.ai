@@ -11,9 +11,11 @@
 /**
  * Core conversation
  */
+export type ConversationStatus = 'active' | 'paused' | 'completed' | 'archived';
+
 export interface Conversation {
   title: string;
-  status: 'active' | 'paused' | 'completed' | 'archived';
+  status: ConversationStatus;
 }
 
 /**

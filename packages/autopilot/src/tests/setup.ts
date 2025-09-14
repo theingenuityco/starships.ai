@@ -2,7 +2,7 @@
  * Jest setup file for autopilot package tests
  */
 
-import { AgentMemory } from '@/AgentMemory';
+import { AgentMemory } from '@/memory/AgentMemory';
 import type { Blueprint, Execution, Node } from '@/types';
 
 // Mock nanoid for consistent ID generation in tests
@@ -40,16 +40,15 @@ global.console = mockConsole;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).createAgentMemory = (): AgentMemory => {
   const memory = new AgentMemory();
-  memory.addMessage('system', 'Test system prompt');
+  memory.addMessageToHistory({ role: 'system', content: 'Test system prompt' });
   return memory;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({
   status: 'not_started',
-  executionResults: new Map(),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  agentMemory: (globalThis as any).createAgentMemory(),
+  results: [],
+  state: {},
   ...overrides,
 });
 

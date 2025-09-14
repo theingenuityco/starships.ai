@@ -5,38 +5,18 @@
  * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-import type { AgentMemoryState } from '@/AgentMemory';
+import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
-
-/**
- * Conditional node parameters for data-driven routing
- */
-export interface ConditionalNodeParameters {
-  sourceNodeId: string;
-  expression: string;
-  conditions: Record<string, string>;
-  defaultCondition?: string;
-}
 
 /**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptNodeParameters {
+export interface UserPromptParams {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string;
   timeout?: number;
   required?: boolean;
-}
-
-/**
- * Output node parameters for final result generation
- */
-export interface OutputNodeParameters {
-  template: string;
-  sources: string[];
-  format: OutputFormat;
-  title?: string;
 }
 
 /**
@@ -50,52 +30,30 @@ export interface UserPromptChoice {
 }
 
 /**
- * Output formats for workflow results
- */
-export type OutputFormat = 'text' | 'markdown' | 'json' | 'html' | 'xml' | 'pdf' | 'csv';
-
-/**
  * HTTP request node parameters for making HTTP calls
+ * Fully compatible with fetch RequestInit structure
  */
-export interface HttpRequestNodeParameters {
+export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
+  // Required URL (not part of RequestInit as it's the first parameter to fetch)
   url: string;
-  method: HttpMethod;
-  headers?: Record<string, string>;
-  body?: string | object;
+
+  // Overriding body to make it a string or object
+  body?: Record<string, unknown> | string | null;
+
+  // Custom properties for convenience
   timeout?: number;
-  retries?: number;
-  followRedirects?: boolean;
-  authentication?: HttpAuthentication;
-}
-
-/**
- * HTTP methods supported by the HTTP request node
- */
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
-
-/**
- * HTTP authentication configuration
- */
-export interface HttpAuthentication {
-  type: 'bearer' | 'basic' | 'api-key';
-  token?: string;
-  username?: string;
-  password?: string;
-  apiKey?: string;
-  headerName?: string; // for api-key type
 }
 
 /**
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
  */
-export interface LlmNodeParameters {
+export interface LlmParams {
   model: string;
-  prompt: string;
+  messages: { role: string; content: string }[];
   temperature?: number;
   maxTokens?: number;
   timeout?: number;
-  stream?: boolean;
   topP?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
@@ -137,7 +95,7 @@ export interface AgentParams {
   timeout?: number;
 
   // Memory system (required)
-  memory: AgentMemoryState;
+  memoryState: AgentMemoryState;
 
   // Blueprint execution
   blueprint: Blueprint;
@@ -147,19 +105,28 @@ export interface AgentParams {
 }
 
 /**
+ * Conditional node parameters for branching logic
+ */
+export interface ConditionalParams {
+  expression: string; // JSONata expression to evaluate
+  timeout?: number;
+}
+
+/**
  * Start and End node parameters
  */
-export type StartEndNodeParameters = Record<string, unknown>;
+export type StartParams = Record<string, unknown>;
+export type EndParams = Record<string, unknown>;
 
 /**
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
   | AgentParams
-  | ConditionalNodeParameters
-  | UserPromptNodeParameters
-  | OutputNodeParameters
-  | HttpRequestNodeParameters
-  | LlmNodeParameters
+  | UserPromptParams
+  | HttpRequestParams
+  | LlmParams
   | WorkflowParams
-  | StartEndNodeParameters;
+  | StartParams
+  | EndParams
+  | ConditionalParams;

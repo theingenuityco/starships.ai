@@ -78,10 +78,10 @@ describe('ExecutionEntity', () => {
       const serialized = toDatabase(execution);
 
       expect(serialized.currentNodeRef).toBeUndefined();
-      expect(serialized.executionData).toBeNull(); // JsonTransform returns null for undefined
-      expect(serialized.error).toBeNull(); // JsonTransform returns null for undefined
-      expect(serialized.result).toBeNull(); // JsonTransform returns null for undefined
-      expect(serialized.startTime).toBeNull(); // DateTransform returns null for undefined
+      expect(serialized.executionData).toBeUndefined(); // JsonTransform returns undefined for undefined
+      expect(serialized.error).toBeUndefined(); // JsonTransform returns undefined for undefined
+      expect(serialized.result).toBeUndefined(); // JsonTransform returns undefined for undefined
+      expect(serialized.startTime).toBeUndefined(); // DateTransform returns undefined for undefined
       expect(serialized.endTime).toBeNull(); // DateTransform returns null for undefined
       expect(serialized.pausedAt).toBeNull(); // DateTransform returns null for undefined
       expect(serialized.results).toBe('[]');
@@ -137,7 +137,7 @@ describe('ExecutionEntity', () => {
       expect(entity.result).toEqual({ output: 'final result', metadata: { duration: 5000 } });
       expect(entity.startTime).toBe('2024-01-01T00:00:00.000Z');
       expect(entity.endTime).toBe('2024-01-01T00:05:00.000Z');
-      expect(entity.pausedAt).toBeNull();
+      expect(entity.pausedAt).toBeUndefined();
       expect(entity.results).toEqual([
         { nodeRef: 'node-1', data: { success: true } },
         { nodeRef: 'node-2', data: { processed: 100 } },

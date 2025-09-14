@@ -130,8 +130,8 @@ describe('AgentRepository', () => {
           timeout: 30000,
           memoryState: {},
           blueprint: { type: 'test', nodes: [], edges: [] },
-          createdAt: expect.any(String),
-          updatedAt: expect.any(String),
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
         };
 
         // Mock createEntityWithAutoId call
@@ -179,8 +179,8 @@ describe('AgentRepository', () => {
           timeout: 30000,
           memoryState: {},
           blueprint: { type: 'test', nodes: [], edges: [] },
-          createdAt: expect.any(String),
-          updatedAt: expect.any(String),
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
         };
 
         // Mock createEntityWithAutoId call first, then relationship creation

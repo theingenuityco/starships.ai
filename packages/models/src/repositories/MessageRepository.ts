@@ -62,8 +62,11 @@ export class MessageRepository extends BaseRepository {
   async create(entity: Message & { conversationId: string }): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate using Entity
-        await MessageEntity.validate(entity, 'create');
+        // Extract conversationId before validation since it's not part of MessageEntity
+        const { conversationId, ...messageInput } = entity;
+
+        // Validate using Entity (without conversationId)
+        await MessageEntity.validate(messageInput, 'create');
 
         const now = new Date().toISOString();
 
@@ -83,7 +86,7 @@ export class MessageRepository extends BaseRepository {
         const result = await this.createEntityWithAutoId<MessageModel>('Message', messageEntity.serialize());
 
         // Create explicit Neo4j relationship with conversation if conversationId is provided
-        await this.linkToConversation(result.id, entity.conversationId);
+        await this.linkToConversation(result.id, conversationId);
 
         return MessageEntity.deserialize(result as unknown as Record<string, unknown>);
       },

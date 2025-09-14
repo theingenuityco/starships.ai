@@ -102,13 +102,15 @@ describe('Transformers', () => {
       expect(instance.data).toBeNull();
       expect(instance.metadata).toBeUndefined();
 
-      // Test serialization of null values
+      // Test serialization behavior - undefined values are not included in JSON
       const instanceForSerialization = new JsonTestEntity();
       instanceForSerialization.data = undefined;
       instanceForSerialization.metadata = undefined;
 
       const serialized = instanceToPlain(instanceForSerialization);
-      expect(serialized.data).toBeNull();
+      // With lean JsonTransform, undefined values serialize to undefined
+      expect(serialized.data).toBeUndefined();
+      expect(serialized.metadata).toBeUndefined();
     });
 
     it('should preserve non-string values during deserialization', () => {

@@ -96,7 +96,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   }, [agentsError])
 
   // Shared function to handle agent creation from template
-  const handleCreateFromTemplate = async (templateId: string, agentName: string) => {
+  const handleCreateFromTemplate = async (templateId: string) => {
     // Validate that we have a valid starshipId
     if (!starshipId || typeof starshipId !== 'string' || starshipId.trim() === '') {
       console.error('Cannot create agent: Invalid or missing starshipId:', starshipId)
@@ -107,7 +107,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
     try {
       // Use the real API to create agent from template
       const { templateAPI } = await import('@/lib/api')
-      const newAgent = await templateAPI.createAgentFromTemplate(templateId, agentName, starshipId)
+      const newAgent = await templateAPI.createAgentFromTemplate(templateId, starshipId)
 
       // Select the newly created agent
       onAgentSelect(newAgent)

@@ -612,9 +612,9 @@ export const templateAPI = {
     return data
   },
 
-  createAgentFromTemplate: async (templateId: string, agentName: string, starshipId?: string): Promise<Agent> => {
+  createAgentFromTemplate: async (templateId: string, starshipId?: string): Promise<Agent> => {
     try {
-      const requestBody: { agentName: string; starshipId?: string } = { agentName }
+      const requestBody: { starshipId?: string } = {}
       if (starshipId) {
         requestBody.starshipId = starshipId
       }

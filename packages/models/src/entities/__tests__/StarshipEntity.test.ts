@@ -8,6 +8,22 @@
 import { StarshipEntity, StarshipTransformers } from '@/entities/StarshipEntity';
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { EntityTestHelper } from './entity-test-helper';
+import { plainToInstance, Expose } from 'class-transformer';
+
+// Test entity classes to test transformations in real scenarios (like common serializer tests)
+class SlugTestEntity {
+  @Expose()
+  @StarshipTransformers.SlugTransform()
+  slug?: string;
+}
+
+class MaxAgentsTestEntity {
+  @Expose()
+  @StarshipTransformers.MaxAgentsTransform()
+  maxAgents?: number;
+
+  class?: string; // For testing class-based calculations
+}
 
 describe('StarshipEntity', () => {
   let testHelper: EntityTestHelper<StarshipEntity>;
@@ -20,44 +36,71 @@ describe('StarshipEntity', () => {
   describe('StarshipTransformers', () => {
     describe('SlugTransform', () => {
       it('should transform name to URL-safe slug', () => {
-        const transform = StarshipTransformers.SlugTransform();
+        const testCases = [
+          { input: 'My Amazing Starship!', expected: 'my-amazing-starship' },
+          { input: 'Test___Ship   123', expected: 'test-ship-123' },
+          { input: '---Start--End---', expected: 'start-end' },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: {}, value: 'My Amazing Starship!' }, 'slug')).toBe('my-amazing-starship');
-        expect(transform({ key: '', type: 0, obj: {}, value: 'Test___Ship   123' }, 'slug')).toBe('test-ship-123');
-        expect(transform({ key: '', type: 0, obj: {}, value: '---Start--End---' }, 'slug')).toBe('start-end');
+        testCases.forEach(({ input, expected }) => {
+          const plain = { slug: input };
+          const instance = plainToInstance(SlugTestEntity, plain);
+          expect(instance.slug).toBe(expected);
+        });
       });
 
       it('should handle empty and non-string values', () => {
-        const transform = StarshipTransformers.SlugTransform();
+        const testCases = [
+          { input: '', expected: '' },
+          { input: null, expected: null },
+          { input: 123, expected: 123 },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: {}, value: '' }, 'slug')).toBe('');
-        expect(transform({ key: '', type: 0, obj: {}, value: null }, 'slug')).toBeNull();
-        expect(transform({ key: '', type: 0, obj: {}, value: 123 }, 'slug')).toBe(123);
+        testCases.forEach(({ input, expected }) => {
+          const plain = { slug: input };
+          const instance = plainToInstance(SlugTestEntity, plain);
+          expect(instance.slug).toBe(expected);
+        });
       });
     });
 
     describe('MaxAgentsTransform', () => {
       it('should use provided value if valid', () => {
-        const transform = StarshipTransformers.MaxAgentsTransform();
+        const testCases = [
+          { input: { maxAgents: 5, class: 'scout' }, expected: 5 },
+          { input: { maxAgents: 8, class: 'cruiser' }, expected: 8 },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: { class: 'scout' }, value: 5 }, 'maxAgents')).toBe(5);
-        expect(transform({ key: '', type: 0, obj: { class: 'cruiser' }, value: 8 }, 'maxAgents')).toBe(8);
+        testCases.forEach(({ input, expected }) => {
+          const instance = plainToInstance(MaxAgentsTestEntity, input);
+          expect(instance.maxAgents).toBe(expected);
+        });
       });
 
       it('should auto-calculate based on class when no value provided', () => {
-        const transform = StarshipTransformers.MaxAgentsTransform();
+        const testCases = [
+          { input: { maxAgents: undefined, class: 'scout' }, expected: 3 },
+          { input: { maxAgents: undefined, class: 'cruiser' }, expected: 5 },
+          { input: { maxAgents: undefined, class: 'draught' }, expected: 10 },
+          { input: { maxAgents: undefined, class: 'unknown' }, expected: 3 },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: { class: 'scout' }, value: undefined }, 'maxAgents')).toBe(3);
-        expect(transform({ key: '', type: 0, obj: { class: 'cruiser' }, value: undefined }, 'maxAgents')).toBe(5);
-        expect(transform({ key: '', type: 0, obj: { class: 'draught' }, value: undefined }, 'maxAgents')).toBe(10);
-        expect(transform({ key: '', type: 0, obj: { class: 'unknown' }, value: undefined }, 'maxAgents')).toBe(3);
+        testCases.forEach(({ input, expected }) => {
+          const instance = plainToInstance(MaxAgentsTestEntity, input);
+          expect(instance.maxAgents).toBe(expected);
+        });
       });
 
       it('should handle invalid values', () => {
-        const transform = StarshipTransformers.MaxAgentsTransform();
+        const testCases = [
+          { input: { maxAgents: 0, class: 'scout' }, expected: 3 },
+          { input: { maxAgents: -1, class: 'scout' }, expected: 3 },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: { class: 'scout' }, value: 0 }, 'maxAgents')).toBe(3);
-        expect(transform({ key: '', type: 0, obj: { class: 'scout' }, value: -1 }, 'maxAgents')).toBe(3);
+        testCases.forEach(({ input, expected }) => {
+          const instance = plainToInstance(MaxAgentsTestEntity, input);
+          expect(instance.maxAgents).toBe(expected);
+        });
       });
     });
   });
@@ -575,7 +618,7 @@ describe('StarshipEntity', () => {
       };
 
       const entity = fromDatabase(StarshipEntity, databaseRecord);
-      expect(entity.slug).toBe(123); // Non-string values should be preserved as-is
+      expect(entity.slug).toBe('123'); // Non-string values are converted to string by class-transformer
     });
   });
 

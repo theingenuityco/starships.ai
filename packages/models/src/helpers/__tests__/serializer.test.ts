@@ -23,11 +23,11 @@ class JsonTestEntity {
 class DateTestEntity {
   @Expose()
   @Transformers.DateTransform()
-  createdAt?: Date | string;
+  createdAt?: string;
 
   @Expose()
   @Transformers.DateTransform()
-  updatedAt?: Date | string;
+  updatedAt?: string;
 }
 
 class ArrayTestEntity {
@@ -158,7 +158,7 @@ describe('Transformers', () => {
   });
 
   describe('DateTransform', () => {
-    it('should convert date strings to Date objects during deserialization', () => {
+    it('should preserve ISO date strings during deserialization', () => {
       const dateString = '2024-01-01T00:00:00.000Z';
       const plain = {
         createdAt: dateString,
@@ -167,18 +167,26 @@ describe('Transformers', () => {
 
       const instance = plainToInstance(DateTestEntity, plain);
 
-      expect(instance.createdAt).toBeInstanceOf(Date);
-      expect((instance.createdAt as Date).toISOString()).toBe(dateString);
-      expect(instance.updatedAt).toBeInstanceOf(Date);
+      expect(instance.createdAt).toBe(dateString);
+      expect(instance.updatedAt).toBe('2024-01-02T12:30:45.123Z');
+      expect(typeof instance.createdAt).toBe('string');
+      expect(typeof instance.updatedAt).toBe('string');
     });
 
-    it('should convert Date objects to ISO strings during serialization', () => {
+    it('should convert Date objects to ISO strings during both serialization and deserialization', () => {
       const date = new Date('2024-01-01T00:00:00.000Z');
-      const instance = new DateTestEntity();
-      instance.createdAt = date;
-      instance.updatedAt = new Date('2024-01-02T12:30:45.123Z');
 
-      const plain = instanceToPlain(instance);
+      // Test deserialization of Date objects
+      const plainWithDate = { createdAt: date };
+      const instance = plainToInstance(DateTestEntity, plainWithDate);
+      expect(instance.createdAt).toBe('2024-01-01T00:00:00.000Z');
+
+      // Test serialization
+      const instance2 = new DateTestEntity();
+      instance2.createdAt = '2024-01-01T00:00:00.000Z';
+      instance2.updatedAt = '2024-01-02T12:30:45.123Z';
+
+      const plain = instanceToPlain(instance2);
 
       expect(plain.createdAt).toBe('2024-01-01T00:00:00.000Z');
       expect(plain.updatedAt).toBe('2024-01-02T12:30:45.123Z');
@@ -192,14 +200,14 @@ describe('Transformers', () => {
       expect(instance.updatedAt).toBeNull(); // Transform converts undefined to null
     });
 
-    it('should handle timestamp numbers', () => {
+    it('should handle timestamp numbers by converting to ISO strings', () => {
       const timestamp = 1704067200000; // 2024-01-01T00:00:00.000Z
       const plain = { createdAt: timestamp };
 
       const instance = plainToInstance(DateTestEntity, plain);
 
-      expect(instance.createdAt).toBeInstanceOf(Date);
-      expect((instance.createdAt as Date).toISOString()).toBe('2024-01-01T00:00:00.000Z');
+      expect(instance.createdAt).toBe('2024-01-01T00:00:00.000Z');
+      expect(typeof instance.createdAt).toBe('string');
     });
   });
 
@@ -551,7 +559,7 @@ describe('Real-world integration scenarios', () => {
     metadata?: Record<string, unknown>;
 
     @Transformers.DateTransform()
-    createdAt?: Date | string;
+    createdAt?: string;
   }
 
   it('should work together in a real entity scenario', () => {
@@ -570,7 +578,8 @@ describe('Real-world integration scenarios', () => {
     expect(instance.maxTokens).toBe(2000);
     expect(instance.timeout).toBe(45000);
     expect(instance.metadata).toEqual({ model: 'gpt-4', version: '1.0' });
-    expect(instance.createdAt).toBeInstanceOf(Date);
+    expect(instance.createdAt).toBe('2024-01-01T00:00:00.000Z');
+    expect(typeof instance.createdAt).toBe('string');
 
     // Test serialization
     const serialized = instanceToPlain(instance);

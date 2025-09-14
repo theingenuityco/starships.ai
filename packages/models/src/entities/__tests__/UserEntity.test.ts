@@ -8,6 +8,32 @@
 import { UserEntity, UserTransformers } from '@/entities/UserEntity';
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { EntityTestHelper } from './entity-test-helper';
+import { plainToInstance, Expose } from 'class-transformer';
+
+// Test entity classes to test transformations in real scenarios (like common serializer tests)
+class UsernameTestEntity {
+  @Expose()
+  @UserTransformers.UsernameTransform()
+  username?: string;
+}
+
+class EmailTestEntity {
+  @Expose()
+  @UserTransformers.EmailTransform()
+  email?: string;
+}
+
+class DisplayNameTestEntity {
+  @Expose()
+  @UserTransformers.DisplayNameTransform()
+  displayName?: string;
+}
+
+class AvatarTestEntity {
+  @Expose()
+  @UserTransformers.AvatarTransform()
+  avatar?: string;
+}
 
 describe('UserEntity', () => {
   let testHelper: EntityTestHelper<UserEntity>;
@@ -20,70 +46,96 @@ describe('UserEntity', () => {
   describe('UserTransformers', () => {
     describe('UsernameTransform', () => {
       it('should transform username to lowercase and remove spaces', () => {
-        const transform = UserTransformers.UsernameTransform();
-        const decorator = transform({ key: '', type: 0, obj: {}, value: 'Test User 123' }, 'username');
+        const plain = { username: 'Test User 123' };
+        const instance = plainToInstance(UsernameTestEntity, plain);
 
-        expect(decorator).toBe('testuser123');
+        expect(instance.username).toBe('testuser123');
       });
 
       it('should handle empty and null values', () => {
-        const transform = UserTransformers.UsernameTransform();
+        const testCases = [
+          { input: null, expected: null },
+          { input: undefined, expected: undefined },
+          { input: '', expected: '' },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: {}, value: null }, 'username')).toBeNull();
-        expect(transform({ key: '', type: 0, obj: {}, value: undefined }, 'username')).toBeUndefined();
-        expect(transform({ key: '', type: 0, obj: {}, value: '' }, 'username')).toBe('');
+        testCases.forEach(({ input, expected }) => {
+          const plain = { username: input };
+          const instance = plainToInstance(UsernameTestEntity, plain);
+          expect(instance.username).toBe(expected);
+        });
       });
     });
 
     describe('EmailTransform', () => {
       it('should transform email to lowercase and trim', () => {
-        const transform = UserTransformers.EmailTransform();
+        const plain = { email: '  TEST@EXAMPLE.COM  ' };
+        const instance = plainToInstance(EmailTestEntity, plain);
 
-        expect(transform({ key: '', type: 0, obj: {}, value: '  TEST@EXAMPLE.COM  ' }, 'email')).toBe('test@example.com');
+        expect(instance.email).toBe('test@example.com');
       });
 
       it('should handle non-string values', () => {
-        const transform = UserTransformers.EmailTransform();
+        const testCases = [
+          { input: null, expected: null },
+          { input: 123, expected: 123 },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: {}, value: null }, 'email')).toBeNull();
-        expect(transform({ key: '', type: 0, obj: {}, value: 123 }, 'email')).toBe(123);
+        testCases.forEach(({ input, expected }) => {
+          const plain = { email: input };
+          const instance = plainToInstance(EmailTestEntity, plain);
+          expect(instance.email).toBe(expected);
+        });
       });
     });
 
     describe('DisplayNameTransform', () => {
       it('should trim display name', () => {
-        const transform = UserTransformers.DisplayNameTransform();
+        const plain = { displayName: '  John Doe  ' };
+        const instance = plainToInstance(DisplayNameTestEntity, plain);
 
-        expect(transform({ key: '', type: 0, obj: {}, value: '  John Doe  ' }, 'displayName')).toBe('John Doe');
+        expect(instance.displayName).toBe('John Doe');
       });
     });
 
     describe('AvatarTransform', () => {
       it('should accept valid URLs', () => {
-        const transform = UserTransformers.AvatarTransform();
+        const testCases = [
+          { input: 'https://example.com/avatar.jpg', expected: 'https://example.com/avatar.jpg' },
+          { input: 'http://example.com/avatar.jpg', expected: 'http://example.com/avatar.jpg' },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: {}, value: 'https://example.com/avatar.jpg' }, 'avatar')).toBe(
-          'https://example.com/avatar.jpg'
-        );
-        expect(transform({ key: '', type: 0, obj: {}, value: 'http://example.com/avatar.jpg' }, 'avatar')).toBe(
-          'http://example.com/avatar.jpg'
-        );
+        testCases.forEach(({ input, expected }) => {
+          const plain = { avatar: input };
+          const instance = plainToInstance(AvatarTestEntity, plain);
+          expect(instance.avatar).toBe(expected);
+        });
       });
 
       it('should accept relative paths and data URLs', () => {
-        const transform = UserTransformers.AvatarTransform();
+        const testCases = [
+          { input: '/images/avatar.jpg', expected: '/images/avatar.jpg' },
+          { input: 'data:image/png;base64,iVBOR...', expected: 'data:image/png;base64,iVBOR...' },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: {}, value: '/images/avatar.jpg' }, 'avatar')).toBe('/images/avatar.jpg');
-        expect(transform({ key: '', type: 0, obj: {}, value: 'data:image/png;base64,iVBOR...' }, 'avatar')).toBe(
-          'data:image/png;base64,iVBOR...'
-        );
+        testCases.forEach(({ input, expected }) => {
+          const plain = { avatar: input };
+          const instance = plainToInstance(AvatarTestEntity, plain);
+          expect(instance.avatar).toBe(expected);
+        });
       });
 
       it('should reject invalid URLs', () => {
-        const transform = UserTransformers.AvatarTransform();
+        const testCases = [
+          { input: 'invalid-url', expected: undefined },
+          { input: 'ftp://example.com/avatar.jpg', expected: undefined },
+        ];
 
-        expect(transform({ key: '', type: 0, obj: {}, value: 'invalid-url' }, 'avatar')).toBeUndefined();
-        expect(transform({ key: '', type: 0, obj: {}, value: 'ftp://example.com/avatar.jpg' }, 'avatar')).toBeUndefined();
+        testCases.forEach(({ input, expected }) => {
+          const plain = { avatar: input };
+          const instance = plainToInstance(AvatarTestEntity, plain);
+          expect(instance.avatar).toBe(expected);
+        });
       });
     });
   });

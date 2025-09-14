@@ -23,8 +23,8 @@ export class StarshipTransformers {
       return value
         .toLowerCase()
         .trim()
-        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/[^a-z0-9\s-_]/g, '') // Remove special characters except spaces, hyphens, and underscores
+        .replace(/[\s_]+/g, '-') // Replace spaces and underscores with hyphens
         .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
         .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
     });
@@ -284,7 +284,7 @@ export class StarshipEntity implements StarshipModel {
       agents: {
         used: currentAgentCount,
         max: this.maxAgents,
-        percentage: Math.round((currentAgentCount / this.maxAgents) * 100),
+        percentage: this.maxAgents === 0 ? 0 : Math.round((currentAgentCount / this.maxAgents) * 100),
       },
     };
   }
@@ -296,8 +296,8 @@ export class StarshipEntity implements StarshipModel {
     return name
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/[^a-z0-9\s-_]/g, '') // Remove special characters except spaces, hyphens, and underscores
+      .replace(/[\s_]+/g, '-') // Replace spaces and underscores with hyphens
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
   }

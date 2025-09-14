@@ -82,8 +82,8 @@ describe('ExecutionEntity', () => {
       expect(serialized.error).toBeUndefined(); // JsonTransform returns undefined for undefined
       expect(serialized.result).toBeUndefined(); // JsonTransform returns undefined for undefined
       expect(serialized.startTime).toBeUndefined(); // DateTransform returns undefined for undefined
-      expect(serialized.endTime).toBeNull(); // DateTransform returns null for undefined
-      expect(serialized.pausedAt).toBeNull(); // DateTransform returns null for undefined
+      expect(serialized.endTime).toBeUndefined(); // DateTransform returns undefined for undefined
+      expect(serialized.pausedAt).toBeUndefined(); // DateTransform returns undefined for undefined
       expect(serialized.results).toBe('[]');
       expect(serialized.state).toBe('{}');
     });

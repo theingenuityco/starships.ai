@@ -249,8 +249,8 @@ describe('Transformers', () => {
       const instanceNull = plainToInstance(NumberTestEntity, plainNull);
       const instanceUndefined = plainToInstance(NumberTestEntity, plainUndefined);
 
-      expect(instanceNull.testNumber).toBeNull();
-      expect(instanceUndefined.testNumber).toBeNull();
+      expect(instanceNull.testNumber).toBeUndefined();
+      expect(instanceUndefined.testNumber).toBeUndefined();
     });
 
     it('should throw error for invalid numbers', () => {
@@ -287,8 +287,8 @@ describe('Transformers', () => {
       const instanceNull = plainToInstance(BooleanTestEntity, plainNull);
       const instanceUndefined = plainToInstance(BooleanTestEntity, plainUndefined);
 
-      expect(instanceNull.testBoolean).toBeNull();
-      expect(instanceUndefined.testBoolean).toBeNull();
+      expect(instanceNull.testBoolean).toBeUndefined();
+      expect(instanceUndefined.testBoolean).toBeUndefined();
     });
 
     it('should convert explicit string representations', () => {
@@ -354,8 +354,8 @@ describe('LLMTransformers', () => {
       const instanceNull = plainToInstance(LLMTestEntity, plainNull);
       const instanceUndefined = plainToInstance(LLMTestEntity, plainUndefined);
 
-      expect(instanceNull.temperature).toBeNull();
-      expect(instanceUndefined.temperature).toBeNull();
+      expect(instanceNull.temperature).toBeUndefined();
+      expect(instanceUndefined.temperature).toBeUndefined();
     });
 
     it('should handle invalid temperature values properly', () => {

@@ -6,9 +6,9 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import type { ExecutionStatus, NodeResult } from '@starships/autopilot';
+import type { ExecutionStatus, NodeResult, ExecutionState } from '@starships/autopilot';
 import type { ExecutionModel, ExecutionError } from '@starships/protocol';
-import { Expose, Transform } from 'class-transformer';
+import { Expose } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
@@ -16,13 +16,11 @@ import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationErro
  */
 export class ExecutionEntity implements ExecutionModel {
   @Expose()
-  @Transform(({ value }) => value)
   @IsString()
   @Length(1, 255)
   id!: string;
 
   @Expose()
-  @Transform(({ value }) => value)
   @IsString()
   @Length(1, 255)
   workflowId!: string;
@@ -38,12 +36,10 @@ export class ExecutionEntity implements ExecutionModel {
   updatedAt!: string;
 
   @Expose()
-  @Transform(({ value }) => value || 'pending')
   @IsIn(['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'])
   status!: ExecutionStatus;
 
   @Expose()
-  @Transform(({ value }) => value)
   @IsOptional()
   @IsString()
   currentNodeRef?: string;
@@ -84,13 +80,11 @@ export class ExecutionEntity implements ExecutionModel {
   // Properties from the Execution interface that may not be persisted
   @Expose()
   @Transformers.JsonTransform()
-  @IsOptional()
-  results?: NodeResult[];
+  results!: NodeResult[];
 
   @Expose()
   @Transformers.JsonTransform()
-  @IsOptional()
-  state?: Record<string, unknown>;
+  state!: ExecutionState;
 
   /**
    * Simple validation function using class-validator

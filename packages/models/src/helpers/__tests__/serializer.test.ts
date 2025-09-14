@@ -86,15 +86,13 @@ describe('Transformers', () => {
       expect(plain.metadata).toBe('{"nested":{"deep":"value"}}');
     });
 
-    it('should handle invalid JSON gracefully during deserialization', () => {
+    it('should throw error for invalid JSON during deserialization', () => {
       const plain = {
         data: 'invalid-json{',
         metadata: '{"incomplete": json}',
       };
-      const instance = plainToInstance(JsonTestEntity, plain);
 
-      expect(instance.data).toBeNull();
-      expect(instance.metadata).toBeNull();
+      expect(() => plainToInstance(JsonTestEntity, plain)).toThrow();
     });
 
     it('should handle null and undefined values', () => {
@@ -340,34 +338,6 @@ describe('LLMTransformers', () => {
       });
     });
 
-    it('should clamp values above 2 to 2', () => {
-      const testCases = [
-        { input: 5.0, expected: 2 },
-        { input: 3.7, expected: 2 },
-        { input: 100, expected: 2 },
-      ];
-
-      testCases.forEach(({ input, expected }) => {
-        const plain = { temperature: input };
-        const instance = plainToInstance(LLMTestEntity, plain);
-        expect(instance.temperature).toBe(expected);
-      });
-    });
-
-    it('should clamp values below 0 to 0', () => {
-      const testCases = [
-        { input: -1.0, expected: 0 },
-        { input: -0.5, expected: 0 },
-        { input: -100, expected: 0 },
-      ];
-
-      testCases.forEach(({ input, expected }) => {
-        const plain = { temperature: input };
-        const instance = plainToInstance(LLMTestEntity, plain);
-        expect(instance.temperature).toBe(expected);
-      });
-    });
-
     it('should parse string numbers', () => {
       const plain = { temperature: '0.8' };
       const instance = plainToInstance(LLMTestEntity, plain);
@@ -375,18 +345,23 @@ describe('LLMTransformers', () => {
       expect(instance.temperature).toBe(0.8);
     });
 
-    it('should return undefined for null and invalid values', () => {
-      const testCases = [
-        { input: null, expected: undefined },
-        { input: undefined, expected: undefined },
-        { input: 'not-a-number', expected: undefined },
-        { input: 'invalid', expected: undefined },
-      ];
+    it('should handle null and undefined values', () => {
+      const plainNull = { temperature: null };
+      const plainUndefined = { temperature: undefined };
 
-      testCases.forEach(({ input, expected }) => {
+      const instanceNull = plainToInstance(LLMTestEntity, plainNull);
+      const instanceUndefined = plainToInstance(LLMTestEntity, plainUndefined);
+
+      expect(instanceNull.temperature).toBeNull();
+      expect(instanceUndefined.temperature).toBeNull();
+    });
+
+    it('should throw error for invalid temperature values', () => {
+      const testCases = ['not-a-number', 'invalid', 3.0, -1.0];
+
+      testCases.forEach((input) => {
         const plain = { temperature: input };
-        const instance = plainToInstance(LLMTestEntity, plain);
-        expect(instance.temperature).toBe(expected);
+        expect(() => plainToInstance(LLMTestEntity, plain)).toThrow();
       });
     });
   });

@@ -1,4 +1,5 @@
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { CreateExecutionRequest, ExecutionModel } from '@starships/protocol';
 import { ExecutionEntity } from '../entities/ExecutionEntity';
@@ -13,7 +14,10 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) RETURN e ORDER BY e.createdAt DESC');
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findAll',
       'Execution'
@@ -25,7 +29,7 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) WHERE e.id = $id RETURN e', { id });
-        return result.length > 0 ? ExecutionEntity.fromDatabaseRecord(result[0].e) : null;
+        return result.length > 0 ? fromDatabase(ExecutionEntity, result[0].e) : null;
       },
       'findById',
       'Execution',
@@ -43,19 +47,15 @@ export class ExecutionRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare execution data with defaults and validation
-        const executionEntity = ExecutionEntity.createFromRequest({
+        const executionData = {
           ...entity,
           createdAt: now,
           updatedAt: now,
           status: entity.status || 'pending',
-        });
-
-        const executionData = executionEntity.toDatabaseFormat();
-        // Remove id since it will be auto-generated
-        delete (executionData as { id?: string }).id;
+        };
 
         // Use BaseRepository serialization
-        const result = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionData);
+        const result = await this.createEntityWithAutoId<ExecutionModel>('Execution', toDatabase(executionData));
 
         // Create relationship with workflow
         await connection.executeWrite(
@@ -65,7 +65,7 @@ export class ExecutionRepository extends BaseRepository {
         );
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.fromDatabaseRecord(result);
+        return fromDatabase(ExecutionEntity, result);
       },
       'create',
       'Execution'
@@ -114,9 +114,8 @@ export class ExecutionRepository extends BaseRepository {
         }
         if (updates.executionData !== undefined) {
           setFields.push('e.executionData = $executionData');
-          // Use ExecutionEntity to handle executionData serialization
-          const tempEntity = ExecutionEntity.createFromRequest({ executionData: updates.executionData });
-          const serialized = tempEntity.toDatabaseFormat();
+          // Use toDatabase to handle executionData serialization
+          const serialized = toDatabase({ executionData: updates.executionData });
           params.executionData = serialized.executionData;
         }
         if (updates.error !== undefined) {
@@ -125,9 +124,8 @@ export class ExecutionRepository extends BaseRepository {
         }
         if (updates.result !== undefined) {
           setFields.push('e.result = $result');
-          // Use ExecutionEntity to handle result serialization
-          const tempEntity = ExecutionEntity.createFromRequest({ result: updates.result });
-          const serialized = tempEntity.toDatabaseFormat();
+          // Use toDatabase to handle result serialization
+          const serialized = toDatabase({ result: updates.result });
           params.result = serialized.result;
         }
         if (updates.startTime !== undefined) {
@@ -163,7 +161,7 @@ export class ExecutionRepository extends BaseRepository {
         }
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.fromDatabaseRecord(result[0].e);
+        return fromDatabase(ExecutionEntity, result[0].e);
       },
       'update',
       'Execution',
@@ -196,7 +194,10 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.workflowId = $workflowId RETURN e ORDER BY e.createdAt DESC',
           { workflowId }
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findByWorkflowId',
       'Execution'
@@ -211,7 +212,10 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.status = $status RETURN e ORDER BY e.createdAt DESC',
           { status }
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findByStatus',
       'Execution'
@@ -225,7 +229,10 @@ export class ExecutionRepository extends BaseRepository {
         const result = await connection.executeQuery<{ e: ExecutionModel }>(
           'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findActiveExecutions',
       'Execution'
@@ -250,7 +257,10 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.createdAt >= $startDate AND e.createdAt <= $endDate RETURN e ORDER BY e.createdAt DESC',
           { startDate, endDate }
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findByDateRange',
       'Execution'

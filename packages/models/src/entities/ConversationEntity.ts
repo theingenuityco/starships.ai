@@ -6,9 +6,8 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { ConversationModel } from '@starships/protocol';
-import { Expose, instanceToPlain, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
@@ -41,36 +40,6 @@ export class ConversationEntity implements ConversationModel {
   @Transform(({ value }) => value || 'active')
   @IsIn(['active', 'paused', 'completed', 'archived'])
   status!: 'active' | 'paused' | 'completed' | 'archived';
-
-  /**
-   * Creates a validated entity from API request data
-   * Use this when receiving data from API requests that need validation and transformation
-   */
-  static createFromRequest(data: Record<string, unknown>): ConversationEntity {
-    const entity = new ConversationEntity();
-    Object.assign(entity, data);
-    return entity;
-  }
-
-  /**
-   * Converts entity to database storage format
-   * Transforms complex objects to JSON strings for Neo4j storage
-   */
-  toDatabaseFormat(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Creates entity from database record
-   * Transforms JSON strings back to complex objects for API responses
-   * Uses safe deserialization with proper error handling
-   */
-  static fromDatabaseRecord(data: unknown): ConversationEntity {
-    return createFromDatabaseRecord(ConversationEntity, data);
-  }
 
   /**
    * Simple validation function using class-validator

@@ -6,9 +6,8 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { UserModel } from '@starships/protocol';
-import { Expose, instanceToPlain, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
 
 /**
@@ -145,36 +144,6 @@ export class UserEntity implements UserModel {
   stripeCustomerId?: string;
 
   /**
-   * Creates a validated entity from API request data
-   * Use this when receiving data from API requests that need validation and transformation
-   */
-  static createFromRequest(data: Record<string, unknown>): UserEntity {
-    const entity = new UserEntity();
-    Object.assign(entity, data);
-    return entity;
-  }
-
-  /**
-   * Converts entity to database storage format
-   * Transforms complex objects to JSON strings for Neo4j storage
-   */
-  toDatabaseFormat(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Creates entity from database record
-   * Transforms JSON strings back to complex objects for API responses
-   * Uses safe deserialization with proper error handling
-   */
-  static fromDatabaseRecord(data: unknown): UserEntity {
-    return createFromDatabaseRecord(UserEntity, data);
-  }
-
-  /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
    */
@@ -275,9 +244,8 @@ export class UserEntity implements UserModel {
    * Helper method to get safe user data (without sensitive fields)
    */
   toSafeObject(): Omit<UserModel, 'password'> {
-    const serialized = this.toDatabaseFormat();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeData } = serialized;
+    const { password, ...safeData } = this;
     return safeData as Omit<UserModel, 'password'>;
   }
 

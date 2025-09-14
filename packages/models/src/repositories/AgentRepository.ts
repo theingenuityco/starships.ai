@@ -1,5 +1,6 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 
@@ -13,7 +14,10 @@ export class AgentRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
-        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a));
+        return fromDatabaseArray(
+          AgentEntity,
+          result.map((record) => record.a)
+        );
       },
       'findAll',
       'Agent'
@@ -26,7 +30,7 @@ export class AgentRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id });
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.fromDatabaseRecord(agent) : null;
+        return agent ? fromDatabase(AgentEntity, agent) : null;
       },
       'findById',
       'Agent',
@@ -42,7 +46,12 @@ export class AgentRepository extends BaseRepository {
           'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a',
           { starshipId }
         );
-        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a)) || [];
+        return result && result.length > 0
+          ? fromDatabaseArray(
+              AgentEntity,
+              result.map((record) => record.a)
+            )
+          : [];
       },
       'findByStarship',
       'Agent'
@@ -96,7 +105,7 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('Agent', agentId);
         }
 
-        return AgentEntity.fromDatabaseRecord(result[0].a);
+        return fromDatabase(AgentEntity, result[0].a);
       },
       'updateStarshipId',
       'Agent',
@@ -129,11 +138,8 @@ export class AgentRepository extends BaseRepository {
           updatedAt: now,
         };
 
-        // Create entity from request data and convert to database format
-        const agentEntity = AgentEntity.createFromRequest(agentProps);
-
         // Use base repository for database operation
-        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', agentEntity.toDatabaseFormat());
+        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', toDatabase(agentProps));
 
         const connection = this.getConnection();
         await connection.executeWrite(
@@ -146,7 +152,7 @@ export class AgentRepository extends BaseRepository {
           }
         );
 
-        return AgentEntity.fromDatabaseRecord(agent);
+        return fromDatabase(AgentEntity, agent);
       },
       'create',
       'Agent'
@@ -162,16 +168,13 @@ export class AgentRepository extends BaseRepository {
           updatedAt: new Date().toISOString(),
         };
 
-        // Create entity from update data and convert to database format
-        const updateEntity = AgentEntity.createFromRequest(updateProps);
-
         const result = await connection.executeWrite<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a', {
           id,
-          updates: updateEntity.toDatabaseFormat(),
+          updates: toDatabase(updateProps),
         });
 
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.fromDatabaseRecord(agent) : null;
+        return agent ? fromDatabase(AgentEntity, agent) : null;
       },
       'update',
       'Agent',
@@ -204,7 +207,12 @@ export class AgentRepository extends BaseRepository {
           'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
           { query }
         );
-        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a)) || [];
+        return result && result.length > 0
+          ? fromDatabaseArray(
+              AgentEntity,
+              result.map((record) => record.a)
+            )
+          : [];
       },
       'searchAgents',
       'Agent'

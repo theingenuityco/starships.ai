@@ -6,10 +6,9 @@
  */
 
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
-import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { AgentMemoryState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
-import { Expose, instanceToPlain, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
@@ -131,36 +130,6 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @IsOptional()
   @AgentTemplateTransformers.PreviewPromptsTransform()
   previewPrompts?: string[];
-
-  /**
-   * Creates a validated entity from API request data
-   * Use this when receiving data from API requests that need validation and transformation
-   */
-  static createFromRequest(data: Record<string, unknown>): AgentTemplateEntity {
-    const entity = new AgentTemplateEntity();
-    Object.assign(entity, data);
-    return entity;
-  }
-
-  /**
-   * Converts entity to database storage format
-   * Transforms complex objects (blueprint, memoryState) to JSON strings for Neo4j storage
-   */
-  toDatabaseFormat(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Creates entity from database record
-   * Transforms JSON strings back to complex objects for API responses
-   * Uses safe deserialization with proper error handling
-   */
-  static fromDatabaseRecord(data: unknown): AgentTemplateEntity {
-    return createFromDatabaseRecord(AgentTemplateEntity, data);
-  }
 
   /**
    * Simple validation function using class-validator

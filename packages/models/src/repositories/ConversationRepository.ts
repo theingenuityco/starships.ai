@@ -1,4 +1,5 @@
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel, Conversation, ConversationModel, MessageModel, StarshipModel } from '@starships/protocol';
 import { AgentEntity } from '../entities/AgentEntity';
@@ -16,7 +17,10 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
-        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c));
+        return fromDatabaseArray(
+          ConversationEntity,
+          result.map((record) => record.c)
+        );
       },
       'findAll',
       'Conversation'
@@ -28,7 +32,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0 ? ConversationEntity.fromDatabaseRecord(result[0].c) : null;
+        return result.length > 0 ? fromDatabase(ConversationEntity, result[0].c) : null;
       },
       'findById',
       'Conversation',
@@ -46,18 +50,14 @@ export class ConversationRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare conversation data with defaults and validation
-        const conversationEntity = ConversationEntity.createFromRequest({
+        const conversationData = {
           ...conversationInput,
           createdAt: now,
           status: entity.status || 'active',
-        });
+        };
 
-        const conversationData = conversationEntity.toDatabaseFormat();
-        // Remove id since it will be auto-generated
-        delete (conversationData as { id?: string }).id;
-
-        // Use BaseRepository serialization (the conversationData is already properly prepared)
-        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
+        // Use BaseRepository serialization
+        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', toDatabase(conversationData));
 
         // Create relationship with starship if starshipId is provided
         await this.linkToStarship(result.id, starshipId);
@@ -67,7 +67,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.fromDatabaseRecord(result);
+        return fromDatabase(ConversationEntity, result);
       },
       'create',
       'Conversation'
@@ -109,7 +109,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.fromDatabaseRecord(result[0].c);
+        return fromDatabase(ConversationEntity, result[0].c);
       },
       'update',
       'Conversation',
@@ -146,7 +146,10 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.createdAt DESC`,
           { starshipId }
         );
-        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c));
+        return fromDatabaseArray(
+          ConversationEntity,
+          result.map((record) => record.c)
+        );
       },
       'findByStarship',
       'Conversation'
@@ -167,7 +170,7 @@ export class ConversationRepository extends BaseRepository {
         );
         if (result.length === 0) return null;
 
-        return StarshipEntity.fromDatabaseRecord(result[0].starship);
+        return fromDatabase(StarshipEntity, result[0].starship);
       },
       'getConversationStarship',
       'Conversation'
@@ -234,7 +237,10 @@ export class ConversationRepository extends BaseRepository {
           { conversationId }
         );
 
-        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m));
+        return fromDatabaseArray(
+          MessageEntity,
+          result.map((record) => record.m)
+        );
       },
       'getConversationMessages',
       'Conversation'
@@ -295,7 +301,10 @@ export class ConversationRepository extends BaseRepository {
           { conversationId }
         );
 
-        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a));
+        return fromDatabaseArray(
+          AgentEntity,
+          result.map((record) => record.a)
+        );
       },
       'getConversationAgents',
       'Conversation'

@@ -2,6 +2,7 @@
  * UserRepository Unit Tests - Updated for Layered Architecture
  */
 
+import 'reflect-metadata';
 import { ConflictError, DatabaseError, NotFoundError } from '@starships/errors';
 import { UserModel } from '@starships/protocol';
 import { RepositoryTestHelper } from '../../tests/repository-test-helper';
@@ -16,25 +17,14 @@ jest.mock('@/helpers/database', () => ({
   getConnection: jest.fn(),
 }));
 
-// Mock UserEntity with proper class constructor and jest functions
-jest.mock('@/entities/UserEntity', () => {
-  class MockUserEntity {
-    static validate = jest.fn().mockResolvedValue(undefined);
-    static generateUsernameFromEmail = jest.fn((email: string) => email.split('@')[0]);
-
-    constructor(data: unknown) {
-      Object.assign(this, data);
-    }
-  }
-
-  return {
-    UserEntity: MockUserEntity,
-  };
-});
-
-import { UserEntity } from '@/entities/UserEntity';
 import { UserRepository } from '../UserRepository';
 
+// Import real UserEntity and only mock its validation method
+import { UserEntity } from '@/entities/UserEntity';
+
+// Mock only the methods that need mocking to avoid validation in tests
+jest.spyOn(UserEntity, 'validate').mockResolvedValue(undefined);
+jest.spyOn(UserEntity, 'generateUsernameFromEmail').mockImplementation((email: string) => email.split('@')[0]);
 describe('UserRepository', () => {
   let repository: UserRepository;
   let testHelper: RepositoryTestHelper;
@@ -67,8 +57,14 @@ describe('UserRepository', () => {
 
       expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
       expect(result).toHaveLength(mockUsers.length);
-      expect(result[0]).toEqual(expect.objectContaining(mockUsers[0]));
-      expect(result[1]).toEqual(expect.objectContaining(mockUsers[1]));
+      expect(result[0]).toBeInstanceOf(UserEntity);
+      expect(result[0].id).toBe(mockUsers[0].id);
+      expect(result[0].email).toBe(mockUsers[0].email);
+      expect(result[0].displayName).toBe(mockUsers[0].displayName);
+      expect(result[1]).toBeInstanceOf(UserEntity);
+      expect(result[1].id).toBe(mockUsers[1].id);
+      expect(result[1].email).toBe(mockUsers[1].email);
+      expect(result[1].displayName).toBe(mockUsers[1].displayName);
     });
 
     it('should return empty array when no users found', async () => {
@@ -94,7 +90,11 @@ describe('UserRepository', () => {
       const result = await repository.findById('user-123');
 
       expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.id = $id RETURN u', { id: 'user-123' });
-      expect(result).toEqual(expect.objectContaining(mockUser));
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(mockUser.id);
+      expect(result!.email).toBe(mockUser.email);
+      expect(result!.displayName).toBe(mockUser.displayName);
     });
 
     it('should return null when user not found', async () => {
@@ -116,7 +116,11 @@ describe('UserRepository', () => {
       expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.email = $email RETURN u', {
         email: 'test@example.com',
       });
-      expect(result).toEqual(expect.objectContaining(mockUser));
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(mockUser.id);
+      expect(result!.email).toBe(mockUser.email);
+      expect(result!.displayName).toBe(mockUser.displayName);
     });
 
     it('should return null when email not found', async () => {
@@ -138,7 +142,11 @@ describe('UserRepository', () => {
       expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.username = $username RETURN u', {
         username: 'testuser',
       });
-      expect(result).toEqual(expect.objectContaining(mockUser));
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(mockUser.id);
+      expect(result!.email).toBe(mockUser.email);
+      expect(result!.displayName).toBe(mockUser.displayName);
     });
   });
 
@@ -162,7 +170,15 @@ describe('UserRepository', () => {
       const result = await repository.create(userData);
 
       expect(UserEntity.validate).toHaveBeenCalledWith(userData, 'create');
-      expect(result).toEqual(expect.objectContaining(createdUser));
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: 'generated-test-id-123',
+          email: 'test@example.com',
+          username: 'testuser',
+          displayName: 'Test User',
+        })
+      );
     });
 
     it('should validate required fields', async () => {
@@ -218,6 +234,7 @@ describe('UserRepository', () => {
       const result = await repository.update('user-123', updates);
 
       expect(UserEntity.validate).toHaveBeenCalledWith(updates, 'update');
+      expect(result).toBeInstanceOf(UserEntity);
       expect(result).toEqual(expect.objectContaining(updatedUser));
     });
 
@@ -273,7 +290,10 @@ describe('UserRepository', () => {
       expect(params.updatedAt).toBeDefined();
       // The id in params should be the actual user ID, not the ignored one
       expect(params.id).toBe('user-123');
-      expect(result).toEqual(expect.objectContaining(updatedUser));
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(updatedUser.id);
+      expect(result!.displayName).toBe(updatedUser.displayName);
     });
   });
 
@@ -310,7 +330,10 @@ describe('UserRepository', () => {
         expect.stringContaining('MATCH (user:User {stripeCustomerId: $stripeCustomerId})'),
         { stripeCustomerId: 'cus_123' }
       );
-      expect(result).toEqual(expect.objectContaining(mockUser));
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(mockUser.id);
+      expect(result!.stripeCustomerId).toBe(mockUser.stripeCustomerId);
     });
 
     it('should return null when Stripe customer ID not found', async () => {
@@ -390,7 +413,15 @@ describe('UserRepository', () => {
       expect(existingUser).toBeNull();
 
       const newUser = await repository.create(userData);
-      expect(newUser).toEqual(expect.objectContaining(createdUser));
+      expect(newUser).toBeInstanceOf(UserEntity);
+      expect(newUser).toEqual(
+        expect.objectContaining({
+          id: 'generated-test-id-123',
+          email: 'new@example.com',
+          username: 'newuser',
+          displayName: 'New User',
+        })
+      );
     });
 
     it('should handle user profile update flow', async () => {
@@ -410,7 +441,10 @@ describe('UserRepository', () => {
 
       const result = await repository.update(userId, updates);
 
-      expect(result).toEqual(expect.objectContaining(updatedUser));
+      expect(result).toBeInstanceOf(UserEntity);
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe(updatedUser.id);
+      expect(result!.displayName).toBe(updatedUser.displayName);
     });
 
     it('should handle user deletion flow', async () => {

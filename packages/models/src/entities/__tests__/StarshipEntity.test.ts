@@ -618,7 +618,7 @@ describe('StarshipEntity', () => {
       };
 
       const entity = fromDatabase(StarshipEntity, databaseRecord);
-      expect(entity.slug).toBe('123'); // Non-string values are converted to string by class-transformer
+      expect(entity.slug).toBe(123); // Non-string values pass through unchanged
     });
   });
 

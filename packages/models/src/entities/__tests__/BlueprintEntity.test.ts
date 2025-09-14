@@ -113,7 +113,7 @@ describe('BlueprintEntity', () => {
       expect(entity.edges).toEqual([{ id: 'edge1', source: 'start', target: 'end' }]);
     });
 
-    it('should handle malformed JSON in database record', async () => {
+    it('should throw on malformed JSON in database record', async () => {
       const databaseRecord = {
         id: 'blueprint-123',
         nodes: 'invalid-json',
@@ -121,12 +121,7 @@ describe('BlueprintEntity', () => {
         metadata: 'not-json',
       };
 
-      const entity = fromDatabase(BlueprintEntity, databaseRecord);
-
-      expect(entity).toBeInstanceOf(BlueprintEntity);
-      expect(entity.nodes).toBeNull();
-      expect(entity.edges).toBeNull();
-      expect(entity.metadata).toBeNull();
+      expect(() => fromDatabase(BlueprintEntity, databaseRecord)).toThrow('Unexpected token');
     });
 
     it('should apply default transformations', async () => {
@@ -459,7 +454,7 @@ describe('BlueprintEntity', () => {
       expect(() => fromDatabase(BlueprintEntity, 'not an object')).toThrow();
     });
 
-    it('should handle invalid JSON gracefully', async () => {
+    it('should throw on invalid JSON', async () => {
       const invalidRecord = {
         id: 'blueprint-123',
         nodes: 'invalid json {',
@@ -467,12 +462,7 @@ describe('BlueprintEntity', () => {
         metadata: '{incomplete json',
       };
 
-      const entity = fromDatabase(BlueprintEntity, invalidRecord);
-
-      // Should not crash, but set values to null
-      expect(entity.nodes).toBeNull();
-      expect(entity.edges).toBeNull();
-      expect(entity.metadata).toBeNull();
+      expect(() => fromDatabase(BlueprintEntity, invalidRecord)).toThrow();
     });
   });
 

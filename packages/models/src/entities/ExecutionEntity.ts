@@ -6,9 +6,10 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
+import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { ExecutionStatus, NodeResult } from '@starships/autopilot';
 import type { ExecutionModel, ExecutionError } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, instanceToPlain, Transform } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
@@ -114,12 +115,10 @@ export class ExecutionEntity implements ExecutionModel {
   /**
    * Creates entity from database record
    * Transforms JSON strings back to complex objects for API responses
+   * Uses safe deserialization with proper error handling
    */
-  static fromDatabaseRecord(data: Record<string, unknown>): ExecutionEntity {
-    return plainToInstance(ExecutionEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
+  static fromDatabaseRecord(data: unknown): ExecutionEntity {
+    return createFromDatabaseRecord(ExecutionEntity, data);
   }
 
   /**

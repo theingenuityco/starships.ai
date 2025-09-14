@@ -6,8 +6,9 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
+import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, instanceToPlain, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
@@ -145,12 +146,10 @@ export class StarshipEntity implements StarshipModel {
   /**
    * Creates entity from database record
    * Transforms JSON strings back to complex objects for API responses
+   * Uses safe deserialization with proper error handling
    */
-  static fromDatabaseRecord(data: Record<string, unknown>): StarshipEntity {
-    return plainToInstance(StarshipEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
+  static fromDatabaseRecord(data: unknown): StarshipEntity {
+    return createFromDatabaseRecord(StarshipEntity, data);
   }
 
   /**

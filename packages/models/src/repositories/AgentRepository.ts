@@ -13,7 +13,7 @@ export class AgentRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
-        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>));
+        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a));
       },
       'findAll',
       'Agent'
@@ -26,7 +26,7 @@ export class AgentRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id });
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.fromDatabaseRecord(agent as unknown as Record<string, unknown>) : null;
+        return agent ? AgentEntity.fromDatabaseRecord(agent) : null;
       },
       'findById',
       'Agent',
@@ -42,7 +42,7 @@ export class AgentRepository extends BaseRepository {
           'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a',
           { starshipId }
         );
-        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>)) || [];
+        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a)) || [];
       },
       'findByStarship',
       'Agent'
@@ -96,7 +96,7 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('Agent', agentId);
         }
 
-        return AgentEntity.fromDatabaseRecord(result[0].a as unknown as Record<string, unknown>);
+        return AgentEntity.fromDatabaseRecord(result[0].a);
       },
       'updateStarshipId',
       'Agent',
@@ -146,7 +146,7 @@ export class AgentRepository extends BaseRepository {
           }
         );
 
-        return AgentEntity.fromDatabaseRecord(agent as unknown as Record<string, unknown>);
+        return AgentEntity.fromDatabaseRecord(agent);
       },
       'create',
       'Agent'
@@ -171,7 +171,7 @@ export class AgentRepository extends BaseRepository {
         });
 
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.fromDatabaseRecord(agent as unknown as Record<string, unknown>) : null;
+        return agent ? AgentEntity.fromDatabaseRecord(agent) : null;
       },
       'update',
       'Agent',
@@ -204,7 +204,7 @@ export class AgentRepository extends BaseRepository {
           'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
           { query }
         );
-        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>)) || [];
+        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a)) || [];
       },
       'searchAgents',
       'Agent'

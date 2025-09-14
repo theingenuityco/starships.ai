@@ -16,7 +16,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
-        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c as unknown as Record<string, unknown>));
+        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c));
       },
       'findAll',
       'Conversation'
@@ -28,7 +28,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0 ? ConversationEntity.fromDatabaseRecord(result[0].c as unknown as Record<string, unknown>) : null;
+        return result.length > 0 ? ConversationEntity.fromDatabaseRecord(result[0].c) : null;
       },
       'findById',
       'Conversation',
@@ -67,7 +67,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.fromDatabaseRecord(result as unknown as Record<string, unknown>);
+        return ConversationEntity.fromDatabaseRecord(result);
       },
       'create',
       'Conversation'
@@ -109,7 +109,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.fromDatabaseRecord(result[0].c as unknown as Record<string, unknown>);
+        return ConversationEntity.fromDatabaseRecord(result[0].c);
       },
       'update',
       'Conversation',
@@ -146,7 +146,7 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.createdAt DESC`,
           { starshipId }
         );
-        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c as unknown as Record<string, unknown>));
+        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c));
       },
       'findByStarship',
       'Conversation'
@@ -167,7 +167,7 @@ export class ConversationRepository extends BaseRepository {
         );
         if (result.length === 0) return null;
 
-        return StarshipEntity.fromDatabaseRecord(result[0].starship as unknown as Record<string, unknown>);
+        return StarshipEntity.fromDatabaseRecord(result[0].starship);
       },
       'getConversationStarship',
       'Conversation'
@@ -234,7 +234,7 @@ export class ConversationRepository extends BaseRepository {
           { conversationId }
         );
 
-        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m as unknown as Record<string, unknown>));
+        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m));
       },
       'getConversationMessages',
       'Conversation'
@@ -295,7 +295,7 @@ export class ConversationRepository extends BaseRepository {
           { conversationId }
         );
 
-        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>));
+        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a));
       },
       'getConversationAgents',
       'Conversation'

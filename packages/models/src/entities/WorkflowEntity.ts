@@ -6,9 +6,10 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
+import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { Blueprint } from '@starships/autopilot';
 import type { WorkflowModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, instanceToPlain, Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -149,12 +150,10 @@ export class WorkflowEntity implements WorkflowModel {
   /**
    * Creates entity from database record
    * Transforms JSON strings back to complex objects for API responses
+   * Uses safe deserialization with proper error handling
    */
-  static fromDatabaseRecord(data: Record<string, unknown>): WorkflowEntity {
-    return plainToInstance(WorkflowEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
+  static fromDatabaseRecord(data: unknown): WorkflowEntity {
+    return createFromDatabaseRecord(WorkflowEntity, data);
   }
 
   /**

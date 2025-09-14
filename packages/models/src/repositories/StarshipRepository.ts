@@ -16,7 +16,7 @@ export class StarshipRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
-        return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s as unknown as Record<string, unknown>));
+        return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s));
       },
       'findAll',
       'Starship'
@@ -29,7 +29,7 @@ export class StarshipRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id });
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>) : null;
+        return starship ? StarshipEntity.fromDatabaseRecord(starship) : null;
       },
       'findById',
       'Starship',
@@ -46,7 +46,7 @@ export class StarshipRepository extends BaseRepository {
           { slug, ownerId }
         );
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>) : null;
+        return starship ? StarshipEntity.fromDatabaseRecord(starship) : null;
       },
       'findBySlug',
       'Starship',
@@ -62,7 +62,7 @@ export class StarshipRepository extends BaseRepository {
           'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
           { ownerId }
         );
-        return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s as unknown as Record<string, unknown>));
+        return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s));
       },
       'findByOwner',
       'Starship'
@@ -112,7 +112,7 @@ export class StarshipRepository extends BaseRepository {
           }
         );
 
-        return StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>);
+        return StarshipEntity.fromDatabaseRecord(starship);
       },
       'create',
       'Starship'
@@ -146,7 +146,7 @@ export class StarshipRepository extends BaseRepository {
         );
 
         const starship = result[0]?.s || null;
-        return starship ? StarshipEntity.fromDatabaseRecord(starship as unknown as Record<string, unknown>) : null;
+        return starship ? StarshipEntity.fromDatabaseRecord(starship) : null;
       },
       'update',
       'Starship',
@@ -182,7 +182,7 @@ export class StarshipRepository extends BaseRepository {
        RETURN a ORDER BY a.name`,
       { starshipId }
     );
-    return result.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>));
+    return result.map((record) => AgentEntity.fromDatabaseRecord(record.a));
   }
 
   async deployAgent(starshipId: string, agentId: string): Promise<boolean> {
@@ -370,7 +370,7 @@ export class StarshipRepository extends BaseRepository {
     );
 
     if (!result[0]?.starship) return null;
-    return StarshipEntity.fromDatabaseRecord(result[0].starship as unknown as Record<string, unknown>);
+    return StarshipEntity.fromDatabaseRecord(result[0].starship);
   }
 
   async updateSubscription(
@@ -444,7 +444,7 @@ export class StarshipRepository extends BaseRepository {
       { customerId }
     );
     if (!result[0]?.s) return null;
-    return StarshipEntity.fromDatabaseRecord(result[0].s as unknown as Record<string, unknown>);
+    return StarshipEntity.fromDatabaseRecord(result[0].s);
   }
 
   /** Find all pending payment starships older than specified hours */
@@ -461,7 +461,7 @@ export class StarshipRepository extends BaseRepository {
       { cutoffTime }
     );
 
-    return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s as unknown as Record<string, unknown>));
+    return result.map((record) => StarshipEntity.fromDatabaseRecord(record.s));
   }
 
   /** Clean up abandoned pending starships */

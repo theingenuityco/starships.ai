@@ -2,35 +2,36 @@
  * MessageRepository Unit Tests
  */
 
-import { Neo4jConnection, getConnection } from '@/helpers/database';
+import { getConnection } from '@/helpers/database';
 import { MessageRepository } from '@/repositories/MessageRepository';
 import { DatabaseError } from '@starships/errors';
 import type { MessageModel } from '@starships/protocol';
 
-// Mock dependencies
-jest.mock('../../helpers/database/connection');
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-message-id'),
+// Mock only database connection and nanoid
+jest.mock('../../helpers/database', () => ({
+  getConnection: jest.fn(),
+}));
+
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'test-message-id'),
 }));
 
 describe('MessageRepository', () => {
   let repository: MessageRepository;
-  let mockGetConnection: jest.MockedFunction<typeof getConnection>;
-  let mockConnection: jest.Mocked<Neo4jConnection>;
+  let mockConnection: {
+    executeQuery: jest.Mock;
+    executeWrite: jest.Mock;
+  };
 
   beforeEach(() => {
+    // Create simple mock connection
     mockConnection = {
-      connect: jest.fn(),
-      disconnect: jest.fn(),
-      getSession: jest.fn(),
       executeQuery: jest.fn(),
       executeWrite: jest.fn(),
-      initializeSchema: jest.fn(),
-    } as unknown as jest.Mocked<Neo4jConnection>;
+    };
 
     // Mock getConnection to return our mock connection
-    mockGetConnection = getConnection as jest.MockedFunction<typeof getConnection>;
-    mockGetConnection.mockReturnValue(mockConnection);
+    (getConnection as jest.Mock).mockReturnValue(mockConnection);
 
     repository = new MessageRepository();
     jest.clearAllMocks();

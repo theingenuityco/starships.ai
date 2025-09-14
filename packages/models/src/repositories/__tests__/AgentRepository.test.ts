@@ -6,22 +6,14 @@ import { getConnection } from '@/helpers/database';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { ConflictError, DatabaseError, NotFoundError } from '@starships/errors';
 
-// Mock the database connection
+// Mock the database connection only
 jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(),
-  convertNeo4jIntsInObject: jest.fn((obj) => obj),
-  convertNeo4jIntsInArray: jest.fn((arr) => arr),
 }));
 
-// Import real AgentEntity and only mock its validation method
-import { AgentEntity } from '@/entities/AgentEntity';
-
-// Mock only the validate method to avoid validation in tests
-jest.spyOn(AgentEntity, 'validate').mockResolvedValue(undefined);
-
-// Mock uuid
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-uuid-1234'),
+// Mock nanoid for predictable ID generation
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'test-nanoid-1234'),
 }));
 
 describe('AgentRepository', () => {
@@ -129,7 +121,7 @@ describe('AgentRepository', () => {
 
       it('should create agent successfully', async () => {
         const mockCreatedAgent = {
-          id: 'test-uuid-1234',
+          id: 'test-nanoid-1234',
           name: 'Test Agent',
           description: 'Test Description',
           model: 'gpt-4',
@@ -160,7 +152,7 @@ describe('AgentRepository', () => {
             }),
           })
         );
-        expect(result.id).toBe('test-uuid-1234');
+        expect(result.id).toBe('test-nanoid-1234');
         expect(result.name).toBe('Test Agent');
       });
 
@@ -178,7 +170,7 @@ describe('AgentRepository', () => {
 
       it('should create Neo4j relationship', async () => {
         const mockCreatedAgent = {
-          id: 'test-uuid-1234',
+          id: 'test-nanoid-1234',
           name: 'Test Agent',
           description: 'Test Description',
           model: 'gpt-4',
@@ -204,7 +196,7 @@ describe('AgentRepository', () => {
           expect.stringContaining('CREATE (a)-[:DEPLOYED_ON'),
           expect.objectContaining({
             starshipId: 'starship-123',
-            agentId: 'test-uuid-1234',
+            agentId: 'test-nanoid-1234',
           })
         );
       });

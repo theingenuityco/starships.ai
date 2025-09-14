@@ -7,58 +7,14 @@ import { DatabaseError } from '@starships/errors';
 import type { AgentTemplateModel } from '@starships/protocol';
 import { RepositoryTestHelper } from '../../tests/repository-test-helper';
 
-// Mock dependencies
+// Mock only database connection and nanoid
 jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(),
-  convertNeo4jIntsInObject: jest.fn((obj) => obj),
-  convertNeo4jIntsInArray: jest.fn((arr) => arr),
 }));
 
 jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'test-template-id'),
 }));
-
-jest.mock('../../helpers/slugUtils', () => ({
-  generateSlug: jest.fn((name) => name.toLowerCase().replace(/\s+/g, '-')),
-}));
-
-// Mock AgentTemplateEntity with proper class constructor
-jest.mock('../../entities/AgentTemplateEntity', () => {
-  class MockAgentTemplateEntity {
-    memoryState?: unknown;
-    blueprint?: unknown;
-
-    static async validate() {
-      return undefined;
-    }
-
-    constructor(data: unknown) {
-      Object.assign(this, data);
-
-      // Handle memoryState JSON transformation
-      if (this.memoryState !== undefined && typeof this.memoryState === 'string') {
-        try {
-          this.memoryState = JSON.parse(this.memoryState);
-        } catch {
-          this.memoryState = null;
-        }
-      }
-
-      // Handle blueprint JSON transformation
-      if (this.blueprint !== undefined && typeof this.blueprint === 'string') {
-        try {
-          this.blueprint = JSON.parse(this.blueprint);
-        } catch {
-          this.blueprint = null;
-        }
-      }
-    }
-  }
-
-  return {
-    AgentTemplateEntity: MockAgentTemplateEntity,
-  };
-});
 
 describe('AgentTemplateRepository', () => {
   let repository: AgentTemplateRepository;
@@ -116,6 +72,7 @@ describe('AgentTemplateRepository', () => {
 
   const createMockCreateInput = (overrides: Record<string, unknown> = {}) => ({
     name: 'Test Template',
+    slug: 'test-template', // Add slug for validation
     description: 'A test agent template',
     category: 'general' as const,
     model: 'gpt-4',
@@ -282,6 +239,7 @@ describe('AgentTemplateRepository', () => {
     it('should handle missing optional fields', async () => {
       const minimalInput = {
         name: 'Minimal Template',
+        slug: 'minimal-template', // Add slug for validation
         description: 'Basic template',
         category: 'general' as const,
         blueprint: { type: 'test', nodes: [], edges: [] },

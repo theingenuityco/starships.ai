@@ -1,5 +1,5 @@
 import { MessageService } from '@/services/MessageService';
-import { Agent, AutopilotEvent, LLMResponse } from '@starships/autopilot';
+import { Agent, AutopilotEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -210,6 +210,11 @@ export class ConversationService {
         //   updatedAt: event.timestamp,
         // };
       }
+
+      case 'workflow_failed':
+        console.error(event.data?.execution?.error);
+        console.log(event.data?.execution);
+        break;
 
       case 'workflow_completed':
         console.log('completed');

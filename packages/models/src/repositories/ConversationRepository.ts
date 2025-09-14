@@ -215,13 +215,13 @@ export class ConversationRepository extends BaseRepository {
    */
   async getConversationMessages(
     conversationId: string,
-    orderBy: 'timestamp' | 'created_at' = 'timestamp',
+    orderBy: 'createdAt' = 'createdAt',
     orderDirection: 'asc' | 'desc' = 'asc'
   ): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const orderField = orderBy === 'timestamp' ? 'm.timestamp' : 'm.createdAt';
+        const orderField = orderBy === 'createdAt' ? 'm.createdAt' : 'm.createdAt';
         const direction = orderDirection.toUpperCase();
 
         const result = await connection.executeQuery<{ m: MessageModel }>(

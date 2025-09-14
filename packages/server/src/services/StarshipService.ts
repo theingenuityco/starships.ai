@@ -333,12 +333,7 @@ export class StarshipService {
       console.log(`[STARSHIP-SERVICE] Found default template: ${defaultTemplate.name} (${defaultTemplate.id})`);
 
       // Create agent from template with Sibyl as the default navigator
-      const defaultAgent = await templateService.createAgentFromTemplate(
-        defaultTemplate.id,
-        'Sibyl', // Default agent name - the starship navigator
-        userId,
-        starshipId
-      );
+      const defaultAgent = await templateService.createAgentFromTemplate(defaultTemplate.id, starshipId);
 
       console.log(`[STARSHIP-SERVICE] Created default agent: ${defaultAgent.name} (${defaultAgent.id})`);
       return defaultAgent;

@@ -16,7 +16,7 @@ export { Conditional } from './nodes/Conditional';
 
 // Memory
 export { Memory } from './memory/Memory';
-export type { MemoryState, LlmMessage, MessageRole } from './memory/Memory';
+export type { MemoryState } from './memory/Memory';
 export { AgentMemory } from './memory/AgentMemory';
 export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from './memory/AgentMemory';
 

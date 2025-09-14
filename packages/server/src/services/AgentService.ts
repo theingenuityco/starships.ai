@@ -6,7 +6,7 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent, AgentParams } from '@starships/autopilot';
+import { Agent, AgentParams, ExecutionEvent } from '@starships/autopilot';
 import { createError, NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository } from '@starships/models';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
@@ -242,72 +242,6 @@ export class AgentService {
     const agentInstance = new Agent(agentParams);
 
     return agentInstance;
-  }
-
-  // ============================================================================
-  // AGENT EXECUTION APIs
-  // ============================================================================
-
-  /**
-   * Execute conversation with agent using ConversationRequest format with streaming support
-   * Handles complete conversation lifecycle with event monitoring and message creation
-   */
-
-  async replyToConversation(agentId: string, conversationId: string): Promise<void> {
-    console.log('🚀 [AGENT-SERVICE] Starting streaming conversation execution:', {
-      agentId,
-      conversationId,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Get agent from database
-    const agentModel = await this.getAgent(agentId);
-    if (!agentModel) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    const conversationModel = await this.conversationService.getConversationById(conversationId);
-    if (!conversationModel) {
-      throw new NotFoundError('Conversation', conversationId);
-    }
-
-    // Get conversation messages from database
-    const messages = await this.conversationService.getConversationMessages(conversationId);
-
-    const startTime = Date.now();
-
-    try {
-      // Create agent instance with enhanced options
-      const agent = new Agent(agentModel);
-      // Inject streaming service into agent's engine
-      agent.getEngine().setEmitter(this.agentStreamingService);
-
-      // Execute agent with streaming-enabled execution
-      await agent.execute();
-
-      const executionTime = Date.now() - startTime;
-
-      console.log('✅ [AGENT-SERVICE] Streaming conversation execution completed successfully:', {
-        executionTime,
-      });
-
-      // ! RETURN messages here
-    } catch (error) {
-      console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
-        agentId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      // Create error message in conversation
-      await this.createErrorResponse(error as Error, {
-        agentId,
-        conversationId,
-        starshipId: 'unknown', // starshipId property no longer exists on AgentModel
-      });
-
-      throw error;
-    }
   }
 
   /**

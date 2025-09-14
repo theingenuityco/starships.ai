@@ -25,10 +25,7 @@ export * from './events';
 // ===== VALIDATION TYPES =====
 // Validation and error reporting
 export * from './validation';
-
-// ===== MEMORY SYSTEM =====
-// Base memory types only (no classes)
-export type { LlmMessage } from '@/memory/Memory';
+export * from './llm';
 
 // Agent memory types only (no classes)
 export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from '@/memory/AgentMemory';

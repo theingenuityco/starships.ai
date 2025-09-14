@@ -5,17 +5,7 @@
  * Handles messages in LLM-compatible format
  */
 
-// uuid import removed as it's no longer used in constructor
-
-export type MessageRole = 'user' | 'assistant' | 'system';
-
-/**
- * Message entry with metadata
- */
-export interface LlmMessage {
-  role: MessageRole;
-  content: string;
-}
+import { LlmMessage } from '@/types';
 
 /**
  * Memory constructor parameters

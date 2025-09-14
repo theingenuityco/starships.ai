@@ -283,8 +283,7 @@ export function useConversation(conversationId: string | null) {
                   'Cache-Control': 'no-cache',
                 },
                 body: JSON.stringify({
-                  agentId: data.agentId,
-                  message: data.content,
+                  content: data.content,
                 }),
               })
 

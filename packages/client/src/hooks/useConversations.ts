@@ -1,5 +1,5 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, MessageModel, CreateMessageRequest, StreamingDeltaChunk } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, MessageModel, StreamingDeltaChunk } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
@@ -18,6 +18,17 @@ interface ClientMessage extends MessageModel {
   sending?: boolean
   streaming?: boolean
   error?: boolean
+}
+
+// Create message request interface (local definition since it's not in protocol)
+interface CreateMessageRequest {
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  conversationId?: string
+  agentId?: string
+  starshipId?: string
+  messageType?: 'user_input' | 'agent_response' | 'system_notification' | 'system_instruction' | 'workflow_output' | 'error'
+  stream?: boolean
 }
 
 // Streaming state interface
@@ -76,7 +87,7 @@ export function useConversation(conversationId: string | null) {
           lastActivityAt: string
         }>
       > = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
-        params: { limit: 100, page: 1, orderBy: 'timestamp', orderDirection: 'desc' },
+        params: { limit: 100, page: 1, orderBy: 'createdAt', orderDirection: 'desc' },
       })
 
       return {
@@ -327,21 +338,11 @@ export function useConversation(conversationId: string | null) {
               // Resolve with the user message
               resolve({
                 id: `user-${Date.now()}`,
-                timestamp: new Date().toISOString(),
                 role: data.role,
                 content: data.content,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                version: '1.0.0',
-                starshipId: data.starshipId,
-                agentId: data.agentId,
-                conversationId: data.conversationId,
-                threadDepth: data.threadDepth || 0,
-                processingStatus: data.processingStatus || 'completed',
                 messageType: data.messageType || 'user_input',
-                importance: data.importance || 'medium',
-                contentLength: data.content.length,
-                hasAttachments: data.hasAttachments || false,
               } as ClientMessage)
             } catch (error) {
               reject(error)
@@ -370,21 +371,11 @@ export function useConversation(conversationId: string | null) {
       // Optimistically add the user message
       const tempMessage: ClientMessage = {
         id: `temp-${Date.now()}`,
-        timestamp: new Date().toISOString(),
         role: variables.role,
         content: variables.content,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        version: '1.0.0',
-        starshipId: variables.starshipId,
-        agentId: variables.agentId,
-        conversationId: variables.conversationId,
-        threadDepth: variables.threadDepth || 0,
-        processingStatus: variables.processingStatus || 'pending',
         messageType: variables.messageType || 'user_input',
-        importance: variables.importance || 'medium',
-        contentLength: variables.content.length,
-        hasAttachments: variables.hasAttachments || false,
         sending: true,
       }
 
@@ -412,7 +403,7 @@ export function useConversation(conversationId: string | null) {
           return {
             ...old,
             messages,
-            lastActivityAt: result.timestamp,
+            lastActivityAt: result.createdAt,
           }
         })
       } else {
@@ -579,43 +570,23 @@ export function useDeleteMessage() {
       return response.data.data
     },
     onMutate: async messageId => {
-      // Get message details to know which caches to update
-      const message = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.detail(messageId)) as MessageModel | undefined
-
-      if (message?.conversationId) {
-        await queryClient.cancelQueries({
-          queryKey: CONVERSATION_QUERY_KEYS.messages(message.conversationId),
-        })
-
-        // Optimistically remove the message
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(message.conversationId), (old: any) => {
-          if (!old) return old
-          return {
-            ...old,
-            messages: old.messages.filter((msg: MessageModel) => msg.id !== messageId),
-            total: Math.max(0, old.total - 1),
-          }
-        })
-      }
-
-      return { message }
+      // Since MessageModel no longer has conversationId, we need to find it from the messages cache
+      // This is not ideal but necessary with the current simplified model
+      return { messageId }
     },
     onSuccess: (data, messageId, context) => {
-      if (context?.message?.conversationId) {
-        // Invalidate to refresh from server
-        queryClient.invalidateQueries({
-          queryKey: CONVERSATION_QUERY_KEYS.messages(context.message.conversationId),
-        })
-      }
+      // Invalidate all message queries to ensure consistency
+      // This is less efficient but necessary without conversationId on messages
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+      })
       toast.success('Message deleted successfully!')
     },
     onError: (error: any, messageId, context) => {
-      // Rollback optimistic deletion if we have the message data
-      if (context?.message?.conversationId) {
-        queryClient.invalidateQueries({
-          queryKey: CONVERSATION_QUERY_KEYS.messages(context.message.conversationId),
-        })
-      }
+      // Invalidate all message queries to ensure consistency
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.all,
+      })
 
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to delete message'
       toast.error('Failed to delete message', {

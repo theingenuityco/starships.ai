@@ -51,7 +51,7 @@ export class BlueprintRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Create blueprint entity with proper transformation
-        const blueprintEntity = BlueprintEntity.deserialize({
+        const blueprintEntity = BlueprintEntity.createFromRequest({
           ...request,
           createdAt: now,
           updatedAt: now,
@@ -61,7 +61,7 @@ export class BlueprintRepository extends BaseRepository {
           metadata: request.metadata || {},
         });
 
-        const blueprintData = blueprintEntity.serialize();
+        const blueprintData = blueprintEntity.toDatabaseFormat();
         // Remove id since it will be auto-generated
         delete blueprintData.id;
 
@@ -73,7 +73,7 @@ export class BlueprintRepository extends BaseRepository {
         // Create edges using EdgeRepository with ID mapping
         const edges = await this.edgeRepo.createEdges(blueprint.id, request.edges, idMapping);
 
-        return BlueprintEntity.deserialize({
+        return BlueprintEntity.fromDatabaseRecord({
           ...blueprint,
           nodes,
           edges,
@@ -110,7 +110,7 @@ export class BlueprintRepository extends BaseRepository {
         const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
         const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
-        return BlueprintEntity.deserialize({
+        return BlueprintEntity.fromDatabaseRecord({
           ...blueprint,
           nodes,
           edges,
@@ -145,7 +145,7 @@ export class BlueprintRepository extends BaseRepository {
           const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
           blueprints.push(
-            BlueprintEntity.deserialize({
+            BlueprintEntity.fromDatabaseRecord({
               ...blueprint,
               nodes,
               edges,
@@ -310,7 +310,7 @@ export class BlueprintRepository extends BaseRepository {
           const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
           blueprints.push(
-            BlueprintEntity.deserialize({
+            BlueprintEntity.fromDatabaseRecord({
               ...blueprint,
               nodes,
               edges,

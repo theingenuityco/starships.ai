@@ -91,22 +91,32 @@ export class ExecutionEntity implements ExecutionModel {
   state!: Record<string, unknown>;
 
   /**
-   * Deserialize database record into ExecutionEntity
-   * Converts raw database records to fully typed and validated ExecutionEntity instances
+   * Creates a validated entity from API request data
+   * Use this when receiving data from API requests that need validation and transformation
    */
-  static deserialize(data: Record<string, unknown>): ExecutionEntity {
-    return plainToInstance(ExecutionEntity, data, {
+  static createFromRequest(data: Record<string, unknown>): ExecutionEntity {
+    const entity = new ExecutionEntity();
+    Object.assign(entity, data);
+    return entity;
+  }
+
+  /**
+   * Converts entity to database storage format
+   * Transforms complex objects to JSON strings for Neo4j storage
+   */
+  toDatabaseFormat(): Record<string, unknown> {
+    return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
   }
 
   /**
-   * Serialize ExecutionEntity to database record
-   * Converts entity instance to plain object suitable for database storage
+   * Creates entity from database record
+   * Transforms JSON strings back to complex objects for API responses
    */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
+  static fromDatabaseRecord(data: Record<string, unknown>): ExecutionEntity {
+    return plainToInstance(ExecutionEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });

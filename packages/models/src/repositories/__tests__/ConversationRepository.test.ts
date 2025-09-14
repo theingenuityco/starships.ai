@@ -10,7 +10,7 @@ import { Neo4jConnection } from '@/helpers/database';
 // Define type aliases for test data
 type CreateConversationData = Conversation & { starshipId: string; agentId?: string };
 
-// Mock the database connection
+// Mock the database connection only
 jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(() => ({
     executeQuery: jest.fn(),
@@ -18,22 +18,10 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-// Mock ConversationEntity with proper class constructor
-jest.mock('../../entities/ConversationEntity', () => {
-  class MockConversationEntity {
-    static async validate() {
-      return undefined;
-    }
-
-    constructor(data: unknown) {
-      Object.assign(this, data);
-    }
-  }
-
-  return {
-    ConversationEntity: MockConversationEntity,
-  };
-});
+// Mock nanoid for predictable ID generation
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'test-nanoid-123'),
+}));
 
 import { getConnection } from '@/helpers/database';
 
@@ -131,7 +119,7 @@ describe('ConversationRepository', () => {
 
       const createdConversation: ConversationModel = {
         ...conversationData,
-        id: 'test-uuid-123',
+        id: 'test-nanoid-123',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
       };
@@ -150,7 +138,15 @@ describe('ConversationRepository', () => {
       const result = await repository.create(conversationData);
 
       expect(repository.linkToStarship).toHaveBeenCalledWith(createdConversation.id, 'starship-123');
-      expect(result).toEqual(expect.objectContaining(createdConversation));
+      // The result will be a ConversationEntity with proper date transformations
+      expect(result).toMatchObject({
+        id: 'test-nanoid-123',
+        title: 'Test Conversation',
+        status: 'active',
+        starshipId: 'starship-123',
+      });
+      expect(result.createdAt).toBeDefined();
+      expect(result.updatedAt).toBeDefined();
     });
 
     it('should validate required fields', async () => {

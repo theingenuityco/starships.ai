@@ -1,5 +1,5 @@
 import { Neo4jConnection } from '@/helpers/database';
-import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { CreateExecutionRequest, ExecutionModel } from '@starships/protocol';
 import { ExecutionEntity } from '../entities/ExecutionEntity';
@@ -54,8 +54,9 @@ export class ExecutionRepository extends BaseRepository {
           status: entity.status || 'pending',
         };
 
-        // Use BaseRepository serialization
-        const result = await this.createEntityWithAutoId<ExecutionModel>('Execution', toDatabase(executionData));
+        // Create entity instance from plain object, then serialize
+        const executionEntity = toEntityInstance(ExecutionEntity, executionData);
+        const result = await this.createEntityWithAutoId<ExecutionModel>('Execution', toDatabase(executionEntity));
 
         // Create relationship with workflow
         await connection.executeWrite(
@@ -114,8 +115,9 @@ export class ExecutionRepository extends BaseRepository {
         }
         if (updates.executionData !== undefined) {
           setFields.push('e.executionData = $executionData');
-          // Use toDatabase to handle executionData serialization
-          const serialized = toDatabase({ executionData: updates.executionData });
+          // Create entity instance to handle executionData serialization
+          const executionDataEntity = toEntityInstance(ExecutionEntity, { executionData: updates.executionData });
+          const serialized = toDatabase(executionDataEntity);
           params.executionData = serialized.executionData;
         }
         if (updates.error !== undefined) {
@@ -124,8 +126,9 @@ export class ExecutionRepository extends BaseRepository {
         }
         if (updates.result !== undefined) {
           setFields.push('e.result = $result');
-          // Use toDatabase to handle result serialization
-          const serialized = toDatabase({ result: updates.result });
+          // Create entity instance to handle result serialization
+          const resultEntity = toEntityInstance(ExecutionEntity, { result: updates.result });
+          const serialized = toDatabase(resultEntity);
           params.result = serialized.result;
         }
         if (updates.startTime !== undefined) {

@@ -1,6 +1,6 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { Neo4jConnection } from '@/helpers/database';
-import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 
@@ -138,8 +138,9 @@ export class AgentRepository extends BaseRepository {
           updatedAt: now,
         };
 
-        // Use base repository for database operation
-        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', toDatabase(agentProps));
+        // Create entity instance from plain object, then serialize
+        const agentEntity = toEntityInstance(AgentEntity, agentProps);
+        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', toDatabase(agentEntity));
 
         const connection = this.getConnection();
         await connection.executeWrite(

@@ -95,6 +95,25 @@ export function fromDatabaseArray<T>(entityClass: new () => T, dataArray: unknow
 }
 
 /**
+ * Convert plain object to entity instance for serialization purposes
+ * This creates an entity with proper @Expose decorators from a plain object
+ */
+export function toEntityInstance<T>(entityClass: new () => T, data: Record<string, unknown>): T {
+  if (!entityClass || typeof entityClass !== 'function') {
+    throw new Error('Invalid entity class provided');
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('Data must be a valid object');
+  }
+
+  return plainToInstance(entityClass, data, {
+    enableImplicitConversion: false,
+    excludeExtraneousValues: false, // Allow all properties initially
+  });
+}
+
+/**
  * Standardized method to serialize entities to database format
  * Replaces toDatabaseFormat instance methods on entities
  */

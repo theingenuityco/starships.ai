@@ -8,7 +8,7 @@
 
 import { AgentMemory } from '@/memory/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, Execution } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, Execution, LlmMessage } from '@/types';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
 
@@ -33,6 +33,10 @@ export class Agent implements NodeHandler {
       eventCallback: this.eventCallback,
     };
     this.engine = new Engine(engincConfig);
+  }
+
+  async addMessageToMemory(message: LlmMessage) {
+    return this.memory.addMessageToHistory(message);
   }
 
   /**

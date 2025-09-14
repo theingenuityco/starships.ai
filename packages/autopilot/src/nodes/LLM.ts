@@ -7,29 +7,10 @@
 
 import type { LlmParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
-import type { LlmMessage, MessageRole } from '@/memory/Memory';
 import { autopilot } from '@/Autopilot';
 import { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
 import { EventCallback } from '@/types/events';
-
-export interface LLMUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
-}
-
-export interface LLMResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: {
-    message: LlmMessage;
-    finish_reason: string | null;
-    index: number;
-  }[];
-  usage?: LLMUsage;
-}
+import { LLMMessageRole, LLMResponse, LLMUsage } from '@/types/llm';
 
 interface StreamChoice {
   content: string;
@@ -221,7 +202,7 @@ export class LLM implements NodeHandler {
       choices: choices.map((choice, index) => ({
         index,
         message: {
-          role: 'assistant' as MessageRole,
+          role: 'assistant' as LLMMessageRole,
           content: choice.content,
         },
         finish_reason: choice.finishReason || 'stop',

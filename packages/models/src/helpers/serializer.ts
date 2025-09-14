@@ -150,7 +150,7 @@ export const Transformers = {
 
 export const LLMTransformers = {
   /**
-   * Transform temperature with validation - clamps to valid range 0-2
+   * Transform temperature with validation - throws for invalid values, clamps range
    */
   TemperatureTransform: () => {
     return Transform(({ value }) => {
@@ -161,12 +161,8 @@ export const LLMTransformers = {
         throw new Error(`Invalid temperature value: ${value}`);
       }
 
-      // Throw for out-of-range values to maintain strict validation
-      if (temp < 0 || temp > 2) {
-        throw new Error(`Temperature must be between 0 and 2, got: ${temp}`);
-      }
-
-      return temp;
+      // Clamp temperature to valid range (0-2)
+      return Math.max(0, Math.min(2, temp));
     });
   },
 

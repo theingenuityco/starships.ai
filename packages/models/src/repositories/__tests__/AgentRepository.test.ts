@@ -147,8 +147,8 @@ describe('AgentRepository', () => {
           expect.objectContaining({
             props: expect.objectContaining({
               name: 'Test Agent',
-              memoryState: {},
-              blueprint: { type: 'test', nodes: [], edges: [] },
+              memoryState: '{}',
+              blueprint: '{"type":"test","nodes":[],"edges":[]}',
             }),
           })
         );

@@ -272,7 +272,7 @@ describe('BlueprintRepository', () => {
       expect(result).toBeNull();
     });
 
-    it('should handle malformed metadata JSON gracefully', async () => {
+    it('should throw on malformed metadata JSON', async () => {
       const mockBlueprint = {
         id: 'blueprint-123',
         name: 'Test Blueprint',
@@ -283,14 +283,7 @@ describe('BlueprintRepository', () => {
       mockNodeRepo.getNodesByBlueprintId.mockResolvedValue([]);
       mockEdgeRepo.getEdgesByBlueprintId.mockResolvedValue([]);
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const result = await repository.getBlueprintById('blueprint-123');
-
-      // Metadata stays as string in test mocks
-      expect(result?.metadata).toBe('invalid-json');
-
-      consoleSpy.mockRestore();
+      await expect(repository.getBlueprintById('blueprint-123')).rejects.toThrow();
     });
 
     it('should validate required blueprintId parameter', async () => {
@@ -354,7 +347,7 @@ describe('BlueprintRepository', () => {
       const updates: UpdateBlueprintRequest = {
         name: 'Updated Name',
         description: 'Updated description',
-        category: 'updated',
+        category: 'automation',
         usageCount: 5,
         metadata: { version: '2.0' },
       };
@@ -363,7 +356,7 @@ describe('BlueprintRepository', () => {
         id: blueprintId,
         name: 'Updated Name',
         description: 'Updated description',
-        category: 'updated',
+        category: 'automation',
         usageCount: 5,
         metadata: { version: '2.0' },
         nodes: [],
@@ -383,7 +376,7 @@ describe('BlueprintRepository', () => {
           blueprintId,
           name: 'Updated Name',
           description: 'Updated description',
-          category: 'updated',
+          category: 'automation',
           usageCount: 5,
           updatedAt: expect.any(String),
         })
@@ -526,21 +519,14 @@ describe('BlueprintRepository', () => {
       await expect(repository.getBlueprintsByCategory('')).rejects.toThrow(DatabaseError);
     });
 
-    it('should handle metadata parsing errors', async () => {
+    it('should throw on metadata parsing errors', async () => {
       const mockBlueprints = [{ id: 'blueprint-1', name: 'Blueprint 1', category: 'test', metadata: 'invalid-json' }];
 
       mockConnection.executeQuery.mockResolvedValue([{ b: mockBlueprints[0] }]);
       mockNodeRepo.getNodesByBlueprintId.mockResolvedValue([]);
       mockEdgeRepo.getEdgesByBlueprintId.mockResolvedValue([]);
 
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
-
-      const result = await repository.getBlueprintsByCategory('test');
-
-      // Metadata stays as string in test mocks
-      expect(result[0].metadata).toBe('invalid-json');
-
-      consoleSpy.mockRestore();
+      await expect(repository.getBlueprintsByCategory('test')).rejects.toThrow();
     });
   });
 

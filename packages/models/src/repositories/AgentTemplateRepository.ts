@@ -130,7 +130,7 @@ export class AgentTemplateRepository extends BaseRepository {
           'MATCH (t:AgentTemplate) WHERE t.id = $id SET t += $updates RETURN t',
           {
             id,
-            updates: toDatabase(updateProps),
+            updates: toDatabase(toEntityInstance(AgentTemplateEntity, updateProps)),
           }
         );
 

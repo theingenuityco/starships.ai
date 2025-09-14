@@ -1,5 +1,5 @@
 import { UserEntity } from '@/entities/UserEntity';
-import { fromDatabase, fromDatabaseArray, toDatabase } from '@/helpers/serialization-helper';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { UserModel } from '@starships/protocol';
 
@@ -80,7 +80,7 @@ export class UserRepository extends BaseRepository {
           createdAt: now,
         };
 
-        const databaseFormat = toDatabase(entityData);
+        const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
         // Use email as unique identifier for merge operation
         const user = await this.mergeEntityWithAutoId<UserModel>('User', { email: entity.email }, databaseFormat, databaseFormat);
 
@@ -103,10 +103,12 @@ export class UserRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare update data
-        const updateData = toDatabase({
-          ...updates,
-          updatedAt: now, // Add updatedAt timestamp
-        });
+        const updateData = toDatabase(
+          toEntityInstance(UserEntity, {
+            ...updates,
+            updatedAt: now, // Add updatedAt timestamp
+          })
+        );
         const setClause = Object.keys(updateData)
           .filter((key) => key !== 'id' && key !== 'createdAt' && updateData[key] !== undefined)
           .map((key) => `u.${key} = $${key}`)
@@ -242,7 +244,7 @@ export class UserRepository extends BaseRepository {
         // Validate using Entity
         await UserEntity.validate(entityData, 'create');
 
-        const databaseFormat = toDatabase(entityData);
+        const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
         const user = await this.mergeEntityWithAutoId<UserModel>('User', { email: userData.email }, databaseFormat, databaseFormat);
 
         return fromDatabase(UserEntity, user);

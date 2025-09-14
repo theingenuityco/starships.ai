@@ -150,7 +150,7 @@ export const Transformers = {
 
 export const LLMTransformers = {
   /**
-   * Transform temperature with strict validation - must be between 0 and 2
+   * Transform temperature with validation - clamps to valid range 0-2
    */
   TemperatureTransform: () => {
     return Transform(({ value }) => {
@@ -161,16 +161,13 @@ export const LLMTransformers = {
         throw new Error(`Invalid temperature value: ${value}`);
       }
 
-      if (temp < 0 || temp > 2) {
-        throw new Error(`Temperature must be between 0 and 2, got: ${temp}`);
-      }
-
-      return temp;
+      // Clamp temperature to valid range instead of throwing
+      return Math.max(0, Math.min(2, temp));
     });
   },
 
   /**
-   * Transform maxTokens with strict validation - must be positive integer
+   * Transform maxTokens with validation - clamps to reasonable limits
    */
   MaxTokensTransform: () => {
     return Transform(({ value }) => {
@@ -185,16 +182,13 @@ export const LLMTransformers = {
         throw new Error(`maxTokens must be positive, got: ${tokens}`);
       }
 
-      if (tokens > 100000) {
-        throw new Error(`maxTokens exceeds maximum limit of 100000, got: ${tokens}`);
-      }
-
-      return tokens;
+      // Clamp maxTokens to reasonable limit instead of throwing
+      return Math.min(100000, tokens);
     });
   },
 
   /**
-   * Transform timeout with strict validation - must be positive integer in milliseconds
+   * Transform timeout with validation - clamps to reasonable limits
    */
   TimeoutTransform: () => {
     return Transform(({ value }) => {
@@ -205,15 +199,8 @@ export const LLMTransformers = {
         throw new Error(`Invalid timeout value: ${value}`);
       }
 
-      if (timeout < 1000) {
-        throw new Error(`Timeout must be at least 1000ms (1 second), got: ${timeout}`);
-      }
-
-      if (timeout > 300000) {
-        throw new Error(`Timeout exceeds maximum limit of 300000ms (5 minutes), got: ${timeout}`);
-      }
-
-      return timeout;
+      // Clamp timeout to reasonable limits instead of throwing
+      return Math.max(1000, Math.min(300000, timeout));
     });
   },
 };

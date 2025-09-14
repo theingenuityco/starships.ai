@@ -81,6 +81,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const newConversation = await createConversation.mutateAsync({
             title: `Chat with ${selectedAgent.name}`,
             starshipId: starshipId,
+            agentId: selectedAgent.id,
           })
           currentConversationId = newConversation.id
           onConversationStart?.(currentConversationId!)
@@ -139,6 +140,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           const newConversation = await createConversation.mutateAsync({
             title: `Chat with ${selectedAgent.name}`,
             starshipId: starshipId,
+            agentId: selectedAgent.id,
           })
           currentConversationId = newConversation.id
           onConversationStart?.(currentConversationId!)

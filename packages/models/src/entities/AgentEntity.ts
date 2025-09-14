@@ -6,10 +6,11 @@
  */
 
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
+import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import { AgentMemoryState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance } from 'class-transformer';
+import { Expose, instanceToPlain } from 'class-transformer';
 import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 export class AgentEntity implements AgentModel {
@@ -103,12 +104,10 @@ export class AgentEntity implements AgentModel {
   /**
    * Creates entity from database record
    * Transforms JSON strings back to complex objects for API responses
+   * Uses safe deserialization with proper error handling
    */
-  static fromDatabaseRecord(data: Record<string, unknown>): AgentEntity {
-    return plainToInstance(AgentEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
+  static fromDatabaseRecord(data: unknown): AgentEntity {
+    return createFromDatabaseRecord(AgentEntity, data);
   }
 
   /**

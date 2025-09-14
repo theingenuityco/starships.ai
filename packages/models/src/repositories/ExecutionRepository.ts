@@ -13,7 +13,7 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) RETURN e ORDER BY e.createdAt DESC');
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e as unknown as Record<string, unknown>));
+        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
       },
       'findAll',
       'Execution'
@@ -25,7 +25,7 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) WHERE e.id = $id RETURN e', { id });
-        return result.length > 0 ? ExecutionEntity.fromDatabaseRecord(result[0].e as unknown as Record<string, unknown>) : null;
+        return result.length > 0 ? ExecutionEntity.fromDatabaseRecord(result[0].e) : null;
       },
       'findById',
       'Execution',
@@ -65,7 +65,7 @@ export class ExecutionRepository extends BaseRepository {
         );
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.fromDatabaseRecord(result as unknown as Record<string, unknown>);
+        return ExecutionEntity.fromDatabaseRecord(result);
       },
       'create',
       'Execution'
@@ -163,7 +163,7 @@ export class ExecutionRepository extends BaseRepository {
         }
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.fromDatabaseRecord(result[0].e as unknown as Record<string, unknown>);
+        return ExecutionEntity.fromDatabaseRecord(result[0].e);
       },
       'update',
       'Execution',
@@ -196,7 +196,7 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.workflowId = $workflowId RETURN e ORDER BY e.createdAt DESC',
           { workflowId }
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e as unknown as Record<string, unknown>));
+        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
       },
       'findByWorkflowId',
       'Execution'
@@ -211,7 +211,7 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.status = $status RETURN e ORDER BY e.createdAt DESC',
           { status }
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e as unknown as Record<string, unknown>));
+        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
       },
       'findByStatus',
       'Execution'
@@ -225,7 +225,7 @@ export class ExecutionRepository extends BaseRepository {
         const result = await connection.executeQuery<{ e: ExecutionModel }>(
           'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e as unknown as Record<string, unknown>));
+        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
       },
       'findActiveExecutions',
       'Execution'
@@ -250,7 +250,7 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.createdAt >= $startDate AND e.createdAt <= $endDate RETURN e ORDER BY e.createdAt DESC',
           { startDate, endDate }
         );
-        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e as unknown as Record<string, unknown>));
+        return result.map((record) => ExecutionEntity.fromDatabaseRecord(record.e));
       },
       'findByDateRange',
       'Execution'

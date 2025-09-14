@@ -6,8 +6,9 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
+import { createFromDatabaseRecord } from '@/helpers/serialization-helper';
 import type { UserModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, instanceToPlain, Transform } from 'class-transformer';
 import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
 
 /**
@@ -167,12 +168,10 @@ export class UserEntity implements UserModel {
   /**
    * Creates entity from database record
    * Transforms JSON strings back to complex objects for API responses
+   * Uses safe deserialization with proper error handling
    */
-  static fromDatabaseRecord(data: Record<string, unknown>): UserEntity {
-    return plainToInstance(UserEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
+  static fromDatabaseRecord(data: unknown): UserEntity {
+    return createFromDatabaseRecord(UserEntity, data);
   }
 
   /**

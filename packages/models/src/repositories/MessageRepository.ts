@@ -16,7 +16,7 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) RETURN m ORDER BY m.timestamp DESC');
-        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m as unknown as Record<string, unknown>));
+        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m));
       },
       'findAll',
       'Message'
@@ -29,7 +29,7 @@ export class MessageRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id RETURN m', { id });
         const message = result[0]?.m || null;
-        return message ? MessageEntity.fromDatabaseRecord(message as unknown as Record<string, unknown>) : null;
+        return message ? MessageEntity.fromDatabaseRecord(message) : null;
       },
       'findById',
       'Message',
@@ -52,7 +52,7 @@ export class MessageRepository extends BaseRepository {
         cypher += ' RETURN m ORDER BY m.timestamp DESC';
 
         const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m as unknown as Record<string, unknown>));
+        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m));
       },
       'findByRole',
       'Message'
@@ -88,7 +88,7 @@ export class MessageRepository extends BaseRepository {
         // Create explicit Neo4j relationship with conversation if conversationId is provided
         await this.linkToConversation(result.id, conversationId);
 
-        return MessageEntity.fromDatabaseRecord(result as unknown as Record<string, unknown>);
+        return MessageEntity.fromDatabaseRecord(result);
       },
       'create',
       'Message'
@@ -115,7 +115,7 @@ export class MessageRepository extends BaseRepository {
         });
 
         const message = result[0]?.m || null;
-        return message ? MessageEntity.fromDatabaseRecord(message as unknown as Record<string, unknown>) : null;
+        return message ? MessageEntity.fromDatabaseRecord(message) : null;
       },
       'update',
       'Message',

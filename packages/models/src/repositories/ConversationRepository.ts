@@ -38,11 +38,10 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         // Use lean validation from ConversationEntity
-        await ConversationEntity.validate(entity, 'create');
+        const { starshipId, agentId, ...conversationInput } = entity;
+        await ConversationEntity.validate(conversationInput, 'create');
 
         const now = new Date().toISOString();
-
-        const { starshipId, agentId, ...conversationInput } = entity;
 
         // Prepare conversation data with defaults and validation
         const conversationEntity = ConversationEntity.deserialize({

@@ -14,7 +14,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
-        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
+        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c as unknown as Record<string, unknown>));
       },
       'findAll',
       'Conversation'
@@ -26,7 +26,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0 ? ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>) : null;
+        return result.length > 0 ? ConversationEntity.fromDatabaseRecord(result[0].c as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Conversation',
@@ -44,13 +44,13 @@ export class ConversationRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare conversation data with defaults and validation
-        const conversationEntity = ConversationEntity.deserialize({
+        const conversationEntity = ConversationEntity.createFromRequest({
           ...conversationInput,
           createdAt: now,
           status: entity.status || 'active',
         });
 
-        const conversationData = conversationEntity.serialize();
+        const conversationData = conversationEntity.toDatabaseFormat();
         // Remove id since it will be auto-generated
         delete (conversationData as { id?: string }).id;
 
@@ -65,7 +65,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result as unknown as Record<string, unknown>);
+        return ConversationEntity.fromDatabaseRecord(result as unknown as Record<string, unknown>);
       },
       'create',
       'Conversation'
@@ -107,7 +107,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>);
+        return ConversationEntity.fromDatabaseRecord(result[0].c as unknown as Record<string, unknown>);
       },
       'update',
       'Conversation',
@@ -144,7 +144,7 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.createdAt DESC`,
           { starshipId }
         );
-        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
+        return result.map((record) => ConversationEntity.fromDatabaseRecord(record.c as unknown as Record<string, unknown>));
       },
       'findByStarship',
       'Conversation'
@@ -230,7 +230,7 @@ export class ConversationRepository extends BaseRepository {
           { conversationId }
         );
 
-        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
+        return result.map((record) => MessageEntity.fromDatabaseRecord(record.m as unknown as Record<string, unknown>));
       },
       'getConversationMessages',
       'Conversation'

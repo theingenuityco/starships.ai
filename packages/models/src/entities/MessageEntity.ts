@@ -41,20 +41,32 @@ export class MessageEntity implements MessageModel {
   messageType!: MessageType;
 
   /**
-   * Static factory method for creating MessageEntity from raw data
+   * Creates a validated entity from API request data
+   * Use this when receiving data from API requests that need validation and transformation
    */
-  static deserialize(data: Record<string, unknown>): MessageEntity {
-    return plainToInstance(MessageEntity, data, {
+  static createFromRequest(data: Record<string, unknown>): MessageEntity {
+    const entity = new MessageEntity();
+    Object.assign(entity, data);
+    return entity;
+  }
+
+  /**
+   * Converts entity to database storage format
+   * Transforms complex objects to JSON strings for Neo4j storage
+   */
+  toDatabaseFormat(): Record<string, unknown> {
+    return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
   }
 
   /**
-   * Instance method for converting entity to plain object for storage
+   * Creates entity from database record
+   * Transforms JSON strings back to complex objects for API responses
    */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
+  static fromDatabaseRecord(data: Record<string, unknown>): MessageEntity {
+    return plainToInstance(MessageEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });

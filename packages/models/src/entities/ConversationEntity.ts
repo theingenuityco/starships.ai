@@ -42,22 +42,32 @@ export class ConversationEntity implements ConversationModel {
   status!: 'active' | 'paused' | 'completed' | 'archived';
 
   /**
-   * Deserialize database record into ConversationEntity
-   * Converts raw database records to fully typed and validated ConversationEntity instances
+   * Creates a validated entity from API request data
+   * Use this when receiving data from API requests that need validation and transformation
    */
-  static deserialize(data: Record<string, unknown>): ConversationEntity {
-    return plainToInstance(ConversationEntity, data, {
+  static createFromRequest(data: Record<string, unknown>): ConversationEntity {
+    const entity = new ConversationEntity();
+    Object.assign(entity, data);
+    return entity;
+  }
+
+  /**
+   * Converts entity to database storage format
+   * Transforms complex objects to JSON strings for Neo4j storage
+   */
+  toDatabaseFormat(): Record<string, unknown> {
+    return instanceToPlain(this, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });
   }
 
   /**
-   * Serialize ConversationEntity to database record
-   * Converts entity instance to plain object suitable for database storage
+   * Creates entity from database record
+   * Transforms JSON strings back to complex objects for API responses
    */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
+  static fromDatabaseRecord(data: Record<string, unknown>): ConversationEntity {
+    return plainToInstance(ConversationEntity, data, {
       strategy: 'excludeAll',
       excludeExtraneousValues: true,
     });

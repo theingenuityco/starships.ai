@@ -13,7 +13,7 @@ export class AgentRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) RETURN a ORDER BY a.createdAt DESC');
-        return result.map((record) => AgentEntity.deserialize(record.a as unknown as Record<string, unknown>));
+        return result.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>));
       },
       'findAll',
       'Agent'
@@ -26,7 +26,7 @@ export class AgentRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id RETURN a', { id });
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.deserialize(agent as unknown as Record<string, unknown>) : null;
+        return agent ? AgentEntity.fromDatabaseRecord(agent as unknown as Record<string, unknown>) : null;
       },
       'findById',
       'Agent',
@@ -42,7 +42,7 @@ export class AgentRepository extends BaseRepository {
           'MATCH (a:Agent)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN a',
           { starshipId }
         );
-        return result?.map((record) => AgentEntity.deserialize(record.a as unknown as Record<string, unknown>)) || [];
+        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>)) || [];
       },
       'findByStarship',
       'Agent'
@@ -129,11 +129,11 @@ export class AgentRepository extends BaseRepository {
           updatedAt: now,
         };
 
-        // Transform using Entity
-        const agentEntity = AgentEntity.deserialize(agentProps);
+        // Create entity from request data and convert to database format
+        const agentEntity = AgentEntity.createFromRequest(agentProps);
 
         // Use base repository for database operation
-        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', agentEntity.serialize());
+        const agent = await this.createEntityWithAutoId<AgentModel>('Agent', agentEntity.toDatabaseFormat());
 
         const connection = this.getConnection();
         await connection.executeWrite(
@@ -146,7 +146,7 @@ export class AgentRepository extends BaseRepository {
           }
         );
 
-        return AgentEntity.deserialize(agent as unknown as Record<string, unknown>);
+        return AgentEntity.fromDatabaseRecord(agent as unknown as Record<string, unknown>);
       },
       'create',
       'Agent'
@@ -162,16 +162,16 @@ export class AgentRepository extends BaseRepository {
           updatedAt: new Date().toISOString(),
         };
 
-        // Transform using Entity
-        const updateEntity = AgentEntity.deserialize(updateProps);
+        // Create entity from update data and convert to database format
+        const updateEntity = AgentEntity.createFromRequest(updateProps);
 
         const result = await connection.executeWrite<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $id SET a += $updates RETURN a', {
           id,
-          updates: updateEntity.serialize(),
+          updates: updateEntity.toDatabaseFormat(),
         });
 
         const agent = result[0]?.a || null;
-        return agent ? AgentEntity.deserialize(agent as unknown as Record<string, unknown>) : null;
+        return agent ? AgentEntity.fromDatabaseRecord(agent as unknown as Record<string, unknown>) : null;
       },
       'update',
       'Agent',
@@ -204,7 +204,7 @@ export class AgentRepository extends BaseRepository {
           'CALL db.index.fulltext.queryNodes("agentSearch", $query) YIELD node as a, score RETURN a, score ORDER BY score DESC LIMIT 20',
           { query }
         );
-        return result?.map((record) => AgentEntity.deserialize(record.a as unknown as Record<string, unknown>)) || [];
+        return result?.map((record) => AgentEntity.fromDatabaseRecord(record.a as unknown as Record<string, unknown>)) || [];
       },
       'searchAgents',
       'Agent'

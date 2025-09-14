@@ -265,55 +265,6 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   </div>
                   <Switch checked={isPublic} onCheckedChange={setIsPublic} className="data-[state=checked]:bg-primary" />
                 </div>
-
-                {/* Only show convert to template button when editing an existing public agent */}
-                {agent && isPublic && (
-                  <div className="flex items-center justify-between p-4 border rounded-md border-muted-foreground/20 bg-blue-500/5 border-blue-500/20">
-                    <div className="flex items-start gap-3">
-                      <Sparkles className="h-5 w-5 text-blue-500 mt-0.5" />
-                      <div>
-                        <label className="text-sm font-medium">Convert to Template</label>
-                        <p className="text-xs text-muted-foreground mt-1">Make this agent available as a template for all users</p>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="border-blue-500/30 text-blue-500 hover:bg-blue-500/10"
-                      onClick={async () => {
-                        try {
-                          // Import the templateAPI to avoid circular dependencies
-                          const { templateAPI } = await import('@/lib/api')
-                          console.log('Converting agent to template:', agent.id)
-                          await templateAPI.convertAgentToTemplate(agent.id)
-
-                          // Show success toast
-                          const { toast } = await import('@/hooks/useToast')
-                          toast({
-                            title: 'Template Created',
-                            description: `${agent.name} is now available as a template`,
-                            variant: 'success',
-                          })
-                        } catch (error: any) {
-                          console.error('Failed to convert agent to template:', error)
-
-                          // Show detailed error toast with response data if available
-                          const { toast } = await import('@/hooks/useToast')
-                          const errorMessage = error?.response?.data?.error || error?.message || 'Failed to convert agent to template'
-
-                          toast({
-                            title: 'Conversion Failed',
-                            description: errorMessage,
-                            variant: 'destructive',
-                          })
-                        }
-                      }}
-                    >
-                      Convert
-                    </Button>
-                  </div>
-                )}
               </div>
             </div>
           </div>

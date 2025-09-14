@@ -633,27 +633,6 @@ export const templateAPI = {
       throw error // Re-throw to allow proper error handling in UI
     }
   },
-
-  // Convert a public agent to a template
-  convertAgentToTemplate: async (agentId: string): Promise<AgentTemplate> => {
-    try {
-      console.log('[API] Converting agent to template:', agentId)
-      const data = await api.post(`/api/v1/agent-templates/from-agents/${agentId}`).then(res => {
-        const template = extractResponseData<AgentTemplate>(res)
-        console.log('[API] Agent converted to template successfully:', template.id)
-        return template
-      })
-
-      // Invalidate both agent and template caches
-      invalidateAgentCaches()
-      apiCache.invalidatePattern('^templates:')
-
-      return data
-    } catch (error) {
-      console.error('Failed to convert agent to template:', error)
-      throw error // Re-throw to allow proper error handling in UI
-    }
-  },
 }
 
 // Note: chatAPI functionality has been moved to useConversations hooks for better integration with TanStack Query

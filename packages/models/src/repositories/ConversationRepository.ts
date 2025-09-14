@@ -157,12 +157,12 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ s: StarshipModel }>(
-          `MATCH (s:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})
+        const result = await connection.executeQuery<{ starship: StarshipModel }>(
+          `MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})
            RETURN starship`,
           { conversationId }
         );
-        return result.length > 0 ? result[0].s : null;
+        return result.length > 0 ? result[0].starship : null;
       },
       'getConversationStarship',
       'Conversation'

@@ -7,6 +7,7 @@ import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { NodeRepository } from '@/repositories/NodeRepository';
 import { DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import type { CreateBlueprintRequest, UpdateBlueprintRequest, BlueprintModel } from '@starships/protocol';
+import type { Edge } from '@starships/autopilot';
 
 // Mock dependencies
 jest.mock('../../helpers/database', () => ({
@@ -675,7 +676,12 @@ describe('BlueprintRepository', () => {
       };
 
       const mockNodes = complexRequest.nodes.map((node, i) => ({ id: `node-${i}`, ...node }));
-      const mockEdges = complexRequest.edges.map((edge, i) => ({ id: `edge-${i}`, ...edge }));
+      const mockEdges = complexRequest.edges.map((edge: Edge, i: number) => ({
+        id: `edge-${i}`,
+        ref: edge.ref,
+        from: edge.from,
+        to: edge.to,
+      }));
 
       const mockComplexBlueprintId = 'complex-blueprint-123';
       const mockComplexBlueprint = {

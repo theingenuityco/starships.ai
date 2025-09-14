@@ -27,15 +27,19 @@ jest.mock('../../entities/AgentTemplateEntity', () => ({
   AgentTemplateEntity: {
     validate: jest.fn().mockResolvedValue(undefined),
     deserialize: jest.fn().mockImplementation((data) => {
-      // Simulate JSON parsing for memory and blueprint like the real entity does
+      // Simulate JSON parsing for memoryState and blueprint like the real entity does
       const result = { ...data };
-      if (typeof data.memory === 'string') {
+
+      // Handle memoryState JSON transformation
+      if (typeof data.memoryState === 'string') {
         try {
-          result.memory = JSON.parse(data.memory);
+          result.memoryState = JSON.parse(data.memoryState);
         } catch {
-          result.memory = null;
+          result.memoryState = null;
         }
       }
+
+      // Handle blueprint JSON transformation
       if (typeof data.blueprint === 'string') {
         try {
           result.blueprint = JSON.parse(data.blueprint);
@@ -43,11 +47,13 @@ jest.mock('../../entities/AgentTemplateEntity', () => ({
           result.blueprint = null;
         }
       }
+
       // Add serialize method to the returned object
       result.serialize = jest.fn().mockReturnValue({
         ...result,
-        memoryState: typeof result.memory === 'object' ? JSON.stringify(result.memory) : result.memory,
-        blueprint: typeof result.blueprint === 'object' ? JSON.stringify(result.blueprint) : result.blueprint,
+        memoryState:
+          typeof result.memoryState === 'object' && result.memoryState !== null ? JSON.stringify(result.memoryState) : result.memoryState,
+        blueprint: typeof result.blueprint === 'object' && result.blueprint !== null ? JSON.stringify(result.blueprint) : result.blueprint,
       });
       return result;
     }),

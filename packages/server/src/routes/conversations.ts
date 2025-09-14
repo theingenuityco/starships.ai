@@ -81,7 +81,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Validate query parameters for ordering
       const orderValidation = validateData(
         z.object({
-          orderBy: z.enum(['timestamp', 'created_at']).optional(),
+          orderBy: z.enum(['createdAt']).optional(),
           orderDirection: z.enum(['asc', 'desc']).optional(),
         }),
         req.query,
@@ -92,13 +92,15 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      const conversationData = await conversationService.getConversationMessages(
+      const messages = await conversationService.getConversationMessages(
         conversationId,
         orderValidation.orderBy,
         orderValidation.orderDirection
       );
 
-      if (!conversationData) {
+      // Verify conversation exists
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
           resource: 'conversation',
           id: conversationId,
@@ -106,7 +108,17 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         return;
       }
 
-      sendSuccess(res, conversationData, 200);
+      // Get conversation agents to determine participants
+      // const agents = await conversationService.getConversationAgents(conversationId);
+      // const participants = agents.map((agent) => agent.id);
+
+      // Structure response to match client expectations
+      const responseData = {
+        conversation,
+        messages,
+      };
+
+      sendSuccess(res, responseData, 200);
     }
   } catch (error) {
     handleError(error, res, 'fetching conversation messages');

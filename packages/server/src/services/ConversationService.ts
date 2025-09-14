@@ -96,7 +96,7 @@ export class ConversationService {
    */
   async getConversationMessages(
     conversationId: string,
-    orderBy: 'timestamp' | 'created_at' = 'timestamp',
+    orderBy: 'createdAt' = 'createdAt',
     orderDirection: 'asc' | 'desc' = 'asc'
   ): Promise<MessageModel[]> {
     return this.conversationRepository.getConversationMessages(conversationId, orderBy, orderDirection);

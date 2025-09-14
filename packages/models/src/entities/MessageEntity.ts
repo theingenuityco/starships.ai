@@ -37,7 +37,7 @@ export class MessageEntity implements MessageModel {
 
   // Message classification
   @Expose()
-  @IsEnum(['user_input', 'agent_response', 'system_message', 'workflow_output'])
+  @IsEnum(['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error'])
   messageType!: MessageType;
 
   /**

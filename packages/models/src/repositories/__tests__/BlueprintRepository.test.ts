@@ -22,36 +22,7 @@ jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'blueprint-test-123'),
 }));
 
-// Mock BlueprintEntity with proper class constructor
-jest.mock('../../entities/BlueprintEntity', () => {
-  class MockBlueprintEntity {
-    metadata?: unknown;
-
-    static async validate() {
-      return undefined;
-    }
-
-    constructor(data: unknown) {
-      Object.assign(this, data);
-      // Simulate JSON parsing for metadata like the real entity does
-      // This mimics the JsonTransform decorator behavior
-      if (this.metadata !== undefined) {
-        if (typeof this.metadata === 'string') {
-          try {
-            this.metadata = JSON.parse(this.metadata);
-          } catch {
-            this.metadata = null; // Invalid JSON becomes null
-          }
-        }
-        // If metadata is already an object or null, leave it as-is
-      }
-    }
-  }
-
-  return {
-    BlueprintEntity: MockBlueprintEntity,
-  };
-});
+// Use real BlueprintEntity instead of mocking
 
 jest.mock('../NodeRepository');
 jest.mock('../EdgeRepository');

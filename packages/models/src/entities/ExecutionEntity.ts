@@ -104,7 +104,7 @@ export class ExecutionEntity implements ExecutionModel {
         workflowId: dataRecord.workflowId,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        status: dataRecord.status || 'pending',
+        status: (dataRecord.status as ExecutionStatus) || 'pending',
         currentNodeRef: dataRecord.currentNodeRef,
         executionData: dataRecord.executionData,
         error: dataRecord.error,
@@ -123,7 +123,7 @@ export class ExecutionEntity implements ExecutionModel {
     const errors = await validate(entity, {
       skipMissingProperties: operation === 'update',
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Allow extra properties for flexibility
     });
 
     if (errors.length > 0) {

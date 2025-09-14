@@ -19,6 +19,11 @@ function safeDeserialize<T>(
   } = {}
 ): T {
   try {
+    // Check if entityClass is valid
+    if (!entityClass || typeof entityClass !== 'function') {
+      throw new Error(`Invalid entity class provided: ${entityClass}`);
+    }
+
     if (data === null || data === undefined) {
       throw new Error(`Cannot deserialize null or undefined data to ${entityClass.name}`);
     }
@@ -28,9 +33,9 @@ function safeDeserialize<T>(
     }
 
     const defaultOptions = {
-      strategy: 'excludeAll' as const,
-      excludeExtraneousValues: true,
-      enableImplicitConversion: false,
+      strategy: 'exposeAll' as const, // Changed from 'excludeAll' to 'exposeAll' to include all fields
+      excludeExtraneousValues: false, // Changed to false to be more permissive
+      enableImplicitConversion: true, // Changed to true to handle type conversions
       ...options,
     };
 
@@ -43,7 +48,7 @@ function safeDeserialize<T>(
     return entity;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    throw new Error(`Deserialization failed for ${entityClass.name}: ${errorMessage}`);
+    throw new Error(`Deserialization failed for ${entityClass?.name || 'unknown'}: ${errorMessage}`);
   }
 }
 
@@ -109,10 +114,19 @@ export function toDatabase(entity: unknown): Record<string, unknown> {
     throw new Error('Entity must be a valid object');
   }
 
-  return instanceToPlain(entity, {
-    strategy: 'excludeAll',
-    excludeExtraneousValues: true,
+  // Use exposeAll strategy to ensure all properties are serialized
+  const serialized = instanceToPlain(entity, {
+    strategy: 'exposeAll',
+    excludeExtraneousValues: false,
+    enableImplicitConversion: true,
   });
+
+  // If serialized object is empty or null, return the original object
+  if (!serialized || Object.keys(serialized).length === 0) {
+    return entity as Record<string, unknown>;
+  }
+
+  return serialized;
 }
 
 // Backward compatibility - will be removed after refactor

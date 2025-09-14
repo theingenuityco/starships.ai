@@ -6,11 +6,14 @@ export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 
 // Entity exports
 export { AgentEntity } from './entities/AgentEntity';
+export { AgentTemplateEntity } from './entities/AgentTemplateEntity';
 export { BlueprintEntity } from './entities/BlueprintEntity';
 export { ConversationEntity } from './entities/ConversationEntity';
 export { ExecutionEntity } from './entities/ExecutionEntity';
 export { MessageEntity } from './entities/MessageEntity';
+export { NativeToolApiKeyEntity } from './entities/NativeToolApiKeyEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
+export { UserEntity } from './entities/UserEntity';
 export { WorkflowEntity } from './entities/WorkflowEntity';
 
 // Repository exports

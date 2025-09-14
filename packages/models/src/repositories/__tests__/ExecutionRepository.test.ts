@@ -17,16 +17,22 @@ jest.mock('../../helpers/database', () => ({
   convertNeo4jIntsInObject: jest.fn((obj) => obj),
 }));
 
-// Mock ExecutionEntity with proper static methods
-jest.mock('../../entities/ExecutionEntity', () => ({
-  ExecutionEntity: {
-    validate: jest.fn().mockResolvedValue(undefined),
-    deserialize: jest.fn().mockImplementation((data) => ({
-      ...data,
-      serialize: jest.fn().mockReturnValue(data),
-    })),
-  },
-}));
+// Mock ExecutionEntity with proper class constructor
+jest.mock('../../entities/ExecutionEntity', () => {
+  class MockExecutionEntity {
+    static async validate() {
+      return undefined;
+    }
+
+    constructor(data: unknown) {
+      Object.assign(this, data);
+    }
+  }
+
+  return {
+    ExecutionEntity: MockExecutionEntity,
+  };
+});
 
 import { getConnection } from '@/helpers/database';
 

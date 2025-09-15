@@ -28,7 +28,16 @@ interface MessageContentProps {
   contentChunks?: ContentChunk[]
 }
 
-export function MessageContent({ content, messageId, className, enableMarkdown = true, enableCopy = true, enableLinkPreview = true, isStreaming = false, contentChunks = [] }: MessageContentProps) {
+export function ConversationMessageContent({
+  content,
+  messageId,
+  className,
+  enableMarkdown = true,
+  enableCopy = true,
+  enableLinkPreview = true,
+  isStreaming = false,
+  contentChunks = [],
+}: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 

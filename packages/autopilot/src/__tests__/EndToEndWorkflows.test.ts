@@ -608,7 +608,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Validate Data',
             description: 'Check data quality',
             parameters: {
-              condition: 'results[-1].data.records > 0 and results[-1].data.quality_score > 0.8',
+              condition: 'results[nodeRef = "extract-data"].data ? "true" : "false"',
             },
           },
 

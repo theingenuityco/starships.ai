@@ -372,7 +372,7 @@ export class Agent implements NodeHandler {
     if (options?.useContext !== false) {
       messages.push({
         role: 'system',
-        content: '{{ $nodeResult("memory").messages ~> $join("\\n") }}',
+        content: '{{ state.memory.knowledge }}',
       });
     }
 
@@ -460,7 +460,7 @@ export class Agent implements NodeHandler {
     const messages: LlmMessage[] = [
       {
         role: 'system',
-        content: '{{ $nodeResult("memory").messages ~> $join("\\n") }}',
+        content: '{{ state.memory.knowledge }}',
       },
       {
         role: 'user',
@@ -512,7 +512,7 @@ export class Agent implements NodeHandler {
     if (options?.includeContext !== false) {
       messages.push({
         role: 'system',
-        content: '{{ $nodeResult("memory").messages ~> $join("\\n") }}',
+        content: '{{ state.memory.knowledge }}',
       });
     }
 

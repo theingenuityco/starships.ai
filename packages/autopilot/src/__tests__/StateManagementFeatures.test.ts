@@ -155,7 +155,7 @@ describe('State Management Features', () => {
             name: 'Check User Tier',
             description: 'Determine user privileges',
             parameters: {
-              expression: 'state.userTier = "premium" and state.requestCount > 3',
+              condition: 'state.userTier = "premium" and state.requestCount > 3',
               transforms: [
                 { operation: 'add', path: '/state/conditionEvaluated', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/isPremiumUser', value: '{{ state.userTier = "premium" }}' },

@@ -50,7 +50,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              expression: 'state.user.isPremium = true',
+              condition: 'state.user.isPremium = true',
             },
           },
           {
@@ -138,7 +138,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              expression: 'state.user.isPremium = true',
+              condition: 'state.user.isPremium = true',
             },
           },
           {
@@ -221,7 +221,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Route Decision',
             description: 'Determine routing path',
             parameters: {
-              expression: 'state.user.tier',
+              condition: 'state.user.tier',
             },
           },
           {
@@ -464,7 +464,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Validation',
             description: 'Check if validation passed',
             parameters: {
-              expression: 'results[-1].data.valid = true',
+              condition: 'results[-1].data.valid = true',
             },
           },
           {
@@ -530,7 +530,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Final Check',
             description: 'Check if everything succeeded',
             parameters: {
-              expression: 'results[-1].data[0].success = true',
+              condition: 'results[-1].data[0].success = true',
             },
           },
           {
@@ -692,7 +692,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Analysis Decision',
             description: 'Route based on analysis',
             parameters: {
-              expression: 'results[-1].data[1].data.choices[0].message.content ~> /positive/',
+              condition: 'results[-1].data[1].data.choices[0].message.content ~> /positive/',
             },
           },
           {
@@ -855,7 +855,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Retry',
             description: 'Check if retry succeeded',
             parameters: {
-              expression: 'results[-1].error = null',
+              condition: 'results[-1].error = null',
             },
           },
           {

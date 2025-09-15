@@ -178,7 +178,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Check State',
             description: 'Verify state',
             parameters: {
-              expression: 'state.initialized = true',
+              condition: 'state.initialized = true',
             },
           },
           {
@@ -462,7 +462,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Content Decision',
             description: 'Route based on analysis',
             parameters: {
-              expression: 'results[-1].data.choices[0].message.content ~> /positive/i ? "approve" : "review"',
+              condition: 'results[-1].data.choices[0].message.content ~> /positive/i ? "approve" : "review"',
             },
           },
 
@@ -608,7 +608,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Validate Data',
             description: 'Check data quality',
             parameters: {
-              expression: 'results[-1].data.records > 0 and results[-1].data.quality_score > 0.8',
+              condition: 'results[-1].data.records > 0 and results[-1].data.quality_score > 0.8',
             },
           },
 

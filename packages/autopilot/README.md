@@ -1,492 +1,228 @@
 # @starships/autopilot
 
-Workflow execution engine and agent development framework for starships.ai, providing a clean and simple approach to workflow orchestration with AI model integration.
+Lean workflow execution engine for starships.ai - executes blueprint-based workflows with AI model integration and dynamic state management.
 
 ## Overview
 
-Autopilot provides a lightweight workflow execution system with:
+Autopilot executes workflows defined as node graphs (blueprints) with support for:
 
-- **Engine** - Core workflow execution engine with dynamic node loading
-- **Node System** - Clean node handlers for different task types (Agent, LLM, HTTP, Workflow)
-- **Memory Management** - Simple memory system for AI interactions
-- **Credential Management** - Secure API key handling for external services
-- **Event-driven Architecture** - Comprehensive lifecycle hooks for streaming and monitoring
+- **Dynamic Node Loading** - AI agents, LLM calls, HTTP requests, conditionals, transforms
+- **Template Expressions** - `{{ state.value }}` syntax for dynamic parameters
+- **State Management** - JSON Patch transforms for workflow state mutations
+- **Memory System** - Structured memory for AI agent interactions
+- **Credential Management** - Secure API key handling
 
-## Installation & Setup
+## Quick Start
 
 ```bash
 pnpm install @starships/autopilot
 ```
 
-## Credential Configuration
-
-Autopilot requires manual credential configuration for API access (LLM models, HTTP requests with authentication, etc.). Credentials must be configured before using nodes that require them.
-
-### Setting Up Credentials
+### Basic Usage
 
 ```typescript
-import { autopilot } from '@starships/autopilot';
+import { Engine, autopilot } from '@starships/autopilot';
 
-// Configure OpenRouter API key for LLM nodes
+// Configure credentials
 autopilot.setCredentials({
-  openrouterApiKey: 'sk-or-v1-your-api-key-here',
+  openrouterApiKey: 'sk-or-v1-your-key',
 });
 
-// Verify credentials are set
-if (!autopilot.hasOpenRouterApiKey()) {
-  throw new Error('OpenRouter API key is required for LLM functionality');
-}
-```
+// Create workflow blueprint
+const blueprint = {
+  nodes: [
+    { ref: 'start', type: 'start', name: 'Begin', parameters: {} },
+    {
+      ref: 'llm',
+      type: 'llm',
+      name: 'AI Response',
+      parameters: {
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [{ role: 'user', content: 'Hello!' }],
+      },
+    },
+    { ref: 'end', type: 'end', name: 'Complete', parameters: {} },
+  ],
+  edges: [
+    { ref: 'edge-1', from: 'start', to: 'llm' },
+    { ref: 'edge-2', from: 'llm', to: 'end' },
+  ],
+  metadata: {},
+};
 
-### Server Integration
-
-For server applications, configure credentials during startup:
-
-```typescript
-import { autopilot } from '@starships/autopilot';
-import { getEnvConfig } from '@starships/env';
-
-const config = getEnvConfig();
-
-// Configure credentials from environment
-autopilot.setCredentials({
-  openrouterApiKey: config.OPENROUTER_API_KEY,
-});
-```
-
-**Note**: Autopilot does not automatically read environment variables. Credentials must be explicitly configured using `autopilot.setCredentials()`.
-
-## Core Components
-
-### Engine
-
-The Engine is the core workflow execution system that handles dynamic node loading and execution:
-
-```typescript
-import { Engine } from '@starships/autopilot';
-
+// Execute workflow
 const engine = new Engine({
-  blueprint: {
-    nodes: [
-      { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-      { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} },
-    ],
-    edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
-    metadata: {},
-  },
-  eventCallback: (event) => console.log('Event:', event),
+  blueprint,
+  eventCallback: (event) => console.log(event.type),
 });
 
 await engine.execute();
 console.log('Results:', engine.getExecution().results);
 ```
 
-### Node Handlers
+## Node Types
 
-Each node type has its own handler class that implements the execution logic:
+| Type           | Description          | Key Parameters                              |
+| -------------- | -------------------- | ------------------------------------------- |
+| `start/end`    | Flow control         | `{}`                                        |
+| `llm`          | LLM API calls        | `model`, `messages`, `temperature`          |
+| `agent`        | AI agent with memory | `name`, `model`, `memoryState`, `blueprint` |
+| `http_request` | HTTP API calls       | `url`, `method`, `headers`, `body`          |
+| `conditional`  | Branch workflows     | `condition` (JSONata expression)            |
+| `transform`    | State mutations      | `transforms` (JSON Patch operations)        |
+| `workflow`     | Nested workflows     | `blueprint`                                 |
+| `user_prompt`  | User interaction     | Platform-specific                           |
 
-#### Workflow Node
+## Template Expressions
 
-```typescript
-import { Workflow } from '@starships/autopilot';
-
-const workflowParams = {
-  blueprint: {
-    nodes: [
-      { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-      { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} },
-    ],
-    edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
-    metadata: {},
-  },
-};
-
-const eventCallback = (event) => console.log('Workflow event:', event);
-const workflow = new Workflow(workflowParams, eventCallback);
-const results = await workflow.execute();
-```
-
-#### Agent Node
+Use `{{ }}` syntax for dynamic values:
 
 ```typescript
-import { Agent } from '@starships/autopilot';
-
-const agentParams = {
-  name: 'Support Agent',
-  model: 'anthropic/claude-3.5-sonnet',
-  memoryState: {
-    identity: { name: 'Alex', role: 'Support Agent' },
-    purpose: { primary: 'Help customers effectively' },
-  },
-  blueprint: {
-    nodes: [
-      { ref: 'start', type: 'start', name: 'Start', description: 'Begin', parameters: {} },
-      { ref: 'end', type: 'end', name: 'End', description: 'Complete', parameters: {} },
-    ],
-    edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
-    metadata: {},
-  },
-};
-
-const eventCallback = (event) => console.log('Agent event:', event);
-const agent = new Agent(agentParams, eventCallback);
-const results = await agent.execute();
-```
-
-#### LLM Node
-
-```typescript
-import { LLM } from '@starships/autopilot';
-
-const llmParams = {
-  model: 'anthropic/claude-3.5-sonnet',
-  messages: [
-    { role: 'system', content: 'You are a helpful assistant' },
-    { role: 'user', content: 'Hello!' },
-  ],
-  temperature: 0.7,
-  maxTokens: 1000,
-};
-
-const eventCallback = (event) => console.log('LLM event:', event);
-const llm = new LLM(llmParams, eventCallback);
-const response = await llm.execute();
-```
-
-#### HTTP Request Node
-
-```typescript
-import { HttpRequest } from '@starships/autopilot';
-
-const httpParams = {
-  url: 'https://api.example.com/data',
-  method: 'POST',
-  headers: { Authorization: 'Bearer token' },
-  body: { query: 'search term' },
-  timeout: 30000,
-};
-
-const httpRequest = new HttpRequest(httpParams);
-const response = await httpRequest.execute();
-```
-
-#### Conditional Node
-
-```typescript
-import { Conditional } from '@starships/autopilot';
-
-const conditionalParams = {
-  condition: 'state.userLevel = "premium"', // JSONata expression against execution state
-};
-
-const conditional = new Conditional(conditionalParams, {
-  eventCallback: (event) => console.log('Conditional event:', event),
-  execution: currentExecution, // Access to workflow state and results
-});
-const result = await conditional.execute();
-console.log('Condition result:', result.condition); // true/false or string
-```
-
-#### Transform Node
-
-```typescript
-import { Transform } from '@starships/autopilot';
-
-const transformParams = {
-  transforms: [
-    { operation: 'add', path: '/state/counter', value: 1 },
-    { operation: 'replace', path: '/state/user/status', value: '{{ state.user.level }}' },
-  ],
-};
-
-const eventCallback = (event) => console.log('Transform event:', event);
-const transform = new Transform(transformParams, { eventCallback, execution: currentExecution });
-const result = await transform.execute();
-```
-
-## Inline Parameters
-
-### Inline Conditional Evaluation
-
-Any node can include a `condition` parameter for workflow branching, just like Transform nodes can include `transforms`:
-
-```typescript
-// Example: LLM node with inline condition
-const llmWithCondition = {
-  ref: 'llm_check',
-  type: 'llm',
-  name: 'Content Validator',
-  description: 'Validate content and set condition',
-  parameters: {
-    model: 'anthropic/claude-3.5-sonnet',
-    messages: [{ role: 'user', content: 'Validate this content...' }],
-    condition: 'results[-1].data.content.length > 100', // Inline condition
-  },
-};
-
-// Example: HTTP request with inline condition
-const httpWithCondition = {
-  ref: 'api_call',
+{
+  ref: 'api-call',
   type: 'http_request',
-  name: 'API Status Check',
-  description: 'Check API and evaluate response',
   parameters: {
-    url: 'https://api.example.com/status',
-    method: 'GET',
-    condition: 'results[-1].data.status = "healthy"', // Inline condition
-  },
-};
+    url: 'https://api.example.com/users/{{ state.userId }}',
+    headers: {
+      Authorization: 'Bearer {{ state.auth.token }}'
+    },
+    body: {
+      timestamp: '{{ $now() }}',
+      data: '{{ $nodeResult("input").data.formData }}'
+    }
+  }
+}
 ```
 
-### Inline Transform Operations
+**Available Context:**
 
-Any node can include `transforms` parameter for state mutations:
+- `state` - Current workflow state
+- `results` - Previous node results
+- `$now()` - Current timestamp
+- `$nodeResult(ref)` - Get result from specific node
+- `$random()` - Generate random ID
+
+## State Management
+
+### Inline Transforms
+
+Any node can include `transforms` for state mutations:
 
 ```typescript
-// Example: Agent node with inline transforms
-const agentWithTransforms = {
-  ref: 'support_agent',
-  type: 'agent',
-  name: 'Support Agent',
-  description: 'Handle support and update state',
+{
+  ref: 'api-call',
+  type: 'http_request',
   parameters: {
-    model: 'anthropic/claude-3.5-sonnet',
-    memoryState: {
-      /* ... */
-    },
-    blueprint: {
-      /* ... */
-    },
+    url: 'https://api.example.com/data',
     transforms: [
-      { operation: 'add', path: '/state/ticketCount', value: '{{ state.ticketCount + 1 }}' },
-      { operation: 'replace', path: '/state/lastAction', value: 'support_completed' },
-    ],
-  },
-};
+      { operation: 'replace', path: '/state/apiCalls', value: '{{ (state.apiCalls || 0) + 1 }}' },
+      { operation: 'add', path: '/state/lastCall', value: '{{ $now() }}' }
+    ]
+  }
+}
 ```
 
-**JSONata Expression Context:**
+### Transform Operations
 
-- `state` - Current workflow execution state
-- `results` - Previous node execution results
-- `status` - Workflow execution status
-- `currentNodeRef` - Currently executing node reference
-
-**Example expressions:**
-
-- `state.user.isPremium = true` - Check state value
-- `results[-1].data.isValid` - Check last executed node result
-- `results[$ ~> $filter(function($v) { $v.nodeRef = "user_check" })][-1].data.isValid` - Get most recent result from specific node
-- `status = "running"` - Check execution status
-
-## Memory System
-
-Autopilot includes a simple memory system for managing AI interactions:
-
-### Base Memory
+JSON Patch operations for state mutations:
 
 ```typescript
-import { Memory } from '@starships/autopilot';
-
-const memory = new Memory({
-  messages: [{ role: 'system', content: 'You are a helpful assistant' }],
-});
-memory.addMessage({ role: 'user', content: 'Hello!' });
-
-const messages = memory.toMessages();
+[
+  { operation: 'add', path: '/state/user', value: { id: '123', name: 'John' } },
+  { operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' },
+  { operation: 'remove', path: '/state/temp' },
+  { operation: 'copy', path: '/state/backup', from: '/state/current' },
+  { operation: 'move', path: '/state/archive', from: '/state/old' },
+];
 ```
 
-### Agent Memory
-
-Enhanced memory with structured context:
+## AI Agent Memory
 
 ```typescript
 import { AgentMemory } from '@starships/autopilot';
 
-const agentMemory = new AgentMemory();
+const memory = new AgentMemory();
+memory.setIdentity({ name: 'Sarah', role: 'Support Agent' });
+memory.setPurpose({ primary: 'Help customers' });
+memory.addMessageToHistory({ role: 'user', content: 'I need help' });
 
-// Set structured context
-agentMemory.setIdentity({
-  name: 'Sarah',
-  role: 'Support Agent',
-  personality: 'Professional and helpful',
-});
-
-agentMemory.setPurpose({
-  primary: 'Resolve customer issues',
-  constraints: ['Be professional', 'Escalate complex issues'],
-});
-
-agentMemory.setSpace({
-  description: 'Customer support chat environment',
-});
-
-// Add messages
-agentMemory.addMessageToHistory({
-  role: 'user',
-  content: 'I need help with billing',
-});
-
-// Get formatted messages for LLM
-const messages = agentMemory.toMessages();
+const messages = memory.toMessages(); // Format for LLM
 ```
 
-## Node Types
+## Events & Streaming
 
-The engine supports these node types through dynamic loading:
+```typescript
+const eventCallback = async (event) => {
+  switch (event.type) {
+    case 'workflow_started':
+    case 'workflow_completed':
+    case 'node_started':
+    case 'node_completed':
+    case 'content_chunk': // LLM streaming
+      console.log(event.type, event.data);
+  }
+};
 
-- **start/end** - Flow control nodes
-- **agent** - AI agent with embedded workflow execution
-- **workflow** - Execute nested workflow blueprints
-- **llm** - Large Language Model interactions via OpenRouter
-- **http_request** - HTTP API calls with full fetch API support
-- **user_prompt** - Interactive user input (implementation varies by platform)
-- **conditional** - JSONata expression evaluation for workflow branching
-- **transform** - State mutation using JSON Patch operations
-
-**Universal Parameters:**
-
-- **condition** - Any node can include a `condition` parameter for inline conditional evaluation
-- **transforms** - Any node can include `transforms` parameter for inline state mutations
+const engine = new Engine({ blueprint, eventCallback });
+```
 
 ## API Reference
 
 ### Main Exports
 
 ```typescript
-// Core engine
+// Engine
 export { Engine } from '@starships/autopilot';
 
 // Node handlers
-export { Workflow, LLM, HttpRequest, Agent, Conditional, Transform } from '@starships/autopilot';
+export { LLM, Agent, HttpRequest, Workflow, Conditional, Transform } from '@starships/autopilot';
 
-// Memory system
+// Memory
 export { Memory, AgentMemory } from '@starships/autopilot';
 
 // Configuration
-export { autopilot, config } from '@starships/autopilot';
+export { autopilot } from '@starships/autopilot';
 
 // Types
-export type {
-  Blueprint,
-  Node,
-  ConditionalResult,
-  TransformOperation,
-  AgentIdentity,
-  AgentMemoryState,
-  LlmMessage,
-} from '@starships/autopilot';
+export type { Blueprint, Node, Execution, ConditionalResult, TransformOperation } from '@starships/autopilot';
 ```
 
-### Event System
-
-The engine supports event callbacks for monitoring and streaming:
+### Credential Management
 
 ```typescript
-const eventCallback = async (event) => {
-  console.log(`Event: ${event.type} at ${event.timestamp}`);
-  // Handle workflow_started, workflow_completed, node_started, etc.
-};
+// Set credentials (required for LLM nodes)
+autopilot.setCredentials({ openrouterApiKey: 'sk-or-...' });
 
-const engine = new Engine({
-  blueprint,
-  eventCallback,
-});
+// Check if credentials are available
+if (!autopilot.hasOpenRouterApiKey()) {
+  throw new Error('OpenRouter API key required');
+}
 ```
 
-## LLM Integration
+## LLM Models
 
-LLM nodes use OpenRouter's unified API, providing access to 200+ models:
+Uses OpenRouter API for 200+ models:
 
-### Popular Models
-
-- `anthropic/claude-3.5-sonnet` - Anthropic Claude 3.5 Sonnet
-- `openai/gpt-4-turbo` - OpenAI GPT-4 Turbo
-- `google/gemini-pro-1.5` - Google Gemini Pro 1.5
-- `meta-llama/llama-3.1-405b-instruct` - Meta Llama 3.1 405B
-
-### Streaming Support
-
-LLM nodes automatically support streaming with event callbacks:
-
-```typescript
-const llmParams = {
-  model: 'anthropic/claude-3.5-sonnet',
-  messages: [{ role: 'user', content: 'Tell me a story' }],
-};
-
-const eventCallback = async (event) => {
-  if (event.type === 'content_chunk') {
-    console.log('Streaming chunk:', event.data.chunk);
-  }
-  if (event.type === 'content_complete') {
-    console.log('Streaming complete');
-  }
-};
-
-const llm = new LLM(llmParams, eventCallback);
-const response = await llm.execute();
-```
+- `anthropic/claude-3.5-sonnet`
+- `openai/gpt-4-turbo`
+- `google/gemini-pro-1.5`
+- `meta-llama/llama-3.1-405b-instruct`
 
 ## Development
 
 ```bash
-# Build the package
-pnpm run build
-
-# Type check
-pnpm run type-check
-
-# Lint code
-pnpm run lint
-
-# Run tests
-pnpm run test
-
-# Development mode with watch
-pnpm run dev
+pnpm run build        # Build package
+pnpm run type-check   # Type checking
+pnpm run lint         # Lint code
+pnpm run test         # Run tests
 ```
 
 ## Dependencies
 
-### Core Dependencies
+- **jsonata** - JSONata expressions for templates/conditions
+- **fast-json-patch** - JSON Patch operations for transforms
+- **nanoid** - Unique ID generation
 
-- **jsonata** - JSONPath expressions for conditional logic
-- **nanoid** - Unique identifier generation
+---
 
-## Architecture
-
-```
-src/
-├── index.ts                 # Main exports and public API
-├── Autopilot.ts             # Configuration and credential management
-├── engine/                  # Workflow execution engine
-│   └── Engine.ts            # Core execution engine with dynamic loading
-├── nodes/                   # Node handler implementations
-│   ├── Agent.ts             # Agent node handler
-│   ├── Workflow.ts          # Workflow node handler
-│   ├── LLM.ts               # LLM node handler
-│   ├── HttpRequest.ts       # HTTP request handler
-│   ├── Conditional.ts       # Conditional evaluation handler
-│   ├── Transform.ts         # State transformation handler
-│   ├── Start.ts             # Start node handler
-│   ├── End.ts               # End node handler
-│   └── UserPrompt.ts        # User prompt handler
-├── memory/                  # Memory management system
-│   ├── Memory.ts            # Base memory class
-│   └── AgentMemory.ts       # Enhanced agent memory
-├── types/                   # TypeScript type definitions
-└── constants/               # Configuration constants
-```
-
-## Related Packages
-
-This package is part of the starships.ai monorepo:
-
-- [`@starships/protocol`](../protocol/) - Shared types and contracts
-- [`@starships/server`](../server/) - API server implementation
-- [`@starships/models`](../models/) - Database models and repositories
-
-## License
-
-Private package - Part of the starships.ai project
+Part of the [starships.ai](/) monorepo.

@@ -6,6 +6,8 @@
 
 // Engine
 export { Engine } from './engine/Engine';
+export { Eval } from './engine/Eval';
+export type { EvalContext, EvalOptions } from './engine/Eval';
 
 // Nodes
 export { Workflow } from './nodes/Workflow';

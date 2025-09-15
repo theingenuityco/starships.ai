@@ -8,7 +8,7 @@
 import { applyPatch, deepClone, Operation } from 'fast-json-patch';
 import type { Execution, ExecutionState, ValidationResult, ValidationError } from '@/types';
 import type { TransformOperation } from '@/types/node-parameters';
-import { ParamProcessor } from './ParamProcessor';
+import { Eval } from './Eval';
 
 /**
  * Transform safety manager for state snapshots and rollback
@@ -55,7 +55,7 @@ class TransformSafetyManager {
  */
 export class TransformProcessor {
   private safetyManager = new TransformSafetyManager();
-  private paramProcessor = new ParamProcessor();
+  private eval = new Eval();
 
   /**
    * Apply transform operations to execution state
@@ -119,13 +119,13 @@ export class TransformProcessor {
       // Resolve template expressions in the value
       let resolvedValue = transform.value;
       if (transform.value !== undefined) {
-        resolvedValue = await this.paramProcessor.resolveTemplates(transform.value, execution);
+        resolvedValue = await this.eval.resolveTemplates(transform.value, execution);
       }
 
       // Resolve template expressions in the from path (for copy/move operations)
       let resolvedFrom = transform.from;
       if (transform.from !== undefined) {
-        resolvedFrom = (await this.paramProcessor.resolveTemplates(transform.from, execution)) as string;
+        resolvedFrom = (await this.eval.resolveTemplates(transform.from, execution)) as string;
       }
 
       // Create JSON Patch operation based on operation type
@@ -247,10 +247,10 @@ export class TransformProcessor {
 
     // Validate template expressions in value if present
     if (transform.value !== undefined) {
-      const templateValidation = this.paramProcessor.validateTemplateExpressions(transform.value);
+      const templateValidation = this.eval.validateTemplateExpressions(transform.value);
       if (!templateValidation.valid) {
         const templateErrors =
-          templateValidation.errors?.map((e) => ({
+          templateValidation.errors?.map((e: ValidationError) => ({
             ...e,
             message: `${path}.value: ${e.message}`,
           })) || [];
@@ -260,10 +260,10 @@ export class TransformProcessor {
 
     // Validate template expressions in from path if present
     if (transform.from !== undefined) {
-      const templateValidation = this.paramProcessor.validateTemplateExpressions(transform.from);
+      const templateValidation = this.eval.validateTemplateExpressions(transform.from);
       if (!templateValidation.valid) {
         const templateErrors =
-          templateValidation.errors?.map((e) => ({
+          templateValidation.errors?.map((e: ValidationError) => ({
             ...e,
             message: `${path}.from: ${e.message}`,
           })) || [];

@@ -146,7 +146,7 @@ describe('Engine', () => {
       const engine = new Engine({ blueprint });
 
       const startNode = blueprint.nodes.find((n) => n.type === 'start')!;
-      const handler = await engine.createHandler(startNode);
+      const handler = await engine.createHandler(startNode, {});
 
       expect(handler).toBeDefined();
       expect(typeof handler.execute).toBe('function');

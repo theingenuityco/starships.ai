@@ -145,6 +145,13 @@ export interface EndParams extends BaseParams {
 }
 
 /**
+ * Transform node parameters
+ */
+export type TransformParams = BaseParams;
+// Inherits transforms?: TransformOperation[] from BaseParams
+// No additional parameters needed
+
+/**
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
@@ -155,4 +162,5 @@ export type NodeParameters =
   | WorkflowParams
   | StartParams
   | EndParams
-  | ConditionalParams;
+  | ConditionalParams
+  | TransformParams;

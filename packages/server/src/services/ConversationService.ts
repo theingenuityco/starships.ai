@@ -1,9 +1,10 @@
 import { MessageService } from '@/services/MessageService';
-import { Agent, AutopilotEvent } from '@starships/autopilot';
+import { StreamingService } from '@/services/StreamingService';
+import { Agent, AutopilotEvent, LLMResponse } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
-// import { StreamingService } from './StreamingService';
+import { Operation } from 'fast-json-patch';
 
 /**
  * Clean conversation service with proper error handling
@@ -11,11 +12,14 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 export class ConversationService {
   private conversationRepository: ConversationRepository;
   private messageService: MessageService;
-  // private streamingService: StreamingService;
+  private streamingService: StreamingService;
+  // Track accumulated content for streaming messages by conversation ID
+  private streamingContent: Map<string, string> = new Map();
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
+    this.streamingService = new StreamingService();
   }
 
   /**
@@ -111,12 +115,22 @@ export class ConversationService {
 
   async addConversationMessage(data: Message & { conversationId: string }): Promise<void> {
     // Save user message to database
-    await this.messageService.createMessage({
+    const userMessage = await this.messageService.createMessage({
       conversationId: data.conversationId,
       role: data.role,
       content: data.content,
       messageType: data.messageType,
     });
+
+    // Broadcast user message immediately via streaming if available
+    if (this.streamingService) {
+      const userMessageDelta: Operation = {
+        op: 'add',
+        path: '/messages/-',
+        value: userMessage,
+      };
+      await this.streamingService.broadcastDelta(data.conversationId, userMessageDelta);
+    }
 
     const agentModels = await this.getConversationAgents(data.conversationId);
     if (agentModels.length < 1) {
@@ -157,7 +171,14 @@ export class ConversationService {
         executionTime,
       });
 
-      // ! RETURN messages here
+      // Send completion event
+      if (this.streamingService) {
+        await this.streamingService.broadcastComplete(data.conversationId, {
+          source: 'agent',
+          content: 'Workflow completed',
+          agentId: agentModel.id,
+        });
+      }
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
         agentId: agentModel.id,
@@ -165,75 +186,166 @@ export class ConversationService {
         stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // // Create error message in conversation
-      // await this.createErrorResponse(error as Error, {
-      //   agentId: agentModel.id,
-      //   conversationId: data.conversationId,
-      //   starshipId: 'unknown', // starshipId property no longer exists on AgentModel
-      // });
+      // Send error via streaming if available
+      if (this.streamingService) {
+        await this.streamingService.broadcastError(data.conversationId, {
+          streamId: data.conversationId,
+          errorCode: 'AGENT_EXECUTION_FAILED',
+          message: error instanceof Error ? error.message : 'Unknown agent execution error',
+          timestamp: new Date().toISOString(),
+          recoverable: false,
+        });
+      }
 
       throw error;
     }
   }
 
   async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
+    if (!this.streamingService) {
+      console.log('No streaming service available for event:', event.type);
+      return;
+    }
+
     switch (event.type) {
-      case 'node_completed': {
-        console.log('save messages in db');
+      case 'workflow_started': {
+        console.log('[STREAMING] Workflow started for conversation:', conversationId);
+        // Initialize streaming content tracker
+        this.streamingContent.set(conversationId, '');
+
+        // Create initial assistant message placeholder for streaming
+        const assistantMessage: MessageModel = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          role: 'assistant',
+          content: '',
+          messageType: 'agent_response',
+          createdAt: event.timestamp,
+          updatedAt: event.timestamp,
+        };
+
+        // Add placeholder message to messages array
+        const delta: Operation = {
+          op: 'add',
+          path: '/messages/-',
+          value: { ...assistantMessage, streaming: true },
+        };
+        await this.streamingService.broadcastDelta(conversationId, delta);
         break;
-        // Check if this is an LLM node with response content
-        // const nodeResult = event.data.execution.results.get(event.execution.currentNodeRef || '');
-        // if (nodeResult && !nodeResult.error && nodeResult.data) {
-        //   const llmData = nodeResult.data as LLMResponse;
-        //   const llmResponseContent = llmData;
-
-        //   if (llmResponseContent && typeof llmResponseContent === 'string' && llmResponseContent.trim()) {
-        //     // Return assistant message with LLM response
-        //     return {
-        //       id: messageId,
-        //       role: 'assistant',
-        //       content: llmResponseContent.trim(),
-        //       messageType: 'agent_response',
-        //       createdAt: event.timestamp,
-        //       updatedAt: event.timestamp,
-        //     };
-        //   }
-        // }
-
-        // // Fallback to system completion message
-        // return {
-        //   id: messageId,
-        //   role: 'system',
-        //   content: `✅ Completed node: ${event.execution.currentNodeRef}`,
-        //   messageType: 'system_notification',
-        //   createdAt: event.timestamp,
-        //   updatedAt: event.timestamp,
-        // };
       }
 
-      case 'workflow_failed':
-        console.error(event.data?.execution?.error);
-        console.log(event.data?.execution);
-        break;
+      case 'content_chunk': {
+        // Stream content chunks in real-time
+        const chunkContent = event.data?.chunk;
+        if (
+          chunkContent &&
+          Array.isArray(chunkContent.choices) &&
+          chunkContent.choices.length > 0 &&
+          chunkContent.choices[0]?.delta?.content
+        ) {
+          const content = String(chunkContent.choices[0].delta.content);
+          console.log('[STREAMING] Content chunk:', content);
 
-      case 'workflow_completed':
-        console.log('completed');
-        break;
-      // return {
-      //   id: messageId,
-      //   role: 'system',
-      //   content: '🎉 Agent workflow completed successfully',
-      //   messageType: 'system_notification',
-      //   createdAt: event.timestamp,
-      //   updatedAt: event.timestamp,
-      // };
+          // Accumulate content server-side and send replace operations
+          const currentContent = this.streamingContent.get(conversationId) || '';
+          const newContent = currentContent + content;
+          this.streamingContent.set(conversationId, newContent);
 
-      case 'content_chunk':
-        console.log('chunk', event.data);
+          const delta: Operation = {
+            op: 'replace',
+            path: '/messages/-1/content',
+            value: newContent,
+          };
+          await this.streamingService.broadcastDelta(conversationId, delta);
+        }
         break;
+      }
 
-      case 'content_complete':
-        console.log('chunk complete');
+      case 'content_complete': {
+        console.log('[STREAMING] Content streaming complete');
+        // Mark the last message as no longer streaming
+        const delta: Operation = {
+          op: 'replace',
+          path: '/messages/-1/streaming',
+          value: false,
+        };
+        await this.streamingService.broadcastDelta(conversationId, delta);
+
+        // Clear streaming content tracker
+        this.streamingContent.delete(conversationId);
+        break;
+      }
+
+      case 'node_started': {
+        console.log('[STREAMING] Node started:', event.data?.execution?.currentNodeRef);
+        // Node started
+        break;
+      }
+
+      case 'node_completed': {
+        console.log('[STREAMING] Node completed:', event.data?.execution?.currentNodeRef);
+
+        // Check if this node produced content and save to database
+        const results = event.data?.execution?.results;
+        const currentNodeRef = event.data?.execution?.currentNodeRef;
+
+        if (results && currentNodeRef) {
+          // Find the result for the current node
+          const nodeResult = results.find((result) => result.nodeRef === currentNodeRef);
+
+          if (nodeResult && !nodeResult.error && nodeResult.data) {
+            const nodeData = nodeResult.data as LLMResponse;
+            const llmMessage = nodeData?.choices[0]?.message?.content;
+            // If this is LLM output, save it as an assistant message
+            if (typeof llmMessage === 'string' && llmMessage.trim()) {
+              const assistantMessage = await this.messageService.createMessage({
+                conversationId,
+                role: 'assistant',
+                content: llmMessage,
+                messageType: 'agent_response',
+              });
+
+              // Update the streaming message with the final content from database
+              const delta: Operation = {
+                op: 'replace',
+                path: '/messages/-1',
+                value: { ...assistantMessage, streaming: false },
+              };
+              await this.streamingService.broadcastDelta(conversationId, delta);
+            }
+          }
+        }
+        break;
+      }
+
+      case 'workflow_completed': {
+        console.log('[STREAMING] Workflow completed successfully');
+        // Final completion will be handled by the main addConversationMessage method
+        break;
+      }
+
+      case 'workflow_failed': {
+        console.error('[STREAMING] Workflow failed:', event.data?.execution?.error);
+
+        // Create error message
+        const errorMessage = await this.messageService.createMessage({
+          conversationId,
+          role: 'system',
+          content: `❌ Workflow failed: ${event.data?.execution?.error || 'Unknown error'}`,
+          messageType: 'error',
+        });
+
+        // Broadcast error message
+        const delta: Operation = {
+          op: 'add',
+          path: '/messages/-',
+          value: errorMessage,
+        };
+        await this.streamingService.broadcastDelta(conversationId, delta);
+        break;
+      }
+
+      default:
+        console.log('[STREAMING] Unhandled event type:', event.type);
         break;
     }
   }

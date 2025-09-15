@@ -1,14 +1,16 @@
 /**
- * Transform Processing System
+ * Transform Node
  *
- * Handles state mutation operations using JSON Patch-like operations with fast-json-patch.
- * Provides safe, atomic state updates with rollback capabilities.
+ * Dedicated node for state mutations using JSON Patch operations.
+ * Contains all transform processing logic internally without separate processor class.
  */
 
 import { applyPatch, deepClone, Operation } from 'fast-json-patch';
-import type { Execution, ExecutionState, ValidationResult, ValidationError } from '@/types';
-import type { TransformOperation } from '@/types/node-parameters';
-import { Eval } from './Eval';
+import { NodeHandler } from '@/types/node-handler';
+import { ValidationResult, ValidationError, Execution, ExecutionState } from '@/types';
+import type { TransformOperation, TransformParams } from '@/types/node-parameters';
+import type { NodeHandlerOptions } from '@/types/node-handler';
+import { Eval } from '@/engine/Eval';
 
 /**
  * Transform safety manager for state snapshots and rollback
@@ -50,17 +52,48 @@ class TransformSafetyManager {
   }
 }
 
-/**
- * Core transform processor that handles state mutations using JSON Patch operations
- */
-export class TransformProcessor {
+export class Transform implements NodeHandler {
+  private params: TransformParams;
+  private options?: NodeHandlerOptions;
   private safetyManager = new TransformSafetyManager();
   private eval = new Eval();
+
+  constructor(params: TransformParams, options?: NodeHandlerOptions) {
+    this.params = params;
+    this.options = options;
+  }
+
+  /**
+   * Execute transform operations on execution state
+   */
+  async execute(): Promise<{ transformsApplied: number; operations: string[] }> {
+    if (!this.params.transforms || this.params.transforms.length === 0) {
+      return {
+        transformsApplied: 0,
+        operations: [],
+      };
+    }
+
+    if (!this.options?.execution) {
+      throw new Error('Transform node requires execution context to modify state');
+    }
+
+    // Apply transforms to execution state
+    await this.applyTransforms(this.params.transforms, this.options.execution);
+
+    // Return summary of what was transformed
+    const operations = this.params.transforms.map((t) => `${t.operation} ${t.path}`);
+
+    return {
+      transformsApplied: this.params.transforms.length,
+      operations,
+    };
+  }
 
   /**
    * Apply transform operations to execution state
    */
-  async applyTransforms(transforms: TransformOperation[], execution: Execution): Promise<void> {
+  private async applyTransforms(transforms: TransformOperation[], execution: Execution): Promise<void> {
     if (!transforms || transforms.length === 0) return;
 
     // Create execution snapshot for rollback
@@ -87,26 +120,6 @@ export class TransformProcessor {
       this.safetyManager.rollbackExecution(execution, executionSnapshot);
       throw error;
     }
-  }
-
-  /**
-   * Validate transform operations
-   */
-  validateTransforms(transforms: TransformOperation[]): ValidationResult {
-    const errors: ValidationError[] = [];
-
-    for (let i = 0; i < transforms.length; i++) {
-      const transform = transforms[i];
-      const validation = this.validateTransformOperation(transform, `transforms[${i}]`);
-      if (!validation.valid) {
-        errors.push(...(validation.errors || []));
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
   }
 
   /**
@@ -187,6 +200,56 @@ export class TransformProcessor {
     }
 
     return operations;
+  }
+
+  /**
+   * Validate transform operations
+   */
+  validate(): ValidationResult {
+    const errors: ValidationError[] = [];
+
+    // Check if transforms are provided
+    if (!this.params.transforms || this.params.transforms.length === 0) {
+      errors.push({
+        code: 'MISSING_REQUIRED_FIELD',
+        message: 'Transform node requires at least one transform operation',
+      });
+      return {
+        valid: false,
+        errors,
+      };
+    }
+
+    // Validate transform operations
+    const validation = this.validateTransforms(this.params.transforms);
+    if (!validation.valid) {
+      errors.push(...(validation.errors || []));
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
+  /**
+   * Validate transform operations
+   */
+  private validateTransforms(transforms: TransformOperation[]): ValidationResult {
+    const errors: ValidationError[] = [];
+
+    for (let i = 0; i < transforms.length; i++) {
+      const transform = transforms[i];
+      const validation = this.validateTransformOperation(transform, `transforms[${i}]`);
+      if (!validation.valid) {
+        errors.push(...(validation.errors || []));
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
   }
 
   /**

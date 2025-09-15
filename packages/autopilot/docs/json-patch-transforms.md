@@ -2,7 +2,7 @@
 
 ## Overview
 
-The autopilot package now uses a JSON Patch-based transform system for state mutations, replacing the previous JSONata assignment expressions. This provides a more standardized, predictable, and powerful way to modify execution state.
+The autopilot package uses a JSON Patch-based transform system for state mutations, providing a standardized, predictable, and powerful way to modify execution state. **The system now supports both inline transforms (on any node) and dedicated Transform nodes for maximum flexibility.**
 
 ## Key Changes
 
@@ -85,14 +85,88 @@ interface BaseParams {
 - Paths follow JSON Pointer format (RFC 6901)
 - Array operations use `-` for append: `/state/list/-`
 
+## Transform Node vs Inline Transforms
+
+### Transform Node (Recommended for Complex Operations)
+
+Use dedicated Transform nodes for:
+
+- Complex state transformations that need conditional routing
+- Reusable transform logic
+- Better workflow visibility and debugging
+- Error handling with dedicated paths
+
+```typescript
+// Explicit Transform node in workflow
+{
+  ref: 'update_counters',
+  type: 'transform',
+  name: 'Update Request Counters',
+  description: 'Increment API call counters and update timestamps',
+  parameters: {
+    transforms: [
+      { operation: 'replace', path: '/state/apiCallCount', value: '{{ (state.apiCallCount || 0) + 1 }}' },
+      { operation: 'add', path: '/state/lastApiCall', value: '{{ $now() }}' },
+      { operation: 'add', path: '/state/callHistory/-', value: '{{ { timestamp: $now(), nodeRef: currentNodeRef } }}' }
+    ]
+  }
+}
+```
+
+### Inline Transforms (Backward Compatible)
+
+Use inline transforms for:
+
+- Simple, node-specific state updates
+- Existing workflows that already use the pattern
+- Quick state modifications tied directly to node execution
+
+```typescript
+// Inline transforms on other nodes
+{
+  ref: 'api_call',
+  type: 'http_request',
+  name: 'Fetch User Data',
+  description: 'Get user data from API',
+  parameters: {
+    url: 'https://api.example.com/users/123',
+    transforms: [
+      { operation: 'replace', path: '/state/lastApiCall', value: '{{ $now() }}' },
+      { operation: 'replace', path: '/state/apiCallCount', value: '{{ (state.apiCallCount || 0) + 1 }}' }
+    ]
+  }
+}
+```
+
 ## Usage Examples
 
 ### Basic State Management
+
+**Using Transform Node:**
+
+```typescript
+{
+  ref: 'init_state',
+  type: 'transform',
+  name: 'Initialize Session',
+  description: 'Set up initial session state',
+  parameters: {
+    transforms: [
+      { operation: 'add', path: '/state/session', value: { id: '{{ $random() }}', startTime: '{{ $now() }}' } },
+      { operation: 'add', path: '/state/counters', value: { requests: 0, errors: 0 } }
+    ]
+  }
+}
+```
+
+**Using Inline Transform:**
 
 ```typescript
 {
   ref: 'init',
   type: 'start',
+  name: 'Start Workflow',
+  description: 'Initialize workflow and session state',
   parameters: {
     transforms: [
       { operation: 'add', path: '/state/session', value: { id: '{{ $random() }}', startTime: '{{ $now() }}' } },

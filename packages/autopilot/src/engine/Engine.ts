@@ -10,7 +10,6 @@ import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowN
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
 import { Eval } from './Eval';
-import { TransformProcessor } from './TransformProcessor';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
@@ -22,6 +21,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   llm: () => import('@/nodes/LLM').then((m) => m.LLM as NodeHandlerConstructor),
   user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
   conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
+  transform: () => import('@/nodes/Transform').then((m) => m.Transform as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {
@@ -38,7 +38,6 @@ export class Engine {
   private execution: Execution;
   private eventCallback?: EventCallback;
   private eval: Eval;
-  private transformProcessor: TransformProcessor;
 
   constructor(config: EngineConfig) {
     this.blueprint = config.blueprint;
@@ -53,7 +52,6 @@ export class Engine {
     this.execution = initialExecution;
     this.eventCallback = config.eventCallback;
     this.eval = new Eval();
-    this.transformProcessor = new TransformProcessor();
   }
 
   /**
@@ -221,10 +219,16 @@ export class Engine {
       const data = await handler.execute();
       result.data = data;
 
-      // Step 4: Apply transforms after successful execution
+      // Step 4: Handle transforms based on node type
       const nodeParams = node.parameters as { transforms?: TransformOperation[] };
       if (nodeParams.transforms) {
-        await this.transformProcessor.applyTransforms(nodeParams.transforms, this.execution);
+        if (node.type === 'transform') {
+          // Transform node - transforms already applied in handler execution above
+          // No additional processing needed
+        } else {
+          // Non-transform node with transforms - spawn Transform node dynamically
+          await this.executeInlineTransform(nodeParams.transforms);
+        }
       }
 
       this.emitEvent('node_completed');
@@ -326,7 +330,17 @@ export class Engine {
       // Validate transform expressions if present
       const nodeParams = node.parameters as { transforms?: TransformOperation[] };
       if (nodeParams.transforms) {
-        const transformValidation = this.transformProcessor.validateTransforms(nodeParams.transforms);
+        // Create a temporary Transform node to validate transforms
+        const virtualTransformNode: WorkflowNode = {
+          type: 'transform',
+          ref: 'validation_transform',
+          name: 'Validation Transform',
+          description: 'Temporary transform node for validation',
+          parameters: { transforms: nodeParams.transforms },
+        };
+
+        const transformHandler = await this.createHandler(virtualTransformNode, { transforms: nodeParams.transforms });
+        const transformValidation = transformHandler.validate();
         if (!transformValidation.valid) {
           const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
           validationErrors.push(...errorMessages);
@@ -388,6 +402,23 @@ export class Engine {
 
   getExecution() {
     return this.execution;
+  }
+
+  /**
+   * Execute inline transform operations by creating a virtual Transform node
+   */
+  private async executeInlineTransform(transforms: TransformOperation[]): Promise<void> {
+    // Create virtual Transform node and execute it
+    const virtualTransformNode: WorkflowNode = {
+      type: 'transform',
+      ref: 'inline_transform',
+      name: 'Inline Transform',
+      description: 'Auto-generated transform node for inline transforms',
+      parameters: { transforms },
+    };
+
+    const transformHandler = await this.createHandler(virtualTransformNode, { transforms });
+    await transformHandler.execute();
   }
 
   /**

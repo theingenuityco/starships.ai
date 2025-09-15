@@ -69,16 +69,17 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
 /**
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
+ * Template expressions ({{ }}) are supported for all numeric and string fields
  */
 export interface LlmParams extends BaseParams {
   model: string;
   messages: { role: string; content: string }[];
-  temperature?: number;
-  maxTokens?: number;
-  timeout?: number;
-  topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
+  temperature?: number | string; // Supports template expressions
+  maxTokens?: number | string; // Supports template expressions
+  timeout?: number | string; // Supports template expressions
+  topP?: number | string; // Supports template expressions
+  frequencyPenalty?: number | string; // Supports template expressions
+  presencePenalty?: number | string; // Supports template expressions
 }
 
 /**

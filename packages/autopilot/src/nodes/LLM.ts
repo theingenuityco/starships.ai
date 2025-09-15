@@ -240,43 +240,55 @@ export class LLM implements NodeHandler {
       });
     }
 
-    // Parameter range validation
-    if (this.params.temperature !== undefined && (this.params.temperature < 0 || this.params.temperature > 2)) {
+    // Parameter range validation (skip validation for template strings)
+    if (
+      this.params.temperature !== undefined &&
+      typeof this.params.temperature === 'number' &&
+      (this.params.temperature < 0 || this.params.temperature > 2)
+    ) {
       errors.push({
         code: 'INVALID_PARAMETERS',
         message: 'Temperature must be between 0 and 2',
       });
     }
 
-    if (this.params.maxTokens !== undefined && this.params.maxTokens < 1) {
+    if (this.params.maxTokens !== undefined && typeof this.params.maxTokens === 'number' && this.params.maxTokens < 1) {
       errors.push({
         code: 'INVALID_PARAMETERS',
         message: 'Max tokens must be greater than 0',
       });
     }
 
-    if (this.params.topP !== undefined && (this.params.topP < 0 || this.params.topP > 1)) {
+    if (this.params.topP !== undefined && typeof this.params.topP === 'number' && (this.params.topP < 0 || this.params.topP > 1)) {
       errors.push({
         code: 'INVALID_PARAMETERS',
         message: 'Top P must be between 0 and 1',
       });
     }
 
-    if (this.params.frequencyPenalty !== undefined && (this.params.frequencyPenalty < -2 || this.params.frequencyPenalty > 2)) {
+    if (
+      this.params.frequencyPenalty !== undefined &&
+      typeof this.params.frequencyPenalty === 'number' &&
+      (this.params.frequencyPenalty < -2 || this.params.frequencyPenalty > 2)
+    ) {
       errors.push({
         code: 'INVALID_PARAMETERS',
         message: 'Frequency penalty must be between -2 and 2',
       });
     }
 
-    if (this.params.presencePenalty !== undefined && (this.params.presencePenalty < -2 || this.params.presencePenalty > 2)) {
+    if (
+      this.params.presencePenalty !== undefined &&
+      typeof this.params.presencePenalty === 'number' &&
+      (this.params.presencePenalty < -2 || this.params.presencePenalty > 2)
+    ) {
       errors.push({
         code: 'INVALID_PARAMETERS',
         message: 'Presence penalty must be between -2 and 2',
       });
     }
 
-    if (this.params.timeout !== undefined && this.params.timeout < 1000) {
+    if (this.params.timeout !== undefined && typeof this.params.timeout === 'number' && this.params.timeout < 1000) {
       errors.push({
         code: 'INVALID_PARAMETERS',
         message: 'Timeout should be at least 1000ms',

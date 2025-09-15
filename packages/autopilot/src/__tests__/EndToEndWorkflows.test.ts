@@ -12,10 +12,6 @@ import type { Blueprint } from '@/types';
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Mock jsonata
-const mockJsonata = jest.fn();
-jest.mock('jsonata', () => mockJsonata);
-
 // Mock console to reduce test noise
 const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
@@ -28,11 +24,6 @@ describe('End-to-End Workflow Execution', () => {
     autopilot.reset();
     autopilot.setCredentials({
       openrouterApiKey: 'test-e2e-api-key',
-    });
-
-    // Default JSONata mock
-    mockJsonata.mockReturnValue({
-      evaluate: jest.fn().mockReturnValue(true),
     });
 
     // Default fetch mock with proper structure
@@ -240,10 +231,6 @@ describe('End-to-End Workflow Execution', () => {
           json: async () => ({ updated: true, status: 'processing' }),
           text: async () => '{"updated":true,"status":"processing"}',
         });
-
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue(true),
-      });
 
       const engine = new Engine({
         blueprint,
@@ -581,11 +568,6 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"approved":true,"post_id":"123"}',
         });
 
-      // Mock conditional to return 'approve'
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue('approve'),
-      });
-
       const engine = new Engine({ blueprint });
       await engine.execute();
 
@@ -744,11 +726,6 @@ describe('End-to-End Workflow Execution', () => {
           }),
           text: async () => '{"notification_sent":true,"recipients":["admin@example.com"]}',
         });
-
-      // Mock validation to pass
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue(true),
-      });
 
       const startTime = Date.now();
       const engine = new Engine({ blueprint });

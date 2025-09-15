@@ -12,10 +12,6 @@ import type { Blueprint, Node } from '@/types';
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Mock jsonata
-const mockJsonata = jest.fn();
-jest.mock('jsonata', () => mockJsonata);
-
 describe('Sophisticated Workflows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -24,11 +20,6 @@ describe('Sophisticated Workflows', () => {
     autopilot.reset();
     autopilot.setCredentials({
       openrouterApiKey: 'test-api-key',
-    });
-
-    // Default JSONata mock
-    mockJsonata.mockReturnValue({
-      evaluate: jest.fn().mockReturnValue(true),
     });
 
     // Default fetch mock with proper structure
@@ -93,11 +84,6 @@ describe('Sophisticated Workflows', () => {
         ],
         metadata: { type: 'branching-workflow' },
       };
-
-      // Mock conditional to return true (premium user)
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue(true),
-      });
 
       // Mock premium API response
       const mockHeaders = new Map([['content-type', 'application/json']]);
@@ -186,11 +172,6 @@ describe('Sophisticated Workflows', () => {
         ],
         metadata: { type: 'branching-workflow' },
       };
-
-      // Mock conditional to return false (regular user)
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue(false),
-      });
 
       // Mock regular API response
       const mockHeaders = new Map([['content-type', 'application/json']]);
@@ -286,11 +267,6 @@ describe('Sophisticated Workflows', () => {
         ],
         metadata: { type: 'multi-branch-workflow' },
       };
-
-      // Mock conditional to return 'silver' tier
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue('silver'),
-      });
 
       const mockHeaders = new Map([['content-type', 'application/json']]);
       mockHeaders.forEach = jest.fn((callback) => {
@@ -642,15 +618,6 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"processed":true,"result":"completed"}',
         });
 
-      // Mock conditionals to return success path
-      let callCount = 0;
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockImplementation(() => {
-          callCount++;
-          return callCount === 1 ? true : true; // Both conditionals return true
-        }),
-      });
-
       const engine = new Engine({ blueprint: mainWorkflow });
       await engine.execute();
 
@@ -823,11 +790,6 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"action":"positive","applied":true}',
       });
 
-      // Mock conditional to return 'positive' (matching the positive analysis)
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue('positive'),
-      });
-
       const engine = new Engine({ blueprint });
       await engine.execute();
 
@@ -964,15 +926,6 @@ describe('Sophisticated Workflows', () => {
           json: async () => ({ recovered: true, status: 'handled' }),
           text: async () => '{"recovered":true,"status":"handled"}',
         });
-
-      // Mock conditionals: first false (error), second true (retry success)
-      let conditionCallCount = 0;
-      mockJsonata.mockImplementation(() => ({
-        evaluate: jest.fn().mockImplementation(() => {
-          conditionCallCount++;
-          return conditionCallCount === 1 ? false : true; // First fails, second succeeds
-        }),
-      }));
 
       const engine = new Engine({ blueprint });
       await engine.execute();

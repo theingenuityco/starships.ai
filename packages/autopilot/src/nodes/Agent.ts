@@ -34,17 +34,33 @@ export class Agent implements NodeHandler {
 
     // Initialize blueprint if not provided
     if (!this.params.blueprint) {
+      const startRef = `start_${this.nodeCounter++}`;
+      const endRef = `end_${this.nodeCounter++}`;
+
       this.params.blueprint = {
         nodes: [
           {
-            ref: `start_${this.nodeCounter++}`,
+            ref: startRef,
             type: 'start',
             name: 'Start',
             description: 'Start node',
             parameters: {},
           },
+          {
+            ref: endRef,
+            type: 'end',
+            name: 'End',
+            description: 'End node',
+            parameters: {},
+          },
         ],
-        edges: [],
+        edges: [
+          {
+            ref: `edge_1`,
+            from: startRef,
+            to: endRef,
+          },
+        ],
         metadata: {
           generatedBy: 'Agent constructor',
           createdAt: new Date().toISOString(),
@@ -87,18 +103,29 @@ export class Agent implements NodeHandler {
   }
 
   /**
-   * Helper method to connect new node to previous node
+   * Helper method to connect new node to previous node and redirect to end node
    */
   private connectToPrevious(newNodeRef: string): void {
-    const lastNode = this.getLastNode();
-    if (lastNode && this.params.blueprint.nodes.length > 1) {
-      const prevNode = this.params.blueprint.nodes[this.params.blueprint.nodes.length - 2];
-      this.params.blueprint.edges.push({
-        ref: `edge_${this.params.blueprint.edges.length + 1}`,
-        from: prevNode.ref,
-        to: newNodeRef,
-      });
-    }
+    const nodes = this.params.blueprint.nodes;
+    const edges = this.params.blueprint.edges;
+
+    // Find the end node
+    const endNode = nodes.find((node) => node.type === 'end');
+    if (!endNode) return;
+
+    // Find the node that currently connects to the end node (should be the last added node)
+    const edgeToEnd = edges.find((edge) => edge.to === endNode.ref);
+    if (!edgeToEnd) return;
+
+    // Update the edge to end node: redirect it to point to the new node
+    edgeToEnd.to = newNodeRef;
+
+    // Add new edge from the new node to the end node
+    edges.push({
+      ref: `edge_${edges.length + 1}`,
+      from: newNodeRef,
+      to: endNode.ref,
+    });
   }
 
   // =============================================================================
@@ -629,26 +656,6 @@ export class Agent implements NodeHandler {
   // =============================================================================
   // BUILD* - Workflow Completion
   // =============================================================================
-
-  /**
-   * Complete the agent definition and make it ready for execution
-   */
-  buildAgent(): Agent {
-    const ref = `end_${this.nodeCounter++}`;
-
-    // Add node to blueprint
-    this.params.blueprint.nodes.push({
-      ref,
-      type: 'end',
-      name: 'Built',
-      description: 'Agent is built and ready to execute',
-      parameters: {},
-    });
-
-    this.connectToPrevious(ref);
-    this.updateEngine();
-    return this;
-  }
 
   /**
    * Get current blueprint

@@ -4,7 +4,7 @@ This document explains the client-side streaming implementation that integrates 
 
 ## Overview
 
-The client implements real-time streaming for AI agent conversations using Server-Sent Events (SSE), providing users with immediate feedback as AI responses are generated.
+The client implements real-time streaming for AI agent conversations using Server-Sent Events (SSE) with a **non-blocking architecture** that ensures smooth UI updates during streaming.
 
 ## Architecture
 
@@ -14,13 +14,18 @@ The client implements real-time streaming for AI agent conversations using Serve
 ├─────────────────────────────────────────────────────────┤
 │  ConversationInterface                                  │
 │  ├── ConversationMessageInput (streaming-enabled)      │
-│  ├── ConversationMessageList (streaming display)       │
+│  ├── ConversationMessageList (optimized rendering)     │
 │  └── MessageContent (streaming indicators)             │
 ├─────────────────────────────────────────────────────────┤
-│  useStreamingConversation Hook                          │
-│  ├── SSE Connection Management                          │
-│  ├── Streaming State Management                         │
-│  └── Optimistic UI Updates                              │
+│  useStreamingConversation Hook (NEW)                    │
+│  ├── Non-blocking SSE Management                        │
+│  ├── Event Queue Processing                             │
+│  └── Optimized State Updates                            │
+├─────────────────────────────────────────────────────────┤
+│  StreamingManager Class (NEW)                           │
+│  ├── Event Loop Yielding                                │
+│  ├── Queue-based Processing                             │
+│  └── RequestIdleCallback Integration                    │
 ├─────────────────────────────────────────────────────────┤
 │  Protocol Layer (@starships/protocol)                   │
 │  ├── StreamingChunk Types                               │
@@ -31,121 +36,227 @@ The client implements real-time streaming for AI agent conversations using Serve
 
 ## Key Components
 
+### StreamingManager Class (NEW)
+
+Located at `src/lib/streaming-manager.ts`
+
+**Responsibilities:**
+
+- Manages SSE connections without blocking the event loop
+- Queues streaming events for asynchronous processing
+- Yields control to React for UI updates between events
+- Uses `requestIdleCallback` for optimal scheduling
+
+**Key Features:**
+
+- **Non-blocking event processing**: Events are queued and processed asynchronously
+- **Event loop yielding**: After each event, control is yielded back to the browser
+- **Smart scheduling**: Uses `requestIdleCallback` when available for optimal performance
+- **Graceful degradation**: Falls back to `setTimeout(0)` in older browsers
+
+**Usage:**
+
+```typescript
+const manager = new StreamingManager({
+  url: '/api/streaming',
+  onEvent: async event => {
+    // Process event without blocking
+    updateState(event.data)
+  },
+  onError: error => console.error(error),
+})
+
+await manager.start()
+```
+
 ### useStreamingConversation Hook
 
 Located at `src/hooks/useStreamingConversation.ts`
 
 **Responsibilities:**
 
-- Manages SSE connections to the streaming endpoint
-- Handles real-time chunk processing
-- Provides streaming state and content to components
+- Provides a React-friendly interface to StreamingManager
+- Manages streaming state with optimized updates
 - Integrates with TanStack Query for data consistency
+- Handles conversation-specific streaming logic
 
 **Key Features:**
 
-- Automatic connection management
-- Error handling and recovery
-- Optimistic UI updates
-- Streaming content accumulation
+- **Non-blocking streaming**: Uses StreamingManager for event processing
+- **Optimized React updates**: Batches state updates efficiently
+- **Memory efficient**: Cleans up resources properly
+- **Error resilient**: Handles connection failures gracefully
 
 **Usage:**
 
 ```typescript
-const { sendMessageWithStreaming, streamingState, isStreaming, streamingContent } = useStreamingConversation()
+const { sendMessageWithStreaming, isStreaming, streamingContent, stopStreaming } = useStreamingConversation(conversationId)
 ```
 
-### ConversationMessageInput
+### ConversationMessageList (Updated)
+
+**Optimizations:**
+
+- **Memoized message bubbles**: Prevents unnecessary re-renders
+- **Smart scrolling**: Uses `requestAnimationFrame` for smooth scrolling
+- **Efficient diff detection**: Custom comparison for streaming messages
+- **Optimized rendering**: Only re-renders changed messages
+
+### ConversationMessageInput (Updated)
 
 **Integration Changes:**
 
-- Uses `sendMessageWithStreaming` instead of regular `sendMessage`
-- Disables input during streaming to prevent multiple requests
-- Shows loading indicators during streaming
+- Uses `useStreamingConversation` for non-blocking streaming
+- Supports stop streaming functionality
+- Shows real-time streaming status
+- Handles streaming states gracefully
 
-### ConversationMessageList
-
-**Integration Changes:**
-
-- Displays temporary streaming messages in real-time
-- Combines regular messages with streaming content
-- Passes streaming state to individual message components
-
-### MessageContent
-
-**Integration Changes:**
-
-- Shows streaming indicators (animated cursor, "thinking..." text)
-- Handles incomplete markdown during streaming
-- Displays real-time content updates
-
-## Streaming Flow
+## Non-Blocking Streaming Flow
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Input as MessageInput
     participant Hook as useStreamingConversation
+    participant Manager as StreamingManager
+    participant Queue as Event Queue
+    participant React as React Renderer
     participant Server as Streaming API
-    participant List as MessageList
-    participant Content as MessageContent
 
     User->>Input: Type message & send
     Input->>Hook: sendMessageWithStreaming()
-    Hook->>Server: POST /messages (stream=true)
-    Server->>Hook: StreamingResponse (streamId)
-    Hook->>Server: Connect to SSE endpoint
+    Hook->>Manager: Create & start manager
+    Manager->>Server: POST /messages (stream=true)
 
-    loop Streaming Chunks
-        Server->>Hook: SSE: chunk event
-        Hook->>List: Update streaming content
-        List->>Content: Render with isStreaming=true
-        Content->>User: Show streaming indicators
+    loop Streaming Events
+        Server->>Manager: SSE event
+        Manager->>Queue: Queue event
+        Manager->>Manager: Yield to event loop
+        React->>React: Process state updates
+        Queue->>Hook: Process queued event
+        Hook->>React: Update state
+        React->>User: Render UI update
     end
 
-    Server->>Hook: SSE: complete event
-    Hook->>List: Replace streaming message with final
-    List->>Content: Render final message
-    Content->>User: Show complete message
+    Server->>Manager: Complete event
+    Manager->>Hook: Final update
+    Hook->>React: Clear streaming state
+    React->>User: Show complete message
 ```
 
-## Streaming States
+## Key Improvements in 2025 Architecture
 
-The client manages several streaming states:
+### 1. Non-Blocking Event Processing
+
+**Problem**: SSE streaming was blocking the JavaScript event loop, preventing React from processing state updates until the entire stream completed.
+
+**Solution**: Implemented queue-based event processing with explicit yielding:
 
 ```typescript
-interface StreamingState {
-  status: 'idle' | 'connecting' | 'streaming' | 'complete' | 'error'
-  streamId: string | null
-  content: string // Accumulated streaming content
-  error: StreamingError | null
-  isStreaming: boolean
+// Event processing with yielding
+private async processEventQueue(): Promise<void> {
+  while (this.isStreaming || this.eventQueue.length > 0) {
+    if (this.eventQueue.length > 0) {
+      const event = this.eventQueue.shift()!
+
+      // Process the event
+      await this.options.onEvent(event)
+
+      // Yield control to the event loop
+      await this.yieldToEventLoop()
+    }
+  }
+}
+
+// Smart yielding using requestIdleCallback
+private yieldToEventLoop(): Promise<void> {
+  return new Promise(resolve => {
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => resolve())
+    } else {
+      setTimeout(resolve, 0)
+    }
+  })
 }
 ```
 
-## Error Handling
+### 2. Optimized React Rendering
 
-- **Connection Errors**: Automatic reconnection attempts
-- **Stream Errors**: Fallback to non-streaming requests
-- **Network Issues**: User-friendly error messages
-- **Timeout Handling**: Configurable timeouts with recovery
+**Problem**: Excessive re-renders during streaming caused performance issues.
 
-## Visual Indicators
+**Solution**: Implemented memoization and smart comparison:
 
-### During Streaming
+```typescript
+// Memoized message component with custom comparison
+const MemoizedMessageBubble = memo(MessageBubble, (prev, next) => {
+  if (prev.message.id !== next.message.id) return false
+  if (prev.message.streaming !== next.message.streaming) return false
+  if (prev.message.streaming) {
+    // Only re-render streaming messages if content changed
+    return prev.message.content === next.message.content
+  }
+  return true
+})
+```
 
-- Animated thinking indicator
-- Streaming cursor (blinking)
-- Disabled input state
-- Progress feedback
+### 3. Separated Streaming Logic
 
-### Error States
+**Problem**: Streaming logic was tightly coupled with conversation management.
 
-- Connection error notifications
-- Retry options
-- Fallback messaging
+**Solution**: Created dedicated streaming hooks and managers:
 
-## Development
+- `StreamingManager`: Handles low-level SSE connections
+- `useStreamingConversation`: Provides React integration
+- `useConversation`: Manages base conversation data
+
+This separation allows for:
+
+- Better testability
+- Easier maintenance
+- Flexible streaming strategies
+- Reusable components
+
+## Performance Considerations
+
+### Memory Management
+
+- Event queues are cleaned up after processing
+- Streaming content is cleared after completion
+- SSE connections are properly closed
+- React components are memoized
+
+### CPU Optimization
+
+- Uses `requestIdleCallback` for non-critical updates
+- Batches state updates when possible
+- Minimizes React re-renders
+- Efficient scroll handling with `requestAnimationFrame`
+
+### Network Efficiency
+
+- Reuses SSE connections where possible
+- Implements automatic reconnection
+- Handles connection failures gracefully
+- Supports streaming cancellation
+
+## Browser Support
+
+- **Modern Browsers**: Full support with `requestIdleCallback`
+- **Legacy Browsers**: Graceful degradation with `setTimeout`
+- **Mobile**: Optimized for mobile networks and devices
+- **SSE Support**: Automatic fallback for unsupported browsers
+
+## Development & Testing
+
+### Enable Debug Logging
+
+```typescript
+// In StreamingManager
+console.log('[StreamingManager] Event processed')
+
+// In useStreamingConversation
+console.log('[Streaming] State updated')
+```
 
 ### Testing Streaming
 
@@ -153,137 +264,37 @@ interface StreamingState {
 # Start development server
 pnpm dev
 
-# In browser, navigate to conversation
-# Send a message to see streaming in action
+# Test streaming behavior
+1. Open conversation interface
+2. Send a message
+3. Observe real-time streaming without UI freezing
+4. Check React DevTools for render patterns
 ```
 
-### Debug Mode
+### Performance Monitoring
 
-Enable streaming debug logs:
+Use Chrome DevTools Performance tab to verify:
 
-```typescript
-// In useStreamingConversation.ts
-const DEBUG_STREAMING = true
-```
-
-## Performance Considerations
-
-- **Memory Management**: Streaming content is cleaned up after completion
-- **Connection Pooling**: SSE connections are reused where possible
-- **Rate Limiting**: Client-side throttling prevents spam
-- **Fallback Strategy**: Graceful degradation for unsupported browsers
-
-## Recent Improvements (2025)
-
-### Simplified Real-time Streaming
-
-**Problem**: The original implementation had complex state management using refs, render triggers, setTimeout, and flushSync that caused timing issues and prevented real-time UI updates despite receiving streaming data.
-
-**Solution**: Simplified the approach by:
-
-1. **Direct State Updates in useStreamingConversation**:
-   - Removed `streamingContentRef` and `renderTrigger` complexity
-   - Use direct `setStreamingState` updates for content accumulation
-   - Let React handle re-rendering naturally
-
-```typescript
-// Before: Complex ref + trigger approach
-streamingContentRef.current = streamingContentRef.current + chunk.content
-setTimeout(() => {
-  flushSync(() => {
-    setStreamingState(prev => ({ ...prev, content: currentContent }))
-    setRenderTrigger(prev => prev + 1)
-  })
-}, 0)
-
-// After: Simple direct state update
-setStreamingState((prev: StreamingState) => ({
-  ...prev,
-  content: prev.content + chunk.content,
-  lastUpdate: Date.now(),
-}))
-```
-
-2. **Optimized Message List Rendering**:
-   - Replaced `useState` + `useEffect` pattern with `useMemo` for streaming messages
-   - Removed artificial render triggers and keys
-   - Streaming messages update reactively based on content changes
-
-```typescript
-// Before: Complex state management
-const [streamingMessage, setStreamingMessage] = useState(null)
-useEffect(() => {
-  /* complex logic */
-}, [streamingContent, renderTrigger])
-
-// After: Simple reactive computation
-const displayMessages = useMemo(() => {
-  if (isStreaming && streamingContent) {
-    const streamingMessage = {
-      /* message object */
-    }
-    return [...messages, streamingMessage]
-  }
-  return messages
-}, [messages, isStreaming, streamingContent, streamingState.status])
-```
-
-3. **Enhanced MessageContent for Streaming**:
-   - Proper link detection in streaming content
-   - Clean separation between streaming and final rendering
-   - Removed memoization blockers
-
-**Result**: Real-time streaming now works smoothly with immediate UI updates as content streams in, no more rendering delays or stale state issues.
-
-### Unified Message Rendering (2025)
-
-**Problem**: Messages appeared in different orders when loaded via API versus streaming, causing inconsistent user experience where streaming messages would appear above user messages instead of below.
-
-**Root Cause**:
-
-- API mode: Server returned messages in `desc` order, client applied `.reverse()` → correct chronological order
-- Streaming mode: Server returned messages in `asc` order, client applied `.reverse()` → incorrect order
-
-**Solution**: Implemented unified rendering approach:
-
-1. **Client-Side Sorting**: Replace `.reverse()` with timestamp-based sorting for consistent ordering
-
-```typescript
-// Before: Inconsistent rendering based on source
-{displayMessages.slice().reverse().map(...)}
-
-// After: Unified chronological sorting
-const displayMessages = useMemo(() => {
-  // ... combine API and streaming messages
-  return combinedMessages.sort((a, b) =>
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  )
-}, [messages, isStreaming, streamingContent])
-
-{displayMessages.map(...)} // No reverse needed
-```
-
-2. **Server-Side Consistency**: Made streaming mode consistent with API mode ordering
-
-```typescript
-// Server streaming endpoint now uses consistent ordering
-orderDirection: 'desc' // Same as API mode
-```
-
-**Result**: Both API-loaded messages and streaming messages now appear in the same chronological order (oldest to newest), providing a unified experience regardless of how messages are received.
-
-## Browser Support
-
-- **Modern Browsers**: Full SSE support
-- **Legacy Browsers**: Automatic fallback to polling
-- **Mobile**: Optimized for mobile networks
+- No long tasks during streaming
+- Smooth 60fps during updates
+- Efficient memory usage
+- Proper event loop scheduling
 
 ## Security
 
 - **Authentication**: JWT tokens included in SSE requests
 - **CORS**: Proper cross-origin handling
-- **Data Validation**: All streaming data is validated client-side
+- **Data Validation**: All streaming data is validated
+- **XSS Protection**: Content is sanitized before rendering
+
+## Future Enhancements
+
+1. **Web Worker Integration**: Move stream processing to a worker thread
+2. **Virtual Scrolling**: For conversations with thousands of messages
+3. **Streaming Compression**: Reduce bandwidth usage
+4. **Progressive Enhancement**: Better offline support
+5. **WebTransport**: Migration path for better performance
 
 ---
 
-This streaming implementation provides a seamless real-time experience while maintaining robustness and performance across different scenarios.
+This streaming implementation provides real-time updates without blocking the UI, ensuring a smooth and responsive user experience during AI conversations.

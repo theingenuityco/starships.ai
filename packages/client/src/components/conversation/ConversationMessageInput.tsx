@@ -2,7 +2,8 @@
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation, useConversation } from '@/hooks/useConversations'
+import { useCreateConversation } from '@/hooks/useConversations'
+import { useStreamingConversation } from '@/hooks/useStreamingConversation'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
@@ -42,9 +43,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
 
-    // Use unified conversation hook when we have a conversationId
-    const { sendMessage: sendMessageFn, isSending } = useConversation(conversationId || null)
-    const isStreaming = isSending
+    // Use the new non-blocking streaming hook
+    // We pass null initially, but will provide conversationId directly to sendMessageWithStreaming
+    const { sendMessageWithStreaming, isStreaming, stopStreaming } = useStreamingConversation(null)
 
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
@@ -88,29 +89,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           console.log('Conversation created:', currentConversationId)
         }
 
-        // Notify parent about message activity immediately (for UI state updates)
-        onMessageSent?.()
-
-        // Send message with streaming (this handles everything: saves message + gets agent response)
-        await sendMessageFn({
-          conversationId: currentConversationId!,
-          agentId: selectedAgent!.id,
-          content: messageToSend,
-          role: 'user',
-          starshipId: starshipId!,
-          messageType: 'user_input',
-          stream: true,
-        })
-
-        // No need to manage streamId - streaming hook will use conversationId directly
-
-        // Clear input and reset UI
+        // Clear input and reset UI immediately for better UX
         setMessage('')
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
         }
+
+        // Notify parent about message activity immediately (for UI state updates)
+        onMessageSent?.()
+
+        // Send message with non-blocking streaming
+        // Pass the conversationId directly since it might be newly created
+        await sendMessageWithStreaming(messageToSend, {
+          agentId: selectedAgent.id,
+          starshipId: starshipId,
+          conversationId: currentConversationId,
+        })
       } catch (error) {
         console.error('Failed to send message:', error)
+        // Restore message on error
+        setMessage(messageToSend)
       } finally {
         setSending(false)
       }
@@ -150,18 +148,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message with streaming (this handles everything: saves message + gets agent response)
-        await sendMessageFn({
-          conversationId: currentConversationId!,
-          agentId: selectedAgent!.id,
-          content: suggestionText,
-          role: 'user',
-          starshipId: starshipId!,
-          messageType: 'user_input',
-          stream: true,
+        // Send message with non-blocking streaming
+        // Pass the conversationId directly since it might be newly created
+        await sendMessageWithStreaming(suggestionText, {
+          agentId: selectedAgent.id,
+          starshipId: starshipId,
+          conversationId: currentConversationId,
         })
-
-        // No need to manage streamId - streaming hook will use conversationId directly
       } catch (error) {
         console.error('Failed to send suggestion:', error)
       } finally {
@@ -190,7 +183,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // TODO: Implement voice recording
     }
 
+    const handleStopStreaming = () => {
+      stopStreaming()
+    }
+
     const getPlaceholder = () => {
+      if (isStreaming) return 'AI is thinking...'
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
@@ -240,6 +238,31 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 rows={1}
               />
             </div>
+
+            {/* Minimal mode: Send button inline */}
+            {minimal && (
+              <Button
+                onClick={isStreaming ? handleStopStreaming : handleSubmit}
+                disabled={!isStreaming && !canSend}
+                size="icon"
+                className={cn(
+                  'h-8 w-8 rounded-full shrink-0 transition-all ml-2',
+                  isStreaming
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : canSend
+                      ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
+                      : 'bg-muted text-muted-foreground cursor-not-allowed'
+                )}
+              >
+                {sending ? (
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                ) : isStreaming ? (
+                  <StopCircle className="h-4 w-4" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            )}
           </div>
 
           {/* Footer Section - Selectors and Action Buttons */}
@@ -252,7 +275,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 {/* Right Side - Action Buttons */}
                 <div className="flex items-center gap-2">
                   {/* File Attachment */}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled || isStreaming}>
                     <Paperclip className="h-4 w-4" />
                   </Button>
 
@@ -267,17 +290,27 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                   </Button>
 
-                  {/* Send Button */}
+                  {/* Send/Stop Button */}
                   <Button
-                    onClick={handleSubmit}
-                    disabled={!canSend}
+                    onClick={isStreaming ? handleStopStreaming : handleSubmit}
+                    disabled={!isStreaming && !canSend}
                     size="icon"
                     className={cn(
                       'h-8 w-8 rounded-full shrink-0 transition-all',
-                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      isStreaming
+                        ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl'
+                        : canSend
+                          ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
+                          : 'bg-muted text-muted-foreground cursor-not-allowed'
                     )}
                   >
-                    {sending || isStreaming ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
+                    {sending ? (
+                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : isStreaming ? (
+                      <StopCircle className="h-4 w-4" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -286,7 +319,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         </div>
 
         {/* Agent Indicator - Only show in non-minimal mode */}
-        {!minimal && selectedAgent && <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">Chatting with {selectedAgent.name}</div>}
+        {!minimal && selectedAgent && (
+          <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
+            {isStreaming ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
+          </div>
+        )}
       </div>
     )
   }

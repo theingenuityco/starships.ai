@@ -1,10 +1,11 @@
 'use client'
 
 import { useConversation } from '@/hooks/useConversations'
+import { useStreamingConversation } from '@/hooks/useStreamingConversation'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { Bot, User } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 
 interface ConversationMessageListProps {
@@ -13,50 +14,70 @@ interface ConversationMessageListProps {
 }
 
 export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
-  // Get messages and streaming state from unified hook
-  const { messages, isLoading, error, isStreaming, streamingContent } = useConversation(conversationId)
+  // Get base messages from the regular hook
+  const { messages, isLoading, error } = useConversation(conversationId)
+
+  // Get streaming state from the new non-blocking streaming hook
+  const { isStreaming, streamingContent, streamingState } = useStreamingConversation(conversationId)
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const lastMessageCountRef = useRef(0)
 
-  // Create display messages including streaming content
+  // Create display messages with optimized rendering
   const displayMessages = useMemo(() => {
     let combinedMessages = [...messages]
 
     // Add streaming message if we have streaming content
     if (isStreaming && streamingContent && streamingContent.trim()) {
-      const hasStreamingMessage = messages.some(msg => msg.streaming === true)
+      // Check if we already have a streaming message
+      const existingStreamingIndex = combinedMessages.findIndex(msg => msg.streaming === true)
 
-      if (!hasStreamingMessage) {
-        const streamingMessage = {
-          id: `streaming-${Date.now()}`,
-          content: streamingContent,
-          role: 'assistant' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          messageType: 'agent_response' as const,
-          streaming: true,
-        }
+      const streamingMessage = {
+        id: `streaming-${streamingState.messageId || Date.now()}`,
+        content: streamingContent,
+        role: 'assistant' as const,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageType: 'agent_response' as const,
+        streaming: true,
+      }
+
+      if (existingStreamingIndex >= 0) {
+        // Update existing streaming message
+        combinedMessages[existingStreamingIndex] = streamingMessage
+      } else {
+        // Add new streaming message
         combinedMessages = [...combinedMessages, streamingMessage]
       }
     }
 
-    // Sort by creation time
+    // Sort by creation time for consistent ordering
     return combinedMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  }, [messages, isStreaming, streamingContent])
+  }, [messages, isStreaming, streamingContent, streamingState.messageId])
 
-  // Auto-scroll to bottom when new messages arrive
+  // Optimized auto-scroll with debouncing
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const container = scrollContainerRef.current
-      const isNearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 100
+    if (!scrollContainerRef.current) return
 
-      if (isNearBottom || isStreaming) {
-        setTimeout(() => {
-          container.scrollTop = container.scrollHeight
-        }, 100)
-      }
+    const container = scrollContainerRef.current
+    const shouldScroll = () => {
+      const threshold = 100
+      return container.scrollTop + container.clientHeight >= container.scrollHeight - threshold
     }
+
+    // Only scroll if user is near bottom or new messages arrived
+    if (shouldScroll() || displayMessages.length > lastMessageCountRef.current || isStreaming) {
+      // Use requestAnimationFrame for smooth scrolling
+      requestAnimationFrame(() => {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: displayMessages.length === lastMessageCountRef.current ? 'smooth' : 'auto',
+        })
+      })
+    }
+
+    lastMessageCountRef.current = displayMessages.length
   }, [displayMessages.length, isStreaming, streamingContent])
 
   if (!conversationId) {
@@ -81,10 +102,10 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
 
   return (
     <div className="h-full flex flex-col">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-6">
           {displayMessages.map(message => (
-            <ConversationMessageBubble key={message.streaming ? `streaming-${message.content?.length}` : message.id} message={message} />
+            <MemoizedMessageBubble key={message.streaming ? `streaming-${message.id}` : message.id} message={message} />
           ))}
         </div>
       </div>
@@ -96,47 +117,61 @@ interface ConversationMessageBubbleProps {
   message: MessageModel & { streaming?: boolean }
 }
 
-function ConversationMessageBubble({ message }: ConversationMessageBubbleProps) {
-  const isUser = message.role === 'user'
+// Memoized message bubble to prevent unnecessary re-renders
+const MemoizedMessageBubble = memo(
+  function ConversationMessageBubble({ message }: ConversationMessageBubbleProps) {
+    const isUser = message.role === 'user'
 
-  if (isUser) {
-    // User message: Blue bubble on the right
-    return (
-      <div className="flex justify-end">
-        <div className="flex items-end gap-3 max-w-[70%]">
-          <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3">
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
-          </div>
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-            <User className="w-4 h-4 text-primary" />
-          </div>
-        </div>
-      </div>
-    )
-  } else {
-    // AI message: Plain text on the left (no bubble)
-    return (
-      <div className="flex justify-start">
-        <div className="flex items-start gap-3 max-w-[85%]">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
-            <Bot className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <ConversationMessageContent
-              content={message.content}
-              messageId={message.id}
-              enableMarkdown={true}
-              enableCopy={false}
-              enableLinkPreview={true}
-              isStreaming={message.streaming}
-              className="text-foreground"
-            />
+    if (isUser) {
+      // User message: Blue bubble on the right
+      return (
+        <div className="flex justify-end">
+          <div className="flex items-end gap-3 max-w-[70%]">
+            <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3">
+              <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
+            </div>
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
+              <User className="w-4 h-4 text-primary" />
+            </div>
           </div>
         </div>
-      </div>
-    )
+      )
+    } else {
+      // AI message: Plain text on the left (no bubble)
+      return (
+        <div className="flex justify-start">
+          <div className="flex items-start gap-3 max-w-[85%]">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
+              <Bot className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <ConversationMessageContent
+                content={message.content}
+                messageId={message.id}
+                enableMarkdown={true}
+                enableCopy={!message.streaming}
+                enableLinkPreview={true}
+                isStreaming={message.streaming}
+                className="text-foreground"
+              />
+            </div>
+          </div>
+        </div>
+      )
+    }
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison for memo optimization
+    if (prevProps.message.id !== nextProps.message.id) return false
+    if (prevProps.message.streaming !== nextProps.message.streaming) return false
+    if (prevProps.message.streaming) {
+      // For streaming messages, only re-render if content actually changed
+      return prevProps.message.content === nextProps.message.content
+    }
+    // For non-streaming messages, assume they don't change
+    return true
   }
-}
+)
 
 function EmptyState() {
   return (

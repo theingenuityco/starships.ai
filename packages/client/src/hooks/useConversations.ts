@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { applyOperation, Operation } from 'fast-json-patch'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -192,6 +193,30 @@ export function useConversation(conversationId: string | null) {
         return
       }
 
+      // Handle content streaming events for UI display
+      if (data.content && typeof data.content === 'string') {
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'streaming',
+          isStreaming: true,
+          content: prev.content + data.content, // Accumulate streaming content
+          lastUpdate: Date.now(),
+        }))
+        return
+      }
+
+      // Handle delta content streaming (for incremental text updates)
+      if (data.delta && data.delta.content) {
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'streaming',
+          isStreaming: true,
+          content: prev.content + data.delta.content, // Accumulate streaming content
+          lastUpdate: Date.now(),
+        }))
+        return
+      }
+
       // Legacy content handling removed - now using JSON Patch delta operations
 
       // Complete message objects
@@ -204,7 +229,7 @@ export function useConversation(conversationId: string | null) {
             ...prev,
             status: 'streaming',
             isStreaming: true,
-            content: '',
+            content: '', // Clear any previous streaming content
             lastUpdate: Date.now(),
           }))
 
@@ -233,12 +258,12 @@ export function useConversation(conversationId: string | null) {
       }
 
       // Complete event
-      if (data.status === 'complete') {
+      if (data.status === 'complete' || data.type === 'done') {
         setStreamingState(prev => ({
           ...prev,
           status: 'complete',
           isStreaming: false,
-          content: '',
+          content: '', // Clear streaming content on completion
         }))
 
         // Mark streaming messages as complete
@@ -274,90 +299,87 @@ export function useConversation(conversationId: string | null) {
       }
     ): Promise<ClientMessage> => {
       if (data.stream) {
-        // Handle streaming POST response
+        // Use industry-standard fetch-event-source for POST SSE streaming
         const token = await getCurrentToken()
         if (!token) {
           throw new Error('No authentication token available')
         }
 
         return new Promise((resolve, reject) => {
-          const processStreaming = async () => {
-            try {
-              const response = await fetch(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                  Accept: 'text/event-stream',
-                  'Cache-Control': 'no-cache',
-                },
-                body: JSON.stringify({
+          let resolved = false
+
+          fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              content: data.content,
+            }),
+            async onopen(response) {
+              if (response.ok) {
+                console.log('[STREAMING] Connection opened successfully')
+                // Clear streaming content when starting new stream
+                setStreamingState(prev => ({
+                  ...prev,
+                  status: 'connecting',
+                  isStreaming: true,
+                  content: '',
+                  error: null,
+                  lastUpdate: Date.now(),
+                }))
+                return // Continue processing
+              } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+                // Client error - don't retry
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+              } else {
+                // Server error or rate limit - let it retry
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+              }
+            },
+            onmessage(event) {
+              // Each message event is processed asynchronously - no event loop blocking!
+              try {
+                if (!event.data) return
+
+                const parsed = JSON.parse(event.data)
+                console.log('[STREAMING] Received SSE event:', parsed.op ? 'delta' : parsed.type || 'unknown', parsed)
+
+                // Process streaming event immediately - React will batch updates automatically
+                handleStreamingEvent(parsed)
+              } catch (parseError) {
+                console.warn('[STREAMING] Failed to parse SSE data:', event.data, parseError)
+              }
+            },
+            onclose() {
+              console.log('[STREAMING] Connection closed')
+              if (!resolved) {
+                resolved = true
+                resolve({
+                  id: `user-${Date.now()}`,
+                  role: data.role,
                   content: data.content,
-                }),
-              })
-
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  messageType: data.messageType || 'user_input',
+                } as ClientMessage)
               }
-
-              const reader = response.body?.getReader()
-              if (!reader) {
-                throw new Error('No readable stream available')
+            },
+            onerror(error) {
+              console.error('[STREAMING] Connection error:', error)
+              if (!resolved) {
+                resolved = true
+                reject(error)
               }
-
-              const decoder = new TextDecoder()
-              let buffer = ''
-
-              const processStream = async () => {
-                try {
-                  while (true) {
-                    const { done, value } = await reader.read()
-                    if (done) break
-
-                    buffer += decoder.decode(value, { stream: true })
-                    const lines = buffer.split('\n')
-                    buffer = lines.pop() || ''
-
-                    for (const line of lines) {
-                      if (!line.trim()) continue
-
-                      if (line.startsWith('data: ')) {
-                        const eventData = line.substring(6).trim()
-                        if (!eventData) continue
-
-                        try {
-                          const parsed = JSON.parse(eventData)
-                          console.log('[STREAMING] Received SSE event:', parsed.op ? 'delta' : parsed.type || 'unknown', parsed)
-                          handleStreamingEvent(parsed)
-                        } catch (parseError) {
-                          console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
-                        }
-                      }
-                    }
-                  }
-                } finally {
-                  reader.releaseLock()
-                }
-              }
-
-              // Process the stream
-              await processStream()
-
-              // Resolve with the user message
-              resolve({
-                id: `user-${Date.now()}`,
-                role: data.role,
-                content: data.content,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                messageType: data.messageType || 'user_input',
-              } as ClientMessage)
-            } catch (error) {
+              throw error // Let fetch-event-source handle retries
+            },
+          }).catch(error => {
+            if (!resolved) {
+              resolved = true
               reject(error)
             }
-          }
-
-          processStreaming()
+          })
         })
       } else {
         // Regular message creation
@@ -415,7 +437,7 @@ export function useConversation(conversationId: string | null) {
           }
         })
       } else {
-        // For streaming, just mark the temp message as sent
+        // For streaming, mark the temp message as sent and start streaming
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
           if (!old) return old
 

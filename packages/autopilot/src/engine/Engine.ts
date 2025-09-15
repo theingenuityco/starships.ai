@@ -8,6 +8,7 @@
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode, NodeParameters } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
+import type { TransformOperation } from '@/types/node-parameters';
 import { ParamProcessor } from './ParamProcessor';
 import { TransformProcessor } from './TransformProcessor';
 
@@ -221,9 +222,9 @@ export class Engine {
       result.data = data;
 
       // Step 4: Apply transforms after successful execution
-      const nodeParams = node.parameters as { transform?: string | string[] };
-      if (nodeParams.transform) {
-        await this.transformProcessor.applyTransforms(nodeParams.transform, this.execution, result);
+      const nodeParams = node.parameters as { transforms?: TransformOperation[] };
+      if (nodeParams.transforms) {
+        await this.transformProcessor.applyTransforms(nodeParams.transforms, this.execution);
       }
 
       this.emitEvent('node_completed');
@@ -323,9 +324,9 @@ export class Engine {
       }
 
       // Validate transform expressions if present
-      const nodeParams = node.parameters as { transform?: string | string[] };
-      if (nodeParams.transform) {
-        const transformValidation = this.transformProcessor.validateTransforms(nodeParams.transform);
+      const nodeParams = node.parameters as { transforms?: TransformOperation[] };
+      if (nodeParams.transforms) {
+        const transformValidation = this.transformProcessor.validateTransforms(nodeParams.transforms);
         if (!transformValidation.valid) {
           const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
           validationErrors.push(...errorMessages);

@@ -9,10 +9,24 @@ import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
 
 /**
+ * Transform operation for state mutations using JSON Patch-like operations
+ */
+export interface TransformOperation {
+  /** JSON Patch operation type */
+  operation: 'add' | 'replace' | 'remove' | 'copy' | 'move' | 'test';
+  /** JSON Pointer path (e.g., "/state/counter", "/state/user/name") */
+  path: string;
+  /** Value to apply - can be static value or template expression {{ }} */
+  value?: unknown;
+  /** For copy/move operations - source path */
+  from?: string;
+}
+
+/**
  * Base parameters interface that all node parameters extend from
  */
 export interface BaseParams {
-  transform?: string | string[];
+  transforms?: TransformOperation[];
 }
 
 /**

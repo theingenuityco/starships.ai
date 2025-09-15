@@ -1,5 +1,6 @@
-import type { StreamingDeltaChunk, StreamingError } from '@starships/protocol';
+import type { StreamingError } from '@starships/protocol';
 import type { Response } from 'express';
+import type { Operation } from 'fast-json-patch';
 
 interface ConversationResponse {
   source: 'agent';
@@ -20,9 +21,34 @@ interface ConnectionInfo {
 /**
  * Streaming Service using Server-Sent Events (SSE)
  * Handles multiple concurrent streaming connections for real-time communication
+ * Implemented as a singleton to ensure consistent state across the application
  */
 export class StreamingService {
+  private static instance: StreamingService | null = null;
   private connections: Map<string, ConnectionInfo> = new Map();
+
+  /**
+   * Constructor that enforces singleton pattern
+   * Always returns the same instance when called with 'new'
+   */
+  constructor() {
+    if (StreamingService.instance) {
+      return StreamingService.instance;
+    }
+
+    StreamingService.instance = this;
+    return this;
+  }
+
+  /**
+   * Reset singleton instance (useful for testing)
+   */
+  static resetInstance(): void {
+    if (StreamingService.instance) {
+      StreamingService.instance.closeAllConnections();
+      StreamingService.instance = null;
+    }
+  }
 
   /**
    * Add new streaming connection (supports multiple concurrent connections)
@@ -70,9 +96,9 @@ export class StreamingService {
   }
 
   /**
-   * Broadcast delta chunk to a specific stream
+   * Broadcast delta operation to a specific stream
    */
-  async broadcastDelta(streamId: string, delta: StreamingDeltaChunk): Promise<void> {
+  async broadcastDelta(streamId: string, delta: Operation): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
       this.sendEventToStream(streamId, connection.res, 'delta', delta);
@@ -80,9 +106,9 @@ export class StreamingService {
   }
 
   /**
-   * Broadcast delta chunk to all active streams
+   * Broadcast delta operation to all active streams
    */
-  async broadcastDeltaToAll(delta: StreamingDeltaChunk): Promise<void> {
+  async broadcastDeltaToAll(delta: Operation): Promise<void> {
     const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastDelta(streamId, delta));
     await Promise.all(broadcastPromises);
   }

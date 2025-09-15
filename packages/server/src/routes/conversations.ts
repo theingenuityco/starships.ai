@@ -159,14 +159,29 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
       const streamingService = new StreamingService();
       streamingService.addConnection(conversationId, res);
 
+      // Create ConversationService - it will use the singleton StreamingService internally
+      const streamingConversationService = new ConversationService();
+
       // Process conversation with streaming (async - don't await)
       // Using conversationId as stream identifier - much simpler!
-      conversationService.addConversationMessage({
-        conversationId,
-        content,
-        role: 'user',
-        messageType: 'user_input',
-      });
+      streamingConversationService
+        .addConversationMessage({
+          conversationId,
+          content,
+          role: 'user',
+          messageType: 'user_input',
+        })
+        .catch((error) => {
+          console.error('[ROUTE] Streaming conversation processing failed:', error);
+          // Send error to client via streaming
+          streamingService.broadcastError(conversationId, {
+            streamId: conversationId,
+            errorCode: 'CONVERSATION_PROCESSING_FAILED',
+            message: error instanceof Error ? error.message : 'Unknown conversation processing error',
+            timestamp: new Date().toISOString(),
+            recoverable: false,
+          });
+        });
 
       // Return early to keep connection open (similar to GET endpoint)
       return;

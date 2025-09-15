@@ -1,9 +1,9 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, MessageModel, StreamingDeltaChunk } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
-import { safeApplyDeltas } from '@/lib/jsonPatch'
+import { applyOperation, Operation } from 'fast-json-patch'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -116,74 +116,41 @@ export function useConversation(conversationId: string | null) {
           version: data.version || prev.version,
         }))
 
-        // Apply JSON patch to messages array
+        // Apply JSON patch operation to messages array
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
           if (!old) {
             // Initialize with empty messages array if no data exists
             const initialData = { messages: [], total: 0, conversationId: conversationId! }
-            const deltaResult = safeApplyDeltas(initialData.messages, [data as StreamingDeltaChunk])
 
-            if (deltaResult.success && deltaResult.result) {
+            try {
+              const result = applyOperation(initialData, data as Operation, true)
               return {
-                ...initialData,
-                messages: deltaResult.result,
-                total: Array.isArray(deltaResult.result) ? deltaResult.result.length : 0,
+                ...result.newDocument,
+                total: Array.isArray(result.newDocument.messages) ? result.newDocument.messages.length : 0,
               }
+            } catch (error) {
+              console.error('[STREAMING] Failed to apply operation to initial data:', error)
+              return initialData
             }
-            return initialData
           }
 
-          // Apply patch to existing messages
-          const deltaResult = safeApplyDeltas(old.messages || [], [data as StreamingDeltaChunk])
-
-          if (deltaResult.success && deltaResult.result) {
+          // Apply operation to existing data
+          try {
+            const result = applyOperation(old, data as Operation, true)
             return {
-              ...old,
-              messages: deltaResult.result,
-              total: Array.isArray(deltaResult.result) ? deltaResult.result.length : old.total,
+              ...result.newDocument,
+              total: Array.isArray(result.newDocument.messages) ? result.newDocument.messages.length : old.total,
               lastActivityAt: new Date().toISOString(),
             }
-          } else {
-            console.error('[STREAMING] Failed to apply delta:', deltaResult.error)
-            return old // Return unchanged data on patch failure
+          } catch (error) {
+            console.error('[STREAMING] Failed to apply operation:', error, { operation: data, target: old })
+            return old // Return unchanged data on operation failure
           }
         })
         return
       }
 
-      // Legacy content chunks (incremental text) - kept for backward compatibility
-      if (data.type === 'content') {
-        setStreamingState(prev => ({
-          ...prev,
-          status: 'streaming',
-          isStreaming: true,
-          content: prev.content + data.content,
-          lastUpdate: Date.now(),
-        }))
-
-        // Update the streaming message in TanStack Query cache
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
-          if (!old) return old
-
-          const updatedMessages = [...old.messages]
-          // Find and update the last streaming assistant message
-          for (let i = updatedMessages.length - 1; i >= 0; i--) {
-            const msg = updatedMessages[i]
-            if (msg.role === 'assistant' && msg.streaming === true) {
-              updatedMessages[i] = {
-                ...msg,
-                content: (msg.content || '') + data.content,
-                contentLength: ((msg.content || '') + data.content).length,
-                updatedAt: new Date().toISOString(),
-              }
-              break
-            }
-          }
-
-          return { ...old, messages: updatedMessages }
-        })
-        return
-      }
+      // Legacy content handling removed - now using JSON Patch delta operations
 
       // Complete message objects
       if (data.role !== undefined) {

@@ -220,7 +220,7 @@ export class Engine {
       result.data = data;
 
       // Step 4: Handle transforms based on node type
-      const nodeParams = node.parameters as { transforms?: TransformOperation[] };
+      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
       if (nodeParams.transforms) {
         if (node.type === 'transform') {
           // Transform node - transforms already applied in handler execution above
@@ -228,6 +228,23 @@ export class Engine {
         } else {
           // Non-transform node with transforms - spawn Transform node dynamically
           await this.executeInlineTransform(nodeParams.transforms);
+        }
+      }
+
+      // Step 5: Handle inline condition evaluation
+      if (nodeParams.condition) {
+        if (node.type === 'conditional') {
+          // Conditional node - condition already evaluated in handler execution above
+          // No additional processing needed
+        } else {
+          // Non-conditional node with condition - spawn Conditional node dynamically
+          const conditionResult = await this.executeInlineConditional(nodeParams.condition);
+          // Store condition result in the node result for getNextNode to use
+          if (result.data && typeof result.data === 'object') {
+            (result.data as Record<string, unknown>).condition = conditionResult;
+          } else {
+            result.data = { condition: conditionResult };
+          }
         }
       }
 
@@ -328,7 +345,7 @@ export class Engine {
       }
 
       // Validate transform expressions if present
-      const nodeParams = node.parameters as { transforms?: TransformOperation[] };
+      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
       if (nodeParams.transforms) {
         // Create a temporary Transform node to validate transforms
         const virtualTransformNode: WorkflowNode = {
@@ -343,6 +360,25 @@ export class Engine {
         const transformValidation = transformHandler.validate();
         if (!transformValidation.valid) {
           const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+          validationErrors.push(...errorMessages);
+        }
+      }
+
+      // Validate condition expression if present
+      if (nodeParams.condition) {
+        // Create a temporary Conditional node to validate condition
+        const virtualConditionalNode: WorkflowNode = {
+          type: 'conditional',
+          ref: 'validation_conditional',
+          name: 'Validation Conditional',
+          description: 'Temporary conditional node for validation',
+          parameters: { condition: nodeParams.condition },
+        };
+
+        const conditionalHandler = await this.createHandler(virtualConditionalNode, { condition: nodeParams.condition });
+        const conditionValidation = conditionalHandler.validate();
+        if (!conditionValidation.valid) {
+          const errorMessages = conditionValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
           validationErrors.push(...errorMessages);
         }
       }
@@ -419,6 +455,26 @@ export class Engine {
 
     const transformHandler = await this.createHandler(virtualTransformNode, { transforms });
     await transformHandler.execute();
+  }
+
+  /**
+   * Execute inline condition evaluation by creating a virtual Conditional node
+   */
+  private async executeInlineConditional(conditionExpression: string): Promise<string | boolean | number | null | undefined> {
+    // Create virtual Conditional node and execute it
+    const virtualConditionalNode: WorkflowNode = {
+      type: 'conditional',
+      ref: 'inline_conditional',
+      name: 'Inline Conditional',
+      description: 'Auto-generated conditional node for inline condition evaluation',
+      parameters: { condition: conditionExpression },
+    };
+
+    const conditionalHandler = await this.createHandler(virtualConditionalNode, { condition: conditionExpression });
+    const conditionalResult = await conditionalHandler.execute();
+
+    // Extract condition value from the conditional result
+    return (conditionalResult as { condition: string | boolean | number | null | undefined }).condition;
   }
 
   /**

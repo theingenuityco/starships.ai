@@ -27,6 +27,7 @@ export interface TransformOperation {
  */
 export interface BaseParams {
   transforms?: TransformOperation[];
+  condition?: string; // JSONata expression for conditional evaluation
 }
 
 /**
@@ -128,10 +129,9 @@ export interface AgentParams extends BaseParams {
 /**
  * Conditional node parameters for branching logic
  */
-export interface ConditionalParams extends BaseParams {
-  expression: string; // JSONata expression to evaluate
-  timeout?: number;
-}
+export type ConditionalParams = BaseParams;
+// Inherits condition?: string from BaseParams
+// No additional parameters needed - pure conditional evaluation node
 
 /**
  * Start and End node parameters

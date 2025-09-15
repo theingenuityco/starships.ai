@@ -15,6 +15,10 @@ export { LLM } from './nodes/LLM';
 export { HttpRequest } from './nodes/HttpRequest';
 export { Agent } from './nodes/Agent';
 export { Conditional } from './nodes/Conditional';
+export { Transform } from './nodes/Transform';
+
+// Node result types
+export type { ConditionalResult } from './nodes/Conditional';
 
 // Memory
 export { Memory } from './memory/Memory';

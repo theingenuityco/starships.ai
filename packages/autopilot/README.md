@@ -176,8 +176,7 @@ const response = await httpRequest.execute();
 import { Conditional } from '@starships/autopilot';
 
 const conditionalParams = {
-  expression: 'state.userLevel = "premium"', // JSONata expression against execution state
-  timeout: 5000,
+  condition: 'state.userLevel = "premium"', // JSONata expression against execution state
 };
 
 const conditional = new Conditional(conditionalParams, {
@@ -186,6 +185,84 @@ const conditional = new Conditional(conditionalParams, {
 });
 const result = await conditional.execute();
 console.log('Condition result:', result.condition); // true/false or string
+```
+
+#### Transform Node
+
+```typescript
+import { Transform } from '@starships/autopilot';
+
+const transformParams = {
+  transforms: [
+    { operation: 'add', path: '/state/counter', value: 1 },
+    { operation: 'replace', path: '/state/user/status', value: '{{ state.user.level }}' },
+  ],
+};
+
+const eventCallback = (event) => console.log('Transform event:', event);
+const transform = new Transform(transformParams, { eventCallback, execution: currentExecution });
+const result = await transform.execute();
+```
+
+## Inline Parameters
+
+### Inline Conditional Evaluation
+
+Any node can include a `condition` parameter for workflow branching, just like Transform nodes can include `transforms`:
+
+```typescript
+// Example: LLM node with inline condition
+const llmWithCondition = {
+  ref: 'llm_check',
+  type: 'llm',
+  name: 'Content Validator',
+  description: 'Validate content and set condition',
+  parameters: {
+    model: 'anthropic/claude-3.5-sonnet',
+    messages: [{ role: 'user', content: 'Validate this content...' }],
+    condition: 'results[-1].data.content.length > 100', // Inline condition
+  },
+};
+
+// Example: HTTP request with inline condition
+const httpWithCondition = {
+  ref: 'api_call',
+  type: 'http_request',
+  name: 'API Status Check',
+  description: 'Check API and evaluate response',
+  parameters: {
+    url: 'https://api.example.com/status',
+    method: 'GET',
+    condition: 'results[-1].data.status = "healthy"', // Inline condition
+  },
+};
+```
+
+### Inline Transform Operations
+
+Any node can include `transforms` parameter for state mutations:
+
+```typescript
+// Example: Agent node with inline transforms
+const agentWithTransforms = {
+  ref: 'support_agent',
+  type: 'agent',
+  name: 'Support Agent',
+  description: 'Handle support and update state',
+  parameters: {
+    model: 'anthropic/claude-3.5-sonnet',
+    memoryState: {
+      /* ... */
+    },
+    blueprint: {
+      /* ... */
+    },
+    transforms: [
+      { operation: 'add', path: '/state/ticketCount', value: '{{ state.ticketCount + 1 }}' },
+      { operation: 'replace', path: '/state/lastAction', value: 'support_completed' },
+    ],
+  },
+};
 ```
 
 **JSONata Expression Context:**
@@ -265,6 +342,12 @@ The engine supports these node types through dynamic loading:
 - **http_request** - HTTP API calls with full fetch API support
 - **user_prompt** - Interactive user input (implementation varies by platform)
 - **conditional** - JSONata expression evaluation for workflow branching
+- **transform** - State mutation using JSON Patch operations
+
+**Universal Parameters:**
+
+- **condition** - Any node can include a `condition` parameter for inline conditional evaluation
+- **transforms** - Any node can include `transforms` parameter for inline state mutations
 
 ## API Reference
 
@@ -275,7 +358,7 @@ The engine supports these node types through dynamic loading:
 export { Engine } from '@starships/autopilot';
 
 // Node handlers
-export { Workflow, LLM, HttpRequest, Agent, Conditional } from '@starships/autopilot';
+export { Workflow, LLM, HttpRequest, Agent, Conditional, Transform } from '@starships/autopilot';
 
 // Memory system
 export { Memory, AgentMemory } from '@starships/autopilot';
@@ -284,7 +367,15 @@ export { Memory, AgentMemory } from '@starships/autopilot';
 export { autopilot, config } from '@starships/autopilot';
 
 // Types
-export type { Blueprint, Node, AgentIdentity, AgentMemoryState, LlmMessage } from '@starships/autopilot';
+export type {
+  Blueprint,
+  Node,
+  ConditionalResult,
+  TransformOperation,
+  AgentIdentity,
+  AgentMemoryState,
+  LlmMessage,
+} from '@starships/autopilot';
 ```
 
 ### Event System
@@ -376,6 +467,8 @@ src/
 │   ├── Workflow.ts          # Workflow node handler
 │   ├── LLM.ts               # LLM node handler
 │   ├── HttpRequest.ts       # HTTP request handler
+│   ├── Conditional.ts       # Conditional evaluation handler
+│   ├── Transform.ts         # State transformation handler
 │   ├── Start.ts             # Start node handler
 │   ├── End.ts               # End node handler
 │   └── UserPrompt.ts        # User prompt handler

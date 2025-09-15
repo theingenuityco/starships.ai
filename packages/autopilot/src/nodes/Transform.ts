@@ -100,17 +100,20 @@ export class Transform implements NodeHandler {
     const executionSnapshot = this.safetyManager.createExecutionSnapshot(execution);
 
     try {
-      // Convert transforms to JSON Patch operations
-      const patchOperations = await this.convertToJsonPatchOperations(transforms, execution);
+      // Apply transforms one at a time so each can see the updated state
+      for (const transform of transforms) {
+        // Convert single transform to JSON Patch operation with current state
+        const patchOperations = await this.convertToJsonPatchOperations([transform], execution);
 
-      // Apply patches to a wrapper object to handle the root state correctly
-      const stateWrapper = { state: execution.state };
-      const patchedWrapper = applyPatch(stateWrapper, patchOperations, false, false).newDocument;
+        // Apply patch to a wrapper object to handle the root state correctly
+        const stateWrapper = { state: execution.state };
+        const patchedWrapper = applyPatch(stateWrapper, patchOperations, false, false).newDocument;
 
-      // Update execution state
-      execution.state = patchedWrapper.state;
+        // Update execution state immediately so next transform can see the changes
+        execution.state = patchedWrapper.state;
+      }
 
-      // Validate state changes
+      // Validate final state changes
       const validation = this.safetyManager.validateStateChanges(executionSnapshot.state, execution.state);
       if (!validation.valid) {
         throw new Error(`State validation failed: ${validation.errors?.map((e) => e.message).join(', ')}`);

@@ -9,7 +9,7 @@ import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode, NodeParameters } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
-import { ParamProcessor } from './ParamProcessor';
+import { Eval } from './Eval';
 import { TransformProcessor } from './TransformProcessor';
 
 // Dynamic imports for handlers - pure lazy loading
@@ -37,7 +37,7 @@ export class Engine {
   private blueprint: Blueprint;
   private execution: Execution;
   private eventCallback?: EventCallback;
-  private paramProcessor: ParamProcessor;
+  private eval: Eval;
   private transformProcessor: TransformProcessor;
 
   constructor(config: EngineConfig) {
@@ -52,7 +52,7 @@ export class Engine {
 
     this.execution = initialExecution;
     this.eventCallback = config.eventCallback;
-    this.paramProcessor = new ParamProcessor();
+    this.eval = new Eval();
     this.transformProcessor = new TransformProcessor();
   }
 
@@ -212,7 +212,7 @@ export class Engine {
 
     try {
       // Step 1: Resolve template expressions in parameters
-      const resolvedParams = (await this.paramProcessor.resolveTemplates(node.parameters, this.execution)) as NodeParameters;
+      const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution)) as NodeParameters;
 
       // Step 2: Create handler instance with resolved parameters
       const handler = await this.createHandler(node, resolvedParams);
@@ -317,7 +317,7 @@ export class Engine {
       }
 
       // Validate template expressions in parameters
-      const templateValidation = this.paramProcessor.validateTemplateExpressions(node.parameters);
+      const templateValidation = this.eval.validateTemplateExpressions(node.parameters);
       if (!templateValidation.valid) {
         const errorMessages = templateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
         validationErrors.push(...errorMessages);

@@ -53,10 +53,10 @@ const result = await expression.evaluate(executionContext);
 '{{ state.user.profile.preferences.language }}';
 ```
 
-### 3. ParamProcessor Architecture
+### 3. Eval Architecture
 
 ```typescript
-interface TemplateContext {
+interface EvalContext {
   state: ExecutionState;
   results: NodeResult[];
   status: ExecutionStatus;
@@ -65,17 +65,19 @@ interface TemplateContext {
   $nodeResult: (nodeRef: string) => NodeResult | undefined;
   $lastResult: () => NodeResult | undefined;
   $now: () => string;
+  $random: () => string;
+  $count: (array: unknown[]) => number;
 }
 
-class ParamProcessor {
+class Eval {
   private static readonly TEMPLATE_REGEX = /\{\{\s*(.*?)\s*\}\}/g;
 
   async resolveTemplates(params: any, execution: Execution): Promise<any> {
-    const context = this.buildTemplateContext(execution);
+    const context = this.buildContext(execution);
     return await this.processValue(params, context);
   }
 
-  private async processValue(value: any, context: TemplateContext): Promise<any> {
+  private async processValue(value: any, context: EvalContext): Promise<any> {
     if (typeof value === 'string') {
       return await this.resolveStringTemplates(value, context);
     } else if (Array.isArray(value)) {
@@ -86,8 +88,8 @@ class ParamProcessor {
     return value;
   }
 
-  private async resolveStringTemplates(str: string, context: TemplateContext): Promise<string> {
-    const matches = Array.from(str.matchAll(ParamProcessor.TEMPLATE_REGEX));
+  private async resolveStringTemplates(str: string, context: EvalContext): Promise<string> {
+    const matches = Array.from(str.matchAll(Eval.TEMPLATE_REGEX));
 
     if (matches.length === 0) return str;
 
@@ -106,7 +108,7 @@ class ParamProcessor {
     }
   }
 
-  private async resolveObjectTemplates(obj: Record<string, any>, context: TemplateContext): Promise<any> {
+  private async resolveObjectTemplates(obj: Record<string, any>, context: EvalContext): Promise<any> {
     const result: any = {};
     for (const [key, value] of Object.entries(obj)) {
       result[key] = await this.processValue(value, context);
@@ -114,16 +116,16 @@ class ParamProcessor {
     return result;
   }
 
-  private async evaluateExpression(expression: string, context: TemplateContext): Promise<any> {
+  private async evaluateExpression(expression: string, context: EvalContext): Promise<any> {
     try {
       const jsonataExpr = jsonata(expression.trim());
       return await jsonataExpr.evaluate(context);
     } catch (error) {
-      throw new Error(`Template evaluation failed for expression "${expression}": ${error}`);
+      throw new Error(`Expression evaluation failed for "${expression}": ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
-  private buildTemplateContext(execution: Execution): TemplateContext {
+  buildContext(execution: Execution): EvalContext {
     return {
       state: execution.state,
       results: execution.results,
@@ -134,12 +136,14 @@ class ParamProcessor {
       $nodeResult: (nodeRef: string) => execution.results.find((r) => r.nodeRef === nodeRef),
       $lastResult: () => execution.results[execution.results.length - 1],
       $now: () => new Date().toISOString(),
+      $random: () => Math.random().toString(36).substring(2, 15),
+      $count: (array: unknown[]) => (Array.isArray(array) ? array.length : 0),
     };
   }
 
   hasTemplateExpressions(value: any): boolean {
     if (typeof value === 'string') {
-      return ParamProcessor.TEMPLATE_REGEX.test(value);
+      return Eval.TEMPLATE_REGEX.test(value);
     } else if (Array.isArray(value)) {
       return value.some((item) => this.hasTemplateExpressions(item));
     } else if (value && typeof value === 'object') {

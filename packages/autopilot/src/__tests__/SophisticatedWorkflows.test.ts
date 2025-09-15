@@ -530,7 +530,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Final Check',
             description: 'Check if everything succeeded',
             parameters: {
-              condition: 'results[-1].data[0].success = true',
+              condition: 'results[-1].data.status = "completed"',
             },
           },
           {
@@ -826,7 +826,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Success',
             description: 'Check if API call succeeded',
             parameters: {
-              expression: 'results[-1].error = null',
+              condition: 'results[nodeRef = "risky-api"].data ? "true" : "false"',
             },
           },
           {
@@ -855,7 +855,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Retry',
             description: 'Check if retry succeeded',
             parameters: {
-              condition: 'results[-1].error = null',
+              condition: 'results[nodeRef = "retry-api"].data ? "true" : "false"',
             },
           },
           {
@@ -928,9 +928,33 @@ describe('Sophisticated Workflows', () => {
         });
 
       const engine = new Engine({ blueprint });
-      await engine.execute();
+      try {
+        await engine.execute();
+      } catch (error) {
+        console.log('Engine execution threw error:', error);
+      }
 
       const execution = engine.getExecution();
+
+      // Debug information
+      console.log('Execution status:', execution.status);
+      console.log('Execution error:', execution.error);
+      console.log('Execution results length:', execution.results.length);
+      console.log(
+        'Execution results:',
+        JSON.stringify(
+          execution.results.map((r) => ({
+            nodeRef: r.nodeRef,
+            hasError: !!r.error,
+            hasData: !!r.data,
+            errorMessage: r.error instanceof Error ? r.error.message : r.error,
+            dataKeys: r.data ? Object.keys(r.data) : [],
+          })),
+          null,
+          2
+        )
+      );
+
       expect(execution.status).toBe('completed');
 
       // Should execute: start -> risky-api -> check-success -> retry-api -> check-retry -> recovery-path -> end

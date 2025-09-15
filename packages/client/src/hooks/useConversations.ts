@@ -147,39 +147,6 @@ export function useConversation(conversationId: string | null) {
     refetchOnWindowFocus: true,
   })
 
-  /**
-   * Process queued events with yielding to prevent blocking
-   */
-  const processEventQueue = useCallback(async () => {
-    if (isProcessingRef.current || processingQueueRef.current.length === 0) {
-      return
-    }
-
-    isProcessingRef.current = true
-
-    while (processingQueueRef.current.length > 0) {
-      const data = processingQueueRef.current.shift()
-
-      try {
-        // Process the event
-        handleStreamingEvent(data)
-
-        // Yield to the event loop after each event
-        await new Promise(resolve => {
-          if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => resolve(undefined))
-          } else {
-            setTimeout(resolve, 0)
-          }
-        })
-      } catch (error) {
-        console.error('[STREAMING] Error processing event:', error)
-      }
-    }
-
-    isProcessingRef.current = false
-  }, [])
-
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
     (data: any) => {
@@ -195,36 +162,46 @@ export function useConversation(conversationId: string | null) {
           version: data.version || prev.version,
         }))
 
-        // Apply JSON patch operation to messages array
+        // Apply JSON patch operations to messages array
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
           if (!old) {
             // Initialize with empty messages array if no data exists
             const initialData = { messages: [], total: 0, conversationId: conversationId! }
 
             try {
-              const result = applyOperation(initialData, data as Operation, true)
+              let result = initialData
+              // Apply each operation in the patch array
+              for (const operation of data.patch) {
+                const opResult = applyOperation(result, operation as Operation, true)
+                result = opResult.newDocument
+              }
               const updatedData = {
-                ...result.newDocument,
-                total: Array.isArray(result.newDocument.messages) ? result.newDocument.messages.length : 0,
+                ...result,
+                total: Array.isArray(result.messages) ? result.messages.length : 0,
               }
               return processContentChunks(updatedData)
             } catch (error) {
-              console.error('[STREAMING] Failed to apply operation to initial data:', error)
+              console.error('[STREAMING] Failed to apply operations to initial data:', error)
               return initialData
             }
           }
 
-          // Apply operation to existing data
+          // Apply operations to existing data
           try {
-            const result = applyOperation(old, data as Operation, true)
+            let result = old
+            // Apply each operation in the patch array
+            for (const operation of data.patch) {
+              const opResult = applyOperation(result, operation as Operation, true)
+              result = opResult.newDocument
+            }
             const updatedData = {
-              ...result.newDocument,
-              total: Array.isArray(result.newDocument.messages) ? result.newDocument.messages.length : old.total,
+              ...result,
+              total: Array.isArray(result.messages) ? result.messages.length : old.total,
               lastActivityAt: new Date().toISOString(),
             }
             return processContentChunks(updatedData)
           } catch (error) {
-            console.error('[STREAMING] Failed to apply operation:', error, { operation: data, target: old })
+            console.error('[STREAMING] Failed to apply operations:', error, { operations: data.patch, target: old })
             return old // Return unchanged data on operation failure
           }
         })
@@ -272,24 +249,24 @@ export function useConversation(conversationId: string | null) {
           }))
           contentAccumulatorRef.current = ''
 
-          // Add streaming message to cache
+          // Add streaming message to cache (prepend since messages are in desc order)
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
             if (!old) return { messages: [{ ...message, streaming: true }], total: 1, conversationId }
             return {
               ...old,
-              messages: [...old.messages, { ...message, streaming: true }],
+              messages: [{ ...message, streaming: true }, ...old.messages],
               total: old.total + 1,
             }
           })
           return
         }
 
-        // Regular message - add to cache
+        // Regular message - add to cache (prepend since messages are in desc order)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
           if (!old) return { messages: [message], total: 1, conversationId }
           return {
             ...old,
-            messages: [...old.messages, message],
+            messages: [message, ...old.messages],
             total: old.total + 1,
           }
         })
@@ -331,6 +308,39 @@ export function useConversation(conversationId: string | null) {
     },
     [conversationId, queryClient]
   )
+
+  /**
+   * Process queued events with yielding to prevent blocking
+   */
+  const processEventQueue = useCallback(async () => {
+    if (isProcessingRef.current || processingQueueRef.current.length === 0) {
+      return
+    }
+
+    isProcessingRef.current = true
+
+    while (processingQueueRef.current.length > 0) {
+      const data = processingQueueRef.current.shift()
+
+      try {
+        // Process the event
+        handleStreamingEvent(data)
+
+        // Yield to the event loop after each event
+        await new Promise(resolve => {
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => resolve(undefined))
+          } else {
+            setTimeout(resolve, 0)
+          }
+        })
+      } catch (error) {
+        console.error('[STREAMING] Error processing event:', error)
+      }
+    }
+
+    isProcessingRef.current = false
+  }, [handleStreamingEvent])
 
   /**
    * Queue an event for processing
@@ -480,7 +490,7 @@ export function useConversation(conversationId: string | null) {
         if (!old) return { messages: [tempMessage], total: 1, conversationId: variables.conversationId }
         return {
           ...old,
-          messages: [...old.messages, tempMessage],
+          messages: [tempMessage, ...old.messages],
           total: old.total + 1,
         }
       })

@@ -1,7 +1,7 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { applyOperation, Operation } from 'fast-json-patch'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
@@ -100,6 +100,11 @@ export const CONVERSATION_QUERY_KEYS = {
  */
 export function useConversation(conversationId: string | null) {
   const queryClient = useQueryClient()
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const processingQueueRef = useRef<any[]>([])
+  const isProcessingRef = useRef(false)
+  const contentAccumulatorRef = useRef<string>('')
+
   const [streamingState, setStreamingState] = useState<StreamingState>({
     status: 'idle',
     isStreaming: false,
@@ -141,6 +146,39 @@ export function useConversation(conversationId: string | null) {
     gcTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: true,
   })
+
+  /**
+   * Process queued events with yielding to prevent blocking
+   */
+  const processEventQueue = useCallback(async () => {
+    if (isProcessingRef.current || processingQueueRef.current.length === 0) {
+      return
+    }
+
+    isProcessingRef.current = true
+
+    while (processingQueueRef.current.length > 0) {
+      const data = processingQueueRef.current.shift()
+
+      try {
+        // Process the event
+        handleStreamingEvent(data)
+
+        // Yield to the event loop after each event
+        await new Promise(resolve => {
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => resolve(undefined))
+          } else {
+            setTimeout(resolve, 0)
+          }
+        })
+      } catch (error) {
+        console.error('[STREAMING] Error processing event:', error)
+      }
+    }
+
+    isProcessingRef.current = false
+  }, [])
 
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
@@ -195,11 +233,12 @@ export function useConversation(conversationId: string | null) {
 
       // Handle content streaming events for UI display
       if (data.content && typeof data.content === 'string') {
+        contentAccumulatorRef.current += data.content
         setStreamingState(prev => ({
           ...prev,
           status: 'streaming',
           isStreaming: true,
-          content: prev.content + data.content, // Accumulate streaming content
+          content: contentAccumulatorRef.current,
           lastUpdate: Date.now(),
         }))
         return
@@ -207,17 +246,16 @@ export function useConversation(conversationId: string | null) {
 
       // Handle delta content streaming (for incremental text updates)
       if (data.delta && data.delta.content) {
+        contentAccumulatorRef.current += data.delta.content
         setStreamingState(prev => ({
           ...prev,
           status: 'streaming',
           isStreaming: true,
-          content: prev.content + data.delta.content, // Accumulate streaming content
+          content: contentAccumulatorRef.current,
           lastUpdate: Date.now(),
         }))
         return
       }
-
-      // Legacy content handling removed - now using JSON Patch delta operations
 
       // Complete message objects
       if (data.role !== undefined) {
@@ -232,6 +270,7 @@ export function useConversation(conversationId: string | null) {
             content: '', // Clear any previous streaming content
             lastUpdate: Date.now(),
           }))
+          contentAccumulatorRef.current = ''
 
           // Add streaming message to cache
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
@@ -265,6 +304,7 @@ export function useConversation(conversationId: string | null) {
           isStreaming: false,
           content: '', // Clear streaming content on completion
         }))
+        contentAccumulatorRef.current = ''
 
         // Mark streaming messages as complete
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
@@ -285,10 +325,22 @@ export function useConversation(conversationId: string | null) {
           error: data,
           isStreaming: false,
         }))
+        contentAccumulatorRef.current = ''
         return
       }
     },
     [conversationId, queryClient]
+  )
+
+  /**
+   * Queue an event for processing
+   */
+  const queueEvent = useCallback(
+    (event: any) => {
+      processingQueueRef.current.push(event)
+      processEventQueue()
+    },
+    [processEventQueue]
   )
 
   // Send message mutation with streaming support
@@ -305,8 +357,27 @@ export function useConversation(conversationId: string | null) {
           throw new Error('No authentication token available')
         }
 
+        // Stop any existing stream
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+        }
+
+        // Create new abort controller
+        abortControllerRef.current = new AbortController()
+
         return new Promise((resolve, reject) => {
           let resolved = false
+
+          // Clear previous state
+          contentAccumulatorRef.current = ''
+          processingQueueRef.current = []
+          setStreamingState({
+            status: 'connecting',
+            isStreaming: true,
+            content: '',
+            error: null,
+            lastUpdate: Date.now(),
+          })
 
           fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
             method: 'POST',
@@ -317,17 +388,13 @@ export function useConversation(conversationId: string | null) {
             body: JSON.stringify({
               content: data.content,
             }),
+            signal: abortControllerRef.current?.signal,
             async onopen(response) {
               if (response.ok) {
                 console.log('[STREAMING] Connection opened successfully')
-                // Clear streaming content when starting new stream
                 setStreamingState(prev => ({
                   ...prev,
-                  status: 'connecting',
-                  isStreaming: true,
-                  content: '',
-                  error: null,
-                  lastUpdate: Date.now(),
+                  status: 'streaming',
                 }))
                 return // Continue processing
               } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
@@ -339,15 +406,15 @@ export function useConversation(conversationId: string | null) {
               }
             },
             onmessage(event) {
-              // Each message event is processed asynchronously - no event loop blocking!
+              // Queue events for non-blocking processing
               try {
                 if (!event.data) return
 
                 const parsed = JSON.parse(event.data)
                 console.log('[STREAMING] Received SSE event:', parsed.op ? 'delta' : parsed.type || 'unknown', parsed)
 
-                // Process streaming event immediately - React will batch updates automatically
-                handleStreamingEvent(parsed)
+                // Queue the event for processing
+                queueEvent(parsed)
               } catch (parseError) {
                 console.warn('[STREAMING] Failed to parse SSE data:', event.data, parseError)
               }

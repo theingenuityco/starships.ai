@@ -1,7 +1,7 @@
 /**
  * State Management Features Test
  *
- * Demonstrates the template-based parameter resolution and transform operations
+ * Demonstrates the template-based parameter resolution and JSON Patch transform operations
  * for dynamic state management in autopilot workflows.
  */
 
@@ -19,7 +19,11 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize workflow',
             parameters: {
-              transform: ['state.userId := "user-123"', 'state.sessionStart := $now()', 'state.counter := 0'],
+              transforms: [
+                { operation: 'add', path: '/state/userId', value: 'user-123' },
+                { operation: 'add', path: '/state/sessionStart', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/counter', value: 0 },
+              ],
             },
           },
           {
@@ -39,10 +43,10 @@ describe('State Management Features', () => {
                 counter: '{{ state.counter }}',
                 userAgent: 'Starships-Autopilot/1.0',
               },
-              transform: [
-                'state.counter := state.counter + 1',
-                'state.lastApiCall := $now()',
-                'state.apiCallHistory := $append(state.apiCallHistory ? state.apiCallHistory : [], {"url": "{{ state.userId }}", "timestamp": $now()})',
+              transforms: [
+                { operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' },
+                { operation: 'add', path: '/state/lastApiCall', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/apiCallHistory', value: [{ url: '{{ state.userId }}', timestamp: '{{ $now() }}' }] },
               ],
             },
           },
@@ -52,7 +56,10 @@ describe('State Management Features', () => {
             name: 'End',
             description: 'Complete workflow',
             parameters: {
-              transform: ['state.completedAt := $now()', 'state.totalCalls := state.counter'],
+              transforms: [
+                { operation: 'add', path: '/state/completedAt', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/totalCalls', value: '{{ state.counter }}' },
+              ],
             },
           },
         ],
@@ -112,7 +119,10 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize',
             parameters: {
-              transform: ['state.userTier := "premium"', 'state.requestCount := 5'],
+              transforms: [
+                { operation: 'add', path: '/state/userTier', value: 'premium' },
+                { operation: 'add', path: '/state/requestCount', value: 5 },
+              ],
             },
           },
           {
@@ -122,7 +132,10 @@ describe('State Management Features', () => {
             description: 'Determine user privileges',
             parameters: {
               expression: 'state.userTier = "premium" and state.requestCount > 3',
-              transform: ['state.conditionEvaluated := $now()', 'state.isPremiumUser := state.userTier = "premium"'],
+              transforms: [
+                { operation: 'add', path: '/state/conditionEvaluated', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/isPremiumUser', value: '{{ state.userTier = "premium" }}' },
+              ],
             },
           },
           {
@@ -133,7 +146,10 @@ describe('State Management Features', () => {
             parameters: {
               url: 'https://api.example.com/premium/{{ state.userTier }}',
               method: 'GET',
-              transform: ['state.premiumActionExecuted := true', 'state.executionPath := "premium"'],
+              transforms: [
+                { operation: 'add', path: '/state/premiumActionExecuted', value: true },
+                { operation: 'add', path: '/state/executionPath', value: 'premium' },
+              ],
             },
           },
           {
@@ -144,7 +160,10 @@ describe('State Management Features', () => {
             parameters: {
               url: 'https://api.example.com/standard',
               method: 'GET',
-              transform: ['state.standardActionExecuted := true', 'state.executionPath := "standard"'],
+              transforms: [
+                { operation: 'add', path: '/state/standardActionExecuted', value: true },
+                { operation: 'add', path: '/state/executionPath', value: 'standard' },
+              ],
             },
           },
           {
@@ -194,16 +213,19 @@ describe('State Management Features', () => {
   });
 
   describe('Error Handling and Validation', () => {
-    test('should validate template expressions before execution', async () => {
+    test('should validate transform operations before execution', async () => {
       const invalidBlueprint: Blueprint = {
         nodes: [
           {
             ref: 'start',
             type: 'start',
             name: 'Start',
-            description: 'Start with invalid template',
+            description: 'Start with invalid transform',
             parameters: {
-              transform: ['state.value := {{ invalid.template }}'], // Invalid: template in transform
+              transforms: [
+                { operation: 'add', path: '/invalidPath', value: 'test' }, // Invalid: doesn't start with /state
+                { operation: 'invalid' as 'add', path: '/state/test', value: 'test' }, // Invalid operation
+              ],
             },
           },
           {
@@ -237,18 +259,19 @@ describe('State Management Features', () => {
       await expect(engine.execute()).rejects.toThrow(/validation failed/i);
     });
 
-    test('should validate transform expressions', async () => {
+    test('should validate transform structure', async () => {
       const invalidTransformBlueprint: Blueprint = {
         nodes: [
           {
             ref: 'start',
             type: 'start',
             name: 'Start',
-            description: 'Start with invalid transform',
+            description: 'Start with invalid transform structure',
             parameters: {
-              transform: [
-                'invalidAssignment = "should use :="', // Invalid: should use := operator
-                'global.variable := "forbidden"', // Invalid: can only modify state.*
+              transforms: [
+                { operation: 'add', path: '/state/valid', value: 'test' },
+                { operation: 'copy', path: '/state/copied' } as any, // Missing required 'from' property
+                { operation: 'replace', path: '/state/noValue' } as any, // Missing required 'value' property
               ],
             },
           },
@@ -272,7 +295,7 @@ describe('State Management Features', () => {
   });
 
   describe('Complex State Mutations', () => {
-    test('should handle complex state operations', async () => {
+    test('should handle complex JSON Patch operations', async () => {
       const blueprint: Blueprint = {
         nodes: [
           {
@@ -281,10 +304,10 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize complex state',
             parameters: {
-              transform: [
-                'state.metrics := {"requests": 0, "errors": 0, "successRate": 0}',
-                'state.userSessions := []',
-                'state.startTime := $now()',
+              transforms: [
+                { operation: 'add', path: '/state/metrics', value: { requests: 0, errors: 0, successRate: 0 } },
+                { operation: 'add', path: '/state/userSessions', value: [] },
+                { operation: 'add', path: '/state/startTime', value: '{{ $now() }}' },
               ],
             },
           },
@@ -300,18 +323,27 @@ describe('State Management Features', () => {
                 sessionCount: '{{ $count(state.userSessions) }}',
                 metrics: '{{ state.metrics }}',
               },
-              transform: [
-                // Increment metrics
-                'state.metrics.requests := state.metrics.requests + 1',
+              transforms: [
+                // Increment metrics counter
+                { operation: 'replace', path: '/state/metrics/requests', value: '{{ state.metrics.requests + 1 }}' },
 
-                // Add session data
-                'state.userSessions := $append(state.userSessions, {"id": $random(), "timestamp": $now()})',
+                // Add new session data
+                { operation: 'add', path: '/state/userSessions/-', value: { id: '{{ $random() }}', timestamp: '{{ $now() }}' } },
 
-                // Calculate success rate (assuming this succeeds)
-                'state.metrics.successRate := state.metrics.requests > 0 ? (state.metrics.requests - state.metrics.errors) / state.metrics.requests : 0',
+                // Calculate success rate
+                {
+                  operation: 'replace',
+                  path: '/state/metrics/successRate',
+                  value: '{{ state.metrics.requests > 0 ? (state.metrics.requests - state.metrics.errors) / state.metrics.requests : 0 }}',
+                },
 
-                // Update execution history
-                'state.executionHistory := $append(state.executionHistory ? state.executionHistory : [], {"node": "process-data", "timestamp": $now(), "success": true})',
+                // Add to execution history
+                { operation: 'add', path: '/state/executionHistory', value: [] },
+                {
+                  operation: 'add',
+                  path: '/state/executionHistory/-',
+                  value: { node: 'process-data', timestamp: '{{ $now() }}', success: true },
+                },
               ],
             },
           },
@@ -321,10 +353,9 @@ describe('State Management Features', () => {
             name: 'End',
             description: 'Finalize',
             parameters: {
-              transform: [
-                'state.endTime := $now()',
-                'state.duration := $now()', // In real implementation, would calculate difference
-                'state.finalMetrics := state.metrics',
+              transforms: [
+                { operation: 'add', path: '/state/endTime', value: '{{ $now() }}' },
+                { operation: 'copy', path: '/state/finalMetrics', from: '/state/metrics' },
               ],
             },
           },
@@ -358,6 +389,79 @@ describe('State Management Features', () => {
       });
 
       expect(execution.state.finalMetrics).toEqual(execution.state.metrics);
+      expect(execution.status).toBe('completed');
+    });
+  });
+
+  describe('JSON Patch Operations', () => {
+    test('should support all JSON Patch operations', async () => {
+      const blueprint: Blueprint = {
+        nodes: [
+          {
+            ref: 'start',
+            type: 'start',
+            name: 'Start',
+            description: 'Test JSON Patch operations',
+            parameters: {
+              transforms: [
+                // Add operations
+                { operation: 'add', path: '/state/original', value: { name: 'test', count: 5 } },
+                { operation: 'add', path: '/state/list', value: [1, 2, 3] },
+
+                // Replace operation
+                { operation: 'replace', path: '/state/original/name', value: 'updated' },
+
+                // Add to array
+                { operation: 'add', path: '/state/list/-', value: 4 },
+
+                // Copy operation
+                { operation: 'copy', path: '/state/backup', from: '/state/original' },
+
+                // Move operation
+                { operation: 'move', path: '/state/moved', from: '/state/list' },
+
+                // Test operation (will pass)
+                { operation: 'test', path: '/state/original/name', value: 'updated' },
+              ],
+            },
+          },
+          {
+            ref: 'cleanup',
+            type: 'start', // Using start as a simple node type
+            name: 'Cleanup',
+            description: 'Remove some data',
+            parameters: {
+              transforms: [
+                // Remove operation
+                { operation: 'remove', path: '/state/original/count' },
+              ],
+            },
+          },
+          {
+            ref: 'end',
+            type: 'end',
+            name: 'End',
+            description: 'End',
+            parameters: {},
+          },
+        ],
+        edges: [
+          { ref: 'edge-1', from: 'start', to: 'cleanup' },
+          { ref: 'edge-2', from: 'cleanup', to: 'end' },
+        ],
+        metadata: {},
+      };
+
+      const engine = new Engine({ blueprint });
+      await engine.execute();
+      const execution = engine.getExecution();
+
+      // Verify all operations worked correctly
+      expect(execution.state.original).toEqual({ name: 'updated' }); // count removed
+      expect(execution.state.backup).toEqual({ name: 'updated', count: 5 }); // copied before count removal
+      expect(execution.state.moved).toEqual([1, 2, 3, 4]); // moved from list with added item
+      expect(execution.state.list).toBeUndefined(); // moved away
+
       expect(execution.status).toBe('completed');
     });
   });

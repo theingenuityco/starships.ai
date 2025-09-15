@@ -1,13 +1,14 @@
 /**
  * Transform Processing System
  *
- * Handles state mutation operations using JSONata assignment expressions.
+ * Handles state mutation operations using JSON Patch-like operations with fast-json-patch.
  * Provides safe, atomic state updates with rollback capabilities.
  */
 
-import jsonata from 'jsonata';
-import type { Execution, ExecutionState, NodeResult, ValidationResult, ValidationError } from '@/types';
-import type { TransformContext } from './ParamProcessor';
+import { applyPatch, deepClone, Operation } from 'fast-json-patch';
+import type { Execution, ExecutionState, ValidationResult, ValidationError } from '@/types';
+import type { TransformOperation } from '@/types/node-parameters';
+import { ParamProcessor } from './ParamProcessor';
 
 /**
  * Transform safety manager for state snapshots and rollback
@@ -16,15 +17,16 @@ class TransformSafetyManager {
   /**
    * Create state snapshot before applying transforms
    */
-  createStateSnapshot(execution: Execution): ExecutionState {
-    return JSON.parse(JSON.stringify(execution.state));
+  createExecutionSnapshot(execution: Execution): Execution {
+    return deepClone(execution);
   }
 
   /**
-   * Rollback state if transforms fail
+   * Rollback execution if transforms fail
    */
-  rollbackState(execution: Execution, snapshot: ExecutionState): void {
-    execution.state = snapshot;
+  rollbackExecution(execution: Execution, snapshot: Execution): void {
+    execution.state = snapshot.state;
+    // Note: Don't rollback results as they represent the actual node execution
   }
 
   /**
@@ -41,9 +43,6 @@ class TransformSafetyManager {
       });
     }
 
-    // Check for critical key deletions (if any are defined as critical)
-    // This could be extended based on requirements
-
     return {
       valid: errors.length === 0,
       errors,
@@ -52,54 +51,53 @@ class TransformSafetyManager {
 }
 
 /**
- * Core transform processor that handles state mutations
+ * Core transform processor that handles state mutations using JSON Patch operations
  */
 export class TransformProcessor {
   private safetyManager = new TransformSafetyManager();
+  private paramProcessor = new ParamProcessor();
 
   /**
    * Apply transform operations to execution state
    */
-  async applyTransforms(transforms: string | string[], execution: Execution, nodeResult?: NodeResult): Promise<void> {
-    if (!transforms) return;
+  async applyTransforms(transforms: TransformOperation[], execution: Execution): Promise<void> {
+    if (!transforms || transforms.length === 0) return;
 
-    const transformArray = Array.isArray(transforms) ? transforms : [transforms];
-    if (transformArray.length === 0) return;
-
-    // Create state snapshot for rollback
-    const stateSnapshot = this.safetyManager.createStateSnapshot(execution);
+    // Create execution snapshot for rollback
+    const executionSnapshot = this.safetyManager.createExecutionSnapshot(execution);
 
     try {
-      // Build transform context
-      const context = this.buildTransformContext(execution, nodeResult);
+      // Convert transforms to JSON Patch operations
+      const patchOperations = await this.convertToJsonPatchOperations(transforms, execution);
 
-      // Apply transforms sequentially to maintain order
-      for (const transform of transformArray) {
-        await this.applySingleTransform(transform, execution, context);
-      }
+      // Apply patches to a wrapper object to handle the root state correctly
+      const stateWrapper = { state: execution.state };
+      const patchedWrapper = applyPatch(stateWrapper, patchOperations, false, false).newDocument;
+
+      // Update execution state
+      execution.state = patchedWrapper.state;
 
       // Validate state changes
-      const validation = this.safetyManager.validateStateChanges(stateSnapshot, execution.state);
+      const validation = this.safetyManager.validateStateChanges(executionSnapshot.state, execution.state);
       if (!validation.valid) {
         throw new Error(`State validation failed: ${validation.errors?.map((e) => e.message).join(', ')}`);
       }
     } catch (error) {
       // Rollback state on any failure
-      this.safetyManager.rollbackState(execution, stateSnapshot);
+      this.safetyManager.rollbackExecution(execution, executionSnapshot);
       throw error;
     }
   }
 
   /**
-   * Validate transform expressions
+   * Validate transform operations
    */
-  validateTransforms(transforms: string | string[]): ValidationResult {
+  validateTransforms(transforms: TransformOperation[]): ValidationResult {
     const errors: ValidationError[] = [];
-    const transformArray = Array.isArray(transforms) ? transforms : [transforms];
 
-    for (let i = 0; i < transformArray.length; i++) {
-      const transform = transformArray[i];
-      const validation = this.validateTransformSyntax(transform, `transforms[${i}]`);
+    for (let i = 0; i < transforms.length; i++) {
+      const transform = transforms[i];
+      const validation = this.validateTransformOperation(transform, `transforms[${i}]`);
       if (!validation.valid) {
         errors.push(...(validation.errors || []));
       }
@@ -112,118 +110,170 @@ export class TransformProcessor {
   }
 
   /**
-   * Apply a single transform expression
+   * Convert TransformOperation to JSON Patch Operation with template resolution
    */
-  private async applySingleTransform(transform: string, execution: Execution, context: TransformContext): Promise<void> {
-    try {
-      // Validate transform syntax
-      const validation = this.validateTransformSyntax(transform);
-      if (!validation.valid) {
-        throw new Error(`Transform validation failed: ${validation.errors?.map((e) => e.message).join(', ')}`);
+  private async convertToJsonPatchOperations(transforms: TransformOperation[], execution: Execution): Promise<Operation[]> {
+    const operations: Operation[] = [];
+
+    for (const transform of transforms) {
+      // Resolve template expressions in the value
+      let resolvedValue = transform.value;
+      if (transform.value !== undefined) {
+        resolvedValue = await this.paramProcessor.resolveTemplates(transform.value, execution);
       }
 
-      // Create JSONata expression
-      const expr = jsonata(transform);
+      // Resolve template expressions in the from path (for copy/move operations)
+      let resolvedFrom = transform.from;
+      if (transform.from !== undefined) {
+        resolvedFrom = (await this.paramProcessor.resolveTemplates(transform.from, execution)) as string;
+      }
 
-      // Apply transform to execution state
-      // JSONata assignment expressions modify the context object directly
-      await expr.evaluate(context);
-    } catch (error) {
-      throw new Error(`Transform failed for expression "${transform}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Create JSON Patch operation based on operation type
+      let operation: Operation;
+
+      switch (transform.operation) {
+        case 'add':
+          operation = {
+            op: 'add',
+            path: transform.path,
+            value: resolvedValue,
+          };
+          break;
+        case 'replace':
+          operation = {
+            op: 'replace',
+            path: transform.path,
+            value: resolvedValue,
+          };
+          break;
+        case 'test':
+          operation = {
+            op: 'test',
+            path: transform.path,
+            value: resolvedValue,
+          };
+          break;
+        case 'remove':
+          operation = {
+            op: 'remove',
+            path: transform.path,
+          };
+          break;
+        case 'copy':
+          if (!resolvedFrom) {
+            throw new Error(`Copy operation requires "from" path for transform at ${transform.path}`);
+          }
+          operation = {
+            op: 'copy',
+            path: transform.path,
+            from: resolvedFrom,
+          };
+          break;
+        case 'move':
+          if (!resolvedFrom) {
+            throw new Error(`Move operation requires "from" path for transform at ${transform.path}`);
+          }
+          operation = {
+            op: 'move',
+            path: transform.path,
+            from: resolvedFrom,
+          };
+          break;
+        default:
+          throw new Error(`Unsupported transform operation: ${transform.operation}`);
+      }
+
+      operations.push(operation);
     }
+
+    return operations;
   }
 
   /**
-   * Validate transform syntax and security
+   * Validate a single transform operation
    */
-  private validateTransformSyntax(transform: string, path = ''): ValidationResult {
+  private validateTransformOperation(transform: TransformOperation, path = ''): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Check for assignment operator
-    if (!transform.includes(':=')) {
+    // Validate operation type
+    const validOperations = ['add', 'replace', 'remove', 'copy', 'move', 'test'];
+    if (!validOperations.includes(transform.operation)) {
       errors.push({
         code: 'INVALID_PARAMETERS',
-        message: `Transform expressions must use assignment operator (:=) at ${path}`,
-      });
-      return { valid: false, errors };
-    }
-
-    // Validate that left side starts with 'state.'
-    const leftSide = transform.split(':=')[0].trim();
-    if (!leftSide.startsWith('state.')) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: `Transform expressions can only modify execution state at ${path}`,
+        message: `Invalid transform operation "${transform.operation}" at ${path}`,
       });
     }
 
-    // Additional security checks
-    this.checkForbiddenOperations(transform, errors, path);
-
-    // Validate JSONata syntax
-    try {
-      jsonata(transform);
-    } catch (error) {
+    // Validate path
+    if (!transform.path || typeof transform.path !== 'string') {
       errors.push({
-        code: 'INVALID_JSONATA_EXPRESSION',
-        message: `Invalid JSONata expression at ${path}: ${error instanceof Error ? error.message : 'Syntax error'}`,
+        code: 'INVALID_PARAMETERS',
+        message: `Transform path is required and must be a string at ${path}`,
       });
+    } else if (!transform.path.startsWith('/state')) {
+      errors.push({
+        code: 'INVALID_PARAMETERS',
+        message: `Transform path must start with "/state" at ${path}`,
+      });
+    }
+
+    // Validate operation-specific requirements
+    switch (transform.operation) {
+      case 'add':
+      case 'replace':
+      case 'test':
+        if (transform.value === undefined) {
+          errors.push({
+            code: 'MISSING_REQUIRED_FIELD',
+            message: `Transform operation "${transform.operation}" requires a value at ${path}`,
+          });
+        }
+        break;
+      case 'copy':
+      case 'move':
+        if (!transform.from || typeof transform.from !== 'string') {
+          errors.push({
+            code: 'MISSING_REQUIRED_FIELD',
+            message: `Transform operation "${transform.operation}" requires a "from" path at ${path}`,
+          });
+        } else if (!transform.from.startsWith('/state')) {
+          errors.push({
+            code: 'INVALID_PARAMETERS',
+            message: `Transform "from" path must start with "/state" at ${path}`,
+          });
+        }
+        break;
+    }
+
+    // Validate template expressions in value if present
+    if (transform.value !== undefined) {
+      const templateValidation = this.paramProcessor.validateTemplateExpressions(transform.value);
+      if (!templateValidation.valid) {
+        const templateErrors =
+          templateValidation.errors?.map((e) => ({
+            ...e,
+            message: `${path}.value: ${e.message}`,
+          })) || [];
+        errors.push(...templateErrors);
+      }
+    }
+
+    // Validate template expressions in from path if present
+    if (transform.from !== undefined) {
+      const templateValidation = this.paramProcessor.validateTemplateExpressions(transform.from);
+      if (!templateValidation.valid) {
+        const templateErrors =
+          templateValidation.errors?.map((e) => ({
+            ...e,
+            message: `${path}.from: ${e.message}`,
+          })) || [];
+        errors.push(...templateErrors);
+      }
     }
 
     return {
       valid: errors.length === 0,
       errors,
     };
-  }
-
-  /**
-   * Check for forbidden operations in transform expressions
-   */
-  private checkForbiddenOperations(transform: string, errors: ValidationError[], path = ''): void {
-    const forbidden = ['eval', 'Function', 'require', 'import', 'process', 'global', 'window'];
-
-    for (const op of forbidden) {
-      if (transform.includes(op)) {
-        errors.push({
-          code: 'FORBIDDEN_FUNCTION',
-          message: `Forbidden operation "${op}" in transform expression at ${path}`,
-        });
-      }
-    }
-  }
-
-  /**
-   * Build transform context with mutation capabilities
-   */
-  private buildTransformContext(execution: Execution, nodeResult?: NodeResult): TransformContext {
-    // Create a mutable reference to state for assignments
-    const context: TransformContext = {
-      state: execution.state, // This will be mutated by JSONata assignments
-      results: execution.results,
-      status: execution.status,
-      currentNodeRef: execution.currentNodeRef,
-
-      // Include current node result if provided
-      $currentResult: () => nodeResult,
-      $nodeResult: (nodeRef: string) => execution.results.find((r) => r.nodeRef === nodeRef),
-      $lastResult: () => execution.results[execution.results.length - 1],
-      $now: () => new Date().toISOString(),
-
-      // Helper functions for common operations
-      $increment: (path: string, amount = 1) => {
-        const expr = jsonata(`${path} := (${path} ? ${path} : 0) + ${amount}`);
-        return expr.evaluate(context);
-      },
-
-      $append: <T>(array: T[], item: T): T[] => {
-        return Array.isArray(array) ? [...array, item] : [item];
-      },
-
-      $merge: (target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> => {
-        return { ...target, ...source };
-      },
-    };
-
-    return context;
   }
 }

@@ -223,11 +223,11 @@ export class ConversationService {
           updatedAt: event.timestamp,
         };
 
-        // Add placeholder message to messages array
+        // Add placeholder message to messages array with contentChunks array for delta accumulation
         const delta: Operation = {
           op: 'add',
           path: '/messages/-',
-          value: { ...assistantMessage, streaming: true },
+          value: { ...assistantMessage, streaming: true, contentChunks: [] },
         };
         await this.streamingService.broadcastDelta(conversationId, delta);
         break;
@@ -245,15 +245,21 @@ export class ConversationService {
           const content = String(chunkContent.choices[0].delta.content);
           console.log('[STREAMING] Content chunk:', content);
 
-          // Accumulate content server-side and send replace operations
+          // Track accumulated content server-side for completion event
           const currentContent = this.streamingContent.get(conversationId) || '';
+          const currentLength = currentContent.length;
           const newContent = currentContent + content;
           this.streamingContent.set(conversationId, newContent);
 
+          // Send content chunk with positional information for client-side accumulation
           const delta: Operation = {
-            op: 'replace',
-            path: '/messages/-1/content',
-            value: newContent,
+            op: 'add',
+            path: '/messages/-1/contentChunks/-',
+            value: {
+              content: content,
+              position: currentLength,
+              timestamp: Date.now(),
+            },
           };
           await this.streamingService.broadcastDelta(conversationId, delta);
         }
@@ -262,13 +268,30 @@ export class ConversationService {
 
       case 'content_complete': {
         console.log('[STREAMING] Content streaming complete');
-        // Mark the last message as no longer streaming
-        const delta: Operation = {
-          op: 'replace',
-          path: '/messages/-1/streaming',
-          value: false,
-        };
-        await this.streamingService.broadcastDelta(conversationId, delta);
+        // Set the final accumulated content and mark as complete
+        const finalContent = this.streamingContent.get(conversationId) || '';
+
+        const completionOperations: Operation[] = [
+          {
+            op: 'replace',
+            path: '/messages/-1/content',
+            value: finalContent,
+          },
+          {
+            op: 'replace',
+            path: '/messages/-1/streaming',
+            value: false,
+          },
+          {
+            op: 'remove',
+            path: '/messages/-1/contentChunks',
+          },
+        ];
+
+        // Send all completion operations together
+        for (const operation of completionOperations) {
+          await this.streamingService.broadcastDelta(conversationId, operation);
+        }
 
         // Clear streaming content tracker
         this.streamingContent.delete(conversationId);

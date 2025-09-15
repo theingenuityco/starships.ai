@@ -8,7 +8,31 @@
 import { Engine } from '../engine/Engine';
 import { Blueprint } from '../types';
 
+// Mock fetch
+const mockFetch = jest.fn();
+global.fetch = mockFetch;
+
 describe('State Management Features', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    // Setup mock fetch
+    const mockHeaders = new Map([['content-type', 'application/json']]);
+    mockHeaders.forEach = jest.fn((callback) => {
+      callback('application/json', 'content-type', mockHeaders);
+    });
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      url: 'https://api.example.com/test',
+      headers: mockHeaders,
+      json: async () => ({ success: true }),
+      text: async () => '{"success":true}',
+    });
+  });
+
   describe('Template Resolution', () => {
     test('should resolve template expressions in node parameters', async () => {
       const blueprint: Blueprint = {
@@ -270,8 +294,8 @@ describe('State Management Features', () => {
             parameters: {
               transforms: [
                 { operation: 'add', path: '/state/valid', value: 'test' },
-                { operation: 'copy', path: '/state/copied' } as any, // Missing required 'from' property
-                { operation: 'replace', path: '/state/noValue' } as any, // Missing required 'value' property
+                { operation: 'copy', path: '/state/copied' } as unknown as { operation: 'copy'; path: string; from: string }, // Missing required 'from' property
+                { operation: 'replace', path: '/state/noValue' } as unknown as { operation: 'replace'; path: string; value: unknown }, // Missing required 'value' property
               ],
             },
           },

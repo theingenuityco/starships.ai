@@ -9,7 +9,8 @@ Based on the codebase review, here's the current state management architecture:
 1. **Engine** creates handlers with `params` + `execution` context
 2. **Execution** contains: `state`, `results`, `status`, `currentNodeRef`, `error`
 3. **Params** are static, serialized at blueprint creation time
-4. **Conditional node** already uses JSONata to query execution state read-only
+4. **Template expressions** use `{{ }}` syntax for dynamic value resolution
+5. **Transform operations** use JSON Patch operations via `fast-json-patch`
 
 ### Existing JSONata Pattern ✅
 
@@ -219,152 +220,123 @@ class TemplateValidator {
 
 ### 1. Transform Property Design
 
-Add an optional `transform` property to all node parameter interfaces:
+The current implementation uses an optional `transforms` property (note the plural) with JSON Patch operations:
 
 ```typescript
-interface BaseNodeParams {
-  // ... existing params
-  transform?: string | string[]; // JSONata assignment expressions
+interface BaseParams {
+  transforms?: TransformOperation[];
 }
 
-// Examples of parameter types with transforms
-interface HttpRequestParams extends BaseNodeParams {
-  url: string;
-  method?: string;
-  body?: any;
-  headers?: Record<string, string>;
-  transform?: string | string[];
-}
-
-interface AgentParams extends BaseNodeParams {
-  name: string;
-  model: string;
-  memoryState: AgentMemoryState;
-  blueprint: Blueprint;
-  transform?: string | string[];
+interface TransformOperation {
+  /** JSON Patch operation type */
+  operation: 'add' | 'replace' | 'remove' | 'copy' | 'move' | 'test';
+  /** JSON Pointer path (e.g., "/state/counter", "/state/user/name") */
+  path: string;
+  /** Value to apply - can be static value or template expression {{ }} */
+  value?: unknown;
+  /** For copy/move operations - source path */
+  from?: string;
 }
 ```
 
 ### 2. Transform Syntax and Operations
 
-**JSONata Assignment Expressions** - using `:=` operator for state mutations:
+**JSON Patch Operations** - using standardized RFC 6901 operations:
 
 ```typescript
-// Transform examples
+// Transform examples using JSON Patch operations
 const transforms = [
   // Simple value assignment
-  'state.lastExecuted := $now()',
+  { operation: 'add', path: '/state/lastExecuted', value: '{{ $now() }}' },
 
   // Increment counters
-  'state.apiCallCount := (state.apiCallCount ? state.apiCallCount : 0) + 1',
+  { operation: 'replace', path: '/state/apiCallCount', value: '{{ (state.apiCallCount || 0) + 1 }}' },
 
   // Complex conditional updates
-  "state.user.status := state.user.lastLogin > $dateTime($now(), '-30 days') ? 'active' : 'inactive'",
+  {
+    operation: 'replace',
+    path: '/state/user/status',
+    value: "{{ state.user.lastLogin > $dateTime($now(), '-30 days') ? 'active' : 'inactive' }}",
+  },
 
   // Array operations
-  "state.executionHistory := $append(state.executionHistory ? state.executionHistory : [], {'nodeRef': currentNodeRef, 'timestamp': $now()})",
+  { operation: 'add', path: '/state/executionHistory/-', value: { nodeRef: '{{ currentNodeRef }}', timestamp: '{{ $now() }}' } },
 
   // Nested object updates
-  'state.metrics.success := state.metrics.success + 1',
+  { operation: 'replace', path: '/state/metrics/success', value: '{{ state.metrics.success + 1 }}' },
 
-  // Conditional transforms based on node results
-  'state.lastError := $lastResult().error ? $lastResult().error : null',
+  // Copy operations
+  { operation: 'copy', path: '/state/backup/lastResult', from: '/state/currentResult' },
+
+  // Move operations
+  { operation: 'move', path: '/state/archive/oldData', from: '/state/tempData' },
+
+  // Remove operations
+  { operation: 'remove', path: '/state/tempData' },
+
+  // Test operations (for validation)
+  { operation: 'test', path: '/state/user/tier', value: 'premium' },
 ];
 ```
 
 ### 3. Transform Processor Architecture
 
 ```typescript
-interface TransformContext extends TemplateContext {
-  // Additional helpers for mutations
-  $increment: (path: string, amount?: number) => void;
-  $append: (array: any[], item: any) => any[];
-  $merge: (target: any, source: any) => any;
-  $deleteKey: (obj: any, key: string) => any;
-}
-
 class TransformProcessor {
-  async applyTransforms(transforms: string | string[], execution: Execution, nodeResult?: NodeResult): Promise<void> {
-    const transformArray = Array.isArray(transforms) ? transforms : [transforms];
-    const context = this.buildTransformContext(execution, nodeResult);
+  private safetyManager = new TransformSafetyManager();
+  private eval = new Eval();
 
-    // Apply transforms sequentially to maintain order
-    for (const transform of transformArray) {
-      await this.applySingleTransform(transform, execution, context);
-    }
-  }
+  async applyTransforms(transforms: TransformOperation[], execution: Execution): Promise<void> {
+    if (!transforms || transforms.length === 0) return;
 
-  private async applySingleTransform(transform: string, execution: Execution, context: TransformContext): Promise<void> {
+    // Create execution snapshot for rollback
+    const executionSnapshot = this.safetyManager.createExecutionSnapshot(execution);
+
     try {
-      // Parse and validate assignment expression
-      this.validateTransformSyntax(transform);
+      // Convert transforms to JSON Patch operations
+      const patchOperations = await this.convertToJsonPatchOperations(transforms, execution);
 
-      // Create JSONata expression
-      const expr = jsonata(transform);
+      // Apply patches using fast-json-patch
+      const stateWrapper = { state: execution.state };
+      const patchedWrapper = applyPatch(stateWrapper, patchOperations, false, false).newDocument;
 
-      // Apply transform to execution state
-      // JSONata assignment expressions modify the context object directly
-      await expr.evaluate(context);
-    } catch (error) {
-      throw new Error(`Transform failed for expression "${transform}": ${error}`);
-    }
-  }
+      // Update execution state
+      execution.state = patchedWrapper.state;
 
-  private validateTransformSyntax(transform: string): void {
-    // Check for assignment operator
-    if (!transform.includes(':=')) {
-      throw new Error('Transform expressions must use assignment operator (:=)');
-    }
-
-    // Validate that left side starts with 'state.'
-    const leftSide = transform.split(':=')[0].trim();
-    if (!leftSide.startsWith('state.')) {
-      throw new Error('Transform expressions can only modify execution state');
-    }
-
-    // Additional security checks
-    this.checkForbiddenOperations(transform);
-  }
-
-  private checkForbiddenOperations(transform: string): void {
-    const forbidden = ['eval', 'Function', 'require', 'import'];
-    for (const op of forbidden) {
-      if (transform.includes(op)) {
-        throw new Error(`Forbidden operation "${op}" in transform expression`);
+      // Validate state changes
+      const validation = this.safetyManager.validateStateChanges(executionSnapshot.state, execution.state);
+      if (!validation.valid) {
+        throw new Error(`State validation failed: ${validation.errors?.map((e) => e.message).join(', ')}`);
       }
+    } catch (error) {
+      // Rollback state on any failure
+      this.safetyManager.rollbackExecution(execution, executionSnapshot);
+      throw error;
     }
   }
 
-  private buildTransformContext(execution: Execution, nodeResult?: NodeResult): TransformContext {
-    // Create a mutable reference to state for assignments
-    const context = {
-      state: execution.state, // This will be mutated by JSONata assignments
-      results: execution.results,
-      status: execution.status,
-      currentNodeRef: execution.currentNodeRef,
+  private async convertToJsonPatchOperations(transforms: TransformOperation[], execution: Execution): Promise<Operation[]> {
+    const operations: Operation[] = [];
 
-      // Include current node result if provided
-      $currentResult: () => nodeResult,
-      $nodeResult: (nodeRef: string) => execution.results.find((r) => r.nodeRef === nodeRef),
-      $lastResult: () => execution.results[execution.results.length - 1],
-      $now: () => new Date().toISOString(),
+    for (const transform of transforms) {
+      // Resolve template expressions in the value
+      let resolvedValue = transform.value;
+      if (transform.value !== undefined) {
+        resolvedValue = await this.eval.resolveTemplates(transform.value, execution);
+      }
 
-      // Helper functions for common operations
-      $increment: (path: string, amount = 1) => {
-        const expr = jsonata(`${path} := (${path} ? ${path} : 0) + ${amount}`);
-        return expr.evaluate(context);
-      },
+      // Resolve template expressions in the from path (for copy/move operations)
+      let resolvedFrom = transform.from;
+      if (transform.from !== undefined) {
+        resolvedFrom = (await this.eval.resolveTemplates(transform.from, execution)) as string;
+      }
 
-      $append: (array: any[], item: any) => {
-        return Array.isArray(array) ? [...array, item] : [item];
-      },
+      // Create JSON Patch operation
+      const operation = this.createJsonPatchOperation(transform, resolvedValue, resolvedFrom);
+      operations.push(operation);
+    }
 
-      $merge: (target: any, source: any) => {
-        return { ...target, ...source };
-      },
-    };
-
-    return context;
+    return operations;
   }
 }
 ```
@@ -381,16 +353,16 @@ class TransformProcessor {
     body: {
       data: "{{ $nodeResult('form_input').data }}"
     },
-    transform: [
+    transforms: [
       // Track API usage
-      "state.apiCallCount := (state.apiCallCount ? state.apiCallCount : 0) + 1",
-      "state.lastApiCall := $now()",
+      { operation: 'replace', path: '/state/apiCallCount', value: '{{ (state.apiCallCount || 0) + 1 }}' },
+      { operation: 'add', path: '/state/lastApiCall', value: '{{ $now() }}' },
 
       // Update user session state
-      "state.session.lastActivity := $now()",
+      { operation: 'replace', path: '/state/session/lastActivity', value: '{{ $now() }}' },
 
-      // Conditional error tracking
-      "state.session.errorCount := $currentResult().error ? state.session.errorCount + 1 : state.session.errorCount"
+      // Add to request history array
+      { operation: 'add', path: '/state/requestHistory/-', value: { url: '{{ state.apiEndpoint }}/users', timestamp: '{{ $now() }}' } }
     ]
   }
 }
@@ -405,16 +377,16 @@ class TransformProcessor {
       identity: { name: "Sarah", role: "Support Agent" }
     },
     blueprint: { /* nested workflow */ },
-    transform: [
+    transforms: [
       // Track conversation metadata
-      "state.conversation.agentAssigned := 'customer_support'",
-      "state.conversation.startTime := state.conversation.startTime ? state.conversation.startTime : $now()",
+      { operation: 'add', path: '/state/conversation/agentAssigned', value: 'customer_support' },
+      { operation: 'add', path: '/state/conversation/startTime', value: '{{ state.conversation.startTime || $now() }}' },
 
       // Update user interaction history
-      "state.user.interactions := $append(state.user.interactions ? state.user.interactions : [], {'type': 'agent', 'timestamp': $now()})",
+      { operation: 'add', path: '/state/user/interactions/-', value: { type: 'agent', timestamp: '{{ $now() }}' } },
 
       // Dynamic priority assignment
-      "state.conversation.priority := state.user.tier = 'premium' ? 'high' : (state.session.errorCount > 3 ? 'urgent' : 'normal')"
+      { operation: 'add', path: '/state/conversation/priority', value: "{{ state.user.tier = 'premium' ? 'high' : (state.session.errorCount > 3 ? 'urgent' : 'normal') }}" }
     ]
   }
 }
@@ -424,22 +396,39 @@ class TransformProcessor {
 
 ```typescript
 class TransformSafetyManager {
-  // Create state snapshot before applying transforms
-  createStateSnapshot(execution: Execution): ExecutionState {
-    return JSON.parse(JSON.stringify(execution.state));
+  /**
+   * Create state snapshot before applying transforms
+   */
+  createExecutionSnapshot(execution: Execution): Execution {
+    return deepClone(execution);
   }
 
-  // Rollback state if transforms fail
-  rollbackState(execution: Execution, snapshot: ExecutionState): void {
-    execution.state = snapshot;
+  /**
+   * Rollback execution if transforms fail
+   */
+  rollbackExecution(execution: Execution, snapshot: Execution): void {
+    execution.state = snapshot.state;
+    // Note: Don't rollback results as they represent the actual node execution
   }
 
-  // Validate state changes don't break execution
+  /**
+   * Validate state changes don't break execution
+   */
   validateStateChanges(beforeState: ExecutionState, afterState: ExecutionState): ValidationResult {
-    // Check for breaking changes
-    // Validate state structure integrity
-    // Ensure no critical keys were deleted
-    return { valid: true, errors: [] };
+    const errors: ValidationError[] = [];
+
+    // Basic validation - ensure state is still an object
+    if (!afterState || typeof afterState !== 'object') {
+      errors.push({
+        code: 'INVALID_PARAMETERS',
+        message: 'Transform operations resulted in invalid state structure',
+      });
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
   }
 }
 ```
@@ -451,25 +440,29 @@ graph TD
     A[Node Execution Starts] --> B[Resolve Params Templates]
     B --> C[Execute Node Logic]
     C --> D{Node Succeeded?}
-    D -->|Yes| E[Apply Transform Operations]
+    D -->|Yes| E[Create State Snapshot]
     D -->|No| F[Skip Transforms]
-    E --> G[Validate State Changes]
-    G --> H{State Valid?}
-    H -->|Yes| I[Commit State Changes]
-    H -->|No| J[Rollback State]
-    I --> K[Node Execution Complete]
-    J --> L[Throw Transform Error]
-    F --> K
+    E --> G[Convert Transforms to JSON Patch Operations]
+    G --> H[Apply Patches with fast-json-patch]
+    H --> I[Validate State Changes]
+    I --> J{State Valid?}
+    J -->|Yes| K[Commit State Changes]
+    J -->|No| L[Rollback to Snapshot]
+    K --> M[Node Execution Complete]
+    L --> N[Throw Transform Error]
+    F --> M
 ```
 
-## Benefits of Transform Operations
+## Benefits of JSON Patch Transform Operations
 
-1. **Declarative State Management**: Clear, readable state mutations
-2. **Conditional Logic**: Transforms can include complex business rules
-3. **Execution Context Aware**: Full access to execution state and results
-4. **Atomic Operations**: Transforms are applied atomically with rollback on failure
-5. **Serializable**: All logic stored as JSON-compatible strings
-6. **Order Dependent**: Transform array maintains execution order
-7. **Side-effect Free**: Pure functions that only modify designated state
+1. **Standardized**: Uses RFC 6901 JSON Patch standard for predictable operations
+2. **Atomic**: All transforms in an array are applied atomically with rollback on failure
+3. **Powerful**: Supports all JSON Patch operations (add, replace, remove, copy, move, test)
+4. **Safe**: Path validation ensures only `/state` can be modified
+5. **Template-aware**: Values can use template expressions with `{{ }}` syntax
+6. **Type-safe**: Full TypeScript support with proper operation types
+7. **Validated**: Operations are validated at blueprint parse time
+8. **Performance**: Uses `fast-json-patch` library for efficient patch operations
+9. **Rollback Support**: Deep cloning and snapshot management for safe state mutations
 
-This transform system provides the "mutate" capability you need, complementing the template expressions for state queries.
+This JSON Patch-based transform system provides robust, standardized state mutations while maintaining the flexibility and power needed for complex workflow orchestration.

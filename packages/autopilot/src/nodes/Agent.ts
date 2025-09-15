@@ -26,8 +26,13 @@ export class Agent implements NodeHandler {
     // Store agent parameters
     this.params = structuredClone(params);
 
-    // Create AgentMemory instance from config
-    this.memory = new AgentMemory(this.params.memoryState);
+    // Create AgentMemory instance from config or default
+    this.memory = new AgentMemory(
+      this.params.memoryState || {
+        identity: { name: this.params.name || 'Agent', role: 'AI Assistant' },
+        purpose: { primary: 'Assist users with their needs' },
+      }
+    );
 
     // Create engine - handles all node types internally
     this.eventCallback = options?.eventCallback;
@@ -68,6 +73,7 @@ export class Agent implements NodeHandler {
       };
     }
 
+    // At this point blueprint is guaranteed to exist
     const engincConfig = {
       blueprint: this.params.blueprint,
       eventCallback: this.eventCallback,
@@ -87,7 +93,7 @@ export class Agent implements NodeHandler {
    * Get the last node in the workflow (for chaining)
    */
   private getLastNode(): Node | undefined {
-    const nodes = this.params.blueprint.nodes;
+    const nodes = this.params.blueprint!.nodes;
     return nodes.length > 0 ? nodes[nodes.length - 1] : undefined;
   }
 
@@ -96,7 +102,7 @@ export class Agent implements NodeHandler {
    */
   private updateEngine(): void {
     const engincConfig = {
-      blueprint: this.params.blueprint,
+      blueprint: this.params.blueprint!,
       eventCallback: this.eventCallback,
     };
     this.engine = new Engine(engincConfig);
@@ -106,8 +112,8 @@ export class Agent implements NodeHandler {
    * Helper method to connect new node to previous node and redirect to end node
    */
   private connectToPrevious(newNodeRef: string): void {
-    const nodes = this.params.blueprint.nodes;
-    const edges = this.params.blueprint.edges;
+    const nodes = this.params.blueprint!.nodes;
+    const edges = this.params.blueprint!.edges;
 
     // Find the end node
     const endNode = nodes.find((node) => node.type === 'end');
@@ -247,7 +253,7 @@ export class Agent implements NodeHandler {
       maxTokens: '{{ state.maxTokens || 256 }}',
     };
 
-    this.params.blueprint.nodes.push({
+    this.params.blueprint!.nodes.push({
       ref,
       type: 'llm',
       name,
@@ -317,7 +323,7 @@ export class Agent implements NodeHandler {
       ],
     };
 
-    this.params.blueprint.nodes.push({
+    this.params.blueprint!.nodes.push({
       ref,
       type: 'transform',
       name,
@@ -382,7 +388,7 @@ export class Agent implements NodeHandler {
       maxTokens: '{{ state.maxTokens || 512 }}',
     };
 
-    this.params.blueprint.nodes.push({
+    this.params.blueprint!.nodes.push({
       ref,
       type: 'llm',
       name,
@@ -469,7 +475,7 @@ export class Agent implements NodeHandler {
       maxTokens: '{{ state.maxTokens || 1024 }}',
     };
 
-    this.params.blueprint.nodes.push({
+    this.params.blueprint!.nodes.push({
       ref,
       type: 'llm',
       name,
@@ -530,7 +536,7 @@ export class Agent implements NodeHandler {
       maxTokens: '{{ state.maxTokens || 1024 }}',
     };
 
-    this.params.blueprint.nodes.push({
+    this.params.blueprint!.nodes.push({
       ref,
       type: 'llm',
       name,
@@ -640,7 +646,7 @@ export class Agent implements NodeHandler {
       maxTokens: '{{ state.maxTokens || 256 }}',
     };
 
-    this.params.blueprint.nodes.push({
+    this.params.blueprint!.nodes.push({
       ref,
       type: 'llm',
       name,
@@ -661,7 +667,7 @@ export class Agent implements NodeHandler {
    * Get current blueprint
    */
   getCurrentBlueprint(): Blueprint {
-    return this.params.blueprint;
+    return this.params.blueprint!;
   }
 
   // =============================================================================
@@ -710,7 +716,7 @@ export class Agent implements NodeHandler {
       });
     }
 
-    // Check blueprint structure
+    // Check blueprint structure (guaranteed to exist after constructor)
     if (!this.params.blueprint) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',

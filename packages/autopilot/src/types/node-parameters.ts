@@ -117,11 +117,11 @@ export interface AgentParams extends BaseParams {
   // Execution parameters
   timeout?: number;
 
-  // Memory system (required)
-  memoryState: AgentMemoryState;
+  // Memory system (optional - Agent will create default if not provided)
+  memoryState?: AgentMemoryState;
 
-  // Blueprint execution
-  blueprint: Blueprint;
+  // Blueprint execution (optional - Agent will create default if not provided)
+  blueprint?: Blueprint;
 
   // Metadata
   metadata?: Record<string, unknown>;

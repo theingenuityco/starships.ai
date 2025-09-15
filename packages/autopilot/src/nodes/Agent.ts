@@ -717,44 +717,38 @@ export class Agent implements NodeHandler {
     }
 
     // Check blueprint structure (guaranteed to exist after constructor)
-    if (!this.params.blueprint) {
+    // Blueprint is always present due to constructor logic, so we validate its structure
+    const nodes = this.params.blueprint!.nodes || [];
+    const edges = this.params.blueprint!.edges || [];
+
+    // Check for start node
+    const hasStartNode = nodes.some((node) => node.type === 'start');
+    if (!hasStartNode) {
       errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Agent blueprint is required',
+        code: 'MISSING_START_NODE',
+        message: 'Agent blueprint must have a start node',
       });
-    } else {
-      const nodes = this.params.blueprint.nodes || [];
-      const edges = this.params.blueprint.edges || [];
+    }
 
-      // Check for start node
-      const hasStartNode = nodes.some((node) => node.type === 'start');
-      if (!hasStartNode) {
-        errors.push({
-          code: 'MISSING_START_NODE',
-          message: 'Agent blueprint must have a start node',
-        });
-      }
+    // Check that all node types have handlers (delegate to engine)
+    const unsupportedNodes = nodes.filter((node) => !this.engine.hasHandler(node.type));
+    if (unsupportedNodes.length > 0) {
+      errors.push({
+        code: 'INVALID_NODE_TYPE',
+        message: `Unsupported node types in agent blueprint: ${unsupportedNodes.map((n) => n.type).join(', ')}`,
+        details: { unsupportedNodes: unsupportedNodes.map((n) => ({ type: n.type, ref: n.ref })) },
+      });
+    }
 
-      // Check that all node types have handlers (delegate to engine)
-      const unsupportedNodes = nodes.filter((node) => !this.engine.hasHandler(node.type));
-      if (unsupportedNodes.length > 0) {
-        errors.push({
-          code: 'INVALID_NODE_TYPE',
-          message: `Unsupported node types in agent blueprint: ${unsupportedNodes.map((n) => n.type).join(', ')}`,
-          details: { unsupportedNodes: unsupportedNodes.map((n) => ({ type: n.type, ref: n.ref })) },
-        });
-      }
-
-      // Check edge references
-      const nodeRefs = new Set(nodes.map((n) => n.ref));
-      const invalidEdges = edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
-      if (invalidEdges.length > 0) {
-        errors.push({
-          code: 'INVALID_EDGE_CONNECTION',
-          message: `Invalid edge references found in agent blueprint: ${invalidEdges.length} edges`,
-          details: { invalidEdges: invalidEdges.map((e) => ({ from: e.from, to: e.to, ref: e.ref })) },
-        });
-      }
+    // Check edge references
+    const nodeRefs = new Set(nodes.map((n) => n.ref));
+    const invalidEdges = edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
+    if (invalidEdges.length > 0) {
+      errors.push({
+        code: 'INVALID_EDGE_CONNECTION',
+        message: `Invalid edge references found in agent blueprint: ${invalidEdges.length} edges`,
+        details: { invalidEdges: invalidEdges.map((e) => ({ from: e.from, to: e.to, ref: e.ref })) },
+      });
     }
 
     // Validate timeout if provided

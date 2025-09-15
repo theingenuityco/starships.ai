@@ -102,6 +102,11 @@ export class Transform implements NodeHandler {
     try {
       // Apply transforms one at a time so each can see the updated state
       for (const transform of transforms) {
+        // For 'add' operations, ensure intermediate paths exist
+        if (transform.operation === 'add') {
+          this.ensureIntermediatePaths(execution.state, transform.path);
+        }
+
         // Convert single transform to JSON Patch operation with current state
         const patchOperations = await this.convertToJsonPatchOperations([transform], execution);
 
@@ -122,6 +127,32 @@ export class Transform implements NodeHandler {
       // Rollback state on any failure
       this.safetyManager.rollbackExecution(execution, executionSnapshot);
       throw error;
+    }
+  }
+
+  /**
+   * Ensure intermediate paths exist in the state object for 'add' operations
+   */
+  private ensureIntermediatePaths(state: Record<string, unknown>, path: string): void {
+    // Remove /state prefix if present since we're working directly on the state object
+    const cleanPath = path.startsWith('/state/') ? path.substring('/state'.length) : path;
+
+    if (!cleanPath || cleanPath === '/') return;
+
+    // Split the path and remove empty segments
+    const segments = cleanPath.split('/').filter((segment) => segment.length > 0);
+
+    let current: Record<string, unknown> = state;
+
+    // Create each intermediate object if it doesn't exist (except the last segment)
+    for (let i = 0; i < segments.length - 1; i++) {
+      const segment = segments[i];
+
+      if (!(segment in current) || current[segment] === null || typeof current[segment] !== 'object') {
+        current[segment] = {};
+      }
+
+      current = current[segment] as Record<string, unknown>;
     }
   }
 

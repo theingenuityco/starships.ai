@@ -247,10 +247,10 @@ export class Agent implements NodeHandler {
     ];
 
     const llmParams: LlmParams = {
-      model: '{{ state.model || "anthropic/claude-3-haiku" }}',
+      model: '{{ $exists(state.model) ? state.model : "anthropic/claude-3-haiku" }}',
       messages,
       temperature: 0.3, // Lower temperature for learning
-      maxTokens: '{{ state.maxTokens || 256 }}',
+      maxTokens: '{{ $exists(state.maxTokens) ? state.maxTokens : 256 }}',
     };
 
     this.params.blueprint!.nodes.push({
@@ -372,7 +372,7 @@ export class Agent implements NodeHandler {
     if (options?.useContext !== false) {
       messages.push({
         role: 'system',
-        content: '{{ $nodeResult("memory").messages | join("\\n") }}',
+        content: '{{ $nodeResult("memory").messages ~> $join("\\n") }}',
       });
     }
 
@@ -382,10 +382,10 @@ export class Agent implements NodeHandler {
     });
 
     const llmParams: LlmParams = {
-      model: '{{ state.model || "anthropic/claude-3-haiku" }}',
+      model: '{{ $exists(state.model) ? state.model : "anthropic/claude-3-haiku" }}',
       messages,
-      temperature: '{{ state.temperature || 0.7 }}',
-      maxTokens: '{{ state.maxTokens || 512 }}',
+      temperature: '{{ $exists(state.temperature) ? state.temperature : 0.7 }}',
+      maxTokens: '{{ $exists(state.maxTokens) ? state.maxTokens : 512 }}',
     };
 
     this.params.blueprint!.nodes.push({
@@ -460,7 +460,7 @@ export class Agent implements NodeHandler {
     const messages: LlmMessage[] = [
       {
         role: 'system',
-        content: '{{ $nodeResult("memory").messages | join("\\n") }}',
+        content: '{{ $nodeResult("memory").messages ~> $join("\\n") }}',
       },
       {
         role: 'user',
@@ -469,10 +469,10 @@ export class Agent implements NodeHandler {
     ];
 
     const llmParams: LlmParams = {
-      model: '{{ state.model || "anthropic/claude-3-haiku" }}',
+      model: '{{ $exists(state.model) ? state.model : "anthropic/claude-3-haiku" }}',
       messages,
       temperature: options?.type === 'creative' ? 0.9 : 0.5,
-      maxTokens: '{{ state.maxTokens || 1024 }}',
+      maxTokens: '{{ $exists(state.maxTokens) ? state.maxTokens : 1024 }}',
     };
 
     this.params.blueprint!.nodes.push({
@@ -512,7 +512,7 @@ export class Agent implements NodeHandler {
     if (options?.includeContext !== false) {
       messages.push({
         role: 'system',
-        content: '{{ $nodeResult("memory").messages | join("\\n") }}',
+        content: '{{ $nodeResult("memory").messages ~> $join("\\n") }}',
       });
     }
 
@@ -530,10 +530,10 @@ export class Agent implements NodeHandler {
     });
 
     const llmParams: LlmParams = {
-      model: '{{ state.model || "anthropic/claude-3-haiku" }}',
+      model: '{{ $exists(state.model) ? state.model : "anthropic/claude-3-haiku" }}',
       messages,
-      temperature: '{{ state.temperature || 0.8 }}',
-      maxTokens: '{{ state.maxTokens || 1024 }}',
+      temperature: '{{ $exists(state.temperature) ? state.temperature : 0.8 }}',
+      maxTokens: '{{ $exists(state.maxTokens) ? state.maxTokens : 1024 }}',
     };
 
     this.params.blueprint!.nodes.push({
@@ -640,10 +640,10 @@ export class Agent implements NodeHandler {
     ];
 
     const llmParams: LlmParams = {
-      model: '{{ state.model || "anthropic/claude-3-haiku" }}',
+      model: '{{ $exists(state.model) ? state.model : "anthropic/claude-3-haiku" }}',
       messages,
       temperature: 0.3,
-      maxTokens: '{{ state.maxTokens || 256 }}',
+      maxTokens: '{{ $exists(state.maxTokens) ? state.maxTokens : 256 }}',
     };
 
     this.params.blueprint!.nodes.push({

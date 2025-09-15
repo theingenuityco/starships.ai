@@ -2,8 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation } from '@/hooks/useConversations'
-import { useStreamingConversation } from '@/hooks/useStreamingConversation'
+import { useCreateConversation, useConversation } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
@@ -43,9 +42,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
 
-    // Use the new non-blocking streaming hook
-    // We pass null initially, but will provide conversationId directly to sendMessageWithStreaming
-    const { sendMessageWithStreaming, isStreaming, stopStreaming } = useStreamingConversation(null)
+    // Use unified conversation hook (convert undefined to null for the hook)
+    const { sendMessage: sendMessageFn, isSending, isStreaming } = useConversation(conversationId ?? null)
 
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
@@ -98,12 +96,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message with non-blocking streaming
-        // Pass the conversationId directly since it might be newly created
-        await sendMessageWithStreaming(messageToSend, {
-          agentId: selectedAgent.id,
-          starshipId: starshipId,
-          conversationId: currentConversationId,
+        // Send message with streaming (this handles everything: saves message + gets agent response)
+        await sendMessageFn({
+          conversationId: currentConversationId!,
+          agentId: selectedAgent!.id,
+          content: messageToSend,
+          role: 'user',
+          starshipId: starshipId!,
+          messageType: 'user_input',
+          stream: true,
         })
       } catch (error) {
         console.error('Failed to send message:', error)
@@ -148,12 +149,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message with non-blocking streaming
-        // Pass the conversationId directly since it might be newly created
-        await sendMessageWithStreaming(suggestionText, {
-          agentId: selectedAgent.id,
-          starshipId: starshipId,
-          conversationId: currentConversationId,
+        // Send message with streaming (this handles everything: saves message + gets agent response)
+        await sendMessageFn({
+          conversationId: currentConversationId!,
+          agentId: selectedAgent!.id,
+          content: suggestionText,
+          role: 'user',
+          starshipId: starshipId!,
+          messageType: 'user_input',
+          stream: true,
         })
       } catch (error) {
         console.error('Failed to send suggestion:', error)
@@ -181,10 +185,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const handleVoiceToggle = () => {
       setIsRecording(!isRecording)
       // TODO: Implement voice recording
-    }
-
-    const handleStopStreaming = () => {
-      stopStreaming()
     }
 
     const getPlaceholder = () => {
@@ -242,25 +242,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             {/* Minimal mode: Send button inline */}
             {minimal && (
               <Button
-                onClick={isStreaming ? handleStopStreaming : handleSubmit}
-                disabled={!isStreaming && !canSend}
+                onClick={handleSubmit}
+                disabled={!canSend}
                 size="icon"
                 className={cn(
                   'h-8 w-8 rounded-full shrink-0 transition-all ml-2',
-                  isStreaming
-                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                    : canSend
-                      ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
-                      : 'bg-muted text-muted-foreground cursor-not-allowed'
+                  canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                 )}
               >
-                {sending ? (
-                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : isStreaming ? (
-                  <StopCircle className="h-4 w-4" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+                {sending || isStreaming ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             )}
           </div>
@@ -290,27 +280,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                   </Button>
 
-                  {/* Send/Stop Button */}
+                  {/* Send Button */}
                   <Button
-                    onClick={isStreaming ? handleStopStreaming : handleSubmit}
-                    disabled={!isStreaming && !canSend}
+                    onClick={handleSubmit}
+                    disabled={!canSend}
                     size="icon"
                     className={cn(
                       'h-8 w-8 rounded-full shrink-0 transition-all',
-                      isStreaming
-                        ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg hover:shadow-xl'
-                        : canSend
-                          ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl'
-                          : 'bg-muted text-muted-foreground cursor-not-allowed'
+                      canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                     )}
                   >
-                    {sending ? (
-                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : isStreaming ? (
-                      <StopCircle className="h-4 w-4" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
+                    {sending || isStreaming ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>

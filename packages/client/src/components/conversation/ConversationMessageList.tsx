@@ -1,7 +1,6 @@
 'use client'
 
 import { useConversation } from '@/hooks/useConversations'
-import { useStreamingConversation } from '@/hooks/useStreamingConversation'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { Bot, User } from 'lucide-react'
@@ -14,11 +13,8 @@ interface ConversationMessageListProps {
 }
 
 export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
-  // Get base messages from the regular hook
-  const { messages, isLoading, error } = useConversation(conversationId)
-
-  // Get streaming state from the new non-blocking streaming hook
-  const { isStreaming, streamingContent, streamingState } = useStreamingConversation(conversationId)
+  // Get everything from the unified hook
+  const { messages, isLoading, error, isStreaming, streamingContent, streamingState } = useConversation(conversationId)
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -34,7 +30,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
       const existingStreamingIndex = combinedMessages.findIndex(msg => msg.streaming === true)
 
       const streamingMessage = {
-        id: `streaming-${streamingState.messageId || Date.now()}`,
+        id: `streaming-${Date.now()}`,
         content: streamingContent,
         role: 'assistant' as const,
         createdAt: new Date().toISOString(),
@@ -54,7 +50,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
 
     // Sort by creation time for consistent ordering
     return combinedMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  }, [messages, isStreaming, streamingContent, streamingState.messageId])
+  }, [messages, isStreaming, streamingContent])
 
   // Optimized auto-scroll with debouncing
   useEffect(() => {

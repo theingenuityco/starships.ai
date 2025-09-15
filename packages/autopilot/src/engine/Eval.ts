@@ -147,6 +147,8 @@ export class Eval {
         }
       }
     } catch (error) {
+      // Add more detailed error logging for debugging
+      console.error(`JSONata validation failed for expression: "${expression}"`, error);
       errors.push({
         code: 'INVALID_JSONATA_EXPRESSION',
         message: `Invalid JSONata expression: ${error instanceof Error ? error.message : 'Syntax error'}`,

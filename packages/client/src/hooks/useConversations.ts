@@ -18,6 +18,46 @@ interface ClientMessage extends MessageModel {
   sending?: boolean
   streaming?: boolean
   error?: boolean
+  contentChunks?: Array<{
+    content: string
+    position: number
+    timestamp: number
+  }>
+}
+
+// Content chunk processing utility
+const processContentChunks = (data: any) => {
+  if (!data.messages || !Array.isArray(data.messages)) {
+    return data
+  }
+
+  const processedMessages = data.messages.map((message: ClientMessage) => {
+    // If message has contentChunks, build the streamed content
+    if (message.contentChunks && Array.isArray(message.contentChunks)) {
+      // Sort chunks by position to ensure correct order
+      const sortedChunks = [...message.contentChunks].sort((a, b) => a.position - b.position)
+
+      // Build content from chunks
+      let streamedContent = ''
+      for (const chunk of sortedChunks) {
+        streamedContent += chunk.content
+      }
+
+      // Return message with both the original content and streamed content
+      return {
+        ...message,
+        content: message.streaming ? streamedContent : message.content,
+        streamedContent: streamedContent,
+      }
+    }
+
+    return message
+  })
+
+  return {
+    ...data,
+    messages: processedMessages,
+  }
 }
 
 // Create message request interface (local definition since it's not in protocol)
@@ -124,10 +164,11 @@ export function useConversation(conversationId: string | null) {
 
             try {
               const result = applyOperation(initialData, data as Operation, true)
-              return {
+              const updatedData = {
                 ...result.newDocument,
                 total: Array.isArray(result.newDocument.messages) ? result.newDocument.messages.length : 0,
               }
+              return processContentChunks(updatedData)
             } catch (error) {
               console.error('[STREAMING] Failed to apply operation to initial data:', error)
               return initialData
@@ -137,11 +178,12 @@ export function useConversation(conversationId: string | null) {
           // Apply operation to existing data
           try {
             const result = applyOperation(old, data as Operation, true)
-            return {
+            const updatedData = {
               ...result.newDocument,
               total: Array.isArray(result.newDocument.messages) ? result.newDocument.messages.length : old.total,
               lastActivityAt: new Date().toISOString(),
             }
+            return processContentChunks(updatedData)
           } catch (error) {
             console.error('[STREAMING] Failed to apply operation:', error, { operation: data, target: old })
             return old // Return unchanged data on operation failure

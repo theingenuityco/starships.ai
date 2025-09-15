@@ -11,6 +11,12 @@ import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/pris
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
 
+interface ContentChunk {
+  content: string
+  position: number
+  timestamp: number
+}
+
 interface MessageContentProps {
   content: string
   messageId: string
@@ -19,15 +25,34 @@ interface MessageContentProps {
   enableCopy?: boolean
   enableLinkPreview?: boolean
   isStreaming?: boolean
+  contentChunks?: ContentChunk[]
 }
 
-export function MessageContent({ content, messageId, className, enableMarkdown = true, enableCopy = true, enableLinkPreview = true, isStreaming = false }: MessageContentProps) {
+export function MessageContent({ content, messageId, className, enableMarkdown = true, enableCopy = true, enableLinkPreview = true, isStreaming = false, contentChunks = [] }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 
+  // Build display content from chunks when streaming, use final content when complete
+  const displayContent = useMemo(() => {
+    if (!isStreaming || !contentChunks.length) {
+      return content
+    }
+
+    // Sort chunks by position to ensure correct order
+    const sortedChunks = [...contentChunks].sort((a, b) => a.position - b.position)
+
+    // Build content from chunks
+    let result = ''
+    for (const chunk of sortedChunks) {
+      result += chunk.content
+    }
+
+    return result
+  }, [content, contentChunks, isStreaming])
+
   const handleCopyContent = async () => {
     try {
-      await navigator.clipboard.writeText(content)
+      await navigator.clipboard.writeText(displayContent)
       toast.success('Message copied to clipboard')
     } catch (error) {
       toast.error('Failed to copy message')
@@ -139,7 +164,7 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
     return (
       <div className={cn('relative group', className)}>
         <div className="text-sm leading-relaxed whitespace-pre-wrap">
-          {content}
+          {displayContent}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
         {enableCopy && (
@@ -159,17 +184,18 @@ export function MessageContent({ content, messageId, className, enableMarkdown =
         <div className="flex items-center gap-2 mb-2 text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
           <span className="text-xs font-medium">Assistant is responding...</span>
+          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
         </div>
       )}
 
       {/* Unified markdown rendering - same for both streaming and completed */}
       <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {content}
+          {displayContent}
         </ReactMarkdown>
 
         {/* Streaming cursor - appears after content while streaming */}
-        {isStreaming && content && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
+        {isStreaming && displayContent && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
       </div>
 
       {/* Copy button for entire message */}

@@ -146,7 +146,7 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
     }
   }, [displayMessages.length, isStreaming, streamingContent])
 
-  const renderMessage = (message: MessageModel & { streaming?: boolean }, index: number) => {
+  const renderMessage = (message: ClientStreamingMessage, index: number) => {
     // Generate unique key for each message, including streaming messages
     const messageKey = message.streaming ? `streaming-${message.id}-${message.content?.length || 0}` : message.id
 
@@ -202,18 +202,30 @@ export function ConversationMessageList({ conversationId, starshipId, enableAcce
       {/* Messages List */}
       <div className="flex-1 relative">
         <div ref={scrollContainerRef} className="h-full overflow-y-auto message-scroll-area flex justify-center">
-          <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">
-            {displayMessages.map((message: MessageModel & { streaming?: boolean }, index: number) => renderMessage(message, index))}
-          </div>
+          <div className="w-full max-w-4xl p-2 sm:p-4 flex flex-col gap-3 sm:gap-4">{displayMessages.map((message: ClientStreamingMessage, index: number) => renderMessage(message, index))}</div>
         </div>
       </div>
     </div>
   )
 }
 
+// Content chunk interface for delta streaming
+interface ContentChunk {
+  content: string
+  position: number
+  timestamp: number
+}
+
+// Extended Message interface for client-side streaming support
+interface ClientStreamingMessage extends MessageModel {
+  sending?: boolean
+  streaming?: boolean
+  contentChunks?: ContentChunk[]
+}
+
 // Enhanced Message Bubble Component with all features
 interface MessageBubbleProps {
-  message: MessageModel & { sending?: boolean; streaming?: boolean }
+  message: ClientStreamingMessage
   index: number
   totalMessages: number
   isSelected?: boolean
@@ -351,7 +363,15 @@ function MessageBubble({
           </div>
 
           {/* Message content */}
-          <MessageContent content={message.content} messageId={message.id} enableMarkdown={true} enableCopy={true} enableLinkPreview={true} isStreaming={message.streaming} />
+          <MessageContent
+            content={message.content}
+            messageId={message.id}
+            enableMarkdown={true}
+            enableCopy={true}
+            enableLinkPreview={true}
+            isStreaming={message.streaming}
+            contentChunks={message.contentChunks}
+          />
 
           {/* Message footer */}
           <div className="flex items-center justify-between mt-1.5 sm:mt-2 pt-1.5 sm:pt-2 border-t border-current/10">

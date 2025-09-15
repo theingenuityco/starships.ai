@@ -1,7 +1,8 @@
 /**
  * Conditional Class
  *
- * Evaluates JSONata expressions to determine workflow branching
+ * Evaluates JSONata expressions to determine workflow branching.
+ * Works as both standalone node and embedded parameter in other nodes.
  */
 
 import { NodeHandler } from '@/types/node-handler';
@@ -27,7 +28,11 @@ export class Conditional implements NodeHandler {
    * Execute the conditional expression
    */
   async execute(): Promise<ConditionalResult> {
-    console.log(`Executing conditional: ${this.params.expression}`);
+    if (!this.params.condition) {
+      throw new Error('Conditional node requires a condition expression');
+    }
+
+    console.log(`Executing conditional: ${this.params.condition}`);
 
     try {
       // Ensure we have execution context
@@ -36,7 +41,7 @@ export class Conditional implements NodeHandler {
       }
 
       // Evaluate expression using centralized Eval class
-      const result = await this.eval.evaluateExpression(this.params.expression, this.eval.buildContext(this.options.execution));
+      const result = await this.eval.evaluateExpression(this.params.condition, this.eval.buildContext(this.options.execution));
 
       // Convert result to boolean or string condition
       let condition: string | boolean | number | null | undefined;
@@ -68,27 +73,19 @@ export class Conditional implements NodeHandler {
     const errors: ValidationError[] = [];
 
     // Required fields
-    if (!this.params.expression || this.params.expression.trim() === '') {
+    if (!this.params.condition || this.params.condition.trim() === '') {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
-        message: 'Expression is required',
+        message: 'Condition expression is required',
       });
     }
 
     // Validate JSONata expression syntax
-    if (this.params.expression) {
-      const validation = this.eval.validateExpression(this.params.expression);
+    if (this.params.condition) {
+      const validation = this.eval.validateExpression(this.params.condition);
       if (!validation.valid) {
         errors.push(...(validation.errors || []));
       }
-    }
-
-    // Timeout validation
-    if (this.params.timeout !== undefined && this.params.timeout <= 0) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Timeout must be greater than 0',
-      });
     }
 
     return {

@@ -1,17 +1,17 @@
 /**
- * useStreamingConversation - Web Worker based streaming hook
+ * useStreamingConversation - Simplified non-blocking streaming hook
  *
  * This hook provides real-time streaming capabilities for conversations
- * using a Web Worker to completely offload processing from the main thread.
+ * using fetchEventSource with proper event loop yielding.
  */
 
-import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
+import { useCallback, useRef, useState, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { getStreamingWorkerManager, StreamingWorkerManager } from '@/lib/streaming-worker-manager'
 import { getCurrentToken } from '@/lib/api'
 import { applyOperation, Operation } from 'fast-json-patch'
 import { CONVERSATION_QUERY_KEYS } from './useConversations'
 import type { MessageModel } from '@starships/protocol'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
 
 export interface StreamingState {
   status: 'idle' | 'connecting' | 'streaming' | 'complete' | 'error'
@@ -34,12 +34,11 @@ interface StreamingMessage extends MessageModel {
 }
 
 /**
- * Hook for managing streaming conversations with Web Worker
+ * Hook for managing streaming conversations with non-blocking updates
  */
 export function useStreamingConversation(conversationId: string | null) {
   const queryClient = useQueryClient()
-  const workerManagerRef = useRef<StreamingWorkerManager | null>(null)
-  const currentStreamIdRef = useRef<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Streaming state with optimized updates
   const [streamingState, setStreamingState] = useState<StreamingState>({
@@ -52,32 +51,55 @@ export function useStreamingConversation(conversationId: string | null) {
 
   // Track accumulated content separately for performance
   const contentAccumulatorRef = useRef<string>('')
+  const processingQueueRef = useRef<any[]>([])
+  const isProcessingRef = useRef(false)
 
-  // Initialize worker manager on mount
-  useEffect(() => {
-    workerManagerRef.current = getStreamingWorkerManager()
+  /**
+   * Process queued events with yielding to prevent blocking
+   */
+  const processEventQueue = useCallback(async () => {
+    if (isProcessingRef.current || processingQueueRef.current.length === 0) {
+      return
+    }
 
-    return () => {
-      // Clean up any active streams on unmount
-      if (currentStreamIdRef.current && workerManagerRef.current) {
-        workerManagerRef.current.stopStream(currentStreamIdRef.current)
+    isProcessingRef.current = true
+
+    while (processingQueueRef.current.length > 0) {
+      const event = processingQueueRef.current.shift()
+
+      try {
+        // Process the event
+        await processStreamingEvent(event)
+
+        // Yield to the event loop after each event
+        await new Promise(resolve => {
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(() => resolve(undefined))
+          } else {
+            setTimeout(resolve, 0)
+          }
+        })
+      } catch (error) {
+        console.error('[Streaming] Error processing event:', error)
       }
     }
+
+    isProcessingRef.current = false
   }, [])
 
   /**
-   * Handle streaming events from Web Worker
+   * Process a single streaming event
    */
-  const handleStreamingEvent = useCallback(
-    (event: any, targetConversationId: string) => {
-      const data = event.data
+  const processStreamingEvent = useCallback(
+    async (data: any) => {
+      const targetConversationId = data.conversationId || conversationId
 
       // Handle JSON Patch operations
       if (data?.type === 'patch' && data.patch && Array.isArray(data.patch)) {
         console.log('[Streaming] Applying patch:', data.patch)
 
         // Apply patch to query cache
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId), (old: any) => {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId!), (old: any) => {
           if (!old) {
             const initialData = {
               messages: [],
@@ -153,7 +175,7 @@ export function useStreamingConversation(conversationId: string | null) {
         console.log('[Streaming] Stream complete')
 
         // Mark streaming messages as complete
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId), (old: any) => {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId!), (old: any) => {
           if (!old) return old
           return {
             ...old,
@@ -171,7 +193,6 @@ export function useStreamingConversation(conversationId: string | null) {
         })
 
         contentAccumulatorRef.current = ''
-        currentStreamIdRef.current = null
         return
       }
 
@@ -188,7 +209,6 @@ export function useStreamingConversation(conversationId: string | null) {
         }))
 
         contentAccumulatorRef.current = ''
-        currentStreamIdRef.current = null
         return
       }
 
@@ -212,7 +232,7 @@ export function useStreamingConversation(conversationId: string | null) {
           contentAccumulatorRef.current = ''
 
           // Add streaming message to cache
-          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId), (old: any) => {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId!), (old: any) => {
             if (!old)
               return {
                 messages: [{ ...message, streaming: true }],
@@ -227,7 +247,7 @@ export function useStreamingConversation(conversationId: string | null) {
           })
         } else {
           // Add regular message to cache
-          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId), (old: any) => {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId!), (old: any) => {
             if (!old)
               return {
                 messages: [message],
@@ -243,11 +263,22 @@ export function useStreamingConversation(conversationId: string | null) {
         }
       }
     },
-    [queryClient]
+    [conversationId, queryClient]
   )
 
   /**
-   * Send a message with streaming response using Web Worker
+   * Queue an event for processing
+   */
+  const queueEvent = useCallback(
+    (event: any) => {
+      processingQueueRef.current.push(event)
+      processEventQueue()
+    },
+    [processEventQueue]
+  )
+
+  /**
+   * Send a message with streaming response
    */
   const sendMessageWithStreaming = useCallback(
     async (
@@ -270,18 +301,17 @@ export function useStreamingConversation(conversationId: string | null) {
         throw new Error('No authentication token available')
       }
 
-      if (!workerManagerRef.current) {
-        throw new Error('Worker manager not initialized')
+      // Stop any existing stream
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
       }
 
-      // Stop any existing stream
-      if (currentStreamIdRef.current) {
-        workerManagerRef.current.stopStream(currentStreamIdRef.current)
-        currentStreamIdRef.current = null
-      }
+      // Create new abort controller
+      abortControllerRef.current = new AbortController()
 
       // Clear previous state
       contentAccumulatorRef.current = ''
+      processingQueueRef.current = []
       setStreamingState({
         status: 'connecting',
         isStreaming: true,
@@ -292,56 +322,66 @@ export function useStreamingConversation(conversationId: string | null) {
       })
 
       try {
-        // Start streaming via Web Worker
-        const streamId = await workerManagerRef.current.startStream({
-          url: `/api/v1/conversations/${targetConversationId}/messages?stream=true`,
+        // Use fetchEventSource for proper SSE handling
+        await fetchEventSource(`/api/v1/conversations/${targetConversationId}/messages?stream=true`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: {
+          body: JSON.stringify({
             content,
             agentId: options?.agentId,
             starshipId: options?.starshipId,
-          },
-          onEvent: event => {
-            // Process events in the main thread
-            // The heavy lifting of SSE parsing is done in the worker
-            handleStreamingEvent(event, targetConversationId)
-          },
-          onStatus: status => {
-            console.log('[Streaming] Status:', status)
-            if (status === 'connected') {
+          }),
+          signal: abortControllerRef.current.signal,
+
+          async onopen(response) {
+            if (response.ok) {
+              console.log('[Streaming] Connection opened')
               setStreamingState(prev => ({
                 ...prev,
                 status: 'streaming',
               }))
+              return
+            }
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          },
+
+          onmessage(event) {
+            if (!event.data) return
+
+            try {
+              const parsed = JSON.parse(event.data)
+              parsed.conversationId = targetConversationId
+
+              // Queue the event for non-blocking processing
+              queueEvent(parsed)
+            } catch (error) {
+              console.warn('[Streaming] Failed to parse SSE data:', event.data, error)
             }
           },
-          onError: error => {
-            console.error('[Streaming] Error:', error)
-            setStreamingState(prev => ({
-              ...prev,
-              status: 'error',
-              isStreaming: false,
-              error: error.message,
-            }))
-            currentStreamIdRef.current = null
-          },
-          onComplete: () => {
-            console.log('[Streaming] Complete')
+
+          onclose() {
+            console.log('[Streaming] Connection closed')
             setStreamingState(prev => ({
               ...prev,
               status: 'complete',
               isStreaming: false,
             }))
-            currentStreamIdRef.current = null
+          },
+
+          onerror(error) {
+            console.error('[Streaming] Error:', error)
+            setStreamingState(prev => ({
+              ...prev,
+              status: 'error',
+              isStreaming: false,
+              error: error,
+            }))
+            throw error
           },
         })
-
-        currentStreamIdRef.current = streamId
-        console.log('[Streaming] Started with stream ID:', streamId)
       } catch (error) {
         console.error('[Streaming] Failed to start:', error)
         setStreamingState(prev => ({
@@ -353,17 +393,19 @@ export function useStreamingConversation(conversationId: string | null) {
         throw error
       }
     },
-    [conversationId, handleStreamingEvent]
+    [conversationId, queueEvent]
   )
 
   /**
    * Stop streaming
    */
   const stopStreaming = useCallback(() => {
-    if (currentStreamIdRef.current && workerManagerRef.current) {
-      workerManagerRef.current.stopStream(currentStreamIdRef.current)
-      currentStreamIdRef.current = null
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
     }
+
+    processingQueueRef.current = []
 
     setStreamingState({
       status: 'idle',
@@ -375,16 +417,6 @@ export function useStreamingConversation(conversationId: string | null) {
 
     contentAccumulatorRef.current = ''
   }, [])
-
-  // Cleanup on conversation change
-  useEffect(() => {
-    return () => {
-      if (currentStreamIdRef.current && workerManagerRef.current) {
-        workerManagerRef.current.stopStream(currentStreamIdRef.current)
-        currentStreamIdRef.current = null
-      }
-    }
-  }, [conversationId])
 
   // Memoized return value
   return useMemo(

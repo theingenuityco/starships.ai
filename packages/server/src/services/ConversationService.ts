@@ -1,6 +1,6 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { Agent, AutopilotEvent, LLMResponse } from '@starships/autopilot';
+import { Agent, AutopilotEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -293,6 +293,35 @@ export class ConversationService {
           await this.streamingService.broadcastDelta(conversationId, operation);
         }
 
+        // Persist the final assistant message to the database and patch stable fields
+        try {
+          const assistantMessage = await this.messageService.createMessage({
+            conversationId,
+            role: 'assistant',
+            content: finalContent,
+            messageType: 'agent_response',
+          });
+
+          const finalizeOps: Operation[] = [
+            {
+              op: 'replace',
+              path: '/messages/-1/id',
+              value: assistantMessage.id,
+            },
+            {
+              op: 'replace',
+              path: '/messages/-1/updatedAt',
+              value: assistantMessage.updatedAt,
+            },
+          ];
+
+          for (const op of finalizeOps) {
+            await this.streamingService.broadcastDelta(conversationId, op);
+          }
+        } catch (persistError) {
+          console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
+        }
+
         // Clear streaming content tracker
         this.streamingContent.delete(conversationId);
         break;
@@ -306,48 +335,7 @@ export class ConversationService {
 
       case 'node_completed': {
         console.log('[STREAMING] Node completed:', event.data?.execution?.currentNodeRef);
-
-        // Check if this node produced content and save to database
-        const results = event.data?.execution?.results;
-        const currentNodeRef = event.data?.execution?.currentNodeRef;
-
-        if (results && currentNodeRef) {
-          // Find the result for the current node
-          const nodeResult = results.find((result) => result.nodeRef === currentNodeRef);
-
-          if (nodeResult && !nodeResult.error && nodeResult.data) {
-            const nodeData = nodeResult.data as LLMResponse;
-            const llmMessage = nodeData?.choices[0]?.message?.content;
-            // If this is LLM output, save it as an assistant message
-            if (typeof llmMessage === 'string' && llmMessage.trim()) {
-              const assistantMessage = await this.messageService.createMessage({
-                conversationId,
-                role: 'assistant',
-                content: llmMessage,
-                messageType: 'agent_response',
-              });
-
-              // Persist final message to DB but avoid replacing the whole client message to prevent UI flicker/reordering.
-              // Patch only stable fields that need to reflect DB state.
-              const finalizeOps: Operation[] = [
-                {
-                  op: 'replace',
-                  path: '/messages/-1/id',
-                  value: assistantMessage.id,
-                },
-                {
-                  op: 'replace',
-                  path: '/messages/-1/updatedAt',
-                  value: assistantMessage.updatedAt,
-                },
-                // Keep content (already applied during content_complete) and createdAt as-is to preserve sort and visual stability.
-              ];
-              for (const op of finalizeOps) {
-                await this.streamingService.broadcastDelta(conversationId, op);
-              }
-            }
-          }
-        }
+        // Persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.
         break;
       }
 

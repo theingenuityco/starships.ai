@@ -42,7 +42,7 @@ export default function WaitlistPage() {
   }
 
   const handleApprovedUserRedirect = () => {
-    if (isAuthenticated && starshipsData?.starships?.length > 0) {
+    if (isAuthenticated && starshipsData?.starships && starshipsData.starships.length > 0) {
       // User has starships, go to first one
       const firstStarship = starshipsData.starships[0]
       router.push(`/ship/${firstStarship.slug}/conversations`)

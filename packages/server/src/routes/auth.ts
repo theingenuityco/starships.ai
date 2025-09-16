@@ -193,7 +193,7 @@ router.get('/auth/verify-email', async (req: Request, res: Response): Promise<vo
     // For now, we'll simulate verification by checking if user exists
     const user = await UserService.getUserByEmail(email);
     if (!user) {
-      sendError(res, 'NOT_FOUND', 'User not found', 404);
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
       return;
     }
 

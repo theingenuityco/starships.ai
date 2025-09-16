@@ -46,7 +46,6 @@ export interface Edge {
   from: string;
   to: string;
   condition?: string;
-  dataFlow?: boolean;
   label?: string;
   metadata?: Record<string, unknown>;
 }

@@ -25,7 +25,6 @@ export type { ConditionalResult } from './nodes/Conditional';
 export { Memory } from './memory/Memory';
 export type { MemoryState } from './memory/Memory';
 export { AgentMemory } from './memory/AgentMemory';
-export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from './memory/AgentMemory';
 
 // Types
 export * from './types';

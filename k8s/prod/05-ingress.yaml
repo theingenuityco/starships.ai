@@ -5,17 +5,35 @@ metadata:
   namespace: starships-prod
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: '10m'
-    nginx.ingress.kubernetes.io/proxy-read-timeout: '60'
-    nginx.ingress.kubernetes.io/proxy-send-timeout: '60'
+    # Extended timeouts for SSE streaming
+    nginx.ingress.kubernetes.io/proxy-read-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-send-timeout: '3600'
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: '60'
+    # SSE-specific configuration
+    nginx.ingress.kubernetes.io/proxy-buffering: 'off'
+    nginx.ingress.kubernetes.io/proxy-cache: 'off'
     cert-manager.io/cluster-issuer: 'letsencrypt-prod'
     nginx.ingress.kubernetes.io/ssl-redirect: 'true'
-    # Security headers
+    # Security headers with SSE support
     nginx.ingress.kubernetes.io/configuration-snippet: |
       more_set_headers "X-Frame-Options: DENY";
       more_set_headers "X-Content-Type-Options: nosniff";
       more_set_headers "X-XSS-Protection: 1; mode=block";
       more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
-      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self';";
+      more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: ws:;";
+      # SSE-specific headers
+      more_set_headers "X-Accel-Buffering: no";
+      # Cache control for SSE endpoints
+      location ~* ^/api/v1/conversations/.*/messages.*stream {
+        more_set_headers "Cache-Control: no-cache, no-store, must-revalidate";
+        more_set_headers "Pragma: no-cache";
+        more_set_headers "Expires: 0";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_http_version 1.1;
+        proxy_set_header Connection '';
+        chunked_transfer_encoding on;
+      }
 spec:
   ingressClassName: nginx
   tls:

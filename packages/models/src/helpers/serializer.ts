@@ -8,114 +8,191 @@ import 'reflect-metadata';
 
 /**
  * Common transformation decorators for model properties
+ * Strict transformers that fail fast instead of using fallback values
  */
 export const Transformers = {
   /**
-   * Transform JSON string to object and vice versa
+   * Transform JSON string to object and vice versa - lean and strict
    */
   JsonTransform: () =>
     Transform(({ value, type }) => {
       if (type === 0) {
-        // toClassOnly (deserializing from database)
+        // toClassOnly (deserializing from database) - parse strings only
         if (typeof value === 'string') {
-          try {
-            return JSON.parse(value);
-          } catch {
-            return null;
-          }
+          return JSON.parse(value); // Let JSON.parse throw on invalid JSON
         }
-        return value;
+        return value; // Pass through non-strings as-is
       } else {
-        // toPlainOnly (serializing to database)
-        if (value !== null && value !== undefined) {
-          try {
-            return JSON.stringify(value);
-          } catch {
-            return null;
-          }
-        }
-        return null;
+        // toPlainOnly (serializing to database) - stringify everything
+        return JSON.stringify(value); // Let JSON.stringify throw on circular refs
       }
     }),
 
   /**
-   * Transform date string to Date object and vice versa
+   * Transform date to ensure consistent ISO string format
+   * Fails fast on invalid dates instead of returning fallbacks
    */
   DateTransform: () =>
     Transform(({ value, type }) => {
       if (type === 0) {
-        // toClassOnly (deserializing)
-        return value ? new Date(value) : null;
+        // toClassOnly (deserializing) - ensure consistent ISO string format
+        if (value === null || value === undefined) return undefined;
+        if (value instanceof Date) {
+          if (isNaN(value.getTime())) {
+            throw new Error('Invalid Date object encountered during deserialization');
+          }
+          return value.toISOString();
+        }
+        if (typeof value === 'string') {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) {
+            throw new Error(`Invalid date string: ${value}`);
+          }
+          return date.toISOString();
+        }
+        // Handle numbers (timestamps)
+        if (typeof value === 'number') {
+          const date = new Date(value);
+          if (isNaN(date.getTime())) {
+            throw new Error(`Invalid timestamp: ${value}`);
+          }
+          return date.toISOString();
+        }
+        throw new Error(`Unsupported date value type: ${typeof value}`);
       } else {
         // toPlainOnly (serializing)
-        return value instanceof Date ? value.toISOString() : value ? new Date(value).toISOString() : null;
+        if (value === null || value === undefined) return undefined;
+        if (value instanceof Date) {
+          if (isNaN(value.getTime())) {
+            throw new Error('Invalid Date object encountered during serialization');
+          }
+          return value.toISOString();
+        }
+        if (typeof value === 'string') {
+          // Validate that string is a valid ISO date
+          const date = new Date(value);
+          if (isNaN(date.getTime())) {
+            throw new Error(`Invalid date string during serialization: ${value}`);
+          }
+          return value;
+        }
+        throw new Error(`Unsupported date value for serialization: ${typeof value}`);
       }
     }),
 
   /**
-   * Ensure array type with default empty array
+   * Strict array transformer - fails if value is not an array when expected
    */
-  ArrayTransform: (defaultValue: unknown[] = []) =>
+  ArrayTransform: () =>
     Transform(({ value }) => {
+      if (value === null || value === undefined) return undefined;
       if (Array.isArray(value)) return value;
-      if (value === null || value === undefined) return defaultValue;
-      return defaultValue;
+      throw new Error(`Expected array but received: ${typeof value}`);
     }),
 
   /**
-   * Transform number with default value
+   * Strict number transformer - fails on invalid numbers
    */
-  NumberTransform: (defaultValue: number = 0) =>
+  NumberTransform: () =>
     Transform(({ value }) => {
-      const num = Number(value);
-      return isNaN(num) ? defaultValue : num;
+      if (value === null || value === undefined) return undefined;
+      if (typeof value === 'number') {
+        if (isNaN(value) || !isFinite(value)) {
+          throw new Error(`Invalid number value: ${value}`);
+        }
+        return value;
+      }
+      if (typeof value === 'string') {
+        const num = Number(value);
+        if (isNaN(num) || !isFinite(num)) {
+          throw new Error(`Cannot convert string to number: ${value}`);
+        }
+        return num;
+      }
+      throw new Error(`Cannot transform value to number: ${typeof value}`);
     }),
 
   /**
-   * Transform boolean with default value
+   * Strict boolean transformer - fails on ambiguous values
    */
-  BooleanTransform: (defaultValue: boolean = false) =>
+  BooleanTransform: () =>
     Transform(({ value }) => {
+      if (value === null || value === undefined) return undefined;
       if (typeof value === 'boolean') return value;
-      if (value === null || value === undefined) return defaultValue;
-      return Boolean(value);
+      // Allow explicit string representations
+      if (typeof value === 'string') {
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        throw new Error(`Cannot convert string to boolean: ${value}`);
+      }
+      // Allow explicit numeric representations
+      if (typeof value === 'number') {
+        if (value === 1) return true;
+        if (value === 0) return false;
+        throw new Error(`Cannot convert number to boolean: ${value}`);
+      }
+      throw new Error(`Cannot transform value to boolean: ${typeof value}`);
     }),
 };
 
 export const LLMTransformers = {
   /**
-   * Transform temperature to ensure proper range
+   * Transform temperature with validation - throws for invalid values, clamps range
    */
   TemperatureTransform: () => {
     return Transform(({ value }) => {
-      if (value == null) return undefined;
+      if (value == null || value === undefined) return undefined;
+
       const temp = typeof value === 'string' ? parseFloat(value) : value;
-      if (isNaN(temp)) return undefined;
-      return Math.max(0, Math.min(2, temp)); // Clamp between 0 and 2
+      if (isNaN(temp)) {
+        throw new Error(`Invalid temperature value: ${value}`);
+      }
+
+      // Clamp temperature to valid range (0-2)
+      return Math.max(0, Math.min(2, temp));
     });
   },
 
   /**
-   * Transform maxTokens to ensure it's a positive integer
+   * Transform maxTokens with validation - returns undefined for invalid values
    */
   MaxTokensTransform: () => {
     return Transform(({ value }) => {
-      if (value == null) return undefined;
+      if (value == null || value === undefined) return undefined;
+
       const tokens = typeof value === 'string' ? parseInt(value, 10) : value;
-      if (isNaN(tokens) || tokens < 1) return undefined;
-      return Math.min(tokens, 100000); // Reasonable upper limit
+      if (isNaN(tokens) || !Number.isInteger(tokens)) {
+        return undefined;
+      }
+
+      if (tokens < 1) {
+        return undefined;
+      }
+
+      // Clamp maxTokens to reasonable limit
+      return Math.min(100000, tokens);
     });
   },
 
   /**
-   * Transform timeout to ensure it's a positive integer (milliseconds)
+   * Transform timeout with validation - returns default for invalid values
    */
   TimeoutTransform: () => {
     return Transform(({ value }) => {
-      if (value == null) return 30000; // Default 30 seconds
+      if (value == null || value === undefined) return 30000;
+
       const timeout = typeof value === 'string' ? parseInt(value, 10) : value;
-      if (isNaN(timeout) || timeout < 1000) return 30000; // Minimum 1 second
-      return Math.min(timeout, 300000); // Maximum 5 minutes
+      if (isNaN(timeout) || !Number.isInteger(timeout)) {
+        return 30000;
+      }
+
+      // Return default for values below minimum
+      if (timeout < 1000) {
+        return 30000;
+      }
+
+      // Clamp timeout to reasonable limits
+      return Math.min(300000, timeout);
     });
   },
 };

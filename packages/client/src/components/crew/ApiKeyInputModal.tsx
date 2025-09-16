@@ -43,7 +43,6 @@ export function ApiKeyInputModal({ isOpen, onClose, onSubmit, connector, require
 
   // Initialize validation results - only run when requirements change, not on every state update
   useEffect(() => {
-    console.log('[ApiKeyInputModal] useEffect triggered - requirements:', requirements.length, 'serviceType:', serviceType)
     const initialValidationResults: Record<string, ApiKeyValidationResult> = {}
     requirements.forEach(req => {
       const value = state.values[req.envKey] || ''
@@ -54,7 +53,6 @@ export function ApiKeyInputModal({ isOpen, onClose, onSubmit, connector, require
       })
     })
 
-    console.log('[ApiKeyInputModal] Setting validation results:', Object.keys(initialValidationResults))
     setState(prev => ({
       ...prev,
       validationResults: initialValidationResults,
@@ -140,9 +138,7 @@ export function ApiKeyInputModal({ isOpen, onClose, onSubmit, connector, require
 
   // Reset form when modal opens/closes
   useEffect(() => {
-    console.log('[ApiKeyInputModal] Modal state changed - isOpen:', isOpen, 'initialValues:', Object.keys(initialValues))
     if (isOpen) {
-      console.log('[ApiKeyInputModal] Resetting form state')
       setState(prev => ({
         ...prev,
         values: { ...initialValues },
@@ -248,7 +244,6 @@ export function ApiKeyInputModal({ isOpen, onClose, onSubmit, connector, require
     <Dialog
       open={isOpen}
       onOpenChange={open => {
-        console.log('[ApiKeyInputModal] Dialog onOpenChange called with:', open, 'current isOpen:', isOpen)
         if (!open) {
           handleClose()
         }

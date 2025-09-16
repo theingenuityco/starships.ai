@@ -10,7 +10,7 @@ import { Neo4jConnection } from '@/helpers/database';
 // Define type aliases for test data
 type CreateConversationData = Conversation & { starshipId: string; agentId?: string };
 
-// Mock the database connection
+// Mock the database connection only
 jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(() => ({
     executeQuery: jest.fn(),
@@ -18,15 +18,9 @@ jest.mock('../../helpers/database', () => ({
   })),
 }));
 
-// Mock ConversationEntity with proper static methods
-jest.mock('../../entities/ConversationEntity', () => ({
-  ConversationEntity: {
-    validate: jest.fn().mockResolvedValue(undefined),
-    deserialize: jest.fn().mockImplementation((data) => ({
-      ...data,
-      serialize: jest.fn().mockReturnValue(data),
-    })),
-  },
+// Mock nanoid for predictable ID generation
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'test-nanoid-123'),
 }));
 
 import { getConnection } from '@/helpers/database';
@@ -125,7 +119,7 @@ describe('ConversationRepository', () => {
 
       const createdConversation: ConversationModel = {
         ...conversationData,
-        id: 'test-uuid-123',
+        id: 'test-nanoid-123',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
       };
@@ -144,7 +138,14 @@ describe('ConversationRepository', () => {
       const result = await repository.create(conversationData);
 
       expect(repository.linkToStarship).toHaveBeenCalledWith(createdConversation.id, 'starship-123');
-      expect(result).toEqual(expect.objectContaining(createdConversation));
+      // The result will be a ConversationEntity with proper date transformations
+      expect(result).toMatchObject({
+        id: 'test-nanoid-123',
+        title: 'Test Conversation',
+        status: 'active',
+      });
+      expect(result.createdAt).toBeDefined();
+      expect(result.updatedAt).toBeDefined();
     });
 
     it('should validate required fields', async () => {
@@ -289,7 +290,7 @@ describe('ConversationRepository', () => {
         expect.stringContaining('MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})'),
         { conversationId: 'conv-123' }
       );
-      expect(result).toEqual(mockStarship);
+      expect(result).toMatchObject(mockStarship);
     });
 
     it('should return null when conversation has no associated starship', async () => {

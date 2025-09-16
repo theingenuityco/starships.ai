@@ -6,9 +6,9 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import type { ExecutionStatus, NodeResult } from '@starships/autopilot';
+import type { ExecutionStatus, NodeResult, ExecutionState } from '@starships/autopilot';
 import type { ExecutionModel, ExecutionError } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
@@ -16,13 +16,11 @@ import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationErro
  */
 export class ExecutionEntity implements ExecutionModel {
   @Expose()
-  @Transform(({ value }) => value)
   @IsString()
   @Length(1, 255)
   id!: string;
 
   @Expose()
-  @Transform(({ value }) => value)
   @IsString()
   @Length(1, 255)
   workflowId!: string;
@@ -38,12 +36,10 @@ export class ExecutionEntity implements ExecutionModel {
   updatedAt!: string;
 
   @Expose()
-  @Transform(({ value }) => value || 'pending')
-  @IsIn(['not_started', 'running', 'paused', 'completed', 'failed', 'cancelled'])
+  @IsIn(['pending', 'running', 'paused', 'completed', 'failed', 'cancelled'])
   status!: ExecutionStatus;
 
   @Expose()
-  @Transform(({ value }) => value)
   @IsOptional()
   @IsString()
   currentNodeRef?: string;
@@ -88,29 +84,7 @@ export class ExecutionEntity implements ExecutionModel {
 
   @Expose()
   @Transformers.JsonTransform()
-  state!: Record<string, unknown>;
-
-  /**
-   * Deserialize database record into ExecutionEntity
-   * Converts raw database records to fully typed and validated ExecutionEntity instances
-   */
-  static deserialize(data: Record<string, unknown>): ExecutionEntity {
-    return plainToInstance(ExecutionEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Serialize ExecutionEntity to database record
-   * Converts entity instance to plain object suitable for database storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
+  state!: ExecutionState;
 
   /**
    * Simple validation function using class-validator
@@ -130,7 +104,7 @@ export class ExecutionEntity implements ExecutionModel {
         workflowId: dataRecord.workflowId,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        status: dataRecord.status || 'not_started',
+        status: (dataRecord.status as ExecutionStatus) || 'pending',
         currentNodeRef: dataRecord.currentNodeRef,
         executionData: dataRecord.executionData,
         error: dataRecord.error,
@@ -138,9 +112,8 @@ export class ExecutionEntity implements ExecutionModel {
         startTime: dataRecord.startTime,
         endTime: dataRecord.endTime,
         pausedAt: dataRecord.pausedAt,
-        executionResults: dataRecord.results,
-        agentMemory: dataRecord.agentMemory,
-        ...dataRecord,
+        results: dataRecord.results || [],
+        state: dataRecord.state || {},
       });
     } else {
       // For update operations, only validate provided fields
@@ -150,7 +123,7 @@ export class ExecutionEntity implements ExecutionModel {
     const errors = await validate(entity, {
       skipMissingProperties: operation === 'update',
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Allow extra properties for flexibility
     });
 
     if (errors.length > 0) {

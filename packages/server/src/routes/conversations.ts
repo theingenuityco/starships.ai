@@ -57,14 +57,25 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
       const streamingService = new StreamingService();
-      streamingService.addConnection(conversationId, res);
 
-      // Send existing messages after connection is established
+      // Determine a reliable baseline:
+      // - client hint (query.baselineLength) if provided
+      // - server truth (current messages count)
+      const clientBase = Number((req.query as any).baselineLength ?? 0) || 0;
+
+      // Fetch existing messages first to compute server-side count
       const conversationService = new ConversationService();
       const conversationMessages = await conversationService.getConversationMessages(conversationId);
+      const serverCount = conversationMessages.length;
 
+      // Use the larger of client hint and server truth to avoid undercounting
+      const baseLength = Math.max(clientBase, serverCount);
+
+      // Establish SSE connection with normalized baseline
+      streamingService.addConnection(conversationId, res, { baseLength });
+
+      // Send existing messages via StreamingService (complete message events)
       if (conversationMessages.length > 0) {
-        // Send existing messages via StreamingService
         for (const message of conversationMessages) {
           await streamingService.broadcastMessage(conversationId, message);
         }
@@ -81,7 +92,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Validate query parameters for ordering
       const orderValidation = validateData(
         z.object({
-          orderBy: z.enum(['timestamp', 'created_at']).optional(),
+          orderBy: z.enum(['createdAt']).optional(),
           orderDirection: z.enum(['asc', 'desc']).optional(),
         }),
         req.query,
@@ -92,13 +103,15 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      const conversationData = await conversationService.getConversationMessages(
+      const messages = await conversationService.getConversationMessages(
         conversationId,
         orderValidation.orderBy,
         orderValidation.orderDirection
       );
 
-      if (!conversationData) {
+      // Verify conversation exists
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
           resource: 'conversation',
           id: conversationId,
@@ -106,7 +119,17 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         return;
       }
 
-      sendSuccess(res, conversationData, 200);
+      // Get conversation agents to determine participants
+      // const agents = await conversationService.getConversationAgents(conversationId);
+      // const participants = agents.map((agent) => agent.id);
+
+      // Structure response to match client expectations
+      const responseData = {
+        conversation,
+        messages,
+      };
+
+      sendSuccess(res, responseData, 200);
     }
   } catch (error) {
     handleError(error, res, 'fetching conversation messages');
@@ -126,6 +149,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const bodyValidation = validateData(
       z.object({
         content: z.string().min(1, 'content is required'),
+        baselineLength: z.coerce.number().int().min(0).optional(),
       }),
       req.body,
       res,
@@ -145,16 +169,46 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
       // Add connection to streaming service - it will handle SSE headers and setup
       // This automatically sends connection confirmation via sendEvent('connection', ...)
       const streamingService = new StreamingService();
-      streamingService.addConnection(conversationId, res);
+
+      // Determine a reliable baseline:
+      // - client hint (body.baselineLength) if provided
+      // - server truth (current messages count)
+      const clientBase = Number((req.body as any).baselineLength ?? 0) || 0;
+
+      // Fetch existing messages to compute server-side count
+      const conversationServiceForBaseline = new ConversationService();
+      const existingMessages = await conversationServiceForBaseline.getConversationMessages(conversationId);
+      const serverCount = existingMessages.length;
+
+      // Use the larger of client hint and server truth to avoid undercounting
+      const baseLength = Math.max(clientBase, serverCount);
+
+      // Establish SSE connection with normalized baseline
+      streamingService.addConnection(conversationId, res, { baseLength });
+
+      // Create ConversationService - it will use the singleton StreamingService internally
+      const streamingConversationService = new ConversationService();
 
       // Process conversation with streaming (async - don't await)
       // Using conversationId as stream identifier - much simpler!
-      conversationService.addConversationMessage({
-        conversationId,
-        content,
-        role: 'user',
-        messageType: 'user_input',
-      });
+      streamingConversationService
+        .addConversationMessage({
+          conversationId,
+          content,
+          role: 'user',
+          messageType: 'user_input',
+        })
+        .catch((error) => {
+          console.error('[ROUTE] Streaming conversation processing failed:', error);
+          // Send error to client via streaming
+          streamingService.broadcastError(conversationId, {
+            streamId: conversationId,
+            errorCode: 'CONVERSATION_PROCESSING_FAILED',
+            message: error instanceof Error ? error.message : 'Unknown conversation processing error',
+            timestamp: new Date().toISOString(),
+            recoverable: false,
+          });
+        });
 
       // Return early to keep connection open (similar to GET endpoint)
       return;
@@ -242,7 +296,9 @@ router.post('/conversations', jwtAuthMiddleware, async (req: Request, res: Respo
     // Validate request body
     const bodyValidation = validateData(
       z.object({
+        title: z.string().min(1).max(100).optional(),
         starshipId: NanoidSchema.optional(),
+        agentId: NanoidSchema.optional(),
       }),
       req.body,
       res,

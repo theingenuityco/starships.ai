@@ -100,8 +100,6 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     // In a real app, this would open a support form or send to error tracking
-    console.log('Report issue:', issueData)
-
     // For now, copy to clipboard
     navigator.clipboard?.writeText(JSON.stringify(issueData, null, 2))
   }

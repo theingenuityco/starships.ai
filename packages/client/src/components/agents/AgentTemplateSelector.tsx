@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth'
 
 interface AgentTemplateSelectorProps {
   onSelectTemplate: (template: AgentTemplate) => void
-  onCreateFromTemplate: (templateId: string, agentName: string) => void
+  onCreateFromTemplate: (templateId: string) => void
   trigger?: React.ReactNode
 }
 
@@ -41,9 +41,6 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [selectedTemplate, setSelectedTemplate] = useState<AgentTemplate | null>(null)
-  const [agentName, setAgentName] = useState('')
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   useEffect(() => {
     loadTemplates()
@@ -83,26 +80,12 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
   }
 
   const handleSelectTemplate = (template: AgentTemplate) => {
-    setSelectedTemplate(template)
-    const firstName = userName ? userName.split(' ')[0] : 'Your'
-    setAgentName(`${firstName}'s ${template.name}`)
-    setShowCreateDialog(true)
-  }
-
-  const handleCreateAgent = async () => {
-    if (selectedTemplate && agentName.trim()) {
-      try {
-        // Let the parent component handle the API call
-        onCreateFromTemplate(selectedTemplate.id, agentName.trim())
-
-        // Close dialog and reset state
-        setShowCreateDialog(false)
-        setSelectedTemplate(null)
-        setAgentName('')
-      } catch (error) {
-        console.error('Failed to create agent from template:', error)
-        // TODO: Add error handling UI
-      }
+    // Directly create agent from template without asking for name
+    try {
+      onCreateFromTemplate(template.id)
+    } catch (error) {
+      console.error('Failed to create agent from template:', error)
+      // TODO: Add error handling UI
     }
   }
 
@@ -233,42 +216,6 @@ export function AgentTemplateSelector({ onCreateFromTemplate, trigger }: AgentTe
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-1">{filteredTemplates.map(renderTemplateCard)}</div>
             )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Agent from Template Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create Agent from Template</DialogTitle>
-            <DialogDescription>Create a new agent based on the &ldquo;{selectedTemplate?.name}&rdquo; template.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Agent Name</label>
-              <Input value={agentName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgentName(e.target.value)} placeholder="Enter agent name..." className="mt-1" />
-            </div>
-
-            {selectedTemplate && (
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">{selectedTemplate.icon}</span>
-                  <span className="font-medium">{selectedTemplate.name}</span>
-                </div>
-                <p className="text-sm text-muted-foreground">{selectedTemplate.description}</p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateAgent} disabled={!agentName.trim()}>
-              Create Agent
-            </Button>
           </div>
         </DialogContent>
       </Dialog>

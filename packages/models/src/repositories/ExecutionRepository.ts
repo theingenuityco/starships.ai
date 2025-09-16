@@ -1,4 +1,5 @@
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { CreateExecutionRequest, ExecutionModel } from '@starships/protocol';
 import { ExecutionEntity } from '../entities/ExecutionEntity';
@@ -13,7 +14,10 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) RETURN e ORDER BY e.createdAt DESC');
-        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findAll',
       'Execution'
@@ -25,7 +29,7 @@ export class ExecutionRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ e: ExecutionModel }>('MATCH (e:Execution) WHERE e.id = $id RETURN e', { id });
-        return result.length > 0 ? ExecutionEntity.deserialize(result[0].e as unknown as Record<string, unknown>) : null;
+        return result.length > 0 ? fromDatabase(ExecutionEntity, result[0].e) : null;
       },
       'findById',
       'Execution',
@@ -43,19 +47,16 @@ export class ExecutionRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare execution data with defaults and validation
-        const executionEntity = ExecutionEntity.deserialize({
+        const executionData = {
           ...entity,
           createdAt: now,
           updatedAt: now,
           status: entity.status || 'pending',
-        });
+        };
 
-        const executionData = executionEntity.serialize();
-        // Remove id since it will be auto-generated
-        delete (executionData as { id?: string }).id;
-
-        // Use BaseRepository serialization
-        const result = await this.createEntityWithAutoId<ExecutionModel>('Execution', executionData);
+        // Create entity instance from plain object, then serialize
+        const executionEntity = toEntityInstance(ExecutionEntity, executionData);
+        const result = await this.createEntityWithAutoId<ExecutionModel>('Execution', toDatabase(executionEntity));
 
         // Create relationship with workflow
         await connection.executeWrite(
@@ -65,7 +66,7 @@ export class ExecutionRepository extends BaseRepository {
         );
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.deserialize(result as unknown as Record<string, unknown>);
+        return fromDatabase(ExecutionEntity, result);
       },
       'create',
       'Execution'
@@ -114,9 +115,9 @@ export class ExecutionRepository extends BaseRepository {
         }
         if (updates.executionData !== undefined) {
           setFields.push('e.executionData = $executionData');
-          // Use ExecutionEntity to handle executionData serialization
-          const tempEntity = ExecutionEntity.deserialize({ executionData: updates.executionData });
-          const serialized = tempEntity.serialize();
+          // Create entity instance to handle executionData serialization
+          const executionDataEntity = toEntityInstance(ExecutionEntity, { executionData: updates.executionData });
+          const serialized = toDatabase(executionDataEntity);
           params.executionData = serialized.executionData;
         }
         if (updates.error !== undefined) {
@@ -125,9 +126,9 @@ export class ExecutionRepository extends BaseRepository {
         }
         if (updates.result !== undefined) {
           setFields.push('e.result = $result');
-          // Use ExecutionEntity to handle result serialization
-          const tempEntity = ExecutionEntity.deserialize({ result: updates.result });
-          const serialized = tempEntity.serialize();
+          // Create entity instance to handle result serialization
+          const resultEntity = toEntityInstance(ExecutionEntity, { result: updates.result });
+          const serialized = toDatabase(resultEntity);
           params.result = serialized.result;
         }
         if (updates.startTime !== undefined) {
@@ -163,7 +164,7 @@ export class ExecutionRepository extends BaseRepository {
         }
 
         // Use ExecutionEntity for consistent mapping
-        return ExecutionEntity.deserialize(result[0].e as unknown as Record<string, unknown>);
+        return fromDatabase(ExecutionEntity, result[0].e);
       },
       'update',
       'Execution',
@@ -196,7 +197,10 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.workflowId = $workflowId RETURN e ORDER BY e.createdAt DESC',
           { workflowId }
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findByWorkflowId',
       'Execution'
@@ -211,7 +215,10 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.status = $status RETURN e ORDER BY e.createdAt DESC',
           { status }
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findByStatus',
       'Execution'
@@ -225,7 +232,10 @@ export class ExecutionRepository extends BaseRepository {
         const result = await connection.executeQuery<{ e: ExecutionModel }>(
           'MATCH (e:Execution) WHERE e.status IN ["pending", "running", "paused"] RETURN e ORDER BY e.createdAt DESC'
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findActiveExecutions',
       'Execution'
@@ -250,7 +260,10 @@ export class ExecutionRepository extends BaseRepository {
           'MATCH (e:Execution) WHERE e.createdAt >= $startDate AND e.createdAt <= $endDate RETURN e ORDER BY e.createdAt DESC',
           { startDate, endDate }
         );
-        return result.map((record) => ExecutionEntity.deserialize(record.e as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          ExecutionEntity,
+          result.map((record) => record.e)
+        );
       },
       'findByDateRange',
       'Execution'

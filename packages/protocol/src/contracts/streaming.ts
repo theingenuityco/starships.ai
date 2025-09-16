@@ -1,20 +1,12 @@
 /**
  * Streaming Event Contracts
  *
- * Ultra-simplified streaming using DeltaChunk (RFC6902 JSON Patch) directly.
- * No wrappers - just pure delta operations streamed as-is.
+ * Using fast-json-patch Operation type for RFC6902 JSON Patch operations.
+ * Clean implementation without custom wrappers.
  */
 
-/**
- * DeltaChunk - Pure RFC6902 JSON Patch Operation for streaming
- * This is sent directly as SSE data - no wrapper, no metadata
- */
-export interface StreamingDeltaChunk {
-  op: 'add' | 'remove' | 'replace' | 'move' | 'copy' | 'test';
-  path: string;
-  value?: unknown;
-  from?: string;
-}
+import { Operation } from 'fast-json-patch';
+import type { MessageModel } from '../domains/message';
 
 /**
  * Streaming error event sent via SSE when processing fails
@@ -50,7 +42,8 @@ export interface StreamingHeartbeat {
 export type StreamingEvent =
   | { type: 'connection'; data: StreamingConnection }
   | { type: 'heartbeat'; data: StreamingHeartbeat }
-  | { type: 'delta'; data: StreamingDeltaChunk }
+  | { type: 'delta'; data: Operation }
+  | { type: 'message'; data: MessageModel }
   | { type: 'complete'; data: void }
   | { type: 'error'; data: StreamingError };
 
@@ -73,4 +66,4 @@ export interface StreamingState {
 /**
  * SSE event types
  */
-export type SSEEventType = 'connection' | 'heartbeat' | 'delta' | 'complete' | 'error';
+export type SSEEventType = 'connection' | 'heartbeat' | 'delta' | 'message' | 'complete' | 'error';

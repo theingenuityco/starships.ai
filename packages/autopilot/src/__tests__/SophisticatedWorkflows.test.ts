@@ -12,10 +12,6 @@ import type { Blueprint, Node } from '@/types';
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Mock jsonata
-const mockJsonata = jest.fn();
-jest.mock('jsonata', () => mockJsonata);
-
 describe('Sophisticated Workflows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -24,11 +20,6 @@ describe('Sophisticated Workflows', () => {
     autopilot.reset();
     autopilot.setCredentials({
       openrouterApiKey: 'test-api-key',
-    });
-
-    // Default JSONata mock
-    mockJsonata.mockReturnValue({
-      evaluate: jest.fn().mockReturnValue(true),
     });
 
     // Default fetch mock with proper structure
@@ -59,7 +50,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              expression: 'state.user.isPremium = true',
+              condition: 'state.user.isPremium = true',
             },
           },
           {
@@ -93,11 +84,6 @@ describe('Sophisticated Workflows', () => {
         ],
         metadata: { type: 'branching-workflow' },
       };
-
-      // Mock conditional to return true (premium user)
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue(true),
-      });
 
       // Mock premium API response
       const mockHeaders = new Map([['content-type', 'application/json']]);
@@ -152,7 +138,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              expression: 'state.user.isPremium = true',
+              condition: 'state.user.isPremium = true',
             },
           },
           {
@@ -186,11 +172,6 @@ describe('Sophisticated Workflows', () => {
         ],
         metadata: { type: 'branching-workflow' },
       };
-
-      // Mock conditional to return false (regular user)
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue(false),
-      });
 
       // Mock regular API response
       const mockHeaders = new Map([['content-type', 'application/json']]);
@@ -240,7 +221,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Route Decision',
             description: 'Determine routing path',
             parameters: {
-              expression: 'state.user.tier',
+              condition: 'state.user.tier',
             },
           },
           {
@@ -286,11 +267,6 @@ describe('Sophisticated Workflows', () => {
         ],
         metadata: { type: 'multi-branch-workflow' },
       };
-
-      // Mock conditional to return 'silver' tier
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue('silver'),
-      });
 
       const mockHeaders = new Map([['content-type', 'application/json']]);
       mockHeaders.forEach = jest.fn((callback) => {
@@ -488,7 +464,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Validation',
             description: 'Check if validation passed',
             parameters: {
-              expression: 'results[-1].data.valid = true',
+              condition: 'results[-1].data.valid = true',
             },
           },
           {
@@ -554,7 +530,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Final Check',
             description: 'Check if everything succeeded',
             parameters: {
-              expression: 'results[-1].data[0].success = true',
+              condition: 'results[-1].data.status = "completed"',
             },
           },
           {
@@ -642,15 +618,6 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"processed":true,"result":"completed"}',
         });
 
-      // Mock conditionals to return success path
-      let callCount = 0;
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockImplementation(() => {
-          callCount++;
-          return callCount === 1 ? true : true; // Both conditionals return true
-        }),
-      });
-
       const engine = new Engine({ blueprint: mainWorkflow });
       await engine.execute();
 
@@ -725,7 +692,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Analysis Decision',
             description: 'Route based on analysis',
             parameters: {
-              expression: 'results[-1].data[1].data.choices[0].message.content ~> /positive/',
+              condition: 'results[-1].data[1].data.choices[0].message.content ~> /positive/',
             },
           },
           {
@@ -823,11 +790,6 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"action":"positive","applied":true}',
       });
 
-      // Mock conditional to return 'positive' (matching the positive analysis)
-      mockJsonata.mockReturnValue({
-        evaluate: jest.fn().mockReturnValue('positive'),
-      });
-
       const engine = new Engine({ blueprint });
       await engine.execute();
 
@@ -864,7 +826,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Success',
             description: 'Check if API call succeeded',
             parameters: {
-              expression: 'results[-1].error = null',
+              condition: 'results[nodeRef = "risky-api"].data ? "true" : "false"',
             },
           },
           {
@@ -893,7 +855,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Retry',
             description: 'Check if retry succeeded',
             parameters: {
-              expression: 'results[-1].error = null',
+              condition: 'results[nodeRef = "retry-api"].data ? "true" : "false"',
             },
           },
           {
@@ -965,19 +927,34 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"recovered":true,"status":"handled"}',
         });
 
-      // Mock conditionals: first false (error), second true (retry success)
-      let conditionCallCount = 0;
-      mockJsonata.mockImplementation(() => ({
-        evaluate: jest.fn().mockImplementation(() => {
-          conditionCallCount++;
-          return conditionCallCount === 1 ? false : true; // First fails, second succeeds
-        }),
-      }));
-
       const engine = new Engine({ blueprint });
-      await engine.execute();
+      try {
+        await engine.execute();
+      } catch (error) {
+        console.log('Engine execution threw error:', error);
+      }
 
       const execution = engine.getExecution();
+
+      // Debug information
+      console.log('Execution status:', execution.status);
+      console.log('Execution error:', execution.error);
+      console.log('Execution results length:', execution.results.length);
+      console.log(
+        'Execution results:',
+        JSON.stringify(
+          execution.results.map((r) => ({
+            nodeRef: r.nodeRef,
+            hasError: !!r.error,
+            hasData: !!r.data,
+            errorMessage: r.error instanceof Error ? r.error.message : r.error,
+            dataKeys: r.data ? Object.keys(r.data) : [],
+          })),
+          null,
+          2
+        )
+      );
+
       expect(execution.status).toBe('completed');
 
       // Should execute: start -> risky-api -> check-success -> retry-api -> check-retry -> recovery-path -> end

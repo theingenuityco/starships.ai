@@ -14,7 +14,17 @@
 /**
  * Types of workflow nodes
  */
-export type NodeType = 'agent' | 'conditional' | 'user_prompt' | 'output' | 'start' | 'end' | 'http_request' | 'llm' | 'workflow';
+export type NodeType =
+  | 'agent'
+  | 'conditional'
+  | 'user_prompt'
+  | 'output'
+  | 'start'
+  | 'end'
+  | 'http_request'
+  | 'llm'
+  | 'workflow'
+  | 'transform';
 
 /**
  * Base node interface (untyped parameters)

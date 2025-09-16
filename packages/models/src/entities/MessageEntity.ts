@@ -7,7 +7,7 @@
 
 import { Transformers } from '@/helpers/serializer';
 import type { MessageModel, MessageType } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance } from 'class-transformer';
+import { Expose } from 'class-transformer';
 import { IsEnum, IsISO8601, IsString, Length, validate, ValidationError } from 'class-validator';
 
 export class MessageEntity implements MessageModel {
@@ -37,28 +37,8 @@ export class MessageEntity implements MessageModel {
 
   // Message classification
   @Expose()
-  @IsEnum(['user_input', 'agent_response', 'system_message', 'workflow_output'])
+  @IsEnum(['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error'])
   messageType!: MessageType;
-
-  /**
-   * Static factory method for creating MessageEntity from raw data
-   */
-  static deserialize(data: Record<string, unknown>): MessageEntity {
-    return plainToInstance(MessageEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Instance method for converting entity to plain object for storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
 
   /**
    * Simple validation function using class-validator
@@ -77,9 +57,9 @@ export class MessageEntity implements MessageModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        role: dataRecord.role || 'user',
-        content: dataRecord.content || '',
-        messageType: dataRecord.messageType || 'user_input',
+        role: dataRecord.role, // Don't provide defaults during validation
+        content: dataRecord.content, // Don't provide defaults during validation
+        messageType: dataRecord.messageType, // Don't provide defaults during validation
         ...dataRecord,
       });
     } else {

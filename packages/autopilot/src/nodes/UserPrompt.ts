@@ -22,8 +22,6 @@ export class UserPrompt implements NodeHandler {
     const params = this.params as UserPromptParams;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input
-    console.log(`User prompt: ${params.promptText}`);
-    console.log('Choices:', params.choices);
 
     // For now, return a placeholder result
     return {

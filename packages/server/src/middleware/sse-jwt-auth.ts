@@ -39,19 +39,15 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
     }
 
     if (!token) {
-      console.log(`[SSE-JWT-AUTH] Missing token for ${req.method} ${req.path}`);
       sendError(res, 'AUTHENTICATION_REQUIRED', 'Missing or invalid Authorization header', 401);
       return;
     }
 
     // Basic token validation
     if (token.length < 10) {
-      console.log(`[SSE-JWT-AUTH] Invalid token format for ${req.method} ${req.path}`);
       sendError(res, 'TOKEN_INVALID', 'Invalid token format', 401);
       return;
     }
-
-    console.log(`[SSE-JWT-AUTH] Validating token for SSE request to ${req.method} ${req.path} - token length: ${token.length}`);
 
     // Verify JWT token
     const { payload } = await jwtVerify(token, JWT_SECRET, {
@@ -59,14 +55,10 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
       audience: JWT_AUDIENCE,
     });
 
-    console.log(`[SSE-JWT-AUTH] Token validated for user: ${payload.sub}`);
-
     // Look up user in database by ID
     let user;
     try {
-      console.log(`[SSE-JWT-AUTH] Attempting database lookup for user ID: ${payload.sub}`);
       user = await UserService.getUserById(payload.sub as string);
-      console.log(`[SSE-JWT-AUTH] Database lookup completed for user ID: ${payload.sub}, result: ${user ? 'found' : 'not found'}`);
     } catch (dbError: any) {
       console.error(`[SSE-JWT-AUTH] Database error when looking up user: ${payload.sub}`);
       console.error(`[SSE-JWT-AUTH] Error message: ${dbError?.message}`);
@@ -75,15 +67,12 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
     }
 
     if (!user) {
-      console.log(`[SSE-JWT-AUTH] User not found in database for ID: ${payload.sub}`);
       sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
       return;
     }
 
     // Attach user info to request for use in route handlers
     req.user = user;
-
-    console.log(`[SSE-JWT-AUTH] User resolved: ${user.id} (${user.displayName || user.username})`);
 
     next();
   } catch (error: any) {

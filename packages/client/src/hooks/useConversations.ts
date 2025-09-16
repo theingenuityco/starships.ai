@@ -1,9 +1,11 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, MessageModel, StreamingDeltaChunk } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { safeApplyDeltas } from '@/lib/jsonPatch'
+import { applyOperation, Operation } from 'fast-json-patch'
+import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -18,6 +20,46 @@ interface ClientMessage extends MessageModel {
   sending?: boolean
   streaming?: boolean
   error?: boolean
+  contentChunks?: Array<{
+    content: string
+    position: number
+    timestamp: number
+  }>
+}
+
+// Content chunk processing utility
+const processContentChunks = (data: any) => {
+  if (!data.messages || !Array.isArray(data.messages)) {
+    return data
+  }
+
+  const processedMessages = data.messages.map((message: ClientMessage) => {
+    // If message has contentChunks, build the streamed content
+    if (message.contentChunks && Array.isArray(message.contentChunks)) {
+      // Sort chunks by position to ensure correct order
+      const sortedChunks = [...message.contentChunks].sort((a, b) => a.position - b.position)
+
+      // Build content from chunks
+      let streamedContent = ''
+      for (const chunk of sortedChunks) {
+        streamedContent += chunk.content
+      }
+
+      // Return message with both the original content and streamed content
+      return {
+        ...message,
+        content: message.streaming ? streamedContent : message.content,
+        streamedContent: streamedContent,
+      }
+    }
+
+    return message
+  })
+
+  return {
+    ...data,
+    messages: processedMessages,
+  }
 }
 
 // Create message request interface (local definition since it's not in protocol)
@@ -59,6 +101,12 @@ export const CONVERSATION_QUERY_KEYS = {
  */
 export function useConversation(conversationId: string | null) {
   const queryClient = useQueryClient()
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const processingQueueRef = useRef<any[]>([])
+  const isProcessingRef = useRef(false)
+  const completedRef = useRef(false)
+  const shouldRetryRef = useRef(true)
+
   const [streamingState, setStreamingState] = useState<StreamingState>({
     status: 'idle',
     isStreaming: false,
@@ -66,6 +114,16 @@ export function useConversation(conversationId: string | null) {
     error: null,
   })
 
+  // Select zustand actions and read-only selectors without using getState
+  const setConversationSnapshot = useStarshipUIStore(s => s.setConversationSnapshot)
+  const startStreaming = useStarshipUIStore(s => s.startStreaming)
+  const appendStreamingChunk = useStarshipUIStore(s => s.appendStreamingChunk)
+  const appendMessageChunk = useStarshipUIStore(s => s.appendMessageChunk)
+  const markMessageStreaming = useStarshipUIStore(s => s.markMessageStreaming)
+  const updateMessageAt = useStarshipUIStore(s => s.updateMessageAt)
+  const endStreaming = useStarshipUIStore(s => s.endStreaming)
+  const clearStreaming = useStarshipUIStore(s => s.clearStreaming)
+  const existingConversation = useStarshipUIStore(s => (conversationId ? s.conversations[conversationId] : undefined))
   // Get conversation messages
   const messagesQuery = useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId!),
@@ -87,7 +145,7 @@ export function useConversation(conversationId: string | null) {
           lastActivityAt: string
         }>
       > = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
-        params: { limit: 100, page: 1, orderBy: 'createdAt', orderDirection: 'desc' },
+        params: { limit: 100, page: 1, orderBy: 'createdAt', orderDirection: 'asc' },
       })
 
       return {
@@ -101,87 +159,337 @@ export function useConversation(conversationId: string | null) {
     refetchOnWindowFocus: true,
   })
 
+  // Mirror TanStack cache into Zustand so UI rendering is driven by store
+  // IMPORTANT: depend on dataUpdatedAt to avoid infinite loops when Zustand updates trigger re-renders.
+  useEffect(() => {
+    if (!conversationId) return
+    const data = messagesQuery.data as any
+    if (!data) return
+
+    try {
+      const existing = existingConversation
+
+      // Guard: if reference equal, skip
+      if (existing && existing.messages === data.messages) return
+
+      // Guard: if shape unchanged (same length + lastActivityAt), skip
+      if (existing && Array.isArray(existing.messages) && Array.isArray(data.messages)) {
+        const sameLen = existing.messages.length === data.messages.length
+        const sameActivity = existing.lastActivityAt === data.lastActivityAt
+        if (sameLen && sameActivity) return
+      }
+
+      setConversationSnapshot(conversationId, {
+        messages: data.messages as any,
+        total: data.total,
+        lastActivityAt: data.lastActivityAt,
+      })
+    } catch {}
+  }, [conversationId, messagesQuery.dataUpdatedAt])
+
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
     (data: any) => {
       // JSON Patch events (RFC6902 delta updates)
-      if (data.type === 'patch' && data.patch && Array.isArray(data.patch)) {
-        console.log('[STREAMING] Received patch:', data.patch, 'version:', data.version)
+      // Support both:
+      // 1) Batched patches: { type: 'patch', patch: Operation[] }
+      // 2) Single op deltas: { op: 'add' | 'replace' | 'remove', path: string, value?: any }
+      const isSingleOp = data && typeof data.op === 'string' && typeof data.path === 'string'
+      const isPatchArray = data && data.type === 'patch' && Array.isArray(data.patch)
 
+      if (isPatchArray || isSingleOp) {
+        const ops: Operation[] = isSingleOp ? [data as Operation] : (data.patch as Operation[])
+        const version = (data as any).version
+
+        // Split chunk-add ops from others to avoid blocking event loop with frequent cache writes
+        const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/contentChunks\/-$/.test(op.path))
+        const nonChunkOps = ops.filter(op => !chunkOps.includes(op))
+
+        // Fast path: update ephemeral streaming state in zustand for chunk adds
+        if (chunkOps.length > 0) {
+          const text = chunkOps
+            .map(op => (op as any).value?.content)
+            .filter(Boolean)
+            .join('')
+          if (text) {
+            startStreaming(conversationId!, version)
+            appendStreamingChunk(conversationId!, text, version)
+          }
+
+          // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
+          // We directly mutate the messages cache per op target index rather than applying JSON-Patch (lighter + avoids starvation).
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+            if (!old || !Array.isArray(old.messages)) return old
+            // Clone shallow containers to keep immutability
+            const updated = { ...old, messages: [...old.messages] }
+
+            for (const op of chunkOps) {
+              const path = String((op as any).path || '')
+              // Expect path like: /messages/{index}/contentChunks/-
+              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              if (!match) continue
+              const msgIndex = Number(match[1])
+              if (!Number.isInteger(msgIndex) || msgIndex < 0 || msgIndex >= updated.messages.length) continue
+
+              const target = { ...updated.messages[msgIndex] }
+              const chunkVal = (op as any).value
+              // Ensure contentChunks array
+              const chunks = Array.isArray(target.contentChunks) ? [...target.contentChunks] : []
+              if (chunkVal && typeof chunkVal.content === 'string') {
+                chunks.push({
+                  content: String(chunkVal.content),
+                  position: typeof chunkVal.position === 'number' ? chunkVal.position : chunks.length > 0 ? chunks[chunks.length - 1].position + chunkVal.content.length : 0,
+                  timestamp: typeof chunkVal.timestamp === 'number' ? chunkVal.timestamp : Date.now(),
+                })
+              }
+              target.contentChunks = chunks
+              // Ensure streaming flag is true while chunks are arriving
+              target.streaming = true
+              // Write back
+              updated.messages[msgIndex] = target
+            }
+
+            // Do not bump lastActivityAt on chunk-only updates to avoid unnecessary re-renders
+            return updated
+          })
+
+          // Reflect chunks into Zustand immediately for low-latency rendering (without getState)
+          try {
+            for (const op of chunkOps) {
+              const path = String((op as any).path || '')
+              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              if (!match) continue
+              const msgIndex = Number(match[1])
+              const val = (op as any).value || {}
+              appendMessageChunk(conversationId!, msgIndex, {
+                content: typeof val.content === 'string' ? val.content : '',
+                position: typeof val.position === 'number' ? val.position : 0,
+                timestamp: typeof val.timestamp === 'number' ? val.timestamp : Date.now(),
+              })
+              markMessageStreaming(conversationId!, msgIndex, true)
+            }
+          } catch {}
+        }
+
+        // Update local streaming flag for UI consumers (kept for compatibility)
         setStreamingState(prev => ({
           ...prev,
           status: 'streaming',
           isStreaming: true,
           lastUpdate: Date.now(),
-          version: data.version || prev.version,
+          version: version || prev.version,
         }))
 
-        // Apply JSON patch to messages array
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
-          if (!old) {
-            // Initialize with empty messages array if no data exists
-            const initialData = { messages: [], total: 0, conversationId: conversationId! }
-            const deltaResult = safeApplyDeltas(initialData.messages, [data as StreamingDeltaChunk])
+        // Apply only non-chunk ops to React Query cache (e.g., add message shell, replace content, mark streaming=false)
+        if (nonChunkOps.length > 0) {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+            const applyOps = (target: any) => {
+              // Helper: check if a JSON Pointer path exists in current state before applying 'remove'
+              const jsonPointerExists = (state: any, pointer: string): boolean => {
+                if (typeof pointer !== 'string' || !pointer.startsWith('/')) return false
+                // Split pointer and unescape tokens (~1 -> /, ~0 -> ~)
+                const tokens = pointer
+                  .split('/')
+                  .slice(1)
+                  .map(t => t.replace(/~1/g, '/').replace(/~0/g, '~'))
 
-            if (deltaResult.success && deltaResult.result) {
-              return {
-                ...initialData,
-                messages: deltaResult.result,
-                total: Array.isArray(deltaResult.result) ? deltaResult.result.length : 0,
+                // Traverse to parent of the last token
+                let node: any = state
+                for (let i = 0; i < tokens.length - 1; i++) {
+                  const key = tokens[i]
+                  if (Array.isArray(node)) {
+                    const idx = Number(key)
+                    if (!Number.isInteger(idx) || idx < 0 || idx >= node.length) return false
+                    node = node[idx]
+                  } else if (node && typeof node === 'object') {
+                    if (!(key in node)) return false
+                    node = node[key]
+                  } else {
+                    return false
+                  }
+                }
+
+                // At parent, check existence of last key/index
+                const last = tokens[tokens.length - 1]
+                if (Array.isArray(node)) {
+                  const idx = Number(last)
+                  return Number.isInteger(idx) && idx >= 0 && idx < node.length
+                } else if (node && typeof node === 'object') {
+                  return last in node
+                }
+                return false
+              }
+
+              let result = target
+              for (const operation of nonChunkOps) {
+                // Skip 'remove' if path no longer exists (can happen if another op replaced the whole node)
+                if ((operation as any).op === 'remove' && typeof (operation as any).path === 'string') {
+                  const exists = jsonPointerExists(result, (operation as any).path as string)
+                  if (!exists) {
+                    // Silently ignore to avoid OPERATION_PATH_UNRESOLVABLE noise during racing ops
+                    continue
+                  }
+                }
+
+                try {
+                  const opResult = applyOperation(result, operation as Operation, true)
+                  result = opResult.newDocument
+                } catch (opErr) {
+                  console.warn('[STREAMING] Operation failed, continuing with others:', operation, opErr)
+                }
+              }
+              return result
+            }
+            if (!old) {
+              // Initialize with empty messages array if no data exists
+              const initialData = { messages: [], total: 0, conversationId: conversationId! }
+              try {
+                const patched = applyOps(initialData)
+                const updatedData = {
+                  ...patched,
+                  total: Array.isArray(patched.messages) ? patched.messages.length : 0,
+                }
+
+                return processContentChunks(updatedData)
+              } catch (error) {
+                console.error('[STREAMING] Failed to apply operations to initial data:', error)
+                return initialData
               }
             }
-            return initialData
-          }
 
-          // Apply patch to existing messages
-          const deltaResult = safeApplyDeltas(old.messages || [], [data as StreamingDeltaChunk])
+            // Apply operations to existing data
+            try {
+              const patched = applyOps(old)
+              const updatedData = {
+                ...patched,
+                total: Array.isArray(patched.messages) ? patched.messages.length : old.total,
+                lastActivityAt: new Date().toISOString(),
+              }
 
-          if (deltaResult.success && deltaResult.result) {
-            return {
-              ...old,
-              messages: deltaResult.result,
-              total: Array.isArray(deltaResult.result) ? deltaResult.result.length : old.total,
-              lastActivityAt: new Date().toISOString(),
+              return processContentChunks(updatedData)
+            } catch (error) {
+              console.error('[STREAMING] Failed to apply operations:', error, { operations: nonChunkOps, target: old })
+              return old // Return unchanged data on operation failure
             }
-          } else {
-            console.error('[STREAMING] Failed to apply delta:', deltaResult.error)
-            return old // Return unchanged data on patch failure
+          })
+
+          // Identify message indices that completed (either content replaced or streaming=false)
+          const completedIdxs = new Set<number>()
+          for (const op of nonChunkOps) {
+            if (op.op === 'replace' && typeof (op as any).path === 'string') {
+              const p = String((op as any).path)
+              const mStreaming = p.match(/^\/messages\/(\d+)\/streaming$/)
+              const mContent = p.match(/^\/messages\/(\d+)\/content$/)
+              if (mStreaming && (op as any).value === false) {
+                completedIdxs.add(Number(mStreaming[1]))
+              }
+              if (mContent) {
+                completedIdxs.add(Number(mContent[1]))
+              }
+            }
           }
-        })
+
+          // If any op marks streaming complete, end zustand streaming
+          const marksDone =
+            nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/streaming$/.test(op.path) && (op as any).value === false) ||
+            nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
+          if (marksDone) {
+            endStreaming(conversationId!)
+            // Also ensure store cleanup for the event's conversation if provided
+            try {
+              if ((data as any)?.conversationId) {
+                endStreaming((data as any).conversationId as string)
+              }
+            } catch {}
+            // Reflect completion in local streaming state to re-enable input
+            setStreamingState(prev => ({
+              ...prev,
+              status: 'complete',
+              isStreaming: false,
+              content: '',
+              lastUpdate: Date.now(),
+            }))
+
+            // Ensure message-level streaming flags are cleared in the UI store
+            if (completedIdxs.size > 0) {
+              try {
+                for (const idx of completedIdxs) {
+                  markMessageStreaming(conversationId!, idx, false)
+                  // Remove ephemeral chunks on the UI side to stop any spinners tied to chunks
+                  updateMessageAt(conversationId!, idx, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                }
+              } catch {}
+            }
+
+            // Optionally clear ephemeral state shortly after completion
+            setTimeout(() => clearStreaming(conversationId!), 500)
+            if ((data as any)?.conversationId) {
+              setTimeout(() => {
+                try {
+                  clearStreaming((data as any).conversationId as string)
+                } catch {}
+              }, 500)
+            }
+          }
+        }
+
         return
       }
 
-      // Legacy content chunks (incremental text) - kept for backward compatibility
-      if (data.type === 'content') {
+      // Handle completion by SSE event name
+      if (data && (data as any).__event === 'complete') {
+        // Mark streaming finished
         setStreamingState(prev => ({
           ...prev,
-          status: 'streaming',
-          isStreaming: true,
-          content: prev.content + data.content,
+          status: 'complete',
+          isStreaming: false,
+          content: '',
           lastUpdate: Date.now(),
         }))
+        try {
+          endStreaming(conversationId!)
+        } catch {}
+        try {
+          if ((data as any)?.conversationId) {
+            endStreaming((data as any).conversationId as string)
+          }
+        } catch {}
 
-        // Update the streaming message in TanStack Query cache
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
-          if (!old) return old
-
-          const updatedMessages = [...old.messages]
-          // Find and update the last streaming assistant message
-          for (let i = updatedMessages.length - 1; i >= 0; i--) {
-            const msg = updatedMessages[i]
-            if (msg.role === 'assistant' && msg.streaming === true) {
-              updatedMessages[i] = {
-                ...msg,
-                content: (msg.content || '') + data.content,
-                contentLength: ((msg.content || '') + data.content).length,
-                updatedAt: new Date().toISOString(),
-              }
+        // Also mark the last streaming message as complete in the UI store
+        try {
+          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!))
+          const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i]?.streaming === true) {
+              markMessageStreaming(conversationId!, i, false)
+              updateMessageAt(conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
               break
             }
           }
+        } catch {}
 
-          return { ...old, messages: updatedMessages }
-        })
+        // Clear ephemeral streaming state shortly after completion
+        setTimeout(() => {
+          try {
+            clearStreaming(conversationId!)
+          } catch {}
+        }, 500)
+        if ((data as any)?.conversationId) {
+          setTimeout(() => {
+            try {
+              clearStreaming((data as any).conversationId as string)
+            } catch {}
+          }, 500)
+        }
+        // Mark complete and hard-stop the SSE client to avoid POST retries
+        completedRef.current = true
+        shouldRetryRef.current = false
+        if (abortControllerRef.current) {
+          try {
+            abortControllerRef.current.abort()
+          } catch {}
+          abortControllerRef.current = null
+        }
         return
       }
 
@@ -195,23 +503,32 @@ export function useConversation(conversationId: string | null) {
             ...prev,
             status: 'streaming',
             isStreaming: true,
-            content: '',
+            content: '', // Clear any previous streaming content
             lastUpdate: Date.now(),
           }))
+          try {
+            startStreaming(conversationId!)
+          } catch {}
 
-          // Add streaming message to cache
+          // Add streaming message to cache (append; ascending order)
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
-            if (!old) return { messages: [{ ...message, streaming: true }], total: 1, conversationId }
-            return {
-              ...old,
-              messages: [...old.messages, { ...message, streaming: true }],
-              total: old.total + 1,
+            let next: any
+            if (!old) {
+              next = { messages: [{ ...message, streaming: true }], total: 1, conversationId }
+            } else {
+              next = {
+                ...old,
+                messages: [...old.messages, { ...message, streaming: true }],
+                total: old.total + 1,
+              }
             }
+
+            return next
           })
           return
         }
 
-        // Regular message - add to cache
+        // Regular message - add to cache (append; ascending order)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
           if (!old) return { messages: [message], total: 1, conversationId }
           return {
@@ -224,15 +541,15 @@ export function useConversation(conversationId: string | null) {
       }
 
       // Complete event
-      if (data.status === 'complete') {
+      if (data.status === 'complete' || data.type === 'done') {
         setStreamingState(prev => ({
           ...prev,
           status: 'complete',
           isStreaming: false,
-          content: '',
+          content: '', // Clear streaming content on completion
         }))
 
-        // Mark streaming messages as complete
+        // Mark streaming messages as complete in React Query cache
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
           if (!old) return old
           return {
@@ -240,6 +557,51 @@ export function useConversation(conversationId: string | null) {
             messages: old.messages.map((msg: ClientMessage) => (msg.streaming ? { ...msg, streaming: false, processingStatus: 'completed' } : msg)),
           }
         })
+
+        // Also clear UI store streaming flags for the last streaming message
+        try {
+          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!))
+          const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i]?.streaming === true) {
+              markMessageStreaming(conversationId!, i, false)
+              updateMessageAt(conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              break
+            }
+          }
+        } catch {}
+
+        // End ephemeral streaming state so the input re-enables
+        try {
+          endStreaming(conversationId!)
+        } catch {}
+        try {
+          if ((data as any)?.conversationId) {
+            endStreaming((data as any).conversationId as string)
+          }
+        } catch {}
+        setTimeout(() => {
+          try {
+            clearStreaming(conversationId!)
+          } catch {}
+        }, 500)
+        if ((data as any)?.conversationId) {
+          setTimeout(() => {
+            try {
+              clearStreaming((data as any).conversationId as string)
+            } catch {}
+          }, 500)
+        }
+        // Mark complete and hard-stop the SSE client to avoid POST retries
+        completedRef.current = true
+        shouldRetryRef.current = false
+        if (abortControllerRef.current) {
+          try {
+            abortControllerRef.current.abort()
+          } catch {}
+          abortControllerRef.current = null
+        }
+
         return
       }
 
@@ -257,6 +619,50 @@ export function useConversation(conversationId: string | null) {
     [conversationId, queryClient]
   )
 
+  /**
+   * Process queued events with yielding to prevent blocking
+   */
+  const processEventQueue = useCallback(async () => {
+    if (isProcessingRef.current || processingQueueRef.current.length === 0) {
+      return
+    }
+
+    isProcessingRef.current = true
+
+    while (processingQueueRef.current.length > 0) {
+      const data = processingQueueRef.current.shift()
+
+      try {
+        // Process the event
+        handleStreamingEvent(data)
+
+        // Yield once per animation frame for snappier streaming without batching too many chunks
+        await new Promise(resolve => {
+          if (typeof requestAnimationFrame !== 'undefined') {
+            requestAnimationFrame(() => resolve(undefined))
+          } else {
+            setTimeout(resolve, 0)
+          }
+        })
+      } catch (error) {
+        console.error('[STREAMING] Error processing event:', error)
+      }
+    }
+
+    isProcessingRef.current = false
+  }, [handleStreamingEvent])
+
+  /**
+   * Queue an event for processing
+   */
+  const queueEvent = useCallback(
+    (event: any) => {
+      processingQueueRef.current.push(event)
+      processEventQueue()
+    },
+    [processEventQueue]
+  )
+
   // Send message mutation with streaming support
   const sendMessageMutation = useMutation({
     mutationFn: async (
@@ -265,91 +671,158 @@ export function useConversation(conversationId: string | null) {
       }
     ): Promise<ClientMessage> => {
       if (data.stream) {
-        // Handle streaming POST response
+        // Use industry-standard fetch-event-source for POST SSE streaming
         const token = await getCurrentToken()
         if (!token) {
           throw new Error('No authentication token available')
         }
 
+        // Stop any existing stream
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+        }
+
+        // Create new abort controller
+        abortControllerRef.current = new AbortController()
+
+        // Reset retry/completion flags to allow retries only while actively streaming
+        completedRef.current = false
+        shouldRetryRef.current = true
+
         return new Promise((resolve, reject) => {
-          const processStreaming = async () => {
-            try {
-              const response = await fetch(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${token}`,
-                  Accept: 'text/event-stream',
-                  'Cache-Control': 'no-cache',
-                },
-                body: JSON.stringify({
-                  agentId: data.agentId,
-                  message: data.content,
-                }),
-              })
+          let resolved = false
 
-              if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`)
+          // Clear previous state
+          processingQueueRef.current = []
+          setStreamingState({
+            status: 'connecting',
+            isStreaming: true,
+            content: '',
+            error: null,
+            lastUpdate: Date.now(),
+          })
+
+          // Compute baseline length to help the server emit concrete numeric indexes
+          const baselineCache = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(data.conversationId!)) as any
+          const messagesSnapshot = Array.isArray(baselineCache?.messages) ? baselineCache.messages : []
+          const optimisticCount = messagesSnapshot.filter((m: any) => m?.sending === true).length
+          const baselineLength = Math.max(messagesSnapshot.length - optimisticCount, 0)
+
+          fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              content: data.content,
+              baselineLength,
+            }),
+            signal: abortControllerRef.current?.signal,
+            openWhenHidden: true,
+            async onopen(response) {
+              if (response.ok) {
+                setStreamingState(prev => ({
+                  ...prev,
+                  status: 'streaming',
+                }))
+                return // Continue processing
+              } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+                // Client error - don't retry
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+              } else {
+                // Server error or rate limit - let it retry
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`)
               }
+            },
+            onmessage(event) {
+              // Queue events for non-blocking processing
+              try {
+                if (!event.data) return
 
-              const reader = response.body?.getReader()
-              if (!reader) {
-                throw new Error('No readable stream available')
+                const parsed = JSON.parse(event.data)
+                const eventType = (event as any).event || null
+
+                // Attach conversationId for reliable routing and queue the event
+                queueEvent({ ...parsed, __event: eventType, conversationId: data.conversationId })
+              } catch (parseError) {
+                console.warn('[STREAMING] Failed to parse SSE data:', event.data, parseError)
               }
-
-              const decoder = new TextDecoder()
-              let buffer = ''
-
-              const processStream = async () => {
+            },
+            onclose() {
+              // Mark as completed and prevent retries
+              completedRef.current = true
+              shouldRetryRef.current = false
+              // Abort and clear controller to stop any reconnection attempts
+              if (abortControllerRef.current) {
                 try {
-                  while (true) {
-                    const { done, value } = await reader.read()
-                    if (done) break
-
-                    buffer += decoder.decode(value, { stream: true })
-                    const lines = buffer.split('\n')
-                    buffer = lines.pop() || ''
-
-                    for (const line of lines) {
-                      if (!line.trim()) continue
-
-                      if (line.startsWith('data: ')) {
-                        const eventData = line.substring(6).trim()
-                        if (!eventData) continue
-
-                        try {
-                          const parsed = JSON.parse(eventData)
-                          console.log('[STREAMING] Received SSE event:', parsed.op ? 'delta' : parsed.type || 'unknown', parsed)
-                          handleStreamingEvent(parsed)
-                        } catch (parseError) {
-                          console.warn('[STREAMING] Failed to parse SSE data:', eventData, parseError)
-                        }
-                      }
-                    }
-                  }
-                } finally {
-                  reader.releaseLock()
-                }
+                  abortControllerRef.current.abort()
+                } catch {}
+                abortControllerRef.current = null
               }
 
-              // Process the stream
-              await processStream()
+              // Ensure streaming state is reset on close
+              setStreamingState(prev => ({
+                ...prev,
+                status: 'complete',
+                isStreaming: false,
+                content: '',
+                lastUpdate: Date.now(),
+              }))
+              try {
+                endStreaming(data.conversationId!)
+              } catch {}
 
-              // Resolve with the user message
-              resolve({
-                id: `user-${Date.now()}`,
-                role: data.role,
-                content: data.content,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                messageType: data.messageType || 'user_input',
-              } as ClientMessage)
-            } catch (error) {
+              // Also mark the last streaming message as complete in the UI store
+              try {
+                const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(data.conversationId!))
+                const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                  if (msgs[i]?.streaming === true) {
+                    markMessageStreaming(data.conversationId!, i, false)
+                    updateMessageAt(data.conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                    break
+                  }
+                }
+              } catch {}
+
+              setTimeout(() => {
+                try {
+                  clearStreaming(data.conversationId!)
+                } catch {}
+              }, 300)
+
+              if (!resolved) {
+                resolved = true
+                resolve({
+                  id: `user-${Date.now()}`,
+                  role: data.role,
+                  content: data.content,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                  messageType: data.messageType || 'user_input',
+                } as ClientMessage)
+              }
+            },
+            onerror(error) {
+              console.error('[STREAMING] Connection error:', error)
+              // If aborted or completed, suppress retries
+              if (abortControllerRef.current?.signal.aborted || completedRef.current || !shouldRetryRef.current) {
+                return
+              }
+              if (!resolved) {
+                resolved = true
+                reject(error)
+              }
+              // Throw to allow retry while actively streaming
+              throw error
+            },
+          }).catch(error => {
+            if (!resolved) {
+              resolved = true
               reject(error)
             }
-          }
-
-          processStreaming()
+          })
         })
       } else {
         // Regular message creation
@@ -368,7 +841,12 @@ export function useConversation(conversationId: string | null) {
       // Snapshot the previous messages
       const previousMessages = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId))
 
-      // Optimistically add the user message
+      // Do NOT optimistically add the user message when streaming; rely on server deltas
+      if (variables.stream) {
+        return { previousMessages, conversationId: variables.conversationId }
+      }
+
+      // Optimistically add the user message for non-streaming requests (append; ascending order)
       const tempMessage: ClientMessage = {
         id: `temp-${Date.now()}`,
         role: variables.role,
@@ -393,12 +871,13 @@ export function useConversation(conversationId: string | null) {
     onSuccess: (result, variables, context) => {
       if (!variables.conversationId || !context) return
 
-      // Replace temp message with real message (for non-streaming)
       if (!variables.stream) {
+        // Replace temp message with real message (non-streaming)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
           if (!old) return { messages: [result], total: 1, conversationId: variables.conversationId }
 
-          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...result, sending: false } : msg))
+          const tempId = (context as any).tempMessage?.id
+          const messages = old.messages.map((msg: ClientMessage) => (tempId && msg.id === tempId ? { ...result, sending: false } : msg))
 
           return {
             ...old,
@@ -407,14 +886,7 @@ export function useConversation(conversationId: string | null) {
           }
         })
       } else {
-        // For streaming, just mark the temp message as sent
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
-          if (!old) return old
-
-          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...msg, sending: false } : msg))
-
-          return { ...old, messages }
-        })
+        // Streaming path uses server-sent deltas; no optimistic message to reconcile.
       }
     },
     onError: (error: any, variables, context) => {
@@ -461,7 +933,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { title: string; starshipId?: string }): Promise<ConversationModel> => {
+    mutationFn: async (data: { title?: string; starshipId?: string; agentId?: string }): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },

@@ -1,4 +1,5 @@
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { WorkflowModel } from '@starships/protocol';
 import { WorkflowEntity } from '../entities/WorkflowEntity';
@@ -13,7 +14,10 @@ export class WorkflowRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC');
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'findAll',
       'Workflow'
@@ -25,7 +29,7 @@ export class WorkflowRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) WHERE w.id = $id RETURN w', { id });
-        return result.length > 0 ? WorkflowEntity.deserialize(result[0].w as unknown as Record<string, unknown>) : null;
+        return result.length > 0 ? fromDatabase(WorkflowEntity, result[0].w) : null;
       },
       'findById',
       'Workflow',
@@ -42,7 +46,7 @@ export class WorkflowRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         // Prepare workflow data with defaults and validation
-        const workflowEntity = WorkflowEntity.deserialize({
+        const workflowData = {
           ...entity,
           createdAt: now,
           updatedAt: now,
@@ -59,14 +63,11 @@ export class WorkflowRepository extends BaseRepository {
             edges: [],
             metadata: {},
           },
-        });
+        };
 
-        const workflowData = workflowEntity.serialize();
-        // Remove id since it will be auto-generated
-        delete workflowData.id;
-
-        // Use BaseRepository serialization
-        const result = await this.createEntityWithAutoId<WorkflowModel>('Workflow', workflowData);
+        // Create entity instance from plain object, then serialize
+        const workflowEntity = toEntityInstance(WorkflowEntity, workflowData);
+        const result = await this.createEntityWithAutoId<WorkflowModel>('Workflow', toDatabase(workflowEntity));
 
         // Create relationship with starship if starshipId is provided
         if (result.starshipId) {
@@ -74,7 +75,7 @@ export class WorkflowRepository extends BaseRepository {
         }
 
         // Use WorkflowEntity for consistent mapping
-        return WorkflowEntity.deserialize(result as unknown as Record<string, unknown>);
+        return fromDatabase(WorkflowEntity, result);
       },
       'create',
       'Workflow'
@@ -134,9 +135,9 @@ export class WorkflowRepository extends BaseRepository {
         }
         if (updates.blueprint !== undefined) {
           setFields.push('w.blueprint = $blueprint');
-          // Use WorkflowEntity to handle blueprint serialization
-          const tempEntity = WorkflowEntity.deserialize({ blueprint: updates.blueprint });
-          const serialized = tempEntity.serialize();
+          // Create entity instance to handle blueprint serialization
+          const blueprintEntity = toEntityInstance(WorkflowEntity, { blueprint: updates.blueprint });
+          const serialized = toDatabase(blueprintEntity);
           params.blueprint = serialized.blueprint;
         }
         if (updates.starshipId !== undefined) {
@@ -164,7 +165,7 @@ export class WorkflowRepository extends BaseRepository {
         }
 
         // Use WorkflowEntity for consistent mapping
-        return WorkflowEntity.deserialize(result[0].w as unknown as Record<string, unknown>);
+        return fromDatabase(WorkflowEntity, result[0].w);
       },
       'update',
       'Workflow',
@@ -197,7 +198,10 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
           { authorId }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'findByAuthor',
       'Workflow'
@@ -212,7 +216,10 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
           { category }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'findByCategory',
       'Workflow'
@@ -227,7 +234,10 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.starshipId = $starshipId RETURN w ORDER BY w.name',
           { starshipId }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'findByStarshipId',
       'Workflow'
@@ -242,7 +252,10 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
           { tags }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'findByTags',
       'Workflow'
@@ -257,7 +270,10 @@ export class WorkflowRepository extends BaseRepository {
           'MATCH (w:Workflow) WHERE w.isPublic = true RETURN w ORDER BY w.usageCount DESC, w.rating DESC SKIP $offset LIMIT $limit',
           { limit, offset }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'findPublic',
       'Workflow'
@@ -276,7 +292,10 @@ export class WorkflowRepository extends BaseRepository {
            RETURN w ORDER BY w.usageCount DESC LIMIT 20`,
           { query }
         );
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'searchWorkflows',
       'Workflow'
@@ -324,7 +343,10 @@ export class WorkflowRepository extends BaseRepository {
         query += ' RETURN w ORDER BY w.usageCount DESC, w.rating DESC';
 
         const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
-        return result.map((record) => WorkflowEntity.deserialize(record.w as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          WorkflowEntity,
+          result.map((record) => record.w)
+        );
       },
       'findWithFilters',
       'Workflow'

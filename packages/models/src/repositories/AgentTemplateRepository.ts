@@ -1,5 +1,6 @@
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest } from '@starships/protocol';
@@ -15,7 +16,10 @@ export class AgentTemplateRepository extends BaseRepository {
         const connection = this.getConnection();
         const query = `MATCH (t:AgentTemplate) RETURN t ORDER BY t.createdAt DESC`;
         const result = await connection.executeQuery<{ t: AgentTemplateModel }>(query);
-        return result.map((record) => AgentTemplateEntity.deserialize(record.t as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          AgentTemplateEntity,
+          result.map((record) => record.t)
+        );
       },
       'findAll',
       'AgentTemplate'
@@ -36,7 +40,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const connection = this.getConnection();
         const results = await connection.executeQuery<{ t: AgentTemplateModel }>(query, { id });
         const template = results.length > 0 ? results[0].t : null;
-        return template ? AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>) : null;
+        return template ? fromDatabase(AgentTemplateEntity, template) : null;
       },
       'findById',
       'AgentTemplate',
@@ -58,7 +62,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const results = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { slug });
         const template = results.length > 0 ? results[0].t : null;
-        return template ? AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>) : null;
+        return template ? fromDatabase(AgentTemplateEntity, template) : null;
       },
       'findBySlug',
       'AgentTemplate',
@@ -77,7 +81,7 @@ export class AgentTemplateRepository extends BaseRepository {
         // Generate slug if not provided
         const slug = generateSlug(data.name);
 
-        // Build template data, ensuring no complex objects for Neo4j storage
+        // Build template data for database storage
         const templateProps = {
           // Explicit primitive fields
           name: data.name,
@@ -99,14 +103,12 @@ export class AgentTemplateRepository extends BaseRepository {
           updatedAt: now,
         };
 
-        // Transform using Entity
-        const templateEntity = AgentTemplateEntity.deserialize(templateProps);
+        // Create entity instance from plain object, then serialize
+        const templateEntity = toEntityInstance(AgentTemplateEntity, templateProps);
+        const template = await this.createEntityWithAutoId<AgentTemplateModel>('AgentTemplate', toDatabase(templateEntity));
 
-        // Use base repository for database operation
-        const template = await this.createEntityWithAutoId<AgentTemplateModel>('AgentTemplate', templateEntity.serialize());
-
-        // Parse the JSON strings back to objects manually for the response
-        return AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>);
+        // Transform database result back to domain model
+        return fromDatabase(AgentTemplateEntity, template);
       },
       'create',
       'AgentTemplate'
@@ -124,19 +126,16 @@ export class AgentTemplateRepository extends BaseRepository {
           updatedAt: new Date().toISOString(),
         };
 
-        // Transform using Entity
-        const updateEntity = AgentTemplateEntity.deserialize(updateProps);
-
         const result = await connection.executeWrite<{ t: AgentTemplateModel }>(
           'MATCH (t:AgentTemplate) WHERE t.id = $id SET t += $updates RETURN t',
           {
             id,
-            updates: updateEntity.serialize(),
+            updates: toDatabase(toEntityInstance(AgentTemplateEntity, updateProps)),
           }
         );
 
         const template = result[0]?.t || null;
-        return template ? AgentTemplateEntity.deserialize(template as unknown as Record<string, unknown>) : null;
+        return template ? fromDatabase(AgentTemplateEntity, template) : null;
       },
       'update',
       'AgentTemplate',
@@ -180,7 +179,10 @@ export class AgentTemplateRepository extends BaseRepository {
       `;
 
         const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(query, { category });
-        return result.map((record) => AgentTemplateEntity.deserialize(record.t as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          AgentTemplateEntity,
+          result.map((record) => record.t)
+        );
       },
       'findByCategory',
       'AgentTemplate'
@@ -216,7 +218,10 @@ export class AgentTemplateRepository extends BaseRepository {
         const result = await this.getConnection().executeQuery<{ t: AgentTemplateModel }>(searchQuery, {
           query,
         });
-        return result.map((record) => AgentTemplateEntity.deserialize(record.t as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          AgentTemplateEntity,
+          result.map((record) => record.t)
+        );
       },
       'searchTemplates',
       'AgentTemplate'

@@ -71,7 +71,7 @@ jobs:
 
   build:
     name: Build Check
-    runs-on: [self-hosted, linux, x64, instance:t3.medium] # Explicit instance type for builds
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
     needs: [lint, type-check, test]
     environment: ci

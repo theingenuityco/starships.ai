@@ -256,24 +256,8 @@ def determine_instance_type(labels, workflow_name=None, job_name=None):
             print(f"Explicit instance type requested: {requested_type}")
             return requested_type
     
-    # Legacy keyword-based fallback
-    labels_str = ','.join(labels).lower()
-    workflow_name_str = (workflow_name or '').lower()
-    job_name_str = (job_name or '').lower()
-    
-    # Resource-intensive jobs that need larger instances
-    if any(keyword in labels_str or keyword in workflow_name_str or keyword in job_name_str for keyword in [
-        'codeql', 'security', 'large', 'heavy', 'analysis'
-    ]):
-        return 't3.large'  # 8GB RAM, 2 vCPUs - for CodeQL and security analysis
-    
-    # Build jobs might need medium instances
-    if any(keyword in labels_str or keyword in workflow_name_str or keyword in job_name_str for keyword in [
-        'build', 'compile', 'medium'
-    ]):
-        return 't3.medium'  # 4GB RAM, 2 vCPUs - for builds
-    
-    # Default for most jobs (linting, testing, etc.)
+    # Default for all jobs without explicit instance type
+    print("No explicit instance type specified, using default t3.small")
     return 't3.small'  # 2GB RAM, 2 vCPUs - cost-effective default
 
 def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels, workflow_name=None, job_name=None):

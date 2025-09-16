@@ -23,8 +23,8 @@ metadata:
       more_set_headers "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: ws:;";
       # SSE-specific headers
       more_set_headers "X-Accel-Buffering: no";
-      # Cache control for SSE endpoints
-      location ~* ^/api/v1/conversations/.*/messages.*stream {
+      # Cache control for SSE conversation message endpoints
+      location ~* ^/api/v1/conversations/[^/]+/messages$ {
         more_set_headers "Cache-Control: no-cache, no-store, must-revalidate";
         more_set_headers "Pragma: no-cache";
         more_set_headers "Expires: 0";

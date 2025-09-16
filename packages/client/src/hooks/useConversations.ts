@@ -112,6 +112,15 @@ export function useConversation(conversationId: string | null) {
     error: null,
   })
 
+  // Select zustand actions and read-only selectors without using getState
+  const setConversationSnapshot = useStarshipUIStore(s => s.setConversationSnapshot)
+  const startStreaming = useStarshipUIStore(s => s.startStreaming)
+  const appendStreamingChunk = useStarshipUIStore(s => s.appendStreamingChunk)
+  const appendMessageChunk = useStarshipUIStore(s => s.appendMessageChunk)
+  const markMessageStreaming = useStarshipUIStore(s => s.markMessageStreaming)
+  const endStreaming = useStarshipUIStore(s => s.endStreaming)
+  const clearStreaming = useStarshipUIStore(s => s.clearStreaming)
+  const existingConversation = useStarshipUIStore(s => (conversationId ? s.conversations[conversationId] : undefined))
   // Get conversation messages
   const messagesQuery = useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId!),
@@ -155,8 +164,7 @@ export function useConversation(conversationId: string | null) {
     if (!data) return
 
     try {
-      const store = useStarshipUIStore.getState()
-      const existing = store.conversations?.[conversationId]
+      const existing = existingConversation
 
       // Guard: if reference equal, skip
       if (existing && existing.messages === data.messages) return
@@ -168,7 +176,7 @@ export function useConversation(conversationId: string | null) {
         if (sameLen && sameActivity) return
       }
 
-      store.setConversationSnapshot(conversationId, {
+      setConversationSnapshot(conversationId, {
         messages: data.messages as any,
         total: data.total,
         lastActivityAt: data.lastActivityAt,
@@ -202,9 +210,8 @@ export function useConversation(conversationId: string | null) {
             .filter(Boolean)
             .join('')
           if (text) {
-            const store = useStarshipUIStore.getState()
-            store.startStreaming(conversationId!, version)
-            store.appendStreamingChunk(conversationId!, text, version)
+            startStreaming(conversationId!, version)
+            appendStreamingChunk(conversationId!, text, version)
           }
 
           // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
@@ -244,8 +251,22 @@ export function useConversation(conversationId: string | null) {
             return updated
           })
 
-          // NOTE: Avoid direct Zustand updates here to prevent feedback loops.
-          // Zustand is mirrored from React Query via the useEffect below, which is sufficient for streaming updates.
+          // Reflect chunks into Zustand immediately for low-latency rendering (without getState)
+          try {
+            for (const op of chunkOps) {
+              const path = String((op as any).path || '')
+              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              if (!match) continue
+              const msgIndex = Number(match[1])
+              const val = (op as any).value || {}
+              appendMessageChunk(conversationId!, msgIndex, {
+                content: typeof val.content === 'string' ? val.content : '',
+                position: typeof val.position === 'number' ? val.position : 0,
+                timestamp: typeof val.timestamp === 'number' ? val.timestamp : Date.now(),
+              })
+              markMessageStreaming(conversationId!, msgIndex, true)
+            }
+          } catch {}
         }
 
         // Update local streaming flag for UI consumers (kept for compatibility)
@@ -355,10 +376,9 @@ export function useConversation(conversationId: string | null) {
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/streaming$/.test(op.path) && (op as any).value === false) ||
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
           if (marksDone) {
-            const store = useStarshipUIStore.getState()
-            store.endStreaming(conversationId!)
+            endStreaming(conversationId!)
             // Optionally clear ephemeral state shortly after completion
-            setTimeout(() => useStarshipUIStore.getState().clearStreaming(conversationId!), 500)
+            setTimeout(() => clearStreaming(conversationId!), 500)
           }
         }
 
@@ -379,7 +399,7 @@ export function useConversation(conversationId: string | null) {
             lastUpdate: Date.now(),
           }))
           try {
-            useStarshipUIStore.getState().startStreaming(conversationId!)
+            startStreaming(conversationId!)
           } catch {}
 
           // Add streaming message to cache (append; ascending order)
@@ -463,10 +483,10 @@ export function useConversation(conversationId: string | null) {
         // Process the event
         handleStreamingEvent(data)
 
-        // Yield to the event loop after each event
+        // Yield once per animation frame for snappier streaming without batching too many chunks
         await new Promise(resolve => {
-          if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(() => resolve(undefined))
+          if (typeof requestAnimationFrame !== 'undefined') {
+            requestAnimationFrame(() => resolve(undefined))
           } else {
             setTimeout(resolve, 0)
           }

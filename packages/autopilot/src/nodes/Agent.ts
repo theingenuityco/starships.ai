@@ -9,17 +9,7 @@
 
 import { AgentMemory } from '@/memory/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import {
-  AgentParams,
-  ValidationResult,
-  ValidationError,
-  NodeHandlerOptions,
-  Execution,
-  LlmMessage,
-  NodeType,
-  ExecutionItem,
-} from '@/types';
-import { EventCallback } from '@/types/events';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, LlmMessage, NodeType, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint, Node } from '@/types/blueprint';
 import { NodeParameters } from '@/types/node-parameters';
@@ -27,9 +17,9 @@ import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
+  private options?: NodeHandlerOptions;
   private memory: AgentMemory;
   private engine: Engine;
-  private eventCallback?: EventCallback;
   private nodeCounter: number = 1;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
@@ -44,8 +34,8 @@ export class Agent implements NodeHandler {
       }
     );
 
-    // Create engine - handles all node types internally
-    this.eventCallback = options?.eventCallback;
+    // Create options
+    this.options = options;
 
     // Initialize blueprint if not provided
     if (!this.params.blueprint) {
@@ -84,11 +74,11 @@ export class Agent implements NodeHandler {
     }
 
     // At this point blueprint is guaranteed to exist
-    const engincConfig = {
+    const engineConfig = {
       blueprint: this.params.blueprint,
-      eventCallback: this.eventCallback,
+      eventCallback: this.options?.eventCallback,
     };
-    this.engine = new Engine(engincConfig);
+    this.engine = new Engine(engineConfig);
   }
 
   async addMessageToMemory(message: LlmMessage) {
@@ -111,11 +101,11 @@ export class Agent implements NodeHandler {
    * Recreate engine after blueprint modifications
    */
   private updateEngine(): void {
-    const engincConfig = {
+    const engineConfig = {
       blueprint: this.params.blueprint!,
-      eventCallback: this.eventCallback,
+      eventCallback: this.options?.eventCallback,
     };
-    this.engine = new Engine(engincConfig);
+    this.engine = new Engine(engineConfig);
   }
 
   /**

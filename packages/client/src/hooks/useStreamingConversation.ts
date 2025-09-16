@@ -39,6 +39,8 @@ interface StreamingMessage extends MessageModel {
 export function useStreamingConversation(conversationId: string | null) {
   const queryClient = useQueryClient()
   const abortControllerRef = useRef<AbortController | null>(null)
+  const completedRef = useRef(false)
+  const shouldRetryRef = useRef(true)
 
   // Streaming state with optimized updates
   const [streamingState, setStreamingState] = useState<StreamingState>({
@@ -193,6 +195,16 @@ export function useStreamingConversation(conversationId: string | null) {
         })
 
         contentAccumulatorRef.current = ''
+
+        // Mark complete and hard-stop the SSE client to avoid POST retries
+        completedRef.current = true
+        shouldRetryRef.current = false
+        if (abortControllerRef.current) {
+          try {
+            abortControllerRef.current.abort()
+          } catch {}
+          abortControllerRef.current = null
+        }
         return
       }
 
@@ -309,6 +321,10 @@ export function useStreamingConversation(conversationId: string | null) {
       // Create new abort controller
       abortControllerRef.current = new AbortController()
 
+      // Reset retry/completion flags to allow retries only while actively streaming
+      completedRef.current = false
+      shouldRetryRef.current = true
+
       // Clear previous state
       contentAccumulatorRef.current = ''
       processingQueueRef.current = []
@@ -335,6 +351,7 @@ export function useStreamingConversation(conversationId: string | null) {
             starshipId: options?.starshipId,
           }),
           signal: abortControllerRef.current.signal,
+          openWhenHidden: true,
 
           async onopen(response) {
             if (response.ok) {
@@ -364,6 +381,16 @@ export function useStreamingConversation(conversationId: string | null) {
 
           onclose() {
             console.log('[Streaming] Connection closed')
+            // Mark as completed and prevent retries
+            completedRef.current = true
+            shouldRetryRef.current = false
+            // Abort and clear controller to stop any reconnection attempts
+            if (abortControllerRef.current) {
+              try {
+                abortControllerRef.current.abort()
+              } catch {}
+              abortControllerRef.current = null
+            }
             setStreamingState(prev => ({
               ...prev,
               status: 'complete',
@@ -373,12 +400,18 @@ export function useStreamingConversation(conversationId: string | null) {
 
           onerror(error) {
             console.error('[Streaming] Error:', error)
+            // If aborted or completed, suppress retries
+            if (abortControllerRef.current?.signal.aborted || completedRef.current || !shouldRetryRef.current) {
+              console.log('[Streaming] Suppressing retry after completion/abort')
+              return
+            }
             setStreamingState(prev => ({
               ...prev,
               status: 'error',
               isStreaming: false,
               error: error,
             }))
+            // Throw to allow retry while actively streaming
             throw error
           },
         })
@@ -404,6 +437,8 @@ export function useStreamingConversation(conversationId: string | null) {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
+    // Prevent any further retries after a manual stop
+    shouldRetryRef.current = false
 
     processingQueueRef.current = []
 

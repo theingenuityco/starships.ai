@@ -6,20 +6,22 @@
  */
 
 import jsonata from 'jsonata';
-import type { Execution, ExecutionState, NodeResult, ExecutionStatus, ValidationResult, ValidationError } from '@/types';
+import { nanoid } from 'nanoid';
+import type { Execution, ExecutionState, ExecutionStatus, ValidationResult, ValidationError } from '@/types';
 
 /**
  * Evaluation context available to JSONata expressions
  */
 export interface EvalContext {
   state: ExecutionState;
-  results: NodeResult[];
+  outputs: Record<string, unknown>;
   status: ExecutionStatus;
   currentNodeRef?: string;
+  input?: unknown;
 
   // Helper functions
-  $nodeResult: (nodeRef: string) => NodeResult | undefined;
-  $lastResult: () => NodeResult | undefined;
+  $output: (nodeRef: string) => unknown;
+  $input: (path?: string) => unknown;
   $now: () => string;
   $random: () => string;
   $count: (array: unknown[]) => number;
@@ -43,20 +45,42 @@ export class Eval {
   /**
    * Build evaluation context from execution state
    */
-  buildContext(execution: Execution): EvalContext {
+  buildContext(execution: Execution, inputData?: unknown): EvalContext {
     return {
       state: execution.state,
-      results: execution.results,
+      outputs: execution.nodeOutputs,
       status: execution.status,
       currentNodeRef: execution.currentNodeRef,
+      input: inputData,
 
       // Helper functions
-      $nodeResult: (nodeRef: string) => execution.results.find((r) => r.nodeRef === nodeRef),
-      $lastResult: () => execution.results[execution.results.length - 1],
+      $output: (nodeRef: string) => execution.nodeOutputs[nodeRef],
+      $input: (path?: string) => this.extractPath(inputData, path),
       $now: () => new Date().toISOString(),
-      $random: () => Math.random().toString(36).substring(2, 15),
+      $random: () => nanoid(),
       $count: (array: unknown[]) => (Array.isArray(array) ? array.length : 0),
     };
+  }
+
+  /**
+   * Extract data from a path using dot notation
+   */
+  private extractPath(data: unknown, path?: string): unknown {
+    if (!path) return data;
+    if (!data || typeof data !== 'object') return undefined;
+
+    const keys = path.split('.');
+    let result: unknown = data;
+
+    for (const key of keys) {
+      if (result && typeof result === 'object' && key in result) {
+        result = (result as Record<string, unknown>)[key];
+      } else {
+        return undefined;
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -96,8 +120,8 @@ export class Eval {
   /**
    * Resolve template expressions in any value type
    */
-  async resolveTemplates(value: unknown, execution: Execution, options?: EvalOptions): Promise<unknown> {
-    const context = this.buildContext(execution);
+  async resolveTemplates(value: unknown, execution: Execution, inputData?: unknown, options?: EvalOptions): Promise<unknown> {
+    const context = this.buildContext(execution, inputData);
     return await this.processValue(value, context, options);
   }
 

@@ -34,10 +34,12 @@ export class Workflow implements NodeHandler {
   }
 
   /**
-   * Execute the workflow with streaming support
+   * Execute the workflow with streaming support and optional input data
    */
-  async execute(): Promise<Execution> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async execute(_input?: unknown): Promise<Execution> {
     // Execute workflow through engine - it will handle streaming if configured
+    // Note: Input data could be used to set initial state or pass to first node in future
     await this.engine.execute();
     return this.engine.getExecution();
   }

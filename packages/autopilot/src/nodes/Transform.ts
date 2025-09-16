@@ -64,30 +64,140 @@ export class Transform implements NodeHandler {
   }
 
   /**
-   * Execute transform operations on execution state
+   * Execute transform operations on execution state or input data
    */
-  async execute(): Promise<{ transformsApplied: number; operations: string[] }> {
+  async execute(input?: unknown): Promise<unknown> {
     if (!this.params.transforms || this.params.transforms.length === 0) {
-      return {
-        transformsApplied: 0,
-        operations: [],
-      };
+      return input !== undefined ? input : { transformsApplied: 0, operations: [] };
     }
 
     if (!this.options?.execution) {
-      throw new Error('Transform node requires execution context to modify state');
+      throw new Error('Transform node requires execution context');
     }
 
-    // Apply transforms to execution state
-    await this.applyTransforms(this.params.transforms, this.options.execution);
+    // Check execution mode based on input presence
+    if (input !== undefined) {
+      // Data flow mode: Transform the input data
+      return await this.transformInputData(input, this.params.transforms);
+    } else {
+      // State mode: Apply transforms to execution state (existing behavior)
+      await this.applyTransforms(this.params.transforms, this.options.execution);
 
-    // Return summary of what was transformed
-    const operations = this.params.transforms.map((t) => `${t.operation} ${t.path}`);
+      // Return summary of what was transformed
+      const operations = this.params.transforms.map((t) => `${t.operation} ${t.path}`);
+      return {
+        transformsApplied: this.params.transforms.length,
+        operations,
+      };
+    }
+  }
 
-    return {
-      transformsApplied: this.params.transforms.length,
-      operations,
+  /**
+   * Transform input data using JSON Patch operations
+   */
+  private async transformInputData(data: unknown, transforms: TransformOperation[]): Promise<unknown> {
+    if (!transforms || transforms.length === 0) return data;
+
+    let result = data;
+
+    try {
+      // Apply transforms one at a time so each can see the updated data
+      for (const transform of transforms) {
+        // Convert single transform to JSON Patch operation with current data
+        const patchOperations = await this.convertToJsonPatchOperationsForInput(transform, result);
+
+        // Apply patch to the data directly
+        const patchedResult = applyPatch(result, patchOperations, false, false).newDocument;
+
+        // Update result immediately so next transform can see the changes
+        result = patchedResult;
+      }
+
+      return result;
+    } catch (error) {
+      throw new Error(`Data transformation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Convert TransformOperation to JSON Patch Operation for input data
+   */
+  private async convertToJsonPatchOperationsForInput(transform: TransformOperation, currentData: unknown): Promise<Operation[]> {
+    // Create a temporary execution context for template resolution
+    const tempExecution = this.options?.execution || {
+      status: 'running' as const,
+      state: {},
+      nodeOutputs: {},
     };
+
+    // Resolve template expressions in the value with current data as input
+    let resolvedValue = transform.value;
+    if (transform.value !== undefined) {
+      resolvedValue = await this.eval.resolveTemplates(transform.value, tempExecution, currentData);
+    }
+
+    // Resolve template expressions in the from path
+    let resolvedFrom = transform.from;
+    if (transform.from !== undefined) {
+      resolvedFrom = (await this.eval.resolveTemplates(transform.from, tempExecution, currentData)) as string;
+    }
+
+    // Create JSON Patch operation
+    let operation: Operation;
+
+    switch (transform.operation) {
+      case 'add':
+        operation = {
+          op: 'add',
+          path: transform.path,
+          value: resolvedValue,
+        };
+        break;
+      case 'replace':
+        operation = {
+          op: 'replace',
+          path: transform.path,
+          value: resolvedValue,
+        };
+        break;
+      case 'test':
+        operation = {
+          op: 'test',
+          path: transform.path,
+          value: resolvedValue,
+        };
+        break;
+      case 'remove':
+        operation = {
+          op: 'remove',
+          path: transform.path,
+        };
+        break;
+      case 'copy':
+        if (!resolvedFrom) {
+          throw new Error(`Copy operation requires "from" path for transform at ${transform.path}`);
+        }
+        operation = {
+          op: 'copy',
+          path: transform.path,
+          from: resolvedFrom,
+        };
+        break;
+      case 'move':
+        if (!resolvedFrom) {
+          throw new Error(`Move operation requires "from" path for transform at ${transform.path}`);
+        }
+        operation = {
+          op: 'move',
+          path: transform.path,
+          from: resolvedFrom,
+        };
+        break;
+      default:
+        throw new Error(`Unsupported transform operation: ${transform.operation}`);
+    }
+
+    return [operation];
   }
 
   /**

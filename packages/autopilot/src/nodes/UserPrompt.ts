@@ -18,7 +18,8 @@ export class UserPrompt implements NodeHandler {
     this.params = params;
   }
 
-  async execute(): Promise<UserPromptResponse> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async execute(_input?: unknown): Promise<UserPromptResponse> {
     const params = this.params as UserPromptParams;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input

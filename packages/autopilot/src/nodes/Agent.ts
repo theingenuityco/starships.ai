@@ -178,9 +178,18 @@ export class Agent implements NodeHandler {
   // =============================================================================
 
   /**
-   * Execute the agent
+   * Execute the agent with optional input data
    */
-  async execute(): Promise<Execution> {
+  async execute(input?: unknown): Promise<Execution> {
+    // If we have input data, add it to agent's memory
+    if (input !== undefined) {
+      const inputContent = typeof input === 'string' ? input : JSON.stringify(input);
+      await this.addMessageToMemory({
+        role: 'user',
+        content: inputContent,
+      });
+    }
+
     await this.engine.execute();
     return this.engine.getExecution();
   }

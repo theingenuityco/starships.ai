@@ -12,8 +12,8 @@ import { EventCallback } from '@/types/events';
  * Handlers are now instantiated with parameters via constructor
  */
 export interface NodeHandler {
-  /** Execute with parameters already injected via constructor */
-  execute(): Promise<unknown>;
+  /** Execute with parameters already injected via constructor and optional input data */
+  execute(input?: unknown): Promise<unknown>;
 
   /** Validate the handler's configuration */
   validate(): ValidationResult;

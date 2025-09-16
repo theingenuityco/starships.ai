@@ -25,9 +25,9 @@ export class Conditional implements NodeHandler {
   }
 
   /**
-   * Execute the conditional expression
+   * Execute the conditional expression with optional input data
    */
-  async execute(): Promise<ConditionalResult> {
+  async execute(input?: unknown): Promise<ConditionalResult> {
     if (!this.params.condition) {
       throw new Error('Conditional node requires a condition expression');
     }
@@ -38,8 +38,9 @@ export class Conditional implements NodeHandler {
         throw new Error('Execution context is required for conditional evaluation');
       }
 
-      // Evaluate expression using centralized Eval class
-      const result = await this.eval.evaluateExpression(this.params.condition, this.eval.buildContext(this.options.execution));
+      // Evaluate expression using centralized Eval class with input data
+      const context = this.eval.buildContext(this.options.execution, input);
+      const result = await this.eval.evaluateExpression(this.params.condition, context);
 
       // Convert result to boolean or string condition
       let condition: string | boolean | number | null | undefined;

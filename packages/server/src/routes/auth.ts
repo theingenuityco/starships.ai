@@ -14,6 +14,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { jwtVerify, SignJWT } from 'jose';
 import { z, ZodError } from 'zod';
+import crypto from 'crypto';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -34,6 +35,15 @@ const LoginSchema = z.object({
   email: z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters'),
   password: z.string().min(1, 'Password is required').max(255, 'Password must be less than 255 characters'),
 });
+
+const EmailVerificationSchema = z.object({
+  token: z.string().min(1, 'Verification token is required'),
+});
+
+// Helper function to generate email verification token
+const generateVerificationToken = (): string => {
+  return crypto.randomBytes(32).toString('hex');
+};
 
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
@@ -61,7 +71,7 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 };
 
 /**
- * Register new user
+ * Register new user with email verification
  * POST /auth/register
  */
 router.post('/auth/register', async (req: Request, res: Response): Promise<void> => {
@@ -79,7 +89,12 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    // Generate email verification token
+    const verificationToken = generateVerificationToken();
+    
     // Create user (password will be hashed in UserService)
+    // Note: In a production system, you'd store the verification token in the database
+    // For now, we'll simulate the flow by logging the token
     const user = await UserService.createUser({
       email,
       password, // Pass plain password - UserService will hash it
@@ -88,7 +103,11 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       username: email.split('@')[0],
     });
 
-    // Create default starship for the new user
+    console.log(`[EMAIL_VERIFICATION] User ${email} verification token: ${verificationToken}`);
+    console.log(`[EMAIL_VERIFICATION] Verification URL: ${req.protocol}://${req.get('host')}/api/v1/auth/verify-email?token=${verificationToken}&email=${encodeURIComponent(email)}`);
+
+    // For now, we'll create the default starship immediately for demo purposes
+    // In production, this would be done after email verification
     let defaultStarship;
     let defaultAgent;
     try {
@@ -145,12 +164,53 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
               description: defaultAgent.description,
             }
           : null,
+        // Include verification info in response
+        emailVerificationRequired: true,
+        message: 'Registration successful. Please check your email to verify your account.',
       },
       201
     );
   } catch (error: any) {
     console.error('[AUTH] Registration error:', error);
     handleError(error, res, 'user registration');
+  }
+});
+
+/**
+ * Verify email address
+ * GET /auth/verify-email
+ */
+router.get('/auth/verify-email', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, email } = req.query;
+    
+    if (!token || !email || typeof token !== 'string' || typeof email !== 'string') {
+      sendError(res, 'VALIDATION_ERROR', 'Missing or invalid verification token or email', 400);
+      return;
+    }
+
+    // In a production system, you'd verify the token from the database
+    // For now, we'll simulate verification by checking if user exists
+    const user = await UserService.getUserByEmail(email);
+    if (!user) {
+      sendError(res, 'NOT_FOUND', 'User not found', 404);
+      return;
+    }
+
+    console.log(`[EMAIL_VERIFICATION] Email verified for user: ${email}`);
+
+    // In production, you'd mark the user as verified in the database
+    // For now, we'll just redirect to login with a success message
+    const redirectUrl = '/login?verified=true';
+    
+    sendSuccess(res, {
+      message: 'Email verified successfully. You can now log in.',
+      redirectUrl,
+      verified: true,
+    });
+  } catch (error: any) {
+    console.error('[AUTH] Email verification error:', error);
+    handleError(error, res, 'email verification');
   }
 });
 

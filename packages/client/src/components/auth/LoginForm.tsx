@@ -9,13 +9,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/useAuth'
 import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 
 /**
  * JWT-based login and registration form
  */
 export function LoginForm() {
   const { login, register, isLoading, error } = useAuth()
+  const searchParams = useSearchParams()
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -33,6 +36,17 @@ export function LoginForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Check for URL parameters on mount
+  useEffect(() => {
+    const verified = searchParams.get('verified')
+    if (verified === 'true') {
+      toast.success('Email verified successfully!', {
+        description: 'You can now log in to your account.',
+        duration: 5000,
+      })
+    }
+  }, [searchParams])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()

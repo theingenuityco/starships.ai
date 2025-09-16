@@ -21,14 +21,38 @@ pnpm install @starships/autopilot
 ### Basic Usage
 
 ```typescript
-import { Engine, autopilot } from '@starships/autopilot';
+import { Engine, Agent, autopilot } from '@starships/autopilot';
 
 // Configure credentials
 autopilot.setCredentials({
   openrouterApiKey: 'sk-or-v1-your-key',
 });
 
-// Create workflow blueprint
+// Create and configure an agent
+const agent = new Agent({
+  name: 'Assistant',
+  model: 'anthropic/claude-3.5-sonnet',
+});
+
+// Add nodes to the agent's blueprint
+agent
+  .addNode('llm', 'Greeting', {
+    model: 'anthropic/claude-3.5-sonnet',
+    messages: [{ role: 'user', content: 'Hello!' }],
+  })
+  .addNode('transform', 'Store Result', {
+    transforms: [{ operation: 'add', path: '/state/greeting', value: '{{ $nodeResult("llm_1").data }}' }],
+  });
+
+// Execute agent
+const execution = await agent.execute();
+console.log('Results:', execution.results);
+```
+
+### Engine Usage
+
+```typescript
+// Create workflow blueprint directly
 const blueprint = {
   nodes: [
     { ref: 'start', type: 'start', name: 'Begin', parameters: {} },
@@ -50,7 +74,7 @@ const blueprint = {
   metadata: {},
 };
 
-// Execute workflow
+// Execute workflow with Engine
 const engine = new Engine({
   blueprint,
   eventCallback: (event) => console.log(event.type),
@@ -136,7 +160,40 @@ JSON Patch operations for state mutations:
 ];
 ```
 
-## AI Agent Memory
+## Agent API
+
+### Creating and Configuring Agents
+
+```typescript
+import { Agent } from '@starships/autopilot';
+
+// Create agent with required parameters
+const agent = new Agent({
+  name: 'MyAgent',
+  model: 'anthropic/claude-3-haiku',
+  temperature: 0.7,
+  maxTokens: 1024,
+});
+
+// Add nodes to build the agent's workflow
+agent
+  .addNode('llm', 'Think', {
+    model: 'anthropic/claude-3-haiku',
+    messages: [
+      { role: 'system', content: 'You are a helpful assistant.' },
+      { role: 'user', content: 'What can you help me with?' },
+    ],
+    temperature: 0.8,
+  })
+  .addNode('transform', 'Store Response', {
+    transforms: [{ operation: 'add', path: '/state/lastResponse', value: '{{ $nodeResult("llm_1").data }}' }],
+  });
+
+// Execute the agent
+const execution = await agent.execute();
+```
+
+### Agent Memory System
 
 ```typescript
 import { AgentMemory } from '@starships/autopilot';
@@ -147,6 +204,13 @@ memory.setPurpose({ primary: 'Help customers' });
 memory.addMessageToHistory({ role: 'user', content: 'I need help' });
 
 const messages = memory.toMessages(); // Format for LLM
+
+// Use memory in agent constructor
+const agent = new Agent({
+  name: 'Sarah',
+  model: 'anthropic/claude-3-haiku',
+  memoryState: memory.state,
+});
 ```
 
 ## Events & Streaming

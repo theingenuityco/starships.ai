@@ -396,6 +396,12 @@ export function useConversation(conversationId: string | null) {
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
           if (marksDone) {
             endStreaming(conversationId!)
+            // Also ensure store cleanup for the event's conversation if provided
+            try {
+              if ((data as any)?.conversationId) {
+                endStreaming((data as any).conversationId as string)
+              }
+            } catch {}
             // Reflect completion in local streaming state to re-enable input
             setStreamingState(prev => ({
               ...prev,
@@ -418,6 +424,13 @@ export function useConversation(conversationId: string | null) {
 
             // Optionally clear ephemeral state shortly after completion
             setTimeout(() => clearStreaming(conversationId!), 500)
+            if ((data as any)?.conversationId) {
+              setTimeout(() => {
+                try {
+                  clearStreaming((data as any).conversationId as string)
+                } catch {}
+              }, 500)
+            }
           }
         }
 
@@ -436,6 +449,11 @@ export function useConversation(conversationId: string | null) {
         }))
         try {
           endStreaming(conversationId!)
+        } catch {}
+        try {
+          if ((data as any)?.conversationId) {
+            endStreaming((data as any).conversationId as string)
+          }
         } catch {}
 
         // Also mark the last streaming message as complete in the UI store
@@ -457,6 +475,13 @@ export function useConversation(conversationId: string | null) {
             clearStreaming(conversationId!)
           } catch {}
         }, 500)
+        if ((data as any)?.conversationId) {
+          setTimeout(() => {
+            try {
+              clearStreaming((data as any).conversationId as string)
+            } catch {}
+          }, 500)
+        }
         // Mark complete and hard-stop the SSE client to avoid POST retries
         completedRef.current = true
         shouldRetryRef.current = false
@@ -551,11 +576,23 @@ export function useConversation(conversationId: string | null) {
         try {
           endStreaming(conversationId!)
         } catch {}
+        try {
+          if ((data as any)?.conversationId) {
+            endStreaming((data as any).conversationId as string)
+          }
+        } catch {}
         setTimeout(() => {
           try {
             clearStreaming(conversationId!)
           } catch {}
         }, 500)
+        if ((data as any)?.conversationId) {
+          setTimeout(() => {
+            try {
+              clearStreaming((data as any).conversationId as string)
+            } catch {}
+          }, 500)
+        }
         // Mark complete and hard-stop the SSE client to avoid POST retries
         completedRef.current = true
         shouldRetryRef.current = false
@@ -709,8 +746,8 @@ export function useConversation(conversationId: string | null) {
                 const eventType = (event as any).event || null
                 console.log('[STREAMING] Received SSE event:', eventType || (parsed.op ? 'delta' : parsed.type || 'unknown'), parsed)
 
-                // Queue the event for processing with SSE event name attached
-                queueEvent({ ...parsed, __event: eventType })
+                // Attach conversationId for reliable routing and queue the event
+                queueEvent({ ...parsed, __event: eventType, conversationId: data.conversationId })
               } catch (parseError) {
                 console.warn('[STREAMING] Failed to parse SSE data:', event.data, parseError)
               }

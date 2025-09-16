@@ -98,8 +98,6 @@ export function useStreamingConversation(conversationId: string | null) {
 
       // Handle JSON Patch operations
       if (data?.type === 'patch' && data.patch && Array.isArray(data.patch)) {
-        console.log('[Streaming] Applying patch:', data.patch)
-
         // Apply patch to query cache
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId!), (old: any) => {
           if (!old) {
@@ -174,8 +172,6 @@ export function useStreamingConversation(conversationId: string | null) {
 
       // Handle complete event
       if (data?.status === 'complete' || data?.type === 'done') {
-        console.log('[Streaming] Stream complete')
-
         // Mark streaming messages as complete
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(targetConversationId!), (old: any) => {
           if (!old) return old
@@ -230,8 +226,6 @@ export function useStreamingConversation(conversationId: string | null) {
 
         // Start streaming for empty assistant message
         if (message.role === 'assistant' && (!message.content || message.content.trim() === '')) {
-          console.log('[Streaming] Starting assistant message stream')
-
           setStreamingState(prev => ({
             ...prev,
             status: 'streaming',
@@ -355,7 +349,6 @@ export function useStreamingConversation(conversationId: string | null) {
 
           async onopen(response) {
             if (response.ok) {
-              console.log('[Streaming] Connection opened')
               setStreamingState(prev => ({
                 ...prev,
                 status: 'streaming',
@@ -380,7 +373,6 @@ export function useStreamingConversation(conversationId: string | null) {
           },
 
           onclose() {
-            console.log('[Streaming] Connection closed')
             // Mark as completed and prevent retries
             completedRef.current = true
             shouldRetryRef.current = false
@@ -402,7 +394,6 @@ export function useStreamingConversation(conversationId: string | null) {
             console.error('[Streaming] Error:', error)
             // If aborted or completed, suppress retries
             if (abortControllerRef.current?.signal.aborted || completedRef.current || !shouldRetryRef.current) {
-              console.log('[Streaming] Suppressing retry after completion/abort')
               return
             }
             setStreamingState(prev => ({

@@ -118,6 +118,7 @@ export function useConversation(conversationId: string | null) {
   const appendStreamingChunk = useStarshipUIStore(s => s.appendStreamingChunk)
   const appendMessageChunk = useStarshipUIStore(s => s.appendMessageChunk)
   const markMessageStreaming = useStarshipUIStore(s => s.markMessageStreaming)
+  const updateMessageAt = useStarshipUIStore(s => s.updateMessageAt)
   const endStreaming = useStarshipUIStore(s => s.endStreaming)
   const clearStreaming = useStarshipUIStore(s => s.clearStreaming)
   const existingConversation = useStarshipUIStore(s => (conversationId ? s.conversations[conversationId] : undefined))
@@ -371,6 +372,22 @@ export function useConversation(conversationId: string | null) {
             }
           })
 
+          // Identify message indices that completed (either content replaced or streaming=false)
+          const completedIdxs = new Set<number>()
+          for (const op of nonChunkOps) {
+            if (op.op === 'replace' && typeof (op as any).path === 'string') {
+              const p = String((op as any).path)
+              const mStreaming = p.match(/^\/messages\/(\d+)\/streaming$/)
+              const mContent = p.match(/^\/messages\/(\d+)\/content$/)
+              if (mStreaming && (op as any).value === false) {
+                completedIdxs.add(Number(mStreaming[1]))
+              }
+              if (mContent) {
+                completedIdxs.add(Number(mContent[1]))
+              }
+            }
+          }
+
           // If any op marks streaming complete, end zustand streaming
           const marksDone =
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/streaming$/.test(op.path) && (op as any).value === false) ||
@@ -385,6 +402,18 @@ export function useConversation(conversationId: string | null) {
               content: '',
               lastUpdate: Date.now(),
             }))
+
+            // Ensure message-level streaming flags are cleared in the UI store
+            if (completedIdxs.size > 0) {
+              try {
+                for (const idx of completedIdxs) {
+                  markMessageStreaming(conversationId!, idx, false)
+                  // Remove ephemeral chunks on the UI side to stop any spinners tied to chunks
+                  updateMessageAt(conversationId!, idx, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                }
+              } catch {}
+            }
+
             // Optionally clear ephemeral state shortly after completion
             setTimeout(() => clearStreaming(conversationId!), 500)
           }
@@ -406,6 +435,20 @@ export function useConversation(conversationId: string | null) {
         try {
           endStreaming(conversationId!)
         } catch {}
+
+        // Also mark the last streaming message as complete in the UI store
+        try {
+          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!))
+          const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i]?.streaming === true) {
+              markMessageStreaming(conversationId!, i, false)
+              updateMessageAt(conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              break
+            }
+          }
+        } catch {}
+
         // Clear ephemeral streaming state shortly after completion
         setTimeout(() => {
           try {
@@ -471,7 +514,7 @@ export function useConversation(conversationId: string | null) {
           content: '', // Clear streaming content on completion
         }))
 
-        // Mark streaming messages as complete
+        // Mark streaming messages as complete in React Query cache
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
           if (!old) return old
           return {
@@ -479,6 +522,30 @@ export function useConversation(conversationId: string | null) {
             messages: old.messages.map((msg: ClientMessage) => (msg.streaming ? { ...msg, streaming: false, processingStatus: 'completed' } : msg)),
           }
         })
+
+        // Also clear UI store streaming flags for the last streaming message
+        try {
+          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!))
+          const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i]?.streaming === true) {
+              markMessageStreaming(conversationId!, i, false)
+              updateMessageAt(conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              break
+            }
+          }
+        } catch {}
+
+        // End ephemeral streaming state so the input re-enables
+        try {
+          endStreaming(conversationId!)
+        } catch {}
+        setTimeout(() => {
+          try {
+            clearStreaming(conversationId!)
+          } catch {}
+        }, 500)
+
         return
       }
 
@@ -637,6 +704,20 @@ export function useConversation(conversationId: string | null) {
               try {
                 endStreaming(data.conversationId!)
               } catch {}
+
+              // Also mark the last streaming message as complete in the UI store
+              try {
+                const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(data.conversationId!))
+                const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+                for (let i = msgs.length - 1; i >= 0; i--) {
+                  if (msgs[i]?.streaming === true) {
+                    markMessageStreaming(data.conversationId!, i, false)
+                    updateMessageAt(data.conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                    break
+                  }
+                }
+              } catch {}
+
               setTimeout(() => {
                 try {
                   clearStreaming(data.conversationId!)

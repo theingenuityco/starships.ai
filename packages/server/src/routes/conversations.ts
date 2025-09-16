@@ -57,15 +57,25 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
       const streamingService = new StreamingService();
-      const baseLength = Number((req.query as any).baselineLength ?? 0) || 0;
-      streamingService.addConnection(conversationId, res, { baseLength });
 
-      // Send existing messages after connection is established
+      // Determine a reliable baseline:
+      // - client hint (query.baselineLength) if provided
+      // - server truth (current messages count)
+      const clientBase = Number((req.query as any).baselineLength ?? 0) || 0;
+
+      // Fetch existing messages first to compute server-side count
       const conversationService = new ConversationService();
       const conversationMessages = await conversationService.getConversationMessages(conversationId);
+      const serverCount = conversationMessages.length;
 
+      // Use the larger of client hint and server truth to avoid undercounting
+      const baseLength = Math.max(clientBase, serverCount);
+
+      // Establish SSE connection with normalized baseline
+      streamingService.addConnection(conversationId, res, { baseLength });
+
+      // Send existing messages via StreamingService (complete message events)
       if (conversationMessages.length > 0) {
-        // Send existing messages via StreamingService
         for (const message of conversationMessages) {
           await streamingService.broadcastMessage(conversationId, message);
         }
@@ -159,7 +169,21 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
       // Add connection to streaming service - it will handle SSE headers and setup
       // This automatically sends connection confirmation via sendEvent('connection', ...)
       const streamingService = new StreamingService();
-      const baseLength = Number((req.body as any).baselineLength ?? 0) || 0;
+
+      // Determine a reliable baseline:
+      // - client hint (body.baselineLength) if provided
+      // - server truth (current messages count)
+      const clientBase = Number((req.body as any).baselineLength ?? 0) || 0;
+
+      // Fetch existing messages to compute server-side count
+      const conversationServiceForBaseline = new ConversationService();
+      const existingMessages = await conversationServiceForBaseline.getConversationMessages(conversationId);
+      const serverCount = existingMessages.length;
+
+      // Use the larger of client hint and server truth to avoid undercounting
+      const baseLength = Math.max(clientBase, serverCount);
+
+      // Establish SSE connection with normalized baseline
       streamingService.addConnection(conversationId, res, { baseLength });
 
       // Create ConversationService - it will use the singleton StreamingService internally

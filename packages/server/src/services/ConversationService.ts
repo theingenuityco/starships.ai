@@ -242,6 +242,32 @@ export class ConversationService {
           chunkContent.choices.length > 0 &&
           chunkContent.choices[0]?.delta?.content
         ) {
+          // Guard: ensure an active streaming placeholder exists.
+          // Some providers may emit chunks after a completion event or without a 'workflow_started' event.
+          if (!this.streamingContent.has(conversationId)) {
+            console.warn('[STREAMING] Received content_chunk without active stream; creating assistant placeholder');
+
+            const assistantMessage: MessageModel = {
+              id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              role: 'assistant',
+              content: '',
+              messageType: 'agent_response',
+              createdAt: event.timestamp,
+              updatedAt: event.timestamp,
+            };
+
+            // Add placeholder message with streaming=true and empty contentChunks
+            const shell: Operation = {
+              op: 'add',
+              path: '/messages/-',
+              value: { ...assistantMessage, streaming: true, contentChunks: [] },
+            };
+            await this.streamingService.broadcastDelta(conversationId, shell);
+
+            // Initialize server-side accumulator for this new stream
+            this.streamingContent.set(conversationId, '');
+          }
+
           const content = String(chunkContent.choices[0].delta.content);
           console.log('[STREAMING] Content chunk:', content);
 

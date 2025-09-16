@@ -6,8 +6,9 @@
  */
 
 import { NodeHandler } from '@/types/node-handler';
-import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions } from '@/types';
+import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem } from '@/types';
 import { Eval } from '@/engine/Eval';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export interface ConditionalResult {
   result: unknown;
@@ -25,9 +26,9 @@ export class Conditional implements NodeHandler {
   }
 
   /**
-   * Execute the conditional expression with optional input data
+   * Execute the conditional expression with optional input items
    */
-  async execute(input?: unknown): Promise<ConditionalResult> {
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     if (!this.params.condition) {
       throw new Error('Conditional node requires a condition expression');
     }
@@ -39,7 +40,8 @@ export class Conditional implements NodeHandler {
       }
 
       // Evaluate expression using centralized Eval class with input data
-      const context = this.eval.buildContext(this.options.execution, input);
+      const inputData = NodeHelpers.getSingleInput(input);
+      const context = this.eval.buildContext(this.options.execution, inputData);
       const result = await this.eval.evaluateExpression(this.params.condition, context);
 
       // Convert result to boolean or string condition
@@ -56,10 +58,12 @@ export class Conditional implements NodeHandler {
         condition = Boolean(result);
       }
 
-      return {
+      const conditionalResult = {
         result,
         condition,
       };
+
+      return NodeHelpers.createSingleOutput(conditionalResult, input?.[0]);
     } catch (error) {
       throw new Error(`Conditional evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

@@ -7,10 +7,12 @@
 
 import type { LlmParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
+import { ExecutionItem } from '@/types';
 import { autopilot } from '@/Autopilot';
 import { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
 import { EventCallback } from '@/types/events';
 import { LLMMessageRole, LLMResponse, LLMUsage } from '@/types/llm';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 interface StreamChoice {
   content: string;
@@ -42,9 +44,9 @@ export class LLM implements NodeHandler {
   }
 
   /**
-   * Execute the LLM request with streaming and optional input data
+   * Execute the LLM request with streaming and optional input items
    */
-  async execute(input?: unknown): Promise<LLMResponse> {
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const apiKey = autopilot.getOpenRouterApiKey();
     if (!apiKey) {
       throw new Error('OpenRouter API key is required. Configure it via autopilot.setCredentials().');
@@ -52,8 +54,9 @@ export class LLM implements NodeHandler {
 
     // Use input data as user message if no explicit messages provided
     let messages = this.params.messages;
-    if (input !== undefined && (!messages || messages.length === 0)) {
-      const inputContent = typeof input === 'string' ? input : JSON.stringify(input);
+    if (input && input.length > 0 && (!messages || messages.length === 0)) {
+      const inputData = NodeHelpers.getSingleInput(input);
+      const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
       messages = [{ role: 'user', content: inputContent }];
     }
 
@@ -84,10 +87,11 @@ export class LLM implements NodeHandler {
     const reader = response.body?.getReader();
     if (!reader) {
       const result = (await response.json()) as LLMResponse;
-      return result;
+      return NodeHelpers.createSingleOutput(result, input?.[0]);
     }
 
-    return await this.processStreamingResponse(reader);
+    const llmResponse = await this.processStreamingResponse(reader);
+    return NodeHelpers.createSingleOutput(llmResponse, input?.[0]);
   }
 
   /**

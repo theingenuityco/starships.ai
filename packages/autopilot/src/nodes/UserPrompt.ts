@@ -5,7 +5,8 @@
  */
 
 import { NodeHandler } from '@/types/node-handler';
-import { LlmMessage, UserPromptParams, ValidationError, ValidationResult } from '@/types';
+import { LlmMessage, UserPromptParams, ValidationError, ValidationResult, ExecutionItem } from '@/types';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export interface UserPromptResponse {
   message: LlmMessage;
@@ -19,18 +20,20 @@ export class UserPrompt implements NodeHandler {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async execute(_input?: unknown): Promise<UserPromptResponse> {
+  async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.params as UserPromptParams;
     // TODO: Integrate with UI system for user prompts
     // This will need to pause execution and wait for user input
 
     // For now, return a placeholder result
-    return {
+    const response = {
       message: {
         content: params.choices[0].text,
         role: 'user',
       },
     };
+
+    return NodeHelpers.createSingleOutput(response);
   }
 
   validate(): ValidationResult {

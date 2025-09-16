@@ -5,8 +5,9 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import { HttpRequestParams, ValidationResult, ValidationError } from '@/types';
+import { HttpRequestParams, ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export interface HttpResponse {
   status: number;
@@ -28,9 +29,9 @@ export class HttpRequest implements NodeHandler {
   }
 
   /**
-   * Execute the HTTP request with optional input data
+   * Execute the HTTP request with optional input items
    */
-  async execute(input?: unknown): Promise<HttpResponse> {
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // Setup headers - convert HeadersInit to Record<string, string>
     let headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -60,7 +61,8 @@ export class HttpRequest implements NodeHandler {
 
     try {
       // Use input data as body if available and no explicit body set
-      const bodyData = this.params.body !== undefined ? this.params.body : input;
+      const inputData = NodeHelpers.getSingleInput(input);
+      const bodyData = this.params.body !== undefined ? this.params.body : inputData;
       let body: string | null = null;
 
       if (bodyData !== undefined) {
@@ -118,13 +120,15 @@ export class HttpRequest implements NodeHandler {
           });
         }
 
-        return {
+        const httpResponse = {
           status: response.status,
           statusText: response.statusText,
           headers: responseHeaders,
           body: responseBody,
           url: response.url,
         };
+
+        return NodeHelpers.createSingleOutput(httpResponse, input?.[0]);
       } catch (error) {
         // Handle fetch errors and timeout
         if (controller.signal.aborted) {

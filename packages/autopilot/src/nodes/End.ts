@@ -1,5 +1,6 @@
 import { NodeHandler } from '@/types/node-handler';
-import { EndParams, ValidationResult } from '@/types';
+import { EndParams, ValidationResult, ExecutionItem } from '@/types';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export class End implements NodeHandler {
   params: EndParams;
@@ -9,8 +10,8 @@ export class End implements NodeHandler {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async execute(_input?: unknown): Promise<void> {
-    return;
+  async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    return NodeHelpers.createSingleOutput({});
   }
 
   validate(): ValidationResult {

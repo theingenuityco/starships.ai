@@ -6,10 +6,11 @@
  */
 
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
-import { Blueprint, Execution, NodeHandlerOptions, Node as WorkflowNode, NodeParameters } from '@/types';
+import { Blueprint, Execution, NodeHandlerOptions, Node as WorkflowNode, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
 import { Eval } from './Eval';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
@@ -139,14 +140,14 @@ export class Engine {
         // Update current node
         this.execution.currentNodeRef = currentNode.ref;
 
-        // Get input data for current node
-        const inputData = this.getNodeInput(currentNode);
+        // Get input items for current node
+        const inputItems = this.getNodeInput(currentNode);
 
         // Execute the node
-        const output = await this.executeNode(currentNode, inputData);
+        const outputItems = await this.executeNode(currentNode, inputItems);
 
-        // Store output
-        this.execution.nodeOutputs[currentNode.ref] = output;
+        // Store output items
+        this.execution.nodeOutputs[currentNode.ref] = outputItems;
 
         // Get next node
         const nextNode = this.getNextNode();
@@ -160,7 +161,7 @@ export class Engine {
         const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
 
         // Store failed output
-        this.execution.nodeOutputs[currentNode.ref] = { error: errorMessage };
+        this.execution.nodeOutputs[currentNode.ref] = NodeHelpers.createErrorOutput(errorMessage);
 
         // Set workflow status to failed and break execution
         this.execution.status = 'failed';
@@ -180,14 +181,14 @@ export class Engine {
   }
 
   /**
-   * Get input data for a node based on incoming edges
+   * Get input items for a node based on incoming edges
    */
-  private getNodeInput(node: WorkflowNode): unknown {
+  private getNodeInput(node: WorkflowNode): ExecutionItem[] | undefined {
     // Find incoming edge
     const incomingEdge = this.blueprint.edges.find((edge) => edge.to === node.ref);
 
     if (incomingEdge) {
-      // Always use previous node's output as input
+      // Always use previous node's output items as input
       return this.execution.nodeOutputs[incomingEdge.from];
     }
 
@@ -198,18 +199,19 @@ export class Engine {
   /**
    * Execute a single node with template resolution and transforms
    */
-  private async executeNode(node: WorkflowNode, inputData?: unknown): Promise<unknown> {
+  private async executeNode(node: WorkflowNode, inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
     this.emitEvent('node_started');
 
     try {
-      // Step 1: Resolve template expressions in parameters
+      // Step 1: Resolve template expressions in parameters with input data
+      const inputData = NodeHelpers.getSingleInput(inputItems);
       const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution, inputData)) as NodeParameters;
 
       // Step 2: Create handler instance with resolved parameters
       const handler = await this.createHandler(node, resolvedParams);
 
-      // Step 3: Execute the node with input data
-      const data = await handler.execute(inputData);
+      // Step 3: Execute the node with input items
+      const outputItems = await handler.execute(inputItems);
 
       // Step 4: Handle transforms based on node type
       const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
@@ -231,17 +233,19 @@ export class Engine {
         } else {
           // Non-conditional node with condition - spawn Conditional node dynamically
           const conditionResult = await this.executeInlineConditional(nodeParams.condition);
-          // Store condition result in the node data for getNextNode to use
-          if (data && typeof data === 'object') {
-            (data as Record<string, unknown>).condition = conditionResult;
-          } else {
-            return { condition: conditionResult };
-          }
+          // Store condition result in the node output items for getNextNode to use
+          return outputItems.map((item) => ({
+            ...item,
+            json:
+              typeof item.json === 'object'
+                ? { ...(item.json as Record<string, unknown>), condition: conditionResult }
+                : { condition: conditionResult },
+          }));
         }
       }
 
       this.emitEvent('node_completed');
-      return data;
+      return outputItems;
     } catch (error) {
       this.emitEvent('node_failed');
       throw error;
@@ -264,14 +268,17 @@ export class Engine {
 
     if (outgoingEdges.length > 0) {
       // Get the last execution output to check for conditional result
-      const lastOutput = this.execution.nodeOutputs[this.execution.currentNodeRef!];
+      const lastOutputItems = this.execution.nodeOutputs[this.execution.currentNodeRef!];
       let edgeCondition: string | undefined;
 
       // Check if last output was from a conditional node
-      if (lastOutput && typeof lastOutput === 'object') {
-        const conditionalResult = lastOutput as Record<string, unknown>;
-        if (conditionalResult.condition !== undefined) {
-          edgeCondition = String(conditionalResult.condition);
+      if (lastOutputItems && lastOutputItems.length > 0) {
+        const firstItem = lastOutputItems[0];
+        if (firstItem.json && typeof firstItem.json === 'object') {
+          const conditionalResult = firstItem.json as Record<string, unknown>;
+          if (conditionalResult.condition !== undefined) {
+            edgeCondition = String(conditionalResult.condition);
+          }
         }
       }
 
@@ -461,10 +468,15 @@ export class Engine {
     };
 
     const conditionalHandler = await this.createHandler(virtualConditionalNode, { condition: conditionExpression });
-    const conditionalResult = await conditionalHandler.execute();
+    const conditionalResultItems = await conditionalHandler.execute();
 
-    // Extract condition value from the conditional result
-    return (conditionalResult as { condition: string | boolean | number | null | undefined }).condition;
+    // Extract condition value from the conditional result items
+    const firstItem = conditionalResultItems[0];
+    if (firstItem?.json && typeof firstItem.json === 'object') {
+      const result = firstItem.json as { condition: string | boolean | number | null | undefined };
+      return result.condition;
+    }
+    return undefined;
   }
 
   /**

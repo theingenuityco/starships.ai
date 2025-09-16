@@ -6,40 +6,43 @@
  */
 
 import { applyPatch, Operation } from 'fast-json-patch';
-import { NodeHandler } from '@/types/node-handler';
+import { BaseNode } from './BaseNode';
 import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import type { TransformOperation, TransformParams } from '@/types/node-parameters';
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
 
-export class Transform implements NodeHandler {
-  private params: TransformParams;
-  private options?: NodeHandlerOptions;
+export class Transform extends BaseNode<TransformParams> {
   private eval = new Eval();
 
   constructor(params: TransformParams, options?: NodeHandlerOptions) {
-    this.params = params;
-    this.options = options;
+    super(params, options);
   }
 
   /**
    * Execute transform operations on input data (input->output transformations only)
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    if (!this.params.transforms || this.params.transforms.length === 0) {
-      return input || NodeHelpers.createSingleOutput({ transformsApplied: 0, operations: [] });
+    const params = this.getParams();
+    if (!params.transforms || params.transforms.length === 0) {
+      return input || this.createSingleOutput({ transformsApplied: 0, operations: [] });
     }
 
     // Transform node now only handles input data transformations
     if (!input || input.length === 0) {
-      throw new Error('Transform node requires input data for input->output transformations. Use Mutate node for state mutations.');
+      throw this.handleExecutionError(
+        new Error('Transform node requires input data for input->output transformations. Use Mutate node for state mutations.')
+      );
     }
 
-    // Transform the input data
-    const inputData = NodeHelpers.getSingleInput(input);
-    const transformedData = await this.transformInputData(inputData, this.params.transforms);
-    return NodeHelpers.createSingleOutput(transformedData, input[0]);
+    try {
+      // Transform the input data
+      const inputData = this.getSingleInput(input);
+      const transformedData = await this.transformInputData(inputData, params.transforms);
+      return this.createSingleOutput(transformedData, input[0]);
+    } catch (error) {
+      throw this.handleExecutionError(error, 'Transform execution failed');
+    }
   }
 
   /**
@@ -74,7 +77,8 @@ export class Transform implements NodeHandler {
    */
   private async convertToJsonPatchOperationsForInput(transform: TransformOperation, currentData: unknown): Promise<Operation[]> {
     // Create a temporary execution context for template resolution
-    const tempExecution = this.options?.execution || {
+    const options = this.getOptions();
+    const tempExecution = options?.execution || {
       status: 'running' as const,
       state: {},
       nodeOutputs: {},
@@ -155,9 +159,10 @@ export class Transform implements NodeHandler {
    */
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
+    const params = this.getParams();
 
     // Check if transforms are provided
-    if (!this.params.transforms || this.params.transforms.length === 0) {
+    if (!params.transforms || params.transforms.length === 0) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Transform node requires at least one transform operation',
@@ -169,7 +174,7 @@ export class Transform implements NodeHandler {
     }
 
     // Validate transform operations
-    const validation = this.validateTransforms(this.params.transforms);
+    const validation = this.validateTransforms(params.transforms);
     if (!validation.valid) {
       errors.push(...(validation.errors || []));
     }

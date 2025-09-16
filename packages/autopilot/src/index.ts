@@ -10,6 +10,7 @@ export { Eval } from './engine/Eval';
 export type { EvalContext, EvalOptions } from './engine/Eval';
 
 // Nodes
+export { BaseNode } from './nodes/BaseNode';
 export { Workflow } from './nodes/Workflow';
 export { LLM } from './nodes/LLM';
 export { HttpRequest } from './nodes/HttpRequest';

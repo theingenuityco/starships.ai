@@ -1,4 +1,5 @@
 import { setTokenProvider, type SyncedUser } from '@/lib/api'
+import { getWaitlistStatus } from '@/lib/waitlist-api'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo } from 'react'
@@ -25,6 +26,8 @@ interface AuthRegisterResponse {
   starship?: {
     slug: string
   }
+  emailVerificationRequired?: boolean
+  message?: string
 }
 
 // Centralized query keys
@@ -97,6 +100,31 @@ export function useAuthUser() {
   })
 }
 
+// Helper function to handle post-authentication flow with waitlist checking
+const handlePostAuthSuccess = async (user: AuthUser, router: ReturnType<typeof useRouter>, starship?: { slug: string }) => {
+  try {
+    // Check waitlist status first
+    const waitlistStatus = await getWaitlistStatus()
+    
+    if (waitlistStatus.isValidated) {
+      // User is approved, proceed to starship
+      if (starship) {
+        router.push(`/ship/${starship.slug}/conversations`)
+      } else {
+        // No starship yet, go to main page to create one
+        router.push('/')
+      }
+    } else {
+      // User needs to check waitlist first
+      router.push('/waitlist')
+    }
+  } catch (error) {
+    console.error('[AUTH] Waitlist check failed:', error)
+    // Default to waitlist page if check fails
+    router.push('/waitlist')
+  }
+}
+
 // Login mutation
 export function useLogin() {
   const queryClient = useQueryClient()
@@ -120,7 +148,7 @@ export function useLogin() {
 
       return data.data as AuthLoginResponse
     },
-    onSuccess: data => {
+    onSuccess: async data => {
       const { user, token, starship } = data
 
       // Store token
@@ -129,10 +157,8 @@ export function useLogin() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Redirect to starship's conversation if available
-      if (starship) {
-        router.push(`/ship/${starship.slug}/conversations`)
-      }
+      // Handle post-auth flow with waitlist checking
+      await handlePostAuthSuccess(user, router, starship)
 
       // Invalidate all queries to refetch with new auth context
       queryClient.invalidateQueries()
@@ -170,8 +196,8 @@ export function useRegister() {
 
       return data.data as AuthRegisterResponse
     },
-    onSuccess: data => {
-      const { user, token, starship } = data
+    onSuccess: async data => {
+      const { user, token, starship, emailVerificationRequired, message } = data
 
       // Store token
       setStoredToken(token)
@@ -179,10 +205,16 @@ export function useRegister() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Redirect to starship's conversation if available
-      if (starship) {
-        router.push(`/ship/${starship.slug}/conversations`)
+      // Show email verification message if required
+      if (emailVerificationRequired && message) {
+        toast.success('Registration successful!', {
+          description: message,
+          duration: 8000, // Show longer for important messages
+        })
       }
+
+      // Handle post-auth flow with waitlist checking
+      await handlePostAuthSuccess(user, router, starship)
 
       // Invalidate all queries to refetch with new auth context
       queryClient.invalidateQueries()

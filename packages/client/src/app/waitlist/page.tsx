@@ -10,9 +10,14 @@ import { Badge } from '@/components/ui/badge'
 import { Rocket, Sparkles, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { StarfieldBackground } from '@/components/StarfieldBackground'
 import { checkWaitlistApproval, getWaitlistStatus } from '@/lib/waitlist-api'
+import { useAuth } from '@/hooks/useAuth'
+import { useStarships } from '@/hooks/useStarships'
 
 export default function WaitlistPage() {
   const router = useRouter()
+  const { isAuthenticated, user } = useAuth()
+  const { data: starshipsData } = useStarships()
+  
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -28,11 +33,22 @@ export default function WaitlistPage() {
     try {
       const data = await getWaitlistStatus()
       if (data.isValidated) {
-        // Already validated, redirect to main page
-        router.push('/')
+        // Already validated, redirect to appropriate destination
+        handleApprovedUserRedirect()
       }
     } catch (error) {
       console.error('Error checking session status:', error)
+    }
+  }
+
+  const handleApprovedUserRedirect = () => {
+    if (isAuthenticated && starshipsData?.starships?.length > 0) {
+      // User has starships, go to first one
+      const firstStarship = starshipsData.starships[0]
+      router.push(`/ship/${firstStarship.slug}/conversations`)
+    } else {
+      // No starships yet or not authenticated, go to main page to create one
+      router.push('/')
     }
   }
 
@@ -57,9 +73,9 @@ export default function WaitlistPage() {
         setMessageType('success')
         setIsValidated(true)
 
-        // Use window.location for hard redirect to ensure cookie is properly set
+        // Use the unified redirect logic
         setTimeout(() => {
-          window.location.href = data.redirectUrl || '/'
+          handleApprovedUserRedirect()
         }, 2000)
       } else {
         setMessage(data.message)

@@ -27,6 +27,7 @@ export interface TransformOperation {
  */
 export interface BaseParams {
   transforms?: TransformOperation[];
+  mutations?: TransformOperation[];
   condition?: string; // JSONata expression for conditional evaluation
 }
 
@@ -146,10 +147,17 @@ export interface EndParams extends BaseParams {
 }
 
 /**
- * Transform node parameters
+ * Transform node parameters for input->output transformations
  */
 export type TransformParams = BaseParams;
 // Inherits transforms?: TransformOperation[] from BaseParams
+// No additional parameters needed
+
+/**
+ * Mutate node parameters for state mutation operations
+ */
+export type MutateParams = BaseParams;
+// Inherits mutations?: TransformOperation[] from BaseParams
 // No additional parameters needed
 
 /**
@@ -164,4 +172,5 @@ export type NodeParameters =
   | StartParams
   | EndParams
   | ConditionalParams
-  | TransformParams;
+  | TransformParams
+  | MutateParams;

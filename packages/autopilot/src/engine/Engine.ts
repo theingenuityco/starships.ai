@@ -23,6 +23,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
   conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
   transform: () => import('@/nodes/Transform').then((m) => m.Transform as NodeHandlerConstructor),
+  mutate: () => import('@/nodes/Mutate').then((m) => m.Mutate as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {
@@ -213,15 +214,28 @@ export class Engine {
       // Step 3: Execute the node with input items
       const outputItems = await handler.execute(inputItems);
 
-      // Step 4: Handle transforms based on node type
-      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
+      // Step 4: Handle transforms and mutations based on node type
+      const nodeParams = node.parameters as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
+
+      // Handle transforms for input->output transformations
       if (nodeParams.transforms) {
         if (node.type === 'transform') {
           // Transform node - transforms already applied in handler execution above
           // No additional processing needed
         } else {
-          // Non-transform node with transforms - spawn Transform node dynamically
-          await this.executeInlineTransform(nodeParams.transforms);
+          // Non-transform node with transforms - spawn Transform node dynamically for input->output transformations
+          await this.executeInlineTransform(nodeParams.transforms, inputItems);
+        }
+      }
+
+      // Handle mutations for state mutations
+      if (nodeParams.mutations) {
+        if (node.type === 'mutate') {
+          // Mutate node - mutations already applied in handler execution above
+          // No additional processing needed
+        } else {
+          // Non-mutate node with mutations - spawn Mutate node dynamically for state mutations
+          await this.executeInlineMutate(nodeParams.mutations);
         }
       }
 
@@ -341,10 +355,11 @@ export class Engine {
         validationErrors.push(...errorMessages);
       }
 
-      // Validate transform expressions if present
-      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
+      // Validate transform and mutation expressions if present
+      const nodeParams = node.parameters as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
+
+      // Validate transforms for input->output transformations
       if (nodeParams.transforms) {
-        // Create a temporary Transform node to validate transforms
         const virtualTransformNode: WorkflowNode = {
           type: 'transform',
           ref: 'validation_transform',
@@ -357,6 +372,24 @@ export class Engine {
         const transformValidation = transformHandler.validate();
         if (!transformValidation.valid) {
           const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+          validationErrors.push(...errorMessages);
+        }
+      }
+
+      // Validate mutations for state mutations
+      if (nodeParams.mutations) {
+        const virtualMutateNode: WorkflowNode = {
+          type: 'mutate',
+          ref: 'validation_mutate',
+          name: 'Validation Mutate',
+          description: 'Temporary mutate node for validation',
+          parameters: { mutations: nodeParams.mutations },
+        };
+
+        const mutateHandler = await this.createHandler(virtualMutateNode, { mutations: nodeParams.mutations });
+        const mutateValidation = mutateHandler.validate();
+        if (!mutateValidation.valid) {
+          const errorMessages = mutateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
           validationErrors.push(...errorMessages);
         }
       }
@@ -386,7 +419,7 @@ export class Engine {
     }
 
     if (validationErrors.length > 0) {
-      throw new Error(`Template/Transform validation failed:\n${validationErrors.join('\n')}`);
+      throw new Error(`Template/Transform/Mutate validation failed:\n${validationErrors.join('\n')}`);
     }
   }
 
@@ -440,18 +473,35 @@ export class Engine {
   /**
    * Execute inline transform operations by creating a virtual Transform node
    */
-  private async executeInlineTransform(transforms: TransformOperation[]): Promise<void> {
-    // Create virtual Transform node and execute it
+  private async executeInlineTransform(transforms: TransformOperation[], inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    // Create virtual Transform node and execute it for input->output transformations
     const virtualTransformNode: WorkflowNode = {
       type: 'transform',
       ref: 'inline_transform',
       name: 'Inline Transform',
-      description: 'Auto-generated transform node for inline transforms',
+      description: 'Auto-generated transform node for inline input->output transformations',
       parameters: { transforms },
     };
 
     const transformHandler = await this.createHandler(virtualTransformNode, { transforms });
-    await transformHandler.execute();
+    return await transformHandler.execute(inputItems);
+  }
+
+  /**
+   * Execute inline mutate operations by creating a virtual Mutate node
+   */
+  private async executeInlineMutate(transforms: TransformOperation[]): Promise<void> {
+    // Create virtual Mutate node and execute it for state mutations
+    const virtualMutateNode: WorkflowNode = {
+      type: 'mutate',
+      ref: 'inline_mutate',
+      name: 'Inline Mutate',
+      description: 'Auto-generated mutate node for inline state mutations',
+      parameters: { mutations: transforms },
+    };
+
+    const mutateHandler = await this.createHandler(virtualMutateNode, { mutations: transforms });
+    await mutateHandler.execute();
   }
 
   /**

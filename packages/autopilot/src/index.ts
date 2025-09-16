@@ -16,6 +16,7 @@ export { HttpRequest } from './nodes/HttpRequest';
 export { Agent } from './nodes/Agent';
 export { Conditional } from './nodes/Conditional';
 export { Transform } from './nodes/Transform';
+export { Mutate } from './nodes/Mutate';
 
 // Node result types
 export type { ConditionalResult } from './nodes/Conditional';

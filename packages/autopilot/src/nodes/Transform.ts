@@ -1,62 +1,21 @@
 /**
  * Transform Node
  *
- * Dedicated node for state mutations using JSON Patch operations.
- * Contains all transform processing logic internally without separate processor class.
+ * Dedicated node for input->output transformations using JSON Patch operations.
+ * Only handles data flow transformations, not state mutations.
  */
 
-import { applyPatch, deepClone, Operation } from 'fast-json-patch';
+import { applyPatch, Operation } from 'fast-json-patch';
 import { NodeHandler } from '@/types/node-handler';
-import { ValidationResult, ValidationError, Execution, ExecutionState, ExecutionItem } from '@/types';
+import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import type { TransformOperation, TransformParams } from '@/types/node-parameters';
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
 import { NodeHelpers } from '@/helpers/NodeHelpers';
 
-/**
- * Transform safety manager for state snapshots and rollback
- */
-class TransformSafetyManager {
-  /**
-   * Create state snapshot before applying transforms
-   */
-  createExecutionSnapshot(execution: Execution): Execution {
-    return deepClone(execution);
-  }
-
-  /**
-   * Rollback execution if transforms fail
-   */
-  rollbackExecution(execution: Execution, snapshot: Execution): void {
-    execution.state = snapshot.state;
-    // Note: Don't rollback results as they represent the actual node execution
-  }
-
-  /**
-   * Validate state changes don't break execution
-   */
-  validateStateChanges(beforeState: ExecutionState, afterState: ExecutionState): ValidationResult {
-    const errors: ValidationError[] = [];
-
-    // Basic validation - ensure state is still an object
-    if (!afterState || typeof afterState !== 'object') {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Transform operations resulted in invalid state structure',
-      });
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  }
-}
-
 export class Transform implements NodeHandler {
   private params: TransformParams;
   private options?: NodeHandlerOptions;
-  private safetyManager = new TransformSafetyManager();
   private eval = new Eval();
 
   constructor(params: TransformParams, options?: NodeHandlerOptions) {
@@ -65,34 +24,22 @@ export class Transform implements NodeHandler {
   }
 
   /**
-   * Execute transform operations on execution state or input items
+   * Execute transform operations on input data (input->output transformations only)
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     if (!this.params.transforms || this.params.transforms.length === 0) {
       return input || NodeHelpers.createSingleOutput({ transformsApplied: 0, operations: [] });
     }
 
-    if (!this.options?.execution) {
-      throw new Error('Transform node requires execution context');
+    // Transform node now only handles input data transformations
+    if (!input || input.length === 0) {
+      throw new Error('Transform node requires input data for input->output transformations. Use Mutate node for state mutations.');
     }
 
-    // Check execution mode based on input presence
-    if (input !== undefined && input.length > 0) {
-      // Data flow mode: Transform the input data
-      const inputData = NodeHelpers.getSingleInput(input);
-      const transformedData = await this.transformInputData(inputData, this.params.transforms);
-      return NodeHelpers.createSingleOutput(transformedData, input[0]);
-    } else {
-      // State mode: Apply transforms to execution state (existing behavior)
-      await this.applyTransforms(this.params.transforms, this.options.execution);
-
-      // Return summary of what was transformed
-      const operations = this.params.transforms.map((t) => `${t.operation} ${t.path}`);
-      return NodeHelpers.createSingleOutput({
-        transformsApplied: this.params.transforms.length,
-        operations,
-      });
-    }
+    // Transform the input data
+    const inputData = NodeHelpers.getSingleInput(input);
+    const transformedData = await this.transformInputData(inputData, this.params.transforms);
+    return NodeHelpers.createSingleOutput(transformedData, input[0]);
   }
 
   /**
@@ -204,153 +151,7 @@ export class Transform implements NodeHandler {
   }
 
   /**
-   * Apply transform operations to execution state
-   */
-  private async applyTransforms(transforms: TransformOperation[], execution: Execution): Promise<void> {
-    if (!transforms || transforms.length === 0) return;
-
-    // Create execution snapshot for rollback
-    const executionSnapshot = this.safetyManager.createExecutionSnapshot(execution);
-
-    try {
-      // Apply transforms one at a time so each can see the updated state
-      for (const transform of transforms) {
-        // For 'add' operations, ensure intermediate paths exist
-        if (transform.operation === 'add') {
-          this.ensureIntermediatePaths(execution.state, transform.path);
-        }
-
-        // Convert single transform to JSON Patch operation with current state
-        const patchOperations = await this.convertToJsonPatchOperations([transform], execution);
-
-        // Apply patch to a wrapper object to handle the root state correctly
-        const stateWrapper = { state: execution.state };
-        const patchedWrapper = applyPatch(stateWrapper, patchOperations, false, false).newDocument;
-
-        // Update execution state immediately so next transform can see the changes
-        execution.state = patchedWrapper.state;
-      }
-
-      // Validate final state changes
-      const validation = this.safetyManager.validateStateChanges(executionSnapshot.state, execution.state);
-      if (!validation.valid) {
-        throw new Error(`State validation failed: ${validation.errors?.map((e) => e.message).join(', ')}`);
-      }
-    } catch (error) {
-      // Rollback state on any failure
-      this.safetyManager.rollbackExecution(execution, executionSnapshot);
-      throw error;
-    }
-  }
-
-  /**
-   * Ensure intermediate paths exist in the state object for 'add' operations
-   */
-  private ensureIntermediatePaths(state: Record<string, unknown>, path: string): void {
-    // Remove /state prefix if present since we're working directly on the state object
-    const cleanPath = path.startsWith('/state/') ? path.substring('/state'.length) : path;
-
-    if (!cleanPath || cleanPath === '/') return;
-
-    // Split the path and remove empty segments
-    const segments = cleanPath.split('/').filter((segment) => segment.length > 0);
-
-    let current: Record<string, unknown> = state;
-
-    // Create each intermediate object if it doesn't exist (except the last segment)
-    for (let i = 0; i < segments.length - 1; i++) {
-      const segment = segments[i];
-
-      if (!(segment in current) || current[segment] === null || typeof current[segment] !== 'object') {
-        current[segment] = {};
-      }
-
-      current = current[segment] as Record<string, unknown>;
-    }
-  }
-
-  /**
-   * Convert TransformOperation to JSON Patch Operation with template resolution
-   */
-  private async convertToJsonPatchOperations(transforms: TransformOperation[], execution: Execution): Promise<Operation[]> {
-    const operations: Operation[] = [];
-
-    for (const transform of transforms) {
-      // Resolve template expressions in the value
-      let resolvedValue = transform.value;
-      if (transform.value !== undefined) {
-        resolvedValue = await this.eval.resolveTemplates(transform.value, execution);
-      }
-
-      // Resolve template expressions in the from path (for copy/move operations)
-      let resolvedFrom = transform.from;
-      if (transform.from !== undefined) {
-        resolvedFrom = (await this.eval.resolveTemplates(transform.from, execution)) as string;
-      }
-
-      // Create JSON Patch operation based on operation type
-      let operation: Operation;
-
-      switch (transform.operation) {
-        case 'add':
-          operation = {
-            op: 'add',
-            path: transform.path,
-            value: resolvedValue,
-          };
-          break;
-        case 'replace':
-          operation = {
-            op: 'replace',
-            path: transform.path,
-            value: resolvedValue,
-          };
-          break;
-        case 'test':
-          operation = {
-            op: 'test',
-            path: transform.path,
-            value: resolvedValue,
-          };
-          break;
-        case 'remove':
-          operation = {
-            op: 'remove',
-            path: transform.path,
-          };
-          break;
-        case 'copy':
-          if (!resolvedFrom) {
-            throw new Error(`Copy operation requires "from" path for transform at ${transform.path}`);
-          }
-          operation = {
-            op: 'copy',
-            path: transform.path,
-            from: resolvedFrom,
-          };
-          break;
-        case 'move':
-          if (!resolvedFrom) {
-            throw new Error(`Move operation requires "from" path for transform at ${transform.path}`);
-          }
-          operation = {
-            op: 'move',
-            path: transform.path,
-            from: resolvedFrom,
-          };
-          break;
-        default:
-          throw new Error(`Unsupported transform operation: ${transform.operation}`);
-      }
-
-      operations.push(operation);
-    }
-
-    return operations;
-  }
-
-  /**
-   * Validate transform operations
+   * Validate transform operations for input data transformations
    */
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
@@ -400,7 +201,7 @@ export class Transform implements NodeHandler {
   }
 
   /**
-   * Validate a single transform operation
+   * Validate a single transform operation for input data transformations
    */
   private validateTransformOperation(transform: TransformOperation, path = ''): ValidationResult {
     const errors: ValidationError[] = [];
@@ -420,12 +221,8 @@ export class Transform implements NodeHandler {
         code: 'INVALID_PARAMETERS',
         message: `Transform path is required and must be a string at ${path}`,
       });
-    } else if (!transform.path.startsWith('/state')) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: `Transform path must start with "/state" at ${path}`,
-      });
     }
+    // Note: For input data transformations, paths don't need to start with "/state"
 
     // Validate operation-specific requirements
     switch (transform.operation) {
@@ -445,11 +242,6 @@ export class Transform implements NodeHandler {
           errors.push({
             code: 'MISSING_REQUIRED_FIELD',
             message: `Transform operation "${transform.operation}" requires a "from" path at ${path}`,
-          });
-        } else if (!transform.from.startsWith('/state')) {
-          errors.push({
-            code: 'INVALID_PARAMETERS',
-            message: `Transform "from" path must start with "/state" at ${path}`,
           });
         }
         break;

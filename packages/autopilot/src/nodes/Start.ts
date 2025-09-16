@@ -8,7 +8,8 @@ export class Start implements NodeHandler {
     this.params = params || {};
   }
 
-  async execute(): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async execute(_input?: unknown): Promise<void> {
     return;
   }
 

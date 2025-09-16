@@ -28,9 +28,9 @@ export class HttpRequest implements NodeHandler {
   }
 
   /**
-   * Execute the HTTP request
+   * Execute the HTTP request with optional input data
    */
-  async execute(): Promise<HttpResponse> {
+  async execute(input?: unknown): Promise<HttpResponse> {
     // Setup headers - convert HeadersInit to Record<string, string>
     let headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -59,10 +59,16 @@ export class HttpRequest implements NodeHandler {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      // Use the body directly from params (already in correct fetch format)
-      let body = this.params.body;
-      if (typeof body === 'object' && body !== null) {
-        body = JSON.stringify(body);
+      // Use input data as body if available and no explicit body set
+      const bodyData = this.params.body !== undefined ? this.params.body : input;
+      let body: string | null = null;
+
+      if (bodyData !== undefined) {
+        if (typeof bodyData === 'string') {
+          body = bodyData;
+        } else if (typeof bodyData === 'object' && bodyData !== null) {
+          body = JSON.stringify(bodyData);
+        }
       }
 
       // Build fetch options using all RequestInit properties from params

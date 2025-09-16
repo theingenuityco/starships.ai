@@ -6,7 +6,7 @@
  */
 
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
-import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode, NodeParameters } from '@/types';
+import { Blueprint, Execution, NodeHandlerOptions, Node as WorkflowNode, NodeParameters } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
 import { Eval } from './Eval';
@@ -45,7 +45,7 @@ export class Engine {
     const initialExecution = {
       status: config.execution?.status || 'not_started',
       currentNodeRef: config.execution?.currentNodeRef,
-      results: config.execution?.results || [],
+      nodeOutputs: config.execution?.nodeOutputs || {},
       state: config.execution?.state || {},
     } as Execution;
 
@@ -139,47 +139,28 @@ export class Engine {
         // Update current node
         this.execution.currentNodeRef = currentNode.ref;
 
-        // Execute the node - this now returns updated execution with result stored
-        const result = await this.executeNode(currentNode);
+        // Get input data for current node
+        const inputData = this.getNodeInput(currentNode);
 
-        if (!result.error) {
-          // Node succeeded - continue normal execution
-          const nextNode = this.getNextNode();
+        // Execute the node
+        const output = await this.executeNode(currentNode, inputData);
 
-          if (!nextNode) {
-            break; // No next node, workflow complete
-          }
+        // Store output
+        this.execution.nodeOutputs[currentNode.ref] = output;
 
-          currentNode = nextNode;
-        } else {
-          // Node failed - check if there's error recovery logic
-          const nextNode = this.getNextNode();
+        // Get next node
+        const nextNode = this.getNextNode();
 
-          if (nextNode && this.hasErrorRecoveryPath(currentNode.ref)) {
-            // There's a next node and error recovery logic, continue execution
-            currentNode = nextNode;
-          } else {
-            // No error recovery - fail the workflow
-            this.execution.status = 'failed';
-            this.execution.error = {
-              code: 'SYSTEM_ERROR',
-              message: result.error instanceof Error ? result.error.message : String(result.error),
-              timestamp: new Date().toISOString(),
-              recoverable: false,
-            };
-            await this.emitEvent('workflow_failed');
-            break;
-          }
+        if (!nextNode) {
+          break; // No next node, workflow complete
         }
+
+        currentNode = nextNode;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
 
-        // Store failed result
-        const failedResult: NodeResult = {
-          nodeRef: currentNode.ref,
-          error: errorMessage,
-        };
-        this.execution.results.push(failedResult);
+        // Store failed output
+        this.execution.nodeOutputs[currentNode.ref] = { error: errorMessage };
 
         // Set workflow status to failed and break execution
         this.execution.status = 'failed';
@@ -199,25 +180,36 @@ export class Engine {
   }
 
   /**
+   * Get input data for a node based on incoming edges
+   */
+  private getNodeInput(node: WorkflowNode): unknown {
+    // Find incoming edge with dataFlow flag
+    const incomingEdge = this.blueprint.edges.find((edge) => edge.to === node.ref && edge.dataFlow);
+
+    if (incomingEdge) {
+      // Data flow mode: Use previous node's output directly
+      return this.execution.nodeOutputs[incomingEdge.from];
+    }
+
+    // State mode: No input data (nodes use state via templates)
+    return undefined;
+  }
+
+  /**
    * Execute a single node with template resolution and transforms
    */
-  private async executeNode(node: WorkflowNode): Promise<NodeResult> {
+  private async executeNode(node: WorkflowNode, inputData?: unknown): Promise<unknown> {
     this.emitEvent('node_started');
-
-    const result = {
-      nodeRef: node.ref,
-    } as NodeResult;
 
     try {
       // Step 1: Resolve template expressions in parameters
-      const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution)) as NodeParameters;
+      const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution, inputData)) as NodeParameters;
 
       // Step 2: Create handler instance with resolved parameters
       const handler = await this.createHandler(node, resolvedParams);
 
-      // Step 3: Execute the node
-      const data = await handler.execute();
-      result.data = data;
+      // Step 3: Execute the node with input data
+      const data = await handler.execute(inputData);
 
       // Step 4: Handle transforms based on node type
       const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
@@ -239,23 +231,21 @@ export class Engine {
         } else {
           // Non-conditional node with condition - spawn Conditional node dynamically
           const conditionResult = await this.executeInlineConditional(nodeParams.condition);
-          // Store condition result in the node result for getNextNode to use
-          if (result.data && typeof result.data === 'object') {
-            (result.data as Record<string, unknown>).condition = conditionResult;
+          // Store condition result in the node data for getNextNode to use
+          if (data && typeof data === 'object') {
+            (data as Record<string, unknown>).condition = conditionResult;
           } else {
-            result.data = { condition: conditionResult };
+            return { condition: conditionResult };
           }
         }
       }
 
       this.emitEvent('node_completed');
+      return data;
     } catch (error) {
-      result.error = error;
       this.emitEvent('node_failed');
+      throw error;
     }
-
-    this.execution.results.push(result);
-    return result;
   }
 
   /**
@@ -273,13 +263,13 @@ export class Engine {
     const outgoingEdges = this.blueprint.edges.filter((edge) => edge.from === this.execution.currentNodeRef);
 
     if (outgoingEdges.length > 0) {
-      // Get the last execution result to check for conditional output
-      const lastResult = this.execution.results[this.execution.results.length - 1];
+      // Get the last execution output to check for conditional result
+      const lastOutput = this.execution.nodeOutputs[this.execution.currentNodeRef!];
       let edgeCondition: string | undefined;
 
-      // Check if last result was from a conditional node
-      if (lastResult?.data && typeof lastResult.data === 'object') {
-        const conditionalResult = lastResult.data as Record<string, unknown>;
+      // Check if last output was from a conditional node
+      if (lastOutput && typeof lastOutput === 'object') {
+        const conditionalResult = lastOutput as Record<string, unknown>;
         if (conditionalResult.condition !== undefined) {
           edgeCondition = String(conditionalResult.condition);
         }

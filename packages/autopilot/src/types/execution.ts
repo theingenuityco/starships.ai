@@ -21,17 +21,8 @@ export interface Execution {
   currentNodeRef?: string;
   status: ExecutionStatus;
   state: ExecutionState;
-  results: NodeResult[];
+  nodeOutputs: Record<string, unknown>;
   error?: ExecutionError;
-}
-
-/**
- * Result of executing a workflow node
- */
-export interface NodeResult {
-  nodeRef: string;
-  data?: unknown;
-  error?: unknown;
 }
 
 /**

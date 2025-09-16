@@ -42,17 +42,24 @@ export class LLM implements NodeHandler {
   }
 
   /**
-   * Execute the LLM request with streaming
+   * Execute the LLM request with streaming and optional input data
    */
-  async execute(): Promise<LLMResponse> {
+  async execute(input?: unknown): Promise<LLMResponse> {
     const apiKey = autopilot.getOpenRouterApiKey();
     if (!apiKey) {
       throw new Error('OpenRouter API key is required. Configure it via autopilot.setCredentials().');
     }
 
+    // Use input data as user message if no explicit messages provided
+    let messages = this.params.messages;
+    if (input !== undefined && (!messages || messages.length === 0)) {
+      const inputContent = typeof input === 'string' ? input : JSON.stringify(input);
+      messages = [{ role: 'user', content: inputContent }];
+    }
+
     const requestBody = {
       model: this.params.model,
-      messages: this.params.messages,
+      messages: messages || this.params.messages,
       temperature: this.params.temperature || 0.7,
       max_tokens: this.params.maxTokens || 1024,
       top_p: this.params.topP || 1.0,

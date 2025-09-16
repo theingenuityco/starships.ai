@@ -5,6 +5,7 @@ import { useCallback, useState, useRef } from 'react'
 import { toast } from 'sonner'
 import { applyOperation, Operation } from 'fast-json-patch'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -151,60 +152,119 @@ export function useConversation(conversationId: string | null) {
   const handleStreamingEvent = useCallback(
     (data: any) => {
       // JSON Patch events (RFC6902 delta updates)
-      if (data.type === 'patch' && data.patch && Array.isArray(data.patch)) {
-        console.log('[STREAMING] Received patch:', data.patch, 'version:', data.version)
+      // Support both:
+      // 1) Batched patches: { type: 'patch', patch: Operation[] }
+      // 2) Single op deltas: { op: 'add' | 'replace' | 'remove', path: string, value?: any }
+      const isSingleOp = data && typeof data.op === 'string' && typeof data.path === 'string'
+      const isPatchArray = data && data.type === 'patch' && Array.isArray(data.patch)
 
+      if (isPatchArray || isSingleOp) {
+        const ops: Operation[] = isSingleOp ? [data as Operation] : (data.patch as Operation[])
+        const version = (data as any).version
+        console.log('[STREAMING] Incoming ops:', ops, 'version:', version)
+
+        // Split chunk-add ops from others to avoid blocking event loop with frequent cache writes
+        const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/contentChunks\/-$/.test(op.path))
+        const nonChunkOps = ops.filter(op => !chunkOps.includes(op))
+
+        // Fast path: update ephemeral streaming state in zustand for chunk adds
+        if (chunkOps.length > 0) {
+          const text = chunkOps
+            .map(op => (op as any).value?.content)
+            .filter(Boolean)
+            .join('')
+          if (text) {
+            const store = useStarshipUIStore.getState()
+            store.startStreaming(conversationId!, version)
+            store.appendStreamingChunk(conversationId!, text, version)
+          }
+        }
+
+        // Update local streaming flag for UI consumers (kept for compatibility)
         setStreamingState(prev => ({
           ...prev,
           status: 'streaming',
           isStreaming: true,
           lastUpdate: Date.now(),
-          version: data.version || prev.version,
+          version: version || prev.version,
         }))
 
-        // Apply JSON patch operations to messages array
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
-          if (!old) {
-            // Initialize with empty messages array if no data exists
-            const initialData = { messages: [], total: 0, conversationId: conversationId! }
+        // Apply only non-chunk ops to React Query cache (e.g., add message shell, replace content, mark streaming=false)
+        if (nonChunkOps.length > 0) {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+            const applyOps = (target: any) => {
+              // Normalize a single op against current target state to resolve '/messages/-1/...'
+              const normalizeOpForState = (op: Operation, state: any): Operation => {
+                if (!op || typeof (op as any).path !== 'string') return op
+                let path = (op as any).path as string
 
-            try {
-              let result = initialData
-              // Apply each operation in the patch array
-              for (const operation of data.patch) {
-                const opResult = applyOperation(result, operation as Operation, true)
-                result = opResult.newDocument
+                // Map last-item shorthand to concrete index for all op types
+                if (path.startsWith('/messages/-1')) {
+                  const lastIndex = Array.isArray(state?.messages) && state.messages.length > 0 ? state.messages.length - 1 : -1
+                  if (lastIndex >= 0) {
+                    path = path.replace('/messages/-1', `/messages/${lastIndex}`)
+                  }
+                }
+
+                return { ...(op as any), path } as Operation
               }
+
+              let result = target
+              for (const operation of nonChunkOps) {
+                const normalized = normalizeOpForState(operation as Operation, result)
+                try {
+                  const opResult = applyOperation(result, normalized as Operation, true)
+                  result = opResult.newDocument
+                } catch (opErr) {
+                  console.warn('[STREAMING] Operation failed, continuing with others:', normalized, opErr)
+                }
+              }
+              return result
+            }
+
+            if (!old) {
+              // Initialize with empty messages array if no data exists
+              const initialData = { messages: [], total: 0, conversationId: conversationId! }
+              try {
+                const patched = applyOps(initialData)
+                const updatedData = {
+                  ...patched,
+                  total: Array.isArray(patched.messages) ? patched.messages.length : 0,
+                }
+                return processContentChunks(updatedData)
+              } catch (error) {
+                console.error('[STREAMING] Failed to apply operations to initial data:', error)
+                return initialData
+              }
+            }
+
+            // Apply operations to existing data
+            try {
+              const patched = applyOps(old)
               const updatedData = {
-                ...result,
-                total: Array.isArray(result.messages) ? result.messages.length : 0,
+                ...patched,
+                total: Array.isArray(patched.messages) ? patched.messages.length : old.total,
+                lastActivityAt: new Date().toISOString(),
               }
               return processContentChunks(updatedData)
             } catch (error) {
-              console.error('[STREAMING] Failed to apply operations to initial data:', error)
-              return initialData
+              console.error('[STREAMING] Failed to apply operations:', error, { operations: nonChunkOps, target: old })
+              return old // Return unchanged data on operation failure
             }
-          }
+          })
 
-          // Apply operations to existing data
-          try {
-            let result = old
-            // Apply each operation in the patch array
-            for (const operation of data.patch) {
-              const opResult = applyOperation(result, operation as Operation, true)
-              result = opResult.newDocument
-            }
-            const updatedData = {
-              ...result,
-              total: Array.isArray(result.messages) ? result.messages.length : old.total,
-              lastActivityAt: new Date().toISOString(),
-            }
-            return processContentChunks(updatedData)
-          } catch (error) {
-            console.error('[STREAMING] Failed to apply operations:', error, { operations: data.patch, target: old })
-            return old // Return unchanged data on operation failure
+          // If any op marks streaming complete, end zustand streaming
+          const marksDone =
+            nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/streaming$/.test(op.path) && (op as any).value === false) ||
+            nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
+          if (marksDone) {
+            const store = useStarshipUIStore.getState()
+            store.endStreaming(conversationId!)
+            // Optionally clear ephemeral state shortly after completion
+            setTimeout(() => useStarshipUIStore.getState().clearStreaming(conversationId!), 500)
           }
-        })
+        }
+
         return
       }
 
@@ -248,6 +308,9 @@ export function useConversation(conversationId: string | null) {
             lastUpdate: Date.now(),
           }))
           contentAccumulatorRef.current = ''
+          try {
+            useStarshipUIStore.getState().startStreaming(conversationId!)
+          } catch {}
 
           // Add streaming message to cache (prepend since messages are in desc order)
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {

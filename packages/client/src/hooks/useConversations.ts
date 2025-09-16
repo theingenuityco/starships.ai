@@ -240,11 +240,12 @@ export function useConversation(conversationId: string | null) {
               updated.messages[msgIndex] = target
             }
 
-            // Update metadata
-            updated.lastActivityAt = new Date().toISOString()
-
+            // Do not bump lastActivityAt on chunk-only updates to avoid unnecessary re-renders
             return updated
           })
+
+          // NOTE: Avoid direct Zustand updates here to prevent feedback loops.
+          // Zustand is mirrored from React Query via the useEffect below, which is sufficient for streaming updates.
         }
 
         // Update local streaming flag for UI consumers (kept for compatibility)

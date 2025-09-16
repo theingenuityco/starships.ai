@@ -6,7 +6,7 @@ import { useCreateConversation, useConversation } from '@/hooks/useConversations
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
-import { forwardRef, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {
@@ -56,7 +56,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
     }, [selectedAgent, disabled])
 
-    const handleSubmit = async () => {
+    const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
       if (!messageToSend || sending || disabled) return
 
@@ -113,58 +113,61 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       } finally {
         setSending(false)
       }
-    }
+    }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId])
 
     // Handle suggestion clicks
-    const handleSuggestionSubmit = async (suggestionText: string) => {
-      if (!suggestionText || sending || disabled) return
+    const handleSuggestionSubmit = useCallback(
+      async (suggestionText: string) => {
+        if (!suggestionText || sending || disabled) return
 
-      // Validation for agent
-      if (!selectedAgent) {
-        console.error('No agent selected')
-        return
-      }
-
-      if (!userId) {
-        console.error('User not authenticated')
-        return
-      }
-
-      try {
-        setSending(true)
-        // Create conversation if one doesn't exist
-        let currentConversationId = conversationId
-        if (!currentConversationId) {
-          console.log('Creating new conversation for agent chat suggestion...')
-          const newConversation = await createConversation.mutateAsync({
-            title: `Chat with ${selectedAgent.name}`,
-            starshipId: starshipId,
-            agentId: selectedAgent.id,
-          })
-          currentConversationId = newConversation.id
-          onConversationStart?.(currentConversationId!)
-          console.log('Conversation created:', currentConversationId)
+        // Validation for agent
+        if (!selectedAgent) {
+          console.error('No agent selected')
+          return
         }
 
-        // Notify parent about message activity immediately (for UI state updates)
-        onMessageSent?.()
+        if (!userId) {
+          console.error('User not authenticated')
+          return
+        }
 
-        // Send message with streaming (this handles everything: saves message + gets agent response)
-        await sendMessageFn({
-          conversationId: currentConversationId!,
-          agentId: selectedAgent!.id,
-          content: suggestionText,
-          role: 'user',
-          starshipId: starshipId!,
-          messageType: 'user_input',
-          stream: true,
-        })
-      } catch (error) {
-        console.error('Failed to send suggestion:', error)
-      } finally {
-        setSending(false)
-      }
-    }
+        try {
+          setSending(true)
+          // Create conversation if one doesn't exist
+          let currentConversationId = conversationId
+          if (!currentConversationId) {
+            console.log('Creating new conversation for agent chat suggestion...')
+            const newConversation = await createConversation.mutateAsync({
+              title: `Chat with ${selectedAgent.name}`,
+              starshipId: starshipId,
+              agentId: selectedAgent.id,
+            })
+            currentConversationId = newConversation.id
+            onConversationStart?.(currentConversationId!)
+            console.log('Conversation created:', currentConversationId)
+          }
+
+          // Notify parent about message activity immediately (for UI state updates)
+          onMessageSent?.()
+
+          // Send message with streaming (this handles everything: saves message + gets agent response)
+          await sendMessageFn({
+            conversationId: currentConversationId!,
+            agentId: selectedAgent!.id,
+            content: suggestionText,
+            role: 'user',
+            starshipId: starshipId!,
+            messageType: 'user_input',
+            stream: true,
+          })
+        } catch (error) {
+          console.error('Failed to send suggestion:', error)
+        } finally {
+          setSending(false)
+        }
+      },
+      [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
+    )
 
     const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {

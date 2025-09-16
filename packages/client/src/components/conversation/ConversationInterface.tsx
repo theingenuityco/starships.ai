@@ -4,7 +4,6 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
-import { useConversation } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -27,9 +26,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Ref for direct communication with message input
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
-
-  // Conversation data - now handled by unified hook
-  const conversationData = useConversation(currentConversationId)
 
   // Memoized agent change handler to prevent AgentSelector from remounting
   const handleAgentChange = useCallback((agent: Agent | null) => {
@@ -62,19 +58,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [])
 
-  // Reset conversation when external conversation ID changes
+  // Reset conversation when external conversation ID changes (only when the value actually changes)
   useEffect(() => {
-    if (userId && isAuthenticated) {
-      if (externalConversationId !== undefined) {
-        setCurrentConversationId(externalConversationId)
-        setHasMessages(!!externalConversationId)
-      } else {
-        // Only reset if we don't have an external conversation ID
-        setCurrentConversationId(null)
-        setHasMessages(false)
-      }
-    }
-  }, [userId, isAuthenticated, externalConversationId])
+    if (externalConversationId === undefined) return
+    setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
+    setHasMessages(Boolean(externalConversationId))
+  }, [externalConversationId])
 
   // Show loading state
   if (isLoading) {
@@ -109,7 +98,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area or Welcome Screen */}
       {hasMessages && currentConversationId ? (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} isLoading={conversationData.isLoading} error={conversationData.error} />
+          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} />
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">

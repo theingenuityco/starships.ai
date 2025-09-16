@@ -7,18 +7,24 @@ import { Bot, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 
+// Stable empty array to prevent re-render storms when no conversationId is present.
+// Returning a new array literal from the selector causes a new reference on every store change.
+const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[] }> = Object.freeze([])
+
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
-  isLoading?: boolean
-  error?: any
 }
 
-export function ConversationMessageList({ conversationId, starshipId, isLoading = false, error = null }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
+  // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
+  const isLoading = false
+  const error: any = null
+
   const storeMessages = useStarshipUIStore(state => {
-    if (!conversationId) return [] as (MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[] })[]
+    if (!conversationId) return EMPTY_MESSAGES as any
     const convo = state.conversations[conversationId]
-    return (convo?.messages as any) || []
+    return (convo?.messages as any) || EMPTY_MESSAGES
   })
 
   // Scroll container reference

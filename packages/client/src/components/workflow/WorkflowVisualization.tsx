@@ -322,16 +322,6 @@ const convertToFlowData = (workflow: WorkflowDSL, currentNodeId?: string, agents
     })
   })
 
-  console.log(`[Workflow Visualization] Converted ${nodes.length} nodes, ${edges.length} edges`)
-  console.log(
-    `[Workflow Visualization] Node IDs:`,
-    nodes.map(n => n.id)
-  )
-  console.log(
-    `[Workflow Visualization] Edges:`,
-    edges.map(e => `${e.source} → ${e.target}`)
-  )
-
   return { nodes, edges }
 }
 

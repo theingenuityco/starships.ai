@@ -40,7 +40,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Handle conversation start - receive actual database conversation ID
   const handleConversationStart = useCallback(
     (conversationId: string) => {
-      console.log('[ConversationInterface] Conversation started with ID:', conversationId)
       setCurrentConversationId(conversationId)
       onConversationChange?.(conversationId)
     },

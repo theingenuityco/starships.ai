@@ -113,7 +113,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Create conversation if one doesn't exist
         let currentConversationId = conversationId
         if (!currentConversationId) {
-          console.log('Creating new conversation for agent chat...')
           const newConversation = await createConversation.mutateAsync({
             title: `Chat with ${selectedAgent.name}`,
             starshipId: starshipId,
@@ -121,7 +120,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
           currentConversationId = newConversation.id
           onConversationStart?.(currentConversationId!)
-          console.log('Conversation created:', currentConversationId)
         }
 
         // Clear input and reset UI immediately for better UX
@@ -183,7 +181,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           // Create conversation if one doesn't exist
           let currentConversationId = conversationId
           if (!currentConversationId) {
-            console.log('Creating new conversation for agent chat suggestion...')
             const newConversation = await createConversation.mutateAsync({
               title: `Chat with ${selectedAgent.name}`,
               starshipId: starshipId,
@@ -191,7 +188,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             })
             currentConversationId = newConversation.id
             onConversationStart?.(currentConversationId!)
-            console.log('Conversation created:', currentConversationId)
           }
 
           // Notify parent about message activity immediately (for UI state updates)

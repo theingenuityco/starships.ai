@@ -200,7 +200,6 @@ const tokenProviderPromises: Array<{ resolve: () => void; reject: (error: Error)
 export const setTokenProvider = (tokenProvider: () => Promise<string | null>) => {
   getTokenFunction = tokenProvider
   tokenProviderReady = true
-  console.log('[API] Token provider set')
 
   // Resolve all pending promises waiting for token provider
   tokenProviderPromises.forEach(({ resolve }) => resolve())
@@ -210,7 +209,6 @@ export const setTokenProvider = (tokenProvider: () => Promise<string | null>) =>
 // Export function to get current token (for SSE authentication)
 export const getCurrentToken = async (): Promise<string | null> => {
   if (!getTokenFunction) {
-    console.warn('[API] No token provider configured')
     return null
   }
 
@@ -218,7 +216,6 @@ export const getCurrentToken = async (): Promise<string | null> => {
     await waitForTokenProvider()
     return await getTokenFunction()
   } catch (error) {
-    console.error('[API] Failed to get current token:', error)
     return null
   }
 }
@@ -246,33 +243,19 @@ const waitForTokenProvider = (): Promise<void> => {
 // Request interceptor to add authentication token
 api.interceptors.request.use(
   async (config: RequestConfig) => {
-    console.log('[API] Request interceptor running for:', config.url, 'at', new Date().toISOString())
-
     // Check if this is an authenticated endpoint
     const requiresAuth = config.url?.includes('/api/v1/starships') || config.url?.includes('/api/v1/agents') || config.url?.includes('/api/v1/users') || config.url?.includes('/api/v1/conversations')
 
     if (requiresAuth) {
-      console.log('[API] Authenticated endpoint detected, waiting for token provider...')
-
       try {
         // Wait for token provider to be ready before proceeding
         await waitForTokenProvider()
-        console.log('[API] Token provider ready, proceeding with request')
-      } catch (error) {
-        console.error('[API] Token provider timeout, proceeding without token:', error)
-      }
+      } catch (error) {}
     }
-
-    console.log('[API] Token provider status:', {
-      hasTokenFunction: !!getTokenFunction,
-      tokenProviderReady,
-      requiresAuth,
-      timestamp: new Date().toISOString(),
-    })
 
     if (getTokenFunction) {
       const token = await getTokenFunction()
-      console.log('[API] Token from provider:', token ? 'Token present' : 'No token')
+
       if (token) {
         // Ensure headers is a proper object
         if (!config.headers) {
@@ -280,18 +263,9 @@ api.interceptors.request.use(
         }
         const headers = config.headers as Record<string, string>
         headers.Authorization = `Bearer ${token}`
-        console.log('[API] Authorization header added successfully')
       } else {
-        console.log('[API] No token available, proceeding without Authorization header')
       }
     } else {
-      console.warn('[API] ⚠️  NO TOKEN PROVIDER CONFIGURED - Request may fail with 401/404')
-      console.log('[API] Request details:', {
-        url: config.url,
-        method: config.method,
-        requiresAuth,
-        timestamp: new Date().toISOString(),
-      })
     }
     return config
   },
@@ -335,7 +309,6 @@ api.interceptors.response.use(
 
       // Handle 409 conflicts gracefully
       if (error.config?.url?.includes('/connectors/')) {
-        console.log('[API] Interceptor handling 409 for connector operation - treating as success')
         // Return a successful response instead of rejecting
         return Promise.resolve({
           status: 200,
@@ -443,14 +416,12 @@ export const agentAPI = {
     const cacheKey = CACHE_KEYS.AGENTS_ALL
     const cached = apiCache.get<Agent[]>(cacheKey)
     if (cached) {
-      console.log('[API] Using cached agents:', cached.length)
       return cached
     }
 
-    console.log('[API] Fetching all agents from server')
     const data = await api.get('/api/v1/agents').then(res => {
       const agents = extractResponseData<Agent[]>(res)
-      console.log('[API] Received agents from server:', agents.length)
+
       return agents
     })
     apiCache.set(cacheKey, data)
@@ -484,10 +455,9 @@ export const agentAPI = {
 
   // CRUD methods with cache invalidation
   create: async (agent: CreateAgentRequest): Promise<Agent> => {
-    console.log('[API] Creating new agent:', agent.name)
     const data = await api.post('/api/v1/agents', agent).then(res => {
       const agent = extractResponseData<Agent>(res)
-      console.log('[API] Agent created successfully:', agent.id)
+
       return agent
     })
     console.log('[API] Invalidating agent caches after creation')

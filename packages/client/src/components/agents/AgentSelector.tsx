@@ -239,7 +239,6 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
             <AgentTemplateSelector
               onSelectTemplate={template => {
                 // Handle template selection if needed
-                console.log('Template selected:', template)
               }}
               onCreateFromTemplate={handleCreateFromTemplate}
               trigger={

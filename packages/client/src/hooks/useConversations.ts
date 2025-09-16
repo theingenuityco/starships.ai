@@ -200,7 +200,6 @@ export function useConversation(conversationId: string | null) {
       if (isPatchArray || isSingleOp) {
         const ops: Operation[] = isSingleOp ? [data as Operation] : (data.patch as Operation[])
         const version = (data as any).version
-        console.log('[STREAMING] Incoming ops:', ops, 'version:', version)
 
         // Split chunk-add ops from others to avoid blocking event loop with frequent cache writes
         const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/contentChunks\/-$/.test(op.path))
@@ -723,7 +722,6 @@ export function useConversation(conversationId: string | null) {
             openWhenHidden: true,
             async onopen(response) {
               if (response.ok) {
-                console.log('[STREAMING] Connection opened successfully')
                 setStreamingState(prev => ({
                   ...prev,
                   status: 'streaming',
@@ -744,7 +742,6 @@ export function useConversation(conversationId: string | null) {
 
                 const parsed = JSON.parse(event.data)
                 const eventType = (event as any).event || null
-                console.log('[STREAMING] Received SSE event:', eventType || (parsed.op ? 'delta' : parsed.type || 'unknown'), parsed)
 
                 // Attach conversationId for reliable routing and queue the event
                 queueEvent({ ...parsed, __event: eventType, conversationId: data.conversationId })
@@ -753,8 +750,6 @@ export function useConversation(conversationId: string | null) {
               }
             },
             onclose() {
-              console.log('[STREAMING] Connection closed')
-
               // Mark as completed and prevent retries
               completedRef.current = true
               shouldRetryRef.current = false
@@ -813,7 +808,6 @@ export function useConversation(conversationId: string | null) {
               console.error('[STREAMING] Connection error:', error)
               // If aborted or completed, suppress retries
               if (abortControllerRef.current?.signal.aborted || completedRef.current || !shouldRetryRef.current) {
-                console.log('[STREAMING] Suppressing retry after completion/abort')
                 return
               }
               if (!resolved) {

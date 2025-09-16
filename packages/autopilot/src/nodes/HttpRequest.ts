@@ -31,8 +31,6 @@ export class HttpRequest implements NodeHandler {
    * Execute the HTTP request
    */
   async execute(): Promise<HttpResponse> {
-    console.log(`Executing HTTP ${this.params.method} request to: ${this.params.url}`);
-
     // Setup headers - convert HeadersInit to Record<string, string>
     let headers: Record<string, string> = {
       'Content-Type': 'application/json',

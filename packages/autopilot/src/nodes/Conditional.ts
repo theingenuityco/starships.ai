@@ -32,8 +32,6 @@ export class Conditional implements NodeHandler {
       throw new Error('Conditional node requires a condition expression');
     }
 
-    console.log(`Executing conditional: ${this.params.condition}`);
-
     try {
       // Ensure we have execution context
       if (!this.options?.execution) {

@@ -92,7 +92,6 @@ export class StreamingService {
 
     // Handle connection close
     res.on('close', () => {
-      console.log(`[StreamingService] Streaming disconnected ${streamId}`);
       this.cleanupConnection(streamId);
     });
 

@@ -45,8 +45,6 @@ export class LLM implements NodeHandler {
    * Execute the LLM request with streaming
    */
   async execute(): Promise<LLMResponse> {
-    console.log(`Executing LLM: ${this.params.model}`);
-
     const apiKey = autopilot.getOpenRouterApiKey();
     if (!apiKey) {
       throw new Error('OpenRouter API key is required. Configure it via autopilot.setCredentials().');

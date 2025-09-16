@@ -93,17 +93,11 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     let defaultAgent;
     try {
       defaultStarship = await StarshipService.createDefaultStarship(user.id);
-      console.log(`[AUTH] Created default starship for user: ${user.id}`);
 
       // Create default agent from "General Assistant" template
       if (defaultStarship) {
         try {
           defaultAgent = await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
-          if (defaultAgent) {
-            console.log(`[AUTH] Created default agent for user: ${user.id}`);
-          } else {
-            console.log(`[AUTH] No default agent created for user: ${user.id}`);
-          }
         } catch (agentError) {
           console.error(`[AUTH] Failed to create default agent for user ${user.id}:`, agentError);
           // Continue even if agent creation fails
@@ -126,8 +120,6 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       .setExpirationTime('7d')
       .setIssuedAt()
       .sign(JWT_SECRET);
-
-    console.log(`[AUTH] User registered: ${user.id} (${user.email})`);
 
     sendSuccess(
       res,
@@ -195,9 +187,6 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
       firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
-      if (firstStarship) {
-        console.log(`[AUTH] Found first starship for redirect: ${firstStarship.name} (${firstStarship.slug})`);
-      }
     } catch (error) {
       console.error(`[AUTH] Failed to fetch starships for user ${user.id}:`, error);
       // Continue with login even if starship fetch fails
@@ -215,8 +204,6 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       .setExpirationTime('7d')
       .setIssuedAt()
       .sign(JWT_SECRET);
-
-    console.log(`[AUTH] User logged in: ${user.id} (${user.email})`);
 
     sendSuccess(res, {
       user: {
@@ -297,7 +284,6 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
 router.post('/auth/logout', (req: Request, res: Response): void => {
   // With JWT, logout is primarily handled client-side by removing the token
   // Server-side logout would require a token blacklist, which adds complexity
-  console.log('[AUTH] User logged out');
   sendSuccess(res, { message: 'Logged out successfully' });
 });
 

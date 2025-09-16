@@ -139,12 +139,6 @@ export class ConversationService {
     // only first agent for now
     const agentModel = agentModels[0];
 
-    console.log('🚀 [AGENT-SERVICE] Starting streaming conversation execution:', {
-      agentId: agentModel.id,
-      conversationId: data.conversationId,
-      timestamp: new Date().toISOString(),
-    });
-
     const conversation = await this.getConversationById(data.conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation', data.conversationId);
@@ -164,12 +158,6 @@ export class ConversationService {
 
       // Execute agent with streaming-enabled execution
       await agent.execute();
-
-      const executionTime = Date.now() - startTime;
-
-      console.log('✅ [AGENT-SERVICE] Streaming conversation execution completed successfully:', {
-        executionTime,
-      });
 
       // Send completion event
       if (this.streamingService) {
@@ -203,13 +191,11 @@ export class ConversationService {
 
   async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
     if (!this.streamingService) {
-      console.log('No streaming service available for event:', event.type);
       return;
     }
 
     switch (event.type) {
       case 'workflow_started': {
-        console.log('[STREAMING] Workflow started for conversation:', conversationId);
         // Initialize streaming content tracker
         this.streamingContent.set(conversationId, '');
 
@@ -246,8 +232,6 @@ export class ConversationService {
           // This supports multiple assistant responses within a single streaming session.
           if (!this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
-              console.warn('[STREAMING] No active stream, creating assistant placeholder for new chunk burst');
-
               const assistantMessage: MessageModel = {
                 id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
@@ -267,13 +251,11 @@ export class ConversationService {
               // Initialize server-side accumulator for this new stream
               this.streamingContent.set(conversationId, '');
             } else {
-              console.warn('[STREAMING] Received content_chunk without active stream and no SSE connection; ignoring chunk');
               break;
             }
           }
 
           const content = String(chunkContent.choices[0].delta.content);
-          console.log('[STREAMING] Content chunk:', content);
 
           // Track accumulated content server-side for completion event
           const currentContent = this.streamingContent.get(conversationId) || '';
@@ -297,11 +279,8 @@ export class ConversationService {
       }
 
       case 'content_complete': {
-        console.log('[STREAMING] Content streaming complete');
-
         // Guard: if there's no active stream (no accumulator), ignore completion to avoid corrupting state
         if (!this.streamingContent.has(conversationId)) {
-          console.warn('[STREAMING] content_complete without active stream; ignoring');
           break;
         }
 
@@ -371,19 +350,16 @@ export class ConversationService {
       }
 
       case 'node_started': {
-        console.log('[STREAMING] Node started:', event.data?.execution?.currentNodeRef);
         // Node started
         break;
       }
 
       case 'node_completed': {
-        console.log('[STREAMING] Node completed:', event.data?.execution?.currentNodeRef);
         // Persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.
         break;
       }
 
       case 'workflow_completed': {
-        console.log('[STREAMING] Workflow completed successfully');
         // Final completion will be handled by the main addConversationMessage method
         break;
       }
@@ -410,7 +386,6 @@ export class ConversationService {
       }
 
       default:
-        console.log('[STREAMING] Unhandled event type:', event.type);
         break;
     }
   }

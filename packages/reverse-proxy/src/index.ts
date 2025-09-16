@@ -70,7 +70,6 @@ Routes:
 process.on('SIGTERM', () => {
   console.log('\n📭 SIGTERM signal received: closing proxy server');
   server.close(() => {
-    console.log('Proxy server closed');
     process.exit(0);
   });
 });
@@ -78,7 +77,6 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('\n📭 SIGINT signal received: closing proxy server');
   server.close(() => {
-    console.log('Proxy server closed');
     process.exit(0);
   });
 });

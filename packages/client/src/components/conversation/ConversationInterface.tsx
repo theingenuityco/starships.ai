@@ -4,6 +4,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -26,6 +27,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Ref for direct communication with message input
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
+
+  // Track streaming state for current conversation to focus input on completion
+  const uiStreaming = useStarshipUIStore(s => (currentConversationId ? s.conversationsStreaming[currentConversationId]?.isStreaming === true : false))
+  const prevStreamingRef = useRef(false)
 
   // Memoized agent change handler to prevent AgentSelector from remounting
   const handleAgentChange = useCallback((agent: Agent | null) => {
@@ -64,6 +69,27 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
     setHasMessages(Boolean(externalConversationId))
   }, [externalConversationId])
+
+  // Focus input when streaming transitions from true -> false
+  useEffect(() => {
+    const was = prevStreamingRef.current
+    if (was && !uiStreaming) {
+      setTimeout(() => {
+        messageInputRef.current?.focusInput?.()
+      }, 50)
+    }
+    prevStreamingRef.current = uiStreaming
+  }, [uiStreaming])
+
+  // Focus after first message or when conversation becomes ready
+  useEffect(() => {
+    if (hasMessages && currentConversationId) {
+      const t = setTimeout(() => {
+        messageInputRef.current?.focusInput?.()
+      }, 100)
+      return () => clearTimeout(t)
+    }
+  }, [hasMessages, currentConversationId])
 
   // Show loading state
   if (isLoading) {

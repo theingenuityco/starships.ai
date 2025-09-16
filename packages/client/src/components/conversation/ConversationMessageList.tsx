@@ -6,6 +6,7 @@ import type { MessageModel } from '@starships/protocol'
 import { Bot, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -13,9 +14,14 @@ interface ConversationMessageListProps {
 }
 
 export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
-  // Get everything from the unified hook
-  const { messages, isLoading, error, isStreaming, streamingContent, streamingState } = useConversation(conversationId)
+  // Get messages from the unified hook
+  const { messages, isLoading, error } = useConversation(conversationId)
 
+  // Stream state from zustand (ephemeral, avoids blocking React Query event loop)
+  const streamingUI = useStarshipUIStore(s => (conversationId ? s.conversationsStreaming[conversationId] : undefined))
+  const isStreaming = Boolean(streamingUI?.isStreaming)
+  const streamingContent = streamingUI?.content ?? ''
+  console.log('hello')
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
@@ -109,8 +115,14 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
   )
 }
 
+interface ContentChunk {
+  content: string
+  position: number
+  timestamp: number
+}
+
 interface ConversationMessageBubbleProps {
-  message: MessageModel & { streaming?: boolean }
+  message: MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[] }
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
@@ -149,6 +161,7 @@ const MemoizedMessageBubble = memo(
                 enableLinkPreview={true}
                 isStreaming={message.streaming}
                 className="text-foreground"
+                contentChunks={message.contentChunks}
               />
             </div>
           </div>
@@ -160,12 +173,14 @@ const MemoizedMessageBubble = memo(
     // Custom comparison for memo optimization
     if (prevProps.message.id !== nextProps.message.id) return false
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
-    if (prevProps.message.streaming) {
-      // For streaming messages, only re-render if content actually changed
-      return prevProps.message.content === nextProps.message.content
-    }
-    // For non-streaming messages, assume they don't change
-    return true
+
+    // Re-render when text changes or contentChunks count changes
+    const contentUnchanged = prevProps.message.content === nextProps.message.content
+    const prevLen = prevProps.message.contentChunks?.length ?? 0
+    const nextLen = nextProps.message.contentChunks?.length ?? 0
+    const chunksUnchanged = prevLen === nextLen
+
+    return contentUnchanged && chunksUnchanged
   }
 )
 

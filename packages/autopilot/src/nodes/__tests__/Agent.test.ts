@@ -43,8 +43,8 @@ describe('Agent Node Handler', () => {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: { name: 'TestBot', role: 'Assistant' },
-          purpose: { primary: 'Help users' },
+          systemPrompt: 'You are TestBot, an assistant. Help users with their needs.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
       };
@@ -58,8 +58,8 @@ describe('Agent Node Handler', () => {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: { name: 'TestBot', role: 'Assistant' },
-          purpose: { primary: 'Help users' },
+          systemPrompt: 'You are TestBot, an assistant. Help users with their needs.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
       };
@@ -83,8 +83,8 @@ describe('Agent Node Handler', () => {
         maxTokens: 2000,
         timeout: 60000,
         memoryState: {
-          identity: { name: 'Custom', role: 'Specialist' },
-          purpose: { primary: 'Specialized tasks' },
+          systemPrompt: 'You are Custom, a specialist. Handle specialized tasks.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
         metadata: { version: '1.0', category: 'custom' },
@@ -92,6 +92,34 @@ describe('Agent Node Handler', () => {
 
       const agent = new Agent(params);
       expect(agent).toBeDefined();
+    });
+
+    it('should add nodes using addNode method', () => {
+      const params: AgentParams = {
+        name: 'Builder Agent',
+        model: 'anthropic/claude-3.5-sonnet',
+      };
+
+      const agent = new Agent(params);
+
+      // Add nodes to the agent's blueprint
+      agent
+        .addNode('llm', 'Think', {
+          model: 'anthropic/claude-3-haiku',
+          messages: [
+            { role: 'system', content: 'You are helpful.' },
+            { role: 'user', content: 'What can you help with?' },
+          ],
+          temperature: 0.8,
+        })
+        .addNode('transform', 'Store Response', {
+          transforms: [{ operation: 'add', path: '/state/lastResponse', value: '{{ $nodeResult("llm_1").data }}' }],
+        });
+
+      const blueprint = agent.getCurrentBlueprint();
+      expect(blueprint.nodes).toHaveLength(4); // start, end, llm, transform
+      expect(blueprint.nodes.some((node) => node.name === 'Think')).toBe(true);
+      expect(blueprint.nodes.some((node) => node.name === 'Store Response')).toBe(true);
     });
   });
 
@@ -113,24 +141,36 @@ describe('Agent Node Handler', () => {
         name: 'Memory Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: {
-            name: 'Sarah',
-            role: 'Customer Support Agent',
-            personality: 'Professional and empathetic',
-            expertise: ['customer service', 'technical support'],
-          },
-          purpose: {
-            primary: 'Resolve customer issues efficiently',
-            constraints: ['Be professional', 'Escalate complex issues'],
-          },
-          space: {
-            description: 'Customer support chat environment',
-          },
+          systemPrompt:
+            'You are Sarah, a customer support agent. Be professional and empathetic. Resolve customer issues efficiently and escalate complex issues when needed.',
+          messages: [
+            { role: 'user', content: 'I need help with my account' },
+            { role: 'assistant', content: "I'd be happy to help you with your account. What specific issue are you experiencing?" },
+          ],
         },
         blueprint: createMockBlueprint(),
       };
 
       const agent = new Agent(params);
+      expect(agent).toBeDefined();
+    });
+
+    it('should handle memory operations', async () => {
+      const params: AgentParams = {
+        name: 'Interactive Agent',
+        model: 'anthropic/claude-3.5-sonnet',
+        memoryState: {
+          systemPrompt: 'You are a helpful assistant.',
+          messages: [],
+        },
+      };
+
+      const agent = new Agent(params);
+
+      // Test memory operations
+      await agent.addMessageToMemory({ role: 'user', content: 'Hello' });
+      await agent.addMessageToMemory({ role: 'assistant', content: 'Hi there!' });
+
       expect(agent).toBeDefined();
     });
   });
@@ -185,7 +225,9 @@ describe('Agent Node Handler', () => {
       const params = {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {},
+        memoryState: {
+          systemPrompt: 'You are a test agent.',
+        },
         // Missing blueprint - should create default
       } as AgentParams;
 
@@ -208,7 +250,9 @@ describe('Agent Node Handler', () => {
       const params: AgentParams = {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {},
+        memoryState: {
+          systemPrompt: 'You are a test agent.',
+        },
         blueprint: {
           nodes: [
             // Missing start node
@@ -235,7 +279,9 @@ describe('Agent Node Handler', () => {
       const params: AgentParams = {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {},
+        memoryState: {
+          systemPrompt: 'You are a test agent.',
+        },
         blueprint: createMockBlueprint(),
         timeout: 500, // Too low
         temperature: 3.0, // Too high
@@ -275,8 +321,8 @@ describe('Agent Node Handler', () => {
         maxTokens: 1000,
         timeout: 30000,
         memoryState: {
-          identity: { name: 'ValidBot', role: 'Assistant' },
-          purpose: { primary: 'Help users' },
+          systemPrompt: 'You are ValidBot, an assistant. Help users with their needs.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
         metadata: { version: '1.0' },
@@ -311,7 +357,7 @@ describe('Agent Node Handler', () => {
             name: 'Check',
             description: 'Conditional',
             parameters: {
-              expression: 'results[-1].data.success = true',
+              condition: 'results[-1].data.success = true',
             },
           },
           {
@@ -339,16 +385,9 @@ describe('Agent Node Handler', () => {
         name: 'Complex Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: {
-            name: 'ComplexBot',
-            role: 'Multi-step Assistant',
-            expertise: ['reasoning', 'decision-making'],
-          },
-          purpose: {
-            primary: 'Handle complex multi-step tasks',
-            secondary: ['Analyze', 'Decide', 'Execute'],
-            constraints: ['Be thorough', 'Explain reasoning'],
-          },
+          systemPrompt:
+            'You are ComplexBot, a multi-step assistant with expertise in reasoning and decision-making. Handle complex multi-step tasks by analyzing, deciding, and executing. Be thorough and explain your reasoning.',
+          messages: [],
         },
         blueprint: complexBlueprint,
       };
@@ -356,6 +395,42 @@ describe('Agent Node Handler', () => {
       const agent = new Agent(params);
       const validation = agent.validate();
 
+      expect(validation.valid).toBe(true);
+    });
+
+    it('should handle dynamic workflow building', () => {
+      const params: AgentParams = {
+        name: 'Dynamic Agent',
+        model: 'anthropic/claude-3.5-sonnet',
+        memoryState: {
+          systemPrompt: 'You are a dynamic agent that builds workflows on demand.',
+        },
+      };
+
+      const agent = new Agent(params);
+
+      // Build workflow dynamically
+      agent
+        .addNode('llm', 'Initial Analysis', {
+          model: 'anthropic/claude-3-haiku',
+          messages: [{ role: 'user', content: 'Analyze the situation' }],
+        })
+        .addNode('conditional', 'Decision Point', {
+          condition: '$nodeResult("llm_1").data.confident = true',
+        })
+        .addNode('llm', 'Confident Response', {
+          model: 'anthropic/claude-3.5-sonnet',
+          messages: [{ role: 'user', content: 'Provide detailed response' }],
+        })
+        .addNode('transform', 'Store Result', {
+          transforms: [{ operation: 'add', path: '/state/workflow_result', value: '{{ $nodeResult("llm_2").data }}' }],
+        });
+
+      const blueprint = agent.getCurrentBlueprint();
+      expect(blueprint.nodes).toHaveLength(6); // start, end, + 4 added nodes
+      expect(blueprint.edges).toHaveLength(5); // All nodes connected in sequence
+
+      const validation = agent.validate();
       expect(validation.valid).toBe(true);
     });
   });

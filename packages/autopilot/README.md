@@ -86,16 +86,16 @@ console.log('Results:', engine.getExecution().results);
 
 ## Node Types
 
-| Type           | Description          | Key Parameters                              |
-| -------------- | -------------------- | ------------------------------------------- |
-| `start/end`    | Flow control         | `{}`                                        |
-| `llm`          | LLM API calls        | `model`, `messages`, `temperature`          |
-| `agent`        | AI agent with memory | `name`, `model`, `memoryState`, `blueprint` |
-| `http_request` | HTTP API calls       | `url`, `method`, `headers`, `body`          |
-| `conditional`  | Branch workflows     | `condition` (JSONata expression)            |
-| `transform`    | State mutations      | `transforms` (JSON Patch operations)        |
-| `workflow`     | Nested workflows     | `blueprint`                                 |
-| `user_prompt`  | User interaction     | Platform-specific                           |
+| Type           | Description          | Key Parameters                                          |
+| -------------- | -------------------- | ------------------------------------------------------- |
+| `start/end`    | Flow control         | `{}`                                                    |
+| `llm`          | LLM API calls        | `model`, `messages`, `temperature`                      |
+| `agent`        | AI agent with memory | `name`, `model`, `memoryState` (systemPrompt, messages) |
+| `http_request` | HTTP API calls       | `url`, `method`, `headers`, `body`                      |
+| `conditional`  | Branch workflows     | `condition` (JSONata expression)                        |
+| `transform`    | State mutations      | `transforms` (JSON Patch operations)                    |
+| `workflow`     | Nested workflows     | `blueprint`                                             |
+| `user_prompt`  | User interaction     | Platform-specific                                       |
 
 ## Template Expressions
 
@@ -198,18 +198,32 @@ const execution = await agent.execute();
 ```typescript
 import { AgentMemory } from '@starships/autopilot';
 
-const memory = new AgentMemory();
-memory.setIdentity({ name: 'Sarah', role: 'Support Agent' });
-memory.setPurpose({ primary: 'Help customers' });
-memory.addMessageToHistory({ role: 'user', content: 'I need help' });
+// Create simple agent memory
+const memory = new AgentMemory({
+  systemPrompt: 'You are Sarah, a helpful support agent.',
+  messages: [
+    { role: 'user', content: 'I need help' },
+    { role: 'assistant', content: "I'm here to help! What can I assist you with?" },
+  ],
+});
 
-const messages = memory.toMessages(); // Format for LLM
+// Memory operations
+memory.setSystemPrompt('You are a helpful assistant specialized in customer support.');
+memory.addMessage({ role: 'user', content: 'New user message' });
+
+const messages = memory.toMessages(); // Format for LLM (systemPrompt + messages)
 
 // Use memory in agent constructor
 const agent = new Agent({
   name: 'Sarah',
   model: 'anthropic/claude-3-haiku',
-  memoryState: memory.state,
+  memoryState: {
+    systemPrompt: 'You are Sarah, a support agent. Be helpful and professional.',
+    messages: [
+      { role: 'user', content: 'Hello!' },
+      { role: 'assistant', content: 'Hi! How can I help you today?' },
+    ],
+  },
 });
 ```
 
@@ -235,20 +249,28 @@ const engine = new Engine({ blueprint, eventCallback });
 ### Main Exports
 
 ```typescript
-// Engine
-export { Engine } from '@starships/autopilot';
+// Engine and Agent
+export { Engine, Agent } from '@starships/autopilot';
 
 // Node handlers
-export { LLM, Agent, HttpRequest, Workflow, Conditional, Transform } from '@starships/autopilot';
+export { LLM, HttpRequest, Workflow, Conditional, Transform } from '@starships/autopilot';
 
 // Memory
-export { Memory, AgentMemory } from '@starships/autopilot';
+export { AgentMemory } from '@starships/autopilot';
 
 // Configuration
 export { autopilot } from '@starships/autopilot';
 
 // Types
-export type { Blueprint, Node, Execution, ConditionalResult, TransformOperation } from '@starships/autopilot';
+export type {
+  Blueprint,
+  Node,
+  Execution,
+  ConditionalResult,
+  TransformOperation,
+  AgentParams,
+  AgentMemoryState,
+} from '@starships/autopilot';
 ```
 
 ### Credential Management

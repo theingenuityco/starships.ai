@@ -6,6 +6,7 @@
  */
 
 import { Operation } from 'fast-json-patch';
+import type { MessageModel } from '../domains/message';
 
 /**
  * Streaming error event sent via SSE when processing fails
@@ -42,6 +43,7 @@ export type StreamingEvent =
   | { type: 'connection'; data: StreamingConnection }
   | { type: 'heartbeat'; data: StreamingHeartbeat }
   | { type: 'delta'; data: Operation }
+  | { type: 'message'; data: MessageModel }
   | { type: 'complete'; data: void }
   | { type: 'error'; data: StreamingError };
 
@@ -64,4 +66,4 @@ export interface StreamingState {
 /**
  * SSE event types
  */
-export type SSEEventType = 'connection' | 'heartbeat' | 'delta' | 'complete' | 'error';
+export type SSEEventType = 'connection' | 'heartbeat' | 'delta' | 'message' | 'complete' | 'error';

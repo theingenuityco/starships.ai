@@ -108,6 +108,36 @@ sequenceDiagram
 4. **Scalable**: Handles multiple concurrent streams
 5. **Error Isolation**: Worker crashes don't affect UI
 
+## Consistency and Ordering (Unified Streaming Semantics)
+
+To ensure message rendering matches database order exactly and to eliminate duplicate user bubbles, the client and server follow these rules:
+
+- No optimistic user bubble during streaming:
+  - The client does not pre-render a user message when `stream: true`. The server persists the user message and emits a JSON-Patch add operation, which the client applies to render the user bubble once.
+  - Implemented in [useConversation()](packages/client/src/hooks/useConversations.ts:571) by skipping optimistic insert when `variables.stream` is true and relying on server deltas.
+
+- Strict ascending ordering by `createdAt`:
+  - The client requests messages ordered ascending and appends new ones at the end, matching DB order.
+  - See [useConversation() initial fetch params](packages/client/src/hooks/useConversations.ts:136) and appends in cache updates.
+
+- Stable placeholder targeting via normalized JSON-Patch:
+  - The server emits deltas with paths normalized to concrete numeric indexes derived from a per-connection baseline and running add count.
+  - Placeholder operations target the most recent assistant shell using `/messages/-1/...` which is normalized on the server to the correct index.
+  - See [StreamingService.normalizeDelta()](packages/server/src/services/StreamingService.ts:149).
+
+- Assistant streaming lifecycle:
+  - Shell added: `add /messages/-` with `{ streaming: true, content: '' , contentChunks: [] }`.
+  - Chunks streamed: `add /messages/-1/contentChunks/-` with positional data.
+  - Completion: `replace /messages/-1/content` (final text), `replace /messages/-1/streaming false`, `remove /messages/-1/contentChunks`, followed by final ID/updatedAt patch.
+  - Implemented in [ConversationService.eventCallback()](packages/server/src/services/ConversationService.ts:204).
+
+- Event types:
+  - JSON-Patch deltas are sent as SSE `event: delta` with a single RFC6902 op as data (client auto-detects).
+  - Full messages may be sent as SSE `event: message` with a `MessageModel` body. The client accepts raw message objects (presence of `role` is sufficient).
+  - Defined in [StreamingEvent/SSEEventType](packages/protocol/src/contracts/streaming.ts:41).
+
+This model yields: user types → server persists → JSON-Patch add renders user once → assistant shell added → chunks applied to that shell → completion finalizes → DB order preserved across API and SSE.
+
 ## Usage
 
 ```typescript

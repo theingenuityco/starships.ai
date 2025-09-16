@@ -57,7 +57,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (wantsStreaming) {
       // Add connection to streaming service - it will handle SSE headers and setup
       const streamingService = new StreamingService();
-      streamingService.addConnection(conversationId, res);
+      const baseLength = Number((req.query as any).baselineLength ?? 0) || 0;
+      streamingService.addConnection(conversationId, res, { baseLength });
 
       // Send existing messages after connection is established
       const conversationService = new ConversationService();
@@ -138,6 +139,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const bodyValidation = validateData(
       z.object({
         content: z.string().min(1, 'content is required'),
+        baselineLength: z.coerce.number().int().min(0).optional(),
       }),
       req.body,
       res,
@@ -157,7 +159,8 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
       // Add connection to streaming service - it will handle SSE headers and setup
       // This automatically sends connection confirmation via sendEvent('connection', ...)
       const streamingService = new StreamingService();
-      streamingService.addConnection(conversationId, res);
+      const baseLength = Number((req.body as any).baselineLength ?? 0) || 0;
+      streamingService.addConnection(conversationId, res, { baseLength });
 
       // Create ConversationService - it will use the singleton StreamingService internally
       const streamingConversationService = new ConversationService();

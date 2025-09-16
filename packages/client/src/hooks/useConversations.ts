@@ -193,20 +193,31 @@ export function useConversation(conversationId: string | null) {
         if (nonChunkOps.length > 0) {
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
             const applyOps = (target: any) => {
-              // Normalize a single op against current target state to resolve '/messages/-1/...'
+              // Normalize one op against current state to resolve '/messages/-1/...' or target by id
               const normalizeOpForState = (op: Operation, state: any): Operation => {
                 if (!op || typeof (op as any).path !== 'string') return op
-                let path = (op as any).path as string
+                const raw = op as any
+                let path: string = raw.path
 
-                // Map last-item shorthand to concrete index for all op types
+                // If server provided a targetMessageId, prefer mapping by id for deterministic resolution
+                const targetId: string | undefined = raw.targetMessageId
+                if (targetId && Array.isArray(state?.messages)) {
+                  const idx = state.messages.findIndex((m: any) => m?.id === targetId)
+                  if (idx >= 0) {
+                    // Replace the first /messages/<segment> with the concrete index
+                    path = path.replace(/^\/messages\/(?:-1|\d+)(?=\/|$)/, `/messages/${idx}`)
+                    return { ...raw, path }
+                  }
+                }
+
+                // Fallback: map last-item shorthand to concrete index for all op types
                 if (path.startsWith('/messages/-1')) {
                   const lastIndex = Array.isArray(state?.messages) && state.messages.length > 0 ? state.messages.length - 1 : -1
                   if (lastIndex >= 0) {
                     path = path.replace('/messages/-1', `/messages/${lastIndex}`)
                   }
                 }
-
-                return { ...(op as any), path } as Operation
+                return { ...raw, path }
               }
 
               let result = target
@@ -221,7 +232,6 @@ export function useConversation(conversationId: string | null) {
               }
               return result
             }
-
             if (!old) {
               // Initialize with empty messages array if no data exists
               const initialData = { messages: [], total: 0, conversationId: conversationId! }
@@ -452,6 +462,12 @@ export function useConversation(conversationId: string | null) {
             lastUpdate: Date.now(),
           })
 
+          // Compute baseline length to help the server emit concrete numeric indexes
+          const baselineCache = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(data.conversationId!)) as any
+          const messagesSnapshot = Array.isArray(baselineCache?.messages) ? baselineCache.messages : []
+          const optimisticCount = messagesSnapshot.filter((m: any) => m?.sending === true).length
+          const baselineLength = Math.max(messagesSnapshot.length - optimisticCount, 0)
+
           fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
             method: 'POST',
             headers: {
@@ -460,6 +476,7 @@ export function useConversation(conversationId: string | null) {
             },
             body: JSON.stringify({
               content: data.content,
+              baselineLength,
             }),
             signal: abortControllerRef.current?.signal,
             async onopen(response) {

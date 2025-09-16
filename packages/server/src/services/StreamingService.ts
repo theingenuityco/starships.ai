@@ -16,6 +16,11 @@ interface ConnectionInfo {
   res: Response;
   heartbeatInterval: ReturnType<typeof setInterval>;
   connectedAt: Date;
+
+  // Per-connection synchronization context
+  baseLength: number; // client-declared baseline messages length at connect time
+  runningAdds: number; // number of server-emitted message appends after connect
+  placeholderIndex?: number; // numeric index of the current assistant streaming placeholder
 }
 
 /**
@@ -53,7 +58,7 @@ export class StreamingService {
   /**
    * Add new streaming connection (supports multiple concurrent connections)
    */
-  addConnection(streamId: string, res: Response): void {
+  addConnection(streamId: string, res: Response, opts?: { baseLength?: number }): void {
     // Close any existing connection for this streamId
     this.closeConnection(streamId);
 
@@ -74,11 +79,14 @@ export class StreamingService {
       }
     }, 30000);
 
-    // Store connection info
+    // Store connection info with sync baseline
     this.connections.set(streamId, {
       res,
       heartbeatInterval,
       connectedAt: new Date(),
+      baseLength: typeof opts?.baseLength === 'number' && opts.baseLength >= 0 ? opts.baseLength : 0,
+      runningAdds: 0,
+      placeholderIndex: undefined,
     });
 
     // Handle connection close
@@ -97,11 +105,13 @@ export class StreamingService {
 
   /**
    * Broadcast delta operation to a specific stream
+   * Normalizes paths to concrete numeric indexes using per-connection sync context.
    */
   async broadcastDelta(streamId: string, delta: Operation): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
-      this.sendEventToStream(streamId, connection.res, 'delta', delta);
+      const normalized = this.normalizeDelta(streamId, delta);
+      this.sendEventToStream(streamId, connection.res, 'delta', normalized);
     }
   }
 
@@ -129,6 +139,61 @@ export class StreamingService {
   async broadcastMessageToAll(message: any): Promise<void> {
     const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastMessage(streamId, message));
     await Promise.all(broadcastPromises);
+  }
+
+  /**
+   * Normalize a JSON-Patch operation to use concrete numeric indexes for the messages array
+   * based on per-connection synchronization context.
+   */
+  private normalizeDelta(streamId: string, delta: Operation): Operation {
+    const connection = this.connections.get(streamId);
+    if (!connection) return delta;
+
+    const raw = delta as any;
+    const op: string = raw.op;
+    let path: string = typeof raw.path === 'string' ? raw.path : '';
+
+    // 1) Array append: '/messages/-' -> '/messages/{baseLength + runningAdds}'
+    if (op === 'add' && path === '/messages/-') {
+      const index = connection.baseLength + connection.runningAdds;
+
+      // Heuristic: remember placeholder index if this is the assistant streaming shell
+      const isAssistantPlaceholder =
+        raw?.value &&
+        typeof raw.value === 'object' &&
+        raw.value.role === 'assistant' &&
+        (raw.value.streaming === true || (typeof raw.value.content === 'string' && raw.value.content.length === 0));
+
+      if (isAssistantPlaceholder) {
+        connection.placeholderIndex = index;
+      }
+
+      // Increment running adds after computing index
+      connection.runningAdds += 1;
+
+      return {
+        ...raw,
+        path: `/messages/${index}`,
+      } as Operation;
+    }
+
+    // 2) References to the "last" message placeholder using -1
+    // Map '/messages/-1/...' -> '/messages/{placeholderIndex or lastComputedIndex}/...'
+    if (/^\/messages\/-1(\/|$)/.test(path)) {
+      // Prefer explicit placeholder index if set, else fallback to last added index
+      const fallbackLast = Math.max(connection.baseLength + connection.runningAdds - 1, 0);
+      const targetIndex =
+        typeof connection.placeholderIndex === 'number' && connection.placeholderIndex >= 0 ? connection.placeholderIndex : fallbackLast;
+
+      const newPath = path.replace(/^\/messages\/-1/, `/messages/${targetIndex}`);
+      return {
+        ...raw,
+        path: newPath,
+      } as Operation;
+    }
+
+    // 3) Already concrete or unrelated path: leave unchanged
+    return raw as Operation;
   }
 
   /**

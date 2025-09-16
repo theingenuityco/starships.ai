@@ -133,7 +133,7 @@ export function useConversation(conversationId: string | null) {
           lastActivityAt: string
         }>
       > = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
-        params: { limit: 100, page: 1, orderBy: 'createdAt', orderDirection: 'desc' },
+        params: { limit: 100, page: 1, orderBy: 'createdAt', orderDirection: 'asc' },
       })
 
       return {
@@ -349,24 +349,24 @@ export function useConversation(conversationId: string | null) {
             useStarshipUIStore.getState().startStreaming(conversationId!)
           } catch {}
 
-          // Add streaming message to cache (prepend since messages are in desc order)
+          // Add streaming message to cache (append; ascending order)
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
             if (!old) return { messages: [{ ...message, streaming: true }], total: 1, conversationId }
             return {
               ...old,
-              messages: [{ ...message, streaming: true }, ...old.messages],
+              messages: [...old.messages, { ...message, streaming: true }],
               total: old.total + 1,
             }
           })
           return
         }
 
-        // Regular message - add to cache (prepend since messages are in desc order)
+        // Regular message - add to cache (append; ascending order)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
           if (!old) return { messages: [message], total: 1, conversationId }
           return {
             ...old,
-            messages: [message, ...old.messages],
+            messages: [...old.messages, message],
             total: old.total + 1,
           }
         })
@@ -579,7 +579,12 @@ export function useConversation(conversationId: string | null) {
       // Snapshot the previous messages
       const previousMessages = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId))
 
-      // Optimistically add the user message
+      // Do NOT optimistically add the user message when streaming; rely on server deltas
+      if (variables.stream) {
+        return { previousMessages, conversationId: variables.conversationId }
+      }
+
+      // Optimistically add the user message for non-streaming requests (append; ascending order)
       const tempMessage: ClientMessage = {
         id: `temp-${Date.now()}`,
         role: variables.role,
@@ -594,7 +599,7 @@ export function useConversation(conversationId: string | null) {
         if (!old) return { messages: [tempMessage], total: 1, conversationId: variables.conversationId }
         return {
           ...old,
-          messages: [tempMessage, ...old.messages],
+          messages: [...old.messages, tempMessage],
           total: old.total + 1,
         }
       })
@@ -604,12 +609,13 @@ export function useConversation(conversationId: string | null) {
     onSuccess: (result, variables, context) => {
       if (!variables.conversationId || !context) return
 
-      // Replace temp message with real message (for non-streaming)
       if (!variables.stream) {
+        // Replace temp message with real message (non-streaming)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
           if (!old) return { messages: [result], total: 1, conversationId: variables.conversationId }
 
-          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...result, sending: false } : msg))
+          const tempId = (context as any).tempMessage?.id
+          const messages = old.messages.map((msg: ClientMessage) => (tempId && msg.id === tempId ? { ...result, sending: false } : msg))
 
           return {
             ...old,
@@ -618,14 +624,7 @@ export function useConversation(conversationId: string | null) {
           }
         })
       } else {
-        // For streaming, mark the temp message as sent and start streaming
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), (old: any) => {
-          if (!old) return old
-
-          const messages = old.messages.map((msg: ClientMessage) => (msg.id === context.tempMessage.id ? { ...msg, sending: false } : msg))
-
-          return { ...old, messages }
-        })
+        // Streaming path uses server-sent deltas; no optimistic message to reconcile.
       }
     },
     onError: (error: any, variables, context) => {

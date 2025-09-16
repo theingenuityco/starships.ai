@@ -5,14 +5,13 @@
  * Simplified implementation focusing on core LLM functionality without unnecessary bloat.
  */
 
+import { BaseNode } from './BaseNode';
 import type { LlmParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { autopilot } from '@/Autopilot';
-import { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
-import { EventCallback } from '@/types/events';
+import { NodeHandlerOptions } from '@/types/node-handler';
 import { LLMMessageRole, LLMResponse, LLMUsage } from '@/types/llm';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 interface StreamChoice {
   content: string;
@@ -34,64 +33,65 @@ interface StreamChunk {
   usage?: LLMUsage;
 }
 
-export class LLM implements NodeHandler {
-  private params: LlmParams;
-  private eventCallback?: EventCallback;
-
+export class LLM extends BaseNode<LlmParams> {
   constructor(params: LlmParams, options?: NodeHandlerOptions) {
-    this.params = params;
-    this.eventCallback = options?.eventCallback;
+    super(params, options);
   }
 
   /**
    * Execute the LLM request with streaming and optional input items
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    const params = this.getParams();
     const apiKey = autopilot.getOpenRouterApiKey();
     if (!apiKey) {
-      throw new Error('OpenRouter API key is required. Configure it via autopilot.setCredentials().');
+      throw this.handleExecutionError(new Error('OpenRouter API key is required. Configure it via autopilot.setCredentials().'));
     }
 
-    // Use input data as user message if no explicit messages provided
-    let messages = this.params.messages;
-    if (input && input.length > 0 && (!messages || messages.length === 0)) {
-      const inputData = NodeHelpers.getSingleInput(input);
-      const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
-      messages = [{ role: 'user', content: inputContent }];
+    try {
+      // Use input data as user message if no explicit messages provided
+      let messages = params.messages;
+      if (input && input.length > 0 && (!messages || messages.length === 0)) {
+        const inputData = this.getSingleInput(input);
+        const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
+        messages = [{ role: 'user', content: inputContent }];
+      }
+
+      const requestBody = {
+        model: params.model,
+        messages: messages || params.messages,
+        temperature: params.temperature || 0.7,
+        max_tokens: params.maxTokens || 1024,
+        top_p: params.topP || 1.0,
+        frequency_penalty: params.frequencyPenalty || 0,
+        presence_penalty: params.presencePenalty || 0,
+        stream: true,
+      };
+      console.log('LLM Request Body:', JSON.stringify(requestBody, null, 2));
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        const result = (await response.json()) as LLMResponse;
+        return this.createSingleOutput(result, input?.[0]);
+      }
+
+      const llmResponse = await this.processStreamingResponse(reader);
+      return this.createSingleOutput(llmResponse, input?.[0]);
+    } catch (error) {
+      throw this.handleExecutionError(error, 'LLM execution failed');
     }
-
-    const requestBody = {
-      model: this.params.model,
-      messages: messages || this.params.messages,
-      temperature: this.params.temperature || 0.7,
-      max_tokens: this.params.maxTokens || 1024,
-      top_p: this.params.topP || 1.0,
-      frequency_penalty: this.params.frequencyPenalty || 0,
-      presence_penalty: this.params.presencePenalty || 0,
-      stream: true,
-    };
-    console.log('LLM Request Body:', JSON.stringify(requestBody, null, 2));
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      const result = (await response.json()) as LLMResponse;
-      return NodeHelpers.createSingleOutput(result, input?.[0]);
-    }
-
-    const llmResponse = await this.processStreamingResponse(reader);
-    return NodeHelpers.createSingleOutput(llmResponse, input?.[0]);
   }
 
   /**
@@ -133,8 +133,9 @@ export class LLM implements NodeHandler {
               usage = parsed.usage;
             }
 
-            if (this.eventCallback) {
-              await this.eventCallback({
+            const eventCallback = this.getEventCallback();
+            if (eventCallback) {
+              await eventCallback({
                 type: 'content_chunk',
                 timestamp: new Date().toISOString(),
                 data: { chunk: parsed },
@@ -146,8 +147,9 @@ export class LLM implements NodeHandler {
         }
       }
 
-      if (this.eventCallback) {
-        await this.eventCallback({ type: 'content_complete', timestamp: new Date().toISOString() });
+      const eventCallback = this.getEventCallback();
+      if (eventCallback) {
+        await eventCallback({ type: 'content_complete', timestamp: new Date().toISOString() });
       }
 
       return this.buildFinalResponse(responseMetadata, choices, usage);
@@ -225,21 +227,14 @@ export class LLM implements NodeHandler {
    */
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
+    const params = this.getParams();
 
-    // Required fields
-    if (!this.params.model) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Model is required',
-      });
-    }
+    // Required fields using helper method
+    const modelError = this.validateRequiredField(params.model, 'Model');
+    if (modelError) errors.push(modelError);
 
-    if (!this.params.messages || !Array.isArray(this.params.messages) || this.params.messages.length === 0) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Messages array is required and must not be empty',
-      });
-    }
+    const messagesError = this.validateArrayParameter(params.messages, 'Messages', 1);
+    if (messagesError) errors.push(messagesError);
 
     // API key validation
     if (!autopilot.getOpenRouterApiKey()) {
@@ -249,60 +244,24 @@ export class LLM implements NodeHandler {
       });
     }
 
-    // Parameter range validation (skip validation for template strings)
-    if (
-      this.params.temperature !== undefined &&
-      typeof this.params.temperature === 'number' &&
-      (this.params.temperature < 0 || this.params.temperature > 2)
-    ) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Temperature must be between 0 and 2',
-      });
-    }
+    // Parameter range validation using helper methods
+    const tempError = this.validateParameterRange(params.temperature, 'Temperature', 0, 2);
+    if (tempError) errors.push(tempError);
 
-    if (this.params.maxTokens !== undefined && typeof this.params.maxTokens === 'number' && this.params.maxTokens < 1) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Max tokens must be greater than 0',
-      });
-    }
+    const tokensError = this.validateMinimumValue(params.maxTokens, 'Max tokens', 1);
+    if (tokensError) errors.push(tokensError);
 
-    if (this.params.topP !== undefined && typeof this.params.topP === 'number' && (this.params.topP < 0 || this.params.topP > 1)) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Top P must be between 0 and 1',
-      });
-    }
+    const topPError = this.validateParameterRange(params.topP, 'Top P', 0, 1);
+    if (topPError) errors.push(topPError);
 
-    if (
-      this.params.frequencyPenalty !== undefined &&
-      typeof this.params.frequencyPenalty === 'number' &&
-      (this.params.frequencyPenalty < -2 || this.params.frequencyPenalty > 2)
-    ) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Frequency penalty must be between -2 and 2',
-      });
-    }
+    const freqPenaltyError = this.validateParameterRange(params.frequencyPenalty, 'Frequency penalty', -2, 2);
+    if (freqPenaltyError) errors.push(freqPenaltyError);
 
-    if (
-      this.params.presencePenalty !== undefined &&
-      typeof this.params.presencePenalty === 'number' &&
-      (this.params.presencePenalty < -2 || this.params.presencePenalty > 2)
-    ) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Presence penalty must be between -2 and 2',
-      });
-    }
+    const presPenaltyError = this.validateParameterRange(params.presencePenalty, 'Presence penalty', -2, 2);
+    if (presPenaltyError) errors.push(presPenaltyError);
 
-    if (this.params.timeout !== undefined && typeof this.params.timeout === 'number' && this.params.timeout < 1000) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Timeout should be at least 1000ms',
-      });
-    }
+    const timeoutError = this.validateMinimumValue(params.timeout, 'Timeout', 1000);
+    if (timeoutError) errors.push(timeoutError);
 
     return {
       valid: errors.length === 0,

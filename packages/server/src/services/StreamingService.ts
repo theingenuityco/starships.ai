@@ -212,31 +212,24 @@ export class StreamingService {
 
   /**
    * Broadcast completion to a specific stream
+   * Note: Do NOT auto-close here. Let the client decide when to close,
+   * and allow additional messages in the same SSE session if needed.
    */
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
       this.sendEventToStream(streamId, connection.res, 'complete', finalResponse);
-
-      // Close connection gracefully after completion
-      setTimeout(() => {
-        this.closeConnection(streamId);
-      }, 1000);
     }
   }
 
   /**
    * Broadcast error to a specific stream
+   * Note: Keep the connection open. Client may decide to retry or continue.
    */
   async broadcastError(streamId: string, error: StreamingError): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
       this.sendEventToStream(streamId, connection.res, 'error', error);
-
-      // Close connection after error
-      setTimeout(() => {
-        this.closeConnection(streamId);
-      }, 1000);
     }
   }
 

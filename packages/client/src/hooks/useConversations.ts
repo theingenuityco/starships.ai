@@ -377,11 +377,41 @@ export function useConversation(conversationId: string | null) {
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
           if (marksDone) {
             endStreaming(conversationId!)
+            // Reflect completion in local streaming state to re-enable input
+            setStreamingState(prev => ({
+              ...prev,
+              status: 'complete',
+              isStreaming: false,
+              content: '',
+              lastUpdate: Date.now(),
+            }))
             // Optionally clear ephemeral state shortly after completion
             setTimeout(() => clearStreaming(conversationId!), 500)
           }
         }
 
+        return
+      }
+
+      // Handle completion by SSE event name
+      if (data && (data as any).__event === 'complete') {
+        // Mark streaming finished
+        setStreamingState(prev => ({
+          ...prev,
+          status: 'complete',
+          isStreaming: false,
+          content: '',
+          lastUpdate: Date.now(),
+        }))
+        try {
+          endStreaming(conversationId!)
+        } catch {}
+        // Clear ephemeral streaming state shortly after completion
+        setTimeout(() => {
+          try {
+            clearStreaming(conversationId!)
+          } catch {}
+        }, 500)
         return
       }
 
@@ -584,16 +614,35 @@ export function useConversation(conversationId: string | null) {
                 if (!event.data) return
 
                 const parsed = JSON.parse(event.data)
-                console.log('[STREAMING] Received SSE event:', parsed.op ? 'delta' : parsed.type || 'unknown', parsed)
+                const eventType = (event as any).event || null
+                console.log('[STREAMING] Received SSE event:', eventType || (parsed.op ? 'delta' : parsed.type || 'unknown'), parsed)
 
-                // Queue the event for processing
-                queueEvent(parsed)
+                // Queue the event for processing with SSE event name attached
+                queueEvent({ ...parsed, __event: eventType })
               } catch (parseError) {
                 console.warn('[STREAMING] Failed to parse SSE data:', event.data, parseError)
               }
             },
             onclose() {
               console.log('[STREAMING] Connection closed')
+
+              // Ensure streaming state is reset on close
+              setStreamingState(prev => ({
+                ...prev,
+                status: 'complete',
+                isStreaming: false,
+                content: '',
+                lastUpdate: Date.now(),
+              }))
+              try {
+                endStreaming(data.conversationId!)
+              } catch {}
+              setTimeout(() => {
+                try {
+                  clearStreaming(data.conversationId!)
+                } catch {}
+              }, 300)
+
               if (!resolved) {
                 resolved = true
                 resolve({

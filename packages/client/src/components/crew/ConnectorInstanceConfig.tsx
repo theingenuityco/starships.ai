@@ -146,7 +146,6 @@ export function ConnectorInstanceConfig({ connectorId, connectorName, currentCon
             <DropdownMenuItem
               onClick={() => {
                 // For now, just log that refresh was requested
-                console.log(`Refresh configuration for connector ${connectorId}`)
               }}
               disabled={isUpdating}
             >

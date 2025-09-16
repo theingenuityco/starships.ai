@@ -88,27 +88,20 @@ export const CACHE_KEYS = {
 
 // Helper function to invalidate related caches when agents are modified
 export const invalidateAgentCaches = (agentId?: string) => {
-  console.log('[CACHE] Invalidating agent caches', agentId ? `for agent ${agentId}` : 'for all agents')
-
   if (agentId) {
     apiCache.invalidate(CACHE_KEYS.AGENT_BY_ID(agentId))
-    console.log('[CACHE] Invalidated specific agent cache:', CACHE_KEYS.AGENT_BY_ID(agentId))
   }
 
   // Invalidate all agent list caches
   apiCache.invalidatePattern('^agents:')
-  console.log('[CACHE] Invalidated all agent list caches with pattern: ^agents:')
 
   apiCache.invalidatePattern('^starship:.*:agents$')
-  console.log('[CACHE] Invalidated all starship agent caches with pattern: ^starship:.*:agents$')
 
   // Invalidate starships list cache since agent assignments may have changed
   apiCache.invalidate('starships:list')
-  console.log('[CACHE] Invalidated starships list cache')
 
   // Log remaining cache keys for debugging
   const stats = apiCache.getStats()
-  console.log('[CACHE] Remaining cache keys after invalidation:', stats.keys)
 }
 
 // Helper function to invalidate template caches
@@ -127,18 +120,13 @@ export const invalidateTemplateCaches = (templateId?: string) => {
 
 // NEW: Helper function to invalidate connector instance caches
 export const invalidateConnectorInstanceCaches = (starshipId?: string) => {
-  console.log('[CACHE] Invalidating connector instance caches', starshipId ? `for starship ${starshipId}` : 'for all instances')
-
   if (starshipId) {
     apiCache.invalidate(CACHE_KEYS.CONNECTOR_INSTANCES_BY_STARSHIP(starshipId))
-    console.log('[CACHE] Invalidated connector instances cache for starship:', starshipId)
   } else {
     // Invalidate all starship-specific connector instance caches
     apiCache.invalidatePattern('^connector-instances:starship:')
-    console.log('[CACHE] Invalidated all starship connector instance caches with pattern: ^connector-instances:starship:')
   }
 
   // Log remaining cache keys for debugging
   const stats = apiCache.getStats()
-  console.log('[CACHE] Remaining cache keys after connector instance invalidation:', stats.keys)
 }

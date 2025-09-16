@@ -150,10 +150,8 @@ def handle_job_queued(body):
         # Create user data script
         user_data_script = create_user_data_script(repo_url, registration_token, labels, job_id)
         
-        # Launch EC2 instance with dynamic sizing
-        workflow_name = workflow_job.get('workflow_name')
-        job_name = workflow_job.get('name')
-        instance_id = launch_ec2_instance(user_data_script, job_id, run_id, repo_url, labels, workflow_name, job_name)
+        # Launch EC2 instance
+        instance_id = launch_ec2_instance(user_data_script, job_id, run_id, repo_url)
         
         
         return {
@@ -245,33 +243,13 @@ shutdown -h now
     # Encode to base64 for EC2 UserData
     return base64.b64encode(script.encode()).decode()
 
-def determine_instance_type(labels, workflow_name=None, job_name=None):
-    """Determine appropriate instance type based on job requirements"""
-    
-    # Check for explicit instance type in runner labels
-    # Format: runs-on: [self-hosted, linux, x64, instance:t3.large]
-    for label in labels:
-        if label.startswith('instance:'):
-            requested_type = label.split(':', 1)[1]
-            print(f"Explicit instance type requested: {requested_type}")
-            return requested_type
-    
-    # Default for all jobs without explicit instance type
-    print("No explicit instance type specified, using default t3.small")
-    return 't3.small'  # 2GB RAM, 2 vCPUs - cost-effective default
-
-def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels, workflow_name=None, job_name=None):
-    """Launch EC2 Spot instance for runner with dynamic sizing"""
-    
-    # Determine instance type based on job requirements
-    instance_type = determine_instance_type(labels, workflow_name, job_name)
-    
-    print(f"Selected instance type: {instance_type} for job {job_id}")
+def launch_ec2_instance(user_data, job_id, run_id, repo_url):
+    """Launch EC2 Spot instance for runner"""
     
     # Instance configuration
     instance_params = {
         'ImageId': RUNNER_AMI_ID,
-        'InstanceType': instance_type,
+        'InstanceType': 't3.small',
         'MaxCount': 1,
         'MinCount': 1,
         'UserData': user_data,

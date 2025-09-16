@@ -150,8 +150,10 @@ def handle_job_queued(body):
         # Create user data script
         user_data_script = create_user_data_script(repo_url, registration_token, labels, job_id)
         
-        # Launch EC2 instance
-        instance_id = launch_ec2_instance(user_data_script, job_id, run_id, repo_url)
+        # Launch EC2 instance with dynamic sizing
+        workflow_name = workflow_job.get('workflow_name')
+        job_name = workflow_job.get('name')
+        instance_id = launch_ec2_instance(user_data_script, job_id, run_id, repo_url, labels, workflow_name, job_name)
         
         
         return {
@@ -243,13 +245,49 @@ shutdown -h now
     # Encode to base64 for EC2 UserData
     return base64.b64encode(script.encode()).decode()
 
-def launch_ec2_instance(user_data, job_id, run_id, repo_url):
-    """Launch EC2 Spot instance for runner"""
+def determine_instance_type(labels, workflow_name=None, job_name=None):
+    """Determine appropriate instance type based on job requirements"""
+    
+    # Check for explicit instance type in runner labels
+    # Format: runs-on: [self-hosted, linux, x64, instance:t3.large]
+    for label in labels:
+        if label.startswith('instance:'):
+            requested_type = label.split(':', 1)[1]
+            print(f"Explicit instance type requested: {requested_type}")
+            return requested_type
+    
+    # Legacy keyword-based fallback
+    labels_str = ','.join(labels).lower()
+    workflow_name_str = (workflow_name or '').lower()
+    job_name_str = (job_name or '').lower()
+    
+    # Resource-intensive jobs that need larger instances
+    if any(keyword in labels_str or keyword in workflow_name_str or keyword in job_name_str for keyword in [
+        'codeql', 'security', 'large', 'heavy', 'analysis'
+    ]):
+        return 't3.large'  # 8GB RAM, 2 vCPUs - for CodeQL and security analysis
+    
+    # Build jobs might need medium instances
+    if any(keyword in labels_str or keyword in workflow_name_str or keyword in job_name_str for keyword in [
+        'build', 'compile', 'medium'
+    ]):
+        return 't3.medium'  # 4GB RAM, 2 vCPUs - for builds
+    
+    # Default for most jobs (linting, testing, etc.)
+    return 't3.small'  # 2GB RAM, 2 vCPUs - cost-effective default
+
+def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels, workflow_name=None, job_name=None):
+    """Launch EC2 Spot instance for runner with dynamic sizing"""
+    
+    # Determine instance type based on job requirements
+    instance_type = determine_instance_type(labels, workflow_name, job_name)
+    
+    print(f"Selected instance type: {instance_type} for job {job_id}")
     
     # Instance configuration
     instance_params = {
         'ImageId': RUNNER_AMI_ID,
-        'InstanceType': 't3.small',
+        'InstanceType': instance_type,
         'MaxCount': 1,
         'MinCount': 1,
         'UserData': user_data,

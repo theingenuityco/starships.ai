@@ -56,8 +56,8 @@ jobs:
 
   codeql:
     name: CodeQL Analysis
-    runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 720
+    runs-on: [self-hosted, linux, x64, instance:t3.large] # Explicit instance type for CodeQL
+    timeout-minutes: 180 # Reduce timeout with better resources
     permissions:
       security-events: write
       packages: read
@@ -78,8 +78,8 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: security-extended,security-and-quality
-          ram: 4096
-          threads: 4
+          ram: 6144 # Use 6GB of the 8GB available
+          threads: 2 # Match t3.large vCPUs
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
@@ -90,8 +90,8 @@ jobs:
           category: '/language:${{matrix.language}}'
           output: codeql-results
           upload: false
-          ram: 4096
-          threads: 4
+          ram: 6144 # Use 6GB of the 8GB available
+          threads: 2 # Match t3.large vCPUs
 
       - name: Check and display CodeQL results
         run: |

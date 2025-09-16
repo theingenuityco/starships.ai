@@ -183,15 +183,15 @@ export class Engine {
    * Get input data for a node based on incoming edges
    */
   private getNodeInput(node: WorkflowNode): unknown {
-    // Find incoming edge with dataFlow flag
-    const incomingEdge = this.blueprint.edges.find((edge) => edge.to === node.ref && edge.dataFlow);
+    // Find incoming edge
+    const incomingEdge = this.blueprint.edges.find((edge) => edge.to === node.ref);
 
     if (incomingEdge) {
-      // Data flow mode: Use previous node's output directly
+      // Always use previous node's output as input
       return this.execution.nodeOutputs[incomingEdge.from];
     }
 
-    // State mode: No input data (nodes use state via templates)
+    // No incoming edge (e.g., start node)
     return undefined;
   }
 

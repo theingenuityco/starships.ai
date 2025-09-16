@@ -327,13 +327,24 @@ export class ConversationService {
                 messageType: 'agent_response',
               });
 
-              // Update the streaming message with the final content from database
-              const delta: Operation = {
-                op: 'replace',
-                path: '/messages/-1',
-                value: { ...assistantMessage, streaming: false },
-              };
-              await this.streamingService.broadcastDelta(conversationId, delta);
+              // Persist final message to DB but avoid replacing the whole client message to prevent UI flicker/reordering.
+              // Patch only stable fields that need to reflect DB state.
+              const finalizeOps: Operation[] = [
+                {
+                  op: 'replace',
+                  path: '/messages/-1/id',
+                  value: assistantMessage.id,
+                },
+                {
+                  op: 'replace',
+                  path: '/messages/-1/updatedAt',
+                  value: assistantMessage.updatedAt,
+                },
+                // Keep content (already applied during content_complete) and createdAt as-is to preserve sort and visual stability.
+              ];
+              for (const op of finalizeOps) {
+                await this.streamingService.broadcastDelta(conversationId, op);
+              }
             }
           }
         }

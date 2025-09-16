@@ -20,7 +20,8 @@ interface ConnectionInfo {
   // Per-connection synchronization context
   baseLength: number; // client-declared baseline messages length at connect time
   runningAdds: number; // number of server-emitted message appends after connect
-  placeholderIndex?: number; // numeric index of the current assistant streaming placeholder
+  // Support multiple overlapping placeholders (stack-like behavior)
+  placeholderStack: number[]; // top is the most recent placeholder index
 }
 
 /**
@@ -86,7 +87,7 @@ export class StreamingService {
       connectedAt: new Date(),
       baseLength: typeof opts?.baseLength === 'number' && opts.baseLength >= 0 ? opts.baseLength : 0,
       runningAdds: 0,
-      placeholderIndex: undefined,
+      placeholderStack: [],
     });
 
     // Handle connection close
@@ -153,11 +154,15 @@ export class StreamingService {
     const op: string = raw.op;
     let path: string = typeof raw.path === 'string' ? raw.path : '';
 
+    // Helper: current placeholder index (top of stack)
+    const topPlaceholder = (): number | undefined =>
+      connection.placeholderStack.length > 0 ? connection.placeholderStack[connection.placeholderStack.length - 1] : undefined;
+
     // 1) Array append: '/messages/-' -> '/messages/{baseLength + runningAdds}'
     if (op === 'add' && path === '/messages/-') {
       const index = connection.baseLength + connection.runningAdds;
 
-      // Heuristic: remember placeholder index if this is the assistant streaming shell
+      // If this is the assistant streaming shell, push its index to placeholder stack
       const isAssistantPlaceholder =
         raw?.value &&
         typeof raw.value === 'object' &&
@@ -165,34 +170,43 @@ export class StreamingService {
         (raw.value.streaming === true || (typeof raw.value.content === 'string' && raw.value.content.length === 0));
 
       if (isAssistantPlaceholder) {
-        connection.placeholderIndex = index;
+        connection.placeholderStack.push(index);
       }
 
-      // Increment running adds after computing index
+      // Increment running adds
       connection.runningAdds += 1;
 
-      return {
-        ...raw,
-        path: `/messages/${index}`,
-      } as Operation;
+      return { ...raw, path: `/messages/${index}` } as Operation;
     }
 
-    // 2) References to the "last" message placeholder using -1
-    // Map '/messages/-1/...' -> '/messages/{placeholderIndex or lastComputedIndex}/...'
+    // 2) '-1' refers to the current streaming placeholder message for this connection
     if (/^\/messages\/-1(\/|$)/.test(path)) {
-      // Prefer explicit placeholder index if set, else fallback to last added index
       const fallbackLast = Math.max(connection.baseLength + connection.runningAdds - 1, 0);
-      const targetIndex =
-        typeof connection.placeholderIndex === 'number' && connection.placeholderIndex >= 0 ? connection.placeholderIndex : fallbackLast;
+      const targetIndex = typeof topPlaceholder() === 'number' ? (topPlaceholder() as number) : fallbackLast;
 
       const newPath = path.replace(/^\/messages\/-1/, `/messages/${targetIndex}`);
-      return {
-        ...raw,
-        path: newPath,
-      } as Operation;
+      const normalized = { ...raw, path: newPath } as Operation;
+
+      // Pop placeholder on completion events:
+      // - replace '/streaming' -> false
+      // - replace whole message '/messages/{idx}'
+      const isReplace = normalized.op === 'replace';
+      const streamingFalse =
+        isReplace && typeof normalized.path === 'string' && /\/streaming$/.test(normalized.path) && raw?.value === false;
+      const replaceWhole = isReplace && typeof normalized.path === 'string' && /^\/messages\/\d+$/.test(normalized.path);
+
+      if ((streamingFalse || replaceWhole) && connection.placeholderStack.length > 0) {
+        const tokens = String(normalized.path).split('/');
+        const idxInPath = tokens.length >= 3 ? Number(tokens[2]) : NaN;
+        if (!Number.isNaN(idxInPath) && idxInPath === topPlaceholder()) {
+          connection.placeholderStack.pop();
+        }
+      }
+
+      return normalized;
     }
 
-    // 3) Already concrete or unrelated path: leave unchanged
+    // 3) Already concrete/other paths - pass through
     return raw as Operation;
   }
 

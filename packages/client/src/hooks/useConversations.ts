@@ -104,7 +104,6 @@ export function useConversation(conversationId: string | null) {
   const abortControllerRef = useRef<AbortController | null>(null)
   const processingQueueRef = useRef<any[]>([])
   const isProcessingRef = useRef(false)
-  const contentAccumulatorRef = useRef<string>('')
 
   const [streamingState, setStreamingState] = useState<StreamingState>({
     status: 'idle',
@@ -178,6 +177,44 @@ export function useConversation(conversationId: string | null) {
             store.startStreaming(conversationId!, version)
             store.appendStreamingChunk(conversationId!, text, version)
           }
+
+          // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
+          // We directly mutate the messages cache per op target index rather than applying JSON-Patch (lighter + avoids starvation).
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+            if (!old || !Array.isArray(old.messages)) return old
+            // Clone shallow containers to keep immutability
+            const updated = { ...old, messages: [...old.messages] }
+
+            for (const op of chunkOps) {
+              const path = String((op as any).path || '')
+              // Expect path like: /messages/{index}/contentChunks/-
+              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              if (!match) continue
+              const msgIndex = Number(match[1])
+              if (!Number.isInteger(msgIndex) || msgIndex < 0 || msgIndex >= updated.messages.length) continue
+
+              const target = { ...updated.messages[msgIndex] }
+              const chunkVal = (op as any).value
+              // Ensure contentChunks array
+              const chunks = Array.isArray(target.contentChunks) ? [...target.contentChunks] : []
+              if (chunkVal && typeof chunkVal.content === 'string') {
+                chunks.push({
+                  content: String(chunkVal.content),
+                  position: typeof chunkVal.position === 'number' ? chunkVal.position : chunks.length > 0 ? chunks[chunks.length - 1].position + chunkVal.content.length : 0,
+                  timestamp: typeof chunkVal.timestamp === 'number' ? chunkVal.timestamp : Date.now(),
+                })
+              }
+              target.contentChunks = chunks
+              // Ensure streaming flag is true while chunks are arriving
+              target.streaming = true
+              // Write back
+              updated.messages[msgIndex] = target
+            }
+
+            // Update metadata
+            updated.lastActivityAt = new Date().toISOString()
+            return updated
+          })
         }
 
         // Update local streaming flag for UI consumers (kept for compatibility)
@@ -193,41 +230,58 @@ export function useConversation(conversationId: string | null) {
         if (nonChunkOps.length > 0) {
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
             const applyOps = (target: any) => {
-              // Normalize one op against current state to resolve '/messages/-1/...' or target by id
-              const normalizeOpForState = (op: Operation, state: any): Operation => {
-                if (!op || typeof (op as any).path !== 'string') return op
-                const raw = op as any
-                let path: string = raw.path
+              // Helper: check if a JSON Pointer path exists in current state before applying 'remove'
+              const jsonPointerExists = (state: any, pointer: string): boolean => {
+                if (typeof pointer !== 'string' || !pointer.startsWith('/')) return false
+                // Split pointer and unescape tokens (~1 -> /, ~0 -> ~)
+                const tokens = pointer
+                  .split('/')
+                  .slice(1)
+                  .map(t => t.replace(/~1/g, '/').replace(/~0/g, '~'))
 
-                // If server provided a targetMessageId, prefer mapping by id for deterministic resolution
-                const targetId: string | undefined = raw.targetMessageId
-                if (targetId && Array.isArray(state?.messages)) {
-                  const idx = state.messages.findIndex((m: any) => m?.id === targetId)
-                  if (idx >= 0) {
-                    // Replace the first /messages/<segment> with the concrete index
-                    path = path.replace(/^\/messages\/(?:-1|\d+)(?=\/|$)/, `/messages/${idx}`)
-                    return { ...raw, path }
+                // Traverse to parent of the last token
+                let node: any = state
+                for (let i = 0; i < tokens.length - 1; i++) {
+                  const key = tokens[i]
+                  if (Array.isArray(node)) {
+                    const idx = Number(key)
+                    if (!Number.isInteger(idx) || idx < 0 || idx >= node.length) return false
+                    node = node[idx]
+                  } else if (node && typeof node === 'object') {
+                    if (!(key in node)) return false
+                    node = node[key]
+                  } else {
+                    return false
                   }
                 }
 
-                // Fallback: map last-item shorthand to concrete index for all op types
-                if (path.startsWith('/messages/-1')) {
-                  const lastIndex = Array.isArray(state?.messages) && state.messages.length > 0 ? state.messages.length - 1 : -1
-                  if (lastIndex >= 0) {
-                    path = path.replace('/messages/-1', `/messages/${lastIndex}`)
-                  }
+                // At parent, check existence of last key/index
+                const last = tokens[tokens.length - 1]
+                if (Array.isArray(node)) {
+                  const idx = Number(last)
+                  return Number.isInteger(idx) && idx >= 0 && idx < node.length
+                } else if (node && typeof node === 'object') {
+                  return last in node
                 }
-                return { ...raw, path }
+                return false
               }
 
               let result = target
               for (const operation of nonChunkOps) {
-                const normalized = normalizeOpForState(operation as Operation, result)
+                // Skip 'remove' if path no longer exists (can happen if another op replaced the whole node)
+                if ((operation as any).op === 'remove' && typeof (operation as any).path === 'string') {
+                  const exists = jsonPointerExists(result, (operation as any).path as string)
+                  if (!exists) {
+                    // Silently ignore to avoid OPERATION_PATH_UNRESOLVABLE noise during racing ops
+                    continue
+                  }
+                }
+
                 try {
-                  const opResult = applyOperation(result, normalized as Operation, true)
+                  const opResult = applyOperation(result, operation as Operation, true)
                   result = opResult.newDocument
                 } catch (opErr) {
-                  console.warn('[STREAMING] Operation failed, continuing with others:', normalized, opErr)
+                  console.warn('[STREAMING] Operation failed, continuing with others:', operation, opErr)
                 }
               }
               return result
@@ -278,32 +332,6 @@ export function useConversation(conversationId: string | null) {
         return
       }
 
-      // Handle content streaming events for UI display
-      if (data.content && typeof data.content === 'string') {
-        contentAccumulatorRef.current += data.content
-        setStreamingState(prev => ({
-          ...prev,
-          status: 'streaming',
-          isStreaming: true,
-          content: contentAccumulatorRef.current,
-          lastUpdate: Date.now(),
-        }))
-        return
-      }
-
-      // Handle delta content streaming (for incremental text updates)
-      if (data.delta && data.delta.content) {
-        contentAccumulatorRef.current += data.delta.content
-        setStreamingState(prev => ({
-          ...prev,
-          status: 'streaming',
-          isStreaming: true,
-          content: contentAccumulatorRef.current,
-          lastUpdate: Date.now(),
-        }))
-        return
-      }
-
       // Complete message objects
       if (data.role !== undefined) {
         const message = data as ClientMessage
@@ -317,7 +345,6 @@ export function useConversation(conversationId: string | null) {
             content: '', // Clear any previous streaming content
             lastUpdate: Date.now(),
           }))
-          contentAccumulatorRef.current = ''
           try {
             useStarshipUIStore.getState().startStreaming(conversationId!)
           } catch {}
@@ -354,7 +381,6 @@ export function useConversation(conversationId: string | null) {
           isStreaming: false,
           content: '', // Clear streaming content on completion
         }))
-        contentAccumulatorRef.current = ''
 
         // Mark streaming messages as complete
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
@@ -375,7 +401,6 @@ export function useConversation(conversationId: string | null) {
           error: data,
           isStreaming: false,
         }))
-        contentAccumulatorRef.current = ''
         return
       }
     },
@@ -452,7 +477,6 @@ export function useConversation(conversationId: string | null) {
           let resolved = false
 
           // Clear previous state
-          contentAccumulatorRef.current = ''
           processingQueueRef.current = []
           setStreamingState({
             status: 'connecting',

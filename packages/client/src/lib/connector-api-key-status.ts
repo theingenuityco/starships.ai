@@ -55,15 +55,6 @@ export class ConnectorApiKeyStatus {
     // Parse current environment variables from connector instance
     const currentEnv = this.parseConnectorEnvironment(connector)
 
-    // DEBUG: Log the parsed environment and requirements
-    console.log('[ConnectorApiKeyStatus] DEBUG - Connector:', connector.id)
-    console.log('[ConnectorApiKeyStatus] DEBUG - Raw env string:', connector.env)
-    console.log('[ConnectorApiKeyStatus] DEBUG - Parsed environment:', currentEnv)
-    console.log(
-      '[ConnectorApiKeyStatus] DEBUG - Requirements:',
-      requirements.map(r => r.envKey)
-    )
-
     // Check which keys are configured
     const configuredKeys: string[] = []
     const missingKeys: string[] = []
@@ -72,15 +63,11 @@ export class ConnectorApiKeyStatus {
     for (const requirement of requirements) {
       const value = currentEnv[requirement.envKey]
 
-      console.log(`[ConnectorApiKeyStatus] DEBUG - Checking ${requirement.envKey}: "${value}" (type: ${typeof value})`)
-
       if (value && value.trim() !== '') {
         configuredKeys.push(requirement.envKey)
         maskedValues[requirement.envKey] = ConnectorApiKeyManager.maskValue(value, requirement)
-        console.log(`[ConnectorApiKeyStatus] DEBUG - ${requirement.envKey} is CONFIGURED`)
       } else if (requirement.required) {
         missingKeys.push(requirement.envKey)
-        console.log(`[ConnectorApiKeyStatus] DEBUG - ${requirement.envKey} is MISSING (required: ${requirement.required})`)
       }
     }
 

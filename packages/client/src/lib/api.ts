@@ -460,7 +460,6 @@ export const agentAPI = {
 
       return agent
     })
-    console.log('[API] Invalidating agent caches after creation')
     invalidateAgentCaches()
     return data
   },

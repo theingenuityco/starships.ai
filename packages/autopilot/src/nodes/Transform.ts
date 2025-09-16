@@ -7,10 +7,11 @@
 
 import { applyPatch, deepClone, Operation } from 'fast-json-patch';
 import { NodeHandler } from '@/types/node-handler';
-import { ValidationResult, ValidationError, Execution, ExecutionState } from '@/types';
+import { ValidationResult, ValidationError, Execution, ExecutionState, ExecutionItem } from '@/types';
 import type { TransformOperation, TransformParams } from '@/types/node-parameters';
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 /**
  * Transform safety manager for state snapshots and rollback
@@ -64,11 +65,11 @@ export class Transform implements NodeHandler {
   }
 
   /**
-   * Execute transform operations on execution state or input data
+   * Execute transform operations on execution state or input items
    */
-  async execute(input?: unknown): Promise<unknown> {
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     if (!this.params.transforms || this.params.transforms.length === 0) {
-      return input !== undefined ? input : { transformsApplied: 0, operations: [] };
+      return input || NodeHelpers.createSingleOutput({ transformsApplied: 0, operations: [] });
     }
 
     if (!this.options?.execution) {
@@ -76,19 +77,21 @@ export class Transform implements NodeHandler {
     }
 
     // Check execution mode based on input presence
-    if (input !== undefined) {
+    if (input !== undefined && input.length > 0) {
       // Data flow mode: Transform the input data
-      return await this.transformInputData(input, this.params.transforms);
+      const inputData = NodeHelpers.getSingleInput(input);
+      const transformedData = await this.transformInputData(inputData, this.params.transforms);
+      return NodeHelpers.createSingleOutput(transformedData, input[0]);
     } else {
       // State mode: Apply transforms to execution state (existing behavior)
       await this.applyTransforms(this.params.transforms, this.options.execution);
 
       // Return summary of what was transformed
       const operations = this.params.transforms.map((t) => `${t.operation} ${t.path}`);
-      return {
+      return NodeHelpers.createSingleOutput({
         transformsApplied: this.params.transforms.length,
         operations,
-      };
+      });
     }
   }
 

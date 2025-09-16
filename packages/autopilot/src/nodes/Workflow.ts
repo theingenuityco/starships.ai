@@ -7,10 +7,11 @@
  */
 
 import { Engine, EngineConfig } from '@/engine/Engine';
-import { Execution, NodeHandlerOptions, ValidationResult, WorkflowParams } from '@/types';
+import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem, Execution } from '@/types';
 import { ValidationError } from '@/types/validation';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export class Workflow implements NodeHandler {
   private params: WorkflowParams;
@@ -34,14 +35,17 @@ export class Workflow implements NodeHandler {
   }
 
   /**
-   * Execute the workflow with streaming support and optional input data
+   * Execute the workflow with streaming support and optional input items
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async execute(_input?: unknown): Promise<Execution> {
+
+  async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // Execute workflow through engine - it will handle streaming if configured
     // Note: Input data could be used to set initial state or pass to first node in future
     await this.engine.execute();
-    return this.engine.getExecution();
+    const execution = this.engine.getExecution();
+
+    // Return the execution wrapped as an item
+    return NodeHelpers.createSingleOutput(execution, _input?.[0]);
   }
 
   /**

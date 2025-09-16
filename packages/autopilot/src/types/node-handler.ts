@@ -4,7 +4,7 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { Execution, NodeParameters, ValidationResult } from '@/types';
+import { Execution, NodeParameters, ValidationResult, ExecutionItem } from '@/types';
 import { EventCallback } from '@/types/events';
 
 /**
@@ -12,8 +12,8 @@ import { EventCallback } from '@/types/events';
  * Handlers are now instantiated with parameters via constructor
  */
 export interface NodeHandler {
-  /** Execute with parameters already injected via constructor and optional input data */
-  execute(input?: unknown): Promise<unknown>;
+  /** Execute with parameters already injected via constructor and optional input items */
+  execute(input?: ExecutionItem[]): Promise<ExecutionItem[]>;
 
   /** Validate the handler's configuration */
   validate(): ValidationResult;

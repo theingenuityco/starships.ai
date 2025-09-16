@@ -9,11 +9,21 @@
 
 import { AgentMemory } from '@/memory/AgentMemory';
 import { Engine } from '@/engine/Engine';
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, Execution, LlmMessage, NodeType } from '@/types';
+import {
+  AgentParams,
+  ValidationResult,
+  ValidationError,
+  NodeHandlerOptions,
+  Execution,
+  LlmMessage,
+  NodeType,
+  ExecutionItem,
+} from '@/types';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint, Node } from '@/types/blueprint';
 import { NodeParameters } from '@/types/node-parameters';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
@@ -178,12 +188,13 @@ export class Agent implements NodeHandler {
   // =============================================================================
 
   /**
-   * Execute the agent with optional input data
+   * Execute the agent with optional input items
    */
-  async execute(input?: unknown): Promise<Execution> {
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // If we have input data, add it to agent's memory
-    if (input !== undefined) {
-      const inputContent = typeof input === 'string' ? input : JSON.stringify(input);
+    if (input && input.length > 0) {
+      const inputData = NodeHelpers.getSingleInput(input);
+      const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
       await this.addMessageToMemory({
         role: 'user',
         content: inputContent,
@@ -191,7 +202,10 @@ export class Agent implements NodeHandler {
     }
 
     await this.engine.execute();
-    return this.engine.getExecution();
+    const execution = this.engine.getExecution();
+
+    // Return the execution wrapped as an item
+    return NodeHelpers.createSingleOutput(execution, input?.[0]);
   }
 
   /**

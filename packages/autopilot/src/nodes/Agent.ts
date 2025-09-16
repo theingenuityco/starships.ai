@@ -29,8 +29,8 @@ export class Agent implements NodeHandler {
     // Create AgentMemory instance from config or default
     this.memory = new AgentMemory(
       this.params.memoryState || {
-        identity: { name: this.params.name || 'Agent', role: 'AI Assistant' },
-        purpose: { primary: 'Assist users with their needs' },
+        systemPrompt: `You are ${this.params.name || 'Agent'}, an AI assistant. Assist users with their needs.`,
+        messages: [],
       }
     );
 
@@ -82,7 +82,7 @@ export class Agent implements NodeHandler {
   }
 
   async addMessageToMemory(message: LlmMessage) {
-    return this.memory.addMessageToHistory(message);
+    return this.memory.addMessage(message);
   }
 
   // =============================================================================

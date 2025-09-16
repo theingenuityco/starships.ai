@@ -6,7 +6,6 @@ import type { MessageModel } from '@starships/protocol'
 import { Bot, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -17,46 +16,14 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
   // Get messages from the unified hook
   const { messages, isLoading, error } = useConversation(conversationId)
 
-  // Stream state from zustand (ephemeral, avoids blocking React Query event loop)
-  const streamingUI = useStarshipUIStore(s => (conversationId ? s.conversationsStreaming[conversationId] : undefined))
-  const isStreaming = Boolean(streamingUI?.isStreaming)
-  const streamingContent = streamingUI?.content ?? ''
-  console.log('hello')
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
 
-  // Create display messages with optimized rendering
+  // Create display messages with optimized rendering (no synthetic overlay; rely on server patches)
   const displayMessages = useMemo(() => {
-    let combinedMessages = [...messages]
-
-    // Add streaming message if we have streaming content
-    if (isStreaming && streamingContent && streamingContent.trim()) {
-      // Check if we already have a streaming message
-      const existingStreamingIndex = combinedMessages.findIndex(msg => msg.streaming === true)
-
-      const streamingMessage = {
-        id: `streaming-${Date.now()}`,
-        content: streamingContent,
-        role: 'assistant' as const,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        messageType: 'agent_response' as const,
-        streaming: true,
-      }
-
-      if (existingStreamingIndex >= 0) {
-        // Update existing streaming message
-        combinedMessages[existingStreamingIndex] = streamingMessage
-      } else {
-        // Add new streaming message
-        combinedMessages = [...combinedMessages, streamingMessage]
-      }
-    }
-
-    // Sort by creation time for consistent ordering
-    return combinedMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  }, [messages, isStreaming, streamingContent])
+    return [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+  }, [messages])
 
   // Optimized auto-scroll with debouncing
   useEffect(() => {
@@ -69,7 +36,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
     }
 
     // Only scroll if user is near bottom or new messages arrived
-    if (shouldScroll() || displayMessages.length > lastMessageCountRef.current || isStreaming) {
+    if (shouldScroll() || displayMessages.length > lastMessageCountRef.current) {
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
         container.scrollTo({
@@ -80,7 +47,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
     }
 
     lastMessageCountRef.current = displayMessages.length
-  }, [displayMessages.length, isStreaming, streamingContent])
+  }, [displayMessages.length])
 
   if (!conversationId) {
     return <EmptyState />
@@ -107,7 +74,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-6">
           {displayMessages.map(message => (
-            <MemoizedMessageBubble key={message.streaming ? `streaming-${message.id}` : message.id} message={message} />
+            <MemoizedMessageBubble key={message.id} message={message} />
           ))}
         </div>
       </div>

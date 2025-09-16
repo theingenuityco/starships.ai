@@ -1,6 +1,7 @@
 import React from 'react'
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
+import type { MessageModel } from '@starships/protocol'
 
 interface ConversationStreaming {
   content: string
@@ -10,10 +11,33 @@ interface ConversationStreaming {
   updatedAt: number
 }
 
+// UI conversation message shape (extends protocol with UI flags)
+interface UIContentChunk {
+  content: string
+  position: number
+  timestamp: number
+}
+export interface UIMessage extends MessageModel {
+  sending?: boolean
+  streaming?: boolean
+  error?: boolean
+  contentChunks?: UIContentChunk[]
+  streamedContent?: string
+}
+
+interface ConversationData {
+  messages: UIMessage[]
+  total: number
+  lastActivityAt?: string
+}
+
 interface StarshipUIState {
   // UI-only state
   activeStarshipId: string | null
   currentRoute: string
+
+  // Conversations data (authoritative UI source)
+  conversations: Record<string, ConversationData>
 
   // Streaming (ephemeral, not persisted)
   conversationsStreaming: Record<string, ConversationStreaming>
@@ -22,7 +46,15 @@ interface StarshipUIState {
   setActiveStarship: (id: string | null) => void
   navigateTo: (route: string) => void
 
-  // Streaming actions
+  // Conversation data actions (UI-driven from TanStack and SSE)
+  setConversationSnapshot: (conversationId: string, data: ConversationData) => void
+  appendMessage: (conversationId: string, message: UIMessage) => void
+  updateMessageAt: (conversationId: string, index: number, updater: Partial<UIMessage> | ((m: UIMessage) => UIMessage)) => void
+  appendMessageChunk: (conversationId: string, index: number, chunk: UIContentChunk) => void
+  markMessageStreaming: (conversationId: string, index: number, isStreaming: boolean) => void
+  clearConversation: (conversationId: string) => void
+
+  // Streaming actions (ephemeral)
   startStreaming: (conversationId: string, version?: number) => void
   appendStreamingChunk: (conversationId: string, text: string, version?: number) => void
   endStreaming: (conversationId: string) => void
@@ -36,6 +68,7 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         // Initial state
         activeStarshipId: null,
         currentRoute: '/',
+        conversations: {},
         conversationsStreaming: {},
 
         // UI actions
@@ -53,6 +86,111 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         },
 
         navigateTo: (route: string) => set({ currentRoute: route }, false, 'ui/navigate'),
+
+        // Conversation data actions
+        setConversationSnapshot: (conversationId: string, data: ConversationData) =>
+          set(
+            state => {
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: {
+                    messages: Array.isArray(data.messages) ? data.messages : [],
+                    total: typeof data.total === 'number' ? data.total : Array.isArray(data.messages) ? data.messages.length : 0,
+                    lastActivityAt: data.lastActivityAt,
+                  },
+                },
+              }
+            },
+            false,
+            'convo/setSnapshot'
+          ),
+
+        appendMessage: (conversationId: string, message: UIMessage) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId] || { messages: [], total: 0 }
+              const messages = [...current.messages, message]
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, messages, total: messages.length },
+                },
+              }
+            },
+            false,
+            'convo/appendMessage'
+          ),
+
+        updateMessageAt: (conversationId: string, index: number, updater: Partial<UIMessage> | ((m: UIMessage) => UIMessage)) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId]
+              if (!current || index < 0 || index >= current.messages.length) return { conversations: state.conversations }
+              const nextMessages = [...current.messages]
+              const existing = nextMessages[index]
+              nextMessages[index] = typeof updater === 'function' ? (updater as any)(existing) : { ...existing, ...(updater as any) }
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, messages: nextMessages },
+                },
+              }
+            },
+            false,
+            'convo/updateMessageAt'
+          ),
+
+        appendMessageChunk: (conversationId: string, index: number, chunk: UIContentChunk) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId]
+              if (!current || index < 0 || index >= current.messages.length) return { conversations: state.conversations }
+              const nextMessages = [...current.messages]
+              const target = { ...nextMessages[index] }
+              const chunks = Array.isArray(target.contentChunks) ? [...target.contentChunks] : []
+              chunks.push({ content: chunk.content, position: chunk.position, timestamp: chunk.timestamp })
+              target.contentChunks = chunks
+              target.streaming = true
+              nextMessages[index] = target
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, messages: nextMessages },
+                },
+              }
+            },
+            false,
+            'convo/appendMessageChunk'
+          ),
+
+        markMessageStreaming: (conversationId: string, index: number, isStreaming: boolean) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId]
+              if (!current || index < 0 || index >= current.messages.length) return { conversations: state.conversations }
+              const nextMessages = [...current.messages]
+              nextMessages[index] = { ...nextMessages[index], streaming: isStreaming }
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, messages: nextMessages },
+                },
+              }
+            },
+            false,
+            'convo/markMessageStreaming'
+          ),
+
+        clearConversation: (conversationId: string) =>
+          set(
+            state => {
+              const { [conversationId]: _, ...rest } = state.conversations
+              return { conversations: rest }
+            },
+            false,
+            'convo/clear'
+          ),
 
         // Streaming actions (ephemeral)
         startStreaming: (conversationId: string, version?: number) =>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useConversation } from '@/hooks/useConversations'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 import { Bot, User } from 'lucide-react'
@@ -10,11 +10,16 @@ import { ConversationMessageContent } from './ConversationMessageContent'
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  isLoading?: boolean
+  error?: any
 }
 
-export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
-  // Get messages from the unified hook
-  const { messages, isLoading, error } = useConversation(conversationId)
+export function ConversationMessageList({ conversationId, starshipId, isLoading = false, error = null }: ConversationMessageListProps) {
+  const storeMessages = useStarshipUIStore(state => {
+    if (!conversationId) return [] as (MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[] })[]
+    const convo = state.conversations[conversationId]
+    return (convo?.messages as any) || []
+  })
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -22,8 +27,8 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
 
   // Create display messages with optimized rendering (no synthetic overlay; rely on server patches)
   const displayMessages = useMemo(() => {
-    return [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  }, [messages])
+    return [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+  }, [storeMessages])
 
   // Optimized auto-scroll with debouncing
   useEffect(() => {

@@ -1,7 +1,7 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useState, useRef } from 'react'
+import { useCallback, useState, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
 import { applyOperation, Operation } from 'fast-json-patch'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
@@ -147,6 +147,35 @@ export function useConversation(conversationId: string | null) {
     refetchOnWindowFocus: true,
   })
 
+  // Mirror TanStack cache into Zustand so UI rendering is driven by store
+  // IMPORTANT: depend on dataUpdatedAt to avoid infinite loops when Zustand updates trigger re-renders.
+  useEffect(() => {
+    if (!conversationId) return
+    const data = messagesQuery.data as any
+    if (!data) return
+
+    try {
+      const store = useStarshipUIStore.getState()
+      const existing = store.conversations?.[conversationId]
+
+      // Guard: if reference equal, skip
+      if (existing && existing.messages === data.messages) return
+
+      // Guard: if shape unchanged (same length + lastActivityAt), skip
+      if (existing && Array.isArray(existing.messages) && Array.isArray(data.messages)) {
+        const sameLen = existing.messages.length === data.messages.length
+        const sameActivity = existing.lastActivityAt === data.lastActivityAt
+        if (sameLen && sameActivity) return
+      }
+
+      store.setConversationSnapshot(conversationId, {
+        messages: data.messages as any,
+        total: data.total,
+        lastActivityAt: data.lastActivityAt,
+      })
+    } catch {}
+  }, [conversationId, messagesQuery.dataUpdatedAt])
+
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
     (data: any) => {
@@ -213,6 +242,7 @@ export function useConversation(conversationId: string | null) {
 
             // Update metadata
             updated.lastActivityAt = new Date().toISOString()
+
             return updated
           })
         }
@@ -295,6 +325,7 @@ export function useConversation(conversationId: string | null) {
                   ...patched,
                   total: Array.isArray(patched.messages) ? patched.messages.length : 0,
                 }
+
                 return processContentChunks(updatedData)
               } catch (error) {
                 console.error('[STREAMING] Failed to apply operations to initial data:', error)
@@ -310,6 +341,7 @@ export function useConversation(conversationId: string | null) {
                 total: Array.isArray(patched.messages) ? patched.messages.length : old.total,
                 lastActivityAt: new Date().toISOString(),
               }
+
               return processContentChunks(updatedData)
             } catch (error) {
               console.error('[STREAMING] Failed to apply operations:', error, { operations: nonChunkOps, target: old })
@@ -351,12 +383,18 @@ export function useConversation(conversationId: string | null) {
 
           // Add streaming message to cache (append; ascending order)
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
-            if (!old) return { messages: [{ ...message, streaming: true }], total: 1, conversationId }
-            return {
-              ...old,
-              messages: [...old.messages, { ...message, streaming: true }],
-              total: old.total + 1,
+            let next: any
+            if (!old) {
+              next = { messages: [{ ...message, streaming: true }], total: 1, conversationId }
+            } else {
+              next = {
+                ...old,
+                messages: [...old.messages, { ...message, streaming: true }],
+                total: old.total + 1,
+              }
             }
+
+            return next
           })
           return
         }

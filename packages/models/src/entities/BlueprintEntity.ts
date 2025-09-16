@@ -8,7 +8,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { Node, Edge } from '@starships/autopilot';
 import type { BlueprintModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsArray, IsIn, IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
 
 /**
@@ -49,11 +49,12 @@ export class BlueprintEntity implements BlueprintModel {
   @Expose()
   @Transform(({ value }) => value || 'general')
   @IsOptional()
-  @IsIn(['general', 'workflow', 'automation', 'integration', 'analysis'])
+  @IsIn(['general', 'workflow', 'automation', 'integration', 'analysis', 'test'])
   category?: string;
 
   @Expose()
-  @Transformers.NumberTransform(0)
+  @Transform(({ value }) => value ?? 0)
+  @Transformers.NumberTransform()
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -73,28 +74,6 @@ export class BlueprintEntity implements BlueprintModel {
   @Transformers.JsonTransform()
   @IsArray()
   edges!: Edge[];
-
-  /**
-   * Deserialize database record into BlueprintEntity
-   * Converts raw database records to fully typed and validated BlueprintEntity instances
-   */
-  static deserialize(data: Record<string, unknown>): BlueprintEntity {
-    return plainToInstance(BlueprintEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Serialize BlueprintEntity to database record
-   * Converts entity instance to plain object suitable for database storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
 
   /**
    * Simple validation function using class-validator
@@ -118,8 +97,9 @@ export class BlueprintEntity implements BlueprintModel {
         category: dataRecord.category || 'general',
         usageCount: dataRecord.usageCount ?? 0,
         metadata: dataRecord.metadata || {},
-        nodes: dataRecord.nodes || [],
-        edges: dataRecord.edges || [],
+        // Don't provide defaults for required arrays - let validation fail if missing
+        nodes: dataRecord.nodes,
+        edges: dataRecord.edges,
         ...dataRecord,
       });
     } else {
@@ -130,7 +110,7 @@ export class BlueprintEntity implements BlueprintModel {
     const errors = await validate(entity, {
       skipMissingProperties: operation === 'update',
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: true, // Maintain strict validation
     });
 
     if (errors.length > 0) {

@@ -6,6 +6,7 @@
  */
 
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { EdgeRepository } from '@/repositories/EdgeRepository';
 import { NodeRepository } from '@/repositories/NodeRepository';
@@ -50,8 +51,8 @@ export class BlueprintRepository extends BaseRepository {
 
         const now = new Date().toISOString();
 
-        // Create blueprint entity with proper transformation
-        const blueprintEntity = BlueprintEntity.deserialize({
+        // Prepare blueprint data with proper transformation
+        const blueprintData = {
           ...request,
           createdAt: now,
           updatedAt: now,
@@ -59,13 +60,11 @@ export class BlueprintRepository extends BaseRepository {
           nodes: request.nodes,
           edges: request.edges,
           metadata: request.metadata || {},
-        });
+        };
 
-        const blueprintData = blueprintEntity.serialize();
-        // Remove id since it will be auto-generated
-        delete blueprintData.id;
-
-        const blueprint = await this.createEntityWithAutoId<BlueprintModel>('Blueprint', blueprintData);
+        // Create entity instance from plain object, then serialize
+        const blueprintEntity = toEntityInstance(BlueprintEntity, blueprintData);
+        const blueprint = await this.createEntityWithAutoId<BlueprintModel>('Blueprint', toDatabase(blueprintEntity));
 
         // Create nodes using NodeRepository
         const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprint.id, request.nodes);
@@ -73,7 +72,7 @@ export class BlueprintRepository extends BaseRepository {
         // Create edges using EdgeRepository with ID mapping
         const edges = await this.edgeRepo.createEdges(blueprint.id, request.edges, idMapping);
 
-        return BlueprintEntity.deserialize({
+        return fromDatabase(BlueprintEntity, {
           ...blueprint,
           nodes,
           edges,
@@ -110,7 +109,7 @@ export class BlueprintRepository extends BaseRepository {
         const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
         const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
-        return BlueprintEntity.deserialize({
+        return fromDatabase(BlueprintEntity, {
           ...blueprint,
           nodes,
           edges,
@@ -145,7 +144,7 @@ export class BlueprintRepository extends BaseRepository {
           const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
           blueprints.push(
-            BlueprintEntity.deserialize({
+            fromDatabase(BlueprintEntity, {
               ...blueprint,
               nodes,
               edges,
@@ -310,7 +309,7 @@ export class BlueprintRepository extends BaseRepository {
           const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
 
           blueprints.push(
-            BlueprintEntity.deserialize({
+            fromDatabase(BlueprintEntity, {
               ...blueprint,
               nodes,
               edges,

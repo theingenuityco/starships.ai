@@ -299,8 +299,6 @@ export class StarshipService {
     // Generate a random name for the starship
     const starshipName = getRandomStarshipName();
 
-    console.log(`[STARSHIP-SERVICE] Creating default starship "${starshipName}" for user: ${userId}`);
-
     // Create the starship with scout class (free tier)
     const starship = await starshipService.createStarship({
       ownerId: userId,
@@ -319,8 +317,6 @@ export class StarshipService {
       const connection = getConnection();
       const templateService = new AgentTemplateService(connection);
 
-      console.log(`[STARSHIP-SERVICE] Creating default agent for user: ${userId}, starship: ${starshipId}`);
-
       // Find the "Sibyl" template to use as the default starship navigator
       const templates = await templateService.searchTemplates('Sibyl');
       const defaultTemplate = templates.find((t) => t.name === 'Sibyl');
@@ -330,17 +326,9 @@ export class StarshipService {
         return null;
       }
 
-      console.log(`[STARSHIP-SERVICE] Found default template: ${defaultTemplate.name} (${defaultTemplate.id})`);
-
       // Create agent from template with Sibyl as the default navigator
-      const defaultAgent = await templateService.createAgentFromTemplate(
-        defaultTemplate.id,
-        'Sibyl', // Default agent name - the starship navigator
-        userId,
-        starshipId
-      );
+      const defaultAgent = await templateService.createAgentFromTemplate(defaultTemplate.id, starshipId);
 
-      console.log(`[STARSHIP-SERVICE] Created default agent: ${defaultAgent.name} (${defaultAgent.id})`);
       return defaultAgent;
     } catch (error) {
       console.error('[STARSHIP-SERVICE] Failed to create default agent:', error);

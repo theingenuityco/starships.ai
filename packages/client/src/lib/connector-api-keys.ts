@@ -55,9 +55,6 @@ export class ConnectorApiKeyManager {
     const requirements: ApiKeyRequirement[] = []
     const foundKeys = new Set<string>()
 
-    // Log template analysis for debugging (can be removed in production)
-    console.log('[ConnectorApiKeyManager] Analyzing template:', template.name)
-
     // Check environment variables JSON string
     if (template.env) {
       try {

@@ -4,7 +4,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
-import { useConversation } from '@/hooks/useConversations'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -28,8 +28,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Ref for direct communication with message input
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
 
-  // Conversation data - now handled by unified hook
-  const conversationData = useConversation(currentConversationId)
+  // Track streaming state for current conversation to focus input on completion
+  const uiStreaming = useStarshipUIStore(s => (currentConversationId ? s.conversationsStreaming[currentConversationId]?.isStreaming === true : false))
+  const prevStreamingRef = useRef(false)
 
   // Memoized agent change handler to prevent AgentSelector from remounting
   const handleAgentChange = useCallback((agent: Agent | null) => {
@@ -39,7 +40,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Handle conversation start - receive actual database conversation ID
   const handleConversationStart = useCallback(
     (conversationId: string) => {
-      console.log('[ConversationInterface] Conversation started with ID:', conversationId)
       setCurrentConversationId(conversationId)
       onConversationChange?.(conversationId)
     },
@@ -62,19 +62,33 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [])
 
-  // Reset conversation when external conversation ID changes
+  // Reset conversation when external conversation ID changes (only when the value actually changes)
   useEffect(() => {
-    if (userId && isAuthenticated) {
-      if (externalConversationId !== undefined) {
-        setCurrentConversationId(externalConversationId)
-        setHasMessages(!!externalConversationId)
-      } else {
-        // Only reset if we don't have an external conversation ID
-        setCurrentConversationId(null)
-        setHasMessages(false)
-      }
+    if (externalConversationId === undefined) return
+    setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
+    setHasMessages(Boolean(externalConversationId))
+  }, [externalConversationId])
+
+  // Focus input when streaming transitions from true -> false
+  useEffect(() => {
+    const was = prevStreamingRef.current
+    if (was && !uiStreaming) {
+      setTimeout(() => {
+        messageInputRef.current?.focusInput?.()
+      }, 50)
     }
-  }, [userId, isAuthenticated, externalConversationId])
+    prevStreamingRef.current = uiStreaming
+  }, [uiStreaming])
+
+  // Focus after first message or when conversation becomes ready
+  useEffect(() => {
+    if (hasMessages && currentConversationId) {
+      const t = setTimeout(() => {
+        messageInputRef.current?.focusInput?.()
+      }, 100)
+      return () => clearTimeout(t)
+    }
+  }, [hasMessages, currentConversationId])
 
   // Show loading state
   if (isLoading) {
@@ -109,7 +123,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area or Welcome Screen */}
       {hasMessages && currentConversationId ? (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} enableAccessibility={true} />
+          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} />
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">

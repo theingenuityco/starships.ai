@@ -26,10 +26,6 @@ export class MessageService {
    * Create a new message with streaming support
    */
   async createMessage(request: Message & { conversationId: string }): Promise<MessageModel> {
-    console.log('📝 [MESSAGE-SERVICE] Creating message:', {
-      role: request.role,
-    });
-
     // Create message with only available properties
     const message = await this.messageRepository.create({
       role: request.role,
@@ -38,7 +34,6 @@ export class MessageService {
       conversationId: request.conversationId,
     });
 
-    console.log('✅ [MESSAGE-SERVICE] Message created:', message.id);
     return message;
   }
 
@@ -52,8 +47,6 @@ export class MessageService {
       return null;
     }
 
-    console.log(`📖 [MESSAGE-SERVICE] Retrieved message ${messageId}`);
-
     return message;
   }
 
@@ -66,11 +59,6 @@ export class MessageService {
     if (updates.content !== undefined) validUpdates.content = updates.content;
 
     const updatedMessage = await this.messageRepository.update(messageId, validUpdates);
-
-    if (updatedMessage) {
-      console.log('✅ [MESSAGE-SERVICE] Message updated:', messageId);
-    }
-
     return updatedMessage;
   }
 
@@ -78,14 +66,7 @@ export class MessageService {
    * Delete message
    */
   async deleteMessage(messageId: string): Promise<boolean> {
-    console.log('🗑️ [MESSAGE-SERVICE] Deleting message:', messageId);
-
     const deleted = await this.messageRepository.delete(messageId);
-
-    if (deleted) {
-      console.log('✅ [MESSAGE-SERVICE] Message deleted:', messageId);
-    }
-
     return deleted;
   }
 }

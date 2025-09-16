@@ -129,11 +129,8 @@ export function useLogin() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      console.log('[AUTH] User logged in:', user.email)
-
       // Redirect to starship's conversation if available
       if (starship) {
-        console.log('[AUTH] Redirecting to starship conversation:', starship.slug)
         router.push(`/ship/${starship.slug}/conversations`)
       }
 
@@ -182,11 +179,8 @@ export function useRegister() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      console.log('[AUTH] User registered:', user.email)
-
       // Redirect to starship's conversation if available
       if (starship) {
-        console.log('[AUTH] Redirecting to starship conversation:', starship.slug)
         router.push(`/ship/${starship.slug}/conversations`)
       }
 
@@ -232,8 +226,6 @@ export function useLogout() {
 
       // Set auth user to null
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), null)
-
-      console.log('[AUTH] User logged out')
     },
     onError: (error: any) => {
       console.error('[AUTH] Logout error:', error)

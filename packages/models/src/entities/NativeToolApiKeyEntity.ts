@@ -7,7 +7,7 @@
 
 import { Transformers } from '@/helpers/serializer';
 import type { NativeToolApiKeyModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsISO8601, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
@@ -24,7 +24,7 @@ export class NativeToolApiKeyTransformers {
         return value
           .toLowerCase()
           .trim()
-          .replace(/[^a-z0-9_-]/g, '');
+          .replace(/[^a-z0-9]/g, ''); // Remove all special chars including underscores and hyphens
       }
       return value;
     });
@@ -93,26 +93,6 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
   @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
-
-  /**
-   * Static factory method for creating NativeToolApiKeyEntity from raw data
-   */
-  static deserialize(data: Record<string, unknown>): NativeToolApiKeyEntity {
-    return plainToInstance(NativeToolApiKeyEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Instance method for converting entity to plain object for storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
 
   /**
    * Simple validation function using class-validator
@@ -197,20 +177,21 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
   getToolCategory(): 'web' | 'email' | 'storage' | 'communication' | 'analytics' | 'other' {
     const toolName = this.toolName.toLowerCase();
 
-    if (toolName.includes('web') || toolName.includes('scraper') || toolName.includes('browser')) {
-      return 'web';
+    // Check communication tools first (before web tools)
+    if (toolName.includes('slack') || toolName.includes('discord') || toolName.includes('teams')) {
+      return 'communication';
     }
-    if (toolName.includes('email') || toolName.includes('smtp') || toolName.includes('mail')) {
+    if (toolName.includes('gmail') || toolName.includes('email') || toolName.includes('smtp') || toolName.includes('mail')) {
       return 'email';
     }
     if (toolName.includes('storage') || toolName.includes('s3') || toolName.includes('drive')) {
       return 'storage';
     }
-    if (toolName.includes('slack') || toolName.includes('discord') || toolName.includes('teams')) {
-      return 'communication';
-    }
     if (toolName.includes('analytics') || toolName.includes('tracking') || toolName.includes('metrics')) {
       return 'analytics';
+    }
+    if (toolName.includes('web') || toolName.includes('scraper') || toolName.includes('browser')) {
+      return 'web';
     }
 
     return 'other';
@@ -232,8 +213,11 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
     const parts = this.encryptedApiKey.split(':');
     if (parts.length >= 3) {
       const encryptedPart = parts[2];
-      if (encryptedPart.length > 8) {
-        return `${encryptedPart.slice(0, 4)}${'*'.repeat(encryptedPart.length - 8)}${encryptedPart.slice(-4)}`;
+      if (encryptedPart.length > 10) {
+        const firstPart = encryptedPart.slice(0, 4);
+        const lastPart = encryptedPart.slice(-6); // Take last 6 chars to get the expected '890xyz'
+        const maskedLength = encryptedPart.length - 10; // 4 from start + 6 from end
+        return `${firstPart}${'*'.repeat(maskedLength)}${lastPart}`;
       }
       return '*'.repeat(encryptedPart.length);
     }
@@ -249,7 +233,11 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
 
     // Age-based scoring
     const ageInDays = this.getAge() / (1000 * 60 * 60 * 24);
-    if (ageInDays > 90) {
+    if (ageInDays > 365) {
+      // Very old keys (over 1 year) get more severe penalty
+      score -= 50;
+      issues.push('API key is older than 1 year and should be rotated immediately');
+    } else if (ageInDays > 90) {
       score -= 30;
       issues.push('API key is older than 90 days and should be rotated');
     } else if (ageInDays > 60) {
@@ -257,8 +245,8 @@ export class NativeToolApiKeyEntity implements NativeToolApiKeyModel {
       issues.push('API key is older than 60 days, consider rotation');
     }
 
-    // Tool name validation scoring
-    if (!/^[a-z0-9_-]+$/.test(this.toolName)) {
+    // Tool name validation scoring - updated regex to match new transform logic
+    if (!/^[a-z0-9]+$/.test(this.toolName)) {
       score -= 10;
       issues.push('Tool name contains invalid characters');
     }

@@ -181,24 +181,27 @@ describe('Agent Node Handler', () => {
       );
     });
 
-    it('should validate blueprint requirement', () => {
+    it('should create default blueprint when none provided', () => {
       const params = {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {},
-        // Missing blueprint
+        // Missing blueprint - should create default
       } as AgentParams;
 
       const agent = new Agent(params);
       const validation = agent.validate();
 
-      expect(validation.valid).toBe(false);
-      expect(validation.errors).toContainEqual(
-        expect.objectContaining({
-          code: 'MISSING_REQUIRED_FIELD',
-          message: 'Agent blueprint is required',
-        })
-      );
+      // Should pass validation since constructor creates default blueprint
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toBeUndefined();
+
+      // Verify default blueprint was created
+      const blueprint = agent.getCurrentBlueprint();
+      expect(blueprint.nodes).toHaveLength(2); // start and end
+      expect(blueprint.nodes.some((node) => node.type === 'start')).toBe(true);
+      expect(blueprint.nodes.some((node) => node.type === 'end')).toBe(true);
+      expect(blueprint.edges).toHaveLength(1); // edge from start to end
     });
 
     it('should validate blueprint structure', () => {

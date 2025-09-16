@@ -292,16 +292,14 @@ describe('WaitlistRepository', () => {
 
       jest.spyOn(repository, 'getByEmail').mockResolvedValue(null);
       jest.spyOn(repository, 'addApprovedEmail').mockResolvedValue(mockEntry);
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await repository.seedInitialEmails();
 
       expect(repository.getByEmail).toHaveBeenCalledTimes(3);
       expect(repository.addApprovedEmail).toHaveBeenCalledTimes(3);
       expect(repository.addApprovedEmail).toHaveBeenCalledWith('dewang@theingenuity.co', 'Founder - Primary tester');
-      expect(consoleSpy).toHaveBeenCalledWith('Added approved email: dewang@theingenuity.co');
-
-      consoleSpy.mockRestore();
+      expect(repository.addApprovedEmail).toHaveBeenCalledWith('rudra@theingenuity.co', 'Team member - Alpha tester');
+      expect(repository.addApprovedEmail).toHaveBeenCalledWith('prashant@theingenuity.co', 'Team member - Alpha tester');
     });
 
     it('should skip existing emails', async () => {
@@ -309,15 +307,14 @@ describe('WaitlistRepository', () => {
 
       jest.spyOn(repository, 'getByEmail').mockResolvedValue(mockEntry);
       jest.spyOn(repository, 'addApprovedEmail').mockResolvedValue(mockEntry);
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await repository.seedInitialEmails();
 
       expect(repository.getByEmail).toHaveBeenCalledTimes(3);
+      expect(repository.getByEmail).toHaveBeenCalledWith('dewang@theingenuity.co');
+      expect(repository.getByEmail).toHaveBeenCalledWith('rudra@theingenuity.co');
+      expect(repository.getByEmail).toHaveBeenCalledWith('prashant@theingenuity.co');
       expect(repository.addApprovedEmail).not.toHaveBeenCalled();
-      expect(consoleSpy).toHaveBeenCalledWith('Email already exists: dewang@theingenuity.co');
-
-      consoleSpy.mockRestore();
     });
 
     it('should handle errors gracefully and continue with other emails', async () => {
@@ -331,16 +328,15 @@ describe('WaitlistRepository', () => {
 
       jest.spyOn(repository, 'addApprovedEmail').mockResolvedValue(mockEntry);
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-      const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await repository.seedInitialEmails();
 
+      // Should continue processing other emails despite one failure
+      expect(repository.getByEmail).toHaveBeenCalledTimes(3);
+      expect(repository.addApprovedEmail).toHaveBeenCalledTimes(2); // Only called for successful cases
       expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to add email rudra@theingenuity.co:', expect.any(Error));
-      expect(consoleLogSpy).toHaveBeenCalledWith('Added approved email: dewang@theingenuity.co');
-      expect(consoleLogSpy).toHaveBeenCalledWith('Added approved email: prashant@theingenuity.co');
 
       consoleErrorSpy.mockRestore();
-      consoleLogSpy.mockRestore();
     });
   });
 

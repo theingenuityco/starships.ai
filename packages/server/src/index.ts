@@ -56,7 +56,6 @@ const PORT = config.SERVER_PORT || 3001;
 // Validate URL formats
 validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
 // Note: NEXT_PUBLIC_API_URL validation is handled by client config
-console.log('✅ Environment variables validated successfully');
 
 // Initialize Neo4j database connection
 const dbConnection = createConnection({
@@ -139,7 +138,6 @@ httpServer.listen(PORT, async () => {
     autopilot.setCredentials({
       openrouterApiKey: config.OPENROUTER_API_KEY,
     });
-    console.log('✅ Autopilot credentials configured');
 
     // Initialize database connection FIRST
     await dbConnection.connect();
@@ -152,7 +150,6 @@ httpServer.listen(PORT, async () => {
     // Initialize Agent Templates (seeds default templates)
     try {
       await seedAgentTemplates();
-      console.log('✅ Agent templates initialized with default templates');
     } catch (error) {
       console.error('⚠️ Failed to seed agent templates:', error);
       // Continue - seeding is not critical for startup
@@ -161,7 +158,6 @@ httpServer.listen(PORT, async () => {
     // Initialize Waitlist (seeds approved emails)
     try {
       await seedWaitlist();
-      console.log('✅ Waitlist initialized with approved emails');
     } catch (error) {
       console.error('⚠️ Failed to seed waitlist:', error);
       // Continue - seeding is not critical for startup

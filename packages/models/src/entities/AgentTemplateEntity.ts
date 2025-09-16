@@ -8,7 +8,7 @@
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import type { AgentMemoryState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
@@ -130,26 +130,6 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @IsOptional()
   @AgentTemplateTransformers.PreviewPromptsTransform()
   previewPrompts?: string[];
-
-  /**
-   * Static factory method for creating AgentTemplateEntity from raw data
-   */
-  static deserialize(data: Record<string, unknown> | AgentTemplateModel): AgentTemplateEntity {
-    return plainToInstance(AgentTemplateEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Instance method for converting entity to plain object for storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
 
   /**
    * Simple validation function using class-validator

@@ -9,9 +9,31 @@ import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
 
 /**
+ * Transform operation for state mutations using JSON Patch-like operations
+ */
+export interface TransformOperation {
+  /** JSON Patch operation type */
+  operation: 'add' | 'replace' | 'remove' | 'copy' | 'move' | 'test';
+  /** JSON Pointer path (e.g., "/state/counter", "/state/user/name") */
+  path: string;
+  /** Value to apply - can be static value or template expression {{ }} */
+  value?: unknown;
+  /** For copy/move operations - source path */
+  from?: string;
+}
+
+/**
+ * Base parameters interface that all node parameters extend from
+ */
+export interface BaseParams {
+  transforms?: TransformOperation[];
+  condition?: string; // JSONata expression for conditional evaluation
+}
+
+/**
  * User prompt node parameters for user interaction
  */
-export interface UserPromptParams {
+export interface UserPromptParams extends BaseParams {
   promptText: string;
   choices: UserPromptChoice[];
   sourceNodeId?: string;
@@ -33,7 +55,7 @@ export interface UserPromptChoice {
  * HTTP request node parameters for making HTTP calls
  * Fully compatible with fetch RequestInit structure
  */
-export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
+export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'> {
   // Required URL (not part of RequestInit as it's the first parameter to fetch)
   url: string;
 
@@ -47,22 +69,23 @@ export interface HttpRequestParams extends Omit<RequestInit, 'body'> {
 /**
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
+ * Template expressions ({{ }}) are supported for all numeric and string fields
  */
-export interface LlmParams {
+export interface LlmParams extends BaseParams {
   model: string;
   messages: { role: string; content: string }[];
-  temperature?: number;
-  maxTokens?: number;
-  timeout?: number;
-  topP?: number;
-  frequencyPenalty?: number;
-  presencePenalty?: number;
+  temperature?: number | string; // Supports template expressions
+  maxTokens?: number | string; // Supports template expressions
+  timeout?: number | string; // Supports template expressions
+  topP?: number | string; // Supports template expressions
+  frequencyPenalty?: number | string; // Supports template expressions
+  presencePenalty?: number | string; // Supports template expressions
 }
 
 /**
  * Workflow node parameters for executing embedded blueprints
  */
-export interface WorkflowParams {
+export interface WorkflowParams extends BaseParams {
   // Core agent identity
   name: string;
   description?: string;
@@ -81,7 +104,7 @@ export interface WorkflowParams {
  * Agent-specific node parameters
  * Contains full agent configuration for workflow execution
  */
-export interface AgentParams {
+export interface AgentParams extends BaseParams {
   // Core agent identity
   name: string;
   description?: string;
@@ -94,11 +117,11 @@ export interface AgentParams {
   // Execution parameters
   timeout?: number;
 
-  // Memory system (required)
-  memoryState: AgentMemoryState;
+  // Memory system (optional - Agent will create default if not provided)
+  memoryState?: AgentMemoryState;
 
-  // Blueprint execution
-  blueprint: Blueprint;
+  // Blueprint execution (optional - Agent will create default if not provided)
+  blueprint?: Blueprint;
 
   // Metadata
   metadata?: Record<string, unknown>;
@@ -107,16 +130,27 @@ export interface AgentParams {
 /**
  * Conditional node parameters for branching logic
  */
-export interface ConditionalParams {
-  expression: string; // JSONata expression to evaluate
-  timeout?: number;
-}
+export type ConditionalParams = BaseParams;
+// Inherits condition?: string from BaseParams
+// No additional parameters needed - pure conditional evaluation node
 
 /**
  * Start and End node parameters
  */
-export type StartParams = Record<string, unknown>;
-export type EndParams = Record<string, unknown>;
+export interface StartParams extends BaseParams {
+  [key: string]: unknown;
+}
+
+export interface EndParams extends BaseParams {
+  [key: string]: unknown;
+}
+
+/**
+ * Transform node parameters
+ */
+export type TransformParams = BaseParams;
+// Inherits transforms?: TransformOperation[] from BaseParams
+// No additional parameters needed
 
 /**
  * Union type for all workflow node parameters
@@ -129,4 +163,5 @@ export type NodeParameters =
   | WorkflowParams
   | StartParams
   | EndParams
-  | ConditionalParams;
+  | ConditionalParams
+  | TransformParams;

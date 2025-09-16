@@ -115,6 +115,13 @@ if (data.type === 'content') {
 
 ## Benefits
 
+### ✅ **True Delta Streaming**
+
+- **Content chunks sent as deltas, not accumulated values**
+- Server tracks position and sends only new content chunks
+- Client builds content incrementally from individual deltas
+- Dramatically reduces bandwidth usage for long responses
+
 ### ✅ **Unified Response Format**
 
 - `/api/v1/conversations/xxx/messages` always returns the same structure
@@ -126,6 +133,7 @@ if (data.type === 'content') {
 - Complete message arrays built piece by piece
 - Supports complex message structures
 - Real-time updates to any message field
+- Content chunks accumulated client-side for optimal performance
 
 ### ✅ **Backward Compatibility**
 
@@ -141,56 +149,88 @@ if (data.type === 'content') {
 
 ### ✅ **Performance Optimized**
 
-- Only sends deltas, not full state
+- **Only sends deltas, not full accumulated state**
+- **Each content chunk sent once with position metadata**
 - Efficient for large conversation histories
-- Reduced bandwidth usage
+- **Significant bandwidth reduction for streaming responses**
 
 ## Usage Examples
 
 ### Server-Side Streaming
 
 ```typescript
-// In AutopilotStreamService
-const encoder = new ArrayDeltaEncoder<MessageModel>([]);
+// In ConversationService - Delta Content Streaming
+case 'content_chunk': {
+  const content = String(chunkContent.choices[0].delta.content);
 
-// Add system message
-const systemResult = encoder.append({
-  id: 'sys-1',
-  role: 'system',
-  content: '🚀 Agent workflow started',
-  // ... other fields
-});
+  // Track accumulated content server-side for completion
+  const currentContent = this.streamingContent.get(conversationId) || '';
+  const currentLength = currentContent.length;
+  const newContent = currentContent + content;
+  this.streamingContent.set(conversationId, newContent);
 
-// Broadcast patch
-await this.broadcastPatch(systemResult.patch, systemResult.version, systemResult.state);
+  // Send ONLY the delta chunk with position metadata
+  const delta: Operation = {
+    op: 'add',
+    path: '/messages/-1/contentChunks/-',
+    value: {
+      content: content,        // ✅ Only the new chunk
+      position: currentLength, // ✅ Position for ordering
+      timestamp: Date.now(),   // ✅ Timing info
+    },
+  };
+  await this.streamingService.broadcastDelta(conversationId, delta);
+}
 
-// Start assistant message
-const assistantResult = encoder.append({
-  id: 'asst-1',
-  role: 'assistant',
-  content: '',
-  processingStatus: 'streaming',
-});
-
-// Update content incrementally
-const contentResult = encoder.replace('/1/content', accumulatedContent);
-await this.broadcastPatch(contentResult.patch, contentResult.version, contentResult.state);
+// Initialize streaming message with contentChunks array
+const delta: Operation = {
+  op: 'add',
+  path: '/messages/-',
+  value: { ...assistantMessage, streaming: true, contentChunks: [] },
+};
 ```
+
+**Key Improvement**: Instead of sending accumulated content (`"Hello" → "Hello world" → "Hello world!"`), we send individual chunks (`"Hello" → " world" → "!"`) with position metadata.
 
 ### Client-Side Consumption
 
 ```typescript
-// In streaming event handler
-if (data.type === 'patch') {
-  const patchResult = safeApplyPatch(currentMessages, data.patch);
+// In useConversations hook - Content chunk accumulation
+const processContentChunks = (data: any) => {
+  const processedMessages = data.messages.map((message: ClientMessage) => {
+    // If message has contentChunks, build the streamed content
+    if (message.contentChunks && Array.isArray(message.contentChunks)) {
+      // Sort chunks by position to ensure correct order
+      const sortedChunks = [...message.contentChunks].sort((a, b) => a.position - b.position);
 
-  if (patchResult.success) {
-    // Update React state with new message array
-    setMessages(patchResult.result);
-    setVersion(data.version);
-  }
-}
+      // Build content from individual delta chunks
+      let streamedContent = '';
+      for (const chunk of sortedChunks) {
+        streamedContent += chunk.content; // ✅ Accumulate deltas client-side
+      }
+
+      return {
+        ...message,
+        content: message.streaming ? streamedContent : message.content,
+        streamedContent: streamedContent,
+      };
+    }
+    return message;
+  });
+  return { ...data, messages: processedMessages };
+};
+
+// In MessageContent component - Display delta-built content
+const displayContent = useMemo(() => {
+  if (!isStreaming || !contentChunks.length) return content;
+
+  // Build from sorted delta chunks
+  const sortedChunks = [...contentChunks].sort((a, b) => a.position - b.position);
+  return sortedChunks.reduce((acc, chunk) => acc + chunk.content, '');
+}, [content, contentChunks, isStreaming]);
 ```
+
+**Key Improvement**: Client efficiently accumulates individual content deltas, eliminating redundant data transmission.
 
 ## Migration Guide
 

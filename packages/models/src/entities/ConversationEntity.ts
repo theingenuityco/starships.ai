@@ -7,7 +7,7 @@
 
 import { Transformers } from '@/helpers/serializer';
 import type { ConversationModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 /**
@@ -42,33 +42,11 @@ export class ConversationEntity implements ConversationModel {
   status!: 'active' | 'paused' | 'completed' | 'archived';
 
   /**
-   * Deserialize database record into ConversationEntity
-   * Converts raw database records to fully typed and validated ConversationEntity instances
-   */
-  static deserialize(data: Record<string, unknown>): ConversationEntity {
-    return plainToInstance(ConversationEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Serialize ConversationEntity to database record
-   * Converts entity instance to plain object suitable for database storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
    * Simple validation function using class-validator
    * This replaces the complex ConversationValidation class with a lean solution
    */
   static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new Error('Data must be an object');
     }
     const dataRecord = data as Record<string, unknown>;
@@ -80,7 +58,7 @@ export class ConversationEntity implements ConversationModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt,
-        title: dataRecord.title || 'Untitled Conversation',
+        title: dataRecord.title, // Don't provide default during validation
         status: dataRecord.status || 'active',
         ...dataRecord,
       });

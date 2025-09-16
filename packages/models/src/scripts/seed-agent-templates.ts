@@ -6,280 +6,132 @@
 import { getConnection } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
-import { AgentMemoryState, Blueprint } from '@starships/autopilot';
+import { Agent, AgentMemoryState, Blueprint } from '@starships/autopilot';
 import { AgentTemplateModel } from '@starships/protocol';
 
 /**
- * Create default blueprint for simple agents
+ * Create simple agent blueprint using Agent building methods
  */
 function createSimpleBlueprint(model: string, temperature: number = 0.7, maxTokens: number = 2000): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start',
-        type: 'start',
-        name: 'Start',
-        description: 'Begin conversation',
-        parameters: {},
-      },
-      {
-        ref: 'chat-response',
-        type: 'llm',
-        name: 'Generate Response',
-        description: 'Process user input and respond',
-        parameters: {
-          model,
-          prompt: 'Respond helpfully to the user based on the conversation context and your system instructions.',
-          temperature,
-          maxTokens,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'end',
-        type: 'end',
-        name: 'End',
-        description: 'Complete conversation',
-        parameters: {},
-      },
-    ],
-    edges: [
-      { ref: 'edge-1', from: 'start', to: 'chat-response' },
-      { ref: 'edge-2', from: 'chat-response', to: 'end' },
-    ],
-    metadata: {
-      version: '1.0',
-      type: 'simple-chat',
-      complexity: 'basic',
-    },
-  };
+  return new Agent({ name: 'Simple Chat Agent', model, temperature, maxTokens })
+    .defineRole('General Assistant', ['conversation', 'problem solving'])
+    .respondTo('the user input', {
+      name: 'Generate Response',
+      style: 'helpful and conversational',
+    })
+    .getCurrentBlueprint();
 }
 
 /**
- * Create workflow blueprint for code review
+ * Create code review agent using Agent building methods
  */
 function createCodeReviewBlueprint(): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start',
-        type: 'start',
-        name: 'Start',
-        description: 'Begin code review process',
-        parameters: {},
-      },
-      {
-        ref: 'analyze-structure',
-        type: 'llm',
-        name: 'Analyze Code Structure',
-        description: 'Review overall code architecture and organization',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Analyze the code structure, architecture, and organization. Identify any structural issues.',
-          temperature: 0.2,
-          maxTokens: 1000,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'check-best-practices',
-        type: 'llm',
-        name: 'Check Best Practices',
-        description: 'Evaluate adherence to coding best practices',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Review the code for adherence to best practices, naming conventions, and code quality standards.',
-          temperature: 0.1,
-          maxTokens: 1200,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'generate-recommendations',
-        type: 'llm',
-        name: 'Generate Recommendations',
-        description: 'Provide comprehensive improvement recommendations',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Based on all analysis, provide specific, actionable recommendations for code improvement.',
-          temperature: 0.3,
-          maxTokens: 1500,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'end',
-        type: 'end',
-        name: 'End',
-        description: 'Complete code review workflow',
-        parameters: {},
-      },
-    ],
-    edges: [
-      { ref: 'edge-1', from: 'start', to: 'analyze-structure' },
-      { ref: 'edge-2', from: 'analyze-structure', to: 'check-best-practices' },
-      { ref: 'edge-3', from: 'check-best-practices', to: 'generate-recommendations' },
-      { ref: 'edge-4', from: 'generate-recommendations', to: 'end' },
-    ],
-    metadata: {
-      version: '1.0',
-      type: 'code-review-workflow',
-      complexity: 'advanced',
-      focus: ['structure', 'best-practices', 'recommendations'],
-    },
-  };
+  return new Agent({
+    name: 'Code Review Agent',
+    model: 'anthropic/claude-3.5-sonnet',
+    temperature: 0.2,
+    maxTokens: 3000,
+  })
+    .defineRole('Expert Code Reviewer', ['software architecture', 'code quality', 'security practices', 'performance optimization'])
+    .defineCapabilities('comprehensive code analysis and improvement recommendations', {
+      examples: [
+        'Analyze code structure and architecture',
+        'Check adherence to best practices and conventions',
+        'Identify security vulnerabilities and performance issues',
+        'Provide specific, actionable improvement suggestions',
+      ],
+    })
+    .behaviorAlways('provide constructive and specific feedback', { priority: 'high' })
+    .behaviorAlways('explain the reasoning behind recommendations')
+    .thinkThrough(
+      [
+        'Analyze the overall code structure and architecture',
+        'Check for adherence to best practices and naming conventions',
+        'Look for potential security issues or performance problems',
+        'Formulate specific, actionable improvement recommendations',
+      ],
+      { style: 'analytical' }
+    )
+    .respondTo('the code to be reviewed', {
+      name: 'Provide Code Review',
+      style: 'thorough and constructive',
+    })
+    .getCurrentBlueprint();
 }
 
 /**
- * Create workflow blueprint for starship navigator
+ * Create starship navigator agent using Agent building methods
  */
 function createStarshipNavigatorBlueprint(): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start',
-        type: 'start',
-        name: 'Start',
-        description: 'Begin starship navigation assistance',
-        parameters: {},
-      },
-      {
-        ref: 'assess-needs',
-        type: 'llm',
-        name: 'Assess Captain Needs',
-        description: 'Understand what the captain needs help with',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt:
-            'As an experienced starship navigator, assess what the captain needs help with regarding their starship operations, setup, or journey.',
-          temperature: 0.3,
-          maxTokens: 800,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'provide-guidance',
-        type: 'llm',
-        name: 'Provide Navigation Guidance',
-        description: 'Offer expert starship guidance and next steps',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt:
-            'Provide clear, actionable guidance on starship operations, crew management, or system configuration. Include specific next steps.',
-          temperature: 0.4,
-          maxTokens: 1200,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'offer-assistance',
-        type: 'llm',
-        name: 'Offer Further Assistance',
-        description: 'Suggest additional ways to help the captain',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Suggest additional resources, features, or assistance that might help the captain with their starship journey.',
-          temperature: 0.5,
-          maxTokens: 1000,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'end',
-        type: 'end',
-        name: 'End',
-        description: 'Complete navigation assistance',
-        parameters: {},
-      },
-    ],
-    edges: [
-      { ref: 'edge-1', from: 'start', to: 'assess-needs' },
-      { ref: 'edge-2', from: 'assess-needs', to: 'provide-guidance' },
-      { ref: 'edge-3', from: 'provide-guidance', to: 'offer-assistance' },
-      { ref: 'edge-4', from: 'offer-assistance', to: 'end' },
-    ],
-    metadata: {
-      version: '1.0',
-      type: 'starship-navigator-workflow',
-      complexity: 'intermediate',
-      focus: ['assessment', 'guidance', 'assistance'],
-    },
-  };
+  return new Agent({
+    name: 'Sibyl',
+    model: 'anthropic/claude-3.5-sonnet',
+    temperature: 0.4,
+    maxTokens: 2000,
+  })
+    .definePersonality(['knowledgeable', 'welcoming', 'expert guide'], { strength: 'strong' })
+    .defineRole('Starship Navigator and First Officer', [
+      'starship operations',
+      'crew management',
+      'system configuration',
+      'onboarding guidance',
+    ])
+    .defineCapabilities('guiding new captains through their starship journey', {
+      examples: [
+        'Help set up and configure starship systems',
+        'Explain crew management and agent deployment',
+        'Provide guidance on starship operations',
+        'Assist with onboarding and getting started',
+      ],
+    })
+    .behaviorAlways('prioritize safety and best practices', { priority: 'high' })
+    .behaviorAlways('maintain professional starship protocols')
+    .learnThat('I am an experienced starship navigator helping new captains succeed')
+    .learnFrom('The starship bridge is where I help new captains learn the ropes and get their vessels operational', {
+      importance: 'important',
+    })
+    .thinkAbout('what the captain needs help with regarding their starship')
+    .processInput("the captain's question or request", { type: 'analytical' })
+    .respondWith('expert starship guidance and specific next steps')
+    .getCurrentBlueprint();
 }
 
 /**
- * Create workflow blueprint for creative writing
+ * Create creative writing agent using Agent building methods
  */
 function createCreativeWritingBlueprint(): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start',
-        type: 'start',
-        name: 'Start',
-        description: 'Begin creative writing process',
-        parameters: {},
-      },
-      {
-        ref: 'brainstorm-ideas',
-        type: 'llm',
-        name: 'Brainstorm Ideas',
-        description: 'Generate creative concepts and themes',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt: "Based on the user's request, brainstorm creative ideas, themes, and approaches for this writing project.",
-          temperature: 0.9,
-          maxTokens: 800,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'develop-outline',
-        type: 'llm',
-        name: 'Develop Outline',
-        description: 'Create structured outline from ideas',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Create a detailed outline that structures the best ideas from the brainstorming session.',
-          temperature: 0.6,
-          maxTokens: 1000,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'write-content',
-        type: 'llm',
-        name: 'Write Content',
-        description: 'Generate the main creative content',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          prompt: 'Write the creative content following the outline, focusing on engaging storytelling and vivid details.',
-          temperature: 0.8,
-          maxTokens: 2500,
-          stream: true, // Enable streaming
-        },
-      },
-      {
-        ref: 'end',
-        type: 'end',
-        name: 'End',
-        description: 'Complete creative writing workflow',
-        parameters: {},
-      },
-    ],
-    edges: [
-      { ref: 'edge-1', from: 'start', to: 'brainstorm-ideas' },
-      { ref: 'edge-2', from: 'brainstorm-ideas', to: 'develop-outline' },
-      { ref: 'edge-3', from: 'develop-outline', to: 'write-content' },
-      { ref: 'edge-4', from: 'write-content', to: 'end' },
-    ],
-    metadata: {
-      version: '1.0',
-      type: 'creative-workflow',
-      complexity: 'intermediate',
-      stages: ['ideation', 'planning', 'creation'],
-    },
-  };
+  return new Agent({
+    name: 'Creative Writer',
+    model: 'anthropic/claude-3.5-sonnet',
+    temperature: 0.8,
+    maxTokens: 2500,
+  })
+    .definePersonality(['imaginative', 'inspiring', 'innovative'], { strength: 'strong' })
+    .defineRole('Creative Writing Specialist', ['storytelling', 'character development', 'creative writing techniques', 'content strategy'])
+    .defineCapabilities('creating engaging and original creative content', {
+      examples: [
+        'Generate creative story ideas and concepts',
+        'Develop compelling characters and narratives',
+        'Create structured outlines and story plans',
+        'Write engaging content with vivid descriptions',
+      ],
+    })
+    .behaviorAlways('encourage creativity and original thinking', { priority: 'high' })
+    .behaviorAlways('provide fresh and innovative perspectives')
+    .learnThat('I help writers through a structured creative process from ideation to final content')
+    .thinkThrough(
+      [
+        'Brainstorm creative ideas and themes based on the request',
+        'Develop and organize the best ideas into a structured outline',
+        'Create engaging content that brings the ideas to life',
+      ],
+      { style: 'creative' }
+    )
+    .respondTo('the writing request', {
+      name: 'Create Content',
+      style: 'creative and engaging',
+    })
+    .getCurrentBlueprint();
 }
 
 /**

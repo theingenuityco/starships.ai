@@ -7,7 +7,7 @@
 
 import { Transformers } from '@/helpers/serializer';
 import type { BillingPeriod, StarshipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
@@ -23,8 +23,8 @@ export class StarshipTransformers {
       return value
         .toLowerCase()
         .trim()
-        .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-        .replace(/\s+/g, '-') // Replace spaces with hyphens
+        .replace(/[^a-z0-9\s-_]/g, '') // Remove special characters except spaces, hyphens, and underscores
+        .replace(/[\s_]+/g, '-') // Replace spaces and underscores with hyphens
         .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
         .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
     });
@@ -120,26 +120,6 @@ export class StarshipEntity implements StarshipModel {
   @IsString()
   @Length(1, 255)
   stripeCustomerId?: string;
-
-  /**
-   * Static factory method for creating StarshipEntity from raw data
-   */
-  static deserialize(data: Record<string, unknown>): StarshipEntity {
-    return plainToInstance(StarshipEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Instance method for converting entity to plain object for storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
 
   /**
    * Simple validation function using class-validator
@@ -304,7 +284,7 @@ export class StarshipEntity implements StarshipModel {
       agents: {
         used: currentAgentCount,
         max: this.maxAgents,
-        percentage: Math.round((currentAgentCount / this.maxAgents) * 100),
+        percentage: this.maxAgents === 0 ? 0 : Math.round((currentAgentCount / this.maxAgents) * 100),
       },
     };
   }
@@ -316,8 +296,8 @@ export class StarshipEntity implements StarshipModel {
     return name
       .toLowerCase()
       .trim()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters except spaces and hyphens
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/[^a-z0-9\s-_]/g, '') // Remove special characters except spaces, hyphens, and underscores
+      .replace(/[\s_]+/g, '-') // Replace spaces and underscores with hyphens
       .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
       .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
   }

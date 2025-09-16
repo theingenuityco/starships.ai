@@ -70,6 +70,9 @@ importers:
 
   packages/autopilot:
     dependencies:
+      fast-json-patch:
+        specifier: ^3.1.1
+        version: 3.1.1
       jsonata:
         specifier: ^2.0.3
         version: 2.1.0
@@ -95,6 +98,9 @@ importers:
 
   packages/client:
     dependencies:
+      '@microsoft/fetch-event-source':
+        specifier: ^2.0.1
+        version: 2.0.1
       '@next/third-parties':
         specifier: ^15.5.2
         version: 15.5.2(next@15.4.7(@opentelemetry/api@1.9.0)(@playwright/test@1.53.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(react@19.1.0)
@@ -167,6 +173,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      fast-json-patch:
+        specifier: ^3.1.1
+        version: 3.1.1
       lucide-react:
         specifier: ^0.525.0
         version: 0.525.0(react@19.1.0)
@@ -366,6 +375,9 @@ importers:
       '@starships/autopilot':
         specifier: workspace:*
         version: link:../autopilot
+      fast-json-patch:
+        specifier: ^3.1.1
+        version: 3.1.1
     devDependencies:
       '@types/node':
         specifier: ^24.0.10
@@ -458,6 +470,9 @@ importers:
       express-rate-limit:
         specifier: ^7.5.1
         version: 7.5.1(express@5.1.0)
+      fast-json-patch:
+        specifier: ^3.1.1
+        version: 3.1.1
       jose:
         specifier: ^6.0.11
         version: 6.0.11
@@ -1177,6 +1192,9 @@ packages:
   '@langchain/core@0.2.36':
     resolution: {integrity: sha512-qHLvScqERDeH7y2cLuJaSAlMwg3f/3Oc9nayRSXRU2UuaK/SOhI42cxiPLj1FnuHJSmN0rBQFkrLx02gI4mcVg==}
     engines: {node: '>=18'}
+
+  '@microsoft/fetch-event-source@2.0.1':
+    resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
 
   '@napi-rs/wasm-runtime@0.2.11':
     resolution: {integrity: sha512-9DPkXtvHydrcOsopiYpUgPHpmj0HWZKMUnL2dZqpvC42lsratuBG06V5ipyno0fUek5VlFsNQ+AcFATSrJXgMA==}
@@ -3211,6 +3229,9 @@ packages:
   fast-glob@3.3.3:
     resolution: {integrity: sha512-7MptL8U0cqcFdzIzwOTHoilX9x5BrNqye7Z/LuC7kCMRio1EMSyqRK3BEAUD7sXRq4iT4AzTVuZdhgQ2TCvYLg==}
     engines: {node: '>=8.6.0'}
+
+  fast-json-patch@3.1.1:
+    resolution: {integrity: sha512-vf6IHUX2SBcA+5/+4883dsIjpBTqmfBjmYiWK1savxQmFk4JfBMLa7ynTYOs1Rolp/T1betJxHiGD3g1Mn8lUQ==}
 
   fast-json-stable-stringify@2.1.0:
     resolution: {integrity: sha512-lhd/wF+Lk98HZoTCtlVraHtfh5XYijIjalXck7saUtuanSDyLMxnHhSXEDJqHxD7msR8D0uCmqlkwjCV8xvwHw==}
@@ -6750,6 +6771,8 @@ snapshots:
     transitivePeerDependencies:
       - openai
 
+  '@microsoft/fetch-event-source@2.0.1': {}
+
   '@napi-rs/wasm-runtime@0.2.11':
     dependencies:
       '@emnapi/core': 1.4.4
@@ -9065,6 +9088,8 @@ snapshots:
       glob-parent: 5.1.2
       merge2: 1.4.1
       micromatch: 4.0.8
+
+  fast-json-patch@3.1.1: {}
 
   fast-json-stable-stringify@2.1.0: {}
 

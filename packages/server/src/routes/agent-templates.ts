@@ -8,21 +8,14 @@ import { createPaginationMeta, handleError, sendError, sendSuccess } from '../ut
 const router: Router = Router();
 
 // Zod schemas for validation
-const IdSchema = z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid ID format');
+const IdSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format');
 const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
 const CreateAgentFromTemplateSchema = z.object({
-  agentName: z
-    .string()
-    .min(1, 'Agent name is required and must be a non-empty string')
-    .max(255, 'Agent name must be less than 255 characters'),
-  starshipId: z
-    .string()
-    .regex(/^([a-z0-9]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug')
-    .optional(),
+  starshipId: z.string().regex(/^([a-z0-9]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug'),
 });
 
 // Helper function for Zod validation
@@ -48,16 +41,6 @@ const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
     }
     return null;
   }
-};
-
-// Helper function for authentication check
-const checkAuth = (req: Request, res: Response): boolean => {
-  const user = req.user;
-  if (!user?.id) {
-    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-    return false;
-  }
-  return true;
 };
 
 // Helper function to get AgentTemplateService instance
@@ -135,7 +118,6 @@ router.get('/agent-templates/:id', jwtAuthMiddleware, async (req: Request, res: 
 router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { templateId } = req.params;
-    const { agentName, starshipId } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -147,14 +129,11 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     const paramValidation = validateData(z.object({ templateId: IdSchema }), req.params, res, 'template parameter');
     if (!paramValidation) return;
 
-    // Validate required fields
-    if (!agentName || typeof agentName !== 'string' || !agentName.trim()) {
-      sendError(res, 'MISSING_REQUIRED_FIELD', 'agentName is required and must be a non-empty string', 400, {
-        field: 'agentName',
-        provided: typeof agentName,
-      });
-      return;
-    }
+    // Validate request body using the schema
+    const bodyValidation = validateData(CreateAgentFromTemplateSchema, req.body, res, 'request body');
+    if (!bodyValidation) return;
+
+    const { starshipId } = bodyValidation;
 
     const templateService = getAgentTemplateService();
     if (!templateService) {
@@ -172,157 +151,45 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
       return;
     }
 
-    // Determine the target starship ID
-    let targetStarshipId = starshipId;
+    // Validate provided starshipId exists and belongs to user using service layer
+    try {
+      const starship = await templateService.validateStarshipAccess(starshipId, userId);
+      console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${starshipId}) for agent creation`);
+    } catch (starshipError: any) {
+      console.error('[TEMPLATE] Error validating starship access:', {
+        starshipId: starshipId,
+        errorName: starshipError?.name,
+        errorMessage: starshipError?.message,
+        fullError: starshipError,
+      });
 
-    // If no starshipId provided, get user's first active starship as fallback
-    if (!targetStarshipId) {
-      try {
-        const activeStarship = await templateService.findUserActiveStarship(userId);
-
-        if (!activeStarship) {
-          sendError(res, 'VALIDATION_ERROR', 'No starship specified and no active starships found', 400, {
-            details: 'Please provide a starshipId or create an active starship first',
-          });
-          return;
-        }
-
-        targetStarshipId = activeStarship.id;
-        console.log(`[TEMPLATE] Using fallback starship "${activeStarship.name}" (${targetStarshipId}) for agent creation`);
-      } catch (starshipError) {
-        console.error('[TEMPLATE] Error finding user starships:', starshipError);
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to determine target starship', 500, {
-          details: 'Could not retrieve user starships to create agent',
+      if (starshipError?.name === 'NotFoundError') {
+        sendError(res, 'RESOURCE_NOT_FOUND', starshipError.message || 'Starship not found', 404, {
+          resource: 'starship',
+          id: starshipId,
+          hint: 'Please ensure you have access to a starship before creating agents',
         });
-        return;
-      }
-    } else {
-      // Validate starshipId format (accepts both IDs and slugs)
-      const starshipValidation = validateData(
-        z.object({ starshipId: z.string().regex(/^([a-z0-9_-]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug') }),
-        { starshipId: targetStarshipId },
-        res,
-        'starship identifier'
-      );
-      if (!starshipValidation) return;
-
-      // Validate provided starshipId exists and belongs to user using service layer
-      try {
-        const starship = await templateService.validateStarshipAccess(targetStarshipId, userId);
-        console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${targetStarshipId}) for agent creation`);
-      } catch (starshipError: any) {
-        console.error('[TEMPLATE] Error validating starship access:', {
-          starshipId: targetStarshipId,
-          userId,
-          errorName: starshipError?.name,
-          errorMessage: starshipError?.message,
-          fullError: starshipError,
+      } else if (starshipError?.name === 'ValidationError') {
+        sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
+          details: 'You do not have permission to create agents on this starship',
         });
-
-        if (starshipError?.name === 'NotFoundError') {
-          sendError(res, 'RESOURCE_NOT_FOUND', starshipError.message || 'Starship not found', 404, {
-            resource: 'starship',
-            id: targetStarshipId,
-            hint: 'Please ensure you have access to a starship before creating agents',
-          });
-        } else if (starshipError?.name === 'ValidationError') {
-          sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
-            details: 'You do not have permission to create agents on this starship',
-          });
-        } else {
-          sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate starship', 500, {
-            details: 'Could not verify starship ownership and existence',
-          });
-        }
-        return;
+      } else {
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate starship', 500, {
+          details: 'Could not verify starship ownership and existence',
+        });
       }
+      return;
     }
 
     // Create agent from template with validated starship ID
-    const agent = await templateService.createAgentFromTemplate(templateId, agentName.trim(), userId, targetStarshipId);
+    const agent = await templateService.createAgentFromTemplate(templateId, starshipId);
 
     // Log the creation for audit purposes
-    console.log(
-      `[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${userId} on starship ${targetStarshipId}`
-    );
+    console.log(`[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${userId} on starship ${starshipId}`);
 
     sendSuccess(res, agent, 201);
   } catch (error) {
     handleError(error, res, 'creating agent from template');
-  }
-});
-
-// POST /agent-templates/from-agents/:agentId - Convert a public agent to a template (OpenAPI pattern)
-router.post('/agent-templates/from-agents/:agentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    console.log('[TEMPLATE] Convert agent to template request received:', req.params);
-    const { agentId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-
-    // Validate agentId format
-    const paramValidation = validateData(z.object({ agentId: IdSchema }), req.params, res, 'agent parameter');
-    if (!paramValidation) return;
-
-    console.log('[TEMPLATE] Getting template service...');
-    const templateService = getAgentTemplateService();
-    if (!templateService) {
-      sendError(res, 'SERVICE_UNAVAILABLE', 'Template service not available', 503);
-      return;
-    }
-
-    // Validate agent using service layer
-    console.log('[TEMPLATE] Validating agent for template conversion...');
-    let agent;
-    try {
-      agent = await templateService.validateAgentForTemplate(agentId, userId);
-      console.log('[TEMPLATE] Agent validated:', agent.id, agent.name);
-    } catch (agentError: any) {
-      console.error('[TEMPLATE] Agent validation failed:', agentError);
-      if (agentError?.name === 'NotFoundError') {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-          resource: 'agent',
-          id: agentId,
-        });
-      } else if (agentError?.name === 'ValidationError') {
-        if (agentError?.message?.includes('public')) {
-          sendError(res, 'VALIDATION_ERROR', 'Only public agents can be converted to templates', 400, {
-            field: 'isPublic',
-            constraint: 'must_be_public',
-          });
-        } else {
-          sendError(res, 'ACCESS_DENIED', 'Access denied', 403, {
-            details: 'You can only convert your own agents to templates',
-          });
-        }
-      } else {
-        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to validate agent', 500);
-      }
-      return;
-    }
-
-    // Create template from agent using any type to bypass TypeScript error
-    console.log('[TEMPLATE] Creating template from agent using type assertion...');
-    const template = await (templateService as any).createTemplateFromAgent(agentId);
-
-    if (!template) {
-      console.log('[TEMPLATE] Error: Failed to create template');
-      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to convert agent to template');
-      return;
-    }
-
-    // Log the conversion for audit purposes
-    console.log(`[TEMPLATE] Agent "${agent.name}" converted to template by user ${userId}`);
-    console.log('[TEMPLATE] Template created:', template.id, template.name);
-
-    sendSuccess(res, template, 201);
-  } catch (error) {
-    console.error('Error converting agent to template:', error);
-    handleError(error, res, 'converting agent to template');
   }
 });
 

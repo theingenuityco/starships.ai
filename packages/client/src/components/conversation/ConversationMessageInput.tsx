@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useConversation } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
 import { Mic, Paperclip, Send, StopCircle } from 'lucide-react'
-import { forwardRef, KeyboardEvent, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, KeyboardEvent, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 
 // Simplified message interface for UI callbacks
 interface MessageNotification {
@@ -31,6 +32,7 @@ interface ConversationMessageInputProps {
 
 export interface ConversationMessageInputRef {
   handleSuggestionSubmit: (suggestion: string) => Promise<void>
+  focusInput: () => void
 }
 
 export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, ConversationMessageInputProps>(
@@ -42,9 +44,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
 
-    // Use unified conversation hook when we have a conversationId
-    const { sendMessage: sendMessageFn, isSending } = useConversation(conversationId || null)
-    const isStreaming = isSending
+    // Use unified conversation hook (convert undefined to null for the hook)
+    const { sendMessage: sendMessageFn, isSending, isStreaming } = useConversation(conversationId ?? null)
+    // Also consider UI store streaming state to avoid mismatches
+    const uiStreaming = useStarshipUIStore(s => (conversationId ? s.conversationsStreaming[conversationId]?.isStreaming === true : false))
+    const isStreamingEffective = isStreaming || uiStreaming
+    // Track previous streaming state to detect transition to complete and refocus input
+    const prevIsStreamingRef = useRef(isStreamingEffective)
 
     // Auto-focus on textarea when component mounts and when agent is selected
     useEffect(() => {
@@ -57,7 +63,37 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
     }, [selectedAgent, disabled])
 
-    const handleSubmit = async () => {
+    // When streaming completes, re-enable and focus the textarea
+    useEffect(() => {
+      const wasStreaming = prevIsStreamingRef.current
+      if (wasStreaming && !isStreamingEffective && !disabled && !sending) {
+        const t = setTimeout(() => {
+          textareaRef.current?.focus()
+        }, 50)
+        prevIsStreamingRef.current = isStreamingEffective
+        return () => clearTimeout(t)
+      }
+      prevIsStreamingRef.current = isStreamingEffective
+    }, [isStreamingEffective, disabled, sending])
+
+    // Secondary guard: whenever input becomes enabled, ensure focus
+    useEffect(() => {
+      if (!isStreamingEffective && !sending && !disabled && selectedAgent) {
+        const t = setTimeout(() => {
+          textareaRef.current?.focus()
+        }, 80)
+        return () => clearTimeout(t)
+      }
+    }, [isStreamingEffective, sending, disabled, selectedAgent])
+
+    // Sync local 'sending' with streaming completion to avoid stuck disabled/loading state
+    useEffect(() => {
+      if (!isStreamingEffective && sending) {
+        setSending(false)
+      }
+    }, [isStreamingEffective, sending])
+
+    const handleSubmit = useCallback(async () => {
       const messageToSend = message.trim()
       if (!messageToSend || sending || disabled) return
 
@@ -77,21 +113,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Create conversation if one doesn't exist
         let currentConversationId = conversationId
         if (!currentConversationId) {
-          console.log('Creating new conversation for agent chat...')
           const newConversation = await createConversation.mutateAsync({
             title: `Chat with ${selectedAgent.name}`,
             starshipId: starshipId,
+            agentId: selectedAgent.id,
           })
           currentConversationId = newConversation.id
           onConversationStart?.(currentConversationId!)
-          console.log('Conversation created:', currentConversationId)
+        }
+
+        // Clear input and reset UI immediately for better UX
+        setMessage('')
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
         }
 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
-        // Send message with streaming (this handles everything: saves message + gets agent response)
-        await sendMessageFn({
+        // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
+        void sendMessageFn({
           conversationId: currentConversationId!,
           agentId: selectedAgent!.id,
           content: messageToSend,
@@ -100,72 +141,83 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           messageType: 'user_input',
           stream: true,
         })
+          .catch(error => {
+            console.error('Failed to send message:', error)
+            // Restore message on error
+            setMessage(messageToSend)
+          })
+          .finally(() => {
+            setSending(false)
+          })
 
-        // No need to manage streamId - streaming hook will use conversationId directly
-
-        // Clear input and reset UI
-        setMessage('')
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
-        }
+        // Exit early to avoid hitting catch/finally paths
+        return
       } catch (error) {
         console.error('Failed to send message:', error)
-      } finally {
+        // Restore message and ensure local sending cleared on immediate failure
+        setMessage(messageToSend)
         setSending(false)
       }
-    }
+    }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId])
 
     // Handle suggestion clicks
-    const handleSuggestionSubmit = async (suggestionText: string) => {
-      if (!suggestionText || sending || disabled) return
+    const handleSuggestionSubmit = useCallback(
+      async (suggestionText: string) => {
+        if (!suggestionText || sending || disabled) return
 
-      // Validation for agent
-      if (!selectedAgent) {
-        console.error('No agent selected')
-        return
-      }
-
-      if (!userId) {
-        console.error('User not authenticated')
-        return
-      }
-
-      try {
-        setSending(true)
-        // Create conversation if one doesn't exist
-        let currentConversationId = conversationId
-        if (!currentConversationId) {
-          console.log('Creating new conversation for agent chat suggestion...')
-          const newConversation = await createConversation.mutateAsync({
-            title: `Chat with ${selectedAgent.name}`,
-            starshipId: starshipId,
-          })
-          currentConversationId = newConversation.id
-          onConversationStart?.(currentConversationId!)
-          console.log('Conversation created:', currentConversationId)
+        // Validation for agent
+        if (!selectedAgent) {
+          console.error('No agent selected')
+          return
         }
 
-        // Notify parent about message activity immediately (for UI state updates)
-        onMessageSent?.()
+        if (!userId) {
+          console.error('User not authenticated')
+          return
+        }
 
-        // Send message with streaming (this handles everything: saves message + gets agent response)
-        await sendMessageFn({
-          conversationId: currentConversationId!,
-          agentId: selectedAgent!.id,
-          content: suggestionText,
-          role: 'user',
-          starshipId: starshipId!,
-          messageType: 'user_input',
-          stream: true,
-        })
+        try {
+          setSending(true)
+          // Create conversation if one doesn't exist
+          let currentConversationId = conversationId
+          if (!currentConversationId) {
+            const newConversation = await createConversation.mutateAsync({
+              title: `Chat with ${selectedAgent.name}`,
+              starshipId: starshipId,
+              agentId: selectedAgent.id,
+            })
+            currentConversationId = newConversation.id
+            onConversationStart?.(currentConversationId!)
+          }
 
-        // No need to manage streamId - streaming hook will use conversationId directly
-      } catch (error) {
-        console.error('Failed to send suggestion:', error)
-      } finally {
-        setSending(false)
-      }
-    }
+          // Notify parent about message activity immediately (for UI state updates)
+          onMessageSent?.()
+
+          // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
+          void sendMessageFn({
+            conversationId: currentConversationId!,
+            agentId: selectedAgent!.id,
+            content: suggestionText,
+            role: 'user',
+            starshipId: starshipId!,
+            messageType: 'user_input',
+            stream: true,
+          })
+            .catch(error => {
+              console.error('Failed to send suggestion:', error)
+            })
+            .finally(() => {
+              setSending(false)
+            })
+
+          return
+        } catch (error) {
+          console.error('Failed to send suggestion:', error)
+          setSending(false)
+        }
+      },
+      [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
+    )
 
     const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -189,16 +241,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     const getPlaceholder = () => {
+      if (isStreamingEffective) return 'AI is thinking...'
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
-    const canSend = message.trim() && !disabled && !sending && !isStreaming && selectedAgent
+    const canSend = message.trim() && !disabled && !sending && !isStreamingEffective && selectedAgent
 
     // Expose methods to parent component via ref
     useImperativeHandle(
       ref,
       () => ({
         handleSuggestionSubmit,
+        focusInput: () => {
+          textareaRef.current?.focus()
+        },
       }),
       [handleSuggestionSubmit]
     )
@@ -226,7 +282,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 onChange={handleTextareaChange}
                 onKeyPress={handleKeyPress}
                 placeholder={getPlaceholder()}
-                disabled={disabled || sending || isStreaming}
+                disabled={disabled || sending || isStreamingEffective}
                 className={cn(
                   'w-full bg-transparent resize-none',
                   minimal ? 'min-h-[20px] max-h-[80px]' : 'min-h-[24px] max-h-[120px]',
@@ -238,6 +294,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 rows={1}
               />
             </div>
+
+            {/* Minimal mode: Send button inline */}
+            {minimal && (
+              <Button
+                onClick={handleSubmit}
+                disabled={!canSend}
+                size="icon"
+                className={cn(
+                  'h-8 w-8 rounded-full shrink-0 transition-all ml-2',
+                  canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
+                )}
+              >
+                {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
 
           {/* Footer Section - Selectors and Action Buttons */}
@@ -250,7 +321,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 {/* Right Side - Action Buttons */}
                 <div className="flex items-center gap-2">
                   {/* File Attachment */}
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full shrink-0 text-muted-foreground hover:text-foreground" disabled={disabled || isStreamingEffective}>
                     <Paperclip className="h-4 w-4" />
                   </Button>
 
@@ -260,7 +331,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     size="icon"
                     onClick={handleVoiceToggle}
                     className={cn('h-8 w-8 rounded-full shrink-0 transition-colors', isRecording ? 'text-red-500 hover:text-red-600 bg-red-500/10' : 'text-muted-foreground hover:text-foreground')}
-                    disabled={disabled || isStreaming}
+                    disabled={disabled || isStreamingEffective}
                   >
                     {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                   </Button>
@@ -275,7 +346,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       canSend ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl' : 'bg-muted text-muted-foreground cursor-not-allowed'
                     )}
                   >
-                    {sending || isStreaming ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
+                    {sending || isStreamingEffective ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Send className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -284,7 +355,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         </div>
 
         {/* Agent Indicator - Only show in non-minimal mode */}
-        {!minimal && selectedAgent && <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">Chatting with {selectedAgent.name}</div>}
+        {!minimal && selectedAgent && (
+          <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
+            {isStreamingEffective ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
+          </div>
+        )}
       </div>
     )
   }

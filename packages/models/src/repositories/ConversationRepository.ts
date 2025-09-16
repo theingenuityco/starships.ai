@@ -1,8 +1,11 @@
 import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel, Conversation, ConversationModel, MessageModel, StarshipModel } from '@starships/protocol';
+import { AgentEntity } from '../entities/AgentEntity';
 import { ConversationEntity } from '../entities/ConversationEntity';
 import { MessageEntity } from '../entities/MessageEntity';
+import { StarshipEntity } from '../entities/StarshipEntity';
 
 export class ConversationRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -14,7 +17,10 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
-        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          ConversationEntity,
+          result.map((record) => record.c)
+        );
       },
       'findAll',
       'Conversation'
@@ -26,7 +32,7 @@ export class ConversationRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ c: ConversationModel }>('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id });
-        return result.length > 0 ? ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>) : null;
+        return result.length > 0 ? fromDatabase(ConversationEntity, result[0].c) : null;
       },
       'findById',
       'Conversation',
@@ -38,25 +44,21 @@ export class ConversationRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         // Use lean validation from ConversationEntity
-        await ConversationEntity.validate(entity, 'create');
+        const { starshipId, agentId, ...conversationInput } = entity;
+        await ConversationEntity.validate(conversationInput, 'create');
 
         const now = new Date().toISOString();
 
-        const { starshipId, agentId, ...conversationInput } = entity;
-
         // Prepare conversation data with defaults and validation
-        const conversationEntity = ConversationEntity.deserialize({
+        const conversationData = {
           ...conversationInput,
           createdAt: now,
           status: entity.status || 'active',
-        });
+        };
 
-        const conversationData = conversationEntity.serialize();
-        // Remove id since it will be auto-generated
-        delete (conversationData as { id?: string }).id;
-
-        // Use BaseRepository serialization (the conversationData is already properly prepared)
-        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', conversationData);
+        // Create entity instance from plain object, then serialize
+        const conversationEntity = toEntityInstance(ConversationEntity, conversationData);
+        const result = await this.createEntityWithAutoId<ConversationModel>('Conversation', toDatabase(conversationEntity));
 
         // Create relationship with starship if starshipId is provided
         await this.linkToStarship(result.id, starshipId);
@@ -66,7 +68,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result as unknown as Record<string, unknown>);
+        return fromDatabase(ConversationEntity, result);
       },
       'create',
       'Conversation'
@@ -108,7 +110,7 @@ export class ConversationRepository extends BaseRepository {
         }
 
         // Use ConversationEntity for consistent mapping
-        return ConversationEntity.deserialize(result[0].c as unknown as Record<string, unknown>);
+        return fromDatabase(ConversationEntity, result[0].c);
       },
       'update',
       'Conversation',
@@ -145,7 +147,10 @@ export class ConversationRepository extends BaseRepository {
            RETURN c ORDER BY c.createdAt DESC`,
           { starshipId }
         );
-        return result.map((record) => ConversationEntity.deserialize(record.c as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          ConversationEntity,
+          result.map((record) => record.c)
+        );
       },
       'findByStarship',
       'Conversation'
@@ -164,7 +169,9 @@ export class ConversationRepository extends BaseRepository {
            RETURN starship`,
           { conversationId }
         );
-        return result.length > 0 ? result[0].starship : null;
+        if (result.length === 0) return null;
+
+        return fromDatabase(StarshipEntity, result[0].starship);
       },
       'getConversationStarship',
       'Conversation'
@@ -216,13 +223,13 @@ export class ConversationRepository extends BaseRepository {
    */
   async getConversationMessages(
     conversationId: string,
-    orderBy: 'timestamp' | 'created_at' = 'timestamp',
+    orderBy: 'createdAt' = 'createdAt',
     orderDirection: 'asc' | 'desc' = 'asc'
   ): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const orderField = orderBy === 'timestamp' ? 'm.timestamp' : 'm.createdAt';
+        const orderField = orderBy === 'createdAt' ? 'm.createdAt' : 'm.createdAt';
         const direction = orderDirection.toUpperCase();
 
         const result = await connection.executeQuery<{ m: MessageModel }>(
@@ -231,7 +238,10 @@ export class ConversationRepository extends BaseRepository {
           { conversationId }
         );
 
-        return result.map((record) => MessageEntity.deserialize(record.m as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          MessageEntity,
+          result.map((record) => record.m)
+        );
       },
       'getConversationMessages',
       'Conversation'
@@ -291,7 +301,11 @@ export class ConversationRepository extends BaseRepository {
            RETURN a`,
           { conversationId }
         );
-        return result.map((record) => record.a);
+
+        return fromDatabaseArray(
+          AgentEntity,
+          result.map((record) => record.a)
+        );
       },
       'getConversationAgents',
       'Conversation'

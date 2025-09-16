@@ -1,4 +1,5 @@
 import { UserEntity } from '@/entities/UserEntity';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { UserModel } from '@starships/protocol';
 
@@ -11,7 +12,10 @@ export class UserRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
-        return result.map((record) => UserEntity.deserialize(record.u as unknown as Record<string, unknown>));
+        return fromDatabaseArray(
+          UserEntity,
+          result.map((record) => record.u)
+        );
       },
       'findAll',
       'User'
@@ -24,7 +28,7 @@ export class UserRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.id = $id RETURN u', { id: id });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
+        return user ? fromDatabase(UserEntity, user) : null;
       },
       'findById',
       'User',
@@ -38,7 +42,7 @@ export class UserRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
+        return user ? fromDatabase(UserEntity, user) : null;
       },
       'findByEmail',
       'User',
@@ -54,7 +58,7 @@ export class UserRepository extends BaseRepository {
           username: username,
         });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
+        return user ? fromDatabase(UserEntity, user) : null;
       },
       'findByUsername',
       'User',
@@ -70,21 +74,17 @@ export class UserRepository extends BaseRepository {
 
         const now = new Date().toISOString();
 
-        // Transform using Entity
-        const userEntity = UserEntity.deserialize({
+        // Prepare entity data
+        const entityData = {
           ...entity,
           createdAt: now,
-        });
+        };
 
+        const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
         // Use email as unique identifier for merge operation
-        const user = await this.mergeEntityWithAutoId<UserModel>(
-          'User',
-          { email: entity.email },
-          userEntity.serialize(),
-          userEntity.serialize()
-        );
+        const user = await this.mergeEntityWithAutoId<UserModel>('User', { email: entity.email }, databaseFormat, databaseFormat);
 
-        return UserEntity.deserialize(user as unknown as Record<string, unknown>);
+        return fromDatabase(UserEntity, user);
       },
       'create',
       'User'
@@ -102,13 +102,13 @@ export class UserRepository extends BaseRepository {
         const connection = this.getConnection();
         const now = new Date().toISOString();
 
-        // Transform using Entity
-        const updateEntity = UserEntity.deserialize({
-          ...updates,
-          updatedAt: now, // Add updatedAt timestamp
-        });
-
-        const updateData = updateEntity.serialize();
+        // Prepare update data
+        const updateData = toDatabase(
+          toEntityInstance(UserEntity, {
+            ...updates,
+            updatedAt: now, // Add updatedAt timestamp
+          })
+        );
         const setClause = Object.keys(updateData)
           .filter((key) => key !== 'id' && key !== 'createdAt' && updateData[key] !== undefined)
           .map((key) => `u.${key} = $${key}`)
@@ -137,7 +137,7 @@ export class UserRepository extends BaseRepository {
           this.handleNotFound('User', id);
         }
 
-        return UserEntity.deserialize(result[0].u as unknown as Record<string, unknown>);
+        return fromDatabase(UserEntity, result[0].u);
       },
       'update',
       'User',
@@ -174,7 +174,7 @@ export class UserRepository extends BaseRepository {
         );
 
         const user = result[0]?.user || null;
-        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
+        return user ? fromDatabase(UserEntity, user) : null;
       },
       'findByStripeCustomerId',
       'User',
@@ -213,7 +213,7 @@ export class UserRepository extends BaseRepository {
         const connection = this.getConnection();
         const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
         const user = result[0]?.u || null;
-        return user ? UserEntity.deserialize(user as unknown as Record<string, unknown>) : null;
+        return user ? fromDatabase(UserEntity, user) : null;
       },
       'findByEmailWithPassword',
       'User',
@@ -244,17 +244,10 @@ export class UserRepository extends BaseRepository {
         // Validate using Entity
         await UserEntity.validate(entityData, 'create');
 
-        // Transform using Entity
-        const userEntity = UserEntity.deserialize(entityData);
+        const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
+        const user = await this.mergeEntityWithAutoId<UserModel>('User', { email: userData.email }, databaseFormat, databaseFormat);
 
-        const user = await this.mergeEntityWithAutoId<UserModel>(
-          'User',
-          { email: userData.email },
-          userEntity.serialize(),
-          userEntity.serialize()
-        );
-
-        return UserEntity.deserialize(user as unknown as Record<string, unknown>);
+        return fromDatabase(UserEntity, user);
       },
       'createWithPassword',
       'User'

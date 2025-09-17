@@ -51,7 +51,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              condition: 'state.user.isPremium = true',
+              condition: '{{ state.user.isPremium = true }}',
             },
           },
           {
@@ -131,7 +131,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              condition: 'state.user.isPremium = true',
+              condition: '{{ state.user.isPremium = true }}',
             },
           },
           {
@@ -207,7 +207,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Route Decision',
             description: 'Determine routing path',
             parameters: {
-              condition: 'state.user.tier',
+              condition: '{{ state.user.tier }}',
             },
           },
           {
@@ -816,7 +816,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Success',
             description: 'Check if API call succeeded',
             parameters: {
-              condition: 'results[nodeRef = "risky-api"].data ? "true" : "false"',
+              condition: '{{ $exists($lastOutputOf("risky-api")) ? "true" : "false" }}',
             },
           },
           {
@@ -845,7 +845,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Retry',
             description: 'Check if retry succeeded',
             parameters: {
-              condition: 'results[nodeRef = "retry-api"].data ? "true" : "false"',
+              condition: '{{ $exists($lastOutputOf("retry-api")) ? "true" : "false" }}',
             },
           },
           {

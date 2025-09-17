@@ -82,7 +82,7 @@ export class Transform extends BaseNode<TransformParams> {
     const tempExecution = options?.execution || {
       status: 'running' as const,
       state: {},
-      nodeOutputs: {},
+      results: {},
     };
 
     // Resolve template expressions in the value with current data as input

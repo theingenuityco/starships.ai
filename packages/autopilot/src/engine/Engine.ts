@@ -197,7 +197,7 @@ export class Engine {
 
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
-    execution.nodeOutputs[currentNode.ref] = ExecutionItemUtils.wrapError(errorMessage);
+    execution.results[currentNode.ref] = ExecutionItemUtils.wrapError(errorMessage);
     await this.setExecutionError(execution, errorMessage);
     await this.emitEvent('workflow_failed', execution);
   }
@@ -219,7 +219,7 @@ export class Engine {
   }
 
   private getNodeInput(execution: Execution): ExecutionItem[] | undefined {
-    return execution.currentNodeInputRef ? execution.nodeOutputs[execution.currentNodeInputRef] : undefined;
+    return execution.currentNodeInputRef ? execution.results[execution.currentNodeInputRef] : undefined;
   }
 
   async executeNode(currentNode: Node, execution: Execution): Promise<ExecutionItem[]> {
@@ -228,7 +228,7 @@ export class Engine {
 
     try {
       // Get input items for current node
-      const initialInputItems = execution.nodeOutputs['__initial__'];
+      const initialInputItems = execution.results['__initial__'];
       const nodeInputItems = currentNode.type === 'start' && initialInputItems ? initialInputItems : this.getNodeInput(execution);
 
       // Resolve node parameters with templates
@@ -269,7 +269,7 @@ export class Engine {
         }
       }
 
-      execution.nodeOutputs[currentNode.ref] = outputItems;
+      execution.results[currentNode.ref] = outputItems;
       await this.emitEvent('node_completed', execution);
       return outputItems;
     } catch (error) {
@@ -297,7 +297,7 @@ export class Engine {
     }
 
     // Extract condition from output if present
-    const lastOutputItems = execution.nodeOutputs[execution.currentNodeRef!];
+    const lastOutputItems = execution.results[execution.currentNodeRef!];
     let edgeCondition: string | undefined;
 
     if (lastOutputItems?.length) {

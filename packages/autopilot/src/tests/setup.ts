@@ -40,14 +40,14 @@ global.console = mockConsole;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).createAgentMemory = (): AgentMemory => {
   const memory = new AgentMemory();
-  memory.addMessageToHistory({ role: 'system', content: 'Test system prompt' });
+  memory.addMessage({ role: 'system', content: 'Test system prompt' });
   return memory;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({
   status: 'not_started',
-  results: [],
+  results: {},
   state: {},
   ...overrides,
 });

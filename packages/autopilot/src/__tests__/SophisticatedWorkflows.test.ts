@@ -508,7 +508,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Final Check',
             description: 'Check if everything succeeded',
             parameters: {
-              condition: '{{ outputs[-1].items[0].json.status = "completed" }}',
+              condition: '{{ inputs[0].json.status = "completed" }}',
             },
           },
           {
@@ -576,7 +576,7 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"valid":true,"checks":"passed"}',
         })
         .mockResolvedValueOnce({
-          // success handler
+          // success handler - this will be the final result of the nested workflow
           ok: true,
           status: 200,
           statusText: 'OK',

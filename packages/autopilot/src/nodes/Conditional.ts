@@ -37,11 +37,22 @@ export class Conditional implements NodeHandler {
    * Execute the conditional expression with optional input items
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    if (
-      this.params.condition === undefined ||
-      this.params.condition === null ||
-      (typeof this.params.condition === 'string' && this.params.condition.trim() === '')
-    ) {
+    // Check if condition parameter exists
+    if (!('condition' in this.params)) {
+      throw new Error('Conditional node requires a condition expression');
+    }
+
+    // Handle case where template resolved to undefined/null (template couldn't resolve)
+    if (this.params.condition === undefined || this.params.condition === null) {
+      const conditionalResult = {
+        result: null,
+        edgeCondition: 'null',
+      };
+      return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);
+    }
+
+    // Handle empty string
+    if (typeof this.params.condition === 'string' && this.params.condition.trim() === '') {
       throw new Error('Conditional node requires a condition expression');
     }
 
@@ -122,31 +133,36 @@ export class Conditional implements NodeHandler {
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Required fields - handle both string and resolved values
-    if (
-      this.params.condition === undefined ||
-      this.params.condition === null ||
-      (typeof this.params.condition === 'string' && this.params.condition.trim() === '')
-    ) {
+    // Check if condition parameter exists at all (even if undefined after template resolution)
+    if (!('condition' in this.params)) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Condition expression is required',
       });
-    }
-
-    // Validate JSONata expression syntax only if it's still a template string
-    if (this.params.condition && typeof this.params.condition === 'string') {
-      const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
-
-      if (hasTemplateExpression) {
-        const validation = this.eval.validateTemplateExpressions(this.params.condition);
-        if (!validation.valid) {
-          errors.push(...(validation.errors || []));
+    } else {
+      // If condition is a string, validate template expressions
+      if (typeof this.params.condition === 'string') {
+        // Empty string is invalid
+        if (this.params.condition.trim() === '') {
+          errors.push({
+            code: 'MISSING_REQUIRED_FIELD',
+            message: 'Condition expression is required',
+          });
+        } else {
+          // Check for template expressions and validate them
+          const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
+          if (hasTemplateExpression) {
+            const validation = this.eval.validateTemplateExpressions(this.params.condition);
+            if (!validation.valid) {
+              errors.push(...(validation.errors || []));
+            }
+          }
+          // Static strings don't need additional validation
         }
       }
-      // Static strings don't need validation
+      // Non-string values (including null, undefined from template resolution) are valid
+      // They will be handled during execution
     }
-    // Non-string values (already resolved) are considered valid
 
     return {
       valid: errors.length === 0,

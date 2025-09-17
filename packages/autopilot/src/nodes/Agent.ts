@@ -6,52 +6,36 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentMemory } from '@/memory/AgentMemory';
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, NodeType, ExecutionItem, LlmMessage } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
-import { NodeParameters, LlmParams } from '@/types/node-parameters';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { Engine } from '@/engine/Engine';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
-  private memory: AgentMemory;
-  private nodeCounter: number = 1;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
     this.params = structuredClone(params);
-
-    // Create AgentMemory instance from config or default
-    this.memory = new AgentMemory(
-      this.params.memoryState || {
-        systemPrompt: `You are ${this.params.name || 'Agent'}, an AI assistant. Assist users with their needs.`,
-        messages: [],
-      }
-    );
 
     // Create options
     this.options = options;
 
     // Initialize blueprint if not provided - creates Start -> LLM -> End workflow
     if (!this.params.blueprint) {
-      const startRef = `start_${this.nodeCounter++}`;
-      const llmRef = `llm_${this.nodeCounter++}`;
-      const endRef = `end_${this.nodeCounter++}`;
-
       this.params.blueprint = {
         nodes: [
           {
-            ref: startRef,
+            ref: 'start_1',
             type: 'start',
             name: 'Start',
             description: 'Start node',
             parameters: {},
           },
           {
-            ref: llmRef,
+            ref: 'llm_1',
             type: 'llm',
             name: 'Respond',
             description: 'AI response node',
@@ -67,14 +51,14 @@ export class Agent implements NodeHandler {
                   path: '/messages/-',
                   value: {
                     role: 'assistant',
-                    content: '{{ $nodeResult().data.choices[0].message.content }}',
+                    content: `{{ $lastOutputOf("llm_1")[0].json.choices[0].message.content }}`,
                   },
                 },
               ],
             },
           },
           {
-            ref: endRef,
+            ref: 'end_1',
             type: 'end',
             name: 'End',
             description: 'End node',
@@ -84,13 +68,13 @@ export class Agent implements NodeHandler {
         edges: [
           {
             ref: `edge_1`,
-            from: startRef,
-            to: llmRef,
+            from: 'start_1',
+            to: 'llm_1',
           },
           {
             ref: `edge_2`,
-            from: llmRef,
-            to: endRef,
+            from: 'llm_1',
+            to: 'end_1',
           },
         ],
         metadata: {
@@ -101,123 +85,6 @@ export class Agent implements NodeHandler {
     }
 
     // Blueprint is guaranteed to exist after constructor logic above
-  }
-
-  // =============================================================================
-  // PRIVATE HELPERS
-  // =============================================================================
-
-  /**
-   * Helper method to connect new node to previous node and redirect to end node
-   */
-  private connectToPrevious(newNodeRef: string): void {
-    const nodes = this.params.blueprint!.nodes;
-    const edges = this.params.blueprint!.edges;
-
-    // Find the end node
-    const endNode = nodes.find((node) => node.type === 'end');
-    if (!endNode) return;
-
-    // Find the node that currently connects to the end node (should be the last added node)
-    const edgeToEnd = edges.find((edge) => edge.to === endNode.ref);
-    if (!edgeToEnd) return;
-
-    // Update the edge to end node: redirect it to point to the new node
-    edgeToEnd.to = newNodeRef;
-
-    // Add new edge from the new node to the end node
-    edges.push({
-      ref: `edge_${edges.length + 1}`,
-      from: newNodeRef,
-      to: endNode.ref,
-    });
-  }
-
-  // =============================================================================
-  // NODE MANAGEMENT
-  // =============================================================================
-
-  /**
-   * Add any type of node to the agent's blueprint
-   */
-  addNode(
-    type: NodeType,
-    name: string,
-    parameters: NodeParameters,
-    options?: {
-      description?: string;
-      ref?: string;
-    }
-  ): Agent {
-    const ref = options?.ref || `${type}_${this.nodeCounter++}`;
-    const description = options?.description || `${type} node: ${name}`;
-
-    this.params.blueprint!.nodes.push({
-      ref,
-      type,
-      name,
-      description,
-      parameters,
-    });
-
-    this.connectToPrevious(ref);
-    return this;
-  }
-
-  /**
-   * Add LLM node for conversation turns
-   * Semantic method for adding language model nodes using the agent's default configuration
-   * Defaults model, temperature, maxTokens, and timeout from the agent's parameters
-   */
-  addLlmNode(
-    name: string,
-    messages: LlmMessage[],
-    options?: {
-      description?: string;
-      ref?: string;
-      model?: string;
-      temperature?: number;
-      maxTokens?: number;
-      timeout?: number;
-      topP?: number;
-      frequencyPenalty?: number;
-      presencePenalty?: number;
-    }
-  ): Agent {
-    const llmParams: LlmParams = {
-      model: options?.model ?? this.params.model,
-      messages,
-      ...(options?.temperature !== undefined
-        ? { temperature: options.temperature }
-        : this.params.temperature !== undefined
-          ? { temperature: this.params.temperature }
-          : {}),
-      ...(options?.maxTokens !== undefined
-        ? { maxTokens: options.maxTokens }
-        : this.params.maxTokens !== undefined
-          ? { maxTokens: this.params.maxTokens }
-          : {}),
-      ...(options?.timeout !== undefined
-        ? { timeout: options.timeout }
-        : this.params.timeout !== undefined
-          ? { timeout: this.params.timeout }
-          : {}),
-      ...(options?.topP !== undefined && { topP: options.topP }),
-      ...(options?.frequencyPenalty !== undefined && { frequencyPenalty: options.frequencyPenalty }),
-      ...(options?.presencePenalty !== undefined && { presencePenalty: options.presencePenalty }),
-    };
-
-    return this.addNode('llm', name, llmParams, {
-      description: options?.description,
-      ref: options?.ref,
-    });
-  }
-
-  /**
-   * Add message to agent memory
-   */
-  addMessageToMemory(message: LlmMessage): void {
-    this.memory.addMessage(message);
   }
 
   /**
@@ -236,21 +103,11 @@ export class Agent implements NodeHandler {
    * Creates a new Engine instance and executes the agent's blueprint
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    // If we have input data, add it to agent's memory as user message
-    if (input && input.length > 0) {
-      const inputData = ExecutionItemUtils.unwrapSingle(input);
-      const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
-      this.addMessageToMemory({
-        role: 'user',
-        content: inputContent,
-      });
-    }
-
     // Create execution context for the agent's blueprint
     const execution = ExecutionItemUtils.createExecution(input);
 
-    // Store current memory messages in execution state for template access
-    execution.state.messages = this.memory.toMessages();
+    // Initialize empty messages array for template access
+    execution.state.messages = [];
 
     // Create a new Engine instance for executing the agent's blueprint
     const engine = new Engine({

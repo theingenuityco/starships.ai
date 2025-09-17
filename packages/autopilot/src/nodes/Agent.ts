@@ -57,18 +57,20 @@ export class Agent implements NodeHandler {
             description: 'AI response node',
             parameters: {
               model: this.params.model,
-              messages: [
-                // Use AgentMemory to format all messages (system prompt + conversation history)
-                ...this.memory.toMessages(),
-                // Add input template for new user input
-                {
-                  role: 'user',
-                  content: '{{ $input }}',
-                },
-              ],
+              messages: '{{ state.messages }}',
               ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
               ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
               ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+              mutations: [
+                {
+                  operation: 'add',
+                  path: '/messages/-',
+                  value: {
+                    role: 'assistant',
+                    content: '{{ $nodeResult().data.choices[0].message.content }}',
+                  },
+                },
+              ],
             },
           },
           {
@@ -234,13 +236,26 @@ export class Agent implements NodeHandler {
    * Creates a new Engine instance and executes the agent's blueprint
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    // If we have input data, add it to agent's memory as user message
+    if (input && input.length > 0) {
+      const inputData = ExecutionItemUtils.unwrapSingle(input);
+      const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
+      this.addMessageToMemory({
+        role: 'user',
+        content: inputContent,
+      });
+    }
+
+    // Create execution context for the agent's blueprint
+    const execution = ExecutionItemUtils.createExecution(input);
+
+    // Store current memory messages in execution state for template access
+    execution.state.messages = this.memory.toMessages();
+
     // Create a new Engine instance for executing the agent's blueprint
     const engine = new Engine({
       eventCallback: this.options?.eventCallback,
     });
-
-    // Create execution context for the agent's blueprint
-    const execution = ExecutionItemUtils.createExecution(input);
 
     try {
       // Execute the agent's blueprint using the new Engine

@@ -86,18 +86,28 @@ export class Engine {
     return await this.createHandler(virtualNode, parameters, dummyExecution);
   }
 
-  private async executeInlineTransform(transforms: TransformOperation[], inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    const transformHandler = await this.createVirtualHandler('transform', { transforms });
+  private async executeInlineTransform(
+    transforms: TransformOperation[],
+    execution: Execution,
+    inputItems?: ExecutionItem[]
+  ): Promise<ExecutionItem[]> {
+    const virtualNode = this.createVirtualNode('transform', `inline_transform`, { transforms });
+    const transformHandler = await this.createHandler(virtualNode, { transforms }, execution);
     return await transformHandler.execute(inputItems);
   }
 
-  private async executeInlineMutate(transforms: TransformOperation[]): Promise<void> {
-    const mutateHandler = await this.createVirtualHandler('mutate', { mutations: transforms });
-    await mutateHandler.execute();
+  private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<void> {
+    const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, { mutations: transforms });
+    const handler = await this.createHandler(virtualNode, { mutations: transforms }, execution);
+    await handler.execute();
   }
 
-  private async executeInlineConditional(conditionExpression: string): Promise<string | boolean | number | null | undefined> {
-    const conditionalHandler = await this.createVirtualHandler('conditional', { condition: conditionExpression });
+  private async executeInlineConditional(
+    conditionExpression: string,
+    execution: Execution
+  ): Promise<string | boolean | number | null | undefined> {
+    const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, { condition: conditionExpression });
+    const conditionalHandler = await this.createHandler(virtualNode, { condition: conditionExpression }, execution);
     const conditionalResultItems = await conditionalHandler.execute();
 
     const firstItem = conditionalResultItems[0];
@@ -283,7 +293,7 @@ export class Engine {
 
       // Execute inline transforms if present
       if (nodeParams.transforms?.length) {
-        processedInputItems = await this.executeInlineTransform(nodeParams.transforms, processedInputItems);
+        processedInputItems = await this.executeInlineTransform(nodeParams.transforms, execution, processedInputItems);
       }
 
       // Execute the handler with processed input items
@@ -291,12 +301,12 @@ export class Engine {
 
       // Execute inline mutations if present
       if (nodeParams.mutations?.length) {
-        await this.executeInlineMutate(nodeParams.mutations);
+        await this.executeInlineMutate(nodeParams.mutations, execution);
       }
 
       // Execute inline conditional if present
       if (nodeParams.condition) {
-        const conditionResult = await this.executeInlineConditional(nodeParams.condition);
+        const conditionResult = await this.executeInlineConditional(nodeParams.condition, execution);
         const firstItem = outputItems[0];
         if (!firstItem?.json || typeof firstItem.json !== 'object' || !('condition' in firstItem.json)) {
           outputItems = ExecutionItemUtils.wrapSingle({ condition: conditionResult });

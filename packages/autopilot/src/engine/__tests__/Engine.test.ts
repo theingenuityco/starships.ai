@@ -158,7 +158,7 @@ describe('Engine', () => {
 
   describe('Error Handling', () => {
     it('should handle execution errors gracefully', async () => {
-      // Create a blueprint with an HTTP node that will fail
+      // Create a blueprint with an HTTP node that will fail at runtime
       const blueprint: Blueprint = {
         nodes: [
           { ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
@@ -168,7 +168,7 @@ describe('Engine', () => {
             name: 'HTTP',
             description: 'HTTP Request',
             parameters: {
-              url: 'invalid-url',
+              url: 'https://nonexistent-domain.invalid/api/test',
               method: 'GET',
             },
           },
@@ -177,11 +177,14 @@ describe('Engine', () => {
         metadata: {},
       };
 
+      // Mock fetch to reject with network error
+      global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
+
       const eventCallback = jest.fn();
       const engine = new Engine({ eventCallback });
       const execution = ExecutionItemUtils.createExecution();
 
-      await engine.executeBlueprint(blueprint, execution);
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow();
 
       expect(execution.status).toBe('failed');
       expect(execution.error).toBeDefined();

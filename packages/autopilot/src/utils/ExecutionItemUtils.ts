@@ -5,7 +5,7 @@
  * while maintaining backward compatibility with simple data processing
  */
 
-import { ExecutionItem } from '@/types';
+import { ExecutionItem, Execution } from '@/types';
 
 export class ExecutionItemUtils {
   /**
@@ -108,5 +108,24 @@ export class ExecutionItemUtils {
    */
   static hasErrors(items: ExecutionItem[]): boolean {
     return items.some((item) => item.error);
+  }
+
+  /**
+   * Create a new execution context with optional initial input
+   * This is a common pattern used when nodes need to execute nested blueprints
+   */
+  static createExecution(input?: ExecutionItem[]): Execution {
+    const execution: Execution = {
+      status: 'not_started',
+      state: {},
+      nodeOutputs: {},
+    };
+
+    // Set initial input for the blueprint if provided
+    if (input && input.length > 0) {
+      execution.nodeOutputs['__initial__'] = input;
+    }
+
+    return execution;
   }
 }

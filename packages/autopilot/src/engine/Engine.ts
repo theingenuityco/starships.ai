@@ -81,7 +81,7 @@ export class Engine {
 
   private async createVirtualHandler(type: 'transform' | 'mutate' | 'conditional', parameters: NodeParameters): Promise<NodeHandler> {
     const virtualNode = this.createVirtualNode(type, `inline_${type}`, parameters);
-    const dummyExecution = { status: 'not_started', nodeOutputs: {}, state: {} } as Execution;
+    const dummyExecution = ExecutionItemUtils.createExecution();
     return await this.createHandler(virtualNode, parameters, dummyExecution);
   }
 

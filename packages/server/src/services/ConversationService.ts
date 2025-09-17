@@ -1,6 +1,6 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { Agent, AutopilotEvent } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -152,9 +152,17 @@ export class ConversationService {
       const agent = new Agent(agentModel, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
       });
+      // Convert database messages to LLM format
+      const llmMessages = messages.map((msg) => ({
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content,
+      }));
 
-      // Execute agent with streaming-enabled execution
-      await agent.execute();
+      // Create input execution item with the conversation messages
+      // The LLM node will use this as fallback when state.messages is empty
+      const input = llmMessages.length > 0 ? ExecutionItemUtils.wrapSingle(llmMessages) : undefined;
+      // Execute agent with conversation messages
+      await agent.execute(input);
 
       // Send completion event
       if (this.streamingService) {

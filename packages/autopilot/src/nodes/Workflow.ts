@@ -6,32 +6,23 @@
  * Supports streaming through the injection-based architecture via Engine.
  */
 
+import { BaseNode } from './BaseNode';
 import { Engine, EngineConfig } from '@/engine/Engine';
 import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem } from '@/types';
 import { ValidationError } from '@/types/validation';
-import { EventCallback } from '@/types/events';
-import { NodeHandler } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
-export class Workflow implements NodeHandler {
-  private params: WorkflowParams;
+export class Workflow extends BaseNode<WorkflowParams> {
   private engine: Engine;
-  private eventCallback?: EventCallback;
 
   constructor(params: WorkflowParams, options?: NodeHandlerOptions) {
-    // Store parameters with cloned blueprint
-    this.params = structuredClone(params);
-    this.eventCallback = options?.eventCallback;
+    super(params, options);
     // Create engine - handles all node types internally
     const engineConfig = {
-      blueprint: this.params.blueprint,
-      eventCallback: this.eventCallback,
+      blueprint: this.getParams().blueprint,
+      eventCallback: this.getEventCallback(),
     } as EngineConfig;
     this.engine = new Engine(engineConfig);
-  }
-
-  getParams(): WorkflowParams {
-    return this.params;
   }
 
   /**
@@ -53,9 +44,10 @@ export class Workflow implements NodeHandler {
    */
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
+    const params = this.getParams();
 
     // Check for start node
-    const hasStartNode = this.params.blueprint.nodes.some((node) => node.type === 'start');
+    const hasStartNode = params.blueprint.nodes.some((node) => node.type === 'start');
     if (!hasStartNode) {
       errors.push({
         code: 'MISSING_START_NODE',
@@ -64,7 +56,7 @@ export class Workflow implements NodeHandler {
     }
 
     // Check that all node types have handlers (delegate to engine)
-    const unsupportedNodes = this.params.blueprint.nodes.filter((node) => !this.engine.hasHandler(node.type));
+    const unsupportedNodes = params.blueprint.nodes.filter((node) => !this.engine.hasHandler(node.type));
     if (unsupportedNodes.length > 0) {
       unsupportedNodes.forEach((node) => {
         errors.push({
@@ -76,8 +68,8 @@ export class Workflow implements NodeHandler {
     }
 
     // Check edge references
-    const nodeRefs = new Set(this.params.blueprint.nodes.map((n) => n.ref));
-    const invalidEdges = this.params.blueprint.edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
+    const nodeRefs = new Set(params.blueprint.nodes.map((n) => n.ref));
+    const invalidEdges = params.blueprint.edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
     if (invalidEdges.length > 0) {
       invalidEdges.forEach((edge) => {
         errors.push({

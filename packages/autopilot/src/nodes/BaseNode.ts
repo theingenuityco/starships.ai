@@ -18,13 +18,11 @@ import { EventCallback } from '@/types/events';
 export abstract class BaseNode<TParams extends NodeParameters = NodeParameters> implements NodeHandler {
   protected params: TParams;
   protected options?: NodeHandlerOptions;
-  protected eventCallback?: EventCallback;
 
   constructor(params: TParams, options?: NodeHandlerOptions) {
     // Store parameters and options for use in derived classes
     this.params = structuredClone(params);
     this.options = options;
-    this.eventCallback = options?.eventCallback;
   }
 
   /**
@@ -60,7 +58,7 @@ export abstract class BaseNode<TParams extends NodeParameters = NodeParameters> 
    * Nodes should construct events directly as needed
    */
   protected getEventCallback(): EventCallback | undefined {
-    return this.eventCallback;
+    return this.options?.eventCallback;
   }
 
   /**

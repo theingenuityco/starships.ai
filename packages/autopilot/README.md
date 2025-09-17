@@ -76,13 +76,44 @@ const blueprint = {
 
 // Execute workflow with Engine
 const engine = new Engine({
-  blueprint,
   eventCallback: (event) => console.log(event.type),
 });
 
-await engine.execute();
-console.log('Results:', engine.getExecution().results);
+await engine.executeBlueprint(blueprint, execution);
+console.log('Results:', execution.results);
 ```
+
+## Error Handling
+
+The Engine supports configurable error handling through the `failOnNodeError` flag:
+
+```typescript
+// Default behavior: fail execution on any node error (failOnNodeError: true)
+const strictEngine = new Engine({
+  eventCallback: (event) => console.log(event.type),
+  // failOnNodeError defaults to true
+});
+
+// Continue execution even when individual nodes fail
+const resilientEngine = new Engine({
+  eventCallback: (event) => console.log(event.type),
+  failOnNodeError: false,
+});
+```
+
+**Configuration Options:**
+
+- `failOnNodeError: true` (default) - Workflow execution stops immediately when any node fails
+- `failOnNodeError: false` - Workflow continues execution despite individual node failures
+
+When `failOnNodeError` is false:
+
+- Failed nodes still record errors in execution results
+- Full error details are still set in the execution context
+- `workflow_failed` events are still emitted for individual node failures
+- Execution status is reset to 'running' and continues to the next node
+- Overall workflow completes normally with `workflow_completed` event
+- All error information is preserved in the final execution results
 
 ## Node Types
 

@@ -28,14 +28,17 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
 
 export interface EngineConfig {
   eventCallback?: EventCallback;
+  failOnNodeError?: boolean;
 }
 
 export class Engine {
   private eventCallback?: EventCallback;
   private eval: Eval;
+  private failOnNodeError: boolean;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
+    this.failOnNodeError = config.failOnNodeError ?? true;
     this.eval = new Eval();
   }
 
@@ -211,7 +214,25 @@ export class Engine {
         currentNode = nextNode;
       } catch (error) {
         await this.handleNodeError(error, currentNode, execution);
-        throw error;
+
+        // If failOnNodeError is true, stop execution by throwing the error
+        if (this.failOnNodeError) {
+          throw error;
+        }
+
+        // Otherwise continue to next node despite the failure
+        // Reset execution status back to running to continue workflow
+        execution.status = 'running';
+
+        const nextNode = this.getNextNode(blueprint, execution);
+        if (!nextNode) {
+          execution.currentNodeRef = undefined;
+          // If we've reached the end, complete the workflow even though we had failures
+          execution.status = 'completed';
+          await this.emitEvent('workflow_completed', execution);
+          return ExecutionItemUtils.wrapSingle(execution.results);
+        }
+        currentNode = nextNode;
       }
     }
 

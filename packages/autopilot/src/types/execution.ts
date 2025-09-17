@@ -32,7 +32,8 @@ export interface Execution {
   currentNodeInputRef?: string; // Which node's output should be used as input for current node
   status: ExecutionStatus;
   state: ExecutionState;
-  results: Record<string, ExecutionItem[]>;
+  results: Array<{ nodeRef: string; items: ExecutionItem[] }>; // Chronological execution results
+  visitCounts?: Record<string, number>; // Track node visit counts for cycle support
   error?: ExecutionError;
 }
 

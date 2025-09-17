@@ -6,25 +6,27 @@
  */
 
 import jsonata from 'jsonata';
-import { nanoid } from 'nanoid';
-import type { Execution, ExecutionState, ExecutionStatus, ValidationResult, ValidationError } from '@/types';
+import type { Execution, ExecutionState, ExecutionStatus, ValidationResult, ValidationError, ExecutionItem } from '@/types';
 
 /**
  * Evaluation context available to JSONata expressions
  */
 export interface EvalContext {
   state: ExecutionState;
-  outputs: Record<string, unknown>;
+  outputs: Array<{ nodeRef: string; items: ExecutionItem[] }>; // Updated to array format
   status: ExecutionStatus;
   currentNodeRef?: string;
   input?: unknown;
 
   // Helper functions
-  $output: (nodeRef: string) => unknown;
+  $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
   $now: () => string;
-  $random: () => string;
-  $count: (array: unknown[]) => number;
+  $filter: (array: unknown[], predicate: (item: unknown, index?: number) => boolean) => unknown[];
+  $map: (array: unknown[], mapper: (item: unknown, index?: number) => unknown) => unknown[];
+  $reduce: (array: unknown[], reducer: (acc: unknown, item: unknown, index?: number) => unknown, initialValue?: unknown) => unknown;
+  $merge: (...objects: Record<string, unknown>[]) => Record<string, unknown>;
+  $clone: (value: unknown) => unknown;
 }
 
 /**
@@ -48,18 +50,100 @@ export class Eval {
   buildContext(execution: Execution, inputData?: unknown): EvalContext {
     return {
       state: execution.state,
-      outputs: execution.results,
+      outputs: execution.results, // Use array format directly
       status: execution.status,
       currentNodeRef: execution.currentNodeRef,
       input: inputData,
 
       // Helper functions
-      $output: (nodeRef: string) => execution.results[nodeRef],
+      $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
       $input: (path?: string) => this.extractPath(inputData, path),
       $now: () => new Date().toISOString(),
-      $random: () => nanoid(),
-      $count: (array: unknown[]) => (Array.isArray(array) ? array.length : 0),
+      $filter: (array: unknown[], predicate: (item: unknown, index?: number) => boolean) => this.filterArray(array, predicate),
+      $map: (array: unknown[], mapper: (item: unknown, index?: number) => unknown) => this.mapArray(array, mapper),
+      $reduce: (array: unknown[], reducer: (acc: unknown, item: unknown, index?: number) => unknown, initialValue?: unknown) =>
+        this.reduceArray(array, reducer, initialValue),
+      $merge: (...objects: Record<string, unknown>[]) => this.mergeObjects(...objects),
+      $clone: (value: unknown) => this.cloneValue(value),
     };
+  }
+
+  private findLatestNodeResult(execution: Execution, nodeRef: string): unknown {
+    // Find latest result for the specified node (reverse search for efficiency)
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      if (execution.results[i].nodeRef === nodeRef) {
+        return execution.results[i].items;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Filter array helper function
+   */
+  private filterArray(array: unknown[], predicate: (item: unknown, index?: number) => boolean): unknown[] {
+    if (!Array.isArray(array)) return [];
+    return array.filter(predicate);
+  }
+
+  /**
+   * Map array helper function
+   */
+  private mapArray(array: unknown[], mapper: (item: unknown, index?: number) => unknown): unknown[] {
+    if (!Array.isArray(array)) return [];
+    return array.map(mapper);
+  }
+
+  /**
+   * Reduce array helper function
+   */
+  private reduceArray(
+    array: unknown[],
+    reducer: (acc: unknown, item: unknown, index?: number) => unknown,
+    initialValue?: unknown
+  ): unknown {
+    if (!Array.isArray(array)) return initialValue;
+    return initialValue !== undefined ? array.reduce(reducer, initialValue) : array.reduce(reducer);
+  }
+
+  /**
+   * Merge objects helper function
+   */
+  private mergeObjects(...objects: Record<string, unknown>[]): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const obj of objects) {
+      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        Object.assign(result, obj);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Deep clone helper function
+   */
+  private cloneValue(value: unknown): unknown {
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => this.cloneValue(item));
+    }
+
+    if (value instanceof Date) {
+      return new Date(value.getTime());
+    }
+
+    if (typeof value === 'object') {
+      const cloned: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+        cloned[key] = this.cloneValue(val);
+      }
+      return cloned;
+    }
+
+    return value;
   }
 
   /**

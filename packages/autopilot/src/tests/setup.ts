@@ -47,7 +47,7 @@ global.console = mockConsole;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).createMockExecution = (overrides: Partial<Execution> = {}): Execution => ({
   status: 'not_started',
-  results: {},
+  results: [],
   state: {},
   ...overrides,
 });

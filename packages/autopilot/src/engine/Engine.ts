@@ -11,6 +11,7 @@ import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/
 import type { TransformOperation } from '@/types/node-parameters';
 import { Eval } from './Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import { config } from '@/constants';
 
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   start: () => import('@/nodes/Start').then((m) => m.Start as NodeHandlerConstructor),
@@ -167,7 +168,22 @@ export class Engine {
   private async executeLoop(blueprint: Blueprint, execution: Execution, startNode: Node): Promise<ExecutionItem[]> {
     let currentNode: Node | null = startNode;
 
+    // Initialize visit counter
+    if (!execution.visitCounts) {
+      execution.visitCounts = {};
+    }
+
     while (currentNode && execution.status === 'running') {
+      // Count visits and check limit for cycle support
+      const visits = (execution.visitCounts[currentNode.ref] || 0) + 1;
+      execution.visitCounts[currentNode.ref] = visits;
+
+      if (visits > config.MAX_NODE_VISITS) {
+        execution.status = 'completed';
+        await this.emitEvent('workflow_completed', execution);
+        return [];
+      }
+
       try {
         const incomingEdge = blueprint.edges.find((edge) => edge.to === currentNode!.ref);
         execution.currentNodeInputRef = incomingEdge?.from;
@@ -197,7 +213,7 @@ export class Engine {
 
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
-    execution.results[currentNode.ref] = ExecutionItemUtils.wrapError(errorMessage);
+    execution.results.push({ nodeRef: currentNode.ref, items: ExecutionItemUtils.wrapError(errorMessage) });
     await this.setExecutionError(execution, errorMessage);
     await this.emitEvent('workflow_failed', execution);
   }
@@ -219,7 +235,25 @@ export class Engine {
   }
 
   private getNodeInput(execution: Execution): ExecutionItem[] | undefined {
-    return execution.currentNodeInputRef ? execution.results[execution.currentNodeInputRef] : undefined;
+    if (!execution.currentNodeInputRef) return undefined;
+
+    // Find latest result for the input node (reverse search for efficiency)
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      if (execution.results[i].nodeRef === execution.currentNodeInputRef) {
+        return execution.results[i].items;
+      }
+    }
+    return undefined;
+  }
+
+  private findNodeResult(execution: Execution, nodeRef: string): ExecutionItem[] | undefined {
+    // Find latest result for the specified node (reverse search for efficiency)
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      if (execution.results[i].nodeRef === nodeRef) {
+        return execution.results[i].items;
+      }
+    }
+    return undefined;
   }
 
   async executeNode(currentNode: Node, execution: Execution): Promise<ExecutionItem[]> {
@@ -228,7 +262,7 @@ export class Engine {
 
     try {
       // Get input items for current node
-      const initialInputItems = execution.results['__initial__'];
+      const initialInputItems = this.findNodeResult(execution, '__initial__');
       const nodeInputItems = currentNode.type === 'start' && initialInputItems ? initialInputItems : this.getNodeInput(execution);
 
       // Resolve node parameters with templates
@@ -269,7 +303,7 @@ export class Engine {
         }
       }
 
-      execution.results[currentNode.ref] = outputItems;
+      execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
       await this.emitEvent('node_completed', execution);
       return outputItems;
     } catch (error) {
@@ -297,7 +331,7 @@ export class Engine {
     }
 
     // Extract condition from output if present
-    const lastOutputItems = execution.results[execution.currentNodeRef!];
+    const lastOutputItems = this.findNodeResult(execution, execution.currentNodeRef!);
     let edgeCondition: string | undefined;
 
     if (lastOutputItems?.length) {

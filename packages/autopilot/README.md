@@ -6,11 +6,12 @@ Lean workflow execution engine for starships.ai - executes blueprint-based workf
 
 Autopilot executes workflows defined as node graphs (blueprints) with support for:
 
-- **Dynamic Node Loading** - AI agents, LLM calls, HTTP requests, conditionals, transforms
-- **Template Expressions** - `{{ state.value }}` syntax for dynamic parameters
+- **Dynamic Node Loading** - AI agents, LLM calls, HTTP requests, conditionals, transforms, mutations
+- **Template Expressions** - `{{ jsonataExpression }}` syntax for dynamic parameters
 - **State Management** - JSON Patch transforms for workflow state mutations
 - **Memory System** - Structured memory for AI agent interactions
 - **Credential Management** - Secure API key handling
+- **Error Handling** - Configurable failure modes with resilient execution options
 
 ## Quick Start
 
@@ -41,12 +42,12 @@ agent
     messages: [{ role: 'user', content: 'Hello!' }],
   })
   .addNode('transform', 'Store Result', {
-    transforms: [{ operation: 'add', path: '/state/greeting', value: '{{ $nodeResult("llm_1").data }}' }],
+    transforms: [{ operation: 'add', path: '/state/greeting', value: '{{ $lastOutputOf("llm_1") }}' }],
   });
 
 // Execute agent
 const execution = await agent.execute();
-console.log('Results:', execution.results);
+console.log('Results:', execution);
 ```
 
 ### Engine Usage
@@ -79,6 +80,7 @@ const engine = new Engine({
   eventCallback: (event) => console.log(event.type),
 });
 
+const execution = ExecutionItemUtils.createExecution();
 await engine.executeBlueprint(blueprint, execution);
 console.log('Results:', execution.results);
 ```
@@ -117,20 +119,21 @@ When `failOnNodeError` is false:
 
 ## Node Types
 
-| Type           | Description          | Key Parameters                                          |
-| -------------- | -------------------- | ------------------------------------------------------- |
-| `start/end`    | Flow control         | `{}`                                                    |
-| `llm`          | LLM API calls        | `model`, `messages`, `temperature`                      |
-| `agent`        | AI agent with memory | `name`, `model`, `memoryState` (systemPrompt, messages) |
-| `http_request` | HTTP API calls       | `url`, `method`, `headers`, `body`                      |
-| `conditional`  | Branch workflows     | `condition` (JSONata expression)                        |
-| `transform`    | State mutations      | `transforms` (JSON Patch operations)                    |
-| `workflow`     | Nested workflows     | `blueprint`                                             |
-| `user_prompt`  | User interaction     | Platform-specific                                       |
+| Type           | Description           | Key Parameters                                          |
+| -------------- | --------------------- | ------------------------------------------------------- |
+| `start/end`    | Flow control          | `{}`                                                    |
+| `llm`          | LLM API calls         | `model`, `messages`, `temperature`                      |
+| `agent`        | AI agent with memory  | `name`, `model`, `memoryState` (systemPrompt, messages) |
+| `http_request` | HTTP API calls        | `url`, `method`, `headers`, `body`                      |
+| `conditional`  | Branch workflows      | `condition` (JSONata expression)                        |
+| `transform`    | Input transformations | `transforms` (JSON Patch operations)                    |
+| `mutate`       | State mutations       | `mutations` (JSON Patch operations)                     |
+| `workflow`     | Nested workflows      | `blueprint`                                             |
+| `user_prompt`  | User interaction      | Platform-specific                                       |
 
 ## Template Expressions
 
-Use `{{ }}` syntax for dynamic values:
+Use `{{ }}` syntax for JSONata expressions:
 
 ```typescript
 {
@@ -143,7 +146,7 @@ Use `{{ }}` syntax for dynamic values:
     },
     body: {
       timestamp: '{{ $now() }}',
-      data: '{{ $nodeResult("input").data.formData }}'
+      data: '{{ $lastOutputOf("input") }}'
     }
   }
 }
@@ -152,16 +155,19 @@ Use `{{ }}` syntax for dynamic values:
 **Available Context:**
 
 - `state` - Current workflow state
-- `results` - Previous node results
-- `$now()` - Current timestamp
-- `$nodeResult(ref)` - Get result from specific node
-- `$random()` - Generate random ID
+- `outputs` - All previous node results (array format)
+- `status` - Current execution status
+- `input` - Current input data
+- `$lastOutputOf(nodeRef)` - Get latest result from specific node
+- `$input(path)` - Extract data from input using dot notation
+- `$random()` - Generate random number
+- `$exists(value)` - Check if value exists
 
 ## State Management
 
-### Inline Transforms
+### Inline Operations
 
-Any node can include `transforms` for state mutations:
+Any node can include inline operations for processing:
 
 ```typescript
 {
@@ -169,26 +175,32 @@ Any node can include `transforms` for state mutations:
   type: 'http_request',
   parameters: {
     url: 'https://api.example.com/data',
+    // Inline input transformation
     transforms: [
+      { operation: 'add', path: '/processedAt', value: '{{ $now() }}' }
+    ],
+    // Inline state mutation
+    mutations: [
       { operation: 'replace', path: '/state/apiCalls', value: '{{ (state.apiCalls || 0) + 1 }}' },
       { operation: 'add', path: '/state/lastCall', value: '{{ $now() }}' }
-    ]
+    ],
+    // Inline conditional logic
+    condition: 'state.retryCount < 3'
   }
 }
 ```
 
-### Transform Operations
+### Transform vs Mutate Operations
 
-JSON Patch operations for state mutations:
+- **Transform** - Processes input data before passing to the node
+- **Mutate** - Modifies global workflow state after node execution
 
 ```typescript
-[
-  { operation: 'add', path: '/state/user', value: { id: '123', name: 'John' } },
-  { operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' },
-  { operation: 'remove', path: '/state/temp' },
-  { operation: 'copy', path: '/state/backup', from: '/state/current' },
-  { operation: 'move', path: '/state/archive', from: '/state/old' },
-];
+// Transform: modify input data
+{ operation: 'add', path: '/userId', value: '{{ state.currentUser.id }}' }
+
+// Mutate: modify workflow state
+{ operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' }
 ```
 
 ## Agent API
@@ -217,7 +229,7 @@ agent
     temperature: 0.8,
   })
   .addNode('transform', 'Store Response', {
-    transforms: [{ operation: 'add', path: '/state/lastResponse', value: '{{ $nodeResult("llm_1").data }}' }],
+    transforms: [{ operation: 'add', path: '/lastResponse', value: '{{ $lastOutputOf("llm_1") }}' }],
   });
 
 // Execute the agent
@@ -227,10 +239,20 @@ const execution = await agent.execute();
 ### Agent Memory System
 
 ```typescript
-import { AgentMemory } from '@starships/autopilot';
+import { AgentMemory, Memory } from '@starships/autopilot';
 
-// Create simple agent memory
+// Create agent memory with identity and purpose
 const memory = new AgentMemory({
+  identity: {
+    name: 'Sarah',
+    role: 'Support Agent',
+    personality: 'helpful and professional',
+  },
+  purpose: {
+    goal: 'Assist customers with their inquiries',
+    capabilities: ['answer questions', 'provide guidance', 'escalate issues'],
+    limitations: ['cannot process payments', 'cannot access external systems'],
+  },
   systemPrompt: 'You are Sarah, a helpful support agent.',
   messages: [
     { role: 'user', content: 'I need help' },
@@ -248,14 +270,25 @@ const messages = memory.toMessages(); // Format for LLM (systemPrompt + messages
 const agent = new Agent({
   name: 'Sarah',
   model: 'anthropic/claude-3-haiku',
-  memoryState: {
-    systemPrompt: 'You are Sarah, a support agent. Be helpful and professional.',
-    messages: [
-      { role: 'user', content: 'Hello!' },
-      { role: 'assistant', content: 'Hi! How can I help you today?' },
-    ],
-  },
+  memoryState: memory.getState(),
 });
+```
+
+### Base Memory Class
+
+```typescript
+import { Memory } from '@starships/autopilot';
+
+// Simple message-only memory
+const simpleMemory = new Memory({
+  messages: [
+    { role: 'user', content: 'Hello!' },
+    { role: 'assistant', content: 'Hi! How can I help you today?' },
+  ],
+});
+
+simpleMemory.addMessage({ role: 'user', content: 'What can you do?' });
+const allMessages = simpleMemory.toMessages();
 ```
 
 ## Events & Streaming
@@ -265,14 +298,62 @@ const eventCallback = async (event) => {
   switch (event.type) {
     case 'workflow_started':
     case 'workflow_completed':
+    case 'workflow_failed':
+    case 'workflow_paused':
+    case 'workflow_resumed':
     case 'node_started':
     case 'node_completed':
+    case 'node_failed':
     case 'content_chunk': // LLM streaming
       console.log(event.type, event.data);
   }
 };
 
-const engine = new Engine({ blueprint, eventCallback });
+const engine = new Engine({ eventCallback });
+```
+
+## Extending with BaseNode
+
+Create custom nodes by extending BaseNode:
+
+```typescript
+import { BaseNode } from '@starships/autopilot';
+import { ExecutionItem, ValidationResult, NodeHandlerOptions } from '@starships/autopilot';
+
+interface CustomParams extends BaseParams {
+  operation: string;
+  value: number;
+}
+
+export class CustomNode extends BaseNode<CustomParams> {
+  constructor(params: CustomParams, options?: NodeHandlerOptions) {
+    super(params, options);
+  }
+
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    const params = this.getParams();
+    const inputValue = ExecutionItemUtils.unwrapSingle(input);
+
+    // Your custom logic here
+    const result = { operation: params.operation, result: inputValue + params.value };
+
+    return ExecutionItemUtils.wrapSingle(result, input?.[0]);
+  }
+
+  validate(): ValidationResult {
+    const errors = [];
+    const params = this.getParams();
+
+    // Use BaseNode validation helpers
+    const operationError = this.validateRequiredField(params.operation, 'Operation');
+    if (operationError) errors.push(operationError);
+
+    const valueError = this.validateRequiredField(params.value, 'Value');
+    if (valueError) errors.push(valueError);
+
+    return { valid: errors.length === 0, errors: errors.length > 0 ? errors : undefined };
+  }
+}
 ```
 
 ## API Reference
@@ -280,27 +361,35 @@ const engine = new Engine({ blueprint, eventCallback });
 ### Main Exports
 
 ```typescript
-// Engine and Agent
-export { Engine, Agent } from '@starships/autopilot';
+// Core classes
+export { Engine, Agent, BaseNode } from '@starships/autopilot';
 
 // Node handlers
-export { LLM, HttpRequest, Workflow, Conditional, Transform } from '@starships/autopilot';
+export { LLM, HttpRequest, Workflow, Conditional, Transform, Mutate } from '@starships/autopilot';
 
-// Memory
-export { AgentMemory } from '@starships/autopilot';
+// Memory system
+export { Memory, AgentMemory } from '@starships/autopilot';
+
+// Evaluation engine
+export { Eval } from '@starships/autopilot';
 
 // Configuration
-export { autopilot } from '@starships/autopilot';
+export { autopilot, AutopilotManager } from '@starships/autopilot';
 
 // Types
 export type {
   Blueprint,
   Node,
+  Edge,
   Execution,
+  ExecutionItem,
   ConditionalResult,
   TransformOperation,
   AgentParams,
   AgentMemoryState,
+  MemoryState,
+  ValidationResult,
+  NodeParameters,
 } from '@starships/autopilot';
 ```
 
@@ -314,6 +403,12 @@ autopilot.setCredentials({ openrouterApiKey: 'sk-or-...' });
 if (!autopilot.hasOpenRouterApiKey()) {
   throw new Error('OpenRouter API key required');
 }
+
+// Get credentials (read-only)
+const credentials = autopilot.getCredentials();
+
+// Reset credentials (useful for testing)
+autopilot.reset();
 ```
 
 ## LLM Models
@@ -337,7 +432,7 @@ pnpm run test         # Run tests
 ## Dependencies
 
 - **jsonata** - JSONata expressions for templates/conditions
-- **fast-json-patch** - JSON Patch operations for transforms
+- **fast-json-patch** - JSON Patch operations for transforms/mutations
 - **nanoid** - Unique ID generation
 
 ---

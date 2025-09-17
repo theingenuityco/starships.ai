@@ -332,8 +332,6 @@ describe('End-to-End Workflow Execution', () => {
 
       expect(execution.status).toBe('completed');
       expect(executionTime).toBeLessThan(1000); // Should complete in under 1 second with mocks
-
-      console.log(`Performance test completed in ${executionTime}ms`);
     });
   });
 
@@ -418,8 +416,6 @@ describe('End-to-End Workflow Execution', () => {
       // Should have received content streaming events from LLM
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'content_chunk' }));
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'content_complete' }));
-
-      console.log(`Total events emitted: ${eventCallback.mock.calls.length}`);
     });
   });
 
@@ -578,8 +574,6 @@ describe('End-to-End Workflow Execution', () => {
       expect(executionPath).not.toContain('flag-review');
 
       expect(mockFetch).toHaveBeenCalledTimes(3);
-
-      console.log('Content analysis workflow completed - content approved');
     });
 
     it('should handle multi-step data processing pipeline', async () => {
@@ -724,11 +718,9 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"notification_sent":true,"recipients":["admin@example.com"]}',
         });
 
-      const startTime = Date.now();
       const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
-      const endTime = Date.now();
 
       // Debug information
       if (execution.status === 'failed') {
@@ -739,8 +731,6 @@ describe('End-to-End Workflow Execution', () => {
       expect(execution.status).toBe('completed');
       expect(execution.results).toHaveLength(7); // All 6 nodes + start + end
       expect(mockFetch).toHaveBeenCalledTimes(4);
-
-      console.log(`ETL pipeline completed in ${endTime - startTime}ms`);
     });
   });
 });

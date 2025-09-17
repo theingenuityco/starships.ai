@@ -7,7 +7,7 @@
 import { Engine } from '@/engine/Engine';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { autopilot } from '@/Autopilot';
-import type { Blueprint, Node, ExecutionItem } from '@/types';
+import type { Blueprint, Node } from '@/types';
 
 // Mock all external dependencies
 const mockFetch = jest.fn();
@@ -921,21 +921,6 @@ describe('Sophisticated Workflows', () => {
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);
-      // Debug information
-      console.log('Execution status:', execution.status);
-      console.log('Execution error:', execution.error);
-      console.log('Execution results length:', execution.results.length);
-      console.log(
-        'Execution results:',
-        JSON.stringify(
-          execution.results.map((r: { nodeRef: string; items: ExecutionItem[] }) => ({
-            nodeRef: r.nodeRef,
-            hasError: r.items.some((item: ExecutionItem) => item.error),
-          })),
-          null,
-          2
-        )
-      );
 
       expect(execution.status).toBe('completed');
 

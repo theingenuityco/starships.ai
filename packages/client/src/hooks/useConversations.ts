@@ -190,6 +190,12 @@ export function useConversation(conversationId: string | null) {
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
     (data: any) => {
+      // Normalize conversation id: prefer event-scoped id, fallback to hook's conversationId
+      const cid = (data as any)?.conversationId ?? conversationId
+      if (!cid) {
+        // Without a resolvable conversation id, we cannot safely route the event
+        return
+      }
       // JSON Patch events (RFC6902 delta updates)
       // Support both:
       // 1) Batched patches: { type: 'patch', patch: Operation[] }
@@ -212,13 +218,13 @@ export function useConversation(conversationId: string | null) {
             .filter(Boolean)
             .join('')
           if (text) {
-            startStreaming(conversationId!, version)
-            appendStreamingChunk(conversationId!, text, version)
+            startStreaming(cid, version)
+            appendStreamingChunk(cid, text, version)
           }
 
           // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
           // We directly mutate the messages cache per op target index rather than applying JSON-Patch (lighter + avoids starvation).
-          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
             if (!old || !Array.isArray(old.messages)) return old
             // Clone shallow containers to keep immutability
             const updated = { ...old, messages: [...old.messages] }
@@ -261,12 +267,12 @@ export function useConversation(conversationId: string | null) {
               if (!match) continue
               const msgIndex = Number(match[1])
               const val = (op as any).value || {}
-              appendMessageChunk(conversationId!, msgIndex, {
+              appendMessageChunk(cid, msgIndex, {
                 content: typeof val.content === 'string' ? val.content : '',
                 position: typeof val.position === 'number' ? val.position : 0,
                 timestamp: typeof val.timestamp === 'number' ? val.timestamp : Date.now(),
               })
-              markMessageStreaming(conversationId!, msgIndex, true)
+              markMessageStreaming(cid, msgIndex, true)
             }
           } catch {}
         }
@@ -282,7 +288,7 @@ export function useConversation(conversationId: string | null) {
 
         // Apply only non-chunk ops to React Query cache (e.g., add message shell, replace content, mark streaming=false)
         if (nonChunkOps.length > 0) {
-          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
             const applyOps = (target: any) => {
               // Helper: check if a JSON Pointer path exists in current state before applying 'remove'
               const jsonPointerExists = (state: any, pointer: string): boolean => {
@@ -342,7 +348,7 @@ export function useConversation(conversationId: string | null) {
             }
             if (!old) {
               // Initialize with empty messages array if no data exists
-              const initialData = { messages: [], total: 0, conversationId: conversationId! }
+              const initialData = { messages: [], total: 0, conversationId: cid }
               try {
                 const patched = applyOps(initialData)
                 const updatedData = {
@@ -394,7 +400,7 @@ export function useConversation(conversationId: string | null) {
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/streaming$/.test(op.path) && (op as any).value === false) ||
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
           if (marksDone) {
-            endStreaming(conversationId!)
+            endStreaming(cid)
             // Also ensure store cleanup for the event's conversation if provided
             try {
               if ((data as any)?.conversationId) {
@@ -414,15 +420,15 @@ export function useConversation(conversationId: string | null) {
             if (completedIdxs.size > 0) {
               try {
                 for (const idx of completedIdxs) {
-                  markMessageStreaming(conversationId!, idx, false)
+                  markMessageStreaming(cid, idx, false)
                   // Remove ephemeral chunks on the UI side to stop any spinners tied to chunks
-                  updateMessageAt(conversationId!, idx, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                  updateMessageAt(cid, idx, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
                 }
               } catch {}
             }
 
             // Optionally clear ephemeral state shortly after completion
-            setTimeout(() => clearStreaming(conversationId!), 500)
+            setTimeout(() => clearStreaming(cid), 500)
             if ((data as any)?.conversationId) {
               setTimeout(() => {
                 try {
@@ -447,7 +453,7 @@ export function useConversation(conversationId: string | null) {
           lastUpdate: Date.now(),
         }))
         try {
-          endStreaming(conversationId!)
+          endStreaming(cid)
         } catch {}
         try {
           if ((data as any)?.conversationId) {
@@ -457,12 +463,12 @@ export function useConversation(conversationId: string | null) {
 
         // Also mark the last streaming message as complete in the UI store
         try {
-          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!))
+          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
           const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
-              markMessageStreaming(conversationId!, i, false)
-              updateMessageAt(conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              markMessageStreaming(cid, i, false)
+              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
               break
             }
           }
@@ -471,7 +477,7 @@ export function useConversation(conversationId: string | null) {
         // Clear ephemeral streaming state shortly after completion
         setTimeout(() => {
           try {
-            clearStreaming(conversationId!)
+            clearStreaming(cid)
           } catch {}
         }, 500)
         if ((data as any)?.conversationId) {
@@ -507,14 +513,14 @@ export function useConversation(conversationId: string | null) {
             lastUpdate: Date.now(),
           }))
           try {
-            startStreaming(conversationId!)
+            startStreaming(cid)
           } catch {}
 
           // Add streaming message to cache (append; ascending order)
-          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
             let next: any
             if (!old) {
-              next = { messages: [{ ...message, streaming: true }], total: 1, conversationId }
+              next = { messages: [{ ...message, streaming: true }], total: 1, conversationId: cid }
             } else {
               next = {
                 ...old,
@@ -529,8 +535,8 @@ export function useConversation(conversationId: string | null) {
         }
 
         // Regular message - add to cache (append; ascending order)
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
-          if (!old) return { messages: [message], total: 1, conversationId }
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
+          if (!old) return { messages: [message], total: 1, conversationId: cid }
           return {
             ...old,
             messages: [...old.messages, message],
@@ -550,7 +556,7 @@ export function useConversation(conversationId: string | null) {
         }))
 
         // Mark streaming messages as complete in React Query cache
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!), (old: any) => {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
           if (!old) return old
           return {
             ...old,
@@ -560,12 +566,12 @@ export function useConversation(conversationId: string | null) {
 
         // Also clear UI store streaming flags for the last streaming message
         try {
-          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId!))
+          const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
           const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
-              markMessageStreaming(conversationId!, i, false)
-              updateMessageAt(conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              markMessageStreaming(cid, i, false)
+              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
               break
             }
           }
@@ -573,7 +579,7 @@ export function useConversation(conversationId: string | null) {
 
         // End ephemeral streaming state so the input re-enables
         try {
-          endStreaming(conversationId!)
+          endStreaming(cid)
         } catch {}
         try {
           if ((data as any)?.conversationId) {
@@ -582,7 +588,7 @@ export function useConversation(conversationId: string | null) {
         } catch {}
         setTimeout(() => {
           try {
-            clearStreaming(conversationId!)
+            clearStreaming(cid)
           } catch {}
         }, 500)
         if ((data as any)?.conversationId) {

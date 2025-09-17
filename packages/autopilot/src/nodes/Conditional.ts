@@ -12,7 +12,7 @@ import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface ConditionalResult {
   result: unknown;
-  edgeCondition: string;
+  edgeCondition?: string;
 }
 
 interface RegexMatchResult {
@@ -45,8 +45,7 @@ export class Conditional implements NodeHandler {
     // Handle case where template resolved to undefined/null (template couldn't resolve)
     if (this.params.condition === undefined || this.params.condition === null) {
       const conditionalResult = {
-        result: null,
-        edgeCondition: 'null',
+        result: this.params.condition,
       };
       return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);
     }
@@ -58,14 +57,14 @@ export class Conditional implements NodeHandler {
 
     try {
       let result: unknown;
-      let edgeCondition: string;
+      let edgeCondition: string | undefined;
 
       // Handle case where condition is already resolved by Engine template processing
       if (typeof this.params.condition !== 'string') {
         // Condition was already evaluated - use the resolved value
         result = this.params.condition;
         if (result === null || result === undefined) {
-          edgeCondition = 'null';
+          // Don't set edgeCondition when result is null/undefined
         } else if (typeof result === 'boolean') {
           edgeCondition = result.toString();
         } else if (typeof result === 'object' && result !== null) {
@@ -95,7 +94,7 @@ export class Conditional implements NodeHandler {
 
           // Convert result to string condition - handle special cases
           if (result === null || result === undefined) {
-            edgeCondition = 'null';
+            // Don't set edgeCondition when result is null/undefined
           } else if (typeof result === 'boolean') {
             edgeCondition = result.toString();
           } else if (typeof result === 'object' && result !== null) {
@@ -116,9 +115,9 @@ export class Conditional implements NodeHandler {
         }
       }
 
-      const conditionalResult = {
+      const conditionalResult: ConditionalResult = {
         result,
-        edgeCondition,
+        ...(edgeCondition !== undefined && { edgeCondition }),
       };
 
       return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);

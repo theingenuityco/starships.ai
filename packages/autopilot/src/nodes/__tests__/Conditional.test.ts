@@ -244,7 +244,40 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result[0].json).toEqual({
-        edgeCondition: 'null',
+        result: undefined,
+      });
+      expect(result.length).toBe(1);
+    });
+
+    it('should handle null condition parameter', async () => {
+      const params = {
+        condition: null,
+      } as unknown as ConditionalParams;
+
+      const conditional = new Conditional(params, {
+        execution: mockExecution,
+      });
+
+      const result = await conditional.execute();
+
+      expect(result[0].json).toEqual({
+        result: null,
+      });
+      expect(result.length).toBe(1);
+    });
+
+    it('should handle undefined condition parameter', async () => {
+      const params = {
+        condition: undefined,
+      } as ConditionalParams;
+
+      const conditional = new Conditional(params, {
+        execution: mockExecution,
+      });
+
+      const result = await conditional.execute();
+
+      expect(result[0].json).toEqual({
         result: undefined,
       });
       expect(result.length).toBe(1);

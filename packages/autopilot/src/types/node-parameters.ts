@@ -74,7 +74,7 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
  */
 export interface LlmParams extends BaseParams {
   model: string;
-  messages: { role: string; content: string }[];
+  messages: { role: string; content: string }[] | string;
   temperature?: number | string; // Supports template expressions
   maxTokens?: number | string; // Supports template expressions
   timeout?: number | string; // Supports template expressions

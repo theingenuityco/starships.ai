@@ -35,9 +35,7 @@ function createCodeReviewBlueprint(): Blueprint {
     maxTokens: 3000,
   });
 
-  // Customize the default LLM node for code review
-  agent.addToChain('Code Review', 'Perform comprehensive code review');
-
+  // Use the single default LLM chain created by Agent constructor
   return agent.getCurrentBlueprint();
 }
 
@@ -52,9 +50,7 @@ function createStarshipNavigatorBlueprint(): Blueprint {
     maxTokens: 2000,
   });
 
-  // Customize the default LLM node for navigation guidance
-  agent.addToChain('Navigator Response', 'Provide starship navigation guidance');
-
+  // Use the single default LLM chain created by Agent constructor
   return agent.getCurrentBlueprint();
 }
 
@@ -69,9 +65,7 @@ function createCreativeWritingBlueprint(): Blueprint {
     maxTokens: 2500,
   });
 
-  // Customize the default LLM node for creative writing
-  agent.addToChain('Creative Content', 'Generate creative writing content');
-
+  // Use the single default LLM chain created by Agent constructor
   return agent.getCurrentBlueprint();
 }
 
@@ -239,8 +233,22 @@ export async function seedAgentTemplates(): Promise<void> {
         const existingTemplate = await templateRepo.findBySlug(template.slug as string);
 
         if (existingTemplate) {
+          // Force-update blueprint and memoryState so agent logic/template fixes are applied
+          await templateRepo.update(existingTemplate.id, {
+            blueprint: template.blueprint,
+            memoryState: template.memoryState,
+            model: template.model,
+            temperature: template.temperature,
+            maxTokens: template.maxTokens,
+            timeout: template.timeout,
+            description: template.description,
+            icon: template.icon,
+            previewPrompts: template.previewPrompts,
+            category: template.category,
+            name: template.name,
+          });
           existingCount++;
-          logger.debug(`Agent template already exists: ${template.name} (slug: ${template.slug})`);
+          logger.info(`Agent template updated: ${template.name} (slug: ${template.slug})`);
         } else {
           // Create the template
           await templateRepo.create(template);

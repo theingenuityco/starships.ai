@@ -68,7 +68,7 @@ export class LLM extends BaseNode<LlmParams> {
         presence_penalty: params.presencePenalty || 0,
         stream: true,
       };
-      console.log('LLM Request Body:', JSON.stringify(requestBody, null, 2));
+      // console.log('LLM Request Body:', JSON.stringify(requestBody, null, 2));
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {

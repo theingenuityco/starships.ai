@@ -6,7 +6,7 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmParams } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
@@ -15,6 +15,7 @@ import { Engine } from '@/engine/Engine';
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
+  private nodeCounter: number = 1;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
@@ -23,7 +24,7 @@ export class Agent implements NodeHandler {
     // Create options
     this.options = options;
 
-    // Initialize blueprint if not provided - creates Start -> LLM -> End workflow
+    // Initialize blueprint if not provided - creates Start -> End workflow (minimal)
     if (!this.params.blueprint) {
       this.params.blueprint = {
         nodes: [
@@ -35,29 +36,6 @@ export class Agent implements NodeHandler {
             parameters: {},
           },
           {
-            ref: 'llm_1',
-            type: 'llm',
-            name: 'Respond',
-            description: 'AI response node',
-            parameters: {
-              model: this.params.model,
-              messages: '{{ state.messages }}',
-              ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
-              ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
-              ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
-              mutations: [
-                {
-                  operation: 'add',
-                  path: '/messages/-',
-                  value: {
-                    role: 'assistant',
-                    content: `{{ $lastOutputOf("llm_1")[0].json.choices[0].message.content }}`,
-                  },
-                },
-              ],
-            },
-          },
-          {
             ref: 'end_1',
             type: 'end',
             name: 'End',
@@ -67,13 +45,8 @@ export class Agent implements NodeHandler {
         ],
         edges: [
           {
-            ref: `edge_1`,
+            ref: 'edge_1',
             from: 'start_1',
-            to: 'llm_1',
-          },
-          {
-            ref: `edge_2`,
-            from: 'llm_1',
             to: 'end_1',
           },
         ],
@@ -82,9 +55,78 @@ export class Agent implements NodeHandler {
           createdAt: new Date().toISOString(),
         },
       };
+      this.nodeCounter = 2; // start_1 and end_1 are taken
+
+      // Add a default LLM node to create start -> llm -> end workflow
+      this.addToChain();
     }
 
     // Blueprint is guaranteed to exist after constructor logic above
+  }
+
+  /**
+   * Add an LLM node to the chain, inserting it before the end node
+   * This allows building chains like: start -> llm -> llm -> ... -> end
+   */
+  addToChain(name?: string, description?: string): Agent {
+    const nodeRef = `llm_${++this.nodeCounter}`;
+    const nodeName = name || 'Respond';
+    const nodeDescription = description || 'AI response node';
+
+    // Create the LLM parameters
+    const llmParams: LlmParams = {
+      model: this.params.model,
+      messages: '{{ state.messages }}',
+      ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
+      ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
+      ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+      mutations: [
+        {
+          operation: 'add' as const,
+          path: '/messages/-',
+          value: {
+            role: 'assistant',
+            content: `{{ $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content }}`,
+          },
+        },
+      ],
+    };
+
+    // Create the LLM node
+    const llmNode = {
+      ref: nodeRef,
+      type: 'llm' as const,
+      name: nodeName,
+      description: nodeDescription,
+      parameters: llmParams,
+    };
+
+    // Find the end node
+    const endNode = this.params.blueprint!.nodes.find((node) => node.type === 'end');
+    if (!endNode) {
+      throw new Error('End node not found in blueprint');
+    }
+
+    // Find the edge that currently connects to the end node
+    const edgeToEnd = this.params.blueprint!.edges.find((edge) => edge.to === endNode.ref);
+    if (!edgeToEnd) {
+      throw new Error('Edge to end node not found');
+    }
+
+    // Update the existing edge to point to the new LLM node
+    edgeToEnd.to = nodeRef;
+
+    // Add the new LLM node to the blueprint
+    this.params.blueprint!.nodes.push(llmNode);
+
+    // Create a new edge from the LLM node to the end node
+    this.params.blueprint!.edges.push({
+      ref: `edge_${this.params.blueprint!.edges.length + 1}`,
+      from: nodeRef,
+      to: endNode.ref,
+    });
+
+    return this;
   }
 
   /**

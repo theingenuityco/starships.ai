@@ -8,16 +8,7 @@
  */
 
 import { AgentMemory } from '@/memory/AgentMemory';
-import {
-  AgentParams,
-  ValidationResult,
-  ValidationError,
-  NodeHandlerOptions,
-  LlmMessage,
-  NodeType,
-  ExecutionItem,
-  Execution,
-} from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, LlmMessage, NodeType, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint, Node } from '@/types/blueprint';
 import { NodeParameters } from '@/types/node-parameters';
@@ -189,16 +180,7 @@ export class Agent implements NodeHandler {
     });
 
     // Create execution context for the agent's blueprint
-    const execution: Execution = {
-      status: 'not_started',
-      state: {},
-      nodeOutputs: {},
-    };
-
-    // Set initial input for the agent's blueprint if provided
-    if (input && input.length > 0) {
-      execution.nodeOutputs['__initial__'] = input;
-    }
+    const execution = ExecutionItemUtils.createExecution(input);
 
     try {
       // Execute the agent's blueprint using the new Engine

@@ -87,7 +87,7 @@ export class Agent implements NodeHandler {
           path: '/state/messages/-',
           value: {
             role: 'assistant',
-            content: `{{ $exists($lastOutputOf("${nodeRef}")[0].json.choices[0].message.content) ? lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "" }}`,
+            content: `{{ $exists($lastOutputOf("${nodeRef}")[0].json.choices[0].message.content) ? $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "" }}`,
           },
         },
       ],

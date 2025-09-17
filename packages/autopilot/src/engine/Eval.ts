@@ -44,7 +44,7 @@ export class Eval {
    * Build evaluation context from execution state
    */
   buildContext(execution: Execution, inputData?: unknown): EvalContext {
-    return {
+    const context = {
       state: execution.state,
       outputs: execution.results, // Use array format directly
       status: execution.status,
@@ -57,6 +57,8 @@ export class Eval {
       $random: () => Math.random(), // Simple custom random function
       $exists: (value: unknown) => value !== null && value !== undefined,
     };
+
+    return context;
   }
 
   private findLatestNodeResult(execution: Execution, nodeRef: string): unknown {

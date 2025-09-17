@@ -6,10 +6,10 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, NodeType, ExecutionItem } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, NodeType, ExecutionItem, LlmMessage } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
-import { NodeParameters } from '@/types/node-parameters';
+import { NodeParameters, LlmParams } from '@/types/node-parameters';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { Engine } from '@/engine/Engine';
 
@@ -25,9 +25,10 @@ export class Agent implements NodeHandler {
     // Create options
     this.options = options;
 
-    // Initialize blueprint if not provided
+    // Initialize blueprint if not provided - creates Start -> LLM -> End workflow
     if (!this.params.blueprint) {
       const startRef = `start_${this.nodeCounter++}`;
+      const llmRef = `llm_${this.nodeCounter++}`;
       const endRef = `end_${this.nodeCounter++}`;
 
       this.params.blueprint = {
@@ -38,6 +39,36 @@ export class Agent implements NodeHandler {
             name: 'Start',
             description: 'Start node',
             parameters: {},
+          },
+          {
+            ref: llmRef,
+            type: 'llm',
+            name: 'Respond',
+            description: 'AI response node',
+            parameters: {
+              model: this.params.model,
+              messages: [
+                // Use system prompt from memoryState if available
+                ...(this.params.memoryState?.systemPrompt
+                  ? [{ role: 'system', content: this.params.memoryState.systemPrompt }]
+                  : [
+                      {
+                        role: 'system',
+                        content: `You are ${this.params.name || 'Agent'}, an AI assistant. Assist users with their needs.`,
+                      },
+                    ]),
+                // Include existing messages from memoryState if available
+                ...(this.params.memoryState?.messages || []),
+                // Add input template for new user input
+                {
+                  role: 'user',
+                  content: '{{ $input }}',
+                },
+              ],
+              ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
+              ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
+              ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+            },
           },
           {
             ref: endRef,
@@ -51,6 +82,11 @@ export class Agent implements NodeHandler {
           {
             ref: `edge_1`,
             from: startRef,
+            to: llmRef,
+          },
+          {
+            ref: `edge_2`,
+            from: llmRef,
             to: endRef,
           },
         ],
@@ -123,6 +159,55 @@ export class Agent implements NodeHandler {
 
     this.connectToPrevious(ref);
     return this;
+  }
+
+  /**
+   * Add LLM node for conversation turns
+   * Semantic method for adding language model nodes using the agent's default configuration
+   * Defaults model, temperature, maxTokens, and timeout from the agent's parameters
+   */
+  addLlmNode(
+    name: string,
+    messages: LlmMessage[],
+    options?: {
+      description?: string;
+      ref?: string;
+      model?: string;
+      temperature?: number;
+      maxTokens?: number;
+      timeout?: number;
+      topP?: number;
+      frequencyPenalty?: number;
+      presencePenalty?: number;
+    }
+  ): Agent {
+    const llmParams: LlmParams = {
+      model: options?.model ?? this.params.model,
+      messages,
+      ...(options?.temperature !== undefined
+        ? { temperature: options.temperature }
+        : this.params.temperature !== undefined
+          ? { temperature: this.params.temperature }
+          : {}),
+      ...(options?.maxTokens !== undefined
+        ? { maxTokens: options.maxTokens }
+        : this.params.maxTokens !== undefined
+          ? { maxTokens: this.params.maxTokens }
+          : {}),
+      ...(options?.timeout !== undefined
+        ? { timeout: options.timeout }
+        : this.params.timeout !== undefined
+          ? { timeout: this.params.timeout }
+          : {}),
+      ...(options?.topP !== undefined && { topP: options.topP }),
+      ...(options?.frequencyPenalty !== undefined && { frequencyPenalty: options.frequencyPenalty }),
+      ...(options?.presencePenalty !== undefined && { presencePenalty: options.presencePenalty }),
+    };
+
+    return this.addNode('llm', name, llmParams, {
+      description: options?.description,
+      ref: options?.ref,
+    });
   }
 
   /**

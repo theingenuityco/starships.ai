@@ -22,6 +22,7 @@ export interface EvalContext {
   $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
   $random: () => number; // Custom random function since JSONata's might not be available in all versions
+  $exists: (value: unknown) => boolean; // Re-add since it's used in tests and might not be available in all JSONata versions
 }
 
 /**
@@ -54,6 +55,7 @@ export class Eval {
       $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
       $input: (path?: string) => this.extractPath(inputData, path),
       $random: () => Math.random(), // Simple custom random function
+      $exists: (value: unknown) => value !== null && value !== undefined,
     };
   }
 

@@ -45,20 +45,10 @@ export class Conditional implements NodeHandler {
       let result: unknown;
       let edgeCondition: string;
 
-      // Check if condition contains JSONata template expressions ({{ ... }})
-      const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
-
-      if (hasTemplateExpression) {
-        // Ensure we have execution context for JSONata evaluation
-        if (!this.options?.execution) {
-          throw new Error('Execution context is required for conditional evaluation');
-        }
-
-        // Evaluate JSONata expression using centralized Eval class with input data
-        const inputData = ExecutionItemUtils.unwrapSingle(input);
-        result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData);
-
-        // Convert result to string condition - handle special cases
+      // Handle case where condition is already resolved by Engine template processing
+      if (typeof this.params.condition !== 'string') {
+        // Condition was already evaluated - use the resolved value
+        result = this.params.condition;
         if (result === null || result === undefined) {
           edgeCondition = 'null';
         } else if (typeof result === 'boolean') {
@@ -75,9 +65,40 @@ export class Conditional implements NodeHandler {
           edgeCondition = String(result);
         }
       } else {
-        // Static string - return as is
-        result = this.params.condition;
-        edgeCondition = this.params.condition;
+        // Check if condition contains JSONata template expressions ({{ ... }})
+        const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
+
+        if (hasTemplateExpression) {
+          // Ensure we have execution context for JSONata evaluation
+          if (!this.options?.execution) {
+            throw new Error('Execution context is required for conditional evaluation');
+          }
+
+          // Evaluate JSONata expression using centralized Eval class with input data
+          const inputData = ExecutionItemUtils.unwrapSingle(input);
+          result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData);
+
+          // Convert result to string condition - handle special cases
+          if (result === null || result === undefined) {
+            edgeCondition = 'null';
+          } else if (typeof result === 'boolean') {
+            edgeCondition = result.toString();
+          } else if (typeof result === 'object' && result !== null) {
+            // Handle regex match objects from JSONata ~> operator
+            if (this.isRegexMatchResult(result)) {
+              edgeCondition = result.match;
+              result = result.match; // Also update the result value
+            } else {
+              edgeCondition = String(result);
+            }
+          } else {
+            edgeCondition = String(result);
+          }
+        } else {
+          // Static string - return as is
+          result = this.params.condition;
+          edgeCondition = this.params.condition;
+        }
       }
 
       const conditionalResult = {
@@ -97,16 +118,16 @@ export class Conditional implements NodeHandler {
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Required fields
-    if (!this.params.condition || this.params.condition.trim() === '') {
+    // Required fields - handle both string and resolved values
+    if (!this.params.condition || (typeof this.params.condition === 'string' && this.params.condition.trim() === '')) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Condition expression is required',
       });
     }
 
-    // Validate JSONata expression syntax only if it contains template expressions
-    if (this.params.condition) {
+    // Validate JSONata expression syntax only if it's still a template string
+    if (this.params.condition && typeof this.params.condition === 'string') {
       const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
 
       if (hasTemplateExpression) {

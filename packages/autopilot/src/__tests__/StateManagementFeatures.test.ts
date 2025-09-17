@@ -44,7 +44,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize workflow',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/userId', value: 'user-123' },
                 { operation: 'add', path: '/state/sessionStart', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/counter', value: 0 },
@@ -68,7 +68,7 @@ describe('State Management Features', () => {
                 counter: '{{ state.counter }}',
                 userAgent: 'Starships-Autopilot/1.0',
               },
-              transforms: [
+              mutations: [
                 { operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' },
                 { operation: 'add', path: '/state/lastApiCall', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/apiCallHistory', value: [{ url: '{{ state.userId }}', timestamp: '{{ $now() }}' }] },
@@ -81,7 +81,7 @@ describe('State Management Features', () => {
             name: 'End',
             description: 'Complete workflow',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/completedAt', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/totalCalls', value: '{{ state.counter }}' },
               ],
@@ -133,7 +133,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/userTier', value: 'premium' },
                 { operation: 'add', path: '/state/requestCount', value: 5 },
               ],
@@ -146,7 +146,7 @@ describe('State Management Features', () => {
             description: 'Determine user privileges',
             parameters: {
               condition: 'state.userTier = "premium" and state.requestCount > 3',
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/conditionEvaluated', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/isPremiumUser', value: '{{ state.userTier = "premium" }}' },
               ],
@@ -160,7 +160,7 @@ describe('State Management Features', () => {
             parameters: {
               url: 'https://api.example.com/premium/{{ state.userTier }}',
               method: 'GET',
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/premiumActionExecuted', value: true },
                 { operation: 'add', path: '/state/executionPath', value: 'premium' },
               ],
@@ -174,7 +174,7 @@ describe('State Management Features', () => {
             parameters: {
               url: 'https://api.example.com/standard',
               method: 'GET',
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/standardActionExecuted', value: true },
                 { operation: 'add', path: '/state/executionPath', value: 'standard' },
               ],
@@ -235,7 +235,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Start with invalid transform',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/invalidPath', value: 'test' }, // Invalid: doesn't start with /state
                 { operation: 'invalid' as 'add', path: '/state/test', value: 'test' }, // Invalid operation
               ],
@@ -282,7 +282,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Start with invalid transform structure',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/valid', value: 'test' },
                 { operation: 'copy', path: '/state/copied' } as unknown as { operation: 'copy'; path: string; from: string }, // Missing required 'from' property
                 { operation: 'replace', path: '/state/noValue' } as unknown as { operation: 'replace'; path: string; value: unknown }, // Missing required 'value' property
@@ -319,7 +319,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize complex state',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/metrics', value: { requests: 0, errors: 0, successRate: 0 } },
                 { operation: 'add', path: '/state/userSessions', value: [] },
                 { operation: 'add', path: '/state/startTime', value: '{{ $now() }}' },
@@ -338,7 +338,7 @@ describe('State Management Features', () => {
                 sessionCount: '{{ $count(state.userSessions) }}',
                 metrics: '{{ state.metrics }}',
               },
-              transforms: [
+              mutations: [
                 // Increment metrics counter
                 { operation: 'replace', path: '/state/metrics/requests', value: '{{ state.metrics.requests + 1 }}' },
 
@@ -368,7 +368,7 @@ describe('State Management Features', () => {
             name: 'End',
             description: 'Finalize',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/endTime', value: '{{ $now() }}' },
                 { operation: 'copy', path: '/state/finalMetrics', from: '/state/metrics' },
               ],
@@ -417,7 +417,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Test JSON Patch operations',
             parameters: {
-              transforms: [
+              mutations: [
                 // Add operations
                 { operation: 'add', path: '/state/original', value: { name: 'test', count: 5 } },
                 { operation: 'add', path: '/state/list', value: [1, 2, 3] },
@@ -445,7 +445,7 @@ describe('State Management Features', () => {
             name: 'Cleanup',
             description: 'Remove some data',
             parameters: {
-              transforms: [
+              mutations: [
                 // Remove operation
                 { operation: 'remove', path: '/state/original/count' },
               ],

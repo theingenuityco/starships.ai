@@ -90,34 +90,6 @@ describe('Agent Node Handler', () => {
       const agent = new Agent(params);
       expect(agent).toBeDefined();
     });
-
-    it('should add nodes using addNode method', () => {
-      const params: AgentParams = {
-        name: 'Builder Agent',
-        model: 'anthropic/claude-3.5-sonnet',
-      };
-
-      const agent = new Agent(params);
-
-      // Add nodes to the agent's blueprint
-      agent
-        .addNode('llm', 'Think', {
-          model: 'anthropic/claude-3-haiku',
-          messages: [
-            { role: 'system', content: 'You are helpful.' },
-            { role: 'user', content: 'What can you help with?' },
-          ],
-          temperature: 0.8,
-        })
-        .addNode('transform', 'Store Response', {
-          transforms: [{ operation: 'add', path: '/state/lastResponse', value: '{{ $nodeResult("llm_1").data }}' }],
-        });
-
-      const blueprint = agent.getCurrentBlueprint();
-      expect(blueprint.nodes).toHaveLength(4); // start, end, llm, transform
-      expect(blueprint.nodes.some((node) => node.name === 'Think')).toBe(true);
-      expect(blueprint.nodes.some((node) => node.name === 'Store Response')).toBe(true);
-    });
   });
 
   describe('Agent Memory Integration', () => {
@@ -198,10 +170,11 @@ describe('Agent Node Handler', () => {
 
       // Verify default blueprint was created
       const blueprint = agent.getCurrentBlueprint();
-      expect(blueprint.nodes).toHaveLength(2); // start and end
+      expect(blueprint.nodes).toHaveLength(3); // start, llm, and end
       expect(blueprint.nodes.some((node) => node.type === 'start')).toBe(true);
+      expect(blueprint.nodes.some((node) => node.type === 'llm')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'end')).toBe(true);
-      expect(blueprint.edges).toHaveLength(1); // edge from start to end
+      expect(blueprint.edges).toHaveLength(2); // edges: start->llm->end
     });
 
     it('should validate blueprint structure', () => {
@@ -353,42 +326,6 @@ describe('Agent Node Handler', () => {
       const agent = new Agent(params);
       const validation = agent.validate();
 
-      expect(validation.valid).toBe(true);
-    });
-
-    it('should handle dynamic workflow building', () => {
-      const params: AgentParams = {
-        name: 'Dynamic Agent',
-        model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {
-          systemPrompt: 'You are a dynamic agent that builds workflows on demand.',
-        },
-      };
-
-      const agent = new Agent(params);
-
-      // Build workflow dynamically
-      agent
-        .addNode('llm', 'Initial Analysis', {
-          model: 'anthropic/claude-3-haiku',
-          messages: [{ role: 'user', content: 'Analyze the situation' }],
-        })
-        .addNode('conditional', 'Decision Point', {
-          condition: '$nodeResult("llm_1").data.confident = true',
-        })
-        .addNode('llm', 'Confident Response', {
-          model: 'anthropic/claude-3.5-sonnet',
-          messages: [{ role: 'user', content: 'Provide detailed response' }],
-        })
-        .addNode('transform', 'Store Result', {
-          transforms: [{ operation: 'add', path: '/state/workflow_result', value: '{{ $nodeResult("llm_2").data }}' }],
-        });
-
-      const blueprint = agent.getCurrentBlueprint();
-      expect(blueprint.nodes).toHaveLength(6); // start, end, + 4 added nodes
-      expect(blueprint.edges).toHaveLength(5); // All nodes connected in sequence
-
-      const validation = agent.validate();
       expect(validation.valid).toBe(true);
     });
   });

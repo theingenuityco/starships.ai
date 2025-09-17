@@ -6,7 +6,7 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmParams } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmParams, LlmMessage } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
@@ -149,19 +149,45 @@ export class Agent implements NodeHandler {
     // Create execution context for the agent's blueprint
     const execution = ExecutionItemUtils.createExecution(input);
 
-    // Initialize messages array - use input messages if provided, otherwise empty array
+    // Initialize messages in the required order:
+    // 1) systemMessage from this.params.memoryState
+    // 2) messages from this.params.memoryState
+    // 3) message(s) from execute args
+    const orderedMessages: LlmMessage[] = [];
+
+    const memory = this.params.memoryState;
+    if (memory?.systemPrompt) {
+      orderedMessages.push({ role: 'system', content: memory.systemPrompt });
+    }
+    if (memory?.messages?.length) {
+      orderedMessages.push(...memory.messages);
+    }
+
+    // Type guard to detect LlmMessage[]
+    const isLlmMessageArray = (val: unknown): val is LlmMessage[] => {
+      return (
+        Array.isArray(val) &&
+        val.every((m) => {
+          if (typeof m !== 'object' || m === null) return false;
+          const obj = m as Record<string, unknown>;
+          return typeof obj.role === 'string' && typeof obj.content === 'string';
+        })
+      );
+    };
+
     if (input && input.length > 0) {
       const inputData = ExecutionItemUtils.unwrapSingle(input);
-      // If input contains an array of messages, use it; otherwise create a user message from the input
-      if (Array.isArray(inputData) && inputData.length > 0 && inputData[0].role) {
-        execution.state.messages = inputData;
+      // If input contains an array of LlmMessage, append them; otherwise create a user message from the input
+      if (isLlmMessageArray(inputData)) {
+        orderedMessages.push(...inputData);
       } else {
         const content = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
-        execution.state.messages = [{ role: 'user', content }];
+        orderedMessages.push({ role: 'user', content });
       }
-    } else {
-      execution.state.messages = [];
     }
+
+    // Commit ordered messages to execution state
+    (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
 
     // Create a new Engine instance for executing the agent's blueprint
     const engine = new Engine({

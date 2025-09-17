@@ -11,14 +11,7 @@ jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => `mock-nanoid-autopilot-${++nanoidCounter}`),
 }));
 
-// Mock console methods to reduce noise in tests
-const mockConsole = {
-  ...console,
-  log: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-};
-global.console = mockConsole;
+// Console methods are not mocked to allow debug logging
 
 // Global test utilities with type assertions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

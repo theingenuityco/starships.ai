@@ -13,9 +13,7 @@ import type { Blueprint } from '@/types';
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Mock console to reduce test noise
-const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+// Console is not mocked to allow debug logging
 
 describe('End-to-End Workflow Execution', () => {
   beforeEach(() => {
@@ -45,8 +43,7 @@ describe('End-to-End Workflow Execution', () => {
   });
 
   afterEach(() => {
-    consoleSpy.mockClear();
-    consoleErrorSpy.mockClear();
+    // No console mocks to clear
   });
 
   describe('Error Handling and Recovery', () => {

@@ -6,6 +6,7 @@
 import { BaseNode } from '../nodes/BaseNode';
 import { ExecutionItem, ValidationResult, NodeHandlerOptions } from '../types';
 import { BaseParams } from '../types/node-parameters';
+import { NodeHelpers } from '../helpers/NodeHelpers';
 
 // Example parameters interface for a custom node - extending BaseParams
 interface CalculatorParams extends BaseParams {
@@ -24,8 +25,8 @@ export class CalculatorNode extends BaseNode<CalculatorParams> {
     try {
       const params = this.getParams();
 
-      // Get input value - using BaseNode helper
-      const inputValue = this.getSingleInput(input);
+      // Get input value - using NodeHelpers directly
+      const inputValue = NodeHelpers.getSingleInput(input);
       const numberInput = typeof inputValue === 'number' ? inputValue : Number(inputValue) || 0;
 
       // Perform calculation based on operation
@@ -50,8 +51,8 @@ export class CalculatorNode extends BaseNode<CalculatorParams> {
           throw new Error(`Unknown operation: ${params.operation}`);
       }
 
-      // Return result using BaseNode helper
-      return this.createSingleOutput(
+      // Return result using NodeHelpers directly
+      return NodeHelpers.createSingleOutput(
         {
           operation: params.operation,
           input: numberInput,

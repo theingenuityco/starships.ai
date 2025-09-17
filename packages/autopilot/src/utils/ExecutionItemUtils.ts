@@ -1,24 +1,24 @@
 /**
- * Node Helper Utilities
+ * Execution Item Utilities
  *
- * Helper functions to make it easy for nodes to work with ExecutionItem arrays
+ * Utility functions to make it easy for nodes to work with ExecutionItem arrays
  * while maintaining backward compatibility with simple data processing
  */
 
 import { ExecutionItem } from '@/types';
 
-export class NodeHelpers {
+export class ExecutionItemUtils {
   /**
-   * Extract simple data from the first item (for nodes that process single values)
+   * Unwrap data from the first ExecutionItem (for nodes that process single values)
    */
-  static getSingleInput(items?: ExecutionItem[]): unknown {
+  static unwrapSingle(items?: ExecutionItem[]): unknown {
     return items?.[0]?.json;
   }
 
   /**
-   * Create a single output item from simple data
+   * Wrap simple data into a single ExecutionItem
    */
-  static createSingleOutput(data: unknown, sourceItem?: ExecutionItem): ExecutionItem[] {
+  static wrapSingle(data: unknown, sourceItem?: ExecutionItem): ExecutionItem[] {
     return [
       {
         json: data,
@@ -29,16 +29,16 @@ export class NodeHelpers {
   }
 
   /**
-   * Extract all data from items array (for nodes that process multiple values)
+   * Unwrap data from all ExecutionItems (for nodes that process multiple values)
    */
-  static getAllInputs(items?: ExecutionItem[]): unknown[] {
+  static unwrapAll(items?: ExecutionItem[]): unknown[] {
     return items?.map((item) => item.json) || [];
   }
 
   /**
-   * Create multiple output items from an array of data
+   * Wrap multiple data values into ExecutionItem array
    */
-  static createMultipleOutputs(dataArray: unknown[], sourceItems?: ExecutionItem[]): ExecutionItem[] {
+  static wrapMultiple(dataArray: unknown[], sourceItems?: ExecutionItem[]): ExecutionItem[] {
     return dataArray.map((data, index) => ({
       json: data,
       pairedItem: { item: index },
@@ -47,9 +47,9 @@ export class NodeHelpers {
   }
 
   /**
-   * Create error item for failed processing
+   * Wrap error message into ExecutionItem for failed processing
    */
-  static createErrorOutput(error: string, sourceItem?: ExecutionItem): ExecutionItem[] {
+  static wrapError(error: string, sourceItem?: ExecutionItem): ExecutionItem[] {
     return [
       {
         json: undefined,
@@ -90,21 +90,21 @@ export class NodeHelpers {
   }
 
   /**
-   * Filter out items with errors
+   * Filter out ExecutionItems with errors
    */
   static filterErrors(items: ExecutionItem[]): ExecutionItem[] {
     return items.filter((item) => !item.error);
   }
 
   /**
-   * Get items with errors
+   * Get ExecutionItems that contain errors
    */
   static getErrors(items: ExecutionItem[]): ExecutionItem[] {
     return items.filter((item) => item.error);
   }
 
   /**
-   * Check if any items have errors
+   * Check if any ExecutionItems have errors
    */
   static hasErrors(items: ExecutionItem[]): boolean {
     return items.some((item) => item.error);

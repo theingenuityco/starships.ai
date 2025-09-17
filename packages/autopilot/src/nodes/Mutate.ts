@@ -11,7 +11,7 @@ import { ValidationResult, ValidationError, Execution, ExecutionState, Execution
 import type { TransformOperation, MutateParams } from '@/types/node-parameters';
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 /**
  * Transform safety manager for state snapshots and rollback
@@ -69,7 +69,7 @@ export class Mutate implements NodeHandler {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     if (!this.params.mutations || this.params.mutations.length === 0) {
-      return input || NodeHelpers.createSingleOutput({ mutationsApplied: 0, operations: [] });
+      return input || ExecutionItemUtils.wrapSingle({ mutationsApplied: 0, operations: [] });
     }
 
     if (!this.options?.execution) {
@@ -81,7 +81,7 @@ export class Mutate implements NodeHandler {
 
     // Return summary of what was mutated
     const operations = this.params.mutations.map((t) => `${t.operation} ${t.path}`);
-    return NodeHelpers.createSingleOutput({
+    return ExecutionItemUtils.wrapSingle({
       mutationsApplied: this.params.mutations.length,
       operations,
     });

@@ -6,7 +6,7 @@
 
 import { NodeHandler } from '@/types/node-handler';
 import { LlmMessage, UserPromptParams, ValidationError, ValidationResult, ExecutionItem } from '@/types';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface UserPromptResponse {
   message: LlmMessage;
@@ -33,7 +33,7 @@ export class UserPrompt implements NodeHandler {
       },
     };
 
-    return NodeHelpers.createSingleOutput(response);
+    return ExecutionItemUtils.wrapSingle(response);
   }
 
   validate(): ValidationResult {

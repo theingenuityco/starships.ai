@@ -10,7 +10,7 @@ import { Blueprint, Execution, NodeHandlerOptions, Node as WorkflowNode, NodePar
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
 import { Eval } from './Eval';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
@@ -162,7 +162,7 @@ export class Engine {
         const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
 
         // Store failed output
-        this.execution.nodeOutputs[currentNode.ref] = NodeHelpers.createErrorOutput(errorMessage);
+        this.execution.nodeOutputs[currentNode.ref] = ExecutionItemUtils.wrapError(errorMessage);
 
         // Set workflow status to failed and break execution
         this.execution.status = 'failed';
@@ -205,7 +205,7 @@ export class Engine {
 
     try {
       // Step 1: Resolve template expressions in parameters with input data
-      const inputData = NodeHelpers.getSingleInput(inputItems);
+      const inputData = ExecutionItemUtils.unwrapSingle(inputItems);
       const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution, inputData)) as NodeParameters;
 
       // Step 2: Create handler instance with resolved parameters

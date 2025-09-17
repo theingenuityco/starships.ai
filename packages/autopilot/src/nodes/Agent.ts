@@ -13,7 +13,7 @@ import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, Llm
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint, Node } from '@/types/blueprint';
 import { NodeParameters } from '@/types/node-parameters';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
@@ -183,7 +183,7 @@ export class Agent implements NodeHandler {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // If we have input data, add it to agent's memory
     if (input && input.length > 0) {
-      const inputData = NodeHelpers.getSingleInput(input);
+      const inputData = ExecutionItemUtils.unwrapSingle(input);
       const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
       await this.addMessageToMemory({
         role: 'user',
@@ -195,7 +195,7 @@ export class Agent implements NodeHandler {
     const execution = this.engine.getExecution();
 
     // Return the execution wrapped as an item
-    return NodeHelpers.createSingleOutput(execution, input?.[0]);
+    return ExecutionItemUtils.wrapSingle(execution, input?.[0]);
   }
 
   /**

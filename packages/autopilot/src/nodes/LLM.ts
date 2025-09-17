@@ -12,7 +12,7 @@ import { ExecutionItem } from '@/types';
 import { autopilot } from '@/Autopilot';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { LLMMessageRole, LLMResponse, LLMUsage } from '@/types/llm';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 interface StreamChoice {
   content: string;
@@ -53,7 +53,7 @@ export class LLM extends BaseNode<LlmParams> {
       // Use input data as user message if no explicit messages provided
       let messages = params.messages;
       if (input && input.length > 0 && (!messages || messages.length === 0)) {
-        const inputData = NodeHelpers.getSingleInput(input);
+        const inputData = ExecutionItemUtils.unwrapSingle(input);
         const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
         messages = [{ role: 'user', content: inputContent }];
       }
@@ -85,11 +85,11 @@ export class LLM extends BaseNode<LlmParams> {
       const reader = response.body?.getReader();
       if (!reader) {
         const result = (await response.json()) as LLMResponse;
-        return NodeHelpers.createSingleOutput(result, input?.[0]);
+        return ExecutionItemUtils.wrapSingle(result, input?.[0]);
       }
 
       const llmResponse = await this.processStreamingResponse(reader);
-      return NodeHelpers.createSingleOutput(llmResponse, input?.[0]);
+      return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
       throw this.handleExecutionError(error, 'LLM execution failed');
     }

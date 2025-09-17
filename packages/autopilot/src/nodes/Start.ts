@@ -1,6 +1,6 @@
 import { BaseNode } from './BaseNode';
 import { StartParams, ValidationResult, ExecutionItem, NodeHandlerOptions } from '@/types';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export class Start extends BaseNode<StartParams> {
   constructor(params?: StartParams, options?: NodeHandlerOptions) {
@@ -9,7 +9,7 @@ export class Start extends BaseNode<StartParams> {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    return NodeHelpers.createSingleOutput({});
+    return ExecutionItemUtils.wrapSingle({});
   }
 
   validate(): ValidationResult {

@@ -9,7 +9,6 @@
 import { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
 import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeParameters } from '@/types/node-parameters';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
 import { EventCallback } from '@/types/events';
 
 /**
@@ -101,30 +100,6 @@ export abstract class BaseNode<TParams extends NodeParameters = NodeParameters> 
       };
     }
     return null;
-  }
-
-  /**
-   * Helper to get single input data from execution items
-   * Common pattern used across nodes
-   */
-  protected getSingleInput(input?: ExecutionItem[]): unknown {
-    return NodeHelpers.getSingleInput(input);
-  }
-
-  /**
-   * Helper to create single output execution item
-   * Common pattern used across nodes
-   */
-  protected createSingleOutput(data: unknown, sourceItem?: ExecutionItem): ExecutionItem[] {
-    return NodeHelpers.createSingleOutput(data, sourceItem);
-  }
-
-  /**
-   * Helper to create error output execution item
-   * Common pattern used across nodes
-   */
-  protected createErrorOutput(message: string, sourceItem?: ExecutionItem): ExecutionItem[] {
-    return NodeHelpers.createErrorOutput(message, sourceItem);
   }
 
   /**

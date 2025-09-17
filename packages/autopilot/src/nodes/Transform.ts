@@ -11,6 +11,7 @@ import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import type { TransformOperation, TransformParams } from '@/types/node-parameters';
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
+import { NodeHelpers } from '@/helpers/NodeHelpers';
 
 export class Transform extends BaseNode<TransformParams> {
   private eval = new Eval();
@@ -25,7 +26,7 @@ export class Transform extends BaseNode<TransformParams> {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
     if (!params.transforms || params.transforms.length === 0) {
-      return input || this.createSingleOutput({ transformsApplied: 0, operations: [] });
+      return input || NodeHelpers.createSingleOutput({ transformsApplied: 0, operations: [] });
     }
 
     // Transform node now only handles input data transformations
@@ -37,9 +38,9 @@ export class Transform extends BaseNode<TransformParams> {
 
     try {
       // Transform the input data
-      const inputData = this.getSingleInput(input);
+      const inputData = NodeHelpers.getSingleInput(input);
       const transformedData = await this.transformInputData(inputData, params.transforms);
-      return this.createSingleOutput(transformedData, input[0]);
+      return NodeHelpers.createSingleOutput(transformedData, input[0]);
     } catch (error) {
       throw this.handleExecutionError(error, 'Transform execution failed');
     }

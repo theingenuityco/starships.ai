@@ -15,6 +15,14 @@ export interface ConditionalResult {
   edgeCondition: string;
 }
 
+interface RegexMatchResult {
+  match: string;
+  start: number;
+  end: number;
+  groups: string[];
+  next: () => RegexMatchResult | undefined;
+}
+
 export class Conditional implements NodeHandler {
   private params: ConditionalParams;
   private options?: NodeHandlerOptions;
@@ -50,11 +58,19 @@ export class Conditional implements NodeHandler {
         const inputData = ExecutionItemUtils.unwrapSingle(input);
         result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData);
 
-        // Convert result to string condition - always a string
+        // Convert result to string condition - handle special cases
         if (result === null || result === undefined) {
           edgeCondition = 'null';
         } else if (typeof result === 'boolean') {
           edgeCondition = result.toString();
+        } else if (typeof result === 'object' && result !== null) {
+          // Handle regex match objects from JSONata ~> operator
+          if (this.isRegexMatchResult(result)) {
+            edgeCondition = result.match;
+            result = result.match; // Also update the result value
+          } else {
+            edgeCondition = String(result);
+          }
         } else {
           edgeCondition = String(result);
         }
@@ -106,5 +122,12 @@ export class Conditional implements NodeHandler {
       valid: errors.length === 0,
       errors: errors.length > 0 ? errors : [],
     };
+  }
+
+  /**
+   * Type guard to check if result is a regex match object
+   */
+  private isRegexMatchResult(result: unknown): result is RegexMatchResult {
+    return typeof result === 'object' && result !== null && 'match' in result && typeof (result as RegexMatchResult).match === 'string';
   }
 }

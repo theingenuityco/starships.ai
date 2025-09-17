@@ -91,9 +91,24 @@ export class Engine {
     execution: Execution,
     inputItems?: ExecutionItem[]
   ): Promise<ExecutionItem[]> {
-    const virtualNode = this.createVirtualNode('transform', `inline_transform`, { transforms });
-    const transformHandler = await this.createHandler(virtualNode, { transforms }, execution);
-    return await transformHandler.execute(inputItems);
+    // Separate state mutations from input transforms
+    const stateMutations = transforms.filter((t) => t.path.startsWith('/state/'));
+    const inputTransforms = transforms.filter((t) => !t.path.startsWith('/state/'));
+
+    // Execute state mutations using Mutate node
+    if (stateMutations.length > 0) {
+      await this.executeInlineMutate(stateMutations, execution);
+    }
+
+    // Execute input transforms using Transform node
+    if (inputTransforms.length > 0) {
+      const virtualNode = this.createVirtualNode('transform', `inline_transform`, { transforms: inputTransforms });
+      const transformHandler = await this.createHandler(virtualNode, { transforms: inputTransforms }, execution);
+      return await transformHandler.execute(inputItems);
+    }
+
+    // If only state mutations, return input items unchanged
+    return inputItems || ExecutionItemUtils.wrapSingle({ transformsApplied: stateMutations.length });
   }
 
   private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<void> {
@@ -119,11 +134,28 @@ export class Engine {
     const nodeParams = node.parameters as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
 
     if (nodeParams.transforms) {
-      const transformHandler = await this.createVirtualHandler('transform', { transforms: nodeParams.transforms });
-      const transformValidation = transformHandler.validate();
-      if (!transformValidation.valid) {
-        const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
-        validationErrors.push(...errorMessages);
+      // Separate state mutations from input transforms for validation
+      const stateMutations = nodeParams.transforms.filter((t) => t.path.startsWith('/state/'));
+      const inputTransforms = nodeParams.transforms.filter((t) => !t.path.startsWith('/state/'));
+
+      // Validate state mutations as Mutate operations
+      if (stateMutations.length > 0) {
+        const mutateHandler = await this.createVirtualHandler('mutate', { mutations: stateMutations });
+        const mutateValidation = mutateHandler.validate();
+        if (!mutateValidation.valid) {
+          const errorMessages = mutateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+          validationErrors.push(...errorMessages);
+        }
+      }
+
+      // Validate input transforms as Transform operations
+      if (inputTransforms.length > 0) {
+        const transformHandler = await this.createVirtualHandler('transform', { transforms: inputTransforms });
+        const transformValidation = transformHandler.validate();
+        if (!transformValidation.valid) {
+          const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+          validationErrors.push(...errorMessages);
+        }
       }
     }
 

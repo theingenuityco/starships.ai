@@ -18,23 +18,10 @@ export interface EvalContext {
   currentNodeRef?: string;
   input?: unknown;
 
-  // Helper functions
+  // Only custom helper functions that aren't built into JSONata
   $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
-  $now: () => string;
-  $filter: (array: unknown[], predicate: (item: unknown, index?: number) => boolean) => unknown[];
-  $map: (array: unknown[], mapper: (item: unknown, index?: number) => unknown) => unknown[];
-  $reduce: (array: unknown[], reducer: (acc: unknown, item: unknown, index?: number) => unknown, initialValue?: unknown) => unknown;
-  $merge: (...objects: Record<string, unknown>[]) => Record<string, unknown>;
-  $clone: (value: unknown) => unknown;
-  $find: (array: unknown[], predicate: (item: unknown, index?: number) => boolean) => unknown;
-  $count: (array: unknown[]) => number;
-  $trim: (str: string) => string;
-  $join: (array: unknown[], separator?: string) => string;
-  $omit: (obj: Record<string, unknown>, keys: string[]) => Record<string, unknown>;
-  $pick: (obj: Record<string, unknown>, keys: string[]) => Record<string, unknown>;
-  $has: (obj: Record<string, unknown>, key: string) => boolean;
-  $exists: (value: unknown) => boolean;
+  $random: () => number; // Custom random function since JSONata's might not be available in all versions
 }
 
 /**
@@ -63,24 +50,10 @@ export class Eval {
       currentNodeRef: execution.currentNodeRef,
       input: inputData,
 
-      // Helper functions
+      // Only custom helper functions
       $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
       $input: (path?: string) => this.extractPath(inputData, path),
-      $now: () => new Date().toISOString(),
-      $filter: (array: unknown[], predicate: (item: unknown, index?: number) => boolean) => this.filterArray(array, predicate),
-      $map: (array: unknown[], mapper: (item: unknown, index?: number) => unknown) => this.mapArray(array, mapper),
-      $reduce: (array: unknown[], reducer: (acc: unknown, item: unknown, index?: number) => unknown, initialValue?: unknown) =>
-        this.reduceArray(array, reducer, initialValue),
-      $merge: (...objects: Record<string, unknown>[]) => this.mergeObjects(...objects),
-      $clone: (value: unknown) => this.cloneValue(value),
-      $find: (array: unknown[], predicate: (item: unknown, index?: number) => boolean) => this.findInArray(array, predicate),
-      $count: (array: unknown[]) => this.countArray(array),
-      $trim: (str: string) => this.trimString(str),
-      $join: (array: unknown[], separator?: string) => this.joinArray(array, separator),
-      $omit: (obj: Record<string, unknown>, keys: string[]) => this.omitKeys(obj, keys),
-      $pick: (obj: Record<string, unknown>, keys: string[]) => this.pickKeys(obj, keys),
-      $has: (obj: Record<string, unknown>, key: string) => this.hasKey(obj, key),
-      $exists: (value: unknown) => this.valueExists(value),
+      $random: () => Math.random(), // Simple custom random function
     };
   }
 
@@ -92,154 +65,6 @@ export class Eval {
       }
     }
     return undefined;
-  }
-
-  /**
-   * Filter array helper function
-   */
-  private filterArray(array: unknown[], predicate: (item: unknown, index?: number) => boolean): unknown[] {
-    if (!Array.isArray(array)) return [];
-    return array.filter(predicate);
-  }
-
-  /**
-   * Map array helper function
-   */
-  private mapArray(array: unknown[], mapper: (item: unknown, index?: number) => unknown): unknown[] {
-    if (!Array.isArray(array)) return [];
-    return array.map(mapper);
-  }
-
-  /**
-   * Reduce array helper function
-   */
-  private reduceArray(
-    array: unknown[],
-    reducer: (acc: unknown, item: unknown, index?: number) => unknown,
-    initialValue?: unknown
-  ): unknown {
-    if (!Array.isArray(array)) return initialValue;
-    return initialValue !== undefined ? array.reduce(reducer, initialValue) : array.reduce(reducer);
-  }
-
-  /**
-   * Merge objects helper function
-   */
-  private mergeObjects(...objects: Record<string, unknown>[]): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const obj of objects) {
-      if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-        Object.assign(result, obj);
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Deep clone helper function
-   */
-  private cloneValue(value: unknown): unknown {
-    if (value === null || typeof value !== 'object') {
-      return value;
-    }
-
-    if (Array.isArray(value)) {
-      return value.map((item) => this.cloneValue(item));
-    }
-
-    if (value instanceof Date) {
-      return new Date(value.getTime());
-    }
-
-    if (typeof value === 'object') {
-      const cloned: Record<string, unknown> = {};
-      for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-        cloned[key] = this.cloneValue(val);
-      }
-      return cloned;
-    }
-
-    return value;
-  }
-
-  /**
-   * Find first element in array matching predicate
-   */
-  private findInArray(array: unknown[], predicate: (item: unknown, index?: number) => boolean): unknown {
-    if (!Array.isArray(array)) return undefined;
-    return array.find(predicate);
-  }
-
-  /**
-   * Count elements in array
-   */
-  private countArray(array: unknown[]): number {
-    if (!Array.isArray(array)) return 0;
-    return array.length;
-  }
-
-  /**
-   * Trim whitespace from string
-   */
-  private trimString(str: string): string {
-    if (typeof str !== 'string') return String(str);
-    return str.trim();
-  }
-
-  /**
-   * Join array elements into string
-   */
-  private joinArray(array: unknown[], separator: string = ','): string {
-    if (!Array.isArray(array)) return '';
-    return array.map((item) => String(item)).join(separator);
-  }
-
-  /**
-   * Create new object omitting specified keys
-   */
-  private omitKeys(obj: Record<string, unknown>, keys: string[]): Record<string, unknown> {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
-    const result: Record<string, unknown> = {};
-    const keysToOmit = new Set(keys);
-
-    for (const [key, value] of Object.entries(obj)) {
-      if (!keysToOmit.has(key)) {
-        result[key] = value;
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Create new object picking only specified keys
-   */
-  private pickKeys(obj: Record<string, unknown>, keys: string[]): Record<string, unknown> {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return {};
-    const result: Record<string, unknown> = {};
-
-    for (const key of keys) {
-      if (key in obj) {
-        result[key] = obj[key];
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Check if object has specified key
-   */
-  private hasKey(obj: Record<string, unknown>, key: string): boolean {
-    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
-    return key in obj;
-  }
-
-  /**
-   * Check if value exists (not null or undefined)
-   */
-  private valueExists(value: unknown): boolean {
-    return value !== null && value !== undefined;
   }
 
   /**

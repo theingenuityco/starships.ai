@@ -154,7 +154,16 @@ export class WorkflowService {
   /**
    * Get workflow analytics - Static method
    */
-  static async getWorkflowAnalytics(workflowId: string): Promise<any> {
+  static async getWorkflowAnalytics(workflowId: string): Promise<{
+    workflowId: string;
+    name: string;
+    category: string;
+    usageCount: number;
+    rating: number;
+    isPublic?: boolean;
+    createdAt: string;
+    lastUpdated: string;
+  }> {
     const repository = new WorkflowRepository();
     const workflow = await repository.findById(workflowId);
 

@@ -184,7 +184,7 @@ router.post('/workflows', jwtAuthMiddleware, async (req: Request, res: Response)
         isPublic: z.boolean().optional(),
         tags: z.array(z.string()).optional(),
         executionMode: ExecutionModeSchema.optional(),
-        blueprint: z.any().optional(),
+        blueprint: z.any().optional(), // TODO: Add proper Blueprint validation
         timeout: z.number().min(1000).optional(),
       }),
       req.body,
@@ -225,7 +225,7 @@ router.put('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, res
         isPublic: z.boolean().optional(),
         tags: z.array(z.string()).optional(),
         executionMode: ExecutionModeSchema.optional(),
-        blueprint: z.any().optional(),
+        blueprint: z.any().optional(), // TODO: Add proper Blueprint validation
         timeout: z.number().min(1000).optional(),
         version: z.string().optional(),
       }),

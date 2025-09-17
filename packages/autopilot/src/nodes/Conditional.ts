@@ -6,12 +6,21 @@
  */
 
 import { NodeHandler } from '@/types/node-handler';
-import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions } from '@/types';
+import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem } from '@/types';
 import { Eval } from '@/engine/Eval';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface ConditionalResult {
   result: unknown;
-  condition: string | boolean | number | null | undefined;
+  edgeCondition?: string;
+}
+
+interface RegexMatchResult {
+  match: string;
+  start: number;
+  end: number;
+  groups: string[];
+  next: () => RegexMatchResult | undefined;
 }
 
 export class Conditional implements NodeHandler {
@@ -25,40 +34,93 @@ export class Conditional implements NodeHandler {
   }
 
   /**
-   * Execute the conditional expression
+   * Execute the conditional expression with optional input items
    */
-  async execute(): Promise<ConditionalResult> {
-    if (!this.params.condition) {
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    // Check if condition parameter exists
+    if (!('condition' in this.params)) {
+      throw new Error('Conditional node requires a condition expression');
+    }
+
+    // Handle case where template resolved to undefined/null (template couldn't resolve)
+    if (this.params.condition === undefined || this.params.condition === null) {
+      const conditionalResult = {
+        result: this.params.condition,
+      };
+      return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);
+    }
+
+    // Handle empty string
+    if (typeof this.params.condition === 'string' && this.params.condition.trim() === '') {
       throw new Error('Conditional node requires a condition expression');
     }
 
     try {
-      // Ensure we have execution context
-      if (!this.options?.execution) {
-        throw new Error('Execution context is required for conditional evaluation');
-      }
+      let result: unknown;
+      let edgeCondition: string | undefined;
 
-      // Evaluate expression using centralized Eval class
-      const result = await this.eval.evaluateExpression(this.params.condition, this.eval.buildContext(this.options.execution));
-
-      // Convert result to boolean or string condition
-      let condition: string | boolean | number | null | undefined;
-      if (typeof result === 'boolean') {
-        condition = result;
-      } else if (typeof result === 'string') {
-        condition = result;
-      } else if (typeof result === 'number') {
-        condition = result;
-      } else if (result === undefined || result === null) {
-        condition = result;
+      // Handle case where condition is already resolved by Engine template processing
+      if (typeof this.params.condition !== 'string') {
+        // Condition was already evaluated - use the resolved value
+        result = this.params.condition;
+        if (result === null || result === undefined) {
+          // Don't set edgeCondition when result is null/undefined
+        } else if (typeof result === 'boolean') {
+          edgeCondition = result.toString();
+        } else if (typeof result === 'object' && result !== null) {
+          // Handle regex match objects from JSONata ~> operator
+          if (this.isRegexMatchResult(result)) {
+            edgeCondition = result.match;
+            result = result.match; // Also update the result value
+          } else {
+            edgeCondition = String(result);
+          }
+        } else {
+          edgeCondition = String(result);
+        }
       } else {
-        condition = Boolean(result);
+        // Check if condition contains JSONata template expressions ({{ ... }})
+        const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
+
+        if (hasTemplateExpression) {
+          // Ensure we have execution context for JSONata evaluation
+          if (!this.options?.execution) {
+            throw new Error('Execution context is required for conditional evaluation');
+          }
+
+          // Evaluate JSONata expression using centralized Eval class with input data
+          const inputData = ExecutionItemUtils.unwrapSingle(input);
+          result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData);
+
+          // Convert result to string condition - handle special cases
+          if (result === null || result === undefined) {
+            // Don't set edgeCondition when result is null/undefined
+          } else if (typeof result === 'boolean') {
+            edgeCondition = result.toString();
+          } else if (typeof result === 'object' && result !== null) {
+            // Handle regex match objects from JSONata ~> operator
+            if (this.isRegexMatchResult(result)) {
+              edgeCondition = result.match;
+              result = result.match; // Also update the result value
+            } else {
+              edgeCondition = String(result);
+            }
+          } else {
+            edgeCondition = String(result);
+          }
+        } else {
+          // Static string - return as is
+          result = this.params.condition;
+          edgeCondition = this.params.condition;
+        }
       }
 
-      return {
+      const conditionalResult: ConditionalResult = {
         result,
-        condition,
+        ...(edgeCondition !== undefined && { edgeCondition }),
       };
+
+      return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);
     } catch (error) {
       throw new Error(`Conditional evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -70,25 +132,47 @@ export class Conditional implements NodeHandler {
   validate(): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Required fields
-    if (!this.params.condition || this.params.condition.trim() === '') {
+    // Check if condition parameter exists at all (even if undefined after template resolution)
+    if (!('condition' in this.params)) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Condition expression is required',
       });
-    }
-
-    // Validate JSONata expression syntax
-    if (this.params.condition) {
-      const validation = this.eval.validateExpression(this.params.condition);
-      if (!validation.valid) {
-        errors.push(...(validation.errors || []));
+    } else {
+      // If condition is a string, validate template expressions
+      if (typeof this.params.condition === 'string') {
+        // Empty string is invalid
+        if (this.params.condition.trim() === '') {
+          errors.push({
+            code: 'MISSING_REQUIRED_FIELD',
+            message: 'Condition expression is required',
+          });
+        } else {
+          // Check for template expressions and validate them
+          const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
+          if (hasTemplateExpression) {
+            const validation = this.eval.validateTemplateExpressions(this.params.condition);
+            if (!validation.valid) {
+              errors.push(...(validation.errors || []));
+            }
+          }
+          // Static strings don't need additional validation
+        }
       }
+      // Non-string values (including null, undefined from template resolution) are valid
+      // They will be handled during execution
     }
 
     return {
       valid: errors.length === 0,
       errors: errors.length > 0 ? errors : [],
     };
+  }
+
+  /**
+   * Type guard to check if result is a regex match object
+   */
+  private isRegexMatchResult(result: unknown): result is RegexMatchResult {
+    return typeof result === 'object' && result !== null && 'match' in result && typeof (result as RegexMatchResult).match === 'string';
   }
 }

@@ -6,15 +6,14 @@
 
 import { Engine } from '@/engine/Engine';
 import { autopilot } from '@/Autopilot';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { Blueprint } from '@/types';
 
 // Mock all external dependencies
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-// Mock console to reduce test noise
-const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+// Console is not mocked to allow debug logging
 
 describe('End-to-End Workflow Execution', () => {
   beforeEach(() => {
@@ -44,8 +43,7 @@ describe('End-to-End Workflow Execution', () => {
   });
 
   afterEach(() => {
-    consoleSpy.mockClear();
-    consoleErrorSpy.mockClear();
+    // No console mocks to clear
   });
 
   describe('Error Handling and Recovery', () => {
@@ -75,14 +73,19 @@ describe('End-to-End Workflow Execution', () => {
       // Mock network failure
       mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
-      expect(execution.status).toBe('failed');
-      expect(execution.error).toBeDefined();
-      expect(execution.error?.message).toContain('Network timeout');
+      expect(execution.status).toBe('completed');
+      expect(execution.results).toHaveLength(3);
+
+      // Check that the api-call node has an error
+      const apiCallResult = execution.results.find((r) => r.nodeRef === 'api-call');
+      expect(apiCallResult).toBeDefined();
+      expect(apiCallResult!.items[0].error).toBe('HTTP request failed: Network timeout');
+      expect(apiCallResult!.items[0].json).toBeUndefined();
     });
 
     it('should handle LLM API failures', async () => {
@@ -111,10 +114,10 @@ describe('End-to-End Workflow Execution', () => {
       // Mock LLM API failure
       mockFetch.mockRejectedValueOnce(new Error('LLM API unavailable'));
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('LLM API unavailable');
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toContain('LLM API unavailable');
@@ -146,10 +149,10 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('OpenRouter API key is required');
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toContain('OpenRouter API key is required');
@@ -232,18 +235,11 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"updated":true,"status":"processing"}',
         });
 
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { initialized: true },
-        },
-      });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { initialized: true };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Debug information
       if (execution.status === 'failed') {
@@ -253,7 +249,7 @@ describe('End-to-End Workflow Execution', () => {
 
       expect(execution.status).toBe('completed');
       expect(execution.state).toEqual({ initialized: true });
-      expect(execution.results).toHaveLength(5);
+      expect(execution.results).toHaveLength(6); // start -> set-state -> check-state -> inline_conditional -> update-state -> end
     });
   });
 
@@ -327,16 +323,15 @@ describe('End-to-End Workflow Execution', () => {
       mockFetch.mockResolvedValueOnce(mockResponses[0]).mockResolvedValueOnce(mockResponses[1]).mockResolvedValueOnce(mockResponses[2]);
 
       const startTime = Date.now();
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
       const endTime = Date.now();
 
       const executionTime = endTime - startTime;
 
-      expect(engine.getExecution().status).toBe('completed');
+      expect(execution.status).toBe('completed');
       expect(executionTime).toBeLessThan(1000); // Should complete in under 1 second with mocks
-
-      console.log(`Performance test completed in ${executionTime}ms`);
     });
   });
 
@@ -409,9 +404,10 @@ describe('End-to-End Workflow Execution', () => {
         });
 
       const eventCallback = jest.fn();
-      const engine = new Engine({ blueprint, eventCallback });
+      const engine = new Engine({ eventCallback });
+      const execution = ExecutionItemUtils.createExecution();
 
-      await engine.execute();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify comprehensive event coverage
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'workflow_started' }));
@@ -420,8 +416,6 @@ describe('End-to-End Workflow Execution', () => {
       // Should have received content streaming events from LLM
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'content_chunk' }));
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'content_complete' }));
-
-      console.log(`Total events emitted: ${eventCallback.mock.calls.length}`);
     });
   });
 
@@ -462,7 +456,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Content Decision',
             description: 'Route based on analysis',
             parameters: {
-              condition: 'results[-1].data.choices[0].message.content ~> /positive/i ? "approve" : "review"',
+              condition: 'results[-1].items[0].json.choices[0].message.content ~> /positive/i ? "approve" : "review"',
             },
           },
 
@@ -543,7 +537,7 @@ describe('End-to-End Workflow Execution', () => {
                 .mockResolvedValueOnce({
                   done: false,
                   value: new TextEncoder().encode(
-                    'data: {"id":"test-123","object":"chat.completion.chunk","created":1234567890,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"delta":{"content":"POSITIVE sentiment detected - product review with enthusiastic tone"},"finish_reason":null}]}\n\n'
+                    'data: {"id":"test-123","object":"chat.completion.chunk","created":1234567890,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"delta":{"content":"positive sentiment detected - product review with enthusiastic tone"},"finish_reason":null}]}\n\n'
                   ),
                 })
                 .mockResolvedValueOnce({
@@ -568,21 +562,18 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"approved":true,"post_id":"123"}',
         });
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       expect(execution.status).toBe('completed');
 
       // Verify approval path was taken
-      const executionPath = execution.results.map((r) => r.nodeRef);
+      const executionPath = execution.results.map((r: { nodeRef: string }) => r.nodeRef);
       expect(executionPath).toContain('approve-content');
       expect(executionPath).not.toContain('flag-review');
 
       expect(mockFetch).toHaveBeenCalledTimes(3);
-
-      console.log('Content analysis workflow completed - content approved');
     });
 
     it('should handle multi-step data processing pipeline', async () => {
@@ -608,7 +599,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Validate Data',
             description: 'Check data quality',
             parameters: {
-              condition: 'results[nodeRef = "extract-data"].data ? "true" : "false"',
+              condition: 'results[nodeRef = "extract-data"].items[0].json ? "true" : "false"',
             },
           },
 
@@ -727,12 +718,9 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"notification_sent":true,"recipients":["admin@example.com"]}',
         });
 
-      const startTime = Date.now();
-      const engine = new Engine({ blueprint });
-      await engine.execute();
-      const endTime = Date.now();
-
-      const execution = engine.getExecution();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Debug information
       if (execution.status === 'failed') {
@@ -741,10 +729,8 @@ describe('End-to-End Workflow Execution', () => {
       }
 
       expect(execution.status).toBe('completed');
-      expect(execution.results).toHaveLength(7); // All 6 nodes + start + end
+      expect(execution.results).toHaveLength(8); // start -> extract-data -> validate-data -> inline_conditional -> transform-data -> load-data -> send-notification -> end
       expect(mockFetch).toHaveBeenCalledTimes(4);
-
-      console.log(`ETL pipeline completed in ${endTime - startTime}ms`);
     });
   });
 });

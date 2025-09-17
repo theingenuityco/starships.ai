@@ -27,6 +27,7 @@ export interface TransformOperation {
  */
 export interface BaseParams {
   transforms?: TransformOperation[];
+  mutations?: TransformOperation[];
   condition?: string; // JSONata expression for conditional evaluation
 }
 
@@ -73,7 +74,7 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
  */
 export interface LlmParams extends BaseParams {
   model: string;
-  messages: { role: string; content: string }[];
+  messages: { role: string; content: string }[] | string;
   temperature?: number | string; // Supports template expressions
   maxTokens?: number | string; // Supports template expressions
   timeout?: number | string; // Supports template expressions
@@ -146,10 +147,17 @@ export interface EndParams extends BaseParams {
 }
 
 /**
- * Transform node parameters
+ * Transform node parameters for input->output transformations
  */
 export type TransformParams = BaseParams;
 // Inherits transforms?: TransformOperation[] from BaseParams
+// No additional parameters needed
+
+/**
+ * Mutate node parameters for state mutation operations
+ */
+export type MutateParams = BaseParams;
+// Inherits mutations?: TransformOperation[] from BaseParams
 // No additional parameters needed
 
 /**
@@ -164,4 +172,5 @@ export type NodeParameters =
   | StartParams
   | EndParams
   | ConditionalParams
-  | TransformParams;
+  | TransformParams
+  | MutateParams;

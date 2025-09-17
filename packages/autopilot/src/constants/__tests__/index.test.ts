@@ -18,6 +18,7 @@ describe('Configuration Constants', () => {
         'RETRY_BACKOFF_MS',
         'JSONATA_EXPRESSION_TIMEOUT_MS',
         'MAX_CONDITIONAL_DEPTH',
+        'MAX_NODE_VISITS',
       ];
 
       const actualKeys = Object.keys(config);
@@ -100,6 +101,7 @@ describe('Configuration Constants', () => {
         'RETRY_BACKOFF_MS',
         'JSONATA_EXPRESSION_TIMEOUT_MS',
         'MAX_CONDITIONAL_DEPTH',
+        'MAX_NODE_VISITS',
       ];
 
       allKeys.forEach((key) => {
@@ -164,7 +166,7 @@ describe('Configuration Constants', () => {
     });
 
     it('should have consistent count limits', () => {
-      const countKeys = ['MAX_NODES', 'MAX_EDGES', 'DEFAULT_RETRIES', 'MAX_CONDITIONAL_DEPTH'];
+      const countKeys = ['MAX_NODES', 'MAX_EDGES', 'DEFAULT_RETRIES', 'MAX_CONDITIONAL_DEPTH', 'MAX_NODE_VISITS'];
 
       countKeys.forEach((key) => {
         const value = config[key as ConfigKey];

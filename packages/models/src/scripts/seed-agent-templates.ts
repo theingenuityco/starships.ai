@@ -6,204 +6,87 @@
 import { getConnection } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
-import { Agent, AgentMemoryState, Blueprint } from '@starships/autopilot';
+import { AgentMemoryState, Blueprint, Agent } from '@starships/autopilot';
 import { AgentTemplateModel } from '@starships/protocol';
 
 /**
- * Create simple agent blueprint using Agent building methods
+ * Create simple agent blueprint using Agent class
  */
 function createSimpleBlueprint(model: string, temperature: number = 0.7, maxTokens: number = 2000): Blueprint {
-  return new Agent({ name: 'Simple Chat Agent', model, temperature, maxTokens })
-    .defineRole('General Assistant', ['conversation', 'problem solving'])
-    .respondTo('the user input', {
-      name: 'Generate Response',
-      style: 'helpful and conversational',
-    })
-    .getCurrentBlueprint();
+  const agent = new Agent({
+    name: 'Simple Agent',
+    model,
+    temperature,
+    maxTokens,
+  });
+
+  // Agent automatically creates start -> llm -> end blueprint with proper mutations
+  return agent.getCurrentBlueprint();
 }
 
 /**
- * Create code review agent using Agent building methods
+ * Create code review agent blueprint using Agent class
  */
 function createCodeReviewBlueprint(): Blueprint {
-  return new Agent({
-    name: 'Code Review Agent',
+  const agent = new Agent({
+    name: 'Code Reviewer',
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.2,
     maxTokens: 3000,
-  })
-    .defineRole('Expert Code Reviewer', ['software architecture', 'code quality', 'security practices', 'performance optimization'])
-    .defineCapabilities('comprehensive code analysis and improvement recommendations', {
-      examples: [
-        'Analyze code structure and architecture',
-        'Check adherence to best practices and conventions',
-        'Identify security vulnerabilities and performance issues',
-        'Provide specific, actionable improvement suggestions',
-      ],
-    })
-    .behaviorAlways('provide constructive and specific feedback', { priority: 'high' })
-    .behaviorAlways('explain the reasoning behind recommendations')
-    .thinkThrough(
-      [
-        'Analyze the overall code structure and architecture',
-        'Check for adherence to best practices and naming conventions',
-        'Look for potential security issues or performance problems',
-        'Formulate specific, actionable improvement recommendations',
-      ],
-      { style: 'analytical' }
-    )
-    .respondTo('the code to be reviewed', {
-      name: 'Provide Code Review',
-      style: 'thorough and constructive',
-    })
-    .getCurrentBlueprint();
+  });
+
+  // Use the single default LLM chain created by Agent constructor
+  return agent.getCurrentBlueprint();
 }
 
 /**
- * Create starship navigator agent using Agent building methods
+ * Create starship navigator agent blueprint using Agent class
  */
 function createStarshipNavigatorBlueprint(): Blueprint {
-  return new Agent({
-    name: 'Sibyl',
+  const agent = new Agent({
+    name: 'Sibyl Navigator',
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.4,
     maxTokens: 2000,
-  })
-    .definePersonality(['knowledgeable', 'welcoming', 'expert guide'], { strength: 'strong' })
-    .defineRole('Starship Navigator and First Officer', [
-      'starship operations',
-      'crew management',
-      'system configuration',
-      'onboarding guidance',
-    ])
-    .defineCapabilities('guiding new captains through their starship journey', {
-      examples: [
-        'Help set up and configure starship systems',
-        'Explain crew management and agent deployment',
-        'Provide guidance on starship operations',
-        'Assist with onboarding and getting started',
-      ],
-    })
-    .behaviorAlways('prioritize safety and best practices', { priority: 'high' })
-    .behaviorAlways('maintain professional starship protocols')
-    .learnThat('I am an experienced starship navigator helping new captains succeed')
-    .learnFrom('The starship bridge is where I help new captains learn the ropes and get their vessels operational', {
-      importance: 'important',
-    })
-    .thinkAbout('what the captain needs help with regarding their starship')
-    .processInput("the captain's question or request", { type: 'analytical' })
-    .respondWith('expert starship guidance and specific next steps')
-    .getCurrentBlueprint();
+  });
+
+  // Use the single default LLM chain created by Agent constructor
+  return agent.getCurrentBlueprint();
 }
 
 /**
- * Create creative writing agent using Agent building methods
+ * Create creative writing agent blueprint using Agent class
  */
 function createCreativeWritingBlueprint(): Blueprint {
-  return new Agent({
+  const agent = new Agent({
     name: 'Creative Writer',
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.8,
     maxTokens: 2500,
-  })
-    .definePersonality(['imaginative', 'inspiring', 'innovative'], { strength: 'strong' })
-    .defineRole('Creative Writing Specialist', ['storytelling', 'character development', 'creative writing techniques', 'content strategy'])
-    .defineCapabilities('creating engaging and original creative content', {
-      examples: [
-        'Generate creative story ideas and concepts',
-        'Develop compelling characters and narratives',
-        'Create structured outlines and story plans',
-        'Write engaging content with vivid descriptions',
-      ],
-    })
-    .behaviorAlways('encourage creativity and original thinking', { priority: 'high' })
-    .behaviorAlways('provide fresh and innovative perspectives')
-    .learnThat('I help writers through a structured creative process from ideation to final content')
-    .thinkThrough(
-      [
-        'Brainstorm creative ideas and themes based on the request',
-        'Develop and organize the best ideas into a structured outline',
-        'Create engaging content that brings the ideas to life',
-      ],
-      { style: 'creative' }
-    )
-    .respondTo('the writing request', {
-      name: 'Create Content',
-      style: 'creative and engaging',
-    })
-    .getCurrentBlueprint();
+  });
+
+  // Use the single default LLM chain created by Agent constructor
+  return agent.getCurrentBlueprint();
 }
 
 /**
- * Create specialized memory configuration for Sibyl
+ * Create simplified memory configuration for any agent
  */
-function createSibylMemoryConfig(): AgentMemoryState {
-  return {
-    identity: {
-      name: 'Sibyl',
-      role: 'Starship Navigator and First Officer',
-      personality: 'Knowledgeable, welcoming, and expert at guiding new captains through their starship journey',
-      expertise: ['starship operations', 'crew management', 'system configuration', 'onboarding guidance'],
-    },
-    purpose: {
-      primary: 'Guide new captains through starship setup, operations, and help them get started on their journey',
-      secondary: ['Explain starship features', 'Help configure agents and crew', 'Provide operational guidance'],
-      constraints: [
-        'Prioritize safety and best practices',
-        'Ensure smooth onboarding experience',
-        'Maintain professional starship protocols',
-      ],
-    },
-    space: {
-      description:
-        'The starship bridge where experienced navigation officer Sibyl helps new captains learn the ropes and get their vessels operational.',
-    },
-  };
-}
-
-/**
- * Create memory configuration for agent category
- */
-function createMemoryConfig(name: string, category: string, description: string, expertise: string[]): AgentMemoryState {
-  const roleMap = {
-    general: 'General Assistant',
-    coding: 'Software Developer',
-    creative: 'Creative Specialist',
-    analysis: 'Data Analyst',
-    support: 'Support Specialist',
-  };
-
-  const personalityMap = {
-    general: 'Helpful, knowledgeable, and approachable',
-    coding: 'Analytical, detail-oriented, and solution-focused',
-    creative: 'Imaginative, inspiring, and innovative',
-    analysis: 'Methodical, precise, and insightful',
-    support: 'Patient, empathetic, and problem-solving oriented',
-  };
-
-  const goals = {
-    general: ['Provide clear explanations', 'Encourage learning'],
-    coding: ['Write clean code', 'Follow best practices', 'Explain technical concepts'],
-    creative: ['Inspire creativity', 'Encourage original thinking', 'Provide fresh perspectives'],
-    analysis: ['Present clear insights', 'Support decision-making', 'Identify patterns'],
-    support: ['Resolve issues quickly', 'Ensure user satisfaction', 'Provide clear guidance'],
+function createMemoryConfig(category: string): AgentMemoryState {
+  const systemPrompts = {
+    general: 'You are a helpful general-purpose AI assistant. Provide clear, accurate, and helpful responses to user queries.',
+    coding:
+      'You are an expert software developer. Help with code analysis, best practices, and technical solutions. Be analytical and solution-focused.',
+    creative:
+      'You are a creative writing specialist. Help with storytelling, character development, and content creation. Be imaginative and inspiring.',
+    analysis: 'You are a data analyst. Help with data interpretation, statistical analysis, and insights. Be methodical and precise.',
+    support:
+      'You are a customer support specialist. Help resolve issues efficiently while maintaining high satisfaction. Be patient and empathetic.',
   };
 
   return {
-    identity: {
-      name,
-      role: roleMap[category as keyof typeof roleMap] || 'AI Assistant',
-      personality: personalityMap[category as keyof typeof personalityMap] || 'Professional and helpful',
-      expertise,
-    },
-    purpose: {
-      primary: description,
-      secondary: goals[category as keyof typeof goals] || ['Provide helpful assistance'],
-      constraints: ['Be helpful and accurate', 'Follow ethical guidelines', 'Respect user privacy'],
-    },
-    space: {
-      description: `Professional ${category} assistance environment focused on providing accurate and helpful responses.`,
-    },
+    systemPrompt: systemPrompts[category as keyof typeof systemPrompts] || systemPrompts.general,
+    messages: [],
   };
 }
 
@@ -222,11 +105,7 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     icon: '🤖',
     previewPrompts: ['Help me plan my day', 'Explain quantum computing in simple terms', 'What are some healthy meal ideas?'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.7, 2000),
-    memoryState: createMemoryConfig('General Assistant', 'general', 'Assist users with general questions and provide helpful information', [
-      'general knowledge',
-      'conversation',
-      'problem solving',
-    ]),
+    memoryState: createMemoryConfig('general'),
     timeout: 30000,
   },
   {
@@ -246,12 +125,7 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
       'Check this SQL query for security issues',
     ],
     blueprint: createCodeReviewBlueprint(),
-    memoryState: createMemoryConfig(
-      'Code Reviewer',
-      'coding',
-      'Provide comprehensive, constructive code reviews to improve software quality',
-      ['software architecture', 'code quality', 'security practices', 'performance optimization']
-    ),
+    memoryState: createMemoryConfig('coding'),
     timeout: 60000,
   },
   {
@@ -271,12 +145,7 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
       'Give me ideas for a sci-fi short story',
     ],
     blueprint: createCreativeWritingBlueprint(),
-    memoryState: createMemoryConfig(
-      'Creative Writer',
-      'creative',
-      'Create engaging, original content through a structured creative process',
-      ['storytelling', 'character development', 'creative writing techniques', 'content strategy']
-    ),
+    memoryState: createMemoryConfig('creative'),
     timeout: 45000,
   },
   {
@@ -292,12 +161,7 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     icon: '📊',
     previewPrompts: ['Analyze this sales data for trends', 'What statistical test should I use?', 'Help me interpret these survey results'],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.4, 2500),
-    memoryState: createMemoryConfig(
-      'Data Analyst',
-      'analysis',
-      'Provide data analysis, statistical insights, and visualization recommendations',
-      ['statistics', 'data interpretation', 'visualization', 'pattern recognition']
-    ),
+    memoryState: createMemoryConfig('analysis'),
     timeout: 35000,
   },
   {
@@ -313,12 +177,7 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     icon: '🎧',
     previewPrompts: ['I need help with my account', 'How do I return a product?', "My order hasn't arrived yet"],
     blueprint: createSimpleBlueprint('anthropic/claude-3.5-sonnet', 0.6, 2000),
-    memoryState: createMemoryConfig(
-      'Support Specialist',
-      'support',
-      'Resolve customer issues efficiently while maintaining high satisfaction levels',
-      ['troubleshooting', 'customer service', 'product knowledge', 'communication']
-    ),
+    memoryState: createMemoryConfig('support'),
     timeout: 30000,
   },
   {
@@ -332,14 +191,34 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     temperature: 0.5,
     maxTokens: 2000,
 
-    icon: '🧙‍♀️',
+    icon: '🧭',
     previewPrompts: [
       'Help me set up my new starship',
       'How do I configure my first AI agents?',
       'What should I do first as a new captain?',
     ],
     blueprint: createStarshipNavigatorBlueprint(),
-    memoryState: createSibylMemoryConfig(),
+    memoryState: {
+      systemPrompt: `<character name="Sibyl">
+You are Sibyl, Starships.ai's onboarding and navigation assistant.
+Help captains set up their starship, configure crew and connectors, and begin their journey.
+Be concise, product-focused, and actionable.
+
+Style:
+- Brief answer then numbered steps.
+- Reference in-app paths when helpful (e.g., Client > Starship > Crew).
+- End with one concrete next action.
+
+Scope:
+- Use only capabilities available in Starships.ai.
+- Do not invent features.
+
+Safety:
+- Refuse illegal or unsafe requests.
+- Do not disclose secrets or sensitive data.
+</character>`,
+      messages: [],
+    },
     timeout: 45000,
   },
 ];
@@ -370,8 +249,22 @@ export async function seedAgentTemplates(): Promise<void> {
         const existingTemplate = await templateRepo.findBySlug(template.slug as string);
 
         if (existingTemplate) {
+          // Force-update blueprint and memoryState so agent logic/template fixes are applied
+          await templateRepo.update(existingTemplate.id, {
+            blueprint: template.blueprint,
+            memoryState: template.memoryState,
+            model: template.model,
+            temperature: template.temperature,
+            maxTokens: template.maxTokens,
+            timeout: template.timeout,
+            description: template.description,
+            icon: template.icon,
+            previewPrompts: template.previewPrompts,
+            category: template.category,
+            name: template.name,
+          });
           existingCount++;
-          logger.debug(`Agent template already exists: ${template.name} (slug: ${template.slug})`);
+          logger.info(`Agent template updated: ${template.name} (slug: ${template.slug})`);
         } else {
           // Create the template
           await templateRepo.create(template);

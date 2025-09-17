@@ -1,17 +1,18 @@
 /**
- * Workflow Execution Engine
+ * Execution Engine
  *
- * Core engine for executing workflow DSL graphs. Handles sequential execution,
+ * Core engine for executing graphs and nodes. Handles sequential execution,
  * state management, error recovery, and user interaction coordination.
  */
 
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
-import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode, NodeParameters } from '@/types';
+import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
 import { Eval } from './Eval';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import { config } from '@/constants';
 
-// Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   start: () => import('@/nodes/Start').then((m) => m.Start as NodeHandlerConstructor),
   end: () => import('@/nodes/End').then((m) => m.End as NodeHandlerConstructor),
@@ -22,502 +23,504 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
   conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
   transform: () => import('@/nodes/Transform').then((m) => m.Transform as NodeHandlerConstructor),
+  mutate: () => import('@/nodes/Mutate').then((m) => m.Mutate as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {
-  blueprint: Blueprint;
-  execution?: Execution;
   eventCallback?: EventCallback;
+  failOnNodeError?: boolean;
 }
 
-/**
- * Main workflow execution engine
- */
 export class Engine {
-  private blueprint: Blueprint;
-  private execution: Execution;
   private eventCallback?: EventCallback;
   private eval: Eval;
+  private failOnNodeError: boolean;
 
-  constructor(config: EngineConfig) {
-    this.blueprint = config.blueprint;
-
-    const initialExecution = {
-      status: config.execution?.status || 'not_started',
-      currentNodeRef: config.execution?.currentNodeRef,
-      results: config.execution?.results || [],
-      state: config.execution?.state || {},
-    } as Execution;
-
-    this.execution = initialExecution;
+  constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
+    this.failOnNodeError = config.failOnNodeError ?? true;
     this.eval = new Eval();
   }
 
-  /**
-   * Create handler instance for a node with pure dynamic loading
-   */
-  async createHandler(node: WorkflowNode, resolvedParams: NodeParameters): Promise<NodeHandler> {
+  async createHandler(node: Node, resolvedParams: NodeParameters, execution: Execution): Promise<NodeHandler> {
     const loader = HANDLER_MAP[node.type];
     if (!loader) {
       throw new Error(`No handler available for node type: ${node.type}`);
     }
 
-    // Load handler constructor dynamically each time
     const handlerConstructor = await loader();
-
     const handlerOptions = {
       eventCallback: this.eventCallback,
-      execution: this.execution,
+      execution: execution,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);
   }
 
-  /**
-   * Check if a node type is supported
-   */
   hasHandler(type: string): boolean {
     return type in HANDLER_MAP;
   }
 
-  /**
-   * Execute a workflow from start to completion
-   */
-  async execute(): Promise<void> {
+  private createVirtualNode(type: 'transform' | 'mutate' | 'conditional', ref: string, parameters: NodeParameters): Node {
+    const nodeNames = {
+      transform: 'Inline Transform',
+      mutate: 'Inline Mutate',
+      conditional: 'Inline Conditional',
+    };
+
+    const nodeDescriptions = {
+      transform: 'Auto-generated transform node for inline input->output transformations',
+      mutate: 'Auto-generated mutate node for inline state mutations',
+      conditional: 'Auto-generated conditional node for inline condition evaluation',
+    };
+
+    return {
+      type,
+      ref,
+      name: nodeNames[type],
+      description: nodeDescriptions[type],
+      parameters,
+    };
+  }
+
+  private async createVirtualHandler(type: 'transform' | 'mutate' | 'conditional', parameters: NodeParameters): Promise<NodeHandler> {
+    const virtualNode = this.createVirtualNode(type, `inline_${type}`, parameters);
+    const dummyExecution = ExecutionItemUtils.createExecution();
+    return await this.createHandler(virtualNode, parameters, dummyExecution);
+  }
+
+  private async executeInlineTransform(
+    transforms: TransformOperation[],
+    execution: Execution,
+    inputItems?: ExecutionItem[]
+  ): Promise<ExecutionItem[]> {
+    // Resolve templates at execution time using the current state and the node's output as input
+    const inputData = ExecutionItemUtils.unwrapSingle(inputItems);
+    const resolved = (await this.eval.resolveTemplates({ transforms }, execution, inputData)) as { transforms: TransformOperation[] };
+
+    const virtualNode = this.createVirtualNode('transform', `inline_transform`, resolved);
+    const transformHandler = await this.createHandler(virtualNode, resolved, execution);
+    const items = await transformHandler.execute(inputItems);
+    // Record inline transform result like a normal node
+    execution.results.push({ nodeRef: virtualNode.ref, items });
+    return items;
+  }
+
+  private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<ExecutionItem[]> {
+    // Resolve templates at execution time using the current state
+    const resolved = (await this.eval.resolveTemplates({ mutations: transforms }, execution)) as { mutations: TransformOperation[] };
+
+    const params = { mutations: resolved.mutations };
+    const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, params);
+    const handler = await this.createHandler(virtualNode, params, execution);
+    const items = await handler.execute();
+    // Record inline mutate result like a normal node
+    execution.results.push({ nodeRef: virtualNode.ref, items });
+    return items;
+  }
+
+  private async executeInlineConditional(conditionExpression: string, execution: Execution): Promise<string> {
+    // Resolve the condition expression at execution time
+    const resolved = (await this.eval.resolveTemplates({ condition: conditionExpression }, execution)) as { condition?: string };
+    const params = { condition: resolved.condition ?? conditionExpression };
+
+    const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, params);
+    const conditionalHandler = await this.createHandler(virtualNode, params, execution);
+    const conditionalResultItems = await conditionalHandler.execute();
+    // Record inline conditional result like a normal node
+    execution.results.push({ nodeRef: virtualNode.ref, items: conditionalResultItems });
+
+    const firstItem = conditionalResultItems[0];
+    if (firstItem?.json && typeof firstItem.json === 'object') {
+      const result = firstItem.json as { edgeCondition: string };
+      return result.edgeCondition;
+    }
+    return 'null';
+  }
+
+  private async validateInlineOperations(node: Node, validationErrors: string[]): Promise<void> {
+    const nodeParams = node.parameters as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
+
+    if (nodeParams.transforms) {
+      const transformHandler = await this.createVirtualHandler('transform', { transforms: nodeParams.transforms });
+      const transformValidation = transformHandler.validate();
+      if (!transformValidation.valid) {
+        const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+        validationErrors.push(...errorMessages);
+      }
+    }
+
+    if (nodeParams.mutations) {
+      const mutateHandler = await this.createVirtualHandler('mutate', { mutations: nodeParams.mutations });
+      const mutateValidation = mutateHandler.validate();
+      if (!mutateValidation.valid) {
+        const errorMessages = mutateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+        validationErrors.push(...errorMessages);
+      }
+    }
+
+    if (nodeParams.condition) {
+      const conditionalHandler = await this.createVirtualHandler('conditional', { condition: nodeParams.condition });
+      const conditionValidation = conditionalHandler.validate();
+      if (!conditionValidation.valid) {
+        const errorMessages = conditionValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+        validationErrors.push(...errorMessages);
+      }
+    }
+  }
+
+  async executeBlueprint(blueprint: Blueprint, execution: Execution): Promise<ExecutionItem[]> {
     try {
-      // Validate workflow before execution
-      await this.validateForExecution(this.blueprint);
+      await this.validateForExecution(blueprint);
+      let currentNode: Node | null;
 
-      // Find start node
-      const startNode = this.getStartNode();
-      if (!startNode) {
-        throw new Error('No start node found in workflow');
+      if (execution.currentNodeRef) {
+        currentNode = blueprint.nodes.find((node) => node.ref === execution.currentNodeRef) || null;
+        if (!currentNode) {
+          throw new Error(`Cannot resume: current node '${execution.currentNodeRef}' not found in blueprint`);
+        }
+      } else {
+        currentNode = this.getStartNode(blueprint);
+        if (!currentNode) {
+          throw new Error('No start node found in blueprint');
+        }
+        await this.emitEvent('workflow_started', execution);
       }
 
-      // Emit start event
-      await this.emitEvent('workflow_started');
-
-      // Update execution state
-      this.execution.status = 'running';
-
-      // Execute workflow graph
-      await this.executeGraph();
-
-      // Mark as completed if no errors
-      if (this.execution.status === 'running') {
-        this.execution.status = 'completed';
-
-        await this.emitEvent('workflow_completed');
-      }
+      execution.status = 'running';
+      return await this.executeLoop(blueprint, execution, currentNode);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await this.handleExecutionError(error, execution);
+      throw error;
+    }
+  }
 
-      this.execution.status = 'failed';
-      this.execution.error = {
-        code: 'SYSTEM_ERROR',
-        message: errorMessage,
-        timestamp: new Date().toISOString(),
-        recoverable: false,
+  private async executeLoop(blueprint: Blueprint, execution: Execution, startNode: Node): Promise<ExecutionItem[]> {
+    let currentNode: Node | null = startNode;
+
+    // Initialize visit counter
+    if (!execution.visitCounts) {
+      execution.visitCounts = {};
+    }
+
+    while (currentNode && execution.status === 'running') {
+      // Count visits and check limit for cycle support
+      const visits = (execution.visitCounts[currentNode.ref] || 0) + 1;
+      execution.visitCounts[currentNode.ref] = visits;
+
+      if (visits > config.MAX_NODE_VISITS) {
+        execution.status = 'completed';
+        await this.emitEvent('workflow_completed', execution);
+        return [];
+      }
+
+      try {
+        const incomingEdge = blueprint.edges.find((edge) => edge.to === currentNode!.ref);
+        execution.currentNodeInputRef = incomingEdge?.from;
+
+        await this.executeNode(currentNode, execution);
+        const nextNode = this.getNextNode(blueprint, execution);
+
+        if (!nextNode) {
+          execution.currentNodeRef = undefined;
+          if (execution.status === 'running') {
+            execution.status = 'completed';
+            await this.emitEvent('workflow_completed', execution);
+          }
+          // Return execution results as ExecutionItem array for proper workflow composition
+          return ExecutionItemUtils.wrapSingle(execution.results);
+        }
+
+        currentNode = nextNode;
+      } catch (error) {
+        await this.handleNodeError(error, currentNode, execution);
+
+        // If failOnNodeError is true, stop execution by throwing the error
+        if (this.failOnNodeError) {
+          throw error;
+        }
+
+        // Otherwise continue to next node despite the failure
+        // Reset execution status back to running to continue workflow
+        execution.status = 'running';
+
+        const nextNode = this.getNextNode(blueprint, execution);
+        if (!nextNode) {
+          execution.currentNodeRef = undefined;
+          // If we've reached the end, complete the workflow even though we had failures
+          execution.status = 'completed';
+          await this.emitEvent('workflow_completed', execution);
+          return ExecutionItemUtils.wrapSingle(execution.results);
+        }
+        currentNode = nextNode;
+      }
+    }
+
+    execution.currentNodeRef = undefined;
+    // Return execution results as ExecutionItem array for proper workflow composition
+    return ExecutionItemUtils.wrapSingle(execution.results);
+  }
+
+  private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {
+    const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
+    execution.results.push({ nodeRef: currentNode.ref, items: ExecutionItemUtils.wrapError(errorMessage) });
+    await this.setExecutionError(execution, errorMessage);
+    await this.emitEvent('workflow_failed', execution);
+  }
+
+  private async handleExecutionError(error: unknown, execution: Execution): Promise<void> {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await this.setExecutionError(execution, errorMessage);
+    await this.emitEvent('workflow_failed', execution);
+  }
+
+  private async setExecutionError(execution: Execution, message: string): Promise<void> {
+    execution.status = 'failed';
+    execution.error = {
+      code: 'SYSTEM_ERROR',
+      message,
+      timestamp: new Date().toISOString(),
+      recoverable: false,
+    };
+  }
+
+  private getNodeInput(execution: Execution): ExecutionItem[] | undefined {
+    if (!execution.currentNodeInputRef) return undefined;
+
+    // Find latest result for the input node (reverse search for efficiency)
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      if (execution.results[i].nodeRef === execution.currentNodeInputRef) {
+        return execution.results[i].items;
+      }
+    }
+    return undefined;
+  }
+
+  private findNodeResult(execution: Execution, nodeRef: string): ExecutionItem[] | undefined {
+    // Find latest result for the specified node (reverse search for efficiency)
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      if (execution.results[i].nodeRef === nodeRef) {
+        return execution.results[i].items;
+      }
+    }
+    return undefined;
+  }
+
+  async executeNode(currentNode: Node, execution: Execution): Promise<ExecutionItem[]> {
+    execution.currentNodeRef = currentNode.ref;
+    await this.emitEvent('node_started', execution);
+
+    try {
+      // Get input items for current node
+      const initialInputItems = this.findNodeResult(execution, '__initial__');
+      const nodeInputItems = currentNode.type === 'start' && initialInputItems ? initialInputItems : this.getNodeInput(execution);
+
+      // Resolve node parameters with templates
+      const inputData = ExecutionItemUtils.unwrapSingle(nodeInputItems);
+      const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, execution, inputData)) as NodeParameters;
+
+      // Create and validate handler
+      const handler = await this.createHandler(currentNode, resolvedParams, execution);
+      const validation = handler.validate();
+      if (!validation.valid) {
+        const errorMessages = validation.errors?.map((e) => `${currentNode.ref}: ${e.message}`) || ['Validation failed'];
+        throw new Error(`Node validation failed:\n${errorMessages.join('\n')}`);
+      }
+
+      // Process inline operations (use RAW inline params from the node definition to ensure templates are resolved at execution time)
+      const inlineParams = currentNode.parameters as {
+        transforms?: TransformOperation[];
+        mutations?: TransformOperation[];
+        condition?: string;
       };
+      let processedInputItems = nodeInputItems;
 
-      await this.emitEvent('workflow_failed');
+      // Execute the handler first (inline transforms will run after on the output)
+      let outputItems = await handler.execute(processedInputItems);
 
-      // Re-throw error for tests that expect it
+      // Record primary node output immediately (as a normal node result)
+      execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
+
+      // Execute inline transforms AFTER handler if present, transforming the node output
+      if (inlineParams.transforms?.length) {
+        outputItems = await this.executeInlineTransform(inlineParams.transforms, execution, outputItems);
+      }
+
+      // Execute inline mutations if present (mutations can use lastOutputOf/current state)
+      if (inlineParams.mutations?.length) {
+        await this.executeInlineMutate(inlineParams.mutations, execution);
+        // Mutations modify state; keep primary output as-is unless you intend otherwise
+        // Optionally, could attach mutate result to primary result if desired
+      }
+
+      // Execute inline conditional if present
+      if (inlineParams.condition) {
+        const conditionResult = await this.executeInlineConditional(inlineParams.condition, execution);
+        const firstItem = outputItems[0];
+        if (!firstItem?.json || typeof firstItem.json !== 'object' || !('edgeCondition' in firstItem.json)) {
+          outputItems = ExecutionItemUtils.wrapSingle({ edgeCondition: conditionResult });
+        }
+      }
+
+      await this.emitEvent('node_completed', execution);
+      return outputItems;
+    } catch (error) {
+      await this.emitEvent('node_failed', execution);
       throw error;
     }
   }
 
   /**
-   * Execute the workflow graph node by node
+   * Find the start node in the blueprint
    */
-  private async executeGraph(): Promise<void> {
-    let currentNode = this.getStartNode();
+  private getStartNode(blueprint: Blueprint): Node | null {
+    return blueprint.nodes.find((node) => node.type === 'start') || null;
+  }
 
-    while (currentNode && this.execution.status === 'running') {
-      try {
-        // Update current node
-        this.execution.currentNodeRef = currentNode.ref;
+  private getNextNode(blueprint: Blueprint, execution: Execution): Node | null {
+    const outgoingEdges = blueprint.edges.filter((edge) => edge.from === execution.currentNodeRef);
 
-        // Execute the node - this now returns updated execution with result stored
-        const result = await this.executeNode(currentNode);
+    if (!outgoingEdges.length) {
+      const currentNode = blueprint.nodes.find((node) => node.ref === execution.currentNodeRef);
+      if (currentNode?.type !== 'end') {
+        throw new Error(`Engine exited unexpectedly, at Node: ${currentNode?.ref}`);
+      }
+      return null;
+    }
 
-        if (!result.error) {
-          // Node succeeded - continue normal execution
-          const nextNode = this.getNextNode();
-
-          if (!nextNode) {
-            break; // No next node, workflow complete
-          }
-
-          currentNode = nextNode;
-        } else {
-          // Node failed - check if there's error recovery logic
-          const nextNode = this.getNextNode();
-
-          if (nextNode && this.hasErrorRecoveryPath(currentNode.ref)) {
-            // There's a next node and error recovery logic, continue execution
-            currentNode = nextNode;
-          } else {
-            // No error recovery - fail the workflow
-            this.execution.status = 'failed';
-            this.execution.error = {
-              code: 'SYSTEM_ERROR',
-              message: result.error instanceof Error ? result.error.message : String(result.error),
-              timestamp: new Date().toISOString(),
-              recoverable: false,
-            };
-            await this.emitEvent('workflow_failed');
-            break;
-          }
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
-
-        // Store failed result
-        const failedResult: NodeResult = {
-          nodeRef: currentNode.ref,
-          error: errorMessage,
-        };
-        this.execution.results.push(failedResult);
-
-        // Set workflow status to failed and break execution
-        this.execution.status = 'failed';
-        this.execution.error = {
-          code: 'SYSTEM_ERROR',
-          message: errorMessage,
-          timestamp: new Date().toISOString(),
-          recoverable: false,
-        };
-        await this.emitEvent('workflow_failed');
+    // Determine edge condition:
+    // Prefer any inline result emitted after the current node that carries edgeCondition.
+    // Scan backwards until we reach the current node's primary result.
+    let edgeCondition: string | undefined;
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      const entry = execution.results[i];
+      if (entry.nodeRef === execution.currentNodeRef) {
+        break; // stop at the current node's primary result
+      }
+      const item = entry.items?.[0];
+      if (item?.json && typeof item.json === 'object' && 'edgeCondition' in (item.json as Record<string, unknown>)) {
+        edgeCondition = (item.json as Record<string, unknown>).edgeCondition as string;
         break;
       }
     }
 
-    // Clear current node when done
-    this.execution.currentNodeRef = undefined;
-  }
-
-  /**
-   * Execute a single node with template resolution and transforms
-   */
-  private async executeNode(node: WorkflowNode): Promise<NodeResult> {
-    this.emitEvent('node_started');
-
-    const result = {
-      nodeRef: node.ref,
-    } as NodeResult;
-
-    try {
-      // Step 1: Resolve template expressions in parameters
-      const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution)) as NodeParameters;
-
-      // Step 2: Create handler instance with resolved parameters
-      const handler = await this.createHandler(node, resolvedParams);
-
-      // Step 3: Execute the node
-      const data = await handler.execute();
-      result.data = data;
-
-      // Step 4: Handle transforms based on node type
-      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
-      if (nodeParams.transforms) {
-        if (node.type === 'transform') {
-          // Transform node - transforms already applied in handler execution above
-          // No additional processing needed
-        } else {
-          // Non-transform node with transforms - spawn Transform node dynamically
-          await this.executeInlineTransform(nodeParams.transforms);
-        }
-      }
-
-      // Step 5: Handle inline condition evaluation
-      if (nodeParams.condition) {
-        if (node.type === 'conditional') {
-          // Conditional node - condition already evaluated in handler execution above
-          // No additional processing needed
-        } else {
-          // Non-conditional node with condition - spawn Conditional node dynamically
-          const conditionResult = await this.executeInlineConditional(nodeParams.condition);
-          // Store condition result in the node result for getNextNode to use
-          if (result.data && typeof result.data === 'object') {
-            (result.data as Record<string, unknown>).condition = conditionResult;
-          } else {
-            result.data = { condition: conditionResult };
+    // Fallback to primary node output if inline didn't provide edgeCondition
+    if (edgeCondition === undefined) {
+      const lastOutputItems = this.findNodeResult(execution, execution.currentNodeRef!);
+      if (lastOutputItems?.length) {
+        const firstItem = lastOutputItems[0];
+        if (firstItem.json && typeof firstItem.json === 'object') {
+          const conditionalResult = firstItem.json as Record<string, unknown>;
+          if (conditionalResult.edgeCondition !== undefined) {
+            edgeCondition = conditionalResult.edgeCondition as string;
           }
         }
       }
-
-      this.emitEvent('node_completed');
-    } catch (error) {
-      result.error = error;
-      this.emitEvent('node_failed');
     }
 
-    this.execution.results.push(result);
-    return result;
-  }
-
-  /**
-   * Find the start node in the workflow
-   */
-  private getStartNode(): WorkflowNode | null {
-    return this.blueprint.nodes.find((node) => node.type === 'start') || null;
-  }
-
-  /**
-   * Find the next node based on current node and edge condition
-   */
-  private getNextNode(): WorkflowNode | null {
-    // Find edges from current node
-    const outgoingEdges = this.blueprint.edges.filter((edge) => edge.from === this.execution.currentNodeRef);
-
-    if (outgoingEdges.length > 0) {
-      // Get the last execution result to check for conditional output
-      const lastResult = this.execution.results[this.execution.results.length - 1];
-      let edgeCondition: string | undefined;
-
-      // Check if last result was from a conditional node
-      if (lastResult?.data && typeof lastResult.data === 'object') {
-        const conditionalResult = lastResult.data as Record<string, unknown>;
-        if (conditionalResult.condition !== undefined) {
-          edgeCondition = String(conditionalResult.condition);
-        }
-      }
-
-      // If we have an edge condition, look for matching edge
-      if (edgeCondition) {
-        const matchingEdge = outgoingEdges.find((edge) => edge.condition === edgeCondition);
-        if (matchingEdge) {
-          return this.blueprint.nodes.find((node) => node.ref === matchingEdge.to) || null;
-        }
-
-        // For boolean conditions, also check for 'true'/'false' string matches
-        const boolMatchingEdge = outgoingEdges.find(
-          (edge) => (edge.condition === 'true' && edgeCondition === 'true') || (edge.condition === 'false' && edgeCondition === 'false')
-        );
-        if (boolMatchingEdge) {
-          return this.blueprint.nodes.find((node) => node.ref === boolMatchingEdge.to) || null;
-        }
-      } else {
-        // No conditional result, use first edge without condition or first edge
-        const defaultEdge = outgoingEdges.find((edge) => !edge.condition) || outgoingEdges[0];
-        if (defaultEdge) {
-          return this.blueprint.nodes.find((node) => node.ref === defaultEdge.to) || null;
-        }
-      }
+    // Find matching edge
+    let targetEdge;
+    if (edgeCondition) {
+      targetEdge = outgoingEdges.find(
+        (edge) =>
+          edge.condition === edgeCondition ||
+          (edge.condition === 'true' && edgeCondition === 'true') ||
+          (edge.condition === 'false' && edgeCondition === 'false')
+      );
     }
 
-    // If we get here, check if current node is an end node
-    const currentNode = this.blueprint.nodes.find((node) => this.execution.currentNodeRef === node.ref);
-    if (currentNode?.type !== 'end') {
-      throw new Error(`Engine exited unexpectedly, at Node: ${currentNode?.ref}`);
+    // Fallback to default edge
+    if (!targetEdge) {
+      targetEdge = outgoingEdges.find((edge) => !edge.condition) || outgoingEdges[0];
     }
 
-    return null;
+    return targetEdge ? blueprint.nodes.find((node) => node.ref === targetEdge.to) || null : null;
   }
 
-  /**
-   * Validate workflow before execution
-   */
   private async validateForExecution(blueprint: Blueprint): Promise<void> {
-    // Check for start node
-    const startNode = this.blueprint?.nodes?.find((node) => node.type === 'start') || null;
-    if (!startNode) {
-      throw new Error('Workflow must have a start node');
-    }
+    this.validateStartNode(blueprint);
 
-    // Check that all node types have available handlers
-    const unsupportedNodes = [];
+    const unsupportedNodes: Array<{ ref: string; type: string }> = [];
     const validationErrors: string[] = [];
 
     for (const node of blueprint.nodes) {
-      if (!(node.type in HANDLER_MAP)) {
+      if (!this.hasHandler(node.type)) {
         unsupportedNodes.push({ ref: node.ref, type: node.type });
         continue;
       }
 
-      // Validate template expressions in parameters
-      const templateValidation = this.eval.validateTemplateExpressions(node.parameters);
-      if (!templateValidation.valid) {
-        const errorMessages = templateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
-        validationErrors.push(...errorMessages);
-      }
-
-      // Validate transform expressions if present
-      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
-      if (nodeParams.transforms) {
-        // Create a temporary Transform node to validate transforms
-        const virtualTransformNode: WorkflowNode = {
-          type: 'transform',
-          ref: 'validation_transform',
-          name: 'Validation Transform',
-          description: 'Temporary transform node for validation',
-          parameters: { transforms: nodeParams.transforms },
-        };
-
-        const transformHandler = await this.createHandler(virtualTransformNode, { transforms: nodeParams.transforms });
-        const transformValidation = transformHandler.validate();
-        if (!transformValidation.valid) {
-          const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
-          validationErrors.push(...errorMessages);
-        }
-      }
-
-      // Validate condition expression if present
-      if (nodeParams.condition) {
-        // Create a temporary Conditional node to validate condition
-        const virtualConditionalNode: WorkflowNode = {
-          type: 'conditional',
-          ref: 'validation_conditional',
-          name: 'Validation Conditional',
-          description: 'Temporary conditional node for validation',
-          parameters: { condition: nodeParams.condition },
-        };
-
-        const conditionalHandler = await this.createHandler(virtualConditionalNode, { condition: nodeParams.condition });
-        const conditionValidation = conditionalHandler.validate();
-        if (!conditionValidation.valid) {
-          const errorMessages = conditionValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
-          validationErrors.push(...errorMessages);
-        }
-      }
+      this.validateTemplateExpressions(node, validationErrors);
+      await this.validateInlineOperations(node, validationErrors);
     }
 
+    this.throwValidationErrors(unsupportedNodes, validationErrors);
+  }
+
+  private validateStartNode(blueprint: Blueprint): void {
+    const startNode = blueprint?.nodes?.find((node) => node.type === 'start');
+    if (!startNode) {
+      throw new Error('Blueprint must have a start node');
+    }
+  }
+
+  private validateTemplateExpressions(node: Node, validationErrors: string[]): void {
+    const templateValidation = this.eval.validateTemplateExpressions(node.parameters);
+    if (!templateValidation.valid) {
+      const errorMessages = templateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+      validationErrors.push(...errorMessages);
+    }
+  }
+
+  private throwValidationErrors(unsupportedNodes: Array<{ ref: string; type: string }>, validationErrors: string[]): void {
     if (unsupportedNodes.length > 0) {
       throw new Error(`Unsupported node types: ${unsupportedNodes.map((n) => n.type).join(', ')}`);
     }
 
     if (validationErrors.length > 0) {
-      throw new Error(`Template/Transform validation failed:\n${validationErrors.join('\n')}`);
+      throw new Error(`Template/Transform/Mutate validation failed:\n${validationErrors.join('\n')}`);
     }
   }
 
   /**
-   * Pause workflow execution
+   * Pause blueprint execution
    */
-  pause(): boolean {
-    if (!this.execution || this.execution.status !== 'running') {
-      return false;
-    }
+  pause(execution: Execution): boolean {
+    if (!execution || execution.status !== 'running') return false;
 
-    this.execution.status = 'paused';
-
-    this.emitEvent('workflow_paused');
-
+    execution.status = 'paused';
+    this.emitEvent('workflow_paused', execution);
     return true;
   }
 
-  /**
-   * Resume workflow execution
-   */
-  resume(): boolean {
-    if (!this.execution || this.execution.status !== 'paused') {
-      return false;
-    }
+  resume(execution: Execution): boolean {
+    if (!execution || execution.status !== 'paused') return false;
 
-    this.execution.status = 'running';
-
-    this.emitEvent('workflow_resumed');
-
+    execution.status = 'running';
+    this.emitEvent('workflow_resumed', execution);
     return true;
   }
 
-  /**
-   * Cancel workflow execution
-   */
-  cancel(): boolean {
-    if (!this.execution || this.execution.status === 'completed' || this.execution.status === 'failed') {
+  cancel(execution: Execution): boolean {
+    if (!execution || execution.status === 'completed' || execution.status === 'failed') {
       return false;
     }
 
-    this.execution.status = 'cancelled';
-
+    execution.status = 'cancelled';
     return true;
   }
 
-  getExecution() {
-    return this.execution;
-  }
+  private async emitEvent(type: ExecutionEventType, execution: Execution): Promise<void> {
+    if (!this.eventCallback) return;
 
-  /**
-   * Execute inline transform operations by creating a virtual Transform node
-   */
-  private async executeInlineTransform(transforms: TransformOperation[]): Promise<void> {
-    // Create virtual Transform node and execute it
-    const virtualTransformNode: WorkflowNode = {
-      type: 'transform',
-      ref: 'inline_transform',
-      name: 'Inline Transform',
-      description: 'Auto-generated transform node for inline transforms',
-      parameters: { transforms },
-    };
-
-    const transformHandler = await this.createHandler(virtualTransformNode, { transforms });
-    await transformHandler.execute();
-  }
-
-  /**
-   * Execute inline condition evaluation by creating a virtual Conditional node
-   */
-  private async executeInlineConditional(conditionExpression: string): Promise<string | boolean | number | null | undefined> {
-    // Create virtual Conditional node and execute it
-    const virtualConditionalNode: WorkflowNode = {
-      type: 'conditional',
-      ref: 'inline_conditional',
-      name: 'Inline Conditional',
-      description: 'Auto-generated conditional node for inline condition evaluation',
-      parameters: { condition: conditionExpression },
-    };
-
-    const conditionalHandler = await this.createHandler(virtualConditionalNode, { condition: conditionExpression });
-    const conditionalResult = await conditionalHandler.execute();
-
-    // Extract condition value from the conditional result
-    return (conditionalResult as { condition: string | boolean | number | null | undefined }).condition;
-  }
-
-  /**
-   * Check if there are conditional nodes that can handle errors from the given node
-   */
-  private hasErrorRecoveryPath(nodeRef: string): boolean {
-    // Look for outgoing edges from this node
-    const outgoingEdges = this.blueprint.edges.filter((edge) => edge.from === nodeRef);
-
-    if (outgoingEdges.length === 0) {
-      return false;
-    }
-
-    // Check if any of the target nodes are conditional nodes
-    for (const edge of outgoingEdges) {
-      const targetNode = this.blueprint.nodes.find((node) => node.ref === edge.to);
-      if (targetNode && targetNode.type === 'conditional') {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Emit workflow execution event via streaming emitter
-   */
-  private async emitEvent(type: ExecutionEventType): Promise<void> {
-    // Delegate streaming to injected emitter if available and enabled
-    if (this.eventCallback) {
-      try {
-        const event = {
-          type: type,
-          timestamp: new Date().toISOString(),
-          data: {
-            execution: this.execution,
-          },
-        } as ExecutionEvent;
-        await this.eventCallback(event);
-      } catch (error) {
-        // Silent fail for streaming events to not interrupt execution
-        console.error('Error in external streaming emitter:', error);
-      }
+    try {
+      const event: ExecutionEvent = {
+        type,
+        timestamp: new Date().toISOString(),
+        data: { execution },
+      };
+      await this.eventCallback(event);
+    } catch (error) {
+      console.error('Error in external streaming emitter:', error);
     }
   }
 }

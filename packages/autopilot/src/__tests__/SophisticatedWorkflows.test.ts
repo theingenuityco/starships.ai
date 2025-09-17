@@ -5,6 +5,7 @@
  */
 
 import { Engine } from '@/engine/Engine';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { autopilot } from '@/Autopilot';
 import type { Blueprint, Node } from '@/types';
 
@@ -50,7 +51,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              condition: 'state.user.isPremium = true',
+              condition: '{{ state.user.isPremium = true }}',
             },
           },
           {
@@ -102,27 +103,20 @@ describe('Sophisticated Workflows', () => {
       });
 
       const eventCallback = jest.fn();
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { user: { isPremium: true, id: 123 } },
-        },
-        eventCallback,
-      });
+      const engine = new Engine({ eventCallback });
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { user: { isPremium: true, id: 123 } };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
 
-      // Should execute start -> check -> premium-path -> end
-      expect(execution.results).toHaveLength(4);
+      // Should execute start -> check -> inline_conditional -> premium-path -> end
+      expect(execution.results).toHaveLength(5);
       expect(execution.results[0].nodeRef).toBe('start');
       expect(execution.results[1].nodeRef).toBe('check');
-      expect(execution.results[2].nodeRef).toBe('premium-path');
-      expect(execution.results[3].nodeRef).toBe('end');
+      expect(execution.results[2].nodeRef).toBe('inline_conditional');
+      expect(execution.results[3].nodeRef).toBe('premium-path');
+      expect(execution.results[4].nodeRef).toBe('end');
 
       // Should have called premium API, not regular API
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/premium', expect.any(Object));
@@ -138,7 +132,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check User',
             description: 'Check if user is premium',
             parameters: {
-              condition: 'state.user.isPremium = true',
+              condition: '{{ state.user.isPremium = true }}',
             },
           },
           {
@@ -189,23 +183,16 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"premium":false,"features":["basic"]}',
       });
 
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { user: { isPremium: false, id: 456 } },
-        },
-      });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { user: { isPremium: false, id: 456 } };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
 
-      // Should execute start -> check -> regular-path -> end
-      expect(execution.results).toHaveLength(4);
-      expect(execution.results[2].nodeRef).toBe('regular-path');
+      // Should execute start -> check -> inline_conditional -> regular-path -> end
+      expect(execution.results).toHaveLength(5);
+      expect(execution.results[3].nodeRef).toBe('regular-path');
 
       // Should have called regular API, not premium API
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/regular', expect.any(Object));
@@ -221,7 +208,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Route Decision',
             description: 'Determine routing path',
             parameters: {
-              condition: 'state.user.tier',
+              condition: '{{ state.user.tier }}',
             },
           },
           {
@@ -283,20 +270,13 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"tier":"silver","benefits":["support","discounts"]}',
       });
 
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { user: { tier: 'silver', id: 789 } },
-        },
-      });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { user: { tier: 'silver', id: 789 } };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
-      expect(execution.results[2].nodeRef).toBe('silver-path');
+      expect(execution.results[3].nodeRef).toBe('silver-path');
 
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/silver', expect.any(Object));
     });
@@ -413,16 +393,15 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"finalized":true,"result":"success"}',
         });
 
-      const engine = new Engine({ blueprint: outerWorkflow });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(outerWorkflow, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
 
       // Should execute all outer workflow nodes
       expect(execution.results).toHaveLength(5);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual(['start', 'prep', 'nested', 'finalize', 'end']);
-
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual(['start', 'prep', 'nested', 'finalize', 'end']);
       // Should have made all three HTTP calls
       expect(mockFetch).toHaveBeenCalledTimes(3);
       expect(mockFetch).toHaveBeenNthCalledWith(
@@ -464,7 +443,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Validation',
             description: 'Check if validation passed',
             parameters: {
-              condition: 'results[-1].data.valid = true',
+              condition: '{{ outputs[-1].items[0].json.body.valid }}',
             },
           },
           {
@@ -530,7 +509,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Final Check',
             description: 'Check if everything succeeded',
             parameters: {
-              condition: 'results[-1].data.status = "completed"',
+              condition: '{{ inputs[0].json[4].items[0].json.body.success }}',
             },
           },
           {
@@ -598,14 +577,14 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"valid":true,"checks":"passed"}',
         })
         .mockResolvedValueOnce({
-          // success handler
+          // success handler - this will be the final result of the nested workflow
           ok: true,
           status: 200,
           statusText: 'OK',
           url: 'https://api.example.com/success',
           headers: createMockHeaders(),
-          json: async () => ({ success: true, message: 'validation passed' }),
-          text: async () => '{"success":true,"message":"validation passed"}',
+          json: async () => ({ success: true, message: 'validation passed', status: 'completed' }),
+          text: async () => '{"success":true,"message":"validation passed","status":"completed"}',
         })
         .mockResolvedValueOnce({
           // process
@@ -618,16 +597,23 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"processed":true,"result":"completed"}',
         });
 
-      const engine = new Engine({ blueprint: mainWorkflow });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(mainWorkflow, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
 
-      // Should execute: start -> data-prep -> validation-flow -> final-check -> process -> end
-      expect(execution.results).toHaveLength(6);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual(['start', 'data-prep', 'validation-flow', 'final-check', 'process', 'end']);
-
+      // Should execute: start -> data-prep -> validation-flow -> final-check -> inline_conditional -> process -> end
+      expect(execution.results).toHaveLength(7);
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
+        'start',
+        'data-prep',
+        'validation-flow',
+        'final-check',
+        'inline_conditional',
+        'process',
+        'end',
+      ]);
       // Should have made 4 HTTP calls total
       expect(mockFetch).toHaveBeenCalledTimes(4);
     });
@@ -692,7 +678,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Analysis Decision',
             description: 'Route based on analysis',
             parameters: {
-              condition: 'results[-1].data[1].data.choices[0].message.content ~> /positive/',
+              condition: '{{ outputs[-1].items[0].json.choices[0].message.content ~> /positive/ }}',
             },
           },
           {
@@ -790,16 +776,23 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"action":"positive","applied":true}',
       });
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
 
       // Should execute all nodes in the positive path
-      expect(execution.results).toHaveLength(6);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual(['start', 'data-fetch', 'ai-analysis', 'decision', 'positive-action', 'end']);
-
+      expect(execution.results).toHaveLength(7);
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
+        'start',
+        'data-fetch',
+        'ai-analysis',
+        'decision',
+        'inline_conditional',
+        'positive-action',
+        'end',
+      ]);
       // Should have called positive action, not negative
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/positive-action', expect.any(Object));
     });
@@ -826,7 +819,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Success',
             description: 'Check if API call succeeded',
             parameters: {
-              condition: 'results[nodeRef = "risky-api"].data ? "true" : "false"',
+              condition: '{{ $not($exists(outputs[nodeRef = "risky-api"].items[0].error)) ? "true" : "false" }}',
             },
           },
           {
@@ -855,7 +848,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Retry',
             description: 'Check if retry succeeded',
             parameters: {
-              condition: 'results[nodeRef = "retry-api"].data ? "true" : "false"',
+              condition: '{{ $not($exists(outputs[nodeRef = "retry-api"].items[0].error)) ? "true" : "false" }}',
             },
           },
           {
@@ -927,44 +920,23 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"recovered":true,"status":"handled"}',
         });
 
-      const engine = new Engine({ blueprint });
-      try {
-        await engine.execute();
-      } catch (error) {
-        console.log('Engine execution threw error:', error);
-      }
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
-
-      // Debug information
-      console.log('Execution status:', execution.status);
-      console.log('Execution error:', execution.error);
-      console.log('Execution results length:', execution.results.length);
-      console.log(
-        'Execution results:',
-        JSON.stringify(
-          execution.results.map((r) => ({
-            nodeRef: r.nodeRef,
-            hasError: !!r.error,
-            hasData: !!r.data,
-            errorMessage: r.error instanceof Error ? r.error.message : r.error,
-            dataKeys: r.data ? Object.keys(r.data) : [],
-          })),
-          null,
-          2
-        )
-      );
+      await engine.executeBlueprint(blueprint, execution);
 
       expect(execution.status).toBe('completed');
 
-      // Should execute: start -> risky-api -> check-success -> retry-api -> check-retry -> recovery-path -> end
-      expect(execution.results).toHaveLength(7);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual([
+      // Should execute: start -> risky-api -> check-success -> inline_conditional -> retry-api -> check-retry -> inline_conditional -> recovery-path -> end
+      expect(execution.results).toHaveLength(9);
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
         'start',
         'risky-api',
         'check-success',
+        'inline_conditional',
         'retry-api',
         'check-retry',
+        'inline_conditional',
         'recovery-path',
         'end',
       ]);
@@ -1028,11 +1000,11 @@ describe('Sophisticated Workflows', () => {
       }
 
       const startTime = Date.now();
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
       const endTime = Date.now();
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
       expect(execution.results).toHaveLength(22); // start + 20 steps + end
 
@@ -1040,7 +1012,7 @@ describe('Sophisticated Workflows', () => {
       expect(endTime - startTime).toBeLessThan(5000);
 
       // All steps should be present
-      const stepRefs = execution.results.map((r) => r.nodeRef);
+      const stepRefs = execution.results.map((r: { nodeRef: string }) => r.nodeRef);
       expect(stepRefs).toContain('start');
       expect(stepRefs).toContain('end');
       for (let i = 1; i <= 20; i++) {

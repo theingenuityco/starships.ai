@@ -87,7 +87,7 @@ export class Agent implements NodeHandler {
           path: '/state/messages/-',
           value: {
             role: 'assistant',
-            content: `{{ $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content ? $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "Error: Unable to extract LLM response content" }}`,
+            content: `{{ $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content }}`,
           },
         },
       ],

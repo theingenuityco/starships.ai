@@ -7,36 +7,30 @@
  */
 
 import { BaseNode } from './BaseNode';
-import { Engine, EngineConfig } from '@/engine/Engine';
 import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem } from '@/types';
 import { ValidationError } from '@/types/validation';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export class Workflow extends BaseNode<WorkflowParams> {
-  private engine: Engine;
-
   constructor(params: WorkflowParams, options?: NodeHandlerOptions) {
     super(params, options);
-    // Create engine - handles all node types internally
-    const engineConfig = {
-      blueprint: this.getParams().blueprint,
-      eventCallback: this.getEventCallback(),
-    } as EngineConfig;
-    this.engine = new Engine(engineConfig);
+    // Workflow no longer creates internal Engine - will be executed by external Engine
   }
 
   /**
    * Execute the workflow with streaming support and optional input items
+   * Note: This method now returns the workflow's blueprint for execution by an external Engine
    */
-
   async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    // Execute workflow through engine - it will handle streaming if configured
-    // Note: Input data could be used to set initial state or pass to first node in future
-    await this.engine.execute();
-    const execution = this.engine.getExecution();
-
-    // Return the execution wrapped as an item
-    return ExecutionItemUtils.wrapSingle(execution, _input?.[0]);
+    // Return the workflow's blueprint for external Engine execution
+    const params = this.getParams();
+    return ExecutionItemUtils.wrapSingle(
+      {
+        blueprint: params.blueprint,
+        workflowParams: params,
+      },
+      _input?.[0]
+    );
   }
 
   /**
@@ -55,17 +49,7 @@ export class Workflow extends BaseNode<WorkflowParams> {
       });
     }
 
-    // Check that all node types have handlers (delegate to engine)
-    const unsupportedNodes = params.blueprint.nodes.filter((node) => !this.engine.hasHandler(node.type));
-    if (unsupportedNodes.length > 0) {
-      unsupportedNodes.forEach((node) => {
-        errors.push({
-          code: 'INVALID_NODE_TYPE',
-          message: `Unsupported node type: ${node.type}`,
-          nodeRef: node.ref,
-        });
-      });
-    }
+    // Note: Node type validation will be handled by external Engine during execution
 
     // Check edge references
     const nodeRefs = new Set(params.blueprint.nodes.map((n) => n.ref));

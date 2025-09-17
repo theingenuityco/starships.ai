@@ -28,13 +28,8 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     temperature: agent?.temperature,
     maxTokens: agent?.maxTokens,
     memoryState: agent?.memoryState || {
-      identity: {
-        name: '',
-        role: '',
-      },
-      purpose: {
-        primary: '',
-      },
+      systemPrompt: '',
+      messages: [],
     },
     blueprint: agent?.blueprint || {
       nodes: [],

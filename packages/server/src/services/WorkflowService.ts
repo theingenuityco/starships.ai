@@ -6,7 +6,7 @@
  * stateless execution engine (autopilot Workflow).
  */
 
-import { AgentMemory, Blueprint, Execution, NodeResult, Workflow } from '@starships/autopilot';
+import { AgentMemory, Blueprint, Workflow } from '@starships/autopilot';
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { WorkflowRepository } from '@starships/models';
 import type { CreateWorkflowRequest, UpdateWorkflowRequest, WorkflowModel } from '@starships/protocol';
@@ -154,7 +154,16 @@ export class WorkflowService {
   /**
    * Get workflow analytics - Static method
    */
-  static async getWorkflowAnalytics(workflowId: string): Promise<any> {
+  static async getWorkflowAnalytics(workflowId: string): Promise<{
+    workflowId: string;
+    name: string;
+    category: string;
+    usageCount: number;
+    rating: number;
+    isPublic?: boolean;
+    createdAt: string;
+    lastUpdated: string;
+  }> {
     const repository = new WorkflowRepository();
     const workflow = await repository.findById(workflowId);
 
@@ -318,7 +327,7 @@ export class WorkflowService {
 
     // Create agent memory for execution context
     const agentMemory = new AgentMemory();
-    agentMemory.addMessageToHistory({ role: 'system', content: 'Workflow execution context' });
+    agentMemory.addMessage({ role: 'system', content: 'Workflow execution context' });
 
     // Execute workflow
     await workflow.execute();

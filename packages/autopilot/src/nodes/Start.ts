@@ -1,15 +1,15 @@
-import { NodeHandler } from '@/types/node-handler';
-import { StartParams, ValidationResult } from '@/types';
+import { BaseNode } from './BaseNode';
+import { StartParams, ValidationResult, ExecutionItem, NodeHandlerOptions } from '@/types';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
-export class Start implements NodeHandler {
-  params: StartParams;
-
-  constructor(params?: StartParams) {
-    this.params = params || {};
+export class Start extends BaseNode<StartParams> {
+  constructor(params?: StartParams, options?: NodeHandlerOptions) {
+    super(params || {}, options);
   }
 
-  async execute(): Promise<void> {
-    return;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    return ExecutionItemUtils.wrapSingle({});
   }
 
   validate(): ValidationResult {

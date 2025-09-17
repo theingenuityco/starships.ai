@@ -6,23 +6,23 @@
  */
 
 import jsonata from 'jsonata';
-import type { Execution, ExecutionState, NodeResult, ExecutionStatus, ValidationResult, ValidationError } from '@/types';
+import type { Execution, ExecutionState, ExecutionStatus, ValidationResult, ValidationError, ExecutionItem } from '@/types';
 
 /**
  * Evaluation context available to JSONata expressions
  */
 export interface EvalContext {
   state: ExecutionState;
-  results: NodeResult[];
+  outputs: Array<{ nodeRef: string; items: ExecutionItem[] }>; // Updated to array format
   status: ExecutionStatus;
   currentNodeRef?: string;
+  input?: unknown;
 
-  // Helper functions
-  $nodeResult: (nodeRef: string) => NodeResult | undefined;
-  $lastResult: () => NodeResult | undefined;
-  $now: () => string;
-  $random: () => string;
-  $count: (array: unknown[]) => number;
+  // Only custom helper functions that aren't built into JSONata
+  $lastOutputOf: (nodeRef: string) => unknown;
+  $input: (path?: string) => unknown;
+  $random: () => number; // Custom random function since JSONata's might not be available in all versions
+  $exists: (value: unknown) => boolean; // Re-add since it's used in tests and might not be available in all JSONata versions
 }
 
 /**
@@ -43,20 +43,53 @@ export class Eval {
   /**
    * Build evaluation context from execution state
    */
-  buildContext(execution: Execution): EvalContext {
-    return {
+  buildContext(execution: Execution, inputData?: unknown): EvalContext {
+    const context = {
       state: execution.state,
-      results: execution.results,
+      outputs: execution.results, // Use array format directly
       status: execution.status,
       currentNodeRef: execution.currentNodeRef,
+      input: inputData,
 
-      // Helper functions
-      $nodeResult: (nodeRef: string) => execution.results.find((r) => r.nodeRef === nodeRef),
-      $lastResult: () => execution.results[execution.results.length - 1],
-      $now: () => new Date().toISOString(),
-      $random: () => Math.random().toString(36).substring(2, 15),
-      $count: (array: unknown[]) => (Array.isArray(array) ? array.length : 0),
+      // Only custom helper functions
+      $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
+      $input: (path?: string) => this.extractPath(inputData, path),
+      $random: () => Math.random(), // Simple custom random function
+      $exists: (value: unknown) => value !== null && value !== undefined,
     };
+
+    return context;
+  }
+
+  private findLatestNodeResult(execution: Execution, nodeRef: string): unknown {
+    // Find latest result for the specified node (reverse search for efficiency)
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      if (execution.results[i].nodeRef === nodeRef) {
+        return execution.results[i].items;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Extract data from a path using dot notation
+   */
+  private extractPath(data: unknown, path?: string): unknown {
+    if (!path) return data;
+    if (!data || typeof data !== 'object') return undefined;
+
+    const keys = path.split('.');
+    let result: unknown = data;
+
+    for (const key of keys) {
+      if (result && typeof result === 'object' && key in result) {
+        result = (result as Record<string, unknown>)[key];
+      } else {
+        return undefined;
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -65,6 +98,12 @@ export class Eval {
   async evaluateExpression(expression: string, context: EvalContext, options?: EvalOptions): Promise<unknown> {
     try {
       const jsonataExpr = jsonata(expression.trim());
+
+      // Register custom functions with JSONata
+      jsonataExpr.registerFunction('lastOutputOf', context.$lastOutputOf);
+      jsonataExpr.registerFunction('input', context.$input);
+      jsonataExpr.registerFunction('random', context.$random);
+      jsonataExpr.registerFunction('exists', context.$exists);
 
       // Note: JSONata timeout would need to be implemented differently if needed
       // For now, we rely on JavaScript's natural execution timeout
@@ -75,7 +114,9 @@ export class Eval {
 
       return await jsonataExpr.evaluate(context);
     } catch (error) {
-      throw new Error(`Expression evaluation failed for "${expression}": ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // Dead simple - just log everything raw
+      console.error('Expression evaluation failed:', expression, error);
+      throw new Error(`Expression evaluation failed for "${expression}": ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -96,8 +137,8 @@ export class Eval {
   /**
    * Resolve template expressions in any value type
    */
-  async resolveTemplates(value: unknown, execution: Execution, options?: EvalOptions): Promise<unknown> {
-    const context = this.buildContext(execution);
+  async resolveTemplates(value: unknown, execution: Execution, inputData?: unknown, options?: EvalOptions): Promise<unknown> {
+    const context = this.buildContext(execution, inputData);
     return await this.processValue(value, context, options);
   }
 
@@ -122,7 +163,13 @@ export class Eval {
 
     try {
       // Test JSONata syntax
-      jsonata(expression.trim());
+      const jsonataExpr = jsonata(expression.trim());
+
+      // Register custom functions for validation (with dummy implementations)
+      jsonataExpr.registerFunction('lastOutputOf', () => null);
+      jsonataExpr.registerFunction('input', () => null);
+      jsonataExpr.registerFunction('random', () => 0);
+      jsonataExpr.registerFunction('exists', () => false);
 
       // Additional validation checks
       if (options?.forbiddenFunctions) {
@@ -147,11 +194,11 @@ export class Eval {
         }
       }
     } catch (error) {
-      // Add more detailed error logging for debugging
-      console.error(`JSONata validation failed for expression: "${expression}"`, error);
+      // Dead simple - just log everything raw
+      console.error('JSONata validation failed:', expression, error);
       errors.push({
         code: 'INVALID_JSONATA_EXPRESSION',
-        message: `Invalid JSONata expression: ${error instanceof Error ? error.message : 'Syntax error'}`,
+        message: `Invalid JSONata expression: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
 

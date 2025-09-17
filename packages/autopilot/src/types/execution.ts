@@ -12,6 +12,16 @@ export type ExecutionState = Record<string, unknown>;
 export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 /**
+ * Execution item representing a single data unit flowing through the workflow
+ */
+export interface ExecutionItem {
+  json: unknown; // The actual data
+  binary?: Record<string, unknown>; // File attachments (for future use)
+  pairedItem?: { item: number }; // Source tracking for debugging
+  error?: string; // Item-level error handling
+}
+
+/**
  * Engine execution
  *
  * This interface is serializable and contains no callback functions.
@@ -19,19 +29,12 @@ export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed'
  */
 export interface Execution {
   currentNodeRef?: string;
+  currentNodeInputRef?: string; // Which node's output should be used as input for current node
   status: ExecutionStatus;
   state: ExecutionState;
-  results: NodeResult[];
+  results: Array<{ nodeRef: string; items: ExecutionItem[] }>; // Chronological execution results
+  visitCounts?: Record<string, number>; // Track node visit counts for cycle support
   error?: ExecutionError;
-}
-
-/**
- * Result of executing a workflow node
- */
-export interface NodeResult {
-  nodeRef: string;
-  data?: unknown;
-  error?: unknown;
 }
 
 /**

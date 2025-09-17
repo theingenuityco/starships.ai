@@ -100,10 +100,9 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
         starshipClass,
       });
       // Convert Workflow instances to WorkflowModel for API response
-      workflows = workflows.map((w) => {
-        const params = w.getParams();
+      workflows = workflows.map(() => {
         return {
-          name: params?.name || 'Unnamed Workflow',
+          name: 'Workflow', // TODO: Get proper name from workflow
           // Add other required WorkflowModel fields
           id: 'temp-id', // TODO: Add proper ID field
           createdAt: new Date().toISOString(),
@@ -114,10 +113,9 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
       // Get all workflows using instance method
       const workflowService = new WorkflowService();
       const workflowInstances = await workflowService.getAllWorkflows();
-      workflows = workflowInstances.map((w) => {
-        const params = w.getParams();
+      workflows = workflowInstances.map(() => {
         return {
-          name: params?.name || 'Unnamed Workflow',
+          name: 'Workflow', // TODO: Get proper name from workflow
           // Add other required WorkflowModel fields
           id: 'temp-id', // TODO: Add proper ID field
           createdAt: new Date().toISOString(),
@@ -186,7 +184,7 @@ router.post('/workflows', jwtAuthMiddleware, async (req: Request, res: Response)
         isPublic: z.boolean().optional(),
         tags: z.array(z.string()).optional(),
         executionMode: ExecutionModeSchema.optional(),
-        blueprint: z.any().optional(),
+        blueprint: z.any().optional(), // TODO: Add proper Blueprint validation
         timeout: z.number().min(1000).optional(),
       }),
       req.body,
@@ -227,7 +225,7 @@ router.put('/workflows/:workflowId', jwtAuthMiddleware, async (req: Request, res
         isPublic: z.boolean().optional(),
         tags: z.array(z.string()).optional(),
         executionMode: ExecutionModeSchema.optional(),
-        blueprint: z.any().optional(),
+        blueprint: z.any().optional(), // TODO: Add proper Blueprint validation
         timeout: z.number().min(1000).optional(),
         version: z.string().optional(),
       }),

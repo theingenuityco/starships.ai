@@ -6,7 +6,7 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import type { ExecutionStatus, NodeResult, ExecutionState } from '@starships/autopilot';
+import type { ExecutionStatus, ExecutionItem, ExecutionState } from '@starships/autopilot';
 import type { ExecutionModel, ExecutionError } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
@@ -80,7 +80,7 @@ export class ExecutionEntity implements ExecutionModel {
   // Properties from the Execution interface that may not be persisted
   @Expose()
   @Transformers.JsonTransform()
-  results!: NodeResult[];
+  results!: Array<{ nodeRef: string; items: ExecutionItem[] }>;
 
   @Expose()
   @Transformers.JsonTransform()

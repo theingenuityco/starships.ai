@@ -95,7 +95,8 @@ export class HttpRequest implements NodeHandler {
 
         // Handle HTTP error status codes
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
         }
         // Parse response body
         let responseBody: unknown;
@@ -130,11 +131,14 @@ export class HttpRequest implements NodeHandler {
 
         return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
       } catch (error) {
-        // Handle fetch errors and timeout
+        // Handle fetch errors and timeout - return error ExecutionItem instead of throwing
+        let errorMessage: string;
         if (controller.signal.aborted) {
-          throw new Error(`HTTP request timeout after ${timeout}ms`);
+          errorMessage = `HTTP request timeout after ${timeout}ms`;
+        } else {
+          errorMessage = `HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
         }
-        throw new Error(`HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
       }
     } finally {
       // Always clear timeout to prevent open handles

@@ -6,6 +6,7 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
+import { AgentMemory } from '@/memory/AgentMemory';
 import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, NodeType, ExecutionItem, LlmMessage } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
@@ -16,11 +17,20 @@ import { Engine } from '@/engine/Engine';
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
+  private memory: AgentMemory;
   private nodeCounter: number = 1;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
     this.params = structuredClone(params);
+
+    // Create AgentMemory instance from config or default
+    this.memory = new AgentMemory(
+      this.params.memoryState || {
+        systemPrompt: `You are ${this.params.name || 'Agent'}, an AI assistant. Assist users with their needs.`,
+        messages: [],
+      }
+    );
 
     // Create options
     this.options = options;
@@ -48,17 +58,8 @@ export class Agent implements NodeHandler {
             parameters: {
               model: this.params.model,
               messages: [
-                // Use system prompt from memoryState if available
-                ...(this.params.memoryState?.systemPrompt
-                  ? [{ role: 'system', content: this.params.memoryState.systemPrompt }]
-                  : [
-                      {
-                        role: 'system',
-                        content: `You are ${this.params.name || 'Agent'}, an AI assistant. Assist users with their needs.`,
-                      },
-                    ]),
-                // Include existing messages from memoryState if available
-                ...(this.params.memoryState?.messages || []),
+                // Use AgentMemory to format all messages (system prompt + conversation history)
+                ...this.memory.toMessages(),
                 // Add input template for new user input
                 {
                   role: 'user',
@@ -208,6 +209,13 @@ export class Agent implements NodeHandler {
       description: options?.description,
       ref: options?.ref,
     });
+  }
+
+  /**
+   * Add message to agent memory
+   */
+  addMessageToMemory(message: LlmMessage): void {
+    this.memory.addMessage(message);
   }
 
   /**

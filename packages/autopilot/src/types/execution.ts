@@ -29,6 +29,7 @@ export interface ExecutionItem {
  */
 export interface Execution {
   currentNodeRef?: string;
+  currentNodeInputRef?: string; // Which node's output should be used as input for current node
   status: ExecutionStatus;
   state: ExecutionState;
   nodeOutputs: Record<string, ExecutionItem[]>;

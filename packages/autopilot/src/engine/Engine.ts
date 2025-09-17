@@ -77,42 +77,39 @@ export class Engine {
       // Validate workflow before execution
       await this.validateForExecution(blueprint);
 
-      // Find start node
-      const startNode = this.getStartNode(blueprint);
-      if (!startNode) {
-        throw new Error('No start node found in workflow');
-      }
+      // Determine starting node - resume from currentNodeRef if exists, otherwise find start node
+      let currentNode: WorkflowNode | null = null;
 
-      // Emit start event
-      await this.emitEvent('workflow_started', execution);
+      if (execution.currentNodeRef) {
+        // Resume from current node
+        currentNode = blueprint.nodes.find((node) => node.ref === execution.currentNodeRef) || null;
+        if (!currentNode) {
+          throw new Error(`Cannot resume: current node '${execution.currentNodeRef}' not found in workflow`);
+        }
+      } else {
+        // Start from beginning
+        currentNode = this.getStartNode(blueprint);
+        if (!currentNode) {
+          throw new Error('No start node found in workflow');
+        }
+
+        // Only emit start event for fresh executions
+        await this.emitEvent('workflow_started', execution);
+      }
 
       // Update execution state
       execution.status = 'running';
 
-      // Get initial input items from execution if they exist
-      const initialInputItems = execution.nodeOutputs['__initial__'];
-
       // Execute the workflow graph node by node
-      let currentNode = startNode;
-      let currentInputItems: ExecutionItem[] | undefined = initialInputItems;
 
       while (currentNode && execution.status === 'running') {
         try {
-          // Update current node
-          execution.currentNodeRef = currentNode.ref;
+          // Set input source for this node (find incoming edge)
+          const incomingEdge = blueprint.edges.find((edge) => edge.to === currentNode!.ref);
+          execution.currentNodeInputRef = incomingEdge?.from;
 
-          // Get input items for current node (use initial input for start node, or from previous outputs)
-          const nodeInputItems =
-            currentNode.type === 'start' && currentInputItems ? currentInputItems : this.getNodeInput(blueprint, execution, currentNode);
-
-          // Create handler for current node and execute it
-          const inputData = ExecutionItemUtils.unwrapSingle(nodeInputItems);
-          const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, execution, inputData)) as NodeParameters;
-          const handler = await this.createHandler(currentNode, resolvedParams, execution);
-          const outputItems = await this.executeNode(handler, execution, nodeInputItems);
-
-          // Store output items
-          execution.nodeOutputs[currentNode.ref] = outputItems;
+          // Execute node directly - it will handle setting currentNodeRef and storing outputs
+          const outputItems = await this.executeNode(currentNode, execution);
 
           // Get next node
           const nextNode = this.getNextNode(blueprint, execution);
@@ -131,7 +128,6 @@ export class Engine {
           }
 
           currentNode = nextNode;
-          currentInputItems = undefined; // Only use initial input for start node
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
 
@@ -172,30 +168,75 @@ export class Engine {
     }
   }
   /**
-   * Get input items for a node based on incoming edges
+   * Get input items for the current node based on stored input reference
    */
-  private getNodeInput(blueprint: Blueprint, execution: Execution, node: WorkflowNode): ExecutionItem[] | undefined {
-    // Find incoming edge
-    const incomingEdge = blueprint.edges.find((edge) => edge.to === node.ref);
-
-    if (incomingEdge) {
-      // Always use previous node's output items as input
-      return execution.nodeOutputs[incomingEdge.from];
+  private getNodeInput(execution: Execution): ExecutionItem[] | undefined {
+    if (!execution.currentNodeInputRef) {
+      // No input source (e.g., start node)
+      return undefined;
     }
 
-    // No incoming edge (e.g., start node)
-    return undefined;
+    // Use stored input reference to get previous node's output
+    return execution.nodeOutputs[execution.currentNodeInputRef];
   }
 
   /**
-   * Execute a NodeHandler instance directly (like Agent, Workflow, etc.)
+   * Execute a workflow node directly
    */
-  async executeNode(handler: NodeHandler, execution: Execution, inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
+  async executeNode(currentNode: WorkflowNode, execution: Execution): Promise<ExecutionItem[]> {
+    // Update current node reference
+    execution.currentNodeRef = currentNode.ref;
+
     await this.emitEvent('node_started', execution);
 
     try {
-      // Execute the handler with input items
-      const outputItems = await handler.execute(inputItems);
+      // Get input items for current node (use initial input for start node, or from previous outputs)
+      const initialInputItems = execution.nodeOutputs['__initial__'];
+      const nodeInputItems = currentNode.type === 'start' && initialInputItems ? initialInputItems : this.getNodeInput(execution);
+
+      // Resolve node parameters with templates
+      const inputData = ExecutionItemUtils.unwrapSingle(nodeInputItems);
+      const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, execution, inputData)) as NodeParameters;
+
+      // Create handler for the node
+      const handler = await this.createHandler(currentNode, resolvedParams, execution);
+
+      // Validate node before execution
+      const validation = handler.validate();
+      if (!validation.valid) {
+        const errorMessages = validation.errors?.map((e) => `${currentNode.ref}: ${e.message}`) || ['Validation failed'];
+        throw new Error(`Node validation failed:\n${errorMessages.join('\n')}`);
+      }
+
+      // Check for inline transform operations
+      const nodeParams = resolvedParams as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
+      let processedInputItems = nodeInputItems;
+
+      // Execute inline transforms if present (for input->output transformations)
+      if (nodeParams.transforms && nodeParams.transforms.length > 0) {
+        processedInputItems = await this.executeInlineTransform(nodeParams.transforms, processedInputItems);
+      }
+
+      // Execute the handler with processed input items
+      let outputItems = await handler.execute(processedInputItems);
+
+      // Execute inline mutations if present (for state mutations)
+      if (nodeParams.mutations && nodeParams.mutations.length > 0) {
+        await this.executeInlineMutate(nodeParams.mutations);
+      }
+
+      // Execute inline conditional if present (for condition evaluation)
+      if (nodeParams.condition) {
+        const conditionResult = await this.executeInlineConditional(nodeParams.condition);
+        // Wrap the condition result in output items if handler didn't produce conditional output
+        const firstItem = outputItems[0];
+        if (!firstItem?.json || typeof firstItem.json !== 'object' || !('condition' in firstItem.json)) {
+          outputItems = ExecutionItemUtils.wrapSingle({ condition: conditionResult });
+        }
+      }
+
+      // Store output items in execution
+      execution.nodeOutputs[currentNode.ref] = outputItems;
 
       await this.emitEvent('node_completed', execution);
       return outputItems;

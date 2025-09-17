@@ -48,13 +48,13 @@ export class Eval {
   buildContext(execution: Execution, inputData?: unknown): EvalContext {
     return {
       state: execution.state,
-      outputs: execution.nodeOutputs,
+      outputs: execution.results,
       status: execution.status,
       currentNodeRef: execution.currentNodeRef,
       input: inputData,
 
       // Helper functions
-      $output: (nodeRef: string) => execution.nodeOutputs[nodeRef],
+      $output: (nodeRef: string) => execution.results[nodeRef],
       $input: (path?: string) => this.extractPath(inputData, path),
       $now: () => new Date().toISOString(),
       $random: () => nanoid(),

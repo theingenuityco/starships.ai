@@ -118,12 +118,12 @@ export class ExecutionItemUtils {
     const execution: Execution = {
       status: 'not_started',
       state: {},
-      nodeOutputs: {},
+      results: {},
     };
 
     // Set initial input for the blueprint if provided
     if (input && input.length > 0) {
-      execution.nodeOutputs['__initial__'] = input;
+      execution.results['__initial__'] = input;
     }
 
     return execution;

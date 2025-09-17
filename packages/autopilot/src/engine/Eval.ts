@@ -108,6 +108,29 @@ export class Eval {
 
       return await jsonataExpr.evaluate(context);
     } catch (error) {
+      // Enhanced error logging for debugging
+      console.error('Expression evaluation failed:', {
+        expression,
+        context: {
+          outputs: context.outputs?.map((o) => ({
+            nodeRef: o.nodeRef,
+            itemsCount: o.items?.length,
+            firstItemStructure: o.items?.[0]
+              ? {
+                  hasJson: !!o.items[0].json,
+                  jsonKeys:
+                    o.items[0].json && typeof o.items[0].json === 'object'
+                      ? Object.keys(o.items[0].json as Record<string, unknown>)
+                      : typeof o.items[0].json,
+                }
+              : null,
+          })),
+          currentNodeRef: context.currentNodeRef,
+          stateKeys: Object.keys(context.state || {}),
+          lastOutputOfLlm3: context.$lastOutputOf('llm_3'),
+        },
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       throw new Error(`Expression evaluation failed for "${expression}": ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

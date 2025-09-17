@@ -100,10 +100,9 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
         starshipClass,
       });
       // Convert Workflow instances to WorkflowModel for API response
-      workflows = workflows.map((w) => {
-        const params = w.getParams();
+      workflows = workflows.map(() => {
         return {
-          name: params?.name || 'Unnamed Workflow',
+          name: 'Workflow', // TODO: Get proper name from workflow
           // Add other required WorkflowModel fields
           id: 'temp-id', // TODO: Add proper ID field
           createdAt: new Date().toISOString(),
@@ -114,10 +113,9 @@ router.get('/workflows', jwtAuthMiddleware, async (req: Request, res: Response):
       // Get all workflows using instance method
       const workflowService = new WorkflowService();
       const workflowInstances = await workflowService.getAllWorkflows();
-      workflows = workflowInstances.map((w) => {
-        const params = w.getParams();
+      workflows = workflowInstances.map(() => {
         return {
-          name: params?.name || 'Unnamed Workflow',
+          name: 'Workflow', // TODO: Get proper name from workflow
           // Add other required WorkflowModel fields
           id: 'temp-id', // TODO: Add proper ID field
           createdAt: new Date().toISOString(),

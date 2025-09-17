@@ -6,7 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type { Execution, NodeResult, ExecutionStatus } from '@starships/autopilot';
+import type { Execution, ExecutionItem, ExecutionStatus } from '@starships/autopilot';
 
 // ============================================================================
 // DATABASE EXECUTION INTERFACE
@@ -73,7 +73,7 @@ export interface CreateExecutionRequest {
   workflowId: string;
   currentNodeRef?: string;
   status?: ExecutionStatus;
-  executionResults?: Map<string, NodeResult>;
+  results?: Array<{ nodeRef: string; items: ExecutionItem[] }>;
   error?: ExecutionError;
   startTime?: string;
   endTime?: string;

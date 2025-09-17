@@ -45,9 +45,8 @@ describe('AgentTemplateRepository', () => {
     icon: '🤖',
     previewPrompts: ['Hello', 'How can I help?'],
     memoryState: {
-      identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
-      purpose: { primary: 'assist users', constraints: [] },
-      space: { description: 'helpful environment' },
+      systemPrompt: 'You are a helpful assistant.',
+      messages: [],
     },
     blueprint: {
       nodes: [{ ref: 'start', type: 'start' as const, name: 'Start', description: 'Begin', parameters: {} }],
@@ -82,9 +81,8 @@ describe('AgentTemplateRepository', () => {
     icon: '🤖',
     previewPrompts: ['Hello'],
     memoryState: {
-      identity: { name: 'Assistant', role: 'helper', personality: 'friendly' },
-      purpose: { primary: 'assist users', constraints: [] },
-      space: { description: 'helpful environment' },
+      systemPrompt: 'You are a helpful assistant.',
+      messages: [],
     },
     blueprint: {
       nodes: [{ ref: 'start', type: 'start' as const, name: 'Start', description: 'Begin', parameters: {} }],
@@ -314,7 +312,7 @@ describe('AgentTemplateRepository', () => {
 
     it('should serialize complex objects in updates', async () => {
       const complexUpdates = {
-        memoryState: { identity: { name: 'Updated' } },
+        memoryState: { systemPrompt: 'You are an updated assistant.' },
         blueprint: { nodes: [], edges: [] },
       };
       const mockUpdatedRaw = createMockRawTemplate(complexUpdates);

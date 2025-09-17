@@ -9,6 +9,7 @@ import { NodeHandler } from '@/types/node-handler';
 import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem } from '@/types';
 import { Eval } from '@/engine/Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import { nanoid } from 'nanoid';
 
 export interface ConditionalResult {
   result: unknown;
@@ -34,14 +35,9 @@ export class Conditional implements NodeHandler {
     }
 
     try {
-      // Ensure we have execution context
-      if (!this.options?.execution) {
-        throw new Error('Execution context is required for conditional evaluation');
-      }
-
-      // Evaluate expression using centralized Eval class with input data
+      // Create minimal evaluation context from input data
       const inputData = ExecutionItemUtils.unwrapSingle(input);
-      const context = this.eval.buildContext(this.options.execution, inputData);
+      const context = this.createMinimalContext(inputData);
       const result = await this.eval.evaluateExpression(this.params.condition, context);
 
       // Convert result to boolean or string condition
@@ -67,6 +63,47 @@ export class Conditional implements NodeHandler {
     } catch (error) {
       throw new Error(`Conditional evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  }
+
+  /**
+   * Create minimal evaluation context from input data
+   */
+  private createMinimalContext(inputData?: unknown) {
+    return {
+      state: {},
+      outputs: {},
+      status: 'running' as const,
+      currentNodeRef: undefined,
+      input: inputData,
+
+      // Helper functions
+      $output: () => undefined,
+      $input: (path?: string) => this.extractPath(inputData, path),
+      $now: () => new Date().toISOString(),
+      $random: () => nanoid(),
+      $count: (array: unknown[]) => (Array.isArray(array) ? array.length : 0),
+    };
+  }
+
+  /**
+   * Extract data from a path using dot notation
+   */
+  private extractPath(data: unknown, path?: string): unknown {
+    if (!path) return data;
+    if (!data || typeof data !== 'object') return undefined;
+
+    const keys = path.split('.');
+    let result: unknown = data;
+
+    for (const key of keys) {
+      if (result && typeof result === 'object' && key in result) {
+        result = (result as Record<string, unknown>)[key];
+      } else {
+        return undefined;
+      }
+    }
+
+    return result;
   }
 
   /**

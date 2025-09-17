@@ -12,6 +12,7 @@ import type { TransformOperation, TransformParams } from '@/types/node-parameter
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import { nanoid } from 'nanoid';
 
 export class Transform extends BaseNode<TransformParams> {
   private eval = new Eval();
@@ -77,24 +78,19 @@ export class Transform extends BaseNode<TransformParams> {
    * Convert TransformOperation to JSON Patch Operation for input data
    */
   private async convertToJsonPatchOperationsForInput(transform: TransformOperation, currentData: unknown): Promise<Operation[]> {
-    // Create a temporary execution context for template resolution
-    const options = this.getOptions();
-    const tempExecution = options?.execution || {
-      status: 'running' as const,
-      state: {},
-      nodeOutputs: {},
-    };
+    // Create minimal context for template resolution using input data
+    const context = this.createMinimalContext(currentData);
 
     // Resolve template expressions in the value with current data as input
     let resolvedValue = transform.value;
     if (transform.value !== undefined) {
-      resolvedValue = await this.eval.resolveTemplates(transform.value, tempExecution, currentData);
+      resolvedValue = await this.eval.evaluateExpression(String(transform.value), context);
     }
 
     // Resolve template expressions in the from path
     let resolvedFrom = transform.from;
     if (transform.from !== undefined) {
-      resolvedFrom = (await this.eval.resolveTemplates(transform.from, tempExecution, currentData)) as string;
+      resolvedFrom = (await this.eval.evaluateExpression(String(transform.from), context)) as string;
     }
 
     // Create JSON Patch operation
@@ -153,6 +149,47 @@ export class Transform extends BaseNode<TransformParams> {
     }
 
     return [operation];
+  }
+
+  /**
+   * Create minimal evaluation context from input data
+   */
+  private createMinimalContext(inputData?: unknown) {
+    return {
+      state: {},
+      outputs: {},
+      status: 'running' as const,
+      currentNodeRef: undefined,
+      input: inputData,
+
+      // Helper functions
+      $output: () => undefined,
+      $input: (path?: string) => this.extractPath(inputData, path),
+      $now: () => new Date().toISOString(),
+      $random: () => nanoid(),
+      $count: (array: unknown[]) => (Array.isArray(array) ? array.length : 0),
+    };
+  }
+
+  /**
+   * Extract data from a path using dot notation
+   */
+  private extractPath(data: unknown, path?: string): unknown {
+    if (!path) return data;
+    if (!data || typeof data !== 'object') return undefined;
+
+    const keys = path.split('.');
+    let result: unknown = data;
+
+    for (const key of keys) {
+      if (result && typeof result === 'object' && key in result) {
+        result = (result as Record<string, unknown>)[key];
+      } else {
+        return undefined;
+      }
+    }
+
+    return result;
   }
 
   /**

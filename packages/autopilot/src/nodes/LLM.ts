@@ -52,7 +52,7 @@ export class LLM extends BaseNode<LlmParams> {
     try {
       // Use input data as user message if no explicit messages provided
       let messages = params.messages;
-      if (input && input.length > 0 && (!messages || messages.length === 0)) {
+      if (input && input.length > 0 && (!messages || (Array.isArray(messages) && messages.length === 0))) {
         const inputData = ExecutionItemUtils.unwrapSingle(input);
         const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
         messages = [{ role: 'user', content: inputContent }];

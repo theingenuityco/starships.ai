@@ -94,8 +94,12 @@ export class Engine {
     execution: Execution,
     inputItems?: ExecutionItem[]
   ): Promise<ExecutionItem[]> {
-    const virtualNode = this.createVirtualNode('transform', `inline_transform`, { transforms });
-    const transformHandler = await this.createHandler(virtualNode, { transforms }, execution);
+    // Resolve templates at execution time using the current state and the node's output as input
+    const inputData = ExecutionItemUtils.unwrapSingle(inputItems);
+    const resolved = (await this.eval.resolveTemplates({ transforms }, execution, inputData)) as { transforms: TransformOperation[] };
+
+    const virtualNode = this.createVirtualNode('transform', `inline_transform`, resolved);
+    const transformHandler = await this.createHandler(virtualNode, resolved, execution);
     const items = await transformHandler.execute(inputItems);
     // Record inline transform result like a normal node
     execution.results.push({ nodeRef: virtualNode.ref, items });
@@ -103,8 +107,12 @@ export class Engine {
   }
 
   private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<ExecutionItem[]> {
-    const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, { mutations: transforms });
-    const handler = await this.createHandler(virtualNode, { mutations: transforms }, execution);
+    // Resolve templates at execution time using the current state
+    const resolved = (await this.eval.resolveTemplates({ mutations: transforms }, execution)) as { mutations: TransformOperation[] };
+
+    const params = { mutations: resolved.mutations };
+    const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, params);
+    const handler = await this.createHandler(virtualNode, params, execution);
     const items = await handler.execute();
     // Record inline mutate result like a normal node
     execution.results.push({ nodeRef: virtualNode.ref, items });
@@ -112,8 +120,12 @@ export class Engine {
   }
 
   private async executeInlineConditional(conditionExpression: string, execution: Execution): Promise<string> {
-    const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, { condition: conditionExpression });
-    const conditionalHandler = await this.createHandler(virtualNode, { condition: conditionExpression }, execution);
+    // Resolve the condition expression at execution time
+    const resolved = (await this.eval.resolveTemplates({ condition: conditionExpression }, execution)) as { condition?: string };
+    const params = { condition: resolved.condition ?? conditionExpression };
+
+    const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, params);
+    const conditionalHandler = await this.createHandler(virtualNode, params, execution);
     const conditionalResultItems = await conditionalHandler.execute();
     // Record inline conditional result like a normal node
     execution.results.push({ nodeRef: virtualNode.ref, items: conditionalResultItems });
@@ -315,8 +327,12 @@ export class Engine {
         throw new Error(`Node validation failed:\n${errorMessages.join('\n')}`);
       }
 
-      // Process inline operations
-      const nodeParams = resolvedParams as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
+      // Process inline operations (use RAW inline params from the node definition to ensure templates are resolved at execution time)
+      const inlineParams = currentNode.parameters as {
+        transforms?: TransformOperation[];
+        mutations?: TransformOperation[];
+        condition?: string;
+      };
       let processedInputItems = nodeInputItems;
 
       // Execute the handler first (inline transforms will run after on the output)
@@ -326,20 +342,20 @@ export class Engine {
       execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
 
       // Execute inline transforms AFTER handler if present, transforming the node output
-      if (nodeParams.transforms?.length) {
-        outputItems = await this.executeInlineTransform(nodeParams.transforms, execution, outputItems);
+      if (inlineParams.transforms?.length) {
+        outputItems = await this.executeInlineTransform(inlineParams.transforms, execution, outputItems);
       }
 
       // Execute inline mutations if present (mutations can use lastOutputOf/current state)
-      if (nodeParams.mutations?.length) {
-        await this.executeInlineMutate(nodeParams.mutations, execution);
+      if (inlineParams.mutations?.length) {
+        await this.executeInlineMutate(inlineParams.mutations, execution);
         // Mutations modify state; keep primary output as-is unless you intend otherwise
         // Optionally, could attach mutate result to primary result if desired
       }
 
       // Execute inline conditional if present
-      if (nodeParams.condition) {
-        const conditionResult = await this.executeInlineConditional(nodeParams.condition, execution);
+      if (inlineParams.condition) {
+        const conditionResult = await this.executeInlineConditional(inlineParams.condition, execution);
         const firstItem = outputItems[0];
         if (!firstItem?.json || typeof firstItem.json !== 'object' || !('edgeCondition' in firstItem.json)) {
           outputItems = ExecutionItemUtils.wrapSingle({ edgeCondition: conditionResult });

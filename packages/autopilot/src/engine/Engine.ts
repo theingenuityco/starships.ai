@@ -195,7 +195,7 @@ export class Engine {
         const incomingEdge = blueprint.edges.find((edge) => edge.to === currentNode!.ref);
         execution.currentNodeInputRef = incomingEdge?.from;
 
-        const outputItems = await this.executeNode(currentNode, execution);
+        await this.executeNode(currentNode, execution);
         const nextNode = this.getNextNode(blueprint, execution);
 
         if (!nextNode) {
@@ -204,7 +204,8 @@ export class Engine {
             execution.status = 'completed';
             await this.emitEvent('workflow_completed', execution);
           }
-          return outputItems;
+          // Return execution results as ExecutionItem array for proper workflow composition
+          return ExecutionItemUtils.wrapSingle(execution.results);
         }
 
         currentNode = nextNode;
@@ -215,7 +216,8 @@ export class Engine {
     }
 
     execution.currentNodeRef = undefined;
-    return [];
+    // Return execution results as ExecutionItem array for proper workflow composition
+    return ExecutionItemUtils.wrapSingle(execution.results);
   }
 
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {

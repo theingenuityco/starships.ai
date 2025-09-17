@@ -76,11 +76,16 @@ describe('End-to-End Workflow Execution', () => {
       const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
 
-      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('Network timeout');
+      await engine.executeBlueprint(blueprint, execution);
 
-      expect(execution.status).toBe('failed');
-      expect(execution.error).toBeDefined();
-      expect(execution.error?.message).toContain('Network timeout');
+      expect(execution.status).toBe('completed');
+      expect(execution.results).toHaveLength(3);
+
+      // Check that the api-call node has an error
+      const apiCallResult = execution.results.find((r) => r.nodeRef === 'api-call');
+      expect(apiCallResult).toBeDefined();
+      expect(apiCallResult!.items[0].error).toBe('HTTP request failed: Network timeout');
+      expect(apiCallResult!.items[0].json).toBeUndefined();
     });
 
     it('should handle LLM API failures', async () => {

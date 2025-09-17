@@ -6,238 +6,73 @@
 import { getConnection } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
-import { AgentMemoryState, Blueprint } from '@starships/autopilot';
+import { AgentMemoryState, Blueprint, Agent } from '@starships/autopilot';
 import { AgentTemplateModel } from '@starships/protocol';
 
 /**
- * Create simple agent blueprint manually
+ * Create simple agent blueprint using Agent class
  */
 function createSimpleBlueprint(model: string, temperature: number = 0.7, maxTokens: number = 2000): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start_1',
-        type: 'start',
-        name: 'Start',
-        description: 'Start node',
-        parameters: {},
-      },
-      {
-        ref: 'llm_1',
-        type: 'llm',
-        name: 'Generate Response',
-        description: 'Generate helpful response',
-        parameters: {
-          model,
-          temperature,
-          maxTokens,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a helpful AI assistant. Provide clear, accurate, and helpful responses to user queries.',
-            },
-          ],
-        },
-      },
-      {
-        ref: 'end_1',
-        type: 'end',
-        name: 'End',
-        description: 'End node',
-        parameters: {},
-      },
-    ],
-    edges: [
-      {
-        ref: 'edge_1',
-        from: 'start_1',
-        to: 'llm_1',
-      },
-      {
-        ref: 'edge_2',
-        from: 'llm_1',
-        to: 'end_1',
-      },
-    ],
-    metadata: {
-      generatedBy: 'seed script',
-      createdAt: new Date().toISOString(),
-    },
-  };
+  const agent = new Agent({
+    name: 'Simple Agent',
+    model,
+    temperature,
+    maxTokens,
+  });
+
+  // Agent automatically creates start -> llm -> end blueprint with proper mutations
+  return agent.getCurrentBlueprint();
 }
 
 /**
- * Create code review agent blueprint manually
+ * Create code review agent blueprint using Agent class
  */
 function createCodeReviewBlueprint(): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start_1',
-        type: 'start',
-        name: 'Start',
-        description: 'Start node',
-        parameters: {},
-      },
-      {
-        ref: 'llm_1',
-        type: 'llm',
-        name: 'Code Review',
-        description: 'Perform comprehensive code review',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          temperature: 0.2,
-          maxTokens: 3000,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are an expert code reviewer. Analyze code for architecture, quality, security, and performance. Provide constructive, specific feedback with actionable recommendations.',
-            },
-          ],
-        },
-      },
-      {
-        ref: 'end_1',
-        type: 'end',
-        name: 'End',
-        description: 'End node',
-        parameters: {},
-      },
-    ],
-    edges: [
-      {
-        ref: 'edge_1',
-        from: 'start_1',
-        to: 'llm_1',
-      },
-      {
-        ref: 'edge_2',
-        from: 'llm_1',
-        to: 'end_1',
-      },
-    ],
-    metadata: {
-      generatedBy: 'seed script',
-      createdAt: new Date().toISOString(),
-    },
-  };
+  const agent = new Agent({
+    name: 'Code Reviewer',
+    model: 'anthropic/claude-3.5-sonnet',
+    temperature: 0.2,
+    maxTokens: 3000,
+  });
+
+  // Customize the default LLM node for code review
+  agent.addToChain('Code Review', 'Perform comprehensive code review');
+
+  return agent.getCurrentBlueprint();
 }
 
 /**
- * Create starship navigator agent blueprint manually
+ * Create starship navigator agent blueprint using Agent class
  */
 function createStarshipNavigatorBlueprint(): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start_1',
-        type: 'start',
-        name: 'Start',
-        description: 'Start node',
-        parameters: {},
-      },
-      {
-        ref: 'llm_1',
-        type: 'llm',
-        name: 'Navigator Response',
-        description: 'Provide starship navigation guidance',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          temperature: 0.4,
-          maxTokens: 2000,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are Sibyl, an expert starship navigator and first officer. Help new captains set up their starships, configure their crew, and begin their journey. Provide knowledgeable, welcoming guidance following starship protocols.',
-            },
-          ],
-        },
-      },
-      {
-        ref: 'end_1',
-        type: 'end',
-        name: 'End',
-        description: 'End node',
-        parameters: {},
-      },
-    ],
-    edges: [
-      {
-        ref: 'edge_1',
-        from: 'start_1',
-        to: 'llm_1',
-      },
-      {
-        ref: 'edge_2',
-        from: 'llm_1',
-        to: 'end_1',
-      },
-    ],
-    metadata: {
-      generatedBy: 'seed script',
-      createdAt: new Date().toISOString(),
-    },
-  };
+  const agent = new Agent({
+    name: 'Sibyl Navigator',
+    model: 'anthropic/claude-3.5-sonnet',
+    temperature: 0.4,
+    maxTokens: 2000,
+  });
+
+  // Customize the default LLM node for navigation guidance
+  agent.addToChain('Navigator Response', 'Provide starship navigation guidance');
+
+  return agent.getCurrentBlueprint();
 }
 
 /**
- * Create creative writing agent blueprint manually
+ * Create creative writing agent blueprint using Agent class
  */
 function createCreativeWritingBlueprint(): Blueprint {
-  return {
-    nodes: [
-      {
-        ref: 'start_1',
-        type: 'start',
-        name: 'Start',
-        description: 'Start node',
-        parameters: {},
-      },
-      {
-        ref: 'llm_1',
-        type: 'llm',
-        name: 'Creative Content',
-        description: 'Generate creative writing content',
-        parameters: {
-          model: 'anthropic/claude-3.5-sonnet',
-          temperature: 0.8,
-          maxTokens: 2500,
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are a creative writing specialist. Help with storytelling, character development, and content creation. Be imaginative, inspiring, and innovative in your approach.',
-            },
-          ],
-        },
-      },
-      {
-        ref: 'end_1',
-        type: 'end',
-        name: 'End',
-        description: 'End node',
-        parameters: {},
-      },
-    ],
-    edges: [
-      {
-        ref: 'edge_1',
-        from: 'start_1',
-        to: 'llm_1',
-      },
-      {
-        ref: 'edge_2',
-        from: 'llm_1',
-        to: 'end_1',
-      },
-    ],
-    metadata: {
-      generatedBy: 'seed script',
-      createdAt: new Date().toISOString(),
-    },
-  };
+  const agent = new Agent({
+    name: 'Creative Writer',
+    model: 'anthropic/claude-3.5-sonnet',
+    temperature: 0.8,
+    maxTokens: 2500,
+  });
+
+  // Customize the default LLM node for creative writing
+  agent.addToChain('Creative Content', 'Generate creative writing content');
+
+  return agent.getCurrentBlueprint();
 }
 
 /**

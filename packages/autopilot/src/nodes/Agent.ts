@@ -83,7 +83,7 @@ export class Agent implements NodeHandler {
       mutations: [
         {
           operation: 'add' as const,
-          path: '/messages/-',
+          path: '/state/messages/-',
           value: {
             role: 'assistant',
             content: `{{ $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content }}`,

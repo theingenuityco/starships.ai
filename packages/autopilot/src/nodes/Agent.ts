@@ -3,14 +3,12 @@
  *
  * Executable agent that combines agent configuration with execution capabilities.
  * Uses an internal Engine for execution that manages all node handlers automatically.
- * Memory-first architecture with AgentMemory system.
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentMemory } from '@/memory/AgentMemory';
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, LlmMessage, NodeType, ExecutionItem } from '@/types';
+import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, NodeType, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
-import { Blueprint, Node } from '@/types/blueprint';
+import { Blueprint } from '@/types/blueprint';
 import { NodeParameters } from '@/types/node-parameters';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { Engine } from '@/engine/Engine';
@@ -18,20 +16,11 @@ import { Engine } from '@/engine/Engine';
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
-  private memory: AgentMemory;
   private nodeCounter: number = 1;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
     this.params = structuredClone(params);
-
-    // Create AgentMemory instance from config or default
-    this.memory = new AgentMemory(
-      this.params.memoryState || {
-        systemPrompt: `You are ${this.params.name || 'Agent'}, an AI assistant. Assist users with their needs.`,
-        messages: [],
-      }
-    );
 
     // Create options
     this.options = options;
@@ -75,21 +64,9 @@ export class Agent implements NodeHandler {
     // Blueprint is guaranteed to exist after constructor logic above
   }
 
-  async addMessageToMemory(message: LlmMessage) {
-    return this.memory.addMessage(message);
-  }
-
   // =============================================================================
   // PRIVATE HELPERS
   // =============================================================================
-
-  /**
-   * Get the last node in the workflow (for chaining)
-   */
-  private getLastNode(): Node | undefined {
-    const nodes = this.params.blueprint!.nodes;
-    return nodes.length > 0 ? nodes[nodes.length - 1] : undefined;
-  }
 
   /**
    * Helper method to connect new node to previous node and redirect to end node
@@ -164,16 +141,6 @@ export class Agent implements NodeHandler {
    * Creates a new Engine instance and executes the agent's blueprint
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    // If we have input data, add it to agent's memory
-    if (input && input.length > 0) {
-      const inputData = ExecutionItemUtils.unwrapSingle(input);
-      const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
-      await this.addMessageToMemory({
-        role: 'user',
-        content: inputContent,
-      });
-    }
-
     // Create a new Engine instance for executing the agent's blueprint
     const engine = new Engine({
       eventCallback: this.options?.eventCallback,
@@ -208,19 +175,6 @@ export class Agent implements NodeHandler {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Agent model is required',
-      });
-    }
-
-    // Check memory is present and valid
-    if (!this.params.memoryState) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Agent memory is required',
-      });
-    } else if (!this.memory || typeof this.memory.toMessages !== 'function') {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Invalid agent memory instance',
       });
     }
 

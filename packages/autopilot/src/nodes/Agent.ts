@@ -73,13 +73,24 @@ export class Agent implements NodeHandler {
     const nodeName = name || 'Respond';
     const nodeDescription = description || 'AI response node';
 
-    // Create the LLM parameters
+    // Create the LLM parameters with inline mutations
     const llmParams: LlmParams = {
       model: this.params.model,
       messages: '{{ state.messages }}',
       ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
       ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
       ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+      // Add mutations directly to LLM node instead of creating separate mutate node
+      mutations: [
+        {
+          operation: 'add' as const,
+          path: '/state/messages/-',
+          value: {
+            role: 'assistant',
+            content: `{{ $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content ? $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "Error: Unable to extract LLM response content" }}`,
+          },
+        },
+      ],
     };
 
     // Create the LLM node
@@ -109,40 +120,10 @@ export class Agent implements NodeHandler {
     // Add the new LLM node to the blueprint
     this.params.blueprint!.nodes.push(llmNode);
 
-    // Create a mutate node to handle adding the response to messages
-    const mutateRef = `mutate_${this.nodeCounter}`;
-    const mutateNode = {
-      ref: mutateRef,
-      type: 'mutate' as const,
-      name: 'Add Response to Messages',
-      description: 'Add LLM response to message history',
-      parameters: {
-        mutations: [
-          {
-            operation: 'add' as const,
-            path: '/state/messages/-',
-            value: {
-              role: 'assistant',
-              content: `{{ $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content ? $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "Error: Unable to extract LLM response content" }}`,
-            },
-          },
-        ],
-      },
-    };
-
-    // Add the mutate node
-    this.params.blueprint!.nodes.push(mutateNode);
-
-    // Create edges: LLM -> Mutate -> End
+    // Create direct edge: LLM -> End (no separate mutate node needed)
     this.params.blueprint!.edges.push({
       ref: `edge_${this.params.blueprint!.edges.length + 1}`,
       from: nodeRef,
-      to: mutateRef,
-    });
-
-    this.params.blueprint!.edges.push({
-      ref: `edge_${this.params.blueprint!.edges.length + 2}`,
-      from: mutateRef,
       to: endNode.ref,
     });
 

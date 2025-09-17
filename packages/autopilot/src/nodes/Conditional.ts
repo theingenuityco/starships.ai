@@ -12,7 +12,7 @@ import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface ConditionalResult {
   result: unknown;
-  condition: string | boolean | number | null | undefined;
+  edgeCondition: string;
 }
 
 export class Conditional implements NodeHandler {
@@ -34,33 +34,39 @@ export class Conditional implements NodeHandler {
     }
 
     try {
-      // Ensure we have execution context
-      if (!this.options?.execution) {
-        throw new Error('Execution context is required for conditional evaluation');
-      }
+      let result: unknown;
+      let edgeCondition: string;
 
-      // Evaluate expression using centralized Eval class with input data
-      const inputData = ExecutionItemUtils.unwrapSingle(input);
-      const context = this.eval.buildContext(this.options.execution, inputData);
-      const result = await this.eval.evaluateExpression(this.params.condition, context);
+      // Check if condition contains JSONata template expressions ({{ ... }})
+      const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
 
-      // Convert result to boolean or string condition
-      let condition: string | boolean | number | null | undefined;
-      if (typeof result === 'boolean') {
-        condition = result;
-      } else if (typeof result === 'string') {
-        condition = result;
-      } else if (typeof result === 'number') {
-        condition = result;
-      } else if (result === undefined || result === null) {
-        condition = result;
+      if (hasTemplateExpression) {
+        // Ensure we have execution context for JSONata evaluation
+        if (!this.options?.execution) {
+          throw new Error('Execution context is required for conditional evaluation');
+        }
+
+        // Evaluate JSONata expression using centralized Eval class with input data
+        const inputData = ExecutionItemUtils.unwrapSingle(input);
+        result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData);
+
+        // Convert result to string condition - always a string
+        if (result === null || result === undefined) {
+          edgeCondition = 'null';
+        } else if (typeof result === 'boolean') {
+          edgeCondition = result.toString();
+        } else {
+          edgeCondition = String(result);
+        }
       } else {
-        condition = Boolean(result);
+        // Static string - return as is
+        result = this.params.condition;
+        edgeCondition = this.params.condition;
       }
 
       const conditionalResult = {
         result,
-        condition,
+        edgeCondition,
       };
 
       return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);
@@ -83,12 +89,17 @@ export class Conditional implements NodeHandler {
       });
     }
 
-    // Validate JSONata expression syntax
+    // Validate JSONata expression syntax only if it contains template expressions
     if (this.params.condition) {
-      const validation = this.eval.validateExpression(this.params.condition);
-      if (!validation.valid) {
-        errors.push(...(validation.errors || []));
+      const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
+
+      if (hasTemplateExpression) {
+        const validation = this.eval.validateTemplateExpressions(this.params.condition);
+        if (!validation.valid) {
+          errors.push(...(validation.errors || []));
+        }
       }
+      // Static strings don't need validation
     }
 
     return {

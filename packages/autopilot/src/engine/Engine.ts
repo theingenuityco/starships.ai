@@ -102,20 +102,17 @@ export class Engine {
     await handler.execute();
   }
 
-  private async executeInlineConditional(
-    conditionExpression: string,
-    execution: Execution
-  ): Promise<string | boolean | number | null | undefined> {
+  private async executeInlineConditional(conditionExpression: string, execution: Execution): Promise<string> {
     const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, { condition: conditionExpression });
     const conditionalHandler = await this.createHandler(virtualNode, { condition: conditionExpression }, execution);
     const conditionalResultItems = await conditionalHandler.execute();
 
     const firstItem = conditionalResultItems[0];
     if (firstItem?.json && typeof firstItem.json === 'object') {
-      const result = firstItem.json as { condition: string | boolean | number | null | undefined };
-      return result.condition;
+      const result = firstItem.json as { edgeCondition: string };
+      return result.edgeCondition;
     }
-    return undefined;
+    return 'null';
   }
 
   private async validateInlineOperations(node: Node, validationErrors: string[]): Promise<void> {
@@ -308,8 +305,8 @@ export class Engine {
       if (nodeParams.condition) {
         const conditionResult = await this.executeInlineConditional(nodeParams.condition, execution);
         const firstItem = outputItems[0];
-        if (!firstItem?.json || typeof firstItem.json !== 'object' || !('condition' in firstItem.json)) {
-          outputItems = ExecutionItemUtils.wrapSingle({ condition: conditionResult });
+        if (!firstItem?.json || typeof firstItem.json !== 'object' || !('edgeCondition' in firstItem.json)) {
+          outputItems = ExecutionItemUtils.wrapSingle({ edgeCondition: conditionResult });
         }
       }
 
@@ -348,8 +345,8 @@ export class Engine {
       const firstItem = lastOutputItems[0];
       if (firstItem.json && typeof firstItem.json === 'object') {
         const conditionalResult = firstItem.json as Record<string, unknown>;
-        if (conditionalResult.condition !== undefined) {
-          edgeCondition = String(conditionalResult.condition);
+        if (conditionalResult.edgeCondition !== undefined) {
+          edgeCondition = conditionalResult.edgeCondition as string;
         }
       }
     }

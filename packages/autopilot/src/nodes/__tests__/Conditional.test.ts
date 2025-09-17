@@ -55,19 +55,14 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockJsonata).toHaveBeenCalledWith('state.user.isPremium = true');
       expect(mockEvaluate).toHaveBeenCalledWith(
         expect.objectContaining({
           state: mockExecution.state,
-          results: mockExecution.results,
+          outputs: mockExecution.results,
           status: mockExecution.status,
           currentNodeRef: mockExecution.currentNodeRef,
-          $nodeResult: expect.any(Function),
-          $lastResult: expect.any(Function),
-          $now: expect.any(Function),
-          $random: expect.any(Function),
-          $count: expect.any(Function),
         })
       );
     });
@@ -89,7 +84,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockJsonata).toHaveBeenCalledWith('state.user.level = "gold"');
     });
 
@@ -110,7 +105,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockJsonata).toHaveBeenCalledWith('results[-1].data.value > 40');
     });
 
@@ -131,7 +126,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: false });
+      expect(result[0].json).toEqual({ condition: false, result: false });
     });
   });
 
@@ -153,7 +148,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockJsonata).toHaveBeenCalledWith('state.user.isPremium and results[-1].data.success');
     });
 
@@ -174,7 +169,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
     });
 
     it('should handle array operations', async () => {
@@ -202,18 +197,13 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockEvaluate).toHaveBeenCalledWith(
         expect.objectContaining({
           state: executionWithArrays.state,
-          results: executionWithArrays.results,
+          outputs: executionWithArrays.results,
           status: executionWithArrays.status,
           currentNodeRef: executionWithArrays.currentNodeRef,
-          $nodeResult: expect.any(Function),
-          $lastResult: expect.any(Function),
-          $now: expect.any(Function),
-          $random: expect.any(Function),
-          $count: expect.any(Function),
         })
       );
     });
@@ -235,7 +225,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: 'gold' });
+      expect(result[0].json).toEqual({ condition: 'gold', result: 'gold' });
     });
   });
 
@@ -256,7 +246,7 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(result.length).toBe(1);
     });
 
@@ -276,7 +266,7 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ condition: 'premium' });
+      expect(result[0].json).toEqual({ condition: 'premium', result: 'premium' });
       expect(result.length).toBe(1);
     });
 
@@ -296,7 +286,7 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ condition: 42 });
+      expect(result[0].json).toEqual({ condition: 42, result: 42 });
       expect(result.length).toBe(1);
     });
 
@@ -316,7 +306,7 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ condition: undefined });
+      expect(result[0].json).toEqual({ condition: undefined, result: undefined });
       expect(result.length).toBe(1);
     });
   });
@@ -389,7 +379,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockJsonata).toHaveBeenCalledWith('state.user.isPremium = true');
     });
 
@@ -484,18 +474,13 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockEvaluate).toHaveBeenCalledWith(
         expect.objectContaining({
           state: mockExecution.state,
-          results: mockExecution.results,
+          outputs: mockExecution.results,
           status: mockExecution.status,
           currentNodeRef: mockExecution.currentNodeRef,
-          $nodeResult: expect.any(Function),
-          $lastResult: expect.any(Function),
-          $now: expect.any(Function),
-          $random: expect.any(Function),
-          $count: expect.any(Function),
         })
       );
     });
@@ -522,18 +507,13 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockEvaluate).toHaveBeenCalledWith(
         expect.objectContaining({
           state: executionWithCurrentNode.state,
-          results: executionWithCurrentNode.results,
+          outputs: executionWithCurrentNode.results,
           status: executionWithCurrentNode.status,
           currentNodeRef: executionWithCurrentNode.currentNodeRef,
-          $nodeResult: expect.any(Function),
-          $lastResult: expect.any(Function),
-          $now: expect.any(Function),
-          $random: expect.any(Function),
-          $count: expect.any(Function),
         })
       );
     });
@@ -560,18 +540,13 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
       expect(mockEvaluate).toHaveBeenCalledWith(
         expect.objectContaining({
           state: executionWithoutResults.state,
-          results: executionWithoutResults.results,
+          outputs: executionWithoutResults.results,
           status: executionWithoutResults.status,
           currentNodeRef: executionWithoutResults.currentNodeRef,
-          $nodeResult: expect.any(Function),
-          $lastResult: expect.any(Function),
-          $now: expect.any(Function),
-          $random: expect.any(Function),
-          $count: expect.any(Function),
         })
       );
     });
@@ -602,7 +577,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
     });
 
     it('should handle business logic conditions', async () => {
@@ -630,7 +605,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: true });
+      expect(result[0].json).toEqual({ condition: true, result: true });
     });
 
     it('should handle workflow routing decisions', async () => {
@@ -655,7 +630,7 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ condition: 'high_confidence' });
+      expect(result[0].json).toEqual({ condition: 'high_confidence', result: 'high_confidence' });
     });
   });
 });

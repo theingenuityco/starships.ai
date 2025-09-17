@@ -96,19 +96,27 @@ export class Engine {
   ): Promise<ExecutionItem[]> {
     const virtualNode = this.createVirtualNode('transform', `inline_transform`, { transforms });
     const transformHandler = await this.createHandler(virtualNode, { transforms }, execution);
-    return await transformHandler.execute(inputItems);
+    const items = await transformHandler.execute(inputItems);
+    // Record inline transform result like a normal node
+    execution.results.push({ nodeRef: virtualNode.ref, items });
+    return items;
   }
 
-  private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<void> {
+  private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<ExecutionItem[]> {
     const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, { mutations: transforms });
     const handler = await this.createHandler(virtualNode, { mutations: transforms }, execution);
-    await handler.execute();
+    const items = await handler.execute();
+    // Record inline mutate result like a normal node
+    execution.results.push({ nodeRef: virtualNode.ref, items });
+    return items;
   }
 
   private async executeInlineConditional(conditionExpression: string, execution: Execution): Promise<string> {
     const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, { condition: conditionExpression });
     const conditionalHandler = await this.createHandler(virtualNode, { condition: conditionExpression }, execution);
     const conditionalResultItems = await conditionalHandler.execute();
+    // Record inline conditional result like a normal node
+    execution.results.push({ nodeRef: virtualNode.ref, items: conditionalResultItems });
 
     const firstItem = conditionalResultItems[0];
     if (firstItem?.json && typeof firstItem.json === 'object') {
@@ -311,17 +319,22 @@ export class Engine {
       const nodeParams = resolvedParams as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
       let processedInputItems = nodeInputItems;
 
-      // Execute inline transforms if present
-      if (nodeParams.transforms?.length) {
-        processedInputItems = await this.executeInlineTransform(nodeParams.transforms, execution, processedInputItems);
-      }
-
-      // Execute the handler with processed input items
+      // Execute the handler first (inline transforms will run after on the output)
       let outputItems = await handler.execute(processedInputItems);
 
-      // Execute inline mutations if present
+      // Record primary node output immediately (as a normal node result)
+      execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
+
+      // Execute inline transforms AFTER handler if present, transforming the node output
+      if (nodeParams.transforms?.length) {
+        outputItems = await this.executeInlineTransform(nodeParams.transforms, execution, outputItems);
+      }
+
+      // Execute inline mutations if present (mutations can use lastOutputOf/current state)
       if (nodeParams.mutations?.length) {
         await this.executeInlineMutate(nodeParams.mutations, execution);
+        // Mutations modify state; keep primary output as-is unless you intend otherwise
+        // Optionally, could attach mutate result to primary result if desired
       }
 
       // Execute inline conditional if present
@@ -333,7 +346,6 @@ export class Engine {
         }
       }
 
-      execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
       await this.emitEvent('node_completed', execution);
       return outputItems;
     } catch (error) {
@@ -360,16 +372,32 @@ export class Engine {
       return null;
     }
 
-    // Extract condition from output if present
-    const lastOutputItems = this.findNodeResult(execution, execution.currentNodeRef!);
+    // Determine edge condition:
+    // Prefer any inline result emitted after the current node that carries edgeCondition.
+    // Scan backwards until we reach the current node's primary result.
     let edgeCondition: string | undefined;
+    for (let i = execution.results.length - 1; i >= 0; i--) {
+      const entry = execution.results[i];
+      if (entry.nodeRef === execution.currentNodeRef) {
+        break; // stop at the current node's primary result
+      }
+      const item = entry.items?.[0];
+      if (item?.json && typeof item.json === 'object' && 'edgeCondition' in (item.json as Record<string, unknown>)) {
+        edgeCondition = (item.json as Record<string, unknown>).edgeCondition as string;
+        break;
+      }
+    }
 
-    if (lastOutputItems?.length) {
-      const firstItem = lastOutputItems[0];
-      if (firstItem.json && typeof firstItem.json === 'object') {
-        const conditionalResult = firstItem.json as Record<string, unknown>;
-        if (conditionalResult.edgeCondition !== undefined) {
-          edgeCondition = conditionalResult.edgeCondition as string;
+    // Fallback to primary node output if inline didn't provide edgeCondition
+    if (edgeCondition === undefined) {
+      const lastOutputItems = this.findNodeResult(execution, execution.currentNodeRef!);
+      if (lastOutputItems?.length) {
+        const firstItem = lastOutputItems[0];
+        if (firstItem.json && typeof firstItem.json === 'object') {
+          const conditionalResult = firstItem.json as Record<string, unknown>;
+          if (conditionalResult.edgeCondition !== undefined) {
+            edgeCondition = conditionalResult.edgeCondition as string;
+          }
         }
       }
     }

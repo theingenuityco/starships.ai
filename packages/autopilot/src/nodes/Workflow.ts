@@ -7,11 +7,11 @@
  */
 
 import { Engine, EngineConfig } from '@/engine/Engine';
-import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem, Execution } from '@/types';
+import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem } from '@/types';
 import { ValidationError } from '@/types/validation';
 import { EventCallback } from '@/types/events';
 import { NodeHandler } from '@/types/node-handler';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export class Workflow implements NodeHandler {
   private params: WorkflowParams;
@@ -45,7 +45,7 @@ export class Workflow implements NodeHandler {
     const execution = this.engine.getExecution();
 
     // Return the execution wrapped as an item
-    return NodeHelpers.createSingleOutput(execution, _input?.[0]);
+    return ExecutionItemUtils.wrapSingle(execution, _input?.[0]);
   }
 
   /**

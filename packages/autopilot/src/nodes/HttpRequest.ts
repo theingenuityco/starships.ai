@@ -7,7 +7,7 @@
 
 import { HttpRequestParams, ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface HttpResponse {
   status: number;
@@ -61,7 +61,7 @@ export class HttpRequest implements NodeHandler {
 
     try {
       // Use input data as body if available and no explicit body set
-      const inputData = NodeHelpers.getSingleInput(input);
+      const inputData = ExecutionItemUtils.unwrapSingle(input);
       const bodyData = this.params.body !== undefined ? this.params.body : inputData;
       let body: string | null = null;
 
@@ -128,7 +128,7 @@ export class HttpRequest implements NodeHandler {
           url: response.url,
         };
 
-        return NodeHelpers.createSingleOutput(httpResponse, input?.[0]);
+        return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
       } catch (error) {
         // Handle fetch errors and timeout
         if (controller.signal.aborted) {

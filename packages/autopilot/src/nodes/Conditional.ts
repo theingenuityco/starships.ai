@@ -8,7 +8,7 @@
 import { NodeHandler } from '@/types/node-handler';
 import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem } from '@/types';
 import { Eval } from '@/engine/Eval';
-import { NodeHelpers } from '@/helpers/NodeHelpers';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface ConditionalResult {
   result: unknown;
@@ -40,7 +40,7 @@ export class Conditional implements NodeHandler {
       }
 
       // Evaluate expression using centralized Eval class with input data
-      const inputData = NodeHelpers.getSingleInput(input);
+      const inputData = ExecutionItemUtils.unwrapSingle(input);
       const context = this.eval.buildContext(this.options.execution, inputData);
       const result = await this.eval.evaluateExpression(this.params.condition, context);
 
@@ -63,7 +63,7 @@ export class Conditional implements NodeHandler {
         condition,
       };
 
-      return NodeHelpers.createSingleOutput(conditionalResult, input?.[0]);
+      return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);
     } catch (error) {
       throw new Error(`Conditional evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

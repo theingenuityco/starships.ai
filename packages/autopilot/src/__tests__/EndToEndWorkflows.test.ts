@@ -249,7 +249,7 @@ describe('End-to-End Workflow Execution', () => {
 
       expect(execution.status).toBe('completed');
       expect(execution.state).toEqual({ initialized: true });
-      expect(execution.results).toHaveLength(5);
+      expect(execution.results).toHaveLength(6); // start -> set-state -> check-state -> inline_conditional -> update-state -> end
     });
   });
 
@@ -729,7 +729,7 @@ describe('End-to-End Workflow Execution', () => {
       }
 
       expect(execution.status).toBe('completed');
-      expect(execution.results).toHaveLength(7); // All 6 nodes + start + end
+      expect(execution.results).toHaveLength(8); // start -> extract-data -> validate-data -> inline_conditional -> transform-data -> load-data -> send-notification -> end
       expect(mockFetch).toHaveBeenCalledTimes(4);
     });
   });

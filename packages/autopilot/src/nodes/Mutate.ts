@@ -5,14 +5,13 @@
  * Handles only state changes, not input->output transformations.
  */
 
-import { deepClone, Operation } from 'fast-json-patch';
+import { applyPatch, deepClone, Operation } from 'fast-json-patch';
 import { NodeHandler } from '@/types/node-handler';
 import { ValidationResult, ValidationError, Execution, ExecutionState, ExecutionItem } from '@/types';
 import type { TransformOperation, MutateParams } from '@/types/node-parameters';
 import type { NodeHandlerOptions } from '@/types/node-handler';
 import { Eval } from '@/engine/Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
-import { nanoid } from 'nanoid';
 
 /**
  * Transform safety manager for state snapshots and rollback
@@ -66,23 +65,66 @@ export class Mutate implements NodeHandler {
   }
 
   /**
-   * Execute state mutation operations (Note: This node cannot function without execution context)
+   * Execute state mutation operations on execution state
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     if (!this.params.mutations || this.params.mutations.length === 0) {
       return input || ExecutionItemUtils.wrapSingle({ mutationsApplied: 0, operations: [] });
     }
 
-    // Since execution context is no longer available via NodeHandlerOptions,
-    // this node cannot perform actual state mutations
-    throw new Error('Mutate node cannot function without execution context. Use inline mutations in the Engine instead.');
+    if (!this.options?.execution) {
+      throw new Error('Mutate node requires execution context');
+    }
+
+    // Apply mutations to execution state
+    await this.applyTransforms(this.params.mutations, this.options.execution);
+
+    // Return summary of what was mutated
+    const operations = this.params.mutations.map((t) => `${t.operation} ${t.path}`);
+    return ExecutionItemUtils.wrapSingle({
+      mutationsApplied: this.params.mutations.length,
+      operations,
+    });
   }
 
   /**
-   * Apply transform operations to execution state (deprecated - cannot function without execution context)
+   * Apply transform operations to execution state
    */
-  private async applyTransforms(): Promise<void> {
-    throw new Error('Mutate node cannot apply transforms without execution context');
+  private async applyTransforms(transforms: TransformOperation[], execution: Execution): Promise<void> {
+    if (!transforms || transforms.length === 0) return;
+
+    // Create execution snapshot for rollback
+    const executionSnapshot = this.safetyManager.createExecutionSnapshot(execution);
+
+    try {
+      // Apply transforms one at a time so each can see the updated state
+      for (const transform of transforms) {
+        // For 'add' operations, ensure intermediate paths exist
+        if (transform.operation === 'add') {
+          this.ensureIntermediatePaths(execution.state, transform.path);
+        }
+
+        // Convert single transform to JSON Patch operation with current state
+        const patchOperations = await this.convertToJsonPatchOperations([transform], execution);
+
+        // Apply patch to a wrapper object to handle the root state correctly
+        const stateWrapper = { state: execution.state };
+        const patchedWrapper = applyPatch(stateWrapper, patchOperations, false, false).newDocument;
+
+        // Update execution state immediately so next transform can see the changes
+        execution.state = patchedWrapper.state;
+      }
+
+      // Validate final state changes
+      const validation = this.safetyManager.validateStateChanges(executionSnapshot.state, execution.state);
+      if (!validation.valid) {
+        throw new Error(`State validation failed: ${validation.errors?.map((e) => e.message).join(', ')}`);
+      }
+    } catch (error) {
+      // Rollback state on any failure
+      this.safetyManager.rollbackExecution(execution, executionSnapshot);
+      throw error;
+    }
   }
 
   /**
@@ -114,21 +156,20 @@ export class Mutate implements NodeHandler {
   /**
    * Convert TransformOperation to JSON Patch Operation with template resolution
    */
-  private async convertToJsonPatchOperations(transforms: TransformOperation[], inputData?: unknown): Promise<Operation[]> {
+  private async convertToJsonPatchOperations(transforms: TransformOperation[], execution: Execution): Promise<Operation[]> {
     const operations: Operation[] = [];
-    const context = this.createMinimalContext(inputData);
 
     for (const transform of transforms) {
       // Resolve template expressions in the value
       let resolvedValue = transform.value;
       if (transform.value !== undefined) {
-        resolvedValue = await this.eval.evaluateExpression(String(transform.value), context);
+        resolvedValue = await this.eval.resolveTemplates(transform.value, execution);
       }
 
       // Resolve template expressions in the from path (for copy/move operations)
       let resolvedFrom = transform.from;
       if (transform.from !== undefined) {
-        resolvedFrom = (await this.eval.evaluateExpression(String(transform.from), context)) as string;
+        resolvedFrom = (await this.eval.resolveTemplates(transform.from, execution)) as string;
       }
 
       // Create JSON Patch operation based on operation type
@@ -190,47 +231,6 @@ export class Mutate implements NodeHandler {
     }
 
     return operations;
-  }
-
-  /**
-   * Create minimal evaluation context from input data
-   */
-  private createMinimalContext(inputData?: unknown) {
-    return {
-      state: {},
-      outputs: {},
-      status: 'running' as const,
-      currentNodeRef: undefined,
-      input: inputData,
-
-      // Helper functions
-      $output: () => undefined,
-      $input: (path?: string) => this.extractPath(inputData, path),
-      $now: () => new Date().toISOString(),
-      $random: () => nanoid(),
-      $count: (array: unknown[]) => (Array.isArray(array) ? array.length : 0),
-    };
-  }
-
-  /**
-   * Extract data from a path using dot notation
-   */
-  private extractPath(data: unknown, path?: string): unknown {
-    if (!path) return data;
-    if (!data || typeof data !== 'object') return undefined;
-
-    const keys = path.split('.');
-    let result: unknown = data;
-
-    for (const key of keys) {
-      if (result && typeof result === 'object' && key in result) {
-        result = (result as Record<string, unknown>)[key];
-      } else {
-        return undefined;
-      }
-    }
-
-    return result;
   }
 
   /**

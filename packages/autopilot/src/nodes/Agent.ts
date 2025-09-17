@@ -8,11 +8,21 @@
  */
 
 import { AgentMemory } from '@/memory/AgentMemory';
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, LlmMessage, NodeType, ExecutionItem } from '@/types';
+import {
+  AgentParams,
+  ValidationResult,
+  ValidationError,
+  NodeHandlerOptions,
+  LlmMessage,
+  NodeType,
+  ExecutionItem,
+  Execution,
+} from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint, Node } from '@/types/blueprint';
 import { NodeParameters } from '@/types/node-parameters';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import { Engine } from '@/engine/Engine';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
@@ -160,7 +170,7 @@ export class Agent implements NodeHandler {
 
   /**
    * Execute the agent with optional input items
-   * Note: This method now returns the agent's blueprint for execution by an external Engine
+   * Creates a new Engine instance and executes the agent's blueprint
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // If we have input data, add it to agent's memory
@@ -173,15 +183,29 @@ export class Agent implements NodeHandler {
       });
     }
 
-    // Return the agent's blueprint and parameters for external Engine execution
-    return ExecutionItemUtils.wrapSingle(
-      {
-        blueprint: this.params.blueprint,
-        agentParams: this.params,
-        memory: this.memory.toMessages(),
-      },
-      input?.[0]
-    );
+    // Create a new Engine instance for executing the agent's blueprint
+    const engine = new Engine({
+      eventCallback: this.options?.eventCallback,
+    });
+
+    // Create execution context for the agent's blueprint
+    const execution: Execution = {
+      status: 'not_started',
+      state: {},
+      nodeOutputs: {},
+    };
+
+    // Set initial input for the agent's blueprint if provided
+    if (input && input.length > 0) {
+      execution.nodeOutputs['__initial__'] = input;
+    }
+
+    try {
+      // Execute the agent's blueprint using the new Engine
+      return await engine.executeBlueprint(this.params.blueprint!, execution);
+    } catch (error) {
+      throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**

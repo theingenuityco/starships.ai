@@ -176,7 +176,12 @@ export class Engine {
         const nextNode = this.getNextNode(blueprint, execution);
 
         if (!nextNode) {
-          return await this.completeExecution(execution, outputItems);
+          execution.currentNodeRef = undefined;
+          if (execution.status === 'running') {
+            execution.status = 'completed';
+            await this.emitEvent('workflow_completed', execution);
+          }
+          return outputItems;
         }
 
         currentNode = nextNode;
@@ -188,15 +193,6 @@ export class Engine {
 
     execution.currentNodeRef = undefined;
     return [];
-  }
-
-  private async completeExecution(execution: Execution, outputItems: ExecutionItem[]): Promise<ExecutionItem[]> {
-    execution.currentNodeRef = undefined;
-    if (execution.status === 'running') {
-      execution.status = 'completed';
-      await this.emitEvent('workflow_completed', execution);
-    }
-    return outputItems;
   }
 
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {

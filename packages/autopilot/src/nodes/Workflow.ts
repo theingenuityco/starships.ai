@@ -7,9 +7,9 @@
  */
 
 import { BaseNode } from './BaseNode';
-import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem } from '@/types';
+import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem, Execution } from '@/types';
 import { ValidationError } from '@/types/validation';
-import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import { Engine } from '@/engine/Engine';
 
 export class Workflow extends BaseNode<WorkflowParams> {
   constructor(params: WorkflowParams, options?: NodeHandlerOptions) {
@@ -19,18 +19,34 @@ export class Workflow extends BaseNode<WorkflowParams> {
 
   /**
    * Execute the workflow with streaming support and optional input items
-   * Note: This method now returns the workflow's blueprint for execution by an external Engine
+   * Creates a new Engine instance and executes the workflow's blueprint
    */
-  async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    // Return the workflow's blueprint for external Engine execution
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
-    return ExecutionItemUtils.wrapSingle(
-      {
-        blueprint: params.blueprint,
-        workflowParams: params,
-      },
-      _input?.[0]
-    );
+
+    // Create a new Engine instance for executing the workflow's blueprint
+    const engine = new Engine({
+      eventCallback: this.options?.eventCallback,
+    });
+
+    // Create execution context for the workflow's blueprint
+    const execution: Execution = {
+      status: 'not_started',
+      state: {},
+      nodeOutputs: {},
+    };
+
+    // Set initial input for the workflow's blueprint if provided
+    if (input && input.length > 0) {
+      execution.nodeOutputs['__initial__'] = input;
+    }
+
+    try {
+      // Execute the workflow's blueprint using the new Engine
+      return await engine.executeBlueprint(params.blueprint, execution);
+    } catch (error) {
+      throw new Error(`Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   /**

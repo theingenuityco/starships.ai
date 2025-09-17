@@ -149,8 +149,19 @@ export class Agent implements NodeHandler {
     // Create execution context for the agent's blueprint
     const execution = ExecutionItemUtils.createExecution(input);
 
-    // Initialize empty messages array for template access
-    execution.state.messages = [];
+    // Initialize messages array - use input messages if provided, otherwise empty array
+    if (input && input.length > 0) {
+      const inputData = ExecutionItemUtils.unwrapSingle(input);
+      // If input contains an array of messages, use it; otherwise create a user message from the input
+      if (Array.isArray(inputData) && inputData.length > 0 && inputData[0].role) {
+        execution.state.messages = inputData;
+      } else {
+        const content = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
+        execution.state.messages = [{ role: 'user', content }];
+      }
+    } else {
+      execution.state.messages = [];
+    }
 
     // Create a new Engine instance for executing the agent's blueprint
     const engine = new Engine({

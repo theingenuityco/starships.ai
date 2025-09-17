@@ -27,6 +27,9 @@ export { Memory } from './memory/Memory';
 export type { MemoryState } from './memory/Memory';
 export { AgentMemory } from './memory/AgentMemory';
 
+// Utils
+export { ExecutionItemUtils } from './utils/ExecutionItemUtils';
+
 // Types
 export * from './types';
 

@@ -191,7 +191,7 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     temperature: 0.5,
     maxTokens: 2000,
 
-    icon: '🧙‍♀️',
+    icon: '🧭',
     previewPrompts: [
       'Help me set up my new starship',
       'How do I configure my first AI agents?',
@@ -199,8 +199,24 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     ],
     blueprint: createStarshipNavigatorBlueprint(),
     memoryState: {
-      systemPrompt:
-        'You are Sibyl, an expert starship navigator and first officer. Help new captains set up their starships, configure their crew, and begin their journey. Provide knowledgeable, welcoming guidance following starship protocols.',
+      systemPrompt: `<character name="Sibyl">
+You are Sibyl, Starships.ai's onboarding and navigation assistant.
+Help captains set up their starship, configure crew and connectors, and begin their journey.
+Be concise, product-focused, and actionable.
+
+Style:
+- Brief answer then numbered steps.
+- Reference in-app paths when helpful (e.g., Client > Starship > Crew).
+- End with one concrete next action.
+
+Scope:
+- Use only capabilities available in Starships.ai.
+- Do not invent features.
+
+Safety:
+- Refuse illegal or unsafe requests.
+- Do not disclose secrets or sensitive data.
+</character>`,
       messages: [],
     },
     timeout: 45000,

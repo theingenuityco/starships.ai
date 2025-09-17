@@ -816,8 +816,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Success',
             description: 'Check if API call succeeded',
             parameters: {
-              condition:
-                '{{ $exists(outputs[nodeRef = "risky-api"]) and $not(outputs[nodeRef = "risky-api"].items[0].error) ? "true" : "false" }}',
+              condition: '{{ $not($exists(outputs[nodeRef = "risky-api"].items[0].error)) ? "true" : "false" }}',
             },
           },
           {

@@ -4,7 +4,7 @@
  * Base interface and abstract class for workflow node handlers with lazy loading support
  */
 
-import { Execution, NodeParameters, ValidationResult, ExecutionItem } from '@/types';
+import { NodeParameters, ValidationResult, ExecutionItem } from '@/types';
 import { EventCallback } from '@/types/events';
 
 /**
@@ -21,7 +21,6 @@ export interface NodeHandler {
 
 export interface NodeHandlerOptions {
   eventCallback?: EventCallback;
-  execution?: Execution;
 }
 /**
  * Constructor type for handlers that accept the full node object

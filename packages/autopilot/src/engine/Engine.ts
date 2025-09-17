@@ -6,7 +6,8 @@
  */
 
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
-import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
+import { Blueprint, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
+import { Execution } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
 import { Eval } from './Eval';
@@ -38,7 +39,7 @@ export class Engine {
     this.eval = new Eval();
   }
 
-  async createHandler(node: Node, resolvedParams: NodeParameters, execution: Execution): Promise<NodeHandler> {
+  async createHandler(node: Node, resolvedParams: NodeParameters): Promise<NodeHandler> {
     const loader = HANDLER_MAP[node.type];
     if (!loader) {
       throw new Error(`No handler available for node type: ${node.type}`);
@@ -47,7 +48,6 @@ export class Engine {
     const handlerConstructor = await loader();
     const handlerOptions = {
       eventCallback: this.eventCallback,
-      execution: execution,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);
@@ -81,8 +81,7 @@ export class Engine {
 
   private async createVirtualHandler(type: 'transform' | 'mutate' | 'conditional', parameters: NodeParameters): Promise<NodeHandler> {
     const virtualNode = this.createVirtualNode(type, `inline_${type}`, parameters);
-    const dummyExecution = ExecutionItemUtils.createExecution();
-    return await this.createHandler(virtualNode, parameters, dummyExecution);
+    return await this.createHandler(virtualNode, parameters);
   }
 
   private async executeInlineTransform(transforms: TransformOperation[], inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
@@ -236,7 +235,7 @@ export class Engine {
       const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, execution, inputData)) as NodeParameters;
 
       // Create and validate handler
-      const handler = await this.createHandler(currentNode, resolvedParams, execution);
+      const handler = await this.createHandler(currentNode, resolvedParams);
       const validation = handler.validate();
       if (!validation.valid) {
         const errorMessages = validation.errors?.map((e) => `${currentNode.ref}: ${e.message}`) || ['Validation failed'];

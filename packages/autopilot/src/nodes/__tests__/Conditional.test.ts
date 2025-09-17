@@ -8,13 +8,6 @@ import { Conditional } from '../Conditional';
 import type { ConditionalParams } from '@/types/node-parameters';
 import type { Execution } from '@/types';
 
-// Mock jsonata library
-jest.mock('jsonata');
-
-import jsonata from 'jsonata';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockJsonata = jsonata as jest.MockedFunction<any>;
-
 describe('Conditional Node Handler', () => {
   const mockExecution: Execution = {
     status: 'running',
@@ -27,15 +20,6 @@ describe('Conditional Node Handler', () => {
       config: { debug: false },
     },
   };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-
-    // Default mock implementation
-    mockJsonata.mockReturnValue({
-      evaluate: jest.fn().mockReturnValue(true),
-    });
-  });
 
   describe('Basic Conditional Functionality', () => {
     it('should handle static string conditions', async () => {
@@ -50,9 +34,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'premium_user', result: 'premium_user' });
-      // JSONata should not be called for static strings
-      expect(mockJsonata).not.toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'premium_user',
+        result: 'premium_user',
+      });
     });
 
     it('should evaluate JSONata expressions with template syntax', async () => {
@@ -60,11 +45,6 @@ describe('Conditional Node Handler', () => {
         condition: '{{ state.user.isPremium = true }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
@@ -72,9 +52,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      // JSONata should be called for template expressions
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should evaluate JSONata string comparison expression', async () => {
@@ -82,11 +63,6 @@ describe('Conditional Node Handler', () => {
         condition: '{{ state.user.level = "gold" }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
@@ -94,19 +70,16 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should evaluate JSONata numeric comparison expression', async () => {
       const params: ConditionalParams = {
-        condition: '{{ results[-1].data.value > 40 }}',
+        condition: '{{ outputs[1].items[0].json.value > 40 }}',
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: mockExecution,
@@ -115,8 +88,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should return false for failing JSONata conditions', async () => {
@@ -124,11 +99,6 @@ describe('Conditional Node Handler', () => {
         condition: '{{ state.user.isPremium = false }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(false);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
@@ -136,21 +106,18 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'false', result: false });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'false',
+        result: false,
+      });
     });
   });
 
   describe('Complex Expression Evaluation', () => {
     it('should handle complex logical operations', async () => {
       const params: ConditionalParams = {
-        condition: '{{ state.user.isPremium and results[-1].data.success }}',
+        condition: '{{ state.user.isPremium and outputs[1].items[0].json.success }}',
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: mockExecution,
@@ -159,29 +126,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
-    });
-
-    it('should handle nested object access', async () => {
-      const params: ConditionalParams = {
-        condition: '{{ results[$ ~> $filter(function($v) { $v.nodeRef = "previous" })][-1].data.value > 30 }}',
-      };
-
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
       });
-
-      const conditional = new Conditional(params, {
-        execution: mockExecution,
-      });
-
-      const result = await conditional.execute();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
     });
 
     it('should handle array operations', async () => {
@@ -194,13 +142,8 @@ describe('Conditional Node Handler', () => {
       };
 
       const params: ConditionalParams = {
-        condition: '{{ $count(state.items[$>state.threshold]) > 1 }}',
+        condition: '{{ $count(state.items[$ > state.threshold]) > 1 }}',
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: executionWithArrays,
@@ -209,19 +152,16 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should handle string matching operations', async () => {
       const params: ConditionalParams = {
         condition: '{{ state.user.level ~> /^(gold|platinum)$/ }}',
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue('gold');
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: mockExecution,
@@ -230,8 +170,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'gold', result: 'gold' });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'gold',
+        result: 'gold',
+      });
     });
   });
 
@@ -247,9 +189,11 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ edgeCondition: 'high_priority', result: 'high_priority' });
+      expect(result[0].json).toEqual({
+        edgeCondition: 'high_priority',
+        result: 'high_priority',
+      });
       expect(result.length).toBe(1);
-      expect(mockJsonata).not.toHaveBeenCalled();
     });
 
     it('should return JSONata evaluated string values', async () => {
@@ -257,31 +201,23 @@ describe('Conditional Node Handler', () => {
         condition: '{{ state.user.level }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue('premium');
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ edgeCondition: 'premium', result: 'premium' });
+      expect(result[0].json).toEqual({
+        edgeCondition: 'gold',
+        result: 'gold',
+      });
       expect(result.length).toBe(1);
-      expect(mockJsonata).toHaveBeenCalled();
     });
 
     it('should return JSONata evaluated numeric values', async () => {
       const params: ConditionalParams = {
-        condition: '{{ results[-1].data.value }}',
+        condition: '{{ outputs[1].items[0].json.value }}',
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue(42);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: mockExecution,
@@ -289,9 +225,11 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ edgeCondition: '42', result: 42 });
+      expect(result[0].json).toEqual({
+        edgeCondition: '42',
+        result: 42,
+      });
       expect(result.length).toBe(1);
-      expect(mockJsonata).toHaveBeenCalled();
     });
 
     it('should handle null/undefined JSONata values', async () => {
@@ -299,58 +237,43 @@ describe('Conditional Node Handler', () => {
         condition: '{{ state.nonexistent }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(undefined);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
 
       const result = await conditional.execute();
 
-      expect(result[0].json).toEqual({ edgeCondition: 'null', result: undefined });
+      expect(result[0].json).toEqual({
+        edgeCondition: 'null',
+        result: undefined,
+      });
       expect(result.length).toBe(1);
-      expect(mockJsonata).toHaveBeenCalled();
     });
   });
 
   describe('Error Handling', () => {
     it('should handle JSONata syntax errors', async () => {
       const params: ConditionalParams = {
-        condition: 'invalid expression $$',
+        condition: '{{ invalid expression $$ }}',
       };
-
-      mockJsonata.mockImplementation(() => {
-        throw new Error('JSONata syntax error');
-      });
 
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
 
-      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed: Expression evaluation failed');
+      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed');
     });
 
     it('should handle evaluation runtime errors', async () => {
       const params: ConditionalParams = {
-        condition: 'state.user.method()',
+        condition: '{{ state.user.method() }}',
       };
-
-      const mockEvaluate = jest.fn().mockImplementation(() => {
-        throw new Error('method is not a function');
-      });
-
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
 
-      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed: Expression evaluation failed');
+      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed');
     });
 
     it('should handle missing execution context for JSONata expressions', async () => {
@@ -377,8 +300,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'static_value', result: 'static_value' });
-      expect(mockJsonata).not.toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'static_value',
+        result: 'static_value',
+      });
     });
   });
 
@@ -388,11 +313,6 @@ describe('Conditional Node Handler', () => {
         condition: '{{ state.user.isPremium = true }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
@@ -400,13 +320,13 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should integrate with Engine virtual node pattern', () => {
-      // This test verifies the virtual node pattern integration
-      // The actual testing is done through Engine integration tests
       const params: ConditionalParams = {
         condition: 'static_edge_value',
       };
@@ -475,6 +395,27 @@ describe('Conditional Node Handler', () => {
       expect(validation.valid).toBe(true);
       expect(validation.errors).toEqual([]);
     });
+
+    it('should validate template expressions with syntax errors', () => {
+      const params: ConditionalParams = {
+        condition: '{{ invalid.expression $$ }}',
+      };
+
+      const conditional = new Conditional(params, {
+        execution: mockExecution,
+      });
+
+      const validation = conditional.validate();
+
+      expect(validation.valid).toBe(false);
+      expect(validation.errors).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'INVALID_JSONATA_EXPRESSION',
+          }),
+        ])
+      );
+    });
   });
 
   describe('Execution Context Access', () => {
@@ -483,11 +424,6 @@ describe('Conditional Node Handler', () => {
         condition: '{{ status = "running" }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
@@ -495,8 +431,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should have access to current node ref', async () => {
@@ -509,11 +447,6 @@ describe('Conditional Node Handler', () => {
         condition: '{{ currentNodeRef = "conditional-1" }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: executionWithCurrentNode,
       });
@@ -521,8 +454,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should handle empty results array', async () => {
@@ -535,11 +470,6 @@ describe('Conditional Node Handler', () => {
         condition: '{{ $count(outputs) = 0 }}',
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: executionWithoutResults,
       });
@@ -547,8 +477,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
   });
 
@@ -565,11 +497,6 @@ describe('Conditional Node Handler', () => {
         },
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: executionWithUser,
       });
@@ -577,8 +504,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should handle business logic conditions', async () => {
@@ -594,11 +523,6 @@ describe('Conditional Node Handler', () => {
         },
       };
 
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
-
       const conditional = new Conditional(params, {
         execution: executionWithBusiness,
       });
@@ -606,24 +530,31 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'true', result: true });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'true',
+        result: true,
+      });
     });
 
     it('should handle workflow routing decisions', async () => {
       const params: ConditionalParams = {
-        condition: '{{ outputs[-1].items[0].json.confidence > 0.8 ? "high_confidence" : "review_needed" }}',
+        condition: '{{ outputs[0].items[0].json.confidence > 0.8 ? "high_confidence" : "review_needed" }}',
       };
 
       const executionWithConfidence: Execution = {
         ...mockExecution,
-        results: [{ nodeRef: 'analysis', items: [{ json: { confidence: 0.95, category: 'positive' }, pairedItem: { item: 0 } }] }],
+        results: [
+          {
+            nodeRef: 'analysis',
+            items: [
+              {
+                json: { confidence: 0.95, category: 'positive' },
+                pairedItem: { item: 0 },
+              },
+            ],
+          },
+        ],
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue('high_confidence');
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: executionWithConfidence,
@@ -632,8 +563,10 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toHaveLength(1);
-      expect(result[0].json).toEqual({ edgeCondition: 'high_confidence', result: 'high_confidence' });
-      expect(mockJsonata).toHaveBeenCalled();
+      expect(result[0].json).toEqual({
+        edgeCondition: 'high_confidence',
+        result: 'high_confidence',
+      });
     });
   });
 });

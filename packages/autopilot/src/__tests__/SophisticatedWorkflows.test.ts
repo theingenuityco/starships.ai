@@ -442,7 +442,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Validation',
             description: 'Check if validation passed',
             parameters: {
-              condition: 'results[-1].data.valid = true',
+              condition: '{{ outputs[-1].items[0].json.valid = true }}',
             },
           },
           {
@@ -508,7 +508,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Final Check',
             description: 'Check if everything succeeded',
             parameters: {
-              condition: 'results[-1].data.status = "completed"',
+              condition: '{{ outputs[-1].items[0].json.status = "completed" }}',
             },
           },
           {
@@ -676,7 +676,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Analysis Decision',
             description: 'Route based on analysis',
             parameters: {
-              condition: 'results[-1].data[1].data.choices[0].message.content ~> /positive/',
+              condition: '{{ outputs[-1].items[0].json.choices[0].message.content ~> /positive/ }}',
             },
           },
           {
@@ -816,7 +816,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Success',
             description: 'Check if API call succeeded',
             parameters: {
-              condition: '{{ $exists($lastOutputOf("risky-api")) ? "true" : "false" }}',
+              condition: '{{ $exists(outputs[nodeRef = "risky-api"]) ? "true" : "false" }}',
             },
           },
           {
@@ -845,7 +845,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Retry',
             description: 'Check if retry succeeded',
             parameters: {
-              condition: '{{ $exists($lastOutputOf("retry-api")) ? "true" : "false" }}',
+              condition: '{{ $exists(outputs[nodeRef = "retry-api"]) ? "true" : "false" }}',
             },
           },
           {

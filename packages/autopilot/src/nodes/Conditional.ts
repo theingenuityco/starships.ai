@@ -37,7 +37,11 @@ export class Conditional implements NodeHandler {
    * Execute the conditional expression with optional input items
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    if (!this.params.condition) {
+    if (
+      this.params.condition === undefined ||
+      this.params.condition === null ||
+      (typeof this.params.condition === 'string' && this.params.condition.trim() === '')
+    ) {
       throw new Error('Conditional node requires a condition expression');
     }
 
@@ -119,7 +123,11 @@ export class Conditional implements NodeHandler {
     const errors: ValidationError[] = [];
 
     // Required fields - handle both string and resolved values
-    if (!this.params.condition || (typeof this.params.condition === 'string' && this.params.condition.trim() === '')) {
+    if (
+      this.params.condition === undefined ||
+      this.params.condition === null ||
+      (typeof this.params.condition === 'string' && this.params.condition.trim() === '')
+    ) {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
         message: 'Condition expression is required',
@@ -138,6 +146,7 @@ export class Conditional implements NodeHandler {
       }
       // Static strings don't need validation
     }
+    // Non-string values (already resolved) are considered valid
 
     return {
       valid: errors.length === 0,

@@ -145,7 +145,7 @@ describe('State Management Features', () => {
             name: 'Check User Tier',
             description: 'Determine user privileges',
             parameters: {
-              condition: 'state.userTier = "premium" and state.requestCount > 3',
+              condition: '{{ state.userTier = "premium" and state.requestCount > 3 }}',
               mutations: [
                 { operation: 'add', path: '/state/conditionEvaluated', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/isPremiumUser', value: '{{ state.userTier = "premium" }}' },
@@ -345,11 +345,12 @@ describe('State Management Features', () => {
                 // Add new session data
                 { operation: 'add', path: '/state/userSessions/-', value: { id: '{{ $random() }}', timestamp: '{{ $now() }}' } },
 
-                // Calculate success rate
+                // Calculate success rate (after incrementing requests)
                 {
                   operation: 'replace',
                   path: '/state/metrics/successRate',
-                  value: '{{ state.metrics.requests > 0 ? (state.metrics.requests - state.metrics.errors) / state.metrics.requests : 0 }}',
+                  value:
+                    '{{ (state.metrics.requests + 1) > 0 ? ((state.metrics.requests + 1) - state.metrics.errors) / (state.metrics.requests + 1) : 0 }}',
                 },
 
                 // Add to execution history

@@ -147,14 +147,11 @@ export class ConversationService {
     // Get conversation messages from database
     const messages = await this.getConversationMessages(data.conversationId);
 
-    const startTime = Date.now();
-
     try {
       // Create agent instance with enhanced options
       const agent = new Agent(agentModel, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
       });
-      messages.forEach((message) => agent.addMessageToMemory(message));
 
       // Execute agent with streaming-enabled execution
       await agent.execute();

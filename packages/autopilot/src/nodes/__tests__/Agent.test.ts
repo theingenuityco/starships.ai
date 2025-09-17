@@ -151,25 +151,6 @@ describe('Agent Node Handler', () => {
       const agent = new Agent(params);
       expect(agent).toBeDefined();
     });
-
-    it('should handle memory operations', async () => {
-      const params: AgentParams = {
-        name: 'Interactive Agent',
-        model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {
-          systemPrompt: 'You are a helpful assistant.',
-          messages: [],
-        },
-      };
-
-      const agent = new Agent(params);
-
-      // Test memory operations
-      await agent.addMessageToMemory({ role: 'user', content: 'Hello' });
-      await agent.addMessageToMemory({ role: 'assistant', content: 'Hi there!' });
-
-      expect(agent).toBeDefined();
-    });
   });
 
   describe('Validation', () => {
@@ -194,26 +175,6 @@ describe('Agent Node Handler', () => {
         expect.objectContaining({
           code: 'MISSING_REQUIRED_FIELD',
           message: 'Agent model is required',
-        })
-      );
-    });
-
-    it('should validate memory state requirement', () => {
-      const params = {
-        name: 'Test Agent',
-        model: 'anthropic/claude-3.5-sonnet',
-        // Missing memoryState
-        blueprint: createMockBlueprint(),
-      } as AgentParams;
-
-      const agent = new Agent(params);
-      const validation = agent.validate();
-
-      expect(validation.valid).toBe(false);
-      expect(validation.errors).toContainEqual(
-        expect.objectContaining({
-          code: 'MISSING_REQUIRED_FIELD',
-          message: 'Agent memory is required',
         })
       );
     });

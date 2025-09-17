@@ -582,8 +582,8 @@ describe('Sophisticated Workflows', () => {
           statusText: 'OK',
           url: 'https://api.example.com/success',
           headers: createMockHeaders(),
-          json: async () => ({ success: true, message: 'validation passed' }),
-          text: async () => '{"success":true,"message":"validation passed"}',
+          json: async () => ({ success: true, message: 'validation passed', status: 'completed' }),
+          text: async () => '{"success":true,"message":"validation passed","status":"completed"}',
         })
         .mockResolvedValueOnce({
           // process

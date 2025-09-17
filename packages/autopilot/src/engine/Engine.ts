@@ -72,7 +72,7 @@ export class Engine {
   /**
    * Execute a blueprint workflow from start to completion
    */
-  async executeBlueprint(blueprint: Blueprint, execution: Execution, inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
+  async executeBlueprint(blueprint: Blueprint, execution: Execution): Promise<ExecutionItem[]> {
     try {
       // Validate workflow before execution
       await this.validateForExecution(blueprint);
@@ -89,16 +89,19 @@ export class Engine {
       // Update execution state
       execution.status = 'running';
 
+      // Get initial input items from execution if they exist
+      const initialInputItems = execution.nodeOutputs['__initial__'];
+
       // Execute the workflow graph node by node
       let currentNode = startNode;
-      let currentInputItems = inputItems;
+      let currentInputItems: ExecutionItem[] | undefined = initialInputItems;
 
       while (currentNode && execution.status === 'running') {
         try {
           // Update current node
           execution.currentNodeRef = currentNode.ref;
 
-          // Get input items for current node (use provided input for start node, or from previous outputs)
+          // Get input items for current node (use initial input for start node, or from previous outputs)
           const nodeInputItems =
             currentNode.type === 'start' && currentInputItems ? currentInputItems : this.getNodeInput(blueprint, execution, currentNode);
 
@@ -128,7 +131,7 @@ export class Engine {
           }
 
           currentNode = nextNode;
-          currentInputItems = undefined; // Only use provided input for start node
+          currentInputItems = undefined; // Only use initial input for start node
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
 

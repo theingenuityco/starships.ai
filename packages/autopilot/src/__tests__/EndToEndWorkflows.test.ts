@@ -79,7 +79,7 @@ describe('End-to-End Workflow Execution', () => {
       const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
 
-      await engine.executeBlueprint(blueprint, execution);
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('Network timeout');
 
       expect(execution.status).toBe('failed');
       expect(execution.error).toBeDefined();
@@ -115,7 +115,7 @@ describe('End-to-End Workflow Execution', () => {
       const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
 
-      await engine.executeBlueprint(blueprint, execution);
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('LLM API unavailable');
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toContain('LLM API unavailable');
@@ -150,7 +150,7 @@ describe('End-to-End Workflow Execution', () => {
       const engine = new Engine();
       const execution = ExecutionItemUtils.createExecution();
 
-      await engine.executeBlueprint(blueprint, execution);
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('OpenRouter API key is required');
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toContain('OpenRouter API key is required');
@@ -458,7 +458,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Content Decision',
             description: 'Route based on analysis',
             parameters: {
-              condition: 'results[-1].data.choices[0].message.content ~> /positive/i ? "approve" : "review"',
+              condition: 'results[-1].items[0].json.choices[0].message.content ~> /positive/i ? "approve" : "review"',
             },
           },
 
@@ -539,7 +539,7 @@ describe('End-to-End Workflow Execution', () => {
                 .mockResolvedValueOnce({
                   done: false,
                   value: new TextEncoder().encode(
-                    'data: {"id":"test-123","object":"chat.completion.chunk","created":1234567890,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"delta":{"content":"POSITIVE sentiment detected - product review with enthusiastic tone"},"finish_reason":null}]}\n\n'
+                    'data: {"id":"test-123","object":"chat.completion.chunk","created":1234567890,"model":"anthropic/claude-3.5-sonnet","choices":[{"index":0,"delta":{"content":"positive sentiment detected - product review with enthusiastic tone"},"finish_reason":null}]}\n\n'
                   ),
                 })
                 .mockResolvedValueOnce({
@@ -603,7 +603,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Validate Data',
             description: 'Check data quality',
             parameters: {
-              condition: 'results[nodeRef = "extract-data"].data ? "true" : "false"',
+              condition: 'results[nodeRef = "extract-data"].items[0].json ? "true" : "false"',
             },
           },
 

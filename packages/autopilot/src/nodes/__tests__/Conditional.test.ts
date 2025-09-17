@@ -142,7 +142,7 @@ describe('Conditional Node Handler', () => {
       };
 
       const params: ConditionalParams = {
-        condition: '{{ $count(state.items[$ > state.threshold]) > 1 }}',
+        condition: '{{ $count($filter(state.items, function($v) { $v > state.threshold })) > 1 }}',
       };
 
       const conditional = new Conditional(params, {

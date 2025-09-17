@@ -105,7 +105,9 @@ export class Mutate implements NodeHandler {
         }
 
         // Convert single transform to JSON Patch operation with current state
-        const patchOperations = await this.convertToJsonPatchOperations([transform], execution);
+        // Force fresh evaluation by creating a new Eval instance each time
+        const freshEval = new Eval();
+        const patchOperations = await this.convertSingleTransformToJsonPatch(transform, execution, freshEval);
 
         // Apply patch to a wrapper object to handle the root state correctly
         const stateWrapper = { state: execution.state };
@@ -154,13 +156,91 @@ export class Mutate implements NodeHandler {
   }
 
   /**
-   * Convert TransformOperation to JSON Patch Operation with template resolution
+   * Convert single transform to JSON Patch Operation with fresh evaluation
+   */
+  private async convertSingleTransformToJsonPatch(
+    transform: TransformOperation,
+    execution: Execution,
+    evalInstance: Eval
+  ): Promise<Operation[]> {
+    // Resolve template expressions in the value using fresh evaluation
+    let resolvedValue = transform.value;
+    if (transform.value !== undefined) {
+      resolvedValue = await evalInstance.resolveTemplates(transform.value, execution);
+    }
+
+    // Resolve template expressions in the from path (for copy/move operations)
+    let resolvedFrom = transform.from;
+    if (transform.from !== undefined) {
+      resolvedFrom = (await evalInstance.resolveTemplates(transform.from, execution)) as string;
+    }
+
+    // Create JSON Patch operation based on operation type
+    let operation: Operation;
+
+    switch (transform.operation) {
+      case 'add':
+        operation = {
+          op: 'add',
+          path: transform.path,
+          value: resolvedValue,
+        };
+        break;
+      case 'replace':
+        operation = {
+          op: 'replace',
+          path: transform.path,
+          value: resolvedValue,
+        };
+        break;
+      case 'test':
+        operation = {
+          op: 'test',
+          path: transform.path,
+          value: resolvedValue,
+        };
+        break;
+      case 'remove':
+        operation = {
+          op: 'remove',
+          path: transform.path,
+        };
+        break;
+      case 'copy':
+        if (!resolvedFrom) {
+          throw new Error(`Copy operation requires "from" path for transform at ${transform.path}`);
+        }
+        operation = {
+          op: 'copy',
+          path: transform.path,
+          from: resolvedFrom,
+        };
+        break;
+      case 'move':
+        if (!resolvedFrom) {
+          throw new Error(`Move operation requires "from" path for transform at ${transform.path}`);
+        }
+        operation = {
+          op: 'move',
+          path: transform.path,
+          from: resolvedFrom,
+        };
+        break;
+      default:
+        throw new Error(`Unsupported transform operation: ${transform.operation}`);
+    }
+
+    return [operation];
+  }
+
+  /**
+   * Convert TransformOperation to JSON Patch Operation with template resolution (batch processing)
    */
   private async convertToJsonPatchOperations(transforms: TransformOperation[], execution: Execution): Promise<Operation[]> {
     const operations: Operation[] = [];
 
     for (const transform of transforms) {
-      // Resolve template expressions in the value
+      // Resolve template expressions in the value using the current state
       let resolvedValue = transform.value;
       if (transform.value !== undefined) {
         resolvedValue = await this.eval.resolveTemplates(transform.value, execution);

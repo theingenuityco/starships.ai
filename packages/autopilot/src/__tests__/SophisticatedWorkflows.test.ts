@@ -442,7 +442,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Check Validation',
             description: 'Check if validation passed',
             parameters: {
-              condition: '{{ outputs[-1].items[0].json.valid = true }}',
+              condition: '{{ outputs[-1].items[0].json.body.valid }}',
             },
           },
           {
@@ -508,7 +508,7 @@ describe('Sophisticated Workflows', () => {
             name: 'Final Check',
             description: 'Check if everything succeeded',
             parameters: {
-              condition: '{{ inputs[0].json.status = "completed" }}',
+              condition: '{{ inputs[0].json[4].items[0].json.body.success }}',
             },
           },
           {

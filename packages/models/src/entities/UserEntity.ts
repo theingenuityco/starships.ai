@@ -7,7 +7,7 @@
 
 import { Transformers } from '@/helpers/serializer';
 import type { UserModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance, Transform } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
 
 /**
@@ -144,26 +144,6 @@ export class UserEntity implements UserModel {
   stripeCustomerId?: string;
 
   /**
-   * Static factory method for creating UserEntity from raw data
-   */
-  static deserialize(data: Record<string, unknown>): UserEntity {
-    return plainToInstance(UserEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Instance method for converting entity to plain object for storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
    */
@@ -264,9 +244,8 @@ export class UserEntity implements UserModel {
    * Helper method to get safe user data (without sensitive fields)
    */
   toSafeObject(): Omit<UserModel, 'password'> {
-    const serialized = this.serialize();
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeData } = serialized;
+    const { password, ...safeData } = this;
     return safeData as Omit<UserModel, 'password'>;
   }
 

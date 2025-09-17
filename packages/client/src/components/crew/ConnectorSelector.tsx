@@ -83,7 +83,6 @@ export function ConnectorSelector({
 
   // Update API key status when connector instances change
   useEffect(() => {
-    console.log('[ConnectorSelector] API key status update triggered - instances:', connectorInstances.length)
     const newApiKeyStatus = new Map<string, ApiKeyStatusInfo>()
     connectorInstances.forEach(instance => {
       if (instance.templateId) {
@@ -91,7 +90,7 @@ export function ConnectorSelector({
         newApiKeyStatus.set(instance.templateId, keyStatus)
       }
     })
-    console.log('[ConnectorSelector] Setting API key status map with', newApiKeyStatus.size, 'entries')
+
     setApiKeyStatusMap(newApiKeyStatus)
   }, [connectorInstances])
 
@@ -179,7 +178,6 @@ export function ConnectorSelector({
     const isCurrentlySelected = isConnectorSelected(connector)
 
     // Log connector interaction for debugging
-    console.log('[ConnectorSelector] Toggling connector:', connector.name)
 
     try {
       setConnectingIds(prev => new Set(prev).add(connector.id))
@@ -224,13 +222,8 @@ export function ConnectorSelector({
     if (!currentConnectorForApiKeys) return
 
     try {
-      console.log('[ConnectorSelector] Submitting API keys for connector:', currentConnectorForApiKeys.name)
-      console.log('[ConnectorSelector] API keys provided:', Object.keys(apiKeys))
-
       // Build environment variables string for the connector configuration
       const environmentVariables = ConnectorApiKeyManager.buildEnvironmentString(currentConnectorForApiKeys)
-
-      console.log('[ConnectorSelector] Built environment variables:', environmentVariables)
 
       // Create enhanced connector option with API keys in the template env field
       // This is used for the UI display and template matching

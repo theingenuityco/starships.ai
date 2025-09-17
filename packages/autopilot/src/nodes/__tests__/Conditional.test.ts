@@ -40,7 +40,7 @@ describe('Conditional Node Handler', () => {
   describe('Basic Conditional Functionality', () => {
     it('should evaluate simple boolean expression', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.isPremium = true',
+        condition: 'state.user.isPremium = true',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -56,12 +56,24 @@ describe('Conditional Node Handler', () => {
 
       expect(result).toEqual({ result: true, condition: true });
       expect(mockJsonata).toHaveBeenCalledWith('state.user.isPremium = true');
-      expect(mockEvaluate).toHaveBeenCalledWith(mockExecution);
+      expect(mockEvaluate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: mockExecution.state,
+          results: mockExecution.results,
+          status: mockExecution.status,
+          currentNodeRef: mockExecution.currentNodeRef,
+          $nodeResult: expect.any(Function),
+          $lastResult: expect.any(Function),
+          $now: expect.any(Function),
+          $random: expect.any(Function),
+          $count: expect.any(Function),
+        })
+      );
     });
 
     it('should evaluate string comparison expression', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.level = "gold"',
+        condition: 'state.user.level = "gold"',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -81,7 +93,7 @@ describe('Conditional Node Handler', () => {
 
     it('should evaluate numeric comparison expression', async () => {
       const params: ConditionalParams = {
-        expression: 'results[-1].data.value > 40',
+        condition: 'results[-1].data.value > 40',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -101,7 +113,7 @@ describe('Conditional Node Handler', () => {
 
     it('should return false for failing conditions', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.isPremium = false',
+        condition: 'state.user.isPremium = false',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(false);
@@ -122,7 +134,7 @@ describe('Conditional Node Handler', () => {
   describe('Complex Expression Evaluation', () => {
     it('should handle complex logical operations', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.isPremium and results[-1].data.success',
+        condition: 'state.user.isPremium and results[-1].data.success',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -142,7 +154,7 @@ describe('Conditional Node Handler', () => {
 
     it('should handle nested object access', async () => {
       const params: ConditionalParams = {
-        expression: 'results[$ ~> $filter(function($v) { $v.nodeRef = "previous" })][-1].data.value > 30',
+        condition: 'results[$ ~> $filter(function($v) { $v.nodeRef = "previous" })][-1].data.value > 30',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -169,7 +181,7 @@ describe('Conditional Node Handler', () => {
       };
 
       const params: ConditionalParams = {
-        expression: '$count(state.items[$>state.threshold]) > 1',
+        condition: '$count(state.items[$>state.threshold]) > 1',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -184,12 +196,24 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toEqual({ result: true, condition: true });
-      expect(mockEvaluate).toHaveBeenCalledWith(executionWithArrays);
+      expect(mockEvaluate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: executionWithArrays.state,
+          results: executionWithArrays.results,
+          status: executionWithArrays.status,
+          currentNodeRef: executionWithArrays.currentNodeRef,
+          $nodeResult: expect.any(Function),
+          $lastResult: expect.any(Function),
+          $now: expect.any(Function),
+          $random: expect.any(Function),
+          $count: expect.any(Function),
+        })
+      );
     });
 
     it('should handle string matching operations', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.level ~> /^(gold|platinum)$/',
+        condition: 'state.user.level ~> /^(gold|platinum)$/',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue('gold');
@@ -210,7 +234,7 @@ describe('Conditional Node Handler', () => {
   describe('Return Value Types', () => {
     it('should return boolean values', async () => {
       const params: ConditionalParams = {
-        expression: 'true',
+        condition: 'true',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -231,7 +255,7 @@ describe('Conditional Node Handler', () => {
 
     it('should return string values', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.level',
+        condition: 'state.user.level',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue('premium');
@@ -252,7 +276,7 @@ describe('Conditional Node Handler', () => {
 
     it('should return numeric values', async () => {
       const params: ConditionalParams = {
-        expression: 'results[-1].data.value',
+        condition: 'results[-1].data.value',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(42);
@@ -273,7 +297,7 @@ describe('Conditional Node Handler', () => {
 
     it('should handle null/undefined values', async () => {
       const params: ConditionalParams = {
-        expression: 'state.nonexistent',
+        condition: 'state.nonexistent',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(undefined);
@@ -295,7 +319,7 @@ describe('Conditional Node Handler', () => {
   describe('Error Handling', () => {
     it('should handle JSONata syntax errors', async () => {
       const params: ConditionalParams = {
-        expression: 'invalid expression $$',
+        condition: 'invalid expression $$',
       };
 
       mockJsonata.mockImplementation(() => {
@@ -306,12 +330,12 @@ describe('Conditional Node Handler', () => {
         execution: mockExecution,
       });
 
-      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed: JSONata syntax error');
+      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed: Expression evaluation failed');
     });
 
     it('should handle evaluation runtime errors', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.method()',
+        condition: 'state.user.method()',
       };
 
       const mockEvaluate = jest.fn().mockImplementation(() => {
@@ -326,43 +350,28 @@ describe('Conditional Node Handler', () => {
         execution: mockExecution,
       });
 
-      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed: method is not a function');
+      await expect(conditional.execute()).rejects.toThrow('Conditional evaluation failed: Expression evaluation failed');
     });
 
     it('should handle missing execution context', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.isPremium',
+        condition: 'state.user.isPremium',
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue(undefined);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         // Missing execution context
       });
 
-      const result = await conditional.execute();
-
-      expect(result).toEqual({ result: undefined, condition: undefined });
-      expect(mockEvaluate).toHaveBeenCalledWith({
-        state: {},
-        results: [],
-        status: 'not_started',
-        currentNodeRef: undefined,
-      });
+      await expect(conditional.execute()).rejects.toThrow('Execution context is required for conditional evaluation');
     });
   });
 
-  describe('Timeout Handling', () => {
-    it('should respect custom timeout', async () => {
+  describe('Virtual Node Pattern', () => {
+    it('should work as standalone conditional node', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.isPremium',
-        timeout: 1000,
+        condition: 'state.user.isPremium = true',
       };
 
-      // Mock evaluation (timeout is not currently implemented in the Conditional class)
       const mockEvaluate = jest.fn().mockReturnValue(true);
       mockJsonata.mockReturnValue({
         evaluate: mockEvaluate,
@@ -375,34 +384,29 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toEqual({ result: true, condition: true });
-      expect(mockEvaluate).toHaveBeenCalledWith(mockExecution);
+      expect(mockJsonata).toHaveBeenCalledWith('state.user.isPremium = true');
     });
 
-    it('should use default timeout when not specified', async () => {
+    it('should integrate with Engine virtual node pattern', () => {
+      // This test verifies the virtual node pattern integration
+      // The actual testing is done through Engine integration tests
       const params: ConditionalParams = {
-        expression: 'state.user.isPremium',
+        condition: 'state.user.isPremium = true',
       };
-
-      const mockEvaluate = jest.fn().mockReturnValue(true);
-      mockJsonata.mockReturnValue({
-        evaluate: mockEvaluate,
-      });
 
       const conditional = new Conditional(params, {
         execution: mockExecution,
       });
 
-      const result = await conditional.execute();
-
-      expect(result).toEqual({ result: true, condition: true });
+      const validation = conditional.validate();
+      expect(validation.valid).toBe(true);
     });
   });
 
   describe('Validation', () => {
-    it('should validate required expression parameter', () => {
+    it('should validate required condition parameter', () => {
       const params = {
-        // Missing expression
-        timeout: 5000,
+        // Missing condition
       } as ConditionalParams;
 
       const conditional = new Conditional(params, {
@@ -415,15 +419,14 @@ describe('Conditional Node Handler', () => {
       expect(validation.errors).toContainEqual(
         expect.objectContaining({
           code: 'MISSING_REQUIRED_FIELD',
-          message: 'Expression is required',
+          message: 'Condition expression is required',
         })
       );
     });
 
-    it('should validate timeout parameter range', () => {
+    it('should validate empty condition parameter', () => {
       const params: ConditionalParams = {
-        expression: 'true',
-        timeout: -1000, // Invalid negative timeout
+        condition: '',
       };
 
       const conditional = new Conditional(params, {
@@ -435,16 +438,15 @@ describe('Conditional Node Handler', () => {
       expect(validation.valid).toBe(false);
       expect(validation.errors).toContainEqual(
         expect.objectContaining({
-          code: 'INVALID_PARAMETERS',
-          message: 'Timeout must be greater than 0',
+          code: 'MISSING_REQUIRED_FIELD',
+          message: 'Condition expression is required',
         })
       );
     });
 
     it('should pass validation with valid parameters', () => {
       const params: ConditionalParams = {
-        expression: 'state.user.isPremium = true',
-        timeout: 5000,
+        condition: 'state.user.isPremium = true',
       };
 
       const conditional = new Conditional(params, {
@@ -461,7 +463,7 @@ describe('Conditional Node Handler', () => {
   describe('Execution Context Access', () => {
     it('should have access to execution status', async () => {
       const params: ConditionalParams = {
-        expression: 'status = "running"',
+        condition: 'status = "running"',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -476,7 +478,19 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toEqual({ result: true, condition: true });
-      expect(mockEvaluate).toHaveBeenCalledWith(mockExecution);
+      expect(mockEvaluate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: mockExecution.state,
+          results: mockExecution.results,
+          status: mockExecution.status,
+          currentNodeRef: mockExecution.currentNodeRef,
+          $nodeResult: expect.any(Function),
+          $lastResult: expect.any(Function),
+          $now: expect.any(Function),
+          $random: expect.any(Function),
+          $count: expect.any(Function),
+        })
+      );
     });
 
     it('should have access to current node ref', async () => {
@@ -486,7 +500,7 @@ describe('Conditional Node Handler', () => {
       };
 
       const params: ConditionalParams = {
-        expression: 'currentNodeRef = "conditional-1"',
+        condition: 'currentNodeRef = "conditional-1"',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -501,7 +515,19 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toEqual({ result: true, condition: true });
-      expect(mockEvaluate).toHaveBeenCalledWith(executionWithCurrentNode);
+      expect(mockEvaluate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: executionWithCurrentNode.state,
+          results: executionWithCurrentNode.results,
+          status: executionWithCurrentNode.status,
+          currentNodeRef: executionWithCurrentNode.currentNodeRef,
+          $nodeResult: expect.any(Function),
+          $lastResult: expect.any(Function),
+          $now: expect.any(Function),
+          $random: expect.any(Function),
+          $count: expect.any(Function),
+        })
+      );
     });
 
     it('should handle empty results array', async () => {
@@ -511,7 +537,7 @@ describe('Conditional Node Handler', () => {
       };
 
       const params: ConditionalParams = {
-        expression: '$count(results) = 0',
+        condition: '$count(results) = 0',
       };
 
       const mockEvaluate = jest.fn().mockReturnValue(true);
@@ -526,14 +552,26 @@ describe('Conditional Node Handler', () => {
       const result = await conditional.execute();
 
       expect(result).toEqual({ result: true, condition: true });
-      expect(mockEvaluate).toHaveBeenCalledWith(executionWithoutResults);
+      expect(mockEvaluate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          state: executionWithoutResults.state,
+          results: executionWithoutResults.results,
+          status: executionWithoutResults.status,
+          currentNodeRef: executionWithoutResults.currentNodeRef,
+          $nodeResult: expect.any(Function),
+          $lastResult: expect.any(Function),
+          $now: expect.any(Function),
+          $random: expect.any(Function),
+          $count: expect.any(Function),
+        })
+      );
     });
   });
 
   describe('Real-world Conditional Scenarios', () => {
     it('should handle user permission checks', async () => {
       const params: ConditionalParams = {
-        expression: 'state.user.role in ["admin", "moderator"] and state.user.active = true',
+        condition: 'state.user.role in ["admin", "moderator"] and state.user.active = true',
       };
 
       const executionWithUser: Execution = {
@@ -559,7 +597,7 @@ describe('Conditional Node Handler', () => {
 
     it('should handle business logic conditions', async () => {
       const params: ConditionalParams = {
-        expression: 'state.order.total > 100 and state.customer.loyaltyPoints > 500',
+        condition: 'state.order.total > 100 and state.customer.loyaltyPoints > 500',
       };
 
       const executionWithBusiness: Execution = {
@@ -586,7 +624,7 @@ describe('Conditional Node Handler', () => {
 
     it('should handle workflow routing decisions', async () => {
       const params: ConditionalParams = {
-        expression: 'results[-1].data.confidence > 0.8 ? "high_confidence" : "review_needed"',
+        condition: 'results[-1].data.confidence > 0.8 ? "high_confidence" : "review_needed"',
       };
 
       const executionWithConfidence: Execution = {

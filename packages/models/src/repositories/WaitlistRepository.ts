@@ -143,8 +143,6 @@ export class WaitlistRepository extends BaseRepository {
         `CREATE INDEX waitlist_status IF NOT EXISTS
          FOR (w:Waitlist) ON (w.status)`
       );
-
-      console.log('Waitlist schema initialized successfully');
     } catch (error) {
       console.warn('Waitlist schema initialization warning:', error);
       // Don't throw - indexes might already exist
@@ -175,9 +173,6 @@ export class WaitlistRepository extends BaseRepository {
         const existing = await this.getByEmail(email);
         if (!existing) {
           await this.addApprovedEmail(email, notes);
-          console.log(`Added approved email: ${email}`);
-        } else {
-          console.log(`Email already exists: ${email}`);
         }
       } catch (error) {
         console.error(`Failed to add email ${email}:`, error);

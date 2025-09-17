@@ -1,21 +1,23 @@
 /**
  * Conditional Class
  *
- * Evaluates JSONata expressions to determine workflow branching
+ * Evaluates JSONata expressions to determine workflow branching.
+ * Works as both standalone node and embedded parameter in other nodes.
  */
 
-import jsonata from 'jsonata';
 import { NodeHandler } from '@/types/node-handler';
 import { ConditionalParams, ValidationResult, ValidationError, NodeHandlerOptions } from '@/types';
+import { Eval } from '@/engine/Eval';
 
 export interface ConditionalResult {
   result: unknown;
-  condition: string | boolean | number | undefined;
+  condition: string | boolean | number | null | undefined;
 }
 
 export class Conditional implements NodeHandler {
   private params: ConditionalParams;
   private options?: NodeHandlerOptions;
+  private eval = new Eval();
 
   constructor(params: ConditionalParams, options?: NodeHandlerOptions) {
     this.params = params;
@@ -26,28 +28,21 @@ export class Conditional implements NodeHandler {
    * Execute the conditional expression
    */
   async execute(): Promise<ConditionalResult> {
-    console.log(`Executing conditional: ${this.params.expression}`);
+    if (!this.params.condition) {
+      throw new Error('Conditional node requires a condition expression');
+    }
 
     try {
-      // Create JSONata expression
-      const expression = jsonata(this.params.expression);
+      // Ensure we have execution context
+      if (!this.options?.execution) {
+        throw new Error('Execution context is required for conditional evaluation');
+      }
 
-      // Get execution state for JSONata evaluation
-      const executionContext = {
-        // Include current execution state
-        state: this.options?.execution?.state || {},
-        // Include previous node results for reference
-        results: this.options?.execution?.results || [],
-        // Include execution status and metadata
-        status: this.options?.execution?.status || 'not_started',
-        currentNodeRef: this.options?.execution?.currentNodeRef,
-      };
-
-      // Evaluate expression against current execution context
-      const result = await expression.evaluate(executionContext);
+      // Evaluate expression using centralized Eval class
+      const result = await this.eval.evaluateExpression(this.params.condition, this.eval.buildContext(this.options.execution));
 
       // Convert result to boolean or string condition
-      let condition: string | boolean | number | undefined;
+      let condition: string | boolean | number | null | undefined;
       if (typeof result === 'boolean') {
         condition = result;
       } else if (typeof result === 'string') {
@@ -76,31 +71,19 @@ export class Conditional implements NodeHandler {
     const errors: ValidationError[] = [];
 
     // Required fields
-    if (!this.params.expression || this.params.expression.trim() === '') {
+    if (!this.params.condition || this.params.condition.trim() === '') {
       errors.push({
         code: 'MISSING_REQUIRED_FIELD',
-        message: 'Expression is required',
+        message: 'Condition expression is required',
       });
     }
 
     // Validate JSONata expression syntax
-    if (this.params.expression) {
-      try {
-        jsonata(this.params.expression);
-      } catch (error) {
-        errors.push({
-          code: 'INVALID_JSONATA_EXPRESSION',
-          message: `Invalid JSONata expression: ${error instanceof Error ? error.message : 'Syntax error'}`,
-        });
+    if (this.params.condition) {
+      const validation = this.eval.validateExpression(this.params.condition);
+      if (!validation.valid) {
+        errors.push(...(validation.errors || []));
       }
-    }
-
-    // Timeout validation
-    if (this.params.timeout !== undefined && this.params.timeout <= 0) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: 'Timeout must be greater than 0',
-      });
     }
 
     return {

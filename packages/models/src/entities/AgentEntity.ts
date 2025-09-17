@@ -9,7 +9,7 @@ import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import { AgentMemoryState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
-import { Expose, instanceToPlain, plainToInstance } from 'class-transformer';
+import { Expose } from 'class-transformer';
 import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 export class AgentEntity implements AgentModel {
@@ -78,26 +78,6 @@ export class AgentEntity implements AgentModel {
   @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
-
-  /**
-   * Static factory method for creating AgentEntity from raw data
-   */
-  static deserialize(data: Record<string, unknown>): AgentEntity {
-    return plainToInstance(AgentEntity, data, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
-
-  /**
-   * Instance method for converting entity to plain object for storage
-   */
-  serialize(): Record<string, unknown> {
-    return instanceToPlain(this, {
-      strategy: 'excludeAll',
-      excludeExtraneousValues: true,
-    });
-  }
 
   /**
    * Simple validation function using class-validator

@@ -6,27 +6,14 @@ import { getConnection } from '@/helpers/database';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { ConflictError, DatabaseError, NotFoundError } from '@starships/errors';
 
-// Mock the database connection
+// Mock the database connection only
 jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(),
-  convertNeo4jIntsInObject: jest.fn((obj) => obj),
-  convertNeo4jIntsInArray: jest.fn((arr) => arr),
 }));
 
-// Mock AgentEntity with proper static methods
-jest.mock('../../entities/AgentEntity', () => ({
-  AgentEntity: {
-    validate: jest.fn().mockResolvedValue(undefined),
-    deserialize: jest.fn().mockImplementation((data) => ({
-      ...data,
-      serialize: jest.fn().mockReturnValue(data),
-    })),
-  },
-}));
-
-// Mock uuid
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'test-uuid-1234'),
+// Mock nanoid for predictable ID generation
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'test-nanoid-1234'),
 }));
 
 describe('AgentRepository', () => {
@@ -134,7 +121,7 @@ describe('AgentRepository', () => {
 
       it('should create agent successfully', async () => {
         const mockCreatedAgent = {
-          id: 'test-uuid-1234',
+          id: 'test-nanoid-1234',
           name: 'Test Agent',
           description: 'Test Description',
           model: 'gpt-4',
@@ -143,8 +130,8 @@ describe('AgentRepository', () => {
           timeout: 30000,
           memoryState: {},
           blueprint: { type: 'test', nodes: [], edges: [] },
-          createdAt: expect.any(String),
-          updatedAt: expect.any(String),
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
         };
 
         // Mock createEntityWithAutoId call
@@ -160,12 +147,12 @@ describe('AgentRepository', () => {
           expect.objectContaining({
             props: expect.objectContaining({
               name: 'Test Agent',
-              memoryState: {},
-              blueprint: { type: 'test', nodes: [], edges: [] },
+              memoryState: '{}',
+              blueprint: '{"type":"test","nodes":[],"edges":[]}',
             }),
           })
         );
-        expect(result.id).toBe('test-uuid-1234');
+        expect(result.id).toBe('test-nanoid-1234');
         expect(result.name).toBe('Test Agent');
       });
 
@@ -183,7 +170,7 @@ describe('AgentRepository', () => {
 
       it('should create Neo4j relationship', async () => {
         const mockCreatedAgent = {
-          id: 'test-uuid-1234',
+          id: 'test-nanoid-1234',
           name: 'Test Agent',
           description: 'Test Description',
           model: 'gpt-4',
@@ -192,8 +179,8 @@ describe('AgentRepository', () => {
           timeout: 30000,
           memoryState: {},
           blueprint: { type: 'test', nodes: [], edges: [] },
-          createdAt: expect.any(String),
-          updatedAt: expect.any(String),
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
         };
 
         // Mock createEntityWithAutoId call first, then relationship creation
@@ -209,7 +196,7 @@ describe('AgentRepository', () => {
           expect.stringContaining('CREATE (a)-[:DEPLOYED_ON'),
           expect.objectContaining({
             starshipId: 'starship-123',
-            agentId: 'test-uuid-1234',
+            agentId: 'test-nanoid-1234',
           })
         );
       });
@@ -307,7 +294,7 @@ describe('AgentRepository', () => {
         expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count', {
           starshipId: 'starship-456',
         });
-        expect(result).toEqual({ id: 'agent-123' });
+        expect(result).toMatchObject({ id: 'agent-123' });
       });
 
       it('should throw error when starship not found', async () => {

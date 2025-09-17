@@ -1,5 +1,6 @@
-import type { StreamingDeltaChunk, StreamingError } from '@starships/protocol';
+import type { StreamingError } from '@starships/protocol';
 import type { Response } from 'express';
+import type { Operation } from 'fast-json-patch';
 
 interface ConversationResponse {
   source: 'agent';
@@ -15,19 +16,50 @@ interface ConnectionInfo {
   res: Response;
   heartbeatInterval: ReturnType<typeof setInterval>;
   connectedAt: Date;
+
+  // Per-connection synchronization context
+  baseLength: number; // client-declared baseline messages length at connect time
+  runningAdds: number; // number of server-emitted message appends after connect
+  // Support multiple overlapping placeholders (stack-like behavior)
+  placeholderStack: number[]; // top is the most recent placeholder index
 }
 
 /**
  * Streaming Service using Server-Sent Events (SSE)
  * Handles multiple concurrent streaming connections for real-time communication
+ * Implemented as a singleton to ensure consistent state across the application
  */
 export class StreamingService {
+  private static instance: StreamingService | null = null;
   private connections: Map<string, ConnectionInfo> = new Map();
+
+  /**
+   * Constructor that enforces singleton pattern
+   * Always returns the same instance when called with 'new'
+   */
+  constructor() {
+    if (StreamingService.instance) {
+      return StreamingService.instance;
+    }
+
+    StreamingService.instance = this;
+    return this;
+  }
+
+  /**
+   * Reset singleton instance (useful for testing)
+   */
+  static resetInstance(): void {
+    if (StreamingService.instance) {
+      StreamingService.instance.closeAllConnections();
+      StreamingService.instance = null;
+    }
+  }
 
   /**
    * Add new streaming connection (supports multiple concurrent connections)
    */
-  addConnection(streamId: string, res: Response): void {
+  addConnection(streamId: string, res: Response, opts?: { baseLength?: number }): void {
     // Close any existing connection for this streamId
     this.closeConnection(streamId);
 
@@ -48,16 +80,18 @@ export class StreamingService {
       }
     }, 30000);
 
-    // Store connection info
+    // Store connection info with sync baseline
     this.connections.set(streamId, {
       res,
       heartbeatInterval,
       connectedAt: new Date(),
+      baseLength: typeof opts?.baseLength === 'number' && opts.baseLength >= 0 ? opts.baseLength : 0,
+      runningAdds: 0,
+      placeholderStack: [],
     });
 
     // Handle connection close
     res.on('close', () => {
-      console.log(`[StreamingService] Streaming disconnected ${streamId}`);
       this.cleanupConnection(streamId);
     });
 
@@ -70,19 +104,21 @@ export class StreamingService {
   }
 
   /**
-   * Broadcast delta chunk to a specific stream
+   * Broadcast delta operation to a specific stream
+   * Normalizes paths to concrete numeric indexes using per-connection sync context.
    */
-  async broadcastDelta(streamId: string, delta: StreamingDeltaChunk): Promise<void> {
+  async broadcastDelta(streamId: string, delta: Operation): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
-      this.sendEventToStream(streamId, connection.res, 'delta', delta);
+      const normalized = this.normalizeDelta(streamId, delta);
+      this.sendEventToStream(streamId, connection.res, 'delta', normalized);
     }
   }
 
   /**
-   * Broadcast delta chunk to all active streams
+   * Broadcast delta operation to all active streams
    */
-  async broadcastDeltaToAll(delta: StreamingDeltaChunk): Promise<void> {
+  async broadcastDeltaToAll(delta: Operation): Promise<void> {
     const broadcastPromises = Array.from(this.connections.keys()).map((streamId) => this.broadcastDelta(streamId, delta));
     await Promise.all(broadcastPromises);
   }
@@ -106,32 +142,93 @@ export class StreamingService {
   }
 
   /**
+   * Normalize a JSON-Patch operation to use concrete numeric indexes for the messages array
+   * based on per-connection synchronization context.
+   */
+  private normalizeDelta(streamId: string, delta: Operation): Operation {
+    const connection = this.connections.get(streamId);
+    if (!connection) return delta;
+
+    const raw = delta as any;
+    const op: string = raw.op;
+    let path: string = typeof raw.path === 'string' ? raw.path : '';
+
+    // Helper: current placeholder index (top of stack)
+    const topPlaceholder = (): number | undefined =>
+      connection.placeholderStack.length > 0 ? connection.placeholderStack[connection.placeholderStack.length - 1] : undefined;
+
+    // 1) Array append: '/messages/-' -> '/messages/{baseLength + runningAdds}'
+    if (op === 'add' && path === '/messages/-') {
+      const index = connection.baseLength + connection.runningAdds;
+
+      // If this is the assistant streaming shell, push its index to placeholder stack
+      const isAssistantPlaceholder =
+        raw?.value &&
+        typeof raw.value === 'object' &&
+        raw.value.role === 'assistant' &&
+        (raw.value.streaming === true || (typeof raw.value.content === 'string' && raw.value.content.length === 0));
+
+      if (isAssistantPlaceholder) {
+        connection.placeholderStack.push(index);
+      }
+
+      // Increment running adds
+      connection.runningAdds += 1;
+
+      return { ...raw, path: `/messages/${index}` } as Operation;
+    }
+
+    // 2) '-1' refers to the current streaming placeholder message for this connection
+    if (/^\/messages\/-1(\/|$)/.test(path)) {
+      const fallbackLast = Math.max(connection.baseLength + connection.runningAdds - 1, 0);
+      const targetIndex = typeof topPlaceholder() === 'number' ? (topPlaceholder() as number) : fallbackLast;
+
+      const newPath = path.replace(/^\/messages\/-1/, `/messages/${targetIndex}`);
+      const normalized = { ...raw, path: newPath } as Operation;
+
+      // Pop placeholder on completion events:
+      // - replace '/streaming' -> false
+      // - replace whole message '/messages/{idx}'
+      const isReplace = normalized.op === 'replace';
+      const streamingFalse =
+        isReplace && typeof normalized.path === 'string' && /\/streaming$/.test(normalized.path) && raw?.value === false;
+      const replaceWhole = isReplace && typeof normalized.path === 'string' && /^\/messages\/\d+$/.test(normalized.path);
+
+      if ((streamingFalse || replaceWhole) && connection.placeholderStack.length > 0) {
+        const tokens = String(normalized.path).split('/');
+        const idxInPath = tokens.length >= 3 ? Number(tokens[2]) : NaN;
+        if (!Number.isNaN(idxInPath) && idxInPath === topPlaceholder()) {
+          connection.placeholderStack.pop();
+        }
+      }
+
+      return normalized;
+    }
+
+    // 3) Already concrete/other paths - pass through
+    return raw as Operation;
+  }
+
+  /**
    * Broadcast completion to a specific stream
+   * Note: Do NOT auto-close here. Let the client decide when to close,
+   * and allow additional messages in the same SSE session if needed.
    */
   async broadcastComplete(streamId: string, finalResponse: ConversationResponse): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
       this.sendEventToStream(streamId, connection.res, 'complete', finalResponse);
-
-      // Close connection gracefully after completion
-      setTimeout(() => {
-        this.closeConnection(streamId);
-      }, 1000);
     }
   }
 
   /**
    * Broadcast error to a specific stream
+   * Note: Keep the connection open. Client may decide to retry or continue.
    */
   async broadcastError(streamId: string, error: StreamingError): Promise<void> {
     const connection = this.connections.get(streamId);
     if (connection && !connection.res.destroyed) {
       this.sendEventToStream(streamId, connection.res, 'error', error);
-
-      // Close connection after error
-      setTimeout(() => {
-        this.closeConnection(streamId);
-      }, 1000);
     }
   }
 

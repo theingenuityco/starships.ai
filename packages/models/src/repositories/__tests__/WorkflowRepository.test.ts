@@ -20,29 +20,7 @@ jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
 }));
 
-// Mock WorkflowEntity validation to avoid validation issues in tests
-jest.mock('../../entities/WorkflowEntity', () => ({
-  WorkflowEntity: {
-    validate: jest.fn().mockResolvedValue(undefined),
-    deserialize: jest.fn().mockImplementation((data) => {
-      // Simulate JSON parsing for blueprint like the real entity does
-      const result = { ...data };
-      if (typeof data.blueprint === 'string') {
-        try {
-          result.blueprint = JSON.parse(data.blueprint);
-        } catch {
-          result.blueprint = null;
-        }
-      }
-      // Add serialize method to the returned object
-      result.serialize = jest.fn().mockReturnValue({
-        ...result,
-        blueprint: typeof result.blueprint === 'object' ? JSON.stringify(result.blueprint) : result.blueprint,
-      });
-      return result;
-    }),
-  },
-}));
+// Use real WorkflowEntity instead of mocking
 
 describe('WorkflowRepository', () => {
   let repository: WorkflowRepository;
@@ -232,7 +210,11 @@ describe('WorkflowRepository', () => {
         };
         const result = await repository.create(dataWithRequired);
 
-        expect(result.blueprint).toEqual({ nodes: [], edges: [], metadata: {} });
+        expect(typeof result.blueprint === 'string' ? JSON.parse(result.blueprint) : result.blueprint).toEqual({
+          nodes: [],
+          edges: [],
+          metadata: {},
+        });
       });
 
       it('should create Neo4j relationship when starshipId provided', async () => {

@@ -6,8 +6,10 @@
  */
 
 import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
-import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode } from '@/types';
+import { Blueprint, Execution, NodeHandlerOptions, NodeResult, Node as WorkflowNode, NodeParameters } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
+import type { TransformOperation } from '@/types/node-parameters';
+import { Eval } from './Eval';
 
 // Dynamic imports for handlers - pure lazy loading
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
@@ -19,6 +21,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   llm: () => import('@/nodes/LLM').then((m) => m.LLM as NodeHandlerConstructor),
   user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
   conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
+  transform: () => import('@/nodes/Transform').then((m) => m.Transform as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {
@@ -34,6 +37,7 @@ export class Engine {
   private blueprint: Blueprint;
   private execution: Execution;
   private eventCallback?: EventCallback;
+  private eval: Eval;
 
   constructor(config: EngineConfig) {
     this.blueprint = config.blueprint;
@@ -47,12 +51,13 @@ export class Engine {
 
     this.execution = initialExecution;
     this.eventCallback = config.eventCallback;
+    this.eval = new Eval();
   }
 
   /**
    * Create handler instance for a node with pure dynamic loading
    */
-  async createHandler(node: WorkflowNode): Promise<NodeHandler> {
+  async createHandler(node: WorkflowNode, resolvedParams: NodeParameters): Promise<NodeHandler> {
     const loader = HANDLER_MAP[node.type];
     if (!loader) {
       throw new Error(`No handler available for node type: ${node.type}`);
@@ -66,7 +71,7 @@ export class Engine {
       execution: this.execution,
     } as NodeHandlerOptions;
 
-    return new handlerConstructor(node.parameters, handlerOptions);
+    return new handlerConstructor(resolvedParams, handlerOptions);
   }
 
   /**
@@ -194,7 +199,7 @@ export class Engine {
   }
 
   /**
-   * Execute a single node with lazy loading
+   * Execute a single node with template resolution and transforms
    */
   private async executeNode(node: WorkflowNode): Promise<NodeResult> {
     this.emitEvent('node_started');
@@ -202,19 +207,54 @@ export class Engine {
     const result = {
       nodeRef: node.ref,
     } as NodeResult;
+
     try {
-      // Create handler instance with parameters (now async)
-      const handler = await this.createHandler(node);
-      // Execute the node - this returns execution with result stored
+      // Step 1: Resolve template expressions in parameters
+      const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution)) as NodeParameters;
+
+      // Step 2: Create handler instance with resolved parameters
+      const handler = await this.createHandler(node, resolvedParams);
+
+      // Step 3: Execute the node
       const data = await handler.execute();
       result.data = data;
+
+      // Step 4: Handle transforms based on node type
+      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
+      if (nodeParams.transforms) {
+        if (node.type === 'transform') {
+          // Transform node - transforms already applied in handler execution above
+          // No additional processing needed
+        } else {
+          // Non-transform node with transforms - spawn Transform node dynamically
+          await this.executeInlineTransform(nodeParams.transforms);
+        }
+      }
+
+      // Step 5: Handle inline condition evaluation
+      if (nodeParams.condition) {
+        if (node.type === 'conditional') {
+          // Conditional node - condition already evaluated in handler execution above
+          // No additional processing needed
+        } else {
+          // Non-conditional node with condition - spawn Conditional node dynamically
+          const conditionResult = await this.executeInlineConditional(nodeParams.condition);
+          // Store condition result in the node result for getNextNode to use
+          if (result.data && typeof result.data === 'object') {
+            (result.data as Record<string, unknown>).condition = conditionResult;
+          } else {
+            result.data = { condition: conditionResult };
+          }
+        }
+      }
+
       this.emitEvent('node_completed');
     } catch (error) {
       result.error = error;
       this.emitEvent('node_failed');
     }
-    this.execution.results.push(result);
 
+    this.execution.results.push(result);
     return result;
   }
 
@@ -282,21 +322,74 @@ export class Engine {
    */
   private async validateForExecution(blueprint: Blueprint): Promise<void> {
     // Check for start node
-    const startNode = this.getStartNode();
+    const startNode = this.blueprint?.nodes?.find((node) => node.type === 'start') || null;
     if (!startNode) {
       throw new Error('Workflow must have a start node');
     }
 
     // Check that all node types have available handlers
     const unsupportedNodes = [];
+    const validationErrors: string[] = [];
+
     for (const node of blueprint.nodes) {
       if (!(node.type in HANDLER_MAP)) {
         unsupportedNodes.push({ ref: node.ref, type: node.type });
+        continue;
+      }
+
+      // Validate template expressions in parameters
+      const templateValidation = this.eval.validateTemplateExpressions(node.parameters);
+      if (!templateValidation.valid) {
+        const errorMessages = templateValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+        validationErrors.push(...errorMessages);
+      }
+
+      // Validate transform expressions if present
+      const nodeParams = node.parameters as { transforms?: TransformOperation[]; condition?: string };
+      if (nodeParams.transforms) {
+        // Create a temporary Transform node to validate transforms
+        const virtualTransformNode: WorkflowNode = {
+          type: 'transform',
+          ref: 'validation_transform',
+          name: 'Validation Transform',
+          description: 'Temporary transform node for validation',
+          parameters: { transforms: nodeParams.transforms },
+        };
+
+        const transformHandler = await this.createHandler(virtualTransformNode, { transforms: nodeParams.transforms });
+        const transformValidation = transformHandler.validate();
+        if (!transformValidation.valid) {
+          const errorMessages = transformValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+          validationErrors.push(...errorMessages);
+        }
+      }
+
+      // Validate condition expression if present
+      if (nodeParams.condition) {
+        // Create a temporary Conditional node to validate condition
+        const virtualConditionalNode: WorkflowNode = {
+          type: 'conditional',
+          ref: 'validation_conditional',
+          name: 'Validation Conditional',
+          description: 'Temporary conditional node for validation',
+          parameters: { condition: nodeParams.condition },
+        };
+
+        const conditionalHandler = await this.createHandler(virtualConditionalNode, { condition: nodeParams.condition });
+        const conditionValidation = conditionalHandler.validate();
+        if (!conditionValidation.valid) {
+          const errorMessages = conditionValidation.errors?.map((e) => `${node.ref}: ${e.message}`) || [];
+          validationErrors.push(...errorMessages);
+        }
       }
     }
 
     if (unsupportedNodes.length > 0) {
       throw new Error(`Unsupported node types: ${unsupportedNodes.map((n) => n.type).join(', ')}`);
+    }
+
+    if (validationErrors.length > 0) {
+      throw new Error(`Template/Transform validation failed:\n${validationErrors.join('\n')}`);
     }
   }
 
@@ -345,6 +438,43 @@ export class Engine {
 
   getExecution() {
     return this.execution;
+  }
+
+  /**
+   * Execute inline transform operations by creating a virtual Transform node
+   */
+  private async executeInlineTransform(transforms: TransformOperation[]): Promise<void> {
+    // Create virtual Transform node and execute it
+    const virtualTransformNode: WorkflowNode = {
+      type: 'transform',
+      ref: 'inline_transform',
+      name: 'Inline Transform',
+      description: 'Auto-generated transform node for inline transforms',
+      parameters: { transforms },
+    };
+
+    const transformHandler = await this.createHandler(virtualTransformNode, { transforms });
+    await transformHandler.execute();
+  }
+
+  /**
+   * Execute inline condition evaluation by creating a virtual Conditional node
+   */
+  private async executeInlineConditional(conditionExpression: string): Promise<string | boolean | number | null | undefined> {
+    // Create virtual Conditional node and execute it
+    const virtualConditionalNode: WorkflowNode = {
+      type: 'conditional',
+      ref: 'inline_conditional',
+      name: 'Inline Conditional',
+      description: 'Auto-generated conditional node for inline condition evaluation',
+      parameters: { condition: conditionExpression },
+    };
+
+    const conditionalHandler = await this.createHandler(virtualConditionalNode, { condition: conditionExpression });
+    const conditionalResult = await conditionalHandler.execute();
+
+    // Extract condition value from the conditional result
+    return (conditionalResult as { condition: string | boolean | number | null | undefined }).condition;
   }
 
   /**

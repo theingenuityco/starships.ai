@@ -7,6 +7,7 @@
 import { LLM } from '../LLM';
 import { autopilot } from '@/Autopilot';
 import type { LlmParams } from '@/types/node-parameters';
+import type { LLMResponse } from '@/types/llm';
 
 // Mock fetch globally
 const mockFetch = jest.fn();
@@ -80,9 +81,12 @@ describe('LLM Node Handler', () => {
       const eventCallback = jest.fn();
       const llm = new LLM(params, { eventCallback });
 
-      const response = await llm.execute();
+      const responseItems = await llm.execute();
 
-      expect(response).toBeDefined();
+      expect(responseItems).toBeDefined();
+      expect(responseItems).toHaveLength(1);
+
+      const response = responseItems[0].json as LLMResponse;
       expect(response.id).toBe('test-123');
       expect(response.model).toBe('anthropic/claude-3.5-sonnet');
       expect(response.choices).toHaveLength(1);
@@ -263,7 +267,8 @@ describe('LLM Node Handler', () => {
       const response = await llm.execute();
 
       // Should recover and process valid chunks
-      expect(response.choices[0].message.content).toBe('Recovery');
+      const responseData = response[0].json as LLMResponse;
+      expect(responseData.choices[0].message.content).toBe('Recovery');
     });
   });
 
@@ -384,9 +389,10 @@ describe('LLM Node Handler', () => {
       const llm = new LLM(params);
       const response = await llm.execute();
 
-      expect(response.choices).toHaveLength(2);
-      expect(response.choices[0].message.content).toBe('Choice 1');
-      expect(response.choices[1].message.content).toBe('Choice 2');
+      const responseData = response[0].json as LLMResponse;
+      expect(responseData.choices).toHaveLength(2);
+      expect(responseData.choices[0].message.content).toBe('Choice 1');
+      expect(responseData.choices[1].message.content).toBe('Choice 2');
     });
 
     it('should handle non-streaming response fallback', async () => {
@@ -417,8 +423,9 @@ describe('LLM Node Handler', () => {
       const llm = new LLM(params);
       const response = await llm.execute();
 
-      expect(response.id).toBe('test-non-stream');
-      expect(response.choices[0].message.content).toBe('Non-streaming response');
+      const responseData = response[0].json as LLMResponse;
+      expect(responseData.id).toBe('test-non-stream');
+      expect(responseData.choices[0].message.content).toBe('Non-streaming response');
     });
   });
 });

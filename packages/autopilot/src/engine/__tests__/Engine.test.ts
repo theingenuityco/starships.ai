@@ -5,6 +5,7 @@
  */
 
 import { Engine } from '../Engine';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { Blueprint, NodeType } from '@/types';
 
 // Test utilities
@@ -28,11 +29,11 @@ describe('Engine', () => {
       const blueprint: Blueprint = createMockBlueprint();
 
       const eventCallback = jest.fn();
-      const engine = new Engine({ blueprint, eventCallback });
+      const engine = new Engine({ eventCallback });
+      const execution = ExecutionItemUtils.createExecution();
 
-      await engine.execute();
+      await engine.executeBlueprint(blueprint, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
       expect(execution.results).toHaveLength(2);
       expect(execution.results[0].nodeRef).toBe('start');
@@ -58,10 +59,11 @@ describe('Engine', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      await expect(engine.execute()).rejects.toThrow('Workflow must have a start node');
-      expect(engine.getExecution().status).toBe('failed');
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('Blueprint must have a start node');
+      expect(execution.status).toBe('failed');
     });
 
     it('should handle unsupported node types', async () => {
@@ -74,61 +76,61 @@ describe('Engine', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      await expect(engine.execute()).rejects.toThrow('Unsupported node types: invalid_type');
+      await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('Unsupported node types: invalid_type');
     });
   });
 
   describe('Workflow State Management', () => {
     it('should track execution state correctly', async () => {
       const blueprint: Blueprint = createMockBlueprint();
-      const engine = new Engine({ blueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      expect(engine.getExecution().status).toBe('not_started');
+      expect(execution.status).toBe('not_started');
 
-      const executePromise = engine.execute();
+      await engine.executeBlueprint(blueprint, execution);
 
-      await executePromise;
-
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
       expect(execution.currentNodeRef).toBeUndefined(); // Cleared after completion
     });
 
     it('should handle workflow pause and resume', async () => {
       const blueprint: Blueprint = createMockBlueprint();
-      const engine = new Engine({ blueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      // Start execution
-      const executePromise = engine.execute();
+      // Can't pause not started execution
+      expect(engine.pause(execution)).toBe(false);
 
-      // Can't pause before running
-      expect(engine.pause()).toBe(false);
-
-      await executePromise;
+      await engine.executeBlueprint(blueprint, execution);
 
       // Can't pause completed workflow
-      expect(engine.pause()).toBe(false);
+      expect(engine.pause(execution)).toBe(false);
     });
 
     it('should handle workflow cancellation', async () => {
       const blueprint: Blueprint = createMockBlueprint();
-      const engine = new Engine({ blueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      expect(engine.cancel()).toBe(true);
-      expect(engine.getExecution().status).toBe('cancelled');
+      expect(engine.cancel(execution)).toBe(true);
+      expect(execution.status).toBe('cancelled');
+
+      // Reset execution and complete it
+      const completedExecution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, completedExecution);
 
       // Can't cancel completed workflow
-      await engine.execute();
-      expect(engine.cancel()).toBe(false);
+      expect(engine.cancel(completedExecution)).toBe(false);
     });
   });
 
   describe('Node Handler Creation', () => {
     it('should create handlers for supported node types', async () => {
-      const blueprint: Blueprint = createMockBlueprint();
-      const engine = new Engine({ blueprint });
+      const engine = new Engine();
 
       expect(engine.hasHandler('start')).toBe(true);
       expect(engine.hasHandler('end')).toBe(true);
@@ -143,10 +145,11 @@ describe('Engine', () => {
 
     it('should create handler instances dynamically', async () => {
       const blueprint: Blueprint = createMockBlueprint();
-      const engine = new Engine({ blueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
       const startNode = blueprint.nodes.find((n) => n.type === 'start')!;
-      const handler = await engine.createHandler(startNode, {});
+      const handler = await engine.createHandler(startNode, {}, execution);
 
       expect(handler).toBeDefined();
       expect(typeof handler.execute).toBe('function');
@@ -175,11 +178,11 @@ describe('Engine', () => {
       };
 
       const eventCallback = jest.fn();
-      const engine = new Engine({ blueprint, eventCallback });
+      const engine = new Engine({ eventCallback });
+      const execution = ExecutionItemUtils.createExecution();
 
-      await engine.execute();
+      await engine.executeBlueprint(blueprint, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('failed');
       expect(execution.error).toBeDefined();
       expect(execution.error?.code).toBe('SYSTEM_ERROR');

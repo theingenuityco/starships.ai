@@ -5,8 +5,9 @@
  */
 
 import { Engine } from '@/engine/Engine';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { autopilot } from '@/Autopilot';
-import type { Blueprint, Node } from '@/types';
+import type { Blueprint, Node, ExecutionItem } from '@/types';
 
 // Mock all external dependencies
 const mockFetch = jest.fn();
@@ -102,19 +103,11 @@ describe('Sophisticated Workflows', () => {
       });
 
       const eventCallback = jest.fn();
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { user: { isPremium: true, id: 123 } },
-        },
-        eventCallback,
-      });
+      const engine = new Engine({ eventCallback });
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { user: { isPremium: true, id: 123 } };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
 
       // Should execute start -> check -> premium-path -> end
@@ -189,18 +182,11 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"premium":false,"features":["basic"]}',
       });
 
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { user: { isPremium: false, id: 456 } },
-        },
-      });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { user: { isPremium: false, id: 456 } };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
 
       // Should execute start -> check -> regular-path -> end
@@ -283,18 +269,11 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"tier":"silver","benefits":["support","discounts"]}',
       });
 
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { user: { tier: 'silver', id: 789 } },
-        },
-      });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { user: { tier: 'silver', id: 789 } };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
       expect(execution.results[2].nodeRef).toBe('silver-path');
 
@@ -413,16 +392,15 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"finalized":true,"result":"success"}',
         });
 
-      const engine = new Engine({ blueprint: outerWorkflow });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(outerWorkflow, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
 
       // Should execute all outer workflow nodes
       expect(execution.results).toHaveLength(5);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual(['start', 'prep', 'nested', 'finalize', 'end']);
-
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual(['start', 'prep', 'nested', 'finalize', 'end']);
       // Should have made all three HTTP calls
       expect(mockFetch).toHaveBeenCalledTimes(3);
       expect(mockFetch).toHaveBeenNthCalledWith(
@@ -618,16 +596,22 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"processed":true,"result":"completed"}',
         });
 
-      const engine = new Engine({ blueprint: mainWorkflow });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(mainWorkflow, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
 
       // Should execute: start -> data-prep -> validation-flow -> final-check -> process -> end
       expect(execution.results).toHaveLength(6);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual(['start', 'data-prep', 'validation-flow', 'final-check', 'process', 'end']);
-
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
+        'start',
+        'data-prep',
+        'validation-flow',
+        'final-check',
+        'process',
+        'end',
+      ]);
       // Should have made 4 HTTP calls total
       expect(mockFetch).toHaveBeenCalledTimes(4);
     });
@@ -790,16 +774,22 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"action":"positive","applied":true}',
       });
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
 
       // Should execute all nodes in the positive path
       expect(execution.results).toHaveLength(6);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual(['start', 'data-fetch', 'ai-analysis', 'decision', 'positive-action', 'end']);
-
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
+        'start',
+        'data-fetch',
+        'ai-analysis',
+        'decision',
+        'positive-action',
+        'end',
+      ]);
       // Should have called positive action, not negative
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/positive-action', expect.any(Object));
     });
@@ -927,15 +917,10 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"recovered":true,"status":"handled"}',
         });
 
-      const engine = new Engine({ blueprint });
-      try {
-        await engine.execute();
-      } catch (error) {
-        console.log('Engine execution threw error:', error);
-      }
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
-
+      await engine.executeBlueprint(blueprint, execution);
       // Debug information
       console.log('Execution status:', execution.status);
       console.log('Execution error:', execution.error);
@@ -943,12 +928,9 @@ describe('Sophisticated Workflows', () => {
       console.log(
         'Execution results:',
         JSON.stringify(
-          execution.results.map((r) => ({
+          execution.results.map((r: { nodeRef: string; items: ExecutionItem[] }) => ({
             nodeRef: r.nodeRef,
-            hasError: !!r.error,
-            hasData: !!r.data,
-            errorMessage: r.error instanceof Error ? r.error.message : r.error,
-            dataKeys: r.data ? Object.keys(r.data) : [],
+            hasError: r.items.some((item: ExecutionItem) => item.error),
           })),
           null,
           2
@@ -959,7 +941,7 @@ describe('Sophisticated Workflows', () => {
 
       // Should execute: start -> risky-api -> check-success -> retry-api -> check-retry -> recovery-path -> end
       expect(execution.results).toHaveLength(7);
-      expect(execution.results.map((r) => r.nodeRef)).toEqual([
+      expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
         'start',
         'risky-api',
         'check-success',
@@ -1028,11 +1010,11 @@ describe('Sophisticated Workflows', () => {
       }
 
       const startTime = Date.now();
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
       const endTime = Date.now();
 
-      const execution = engine.getExecution();
       expect(execution.status).toBe('completed');
       expect(execution.results).toHaveLength(22); // start + 20 steps + end
 
@@ -1040,7 +1022,7 @@ describe('Sophisticated Workflows', () => {
       expect(endTime - startTime).toBeLessThan(5000);
 
       // All steps should be present
-      const stepRefs = execution.results.map((r) => r.nodeRef);
+      const stepRefs = execution.results.map((r: { nodeRef: string }) => r.nodeRef);
       expect(stepRefs).toContain('start');
       expect(stepRefs).toContain('end');
       for (let i = 1; i <= 20; i++) {

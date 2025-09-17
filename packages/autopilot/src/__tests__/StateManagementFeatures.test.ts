@@ -6,6 +6,7 @@
  */
 
 import { Engine } from '../engine/Engine';
+import { ExecutionItemUtils } from '../utils/ExecutionItemUtils';
 import { Blueprint } from '../types';
 
 // Mock fetch
@@ -97,27 +98,16 @@ describe('State Management Features', () => {
         },
       };
 
-      // Mock initial execution state
-      const initialExecution = {
-        status: 'not_started' as const,
-        state: {
-          apiToken: 'abc123token',
-        },
-        results: [],
-      };
-
       const engine = new Engine({
-        blueprint,
-        execution: initialExecution,
         eventCallback: async (event) => {
           console.log(`Event: ${event.type} at ${event.timestamp}`);
         },
       });
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { apiToken: 'abc123token' };
 
       // Execute workflow
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify state transformations were applied
       expect(execution.state.userId).toBe('user-123');
@@ -212,14 +202,13 @@ describe('State Management Features', () => {
       };
 
       const engine = new Engine({
-        blueprint,
         eventCallback: async (event) => {
           console.log(`Conditional Event: ${event.type}`);
         },
       });
+      const execution = ExecutionItemUtils.createExecution();
 
-      await engine.execute();
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify conditional logic executed correctly
       expect(execution.state.userTier).toBe('premium');
@@ -277,10 +266,11 @@ describe('State Management Features', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint: invalidBlueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
       // Should throw validation error before execution
-      await expect(engine.execute()).rejects.toThrow(/validation failed/i);
+      await expect(engine.executeBlueprint(invalidBlueprint, execution)).rejects.toThrow(/validation failed/i);
     });
 
     test('should validate transform structure', async () => {
@@ -311,10 +301,11 @@ describe('State Management Features', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint: invalidTransformBlueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
       // Should throw validation error for invalid transforms
-      await expect(engine.execute()).rejects.toThrow(/validation failed/i);
+      await expect(engine.executeBlueprint(invalidTransformBlueprint, execution)).rejects.toThrow(/validation failed/i);
     });
   });
 
@@ -390,10 +381,9 @@ describe('State Management Features', () => {
         ],
         metadata: {},
       };
-
-      const engine = new Engine({ blueprint });
-      await engine.execute();
-      const execution = engine.getExecution();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify complex state mutations
       expect(execution.state.metrics).toEqual({
@@ -476,10 +466,9 @@ describe('State Management Features', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
-      const execution = engine.getExecution();
-
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
       // Verify all operations worked correctly
       expect(execution.state.original).toEqual({ name: 'updated' }); // count removed
       expect(execution.state.backup).toEqual({ name: 'updated', count: 5 }); // copied before count removal

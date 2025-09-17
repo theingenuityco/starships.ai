@@ -19,8 +19,8 @@ describe('Conditional Node Handler', () => {
   const mockExecution: Execution = {
     status: 'running',
     results: [
-      { nodeRef: 'start', data: { initialized: true } },
-      { nodeRef: 'previous', data: { value: 42, success: true } },
+      { nodeRef: 'start', items: [{ json: { initialized: true }, pairedItem: { item: 0 } }] },
+      { nodeRef: 'previous', items: [{ json: { value: 42, success: true }, pairedItem: { item: 0 } }] },
     ],
     state: {
       user: { isPremium: true, level: 'gold' },
@@ -248,9 +248,8 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result.result).toBe(true);
-      expect(result.condition).toBe(true);
-      expect(typeof result.condition).toBe('boolean');
+      expect(result[0].json).toEqual({ condition: true });
+      expect(result.length).toBe(1);
     });
 
     it('should return string values', async () => {
@@ -269,9 +268,8 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result.result).toBe('premium');
-      expect(result.condition).toBe('premium');
-      expect(typeof result.condition).toBe('string');
+      expect(result[0].json).toEqual({ condition: 'premium' });
+      expect(result.length).toBe(1);
     });
 
     it('should return numeric values', async () => {
@@ -290,9 +288,8 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result.result).toBe(42);
-      expect(result.condition).toBe(42);
-      expect(typeof result.condition).toBe('number');
+      expect(result[0].json).toEqual({ condition: 42 });
+      expect(result.length).toBe(1);
     });
 
     it('should handle null/undefined values', async () => {
@@ -311,8 +308,8 @@ describe('Conditional Node Handler', () => {
 
       const result = await conditional.execute();
 
-      expect(result.result).toBeUndefined();
-      expect(result.condition).toBeUndefined();
+      expect(result[0].json).toEqual({ condition: undefined });
+      expect(result.length).toBe(1);
     });
   });
 
@@ -629,7 +626,7 @@ describe('Conditional Node Handler', () => {
 
       const executionWithConfidence: Execution = {
         ...mockExecution,
-        results: [{ nodeRef: 'analysis', data: { confidence: 0.95, category: 'positive' } }],
+        results: [{ nodeRef: 'analysis', items: [{ json: { confidence: 0.95, category: 'positive' }, pairedItem: { item: 0 } }] }],
       };
 
       const mockEvaluate = jest.fn().mockReturnValue('high_confidence');

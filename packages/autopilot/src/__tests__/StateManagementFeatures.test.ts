@@ -117,7 +117,7 @@ describe('State Management Features', () => {
 
       // Verify execution completed successfully
       expect(execution.status).toBe('completed');
-      expect(execution.results).toHaveLength(3); // start, http-call, end
+      expect(execution.results).toHaveLength(6); // start, inline_mutate, http-call, inline_mutate, end, inline_mutate
     });
   });
 

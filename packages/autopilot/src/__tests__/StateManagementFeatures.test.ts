@@ -99,9 +99,7 @@ describe('State Management Features', () => {
       };
 
       const engine = new Engine({
-        eventCallback: async (event) => {
-          console.log(`Event: ${event.type} at ${event.timestamp}`);
-        },
+        eventCallback: async () => {},
       });
       const execution = ExecutionItemUtils.createExecution();
       execution.state = { apiToken: 'abc123token' };
@@ -202,9 +200,7 @@ describe('State Management Features', () => {
       };
 
       const engine = new Engine({
-        eventCallback: async (event) => {
-          console.log(`Conditional Event: ${event.type}`);
-        },
+        eventCallback: async () => {},
       });
       const execution = ExecutionItemUtils.createExecution();
 

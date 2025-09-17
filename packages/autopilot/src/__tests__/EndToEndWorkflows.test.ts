@@ -6,6 +6,7 @@
 
 import { Engine } from '@/engine/Engine';
 import { autopilot } from '@/Autopilot';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { Blueprint } from '@/types';
 
 // Mock all external dependencies
@@ -75,10 +76,10 @@ describe('End-to-End Workflow Execution', () => {
       // Mock network failure
       mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       expect(execution.status).toBe('failed');
       expect(execution.error).toBeDefined();
@@ -111,10 +112,10 @@ describe('End-to-End Workflow Execution', () => {
       // Mock LLM API failure
       mockFetch.mockRejectedValueOnce(new Error('LLM API unavailable'));
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toContain('LLM API unavailable');
@@ -146,10 +147,10 @@ describe('End-to-End Workflow Execution', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       expect(execution.status).toBe('failed');
       expect(execution.error?.message).toContain('OpenRouter API key is required');
@@ -232,18 +233,11 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"updated":true,"status":"processing"}',
         });
 
-      const engine = new Engine({
-        blueprint,
-        execution: {
-          status: 'not_started',
-          results: [],
-          state: { initialized: true },
-        },
-      });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { initialized: true };
 
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Debug information
       if (execution.status === 'failed') {
@@ -327,13 +321,14 @@ describe('End-to-End Workflow Execution', () => {
       mockFetch.mockResolvedValueOnce(mockResponses[0]).mockResolvedValueOnce(mockResponses[1]).mockResolvedValueOnce(mockResponses[2]);
 
       const startTime = Date.now();
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
       const endTime = Date.now();
 
       const executionTime = endTime - startTime;
 
-      expect(engine.getExecution().status).toBe('completed');
+      expect(execution.status).toBe('completed');
       expect(executionTime).toBeLessThan(1000); // Should complete in under 1 second with mocks
 
       console.log(`Performance test completed in ${executionTime}ms`);
@@ -409,9 +404,10 @@ describe('End-to-End Workflow Execution', () => {
         });
 
       const eventCallback = jest.fn();
-      const engine = new Engine({ blueprint, eventCallback });
+      const engine = new Engine({ eventCallback });
+      const execution = ExecutionItemUtils.createExecution();
 
-      await engine.execute();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify comprehensive event coverage
       expect(eventCallback).toHaveBeenCalledWith(expect.objectContaining({ type: 'workflow_started' }));
@@ -568,15 +564,14 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"approved":true,"post_id":"123"}',
         });
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       expect(execution.status).toBe('completed');
 
       // Verify approval path was taken
-      const executionPath = execution.results.map((r) => r.nodeRef);
+      const executionPath = execution.results.map((r: { nodeRef: string }) => r.nodeRef);
       expect(executionPath).toContain('approve-content');
       expect(executionPath).not.toContain('flag-review');
 
@@ -728,11 +723,10 @@ describe('End-to-End Workflow Execution', () => {
         });
 
       const startTime = Date.now();
-      const engine = new Engine({ blueprint });
-      await engine.execute();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
       const endTime = Date.now();
-
-      const execution = engine.getExecution();
 
       // Debug information
       if (execution.status === 'failed') {

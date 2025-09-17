@@ -11,13 +11,10 @@ import type { Blueprint } from '@/types';
 // Mock Engine to avoid actual workflow execution in unit tests
 jest.mock('@/engine/Engine', () => ({
   Engine: jest.fn().mockImplementation(() => ({
-    execute: jest.fn(),
-    getExecution: jest.fn().mockReturnValue({
-      results: [
-        { nodeRef: 'start', data: {} },
-        { nodeRef: 'end', data: {} },
-      ],
-    }),
+    executeBlueprint: jest.fn().mockResolvedValue([
+      { json: { result: 'start' }, pairedItem: { item: 0 } },
+      { json: { result: 'end' }, pairedItem: { item: 1 } },
+    ]),
     hasHandler: jest.fn().mockReturnValue(true),
   })),
 }));
@@ -69,9 +66,9 @@ describe('Agent Node Handler', () => {
 
       const execution = await agent.execute();
 
-      expect(execution.results).toHaveLength(2);
-      expect(execution.results[0].nodeRef).toBe('start');
-      expect(execution.results[1].nodeRef).toBe('end');
+      expect(execution).toHaveLength(2);
+      expect(execution[0].json).toEqual({ result: 'start' });
+      expect(execution[1].json).toEqual({ result: 'end' });
     });
 
     it('should handle custom agent parameters', () => {

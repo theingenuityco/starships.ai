@@ -288,8 +288,8 @@ describe('LLM Node Handler', () => {
       );
       expect(validation.errors).toContainEqual(
         expect.objectContaining({
-          code: 'MISSING_REQUIRED_FIELD',
-          message: 'Messages array is required and must not be empty',
+          code: 'INVALID_PARAMETERS',
+          message: 'Messages must be an array',
         })
       );
     });

@@ -144,8 +144,11 @@ export class Engine {
         // Get input items for current node
         const inputItems = this.getNodeInput(currentNode);
 
-        // Execute the node
-        const outputItems = await this.executeNode(currentNode, inputItems);
+        // Create handler for current node and execute it
+        const inputData = ExecutionItemUtils.unwrapSingle(inputItems);
+        const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, this.execution, inputData)) as NodeParameters;
+        const handler = await this.createHandler(currentNode, resolvedParams);
+        const outputItems = await this.executeNode(handler, inputItems);
 
         // Store output items
         this.execution.nodeOutputs[currentNode.ref] = outputItems;
@@ -198,65 +201,14 @@ export class Engine {
   }
 
   /**
-   * Execute a single node with template resolution and transforms
+   * Execute a NodeHandler instance directly (like Agent, Workflow, etc.)
    */
-  private async executeNode(node: WorkflowNode, inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
+  async executeNode(handler: NodeHandler, inputItems?: ExecutionItem[]): Promise<ExecutionItem[]> {
     this.emitEvent('node_started');
 
     try {
-      // Step 1: Resolve template expressions in parameters with input data
-      const inputData = ExecutionItemUtils.unwrapSingle(inputItems);
-      const resolvedParams = (await this.eval.resolveTemplates(node.parameters, this.execution, inputData)) as NodeParameters;
-
-      // Step 2: Create handler instance with resolved parameters
-      const handler = await this.createHandler(node, resolvedParams);
-
-      // Step 3: Execute the node with input items
+      // Execute the handler with input items
       const outputItems = await handler.execute(inputItems);
-
-      // Step 4: Handle transforms and mutations based on node type
-      const nodeParams = node.parameters as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
-
-      // Handle transforms for input->output transformations
-      if (nodeParams.transforms) {
-        if (node.type === 'transform') {
-          // Transform node - transforms already applied in handler execution above
-          // No additional processing needed
-        } else {
-          // Non-transform node with transforms - spawn Transform node dynamically for input->output transformations
-          await this.executeInlineTransform(nodeParams.transforms, inputItems);
-        }
-      }
-
-      // Handle mutations for state mutations
-      if (nodeParams.mutations) {
-        if (node.type === 'mutate') {
-          // Mutate node - mutations already applied in handler execution above
-          // No additional processing needed
-        } else {
-          // Non-mutate node with mutations - spawn Mutate node dynamically for state mutations
-          await this.executeInlineMutate(nodeParams.mutations);
-        }
-      }
-
-      // Step 5: Handle inline condition evaluation
-      if (nodeParams.condition) {
-        if (node.type === 'conditional') {
-          // Conditional node - condition already evaluated in handler execution above
-          // No additional processing needed
-        } else {
-          // Non-conditional node with condition - spawn Conditional node dynamically
-          const conditionResult = await this.executeInlineConditional(nodeParams.condition);
-          // Store condition result in the node output items for getNextNode to use
-          return outputItems.map((item) => ({
-            ...item,
-            json:
-              typeof item.json === 'object'
-                ? { ...(item.json as Record<string, unknown>), condition: conditionResult }
-                : { condition: conditionResult },
-          }));
-        }
-      }
 
       this.emitEvent('node_completed');
       return outputItems;

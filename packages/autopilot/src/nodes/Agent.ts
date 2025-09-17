@@ -8,7 +8,6 @@
  */
 
 import { AgentMemory } from '@/memory/AgentMemory';
-import { Engine } from '@/engine/Engine';
 import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, LlmMessage, NodeType, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint, Node } from '@/types/blueprint';
@@ -19,7 +18,6 @@ export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
   private memory: AgentMemory;
-  private engine: Engine;
   private nodeCounter: number = 1;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
@@ -73,12 +71,7 @@ export class Agent implements NodeHandler {
       };
     }
 
-    // At this point blueprint is guaranteed to exist
-    const engineConfig = {
-      blueprint: this.params.blueprint,
-      eventCallback: this.options?.eventCallback,
-    };
-    this.engine = new Engine(engineConfig);
+    // Blueprint is guaranteed to exist after constructor logic above
   }
 
   async addMessageToMemory(message: LlmMessage) {
@@ -95,17 +88,6 @@ export class Agent implements NodeHandler {
   private getLastNode(): Node | undefined {
     const nodes = this.params.blueprint!.nodes;
     return nodes.length > 0 ? nodes[nodes.length - 1] : undefined;
-  }
-
-  /**
-   * Recreate engine after blueprint modifications
-   */
-  private updateEngine(): void {
-    const engineConfig = {
-      blueprint: this.params.blueprint!,
-      eventCallback: this.options?.eventCallback,
-    };
-    this.engine = new Engine(engineConfig);
   }
 
   /**
@@ -162,7 +144,6 @@ export class Agent implements NodeHandler {
     });
 
     this.connectToPrevious(ref);
-    this.updateEngine();
     return this;
   }
 
@@ -179,6 +160,7 @@ export class Agent implements NodeHandler {
 
   /**
    * Execute the agent with optional input items
+   * Note: This method now returns the agent's blueprint for execution by an external Engine
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // If we have input data, add it to agent's memory
@@ -191,11 +173,15 @@ export class Agent implements NodeHandler {
       });
     }
 
-    await this.engine.execute();
-    const execution = this.engine.getExecution();
-
-    // Return the execution wrapped as an item
-    return ExecutionItemUtils.wrapSingle(execution, input?.[0]);
+    // Return the agent's blueprint and parameters for external Engine execution
+    return ExecutionItemUtils.wrapSingle(
+      {
+        blueprint: this.params.blueprint,
+        agentParams: this.params,
+        memory: this.memory.toMessages(),
+      },
+      input?.[0]
+    );
   }
 
   /**
@@ -246,15 +232,7 @@ export class Agent implements NodeHandler {
       });
     }
 
-    // Check that all node types have handlers (delegate to engine)
-    const unsupportedNodes = nodes.filter((node) => !this.engine.hasHandler(node.type));
-    if (unsupportedNodes.length > 0) {
-      errors.push({
-        code: 'INVALID_NODE_TYPE',
-        message: `Unsupported node types in agent blueprint: ${unsupportedNodes.map((n) => n.type).join(', ')}`,
-        details: { unsupportedNodes: unsupportedNodes.map((n) => ({ type: n.type, ref: n.ref })) },
-      });
-    }
+    // Note: Node type validation will be handled by external Engine during execution
 
     // Check edge references
     const nodeRefs = new Set(nodes.map((n) => n.ref));

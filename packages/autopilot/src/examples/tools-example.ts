@@ -4,7 +4,7 @@
  * Examples demonstrating how to use the new tool calling functionality
  */
 
-import { Agent, autopilot } from '../index';
+import { Agent, autopilot, ExecutionItemUtils } from '../index';
 import type { ToolParams } from '../types/node-parameters';
 
 // Configure credentials (required for LLM)
@@ -81,12 +81,7 @@ export async function calculatorExample() {
     tools: [calculatorTool],
   });
 
-  const result = await agent.execute([
-    {
-      role: 'user',
-      content: 'What is 15 * 7 + 23? Please calculate this for me.',
-    },
-  ]);
+  const result = await agent.execute(ExecutionItemUtils.wrapSingle('What is 15 * 7 + 23? Please calculate this for me.'));
 
   console.log('Agent Result:', JSON.stringify(result, null, 2));
   return result;
@@ -105,12 +100,11 @@ export async function multiToolExample() {
     tools: [calculatorTool, timeTool, echoTool],
   });
 
-  const result = await agent.execute([
-    {
-      role: 'user',
-      content: 'Hi! Can you tell me what time it is in Tokyo, then calculate 42 * 17, and echo back the message "Hello Tools!"?',
-    },
-  ]);
+  const result = await agent.execute(
+    ExecutionItemUtils.wrapSingle(
+      'Hi! Can you tell me what time it is in Tokyo, then calculate 42 * 17, and echo back the message "Hello Tools!"?'
+    )
+  );
 
   console.log('Multi-tool Result:', JSON.stringify(result, null, 2));
   return result;
@@ -135,22 +129,12 @@ export async function conversationExample() {
 
   // First interaction
   console.log('\n--- First Message ---');
-  let result = await agent.execute([
-    {
-      role: 'user',
-      content: "What's 25 + 17?",
-    },
-  ]);
+  let result = await agent.execute(ExecutionItemUtils.wrapSingle("What's 25 + 17?"));
   console.log('Response 1:', result);
 
   // Follow-up interaction
   console.log('\n--- Follow-up Message ---');
-  result = await agent.execute([
-    {
-      role: 'user',
-      content: 'Now multiply that result by 3',
-    },
-  ]);
+  result = await agent.execute(ExecutionItemUtils.wrapSingle('Now multiply that result by 3'));
   console.log('Response 2:', result);
 
   return result;
@@ -189,12 +173,7 @@ export async function customToolExample() {
     tools: [customTool],
   });
 
-  const result = await agent.execute([
-    {
-      role: 'user',
-      content: 'Please process the text "Hello World" by making it uppercase.',
-    },
-  ]);
+  const result = await agent.execute(ExecutionItemUtils.wrapSingle('Please process the text "Hello World" by making it uppercase.'));
 
   console.log('Custom tool result:', JSON.stringify(result, null, 2));
   return result;

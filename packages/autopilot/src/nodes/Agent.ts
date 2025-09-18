@@ -92,7 +92,7 @@ export class Agent implements NodeHandler {
           path: '/state/messages/-',
           value: {
             role: 'assistant',
-            content: `{{ $exists($lastOutputOf("${nodeRef}")[0].json.choices[0].message.content) ? $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "" }}`,
+            content: `{{ exists(lastOutputOf("${nodeRef}")[0].json.choices[0].message.content) ? lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "" }}`,
           },
         },
       ],
@@ -143,6 +143,7 @@ export class Agent implements NodeHandler {
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
     const toolNodeRef = `tool_${this.nodeCounter++}`;
     const mutateNodeRef = `mutate_${this.nodeCounter++}`;
+    const mutateAppendNodeRef = `mutate_${this.nodeCounter++}`;
 
     // Create LLM node with tools
     const llmParams: LlmParams = {
@@ -171,9 +172,9 @@ export class Agent implements NodeHandler {
       parameters: {
         // Evaluate to true only if there's a tool_call AND it hasn't been processed in this execution loop
         condition: `{{
-          $exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls)
+          exists(lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls)
           and
-          ($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id != $.state.lastProcessedToolCallId)
+          (lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id != $.state.lastProcessedToolCallId)
         }}`,
       },
     };
@@ -185,7 +186,7 @@ export class Agent implements NodeHandler {
       name: 'Execute Tool',
       description: 'Execute the requested tool',
       parameters: {
-        name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+        name: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
         description: 'Dynamic tool execution',
         parameters: {
           type: 'object',
@@ -195,18 +196,61 @@ export class Agent implements NodeHandler {
       },
     };
 
-    // Create mutate node to mark this tool_call as processed (idempotency) without duplicating messages
+    // Create mutate node to append assistant tool_calls + tool result AND mark processed id
+    // Server only injects history once; Agent manages tool/tool_call conversation messages internally
     const mutateNode = {
       ref: mutateNodeRef,
       type: 'mutate' as const,
-      name: 'Mark Tool Processed',
-      description: 'Track last processed tool_call id to avoid duplicate execution in the same loop',
+      name: 'Update Messages and Mark Tool Processed',
+      description: 'Add assistant tool_calls and tool result to state.messages, then mark tool_call as processed',
+      parameters: {
+        mutations: [
+          // Add assistant message with tool call (as produced by LLM)
+          {
+            operation: 'add' as const,
+            path: '/state/messages/-',
+            value: {
+              role: 'assistant',
+              content: null,
+              tool_calls: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
+            },
+          },
+          // Add tool result message
+          {
+            operation: 'add' as const,
+            path: '/state/messages/-',
+            value: {
+              role: 'tool',
+              tool_call_id: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+              name: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+              content: `{{ string(lastOutputOf("${toolNodeRef}")[0].json) }}`,
+            },
+          },
+          // Mark tool_call as processed to prevent duplicate execution in this loop
+          {
+            operation: 'add' as const,
+            path: '/state/lastProcessedToolCallId',
+            value: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+          },
+        ],
+      },
+    };
+
+    // When no tool_calls are present, append the assistant's textual content to state.messages
+    const mutateAppendNode = {
+      ref: mutateAppendNodeRef,
+      type: 'mutate' as const,
+      name: 'Append Assistant Content',
+      description: 'Append assistant textual reply to state.messages when no tool calls are present',
       parameters: {
         mutations: [
           {
             operation: 'add' as const,
-            path: '/state/lastProcessedToolCallId',
-            value: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+            path: '/state/messages/-',
+            value: {
+              role: 'assistant',
+              content: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
+            },
           },
         ],
       },
@@ -216,7 +260,7 @@ export class Agent implements NodeHandler {
     const endNode = this.params.blueprint!.nodes.find((node) => node.type === 'end')!;
 
     // Update blueprint nodes
-    this.params.blueprint!.nodes.push(llmNode, conditionalNode, toolNode, mutateNode);
+    this.params.blueprint!.nodes.push(llmNode, conditionalNode, toolNode, mutateNode, mutateAppendNode);
 
     // Update blueprint edges to create tool calling loop
     const startToLLMEdge = this.params.blueprint!.edges.find((edge) => edge.to === endNode.ref)!;
@@ -248,12 +292,18 @@ export class Agent implements NodeHandler {
         from: mutateNodeRef,
         to: llmNodeRef,
       },
-      // Conditional -> End (if no tool calls)
+      // Conditional -> MutateAppend (if no tool calls)
       {
         ref: `edge_${this.params.blueprint!.edges.length + 5}`,
         from: conditionalNodeRef,
-        to: endNode.ref,
+        to: mutateAppendNodeRef,
         condition: 'false',
+      },
+      // MutateAppend -> End
+      {
+        ref: `edge_${this.params.blueprint!.edges.length + 6}`,
+        from: mutateAppendNodeRef,
+        to: endNode.ref,
       }
     );
   }

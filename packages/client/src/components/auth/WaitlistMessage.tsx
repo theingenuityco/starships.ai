@@ -25,7 +25,7 @@ export function WaitlistMessage({ message, onClose }: WaitlistMessageProps) {
           <div className="flex-1">
             <h3 className="font-semibold mb-2 flex items-center">
               <Rocket className="h-5 w-5 mr-2" />
-              You're on the waitlist!
+              You&apos;re on the waitlist!
             </h3>
             <p className="text-muted-foreground">{message}</p>
           </div>

@@ -10,6 +10,7 @@ import type { ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import type { LLMResponse, LlmMessage, LlmToolCall } from '@/types/llm';
 
 export class Tool extends BaseNode<ToolParams> {
   constructor(params: ToolParams, options?: NodeHandlerOptions) {
@@ -25,7 +26,11 @@ export class Tool extends BaseNode<ToolParams> {
     try {
       // Extract tool arguments from input
       const inputData = ExecutionItemUtils.unwrapSingle(input);
-      const toolArgs = this.extractToolArguments(inputData);
+      const inputArgs = this.extractToolArguments(inputData);
+
+      // Fallback: if args weren't provided via input, pull them from the last LLM output (execution context)
+      const execArgs = this.getArgsFromExecutionContext(params.name);
+      const toolArgs = this.mergeArgs(inputArgs, execArgs);
 
       // Execute the tool based on its name and parameters
       const result = await this.executeToolLogic(params, toolArgs);
@@ -56,7 +61,62 @@ export class Tool extends BaseNode<ToolParams> {
       // If input is direct arguments object
       return input;
     }
+    // If input is a JSON string of args
+    if (typeof inputData === 'string') {
+      try {
+        const parsed = JSON.parse(inputData);
+        if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+      } catch {
+        // ignore
+      }
+    }
     return {};
+  }
+
+  /**
+   * Fallback: read tool_call arguments from the last LLM output in execution context
+   */
+  private getArgsFromExecutionContext(toolName: string): Record<string, unknown> {
+    const exec = this.getOptions()?.execution;
+    if (!exec || !Array.isArray(exec.results)) return {};
+
+    // Walk backwards over results to find the most recent LLM response with tool_calls
+    for (let i = exec.results.length - 1; i >= 0; i--) {
+      const items = exec.results[i]?.items;
+      const firstJson = items?.[0]?.json;
+      if (!firstJson || typeof firstJson !== 'object') continue;
+
+      // Narrow shape to partial LLMResponse
+      const resp = firstJson as Partial<LLMResponse>;
+      const choices = resp.choices;
+      if (Array.isArray(choices) && choices[0]?.message) {
+        const msg = choices[0].message as LlmMessage;
+        const toolCalls = msg.tool_calls as LlmToolCall[] | undefined;
+        if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+          // Prefer exact tool name match; otherwise use the first
+          const match = toolCalls.find((tc) => tc?.function?.name === toolName) ?? toolCalls[0];
+          const argStr = match?.function?.arguments;
+          if (typeof argStr === 'string') {
+            try {
+              return JSON.parse(argStr);
+            } catch {
+              return {};
+            }
+          } else if (argStr && typeof argStr === 'object') {
+            // In case provider returns already-parsed object (rare)
+            return argStr as Record<string, unknown>;
+          }
+        }
+      }
+    }
+    return {};
+  }
+
+  /**
+   * Merge primary and fallback args (fallback provides defaults)
+   */
+  private mergeArgs(primary: Record<string, unknown>, fallback: Record<string, unknown>): Record<string, unknown> {
+    return { ...fallback, ...primary };
   }
 
   /**
@@ -80,12 +140,45 @@ export class Tool extends BaseNode<ToolParams> {
 
   /**
    * Built-in calculator tool
+   * Accepts flexible inputs and coerces them to a safe expression string:
+   * - { expression: "2 + 3 * 4" }
+   * - { equation: "2 + 3 * 4" } or { value: "2 + 3 * 4" }
+   * - { a: 2, b: 3, operator: "*" }
    */
   private executeCalculator(args: Record<string, unknown>): unknown {
-    const { expression } = args;
-    if (typeof expression !== 'string') {
+    // Prefer "expression", but accept common alternates
+    let expr: unknown = (args as Record<string, unknown>)?.expression;
+
+    if (expr === undefined) {
+      const maybeEq = (args as Record<string, unknown>)?.equation;
+      const maybeVal = (args as Record<string, unknown>)?.value;
+
+      if (typeof maybeEq === 'string' || typeof maybeEq === 'number') {
+        expr = maybeEq;
+      } else if (typeof maybeVal === 'string' || typeof maybeVal === 'number') {
+        expr = maybeVal;
+      } else {
+        const a = (args as Record<string, unknown>)?.a;
+        const b = (args as Record<string, unknown>)?.b;
+        const op = (args as Record<string, unknown>)?.operator || (args as Record<string, unknown>)?.op;
+
+        if ((typeof a === 'number' || typeof a === 'string') && (typeof b === 'number' || typeof b === 'string')) {
+          const operator = typeof op === 'string' && ['+', '-', '*', '/', '%'].includes(op) ? (op as string) : '+';
+          expr = `${a} ${operator} ${b}`;
+        }
+      }
+    }
+
+    // Coerce numbers to strings
+    if (typeof expr === 'number') {
+      expr = String(expr);
+    }
+
+    if (typeof expr !== 'string' || expr.trim() === '') {
       throw new Error('Calculator requires a string expression');
     }
+
+    const expression = expr.trim();
 
     try {
       // Simple evaluation - in production, use a safe math evaluator

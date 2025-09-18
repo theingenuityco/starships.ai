@@ -17,6 +17,13 @@ import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 interface StreamChoice {
   content: string;
   finishReason: string | null;
+  tool_calls?: {
+    id?: string;
+    function: {
+      name?: string;
+      arguments?: string;
+    };
+  }[];
 }
 
 interface StreamChunk {
@@ -28,6 +35,15 @@ interface StreamChunk {
     index?: number;
     delta?: {
       content?: string;
+      role?: string;
+      tool_calls?: {
+        index?: number;
+        id?: string;
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }[];
     };
     finish_reason?: string | null;
   }[];
@@ -58,6 +74,9 @@ export class LLM extends BaseNode<LlmParams> {
         messages = [{ role: 'user', content: inputContent }];
       }
 
+      // Always stream; downstream receiver will handle tool_calls assembly from streaming deltas
+      const useStream = true;
+
       const requestBody: Record<string, unknown> = {
         model: params.model,
         messages: messages || params.messages,
@@ -66,7 +85,7 @@ export class LLM extends BaseNode<LlmParams> {
         top_p: params.topP || 1.0,
         frequency_penalty: params.frequencyPenalty || 0,
         presence_penalty: params.presencePenalty || 0,
-        stream: true,
+        stream: useStream,
       };
 
       // Add function calling support if tools are provided
@@ -74,7 +93,9 @@ export class LLM extends BaseNode<LlmParams> {
         requestBody.tools = this.convertToOpenRouterTools(params.tools);
         requestBody.tool_choice = 'auto';
       }
-      // console.log('LLM Request Body:', JSON.stringify(requestBody, null, 2));
+
+      console.log('LLM Req: ', JSON.stringify(requestBody, null, 2));
+
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -88,6 +109,13 @@ export class LLM extends BaseNode<LlmParams> {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
+      // If streaming is disabled (tools present), return the full JSON (includes tool_calls)
+      if (!useStream) {
+        const result = (await response.json()) as LLMResponse;
+        return ExecutionItemUtils.wrapSingle(result, input?.[0]);
+      }
+
+      // Streaming path
       const reader = response.body?.getReader();
       if (!reader) {
         const result = (await response.json()) as LLMResponse;
@@ -186,15 +214,38 @@ export class LLM extends BaseNode<LlmParams> {
         const index = choice.index ?? 0;
         const content = choice.delta?.content || '';
         const finishReason = choice.finish_reason || null;
+        const toolCallsDelta = choice.delta?.tool_calls || [];
 
         // Ensure choice exists
         while (choices.length <= index) {
           choices.push({ content: '', finishReason: null });
         }
 
+        // Accumulate assistant content
         if (content) {
           choices[index].content += content;
         }
+
+        // Accumulate tool_calls if present (OpenAI/OpenRouter-style streaming)
+        if (toolCallsDelta.length > 0) {
+          if (!choices[index].tool_calls) {
+            choices[index].tool_calls = [];
+          }
+          for (const tc of toolCallsDelta) {
+            const tcIndex = tc.index ?? 0;
+            // Ensure tool_call slot
+            while ((choices[index].tool_calls?.length || 0) <= tcIndex) {
+              choices[index].tool_calls?.push({ id: undefined, function: { name: undefined, arguments: '' } });
+            }
+            const target = choices[index].tool_calls![tcIndex];
+            if (tc.id) target.id = tc.id;
+            if (tc.function?.name) target.function.name = tc.function.name;
+            if (tc.function?.arguments) {
+              target.function.arguments = (target.function.arguments || '') + tc.function.arguments;
+            }
+          }
+        }
+
         if (finishReason) {
           choices[index].finishReason = finishReason;
         }
@@ -222,6 +273,18 @@ export class LLM extends BaseNode<LlmParams> {
         message: {
           role: 'assistant' as LLMMessageRole,
           content: choice.content,
+          ...(choice.tool_calls && choice.tool_calls.length > 0
+            ? {
+                tool_calls: choice.tool_calls.map((tc, i) => ({
+                  id: tc.id || `call_${index}_${i}`,
+                  type: 'function',
+                  function: {
+                    name: tc.function.name || '',
+                    arguments: tc.function.arguments || '',
+                  },
+                })),
+              }
+            : {}),
         },
         finish_reason: choice.finishReason || 'stop',
       })),

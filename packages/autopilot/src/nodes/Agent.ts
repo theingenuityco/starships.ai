@@ -57,8 +57,13 @@ export class Agent implements NodeHandler {
       };
       this.nodeCounter = 2; // start_1 and end_1 are taken
 
-      // Add a default LLM node to create start -> llm -> end workflow
-      this.addToChain();
+      // Create workflow based on whether tools are provided
+      if (this.params.tools && this.params.tools.length > 0) {
+        this.createToolEnabledBlueprint();
+      } else {
+        // Add a default LLM node to create start -> llm -> end workflow
+        this.addToChain();
+      }
     }
 
     // Blueprint is guaranteed to exist after constructor logic above
@@ -128,6 +133,140 @@ export class Agent implements NodeHandler {
     });
 
     return this;
+  }
+
+  /**
+   * Create tool-enabled blueprint with tool calling loop
+   */
+  private createToolEnabledBlueprint(): void {
+    const llmNodeRef = `llm_${this.nodeCounter++}`;
+    const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
+    const toolNodeRef = `tool_${this.nodeCounter++}`;
+    const mutateNodeRef = `mutate_${this.nodeCounter++}`;
+
+    // Create LLM node with tools
+    const llmParams: LlmParams = {
+      model: this.params.model,
+      messages: '{{ state.messages }}',
+      tools: this.params.tools,
+      ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
+      ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
+      ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+    };
+
+    const llmNode = {
+      ref: llmNodeRef,
+      type: 'llm' as const,
+      name: 'LLM with Tools',
+      description: 'AI model with function calling capability',
+      parameters: llmParams,
+    };
+
+    // Create conditional node to check for tool calls
+    const conditionalNode = {
+      ref: conditionalNodeRef,
+      type: 'conditional' as const,
+      name: 'Check Tool Calls',
+      description: 'Check if LLM wants to call any tools',
+      parameters: {
+        condition: `$exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls)`,
+      },
+    };
+
+    // Create tool execution node
+    const toolNode = {
+      ref: toolNodeRef,
+      type: 'tool' as const,
+      name: 'Execute Tool',
+      description: 'Execute the requested tool',
+      parameters: {
+        name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+        description: 'Dynamic tool execution',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+      },
+    };
+
+    // Create mutate node to append tool result to messages
+    const mutateNode = {
+      ref: mutateNodeRef,
+      type: 'mutate' as const,
+      name: 'Update Messages',
+      description: 'Add tool call and result to conversation',
+      parameters: {
+        mutations: [
+          // Add assistant message with tool call
+          {
+            operation: 'add' as const,
+            path: '/state/messages/-',
+            value: {
+              role: 'assistant',
+              content: null,
+              tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
+            },
+          },
+          // Add tool result message
+          {
+            operation: 'add' as const,
+            path: '/state/messages/-',
+            value: {
+              role: 'tool',
+              tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+              name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+              content: `{{ $string($lastOutputOf("${toolNodeRef}")[0].json) }}`,
+            },
+          },
+        ],
+      },
+    };
+
+    // Find the end node
+    const endNode = this.params.blueprint!.nodes.find((node) => node.type === 'end')!;
+
+    // Update blueprint nodes
+    this.params.blueprint!.nodes.push(llmNode, conditionalNode, toolNode, mutateNode);
+
+    // Update blueprint edges to create tool calling loop
+    const startToLLMEdge = this.params.blueprint!.edges.find((edge) => edge.to === endNode.ref)!;
+    startToLLMEdge.to = llmNodeRef;
+
+    this.params.blueprint!.edges.push(
+      // LLM -> Conditional
+      {
+        ref: `edge_${this.params.blueprint!.edges.length + 1}`,
+        from: llmNodeRef,
+        to: conditionalNodeRef,
+      },
+      // Conditional -> Tool (if tool calls exist)
+      {
+        ref: `edge_${this.params.blueprint!.edges.length + 2}`,
+        from: conditionalNodeRef,
+        to: toolNodeRef,
+        condition: 'true',
+      },
+      // Tool -> Mutate
+      {
+        ref: `edge_${this.params.blueprint!.edges.length + 3}`,
+        from: toolNodeRef,
+        to: mutateNodeRef,
+      },
+      // Mutate -> LLM (loop back)
+      {
+        ref: `edge_${this.params.blueprint!.edges.length + 4}`,
+        from: mutateNodeRef,
+        to: llmNodeRef,
+      },
+      // Conditional -> End (if no tool calls)
+      {
+        ref: `edge_${this.params.blueprint!.edges.length + 5}`,
+        from: conditionalNodeRef,
+        to: endNode.ref,
+        condition: 'false',
+      }
+    );
   }
 
   /**

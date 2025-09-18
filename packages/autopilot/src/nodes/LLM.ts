@@ -6,7 +6,7 @@
  */
 
 import { BaseNode } from './BaseNode';
-import type { LlmParams } from '@/types/node-parameters';
+import type { LlmParams, ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { autopilot } from '@/Autopilot';
@@ -58,7 +58,7 @@ export class LLM extends BaseNode<LlmParams> {
         messages = [{ role: 'user', content: inputContent }];
       }
 
-      const requestBody = {
+      const requestBody: Record<string, unknown> = {
         model: params.model,
         messages: messages || params.messages,
         temperature: params.temperature || 0.7,
@@ -68,6 +68,12 @@ export class LLM extends BaseNode<LlmParams> {
         presence_penalty: params.presencePenalty || 0,
         stream: true,
       };
+
+      // Add function calling support if tools are provided
+      if (params.tools && params.tools.length > 0) {
+        requestBody.tools = this.convertToOpenRouterTools(params.tools);
+        requestBody.tool_choice = 'auto';
+      }
       // console.log('LLM Request Body:', JSON.stringify(requestBody, null, 2));
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -221,6 +227,20 @@ export class LLM extends BaseNode<LlmParams> {
       })),
       usage,
     };
+  }
+
+  /**
+   * Convert ToolParams to OpenRouter function calling format
+   */
+  private convertToOpenRouterTools(tools: ToolParams[]): unknown[] {
+    return tools.map((tool) => ({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+      },
+    }));
   }
 
   /**

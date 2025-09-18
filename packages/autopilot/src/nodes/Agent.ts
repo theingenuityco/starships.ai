@@ -169,8 +169,12 @@ export class Agent implements NodeHandler {
       name: 'Check Tool Calls',
       description: 'Check if LLM wants to call any tools',
       parameters: {
-        // IMPORTANT: wrap JSONata in {{ }} so Conditional evaluates it and emits true/false
-        condition: `{{ $exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls) }}`,
+        // Evaluate to true only if there's a tool_call AND it hasn't been processed in this execution loop
+        condition: `{{
+          $exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls)
+          and
+          ($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id != $.state.lastProcessedToolCallId)
+        }}`,
       },
     };
 
@@ -191,34 +195,18 @@ export class Agent implements NodeHandler {
       },
     };
 
-    // Create mutate node to append tool result to messages
+    // Create mutate node to mark this tool_call as processed (idempotency) without duplicating messages
     const mutateNode = {
       ref: mutateNodeRef,
       type: 'mutate' as const,
-      name: 'Update Messages',
-      description: 'Add tool call and result to conversation',
+      name: 'Mark Tool Processed',
+      description: 'Track last processed tool_call id to avoid duplicate execution in the same loop',
       parameters: {
         mutations: [
-          // Add assistant message with tool call
           {
             operation: 'add' as const,
-            path: '/state/messages/-',
-            value: {
-              role: 'assistant',
-              content: null,
-              tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
-            },
-          },
-          // Add tool result message
-          {
-            operation: 'add' as const,
-            path: '/state/messages/-',
-            value: {
-              role: 'tool',
-              tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
-              name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
-              content: `{{ $string($lastOutputOf("${toolNodeRef}")[0].json) }}`,
-            },
+            path: '/state/lastProcessedToolCallId',
+            value: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
           },
         ],
       },

@@ -68,6 +68,31 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
 }
 
 /**
+ * Tool parameter schema for function calling
+ */
+export interface ToolParameterSchema {
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  description: string;
+  enum?: string[];
+  items?: ToolParameterSchema; // For array type
+  properties?: Record<string, ToolParameterSchema>; // For object type
+}
+
+/**
+ * Tool node parameters for function execution
+ */
+export interface ToolParams extends BaseParams {
+  name: string;
+  description: string;
+  parameters: {
+    type: 'object';
+    properties: Record<string, ToolParameterSchema>;
+    required?: string[];
+  };
+  // Tool-specific execution parameters can be added here
+}
+
+/**
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
  * Template expressions ({{ }}) are supported for all numeric and string fields
@@ -81,6 +106,7 @@ export interface LlmParams extends BaseParams {
   topP?: number | string; // Supports template expressions
   frequencyPenalty?: number | string; // Supports template expressions
   presencePenalty?: number | string; // Supports template expressions
+  tools?: ToolParams[]; // Optional tools for function calling schema
 }
 
 /**
@@ -123,6 +149,9 @@ export interface AgentParams extends BaseParams {
 
   // Blueprint execution (optional - Agent will create default if not provided)
   blueprint?: Blueprint;
+
+  // Tool support (optional - enables function calling)
+  tools?: ToolParams[];
 
   // Metadata
   metadata?: Record<string, unknown>;
@@ -169,6 +198,7 @@ export type NodeParameters =
   | HttpRequestParams
   | LlmParams
   | WorkflowParams
+  | ToolParams
   | StartParams
   | EndParams
   | ConditionalParams

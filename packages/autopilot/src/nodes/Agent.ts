@@ -169,7 +169,8 @@ export class Agent implements NodeHandler {
       name: 'Check Tool Calls',
       description: 'Check if LLM wants to call any tools',
       parameters: {
-        condition: `$exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls)`,
+        // IMPORTANT: wrap JSONata in {{ }} so Conditional evaluates it and emits true/false
+        condition: `{{ $exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls) }}`,
       },
     };
 

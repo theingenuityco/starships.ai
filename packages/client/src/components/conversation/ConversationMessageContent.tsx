@@ -58,7 +58,9 @@ export function ConversationMessageContent({
   })
 
   // Track when tool results first appear to trigger auto-collapse delay
-  const prevToolResultsLength = useRef(toolResults?.length || 0)
+  // Always start with 0 to properly detect the first results appearing
+  const prevToolResultsLength = useRef(0)
+  const hasTriggeredCollapseRef = useRef(false)
 
   // Auto-collapse tool calls with delay when results complete (transition from no results to having results)
   useEffect(() => {
@@ -68,14 +70,16 @@ export function ConversationMessageContent({
     // Update the ref for next render
     prevToolResultsLength.current = currentResultsLength
 
-    // Only trigger delay when results first appear (0 -> >0)
-    if (currentResultsLength > 0 && previousResultsLength === 0) {
+    // Only trigger delay when results first appear (0 -> >0) and we haven't already triggered collapse for this message
+    if (currentResultsLength > 0 && previousResultsLength === 0 && !hasTriggeredCollapseRef.current) {
+      hasTriggeredCollapseRef.current = true
+      console.log(`[ConversationMessageContent] Auto-collapsing tool calls for message ${messageId} after 300ms delay`)
       const timer = setTimeout(() => {
         setIsToolCallsOpen(false)
       }, 300)
       return () => clearTimeout(timer)
     }
-  }, [toolResults])
+  }, [toolResults, messageId])
 
   // Build display content from chunks when streaming, use final content when complete
   const displayContent = useMemo(() => {

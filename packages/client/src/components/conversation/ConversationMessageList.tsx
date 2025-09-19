@@ -9,7 +9,7 @@ import { ConversationMessageContent } from './ConversationMessageContent'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
-const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[] }> = Object.freeze([])
+const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean }> = Object.freeze([])
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -100,7 +100,7 @@ interface ContentChunk {
 }
 
 interface ConversationMessageBubbleProps {
-  message: MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[] }
+  message: MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean }
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
@@ -113,8 +113,13 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-end">
           <div className="flex items-end gap-3 max-w-[70%]">
-            <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3">
+            <div className={`bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
               <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
+              {message.sending && (
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-primary border-2 border-background rounded-full flex items-center justify-center">
+                  <div className="w-2 h-2 bg-primary-foreground rounded-full animate-pulse" />
+                </div>
+              )}
             </div>
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
               <User className="w-4 h-4 text-primary" />

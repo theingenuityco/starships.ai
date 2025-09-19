@@ -537,9 +537,30 @@ export function useConversation(conversationId: string | null) {
         // Regular message - add to cache (append; ascending order)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
           if (!old) return { messages: [message], total: 1, conversationId: cid }
+
+          // Check if this is a user message that should replace an optimistic message
+          const isUserMessage = message.role === 'user'
+          let messages = [...old.messages]
+
+          if (isUserMessage) {
+            // Find and replace any optimistic user message with similar content and sending=true
+            const optimisticIndex = messages.findIndex(msg => msg.role === 'user' && msg.sending === true && msg.content === message.content && msg.id.startsWith('temp-user-'))
+
+            if (optimisticIndex !== -1) {
+              // Replace optimistic message with real server message
+              messages[optimisticIndex] = { ...message, sending: false }
+              return {
+                ...old,
+                messages,
+                total: messages.length,
+              }
+            }
+          }
+
+          // No optimistic message found, append normally
           return {
             ...old,
-            messages: [...old.messages, message],
+            messages: [...messages, message],
             total: old.total + 1,
           }
         })

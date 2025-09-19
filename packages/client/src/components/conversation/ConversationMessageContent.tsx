@@ -206,12 +206,14 @@ export function ConversationMessageContent({
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
     <div className={cn('relative group', className)}>
-      {/* Unified markdown rendering - same for both streaming and completed */}
-      <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {displayContent}
-        </ReactMarkdown>
-      </div>
+      {/* Unified markdown rendering - same for both streaming and completed, but skip for tool_result messages */}
+      {messageType !== 'tool_result' && (
+        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {displayContent}
+          </ReactMarkdown>
+        </div>
+      )}
 
       {/* Tool calls rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (

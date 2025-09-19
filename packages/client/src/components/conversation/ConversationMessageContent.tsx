@@ -213,8 +213,8 @@ export function ConversationMessageContent({
         </ReactMarkdown>
       </div>
 
-      {/* Tool calls (function calling) - rendered after message content */}
-      {Array.isArray(toolCalls) && toolCalls.length > 0 && (
+      {/* Tool calls rendering for assistant messages */}
+      {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="mt-3 space-y-2">
           <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-2">
             <Wrench className="w-3 h-3" />
@@ -222,27 +222,34 @@ export function ConversationMessageContent({
           </div>
           {toolCalls.map((tc, idx) => {
             const rawArgs = (tc as any)?.function?.arguments ?? ''
-            let pretty = ''
+            let prettyArgs = ''
             try {
-              pretty = JSON.stringify(JSON.parse(rawArgs), null, 2)
+              prettyArgs = JSON.stringify(JSON.parse(rawArgs), null, 2)
             } catch {
-              pretty = String(rawArgs)
+              prettyArgs = String(rawArgs)
             }
-            const blockId = `${messageId}-tool-${idx}`
+            const argsBlockId = `${messageId}-tool-args-${idx}`
             const funcName = (tc as any)?.function?.name || 'unknown'
+            const toolCallId = (tc as any)?.id
+
             return (
               <Card key={idx} className="border bg-muted/20">
                 <div className="flex items-center justify-between px-3 py-2 border-b">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Function</span>
                     <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
+                    {toolCallId && (
+                      <span className="text-xs text-muted-foreground">
+                        ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
+                      </span>
+                    )}
                   </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(pretty, blockId)}>
-                    {copiedStates[blockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
+                    {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                   </Button>
                 </div>
                 <pre className="text-xs p-3 overflow-x-auto">
-                  <code>{pretty}</code>
+                  <code>{prettyArgs}</code>
                 </pre>
               </Card>
             )
@@ -250,13 +257,33 @@ export function ConversationMessageContent({
         </div>
       )}
 
-      {/* Tool result (parsed JSON) - rendered after message content */}
-      {(messageType === 'workflow_output' || (parsedJson && Array.isArray(toolCalls) && toolCalls.length > 0)) && parsedJson && (
-        <Card className="mt-3 border bg-muted/20">
-          <div className="flex items-center justify-between px-3 py-2 border-b">
-            <div className="text-xs uppercase text-muted-foreground tracking-wide">Tool result</div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(JSON.stringify(parsedJson, null, 2), `${messageId}-tool-result`)}>
+      {/* Tool result message rendering */}
+      {messageType === 'tool_result' && (
+        <Card className="mt-3 border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
+            <div className="flex items-center gap-2">
+              <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
+                <Check className="w-3 h-3" />
+                Tool Result
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>
               {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            </Button>
+          </div>
+          <pre className="text-xs p-3 overflow-x-auto">
+            <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
+          </pre>
+        </Card>
+      )}
+
+      {/* Workflow output without tool calls */}
+      {messageType === 'workflow_output' && (!toolCalls || toolCalls.length === 0) && parsedJson && (
+        <Card className="mt-3 border bg-blue-50 dark:bg-blue-950/20">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800">
+            <div className="text-xs uppercase text-blue-700 dark:text-blue-300 tracking-wide font-medium">Workflow Output</div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(JSON.stringify(parsedJson, null, 2), `${messageId}-workflow-result`)}>
+              {copiedStates[`${messageId}-workflow-result`] ? <Check className="w-3 h-3 text-blue-500" /> : <Copy className="w-3 h-3" />}
             </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">

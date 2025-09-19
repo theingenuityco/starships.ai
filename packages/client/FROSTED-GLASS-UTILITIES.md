@@ -4,50 +4,22 @@ Beautiful frosted glass effects have been added to the Tailwind theme for reuse 
 
 ## Utility Classes
 
-### `.frosted-glass`
-
-The main frosted glass effect - ultra-subtle transparency with strong blur.
-
-- Background: Very subtle gradient (3% to 1% opacity)
-- Backdrop filter: 20px blur with 180% saturation
-- Border: Theme-aware with 20% opacity
-- Perfect for: Navigation panels, floating elements
-
 ### `.frosted-glass-card`
 
-Card-style frosted glass with slightly more opacity.
+The primary frosted glass effect with maximum visibility and dark shadows.
 
-- Background: Card color gradient (10% to 5% opacity)
+- Background: Card color gradient (30% to 20% opacity)
 - Backdrop filter: 20px blur with 180% saturation
 - Border: Theme-aware with 20% opacity
-- Perfect for: Modal dialogs, content cards
-
-### `.frosted-glass-light`
-
-Lighter frosted glass effect with more visibility.
-
-- Background: Background color gradient (5% to 2% opacity)
-- Backdrop filter: 15px blur with 160% saturation
-- Border: Theme-aware with 30% opacity
-- Perfect for: Tooltips, dropdowns, temporary overlays
+- Perfect for: Navigation panels, message inputs (both sizes), modal dialogs, content cards
 
 ## Background Utilities
 
-- `bg-frosted-light`: Light frosted background gradient
-- `bg-frosted-subtle`: Subtle frosted background gradient
 - `bg-frosted-card`: Card frosted background gradient
-
-## Backdrop Filter Utilities
-
-- `backdrop-filter-frosted`: 20px blur with 180% saturation
-- `backdrop-filter-frosted-light`: 15px blur with 160% saturation
-- `backdrop-filter-frosted-heavy`: 25px blur with 200% saturation
 
 ## Shadow Utilities
 
-- `shadow-frosted`: Basic frosted shadow
-- `shadow-frosted-lg`: Large frosted shadow
-- `shadow-frosted-xl`: Extra large frosted shadow
+- `shadow-frosted-xl`: Extra large frosted shadow with maximum dark mode visibility
 
 ## Usage Examples
 

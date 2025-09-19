@@ -266,7 +266,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           className={cn(
             'relative transition-all',
             minimal
-              ? 'frosted-glass-light rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
+              ? 'frosted-glass-card rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
               : 'frosted-glass-card rounded-2xl shadow-frosted-xl focus-within:ring-2 focus-within:ring-primary/20',
             'focus-within:border-primary/40',
             disabled && 'opacity-50'

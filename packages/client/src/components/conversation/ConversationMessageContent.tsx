@@ -222,7 +222,7 @@ export function ConversationMessageContent({
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="mt-3">
           <Collapsible defaultOpen={true}>
-            <CollapsibleTrigger className="text-xs uppercase text-muted-foreground tracking-wide font-medium mb-2">
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
               <Wrench className="w-3 h-3" />
               Tool Calls ({toolCalls.length})
             </CollapsibleTrigger>

@@ -43,10 +43,10 @@ describe('UserEntity (no-username)', () => {
       });
 
       it('should handle non-string or falsy values', () => {
-        const cases = [
-          { input: null as any, expected: null },
-          { input: undefined as any, expected: undefined },
-          { input: 123 as any, expected: 123 },
+        const cases: Array<{ input: unknown; expected: unknown }> = [
+          { input: null, expected: null },
+          { input: undefined, expected: undefined },
+          { input: 123, expected: 123 },
         ];
 
         for (const { input, expected } of cases) {
@@ -271,9 +271,9 @@ describe('UserEntity (no-username)', () => {
     });
 
     it('should reject non-object data', async () => {
-      await expect(UserEntity.validate('string data' as any)).rejects.toThrow('Data must be an object');
-      await expect(UserEntity.validate(null as any)).rejects.toThrow('Data must be an object');
-      await expect(UserEntity.validate(123 as any)).rejects.toThrow('Data must be an object');
+      await expect(UserEntity.validate('string data')).rejects.toThrow('Data must be an object');
+      await expect(UserEntity.validate(null)).rejects.toThrow('Data must be an object');
+      await expect(UserEntity.validate(123)).rejects.toThrow('Data must be an object');
     });
   });
 

@@ -87,6 +87,8 @@ export class MessageRepository extends BaseRepository {
           messageType: entity.messageType || 'user_input',
           // Persist tool_calls when provided (assistant function calling)
           ...(entity.tool_calls ? { tool_calls: entity.tool_calls } : {}),
+          // Persist tool_call_id when provided (tool_result linking)
+          ...(entity.tool_call_id ? { tool_call_id: entity.tool_call_id } : {}),
         };
 
         // Create entity instance from plain object, then serialize

@@ -40,9 +40,55 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
 
-  // Create display messages with optimized rendering (no synthetic overlay; rely on server patches)
+  // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
-    return [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    const sortedMessages = [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+    // First pass: collect all tool result messages by their tool_call_id
+    const toolResultsMap = new Map<string, any>()
+    const processedResultIds = new Set<string>()
+
+    sortedMessages.forEach(msg => {
+      if (msg.messageType === 'tool_result' && (msg as any).tool_call_id) {
+        toolResultsMap.set((msg as any).tool_call_id, msg)
+      }
+    })
+
+    // Second pass: group messages and attach matching tool results
+    const groupedMessages: Array<MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean; toolResults?: any[] }> = []
+
+    for (const message of sortedMessages) {
+      // If this is an assistant message with tool calls, attach all matching tool results
+      if (message.role === 'assistant' && (message as any).tool_calls?.length > 0) {
+        const toolCallIds = ((message as any).tool_calls || []).map((tc: any) => tc.id).filter(Boolean)
+        const toolResults: any[] = []
+
+        // Collect all matching tool results
+        for (const toolCallId of toolCallIds) {
+          if (toolResultsMap.has(toolCallId)) {
+            const result = toolResultsMap.get(toolCallId)
+            toolResults.push(result)
+            processedResultIds.add(result.id) // Mark as processed
+          }
+        }
+
+        // Add the grouped message with tool results
+        groupedMessages.push({
+          ...message,
+          toolResults,
+        })
+      }
+      // Only add tool result messages if they weren't already grouped with their tool calls
+      else if (message.messageType === 'tool_result' && !processedResultIds.has(message.id)) {
+        groupedMessages.push(message)
+      }
+      // For all other messages, add them normally
+      else if (message.messageType !== 'tool_result') {
+        groupedMessages.push(message)
+      }
+    }
+
+    return groupedMessages
   }, [storeMessages])
 
   // Optimized auto-scroll with debouncing
@@ -125,7 +171,7 @@ interface ContentChunk {
 }
 
 interface ConversationMessageBubbleProps {
-  message: MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean }
+  message: MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean; toolResults?: any[] }
   agentName?: string
 }
 
@@ -173,6 +219,7 @@ const MemoizedMessageBubble = memo(
                 contentChunks={message.contentChunks}
                 agentName={agentName}
                 toolCalls={(message as any).tool_calls}
+                toolResults={(message as any).toolResults}
                 messageType={message.messageType}
               />
             </div>
@@ -185,14 +232,27 @@ const MemoizedMessageBubble = memo(
     // Custom comparison for memo optimization
     if (prevProps.message.id !== nextProps.message.id) return false
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
+    if (prevProps.message.messageType !== nextProps.message.messageType) return false
 
-    // Re-render when text changes or contentChunks count changes
-    const contentUnchanged = prevProps.message.content === nextProps.message.content
-    const prevLen = prevProps.message.contentChunks?.length ?? 0
-    const nextLen = nextProps.message.contentChunks?.length ?? 0
-    const chunksUnchanged = prevLen === nextLen
+    // Re-render when text changes
+    if (prevProps.message.content !== nextProps.message.content) return false
 
-    return contentUnchanged && chunksUnchanged
+    // Re-render when contentChunks count changes
+    const prevChunks = prevProps.message.contentChunks?.length ?? 0
+    const nextChunks = nextProps.message.contentChunks?.length ?? 0
+    if (prevChunks !== nextChunks) return false
+
+    // Re-render when tool calls count changes
+    const prevCalls = (prevProps.message as any).tool_calls?.length ?? 0
+    const nextCalls = (nextProps.message as any).tool_calls?.length ?? 0
+    if (prevCalls !== nextCalls) return false
+
+    // CRITICAL: Re-render when grouped toolResults attach later
+    const prevToolResults = (prevProps.message as any).toolResults?.length ?? 0
+    const nextToolResults = (nextProps.message as any).toolResults?.length ?? 0
+    if (prevToolResults !== nextToolResults) return false
+
+    return true
   }
 )
 

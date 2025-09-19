@@ -88,7 +88,6 @@ export function ConversationMessageContent({
     if (currentResultsLength > 0 && previousResultsLength === 0 && !hasTriggeredCollapseRef.current && isToolCallsOpen) {
       hasTriggeredCollapseRef.current = true
       const delayMs = 300
-      console.log(`[ConversationMessageContent] Auto-collapsing tool calls for message ${messageId} after ${delayMs}ms delay`)
       const timer = setTimeout(() => {
         setIsToolCallsOpen(false)
       }, delayMs)

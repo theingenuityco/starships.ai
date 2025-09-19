@@ -435,6 +435,10 @@ pnpm run test         # Run tests
 - **fast-json-patch** - JSON Patch operations for transforms/mutations
 - **nanoid** - Unique ID generation
 
+## Additional Documentation
+
+- **[Tool Calling Guide](./README-TOOLS.md)** - Complete guide to implementing and using function calling with LLMs
+
 ---
 
 Part of the [starships.ai](/) monorepo.

@@ -14,11 +14,7 @@ A comprehensive TypeScript monorepo for orchestrating AI-driven agents and workf
 
 ## 📚 Documentation
 
-- **[Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Production deployment instructions
-- **[Environment Configuration](./docs/ENVIRONMENT_CONFIGURATION.md)** - Environment variables setup guide
-- **[Production Status](./docs/PRODUCTION_DEPLOYMENT_STATUS.md)** - Current deployment status
 - **[ER Diagram](./docs/er-diagram.md)** - Database schema and relationships
-- **[Waitlist Implementation](./docs/waitlist-implementation-plan.md)** - Early access system
 
 ---
 

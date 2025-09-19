@@ -190,14 +190,7 @@ export function ConversationMessageContent({
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
     <div className={cn('relative group', className)}>
-      {/* Streaming indicator - shows above content while streaming */}
-      {isStreaming && (
-        <div className="flex items-center gap-2 mb-2 text-muted-foreground">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
-          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
-        </div>
-      )}
+      {/* Streaming indicator moved to the end of the content to avoid layout shift */}
 
       {/* Unified markdown rendering - same for both streaming and completed */}
       <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content">
@@ -208,6 +201,15 @@ export function ConversationMessageContent({
         {/* Streaming cursor - appears after content while streaming */}
         {isStreaming && displayContent && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
       </div>
+
+      {/* Streaming indicator - shows below content while streaming to minimize layout shift */}
+      {isStreaming && (
+        <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+          <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
+          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
+          <Loader2 className="w-3 h-3 animate-spin" />
+        </div>
+      )}
 
       {/* Copy button for entire message */}
       {enableCopy && !isStreaming && (

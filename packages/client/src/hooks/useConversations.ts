@@ -179,9 +179,31 @@ export function useConversation(conversationId: string | null) {
         if (sameLen && sameActivity) return
       }
 
+      // Preserve optimistic user messages when syncing from TanStack Query
+      let finalMessages = data.messages as any[]
+
+      if (existing && Array.isArray(existing.messages)) {
+        // Find any optimistic messages that should be preserved
+        const optimisticMessages = existing.messages.filter((msg: any) => {
+          if (!msg.sending || !msg.id || !msg.id.startsWith('temp-user-')) {
+            return false
+          }
+
+          // Only preserve if there's no matching server message with same content
+          const hasMatchingServerMessage = data.messages.some((serverMsg: any) => serverMsg.role === 'user' && serverMsg.content === msg.content)
+
+          return !hasMatchingServerMessage
+        })
+
+        if (optimisticMessages.length > 0) {
+          // Add optimistic messages to the end of the synced messages
+          finalMessages = [...data.messages, ...optimisticMessages]
+        }
+      }
+
       setConversationSnapshot(conversationId, {
-        messages: data.messages as any,
-        total: data.total,
+        messages: finalMessages,
+        total: finalMessages.length,
         lastActivityAt: data.lastActivityAt,
       })
     } catch {}
@@ -544,7 +566,7 @@ export function useConversation(conversationId: string | null) {
 
           if (isUserMessage) {
             // Find and replace any optimistic user message with similar content and sending=true
-            const optimisticIndex = messages.findIndex(msg => msg.role === 'user' && msg.sending === true && msg.content === message.content && msg.id.startsWith('temp-user-'))
+            const optimisticIndex = messages.findIndex(msg => msg.role === 'user' && msg.sending === true && msg.content === message.content && msg.id && msg.id.startsWith('temp-user-'))
 
             if (optimisticIndex !== -1) {
               // Replace optimistic message with real server message

@@ -194,7 +194,7 @@ export function ConversationMessageContent({
       {isStreaming && (
         <div className="flex items-center gap-2 mb-2 text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
-          <span className="text-xs font-medium">{agentName || 'Assistant'} is thinking...</span>
+          <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
           {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
         </div>
       )}

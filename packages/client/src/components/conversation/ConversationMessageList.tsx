@@ -14,9 +14,10 @@ const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; conten
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  agentName?: string
 }
 
-export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, agentName }: ConversationMessageListProps) {
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
@@ -85,7 +86,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-6">
           {displayMessages.map(message => (
-            <MemoizedMessageBubble key={message.id} message={message} />
+            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} />
           ))}
         </div>
       </div>
@@ -101,11 +102,12 @@ interface ContentChunk {
 
 interface ConversationMessageBubbleProps {
   message: MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean }
+  agentName?: string
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({ message, agentName }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
 
     if (isUser) {
@@ -145,6 +147,7 @@ const MemoizedMessageBubble = memo(
                 isStreaming={message.streaming}
                 className="text-foreground"
                 contentChunks={message.contentChunks}
+                agentName={agentName}
               />
             </div>
           </div>

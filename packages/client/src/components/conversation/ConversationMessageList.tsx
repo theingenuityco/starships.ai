@@ -172,6 +172,8 @@ const MemoizedMessageBubble = memo(
                 className="text-foreground"
                 contentChunks={message.contentChunks}
                 agentName={agentName}
+                toolCalls={(message as any).tool_calls}
+                messageType={message.messageType}
               />
             </div>
           </div>

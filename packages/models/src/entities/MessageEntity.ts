@@ -7,6 +7,7 @@
 
 import { Transformers } from '@/helpers/serializer';
 import type { MessageModel, MessageType } from '@starships/protocol';
+import type { LlmToolCall } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
 import { IsEnum, IsISO8601, IsString, Length, validate, ValidationError } from 'class-validator';
 
@@ -39,6 +40,10 @@ export class MessageEntity implements MessageModel {
   @Expose()
   @IsEnum(['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error'])
   messageType!: MessageType;
+
+  // Optional tool_calls persisted for assistant messages when function calling is used (autopilot types)
+  @Expose()
+  tool_calls?: LlmToolCall[];
 
   /**
    * Simple validation function using class-validator

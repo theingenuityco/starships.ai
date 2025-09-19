@@ -107,7 +107,7 @@ src/
 │   ├── agent.ts            # Agent management contracts
 │   ├── chat.ts             # Chat system interfaces
 │   ├── llm.ts              # LLM provider contracts
-│   └── sibil.ts            # AI assistant protocols
+│   └── sybil.ts            # AI assistant protocols
 ├── domains/                # Database domain types
 │   ├── agent.ts            # AI agent configurations and deployment
 │   ├── starship.ts         # Starship management

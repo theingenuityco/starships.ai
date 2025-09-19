@@ -152,10 +152,11 @@ export class ConversationService {
       const agent = new Agent(agentModel, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
       });
-      // Convert database messages to LLM format
+      // Convert database messages to LLM format, preserving tool_calls
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system',
         content: msg.content,
+        ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
       }));
 
       // Create input execution item with the conversation messages
@@ -201,26 +202,9 @@ export class ConversationService {
 
     switch (event.type) {
       case 'workflow_started': {
-        // Initialize streaming content tracker
-        this.streamingContent.set(conversationId, '');
-
-        // Create initial assistant message placeholder for streaming
-        const assistantMessage: MessageModel = {
-          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          role: 'assistant',
-          content: '',
-          messageType: 'agent_response',
-          createdAt: event.timestamp,
-          updatedAt: event.timestamp,
-        };
-
-        // Add placeholder message to messages array with contentChunks array for delta accumulation
-        const delta: Operation = {
-          op: 'add',
-          path: '/messages/-',
-          value: { ...assistantMessage, streaming: true, contentChunks: [] },
-        };
-        await this.streamingService.broadcastDelta(conversationId, delta);
+        // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
+        // streamingContent accumulator will be initialized on first chunk if needed.
+        this.streamingContent.delete(conversationId);
         break;
       }
 

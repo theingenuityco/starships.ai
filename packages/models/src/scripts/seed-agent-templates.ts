@@ -7,7 +7,68 @@ import { getConnection } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
 import { AgentMemoryState, Blueprint, Agent } from '@starships/autopilot';
+import type { ToolParams } from '@starships/autopilot';
 import { AgentTemplateModel } from '@starships/protocol';
+
+/**
+ * Built-in tool definitions for agents
+ * These schemas enable function calling in the LLM for built-in tools implemented by Tool node
+ */
+const calculatorTool: ToolParams = {
+  name: 'calculator',
+  description: 'Perform mathematical calculations with basic arithmetic operations',
+  parameters: {
+    type: 'object',
+    properties: {
+      expression: {
+        type: 'string',
+        description: 'Mathematical expression to evaluate (e.g., "2 + 3 * 4")',
+      },
+    },
+    required: ['expression'],
+  },
+};
+
+const timeTool: ToolParams = {
+  name: 'get_current_time',
+  description: 'Get the current date and time',
+  parameters: {
+    type: 'object',
+    properties: {
+      timezone: {
+        type: 'string',
+        description: 'Timezone for the time (default: UTC)',
+        enum: ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'],
+      },
+      format: {
+        type: 'string',
+        description: 'Format for the time output',
+        enum: ['ISO', 'locale', 'timestamp'],
+      },
+    },
+    required: [],
+  },
+};
+
+const echoTool: ToolParams = {
+  name: 'echo',
+  description: 'Echo back the provided input for testing purposes',
+  parameters: {
+    type: 'object',
+    properties: {
+      message: {
+        type: 'string',
+        description: 'Message to echo back',
+      },
+      metadata: {
+        type: 'object',
+        description: 'Additional metadata to include',
+        properties: {},
+      },
+    },
+    required: ['message'],
+  },
+};
 
 /**
  * Create simple agent blueprint using Agent class
@@ -48,6 +109,7 @@ function createStarshipNavigatorBlueprint(): Blueprint {
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.4,
     maxTokens: 2000,
+    tools: [calculatorTool, timeTool, echoTool],
   });
 
   // Use the single default LLM chain created by Agent constructor

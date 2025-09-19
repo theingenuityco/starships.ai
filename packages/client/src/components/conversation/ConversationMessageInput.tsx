@@ -52,39 +52,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
-    // Auto-focus on textarea when component mounts and when agent is selected
+    // Consolidated focus management - handles all focus scenarios
     useEffect(() => {
-      if (textareaRef.current && selectedAgent && !disabled) {
-        // Small delay to ensure the component is fully rendered
+      const shouldFocus = () => {
+        // Don't focus if disabled, streaming, or sending
+        if (disabled || isStreamingEffective || sending) return false
+
+        // Always focus on component mount or navigation changes
+        return true
+      }
+
+      // Handle streaming completion focus
+      const wasStreaming = prevIsStreamingRef.current
+      const streamingCompleted = wasStreaming && !isStreamingEffective
+
+      if (textareaRef.current && shouldFocus()) {
+        const delay = streamingCompleted ? 50 : 100 // Faster focus after streaming completes
         const timer = setTimeout(() => {
           textareaRef.current?.focus()
-        }, 100)
+        }, delay)
+
+        // Update streaming ref
+        prevIsStreamingRef.current = isStreamingEffective
+
         return () => clearTimeout(timer)
       }
-    }, [selectedAgent, disabled])
 
-    // When streaming completes, re-enable and focus the textarea
-    useEffect(() => {
-      const wasStreaming = prevIsStreamingRef.current
-      if (wasStreaming && !isStreamingEffective && !disabled && !sending) {
-        const t = setTimeout(() => {
-          textareaRef.current?.focus()
-        }, 50)
-        prevIsStreamingRef.current = isStreamingEffective
-        return () => clearTimeout(t)
-      }
+      // Always update the streaming ref
       prevIsStreamingRef.current = isStreamingEffective
-    }, [isStreamingEffective, disabled, sending])
-
-    // Secondary guard: whenever input becomes enabled, ensure focus
-    useEffect(() => {
-      if (!isStreamingEffective && !sending && !disabled && selectedAgent) {
-        const t = setTimeout(() => {
-          textareaRef.current?.focus()
-        }, 80)
-        return () => clearTimeout(t)
-      }
-    }, [isStreamingEffective, sending, disabled, selectedAgent])
+    }, [disabled, isStreamingEffective, sending, selectedAgent, conversationId])
 
     // Sync local 'sending' with streaming completion to avoid stuck disabled/loading state
     useEffect(() => {

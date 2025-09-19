@@ -29,7 +29,6 @@ import starshipRoutes from '@/routes/starships';
 import userRoutes from '@/routes/users';
 // import expeditionRoutes from '@/routes/expeditions';
 import nativeApiKeysRoutes from '@/routes/native-api-keys';
-import waitlistRoutes from '@/routes/waitlist';
 import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
 
 // Import new error handling and health check routes
@@ -103,7 +102,6 @@ app.get('/api/v1/starships/pricing', async (req, res) => {
 // API Routes
 app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', healthRoutes);
-app.use('/api/v1', waitlistRoutes);
 app.use('/api/v1', agentRoutes);
 app.use('/api/v1', agentTemplateRoutes);
 app.use('/api/v1', conversationRoutes);

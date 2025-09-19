@@ -39,7 +39,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
   useAuth() // Keep the hook call but don't destructure unused values
   const isDashboard = pathname === '/'
-  const isWaitlist = pathname === '/waitlist'
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
@@ -55,8 +54,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  if (isDashboard || isWaitlist) {
-    // Landing page and waitlist routes - no authentication required
+  if (isDashboard) {
+    // Landing page - no authentication required
     return (
       <div className="h-full w-full">
         {children}

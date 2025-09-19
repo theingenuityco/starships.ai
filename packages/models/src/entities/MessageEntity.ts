@@ -28,8 +28,8 @@ export class MessageEntity implements MessageModel {
   updatedAt!: string;
 
   @Expose()
-  @IsEnum(['system', 'user', 'assistant'])
-  role!: 'system' | 'user' | 'assistant';
+  @IsEnum(['system', 'user', 'assistant', 'tool'])
+  role!: 'system' | 'user' | 'assistant' | 'tool';
 
   @Expose()
   @IsString()
@@ -38,7 +38,7 @@ export class MessageEntity implements MessageModel {
 
   // Message classification
   @Expose()
-  @IsEnum(['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error'])
+  @IsEnum(['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error', 'tool_result'])
   messageType!: MessageType;
 
   // Optional tool_calls persisted for assistant messages when function calling is used (autopilot types)
@@ -46,6 +46,12 @@ export class MessageEntity implements MessageModel {
   @IsOptional()
   @Transformers.JsonTransform()
   tool_calls?: LlmToolCall[];
+
+  // Optional tool_call_id for tool result messages - references the tool call that generated this result
+  @Expose()
+  @IsOptional()
+  @IsString()
+  tool_call_id?: string;
 
   /**
    * Simple validation function using class-validator

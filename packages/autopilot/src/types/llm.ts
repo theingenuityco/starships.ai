@@ -1,6 +1,6 @@
 // uuid import removed as it's no longer used in constructor
 
-export type LLMMessageRole = 'user' | 'assistant' | 'system';
+export type LLMMessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
 /**
  * Message entry with metadata

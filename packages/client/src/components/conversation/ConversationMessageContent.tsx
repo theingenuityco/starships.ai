@@ -31,6 +31,7 @@ interface MessageContentProps {
   contentChunks?: ContentChunk[]
   agentName?: string
   toolCalls?: NonNullable<MessageModel['tool_calls']>
+  toolResults?: any[]
   messageType?: MessageModel['messageType']
 }
 
@@ -45,6 +46,7 @@ export function ConversationMessageContent({
   contentChunks = [],
   agentName,
   toolCalls,
+  toolResults = [],
   messageType,
 }: MessageContentProps) {
   const { theme } = useTheme()
@@ -216,13 +218,13 @@ export function ConversationMessageContent({
         </div>
       )}
 
-      {/* Tool calls rendering for assistant messages */}
+      {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="mt-3">
           <Collapsible defaultOpen={true}>
             <CollapsibleTrigger className="text-xs uppercase text-muted-foreground tracking-wide font-medium mb-2">
               <Wrench className="w-3 h-3" />
-              Tool Calls ({toolCalls.length})
+              Tool Calls ({toolCalls.length}) {toolResults && toolResults.length > 0 && `& Results (${toolResults.length})`}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-2">
@@ -236,28 +238,88 @@ export function ConversationMessageContent({
                   }
                   const argsBlockId = `${messageId}-tool-args-${idx}`
                   const funcName = (tc as any)?.function?.name || 'unknown'
-                  const toolCallId = (tc as any)?.id
+
+                  // Normalize tool call id from multiple potential fields to be resilient across providers
+                  const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.tool_call_id ?? (tc as any)?.function?.id ?? null
+
+                  const toolCallId = rawCallId != null ? String(rawCallId) : ''
+
+                  // Find matching tool result using multiple possible id fields, normalized to strings
+                  const matchingResult = toolResults?.find((result: any) => {
+                    const rid = (result as any)?.tool_call_id ?? (result as any)?.call_id ?? (result as any)?.id
+                    if (rid == null) return false
+                    return String(rid) === toolCallId
+                  })
 
                   return (
-                    <Card key={idx} className="border bg-muted/20">
-                      <div className="flex items-center justify-between px-3 py-2 border-b">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Function</span>
-                          <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
-                          {toolCallId && (
-                            <span className="text-xs text-muted-foreground">
-                              ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
-                            </span>
-                          )}
+                    <div key={idx} className="space-y-2">
+                      {/* Tool Call */}
+                      <Card className="border bg-muted/20">
+                        <div className="flex items-center justify-between px-3 py-2 border-b">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Function</span>
+                            <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
+                            {toolCallId && (
+                              <span className="text-xs text-muted-foreground">
+                                ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
+                              </span>
+                            )}
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
+                            {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                          </Button>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
-                          {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                        </Button>
-                      </div>
-                      <pre className="text-xs p-3 overflow-x-auto">
-                        <code>{prettyArgs}</code>
-                      </pre>
-                    </Card>
+                        <pre className="text-xs p-3 overflow-x-auto">
+                          <code>{prettyArgs}</code>
+                        </pre>
+                      </Card>
+
+                      {/* Tool Result (if available) */}
+                      {matchingResult && (
+                        <Card className="border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20 ml-4">
+                          <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
+                            <div className="flex items-center gap-2">
+                              <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
+                                <Check className="w-3 h-3" />
+                                Result
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => {
+                                const resultContent = matchingResult.content || ''
+                                let parsedResultJson = null
+                                try {
+                                  const t = (resultContent || '').trim()
+                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                    parsedResultJson = JSON.parse(t)
+                                  }
+                                } catch {}
+                                handleCopyCodeBlock(parsedResultJson ? JSON.stringify(parsedResultJson, null, 2) : resultContent, `${messageId}-tool-result-${idx}`)
+                              }}
+                            >
+                              {copiedStates[`${messageId}-tool-result-${idx}`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            </Button>
+                          </div>
+                          <pre className="text-xs p-3 overflow-x-auto">
+                            <code>
+                              {(() => {
+                                const resultContent = matchingResult.content || ''
+                                try {
+                                  const t = (resultContent || '').trim()
+                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                    return JSON.stringify(JSON.parse(t), null, 2)
+                                  }
+                                } catch {}
+                                return resultContent
+                              })()}
+                            </code>
+                          </pre>
+                        </Card>
+                      )}
+                    </div>
                   )
                 })}
               </div>
@@ -266,14 +328,14 @@ export function ConversationMessageContent({
         </div>
       )}
 
-      {/* Tool result message rendering - now as simple card */}
+      {/* Tool result message rendering - fallback for unmatched results */}
       {messageType === 'tool_result' && (
         <Card className="mt-3 border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20">
           <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
             <div className="flex items-center gap-2">
               <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
                 <Check className="w-3 h-3" />
-                Tool Result
+                Tool Result (Standalone)
               </div>
             </div>
             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>

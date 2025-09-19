@@ -23,7 +23,6 @@ export type MessageType =
 
 export interface Message extends LlmMessage {
   messageType: MessageType;
-  tool_call_id?: string; // Reference to the tool call that generated this result (for tool result messages)
 }
 
 /**

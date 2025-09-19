@@ -128,6 +128,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           textareaRef.current.style.height = 'auto'
         }
 
+        // Add optimistic user message to UI store immediately
+        const optimisticMessage = {
+          id: `temp-user-${Date.now()}`,
+          content: messageToSend,
+          role: 'user' as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          messageType: 'user_input' as const,
+          sending: true, // Mark as sending so UI can show loading state
+        }
+
+        // Get UI store actions
+        const { appendMessage } = useStarshipUIStore.getState()
+        appendMessage(currentConversationId!, optimisticMessage)
+
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
 
@@ -143,8 +158,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         })
           .catch(error => {
             console.error('Failed to send message:', error)
-            // Restore message on error
+            // Restore message on error and remove optimistic message
             setMessage(messageToSend)
+            const { conversations } = useStarshipUIStore.getState()
+            const currentMessages = conversations[currentConversationId!]?.messages || []
+            const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
+            useStarshipUIStore.getState().setConversationSnapshot(currentConversationId!, {
+              messages: filteredMessages,
+              total: filteredMessages.length,
+            })
           })
           .finally(() => {
             setSending(false)
@@ -190,6 +212,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             onConversationStart?.(currentConversationId!)
           }
 
+          // Add optimistic user message to UI store immediately
+          const optimisticMessage = {
+            id: `temp-user-${Date.now()}`,
+            content: suggestionText,
+            role: 'user' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            messageType: 'user_input' as const,
+            sending: true, // Mark as sending so UI can show loading state
+          }
+
+          // Get UI store actions
+          const { appendMessage } = useStarshipUIStore.getState()
+          appendMessage(currentConversationId!, optimisticMessage)
+
           // Notify parent about message activity immediately (for UI state updates)
           onMessageSent?.()
 
@@ -205,6 +242,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
             .catch(error => {
               console.error('Failed to send suggestion:', error)
+              // Remove optimistic message on error
+              const { conversations } = useStarshipUIStore.getState()
+              const currentMessages = conversations[currentConversationId!]?.messages || []
+              const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
+              useStarshipUIStore.getState().setConversationSnapshot(currentConversationId!, {
+                messages: filteredMessages,
+                total: filteredMessages.length,
+              })
             })
             .finally(() => {
               setSending(false)

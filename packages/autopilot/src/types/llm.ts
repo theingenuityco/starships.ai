@@ -5,9 +5,21 @@ export type LLMMessageRole = 'user' | 'assistant' | 'system';
 /**
  * Message entry with metadata
  */
+export interface LlmFunctionCall {
+  name: string;
+  arguments: string;
+}
+
+export interface LlmToolCall {
+  id?: string;
+  type?: 'function';
+  function: LlmFunctionCall;
+}
+
 export interface LlmMessage {
   role: LLMMessageRole;
   content: string;
+  tool_calls?: LlmToolCall[];
 }
 
 export interface LLMUsage {

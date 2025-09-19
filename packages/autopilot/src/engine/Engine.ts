@@ -24,6 +24,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),
   transform: () => import('@/nodes/Transform').then((m) => m.Transform as NodeHandlerConstructor),
   mutate: () => import('@/nodes/Mutate').then((m) => m.Mutate as NodeHandlerConstructor),
+  tool: () => import('@/nodes/Tool').then((m) => m.Tool as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {

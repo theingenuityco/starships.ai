@@ -57,77 +57,139 @@ export class Agent implements NodeHandler {
       };
       this.nodeCounter = 2; // start_1 and end_1 are taken
 
-      // Add a default LLM node to create start -> llm -> end workflow
-      this.addToChain();
+      // Create the appropriate blueprint based on configuration
+      this.createDefaultBlueprint();
     }
 
     // Blueprint is guaranteed to exist after constructor logic above
   }
 
   /**
-   * Add an LLM node to the chain, inserting it before the end node
-   * This allows building chains like: start -> llm -> llm -> ... -> end
+   * Create default blueprint - unified approach for all agent types
+   * Simple agents: Start -> LLM -> Conditional -> End (conditional always false)
+   * Tool agents: Start -> LLM -> Conditional -> Tool -> LLM (conditional routes based on tool_calls)
    */
-  addToChain(name?: string, description?: string): Agent {
-    const nodeRef = `llm_${++this.nodeCounter}`;
-    const nodeName = name || 'Respond';
-    const nodeDescription = description || 'AI response node';
+  private createDefaultBlueprint(): void {
+    const llmNodeRef = `llm_${this.nodeCounter++}`;
+    const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
+    const hasTools = this.params.tools && this.params.tools.length > 0;
 
-    // Create the LLM parameters with inline mutations
+    // Create unified LLM node that handles both simple and tool-enabled cases
     const llmParams: LlmParams = {
       model: this.params.model,
       messages: '{{ state.messages }}',
+      ...(hasTools && { tools: this.params.tools }),
       ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
       ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
       ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
-      // Add mutations directly to LLM node instead of creating separate mutate node
+      // Always add assistant message via inline mutation
       mutations: [
         {
           operation: 'add' as const,
           path: '/state/messages/-',
           value: {
             role: 'assistant',
-            content: `{{ $exists($lastOutputOf("${nodeRef}")[0].json.choices[0].message.content) ? $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "" }}`,
+            content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
+            tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
           },
         },
       ],
     };
 
-    // Create the LLM node
     const llmNode = {
-      ref: nodeRef,
+      ref: llmNodeRef,
       type: 'llm' as const,
-      name: nodeName,
-      description: nodeDescription,
+      name: hasTools ? 'LLM with Tools' : 'Respond',
+      description: hasTools ? 'AI model with function calling capability' : 'AI response node',
       parameters: llmParams,
     };
 
+    // Create conditional node to check for tool calls from current LLM response
+    const conditionalNode = {
+      ref: conditionalNodeRef,
+      type: 'conditional' as const,
+      name: 'Check Tool Calls',
+      description: 'Check if LLM wants to call any tools',
+      parameters: {
+        condition: `{{ $exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls) }}`,
+      },
+    };
+
     // Find the end node
-    const endNode = this.params.blueprint!.nodes.find((node) => node.type === 'end');
-    if (!endNode) {
-      throw new Error('End node not found in blueprint');
-    }
+    const endNode = this.params.blueprint!.nodes.find((node) => node.type === 'end')!;
 
-    // Find the edge that currently connects to the end node
-    const edgeToEnd = this.params.blueprint!.edges.find((edge) => edge.to === endNode.ref);
-    if (!edgeToEnd) {
-      throw new Error('Edge to end node not found');
-    }
+    // Always create the unified blueprint structure
+    this.params.blueprint!.nodes.push(llmNode, conditionalNode);
 
-    // Update the existing edge to point to the new LLM node
-    edgeToEnd.to = nodeRef;
+    // Update start edge to point to LLM
+    const startToEndEdge = this.params.blueprint!.edges.find((edge) => edge.to === endNode.ref)!;
+    startToEndEdge.to = llmNodeRef;
 
-    // Add the new LLM node to the blueprint
-    this.params.blueprint!.nodes.push(llmNode);
-
-    // Create direct edge: LLM -> End (no separate mutate node needed)
+    // Add LLM -> Conditional edge
     this.params.blueprint!.edges.push({
       ref: `edge_${this.params.blueprint!.edges.length + 1}`,
-      from: nodeRef,
-      to: endNode.ref,
+      from: llmNodeRef,
+      to: conditionalNodeRef,
     });
 
-    return this;
+    // Create tool node and edges only if tools exist
+    if (hasTools) {
+      const toolNodeRef = `tool_${this.nodeCounter++}`;
+      const toolNode = {
+        ref: toolNodeRef,
+        type: 'tool' as const,
+        name: 'Execute Tool',
+        description: 'Execute the requested tool',
+        parameters: {
+          name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+          description: 'Dynamic tool execution',
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: [],
+          },
+          // Add tool result via inline mutation
+          mutations: [
+            {
+              operation: 'add' as const,
+              path: '/state/messages/-',
+              value: {
+                role: 'tool',
+                tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+                name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+                content: `{{ $string($lastOutputOf("${toolNodeRef}")[0].json) }}`,
+              },
+            },
+          ],
+        },
+      };
+
+      this.params.blueprint!.nodes.push(toolNode);
+
+      this.params.blueprint!.edges.push(
+        // Conditional -> Tool (if tool calls exist)
+        {
+          ref: `edge_${this.params.blueprint!.edges.length + 2}`,
+          from: conditionalNodeRef,
+          to: toolNodeRef,
+          condition: 'true',
+        },
+        // Tool -> LLM (loop back after adding tool result)
+        {
+          ref: `edge_${this.params.blueprint!.edges.length + 3}`,
+          from: toolNodeRef,
+          to: llmNodeRef,
+        }
+      );
+    }
+
+    // Conditional -> End (always present - if no tools or no tool_calls)
+    this.params.blueprint!.edges.push({
+      ref: `edge_${this.params.blueprint!.edges.length + 4}`,
+      from: conditionalNodeRef,
+      to: endNode.ref,
+      condition: 'false',
+    });
   }
 
   /**

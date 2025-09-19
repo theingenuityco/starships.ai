@@ -122,10 +122,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           onConversationStart?.(currentConversationId!)
         }
 
-        // Set agent information and responding state in store
+        // Set agent information in store
         const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
         setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
-        setConversationResponding(currentConversationId!, true)
 
         // Clear input and reset UI immediately for better UX
         setMessage('')
@@ -145,6 +144,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         appendMessage(currentConversationId!, optimisticMessage)
+
+        // Now toggle responding so the indicator renders after the user message
+        setConversationResponding(currentConversationId!, true)
 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
@@ -220,10 +222,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             onConversationStart?.(currentConversationId!)
           }
 
-          // Set agent information and responding state in store
+          // Set agent information in store
           const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
           setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
-          setConversationResponding(currentConversationId!, true)
 
           // Add optimistic user message to UI store immediately
           const optimisticMessage = {
@@ -237,6 +238,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
 
           appendMessage(currentConversationId!, optimisticMessage)
+
+          // Now toggle responding so the indicator renders after the user message
+          setConversationResponding(currentConversationId!, true)
 
           // Notify parent about message activity immediately (for UI state updates)
           onMessageSent?.()
@@ -302,8 +306,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     const getPlaceholder = () => {
-      if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'AI is thinking...'
-      if (sending) return selectedAgent ? `${selectedAgent.name} is responding...` : 'Responding...'
+      if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
+      if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
@@ -419,7 +423,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         {/* Agent Indicator - Only show in non-minimal mode */}
         {!minimal && selectedAgent && (
           <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
-            {isStreamingEffective ? `${selectedAgent.name} is thinking...` : sending ? `${selectedAgent.name} is responding...` : `Chatting with ${selectedAgent.name}`}
+            {isStreamingEffective ? `${selectedAgent.name} is responding...` : sending ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
           </div>
         )}
       </div>

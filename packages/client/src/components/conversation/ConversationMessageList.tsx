@@ -3,7 +3,7 @@
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { Bot, User } from 'lucide-react'
+import { Bot, User, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 
@@ -14,18 +14,26 @@ const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; conten
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
-  agentName?: string
 }
 
-export function ConversationMessageList({ conversationId, starshipId, agentName }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
 
+  // Use stable selectors to avoid returning new objects each render
   const storeMessages = useStarshipUIStore(state => {
     if (!conversationId) return EMPTY_MESSAGES as any
     const convo = state.conversations[conversationId]
     return (convo?.messages as any) || EMPTY_MESSAGES
+  })
+  const agentName = useStarshipUIStore(state => {
+    if (!conversationId) return undefined
+    return state.conversations[conversationId]?.agentName
+  })
+  const isResponding = useStarshipUIStore(state => {
+    if (!conversationId) return false
+    return state.conversations[conversationId]?.isResponding === true
   })
 
   // Scroll container reference
@@ -85,6 +93,22 @@ export function ConversationMessageList({ conversationId, starshipId, agentName 
     <div className="h-full flex flex-col">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-6">
+          {/* Show responding indicator if agent is responding but no messages yet or last message is from user */}
+          {isResponding && agentName && (displayMessages.length === 0 || displayMessages[displayMessages.length - 1]?.role === 'user') && (
+            <div className="flex justify-start">
+              <div className="flex items-start gap-3 max-w-[85%]">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
+                  <Bot className="w-4 h-4 text-muted-foreground" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-2 text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span className="text-xs font-medium">{agentName} is responding...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {displayMessages.map(message => (
             <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} />
           ))}

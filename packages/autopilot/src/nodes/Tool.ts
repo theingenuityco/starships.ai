@@ -270,8 +270,10 @@ export class Tool extends BaseNode<ToolParams> {
     }
 
     // Tool name validation (must be one of supported tools)
+    // Skip validation if name contains template syntax (will be resolved at execution time)
     const supportedTools = ['calculator', 'get_current_time', 'echo'];
-    if (!supportedTools.includes(params.name)) {
+    const isTemplate = params.name.includes('{{') && params.name.includes('}}');
+    if (!isTemplate && !supportedTools.includes(params.name)) {
       errors.push({
         code: 'INVALID_PARAMETERS',
         message: `Unsupported tool '${params.name}'. Supported tools: ${supportedTools.join(', ')}`,

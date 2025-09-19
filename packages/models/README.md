@@ -103,36 +103,54 @@ try {
 
 ```bash
 # Run database migrations
-npm run migrate
+pnpm run migrate
 
 # Seed waitlist data
-npm run seed:waitlist
+pnpm run seed:waitlist
+
+# Seed agent templates
+pnpm run seed:agent-templates
 ```
 
 ### Backup & Recovery
 
 ```bash
 # Create backup
-npm run backup:create
+pnpm run backup:create
 
 # Restore from backup
-npm run backup:restore
+pnpm run backup:restore
 
 # Validate backup integrity
-npm run backup:validate
+pnpm run backup:validate
+
+# Test backup/restore functionality
+pnpm run test:backup
+
+# Get help for backup commands
+pnpm run backup:help
 ```
 
 ### Performance Monitoring
 
 ```bash
 # Monitor database performance
-npm run monitor
+pnpm run monitor
 
 # Cleanup abandoned starships
-npm run cleanup:abandoned-starships
+pnpm run cleanup:abandoned-starships
+
+# Cleanup abandoned starships (dry run)
+pnpm run cleanup:abandoned-starships:dry
 
 # Validate schema constraints
-npm run validate-schema
+pnpm run validate-schema
+
+# Database CLI tool
+pnpm run db-cli
+
+# Disaster recovery
+pnpm run disaster:recovery
 ```
 
 ## Usage Examples
@@ -375,10 +393,23 @@ LOG_METRICS=true
 
 ## Dependencies
 
-- **Neo4j Driver** - Graph database connectivity
+### Core Dependencies
+
+- **neo4j-driver** - Graph database connectivity (v5.28+)
 - **@starships/protocol** - Shared type definitions
-- **UUID** - Unique identifier generation
+- **@starships/errors** - Error handling system
+- **@starships/autopilot** - Workflow execution integration
+- **nanoid** - Unique identifier generation
+- **class-transformer** - Data serialization and transformation
+- **class-validator** - Data validation
+- **reflect-metadata** - Metadata reflection for decorators
+- **fs-extra** - Enhanced file system operations
+
+### Development Dependencies
+
 - **TypeScript** - Type-safe development
+- **Jest** - Testing framework
+- **tsx** - TypeScript execution and development
 
 ## Health Checks
 

@@ -22,12 +22,10 @@ pnpm install @starships/autopilot
 ### Basic Usage
 
 ```typescript
-import { Engine, Agent, autopilot } from '@starships/autopilot';
+import { Engine, Agent, config } from '@starships/autopilot';
 
-// Configure credentials
-autopilot.setCredentials({
-  openrouterApiKey: 'sk-or-v1-your-key',
-});
+// Note: Credentials are typically managed at the application level
+// The autopilot package focuses on workflow execution
 
 // Create and configure an agent
 const agent = new Agent({
@@ -119,17 +117,18 @@ When `failOnNodeError` is false:
 
 ## Node Types
 
-| Type           | Description           | Key Parameters                                          |
-| -------------- | --------------------- | ------------------------------------------------------- |
-| `start/end`    | Flow control          | `{}`                                                    |
-| `llm`          | LLM API calls         | `model`, `messages`, `temperature`                      |
-| `agent`        | AI agent with memory  | `name`, `model`, `memoryState` (systemPrompt, messages) |
-| `http_request` | HTTP API calls        | `url`, `method`, `headers`, `body`                      |
-| `conditional`  | Branch workflows      | `condition` (JSONata expression)                        |
-| `transform`    | Input transformations | `transforms` (JSON Patch operations)                    |
-| `mutate`       | State mutations       | `mutations` (JSON Patch operations)                     |
-| `workflow`     | Nested workflows      | `blueprint`                                             |
-| `user_prompt`  | User interaction      | Platform-specific                                       |
+| Type           | Description              | Key Parameters                                          |
+| -------------- | ------------------------ | ------------------------------------------------------- |
+| `start/end`    | Flow control             | `{}`                                                    |
+| `llm`          | LLM API calls            | `model`, `messages`, `temperature`                      |
+| `agent`        | AI agent with memory     | `name`, `model`, `memoryState` (systemPrompt, messages) |
+| `http_request` | HTTP API calls           | `url`, `method`, `headers`, `body`                      |
+| `conditional`  | Branch workflows         | `condition` (JSONata expression)                        |
+| `transform`    | Input transformations    | `transforms` (JSON Patch operations)                    |
+| `mutate`       | State mutations          | `mutations` (JSON Patch operations)                     |
+| `tool`         | Function calling support | `name`, `description`, `parameters`                     |
+| `workflow`     | Nested workflows         | `blueprint`                                             |
+| `user_prompt`  | User interaction         | Platform-specific                                       |
 
 ## Template Expressions
 
@@ -365,7 +364,7 @@ export class CustomNode extends BaseNode<CustomParams> {
 export { Engine, Agent, BaseNode } from '@starships/autopilot';
 
 // Node handlers
-export { LLM, HttpRequest, Workflow, Conditional, Transform, Mutate } from '@starships/autopilot';
+export { LLM, HttpRequest, Tool, Workflow, Conditional, Transform, Mutate } from '@starships/autopilot';
 
 // Memory system
 export { Memory, AgentMemory } from '@starships/autopilot';
@@ -373,8 +372,8 @@ export { Memory, AgentMemory } from '@starships/autopilot';
 // Evaluation engine
 export { Eval } from '@starships/autopilot';
 
-// Configuration
-export { autopilot, AutopilotManager } from '@starships/autopilot';
+// Configuration and utilities
+export { config, ExecutionItemUtils } from '@starships/autopilot';
 
 // Types
 export type {
@@ -393,27 +392,83 @@ export type {
 } from '@starships/autopilot';
 ```
 
-### Credential Management
+### Configuration
 
 ```typescript
-// Set credentials (required for LLM nodes)
-autopilot.setCredentials({ openrouterApiKey: 'sk-or-...' });
+import { config } from '@starships/autopilot';
 
-// Check if credentials are available
-if (!autopilot.hasOpenRouterApiKey()) {
-  throw new Error('OpenRouter API key required');
-}
+// Access configuration constants
+console.log('Max nodes:', config.MAX_NODES);
+console.log('Execution timeout:', config.EXECUTION_TIMEOUT);
 
-// Get credentials (read-only)
-const credentials = autopilot.getCredentials();
+// Built-in timeouts and limits
+const limits = {
+  approvalTimeout: config.APPROVAL_TIMEOUT,
+  executionTimeout: config.EXECUTION_TIMEOUT,
+  userPromptTimeout: config.USER_PROMPT_TIMEOUT,
+  agentExecutionTimeout: config.AGENT_EXECUTION_TIMEOUT,
+  maxNodes: config.MAX_NODES,
+  maxEdges: config.MAX_EDGES,
+};
+```
 
-// Reset credentials (useful for testing)
-autopilot.reset();
+## Tool Calling Support
+
+The [`Tool`](./src/nodes/Tool.ts) node provides built-in function calling capabilities:
+
+```typescript
+// Built-in tools available
+const supportedTools = [
+  'calculator', // Mathematical expressions
+  'get_current_time', // Current timestamp with timezone support
+  'echo', // Echo arguments (for testing)
+];
+
+// Tool node example
+const toolNode = {
+  ref: 'calc-tool',
+  type: 'tool',
+  name: 'Calculator Tool',
+  parameters: {
+    name: 'calculator',
+    description: 'Perform mathematical calculations',
+    parameters: {
+      type: 'object',
+      properties: {
+        expression: {
+          type: 'string',
+          description: 'Mathematical expression to evaluate',
+        },
+      },
+      required: ['expression'],
+    },
+  },
+};
+```
+
+### Tool Usage Examples
+
+```typescript
+// Calculator tool
+const calcResult = await toolNode.execute([
+  {
+    json: { expression: '2 + 3 * 4' },
+    nodeRef: 'input',
+  },
+]);
+
+// Current time tool
+const timeResult = await toolNode.execute([
+  {
+    json: { timezone: 'America/New_York', format: 'locale' },
+    nodeRef: 'input',
+  },
+]);
 ```
 
 ## LLM Models
 
-Uses OpenRouter API for 200+ models:
+Supports various LLM providers and models:
 
 - `anthropic/claude-3.5-sonnet`
 - `openai/gpt-4-turbo`

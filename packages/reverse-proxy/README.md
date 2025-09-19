@@ -17,8 +17,8 @@ In development, this reverse proxy:
 ### Start with Proxy (Recommended for Development)
 
 ```bash
-# Start all services including the reverse proxy with Turbo
-pnpm run dev
+# Start all services including the reverse proxy
+pnpm dev
 ```
 
 This will:
@@ -109,7 +109,7 @@ pnpm --filter @starships/reverse-proxy dev
 
 ## Configuration
 
-The proxy uses the `@starships/env` package for configuration, which reads from the root `.env` file:
+The proxy reads configuration from the root `.env` file:
 
 | Variable     | Default                 | Description               |
 | ------------ | ----------------------- | ------------------------- |
@@ -117,7 +117,7 @@ The proxy uses the `@starships/env` package for configuration, which reads from 
 | `CLIENT_URL` | `http://localhost:3000` | Next.js frontend URL      |
 | `SERVER_URL` | `http://localhost:4000` | Express backend URL       |
 
-All configuration is centrally managed through the `@starships/env` package:
+Configuration is managed centrally:
 
 - `PROXY_PORT` - The port the proxy listens on
 - `CLIENT_URL` - Frontend routing destination

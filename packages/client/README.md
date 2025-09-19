@@ -21,23 +21,28 @@ Visit [http://localhost:3000](http://localhost:3000) to see the application.
 
 ### Tech Stack
 
-- **Framework**: Next.js 15 with App Router
+- **Framework**: Next.js 15.4+ with App Router
 - **Language**: TypeScript 5.8+
-- **Styling**: Tailwind CSS + shadcn/ui components
-- **State Management**: TanStack Query for data operations + Zustand for UI state
-- **Animations**: Framer Motion for smooth transitions
-- **Theme**: next-themes for dark/light mode
+- **React**: React 19.1+
+- **Styling**: Tailwind CSS + shadcn/ui components (Radix UI primitives)
+- **State Management**: TanStack Query 5.81+ for server state + Zustand 5.0+ for client state
+- **Animations**: Motion (Framer Motion) 12.23+ for smooth transitions
+- **Theme**: next-themes 0.4+ for dark/light mode
 - **Authentication**: JWT-based authentication
+- **Real-time**: Server-Sent Events with @microsoft/fetch-event-source
 
 ### Key Features
 
 - ✅ **Real-time Streaming**: Server-Sent Events (SSE) for live AI agent responses with visual streaming indicators
-- ✅ **Clean Navigation Architecture**: Extracted from command-deck spaghetti into dedicated components
-- ✅ **Command Dashboard**: Comprehensive control interface for starship management
+- ✅ **Clean Navigation Architecture**: Dedicated navigation components with proper separation of concerns
+- ✅ **Starship Management**: Comprehensive starship creation, deployment, and management interface
+- ✅ **Agent Control**: Agent deployment, configuration, and monitoring
+- ✅ **Conversation System**: Multi-agent chat interfaces with structured message handling
+- ✅ **Workflow Visualization**: React Flow integration for workflow visualization (@xyflow/react)
 - ✅ **Responsive Design**: Mobile-first with adaptive layouts
-- ✅ **Modern UI**: shadcn/ui components with glassmorphism effects
+- ✅ **Modern UI**: shadcn/ui components with Radix UI primitives
 - ✅ **Type Safety**: Full TypeScript with strict mode
-- ✅ **State Persistence**: Store integration maintains state across navigation
+- ✅ **State Persistence**: Zustand store with localStorage integration
 
 ## 📁 Project Structure
 
@@ -98,6 +103,12 @@ NEXT_PUBLIC_API_URL=http://localhost:4000
 
 # Authentication
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+
+# Analytics (optional)
+NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=your-ga-id
+
+# Analytics (optional)
+NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=your-ga-id
 ```
 
 ## 🎨 UI Components

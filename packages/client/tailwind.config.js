@@ -63,14 +63,10 @@ module.exports = {
         'frosted-heavy': 'blur(25px) saturate(200%)',
       },
       backgroundImage: {
-        'frosted-light': 'linear-gradient(135deg, hsl(var(--background) / 0.05) 0%, hsl(var(--background) / 0.02) 100%)',
-        'frosted-subtle': 'linear-gradient(135deg, hsl(var(--background) / 0.03) 0%, hsl(var(--background) / 0.01) 100%)',
-        'frosted-card': 'linear-gradient(135deg, hsl(var(--card) / 0.1) 0%, hsl(var(--card) / 0.05) 100%)',
+        'frosted-card': 'linear-gradient(135deg, hsl(var(--card) / 0.30) 0%, hsl(var(--card) / 0.20) 100%)',
       },
       boxShadow: {
-        frosted: '0 4px 16px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
-        'frosted-lg': '0 10px 25px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-        'frosted-xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+        'frosted-xl': 'var(--shadow-frosted-xl)',
       },
     },
   },
@@ -78,23 +74,11 @@ module.exports = {
     require('tailwindcss-animate'),
     function ({ addUtilities }) {
       const newUtilities = {
-        '.frosted-glass': {
-          background: 'linear-gradient(135deg, hsl(var(--background) / 0.03) 0%, hsl(var(--background) / 0.01) 100%)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          border: '1px solid hsl(var(--border) / 0.2)',
-        },
         '.frosted-glass-card': {
-          background: 'linear-gradient(135deg, hsl(var(--card) / 0.1) 0%, hsl(var(--card) / 0.05) 100%)',
+          background: 'linear-gradient(135deg, hsl(var(--card) / 0.30) 0%, hsl(var(--card) / 0.20) 100%)',
           backdropFilter: 'blur(20px) saturate(180%)',
           WebkitBackdropFilter: 'blur(20px) saturate(180%)',
           border: '1px solid hsl(var(--border) / 0.2)',
-        },
-        '.frosted-glass-light': {
-          background: 'linear-gradient(135deg, hsl(var(--background) / 0.05) 0%, hsl(var(--background) / 0.02) 100%)',
-          backdropFilter: 'blur(15px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(15px) saturate(160%)',
-          border: '1px solid hsl(var(--border) / 0.3)',
         },
       }
       addUtilities(newUtilities)

@@ -245,6 +245,8 @@ export class ConversationService {
 
               // Initialize server-side accumulator for this new stream
               this.streamingContent.set(conversationId, '');
+              // Clear tool_calls for this new stream to prevent reuse from previous LLM calls
+              this.streamingToolCalls.delete(conversationId);
             } else {
               break;
             }
@@ -310,13 +312,6 @@ export class ConversationService {
                 value: toolCallsValue,
               };
 
-              console.log('[STREAMING] Broadcasting tool_calls delta:', {
-                conversationId,
-                path: toolCallsOperation.path,
-                toolCallsCount: toolCallsValue.length,
-                toolCalls: toolCallsValue,
-              });
-
               await this.streamingService.broadcastDelta(conversationId, toolCallsOperation);
             } catch (e) {
               // ignore tool_call parse errors to avoid breaking streaming
@@ -361,6 +356,7 @@ export class ConversationService {
         // Persist the final assistant message to the database and patch stable fields
         // Skip persistence when content is empty to avoid DB validation errors
         if (!finalContent || finalContent.trim().length === 0) {
+          console.log('[STREAMING] Skipping persistence - empty content');
           this.streamingContent.delete(conversationId);
           break;
         }
@@ -384,6 +380,8 @@ export class ConversationService {
             }),
           });
 
+          console.log('[STREAMING] Successfully created assistant message:', assistantMessage.id);
+
           const finalizeOps: Operation[] = [
             {
               op: 'replace',
@@ -406,6 +404,8 @@ export class ConversationService {
 
         // Clear streaming content tracker
         this.streamingContent.delete(conversationId);
+        // Also clear tool calls tracker to prevent reuse
+        this.streamingToolCalls.delete(conversationId);
         break;
       }
 

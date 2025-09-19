@@ -61,8 +61,13 @@ export function ConversationMessageContent({
   // Always start with 0 to properly detect the first results appearing
   const prevToolResultsLength = useRef(0)
   const hasTriggeredCollapseRef = useRef(false)
+  // Skip first effect run to avoid triggering on initial mount/refresh
+  const isFirstRenderRef = useRef(true)
 
-  // Auto-collapse tool calls with delay when results complete (transition from no results to having results)
+  // Auto-collapse tool calls with delay after result completion.
+  // - Adds a 300ms delay
+  // - Triggers only on transition from 0 -> >0 results (i.e., completion)
+  // - Skips initial mount to avoid triggering on refresh/remount
   useEffect(() => {
     const currentResultsLength = toolResults?.length || 0
     const previousResultsLength = prevToolResultsLength.current
@@ -70,16 +75,26 @@ export function ConversationMessageContent({
     // Update the ref for next render
     prevToolResultsLength.current = currentResultsLength
 
-    // Only trigger delay when results first appear (0 -> >0) and we haven't already triggered collapse for this message
-    if (currentResultsLength > 0 && previousResultsLength === 0 && !hasTriggeredCollapseRef.current) {
+    // Skip the first effect run (initial mount) to avoid triggering on refresh/remount
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false
+      return
+    }
+
+    // Only trigger when:
+    // 1) results first appear (0 -> >0)
+    // 2) we haven't already triggered collapse for this message
+    // 3) the collapsible is currently open (avoid redundant state updates)
+    if (currentResultsLength > 0 && previousResultsLength === 0 && !hasTriggeredCollapseRef.current && isToolCallsOpen) {
       hasTriggeredCollapseRef.current = true
-      console.log(`[ConversationMessageContent] Auto-collapsing tool calls for message ${messageId} after 300ms delay`)
+      const delayMs = 300
+      console.log(`[ConversationMessageContent] Auto-collapsing tool calls for message ${messageId} after ${delayMs}ms delay`)
       const timer = setTimeout(() => {
         setIsToolCallsOpen(false)
-      }, 300)
+      }, delayMs)
       return () => clearTimeout(timer)
     }
-  }, [toolResults, messageId])
+  }, [toolResults, isToolCallsOpen, messageId])
 
   // Build display content from chunks when streaming, use final content when complete
   const displayContent = useMemo(() => {

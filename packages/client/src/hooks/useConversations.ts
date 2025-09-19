@@ -365,21 +365,8 @@ export function useConversation(conversationId: string | null) {
                 }
 
                 try {
-                  // Add debugging for tool_calls operations
-                  if (typeof (operation as any).path === 'string' && (operation as any).path.includes('tool_calls')) {
-                    console.log('[STREAMING] Processing tool_calls operation:', operation)
-                  }
-
                   const opResult = applyOperation(result, operation as Operation, true)
                   result = opResult.newDocument
-
-                  // Log successful tool_calls operations
-                  if (typeof (operation as any).path === 'string' && (operation as any).path.includes('tool_calls')) {
-                    console.log('[STREAMING] Tool_calls operation applied successfully:', {
-                      operation,
-                      resultingMessage: result.messages?.[result.messages.length - 1],
-                    })
-                  }
                 } catch (opErr) {
                   console.warn('[STREAMING] Operation failed, continuing with others:', operation, opErr)
                 }

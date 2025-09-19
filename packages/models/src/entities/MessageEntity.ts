@@ -9,7 +9,7 @@ import { Transformers } from '@/helpers/serializer';
 import type { MessageModel, MessageType } from '@starships/protocol';
 import type { LlmToolCall } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsEnum, IsISO8601, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsEnum, IsISO8601, IsString, Length, validate, ValidationError, IsOptional } from 'class-validator';
 
 export class MessageEntity implements MessageModel {
   @Expose()
@@ -43,6 +43,8 @@ export class MessageEntity implements MessageModel {
 
   // Optional tool_calls persisted for assistant messages when function calling is used (autopilot types)
   @Expose()
+  @IsOptional()
+  @Transformers.JsonTransform()
   tool_calls?: LlmToolCall[];
 
   /**

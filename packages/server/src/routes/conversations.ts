@@ -120,13 +120,18 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       }
 
       // Get conversation agents to determine participants
-      // const agents = await conversationService.getConversationAgents(conversationId);
-      // const participants = agents.map((agent) => agent.id);
+      const agents = await conversationService.getConversationAgents(conversationId);
+      const participants = agents.map((agent) => agent.id);
 
       // Structure response to match client expectations
       const responseData = {
-        conversation,
+        conversationId,
         messages,
+        total: messages.length,
+        participants,
+        startedAt: conversation.createdAt,
+        lastActivityAt: conversation.updatedAt || conversation.createdAt,
+        agents, // Include full agent information for client
       };
 
       sendSuccess(res, responseData, 200);

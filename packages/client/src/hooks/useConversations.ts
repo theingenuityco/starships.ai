@@ -1137,6 +1137,22 @@ export function useDeleteMessage() {
   })
 }
 
+// Get conversation agents (for agent restoration on refresh)
+export function useConversationAgents(conversationId: string | null) {
+  return useQuery({
+    queryKey: [...CONVERSATION_QUERY_KEYS.messages(conversationId!), 'agents'],
+    queryFn: async (): Promise<any[]> => {
+      const response: FetchResponse<any> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
+        params: { limit: 1, page: 1 }, // We only need agents, not all messages
+      })
+      return response.data.data.agents || []
+    },
+    enabled: !!conversationId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  })
+}
+
 // Update conversation status
 export function useUpdateConversationStatus() {
   const queryClient = useQueryClient()

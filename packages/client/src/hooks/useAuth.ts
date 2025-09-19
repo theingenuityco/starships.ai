@@ -12,19 +12,25 @@ export interface AuthUser {
 }
 
 interface AuthLoginResponse {
-  user: AuthUser
-  token: string
+  user?: AuthUser
+  token?: string
   starship?: {
     slug: string
   }
+  waitlisted?: boolean
+  status?: 'pending' | 'approved'
+  message?: string
 }
 
 interface AuthRegisterResponse {
-  user: AuthUser
-  token: string
+  user?: AuthUser
+  token?: string
   starship?: {
     slug: string
   }
+  waitlisted?: boolean
+  status?: 'pending' | 'approved'
+  message?: string
 }
 
 // Centralized query keys
@@ -114,6 +120,11 @@ export function useLogin() {
 
       const data = await response.json()
 
+      // Check if it's a waitlist response (HTTP 200 with waitlisted flag)
+      if (response.ok && data.data?.waitlisted) {
+        return data.data as AuthLoginResponse
+      }
+
       if (!response.ok || !data.data) {
         throw new Error(data.error?.message || 'Login failed')
       }
@@ -121,7 +132,18 @@ export function useLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
+      // Check if user is waitlisted
+      if (data.waitlisted) {
+        // Don't set token or user for waitlisted users
+        return
+      }
+
       const { user, token, starship } = data
+
+      if (!user || !token) {
+        console.error('[AUTH] Login successful but missing user or token')
+        return
+      }
 
       // Store token
       setStoredToken(token)
@@ -164,6 +186,11 @@ export function useRegister() {
 
       const data = await response.json()
 
+      // Check if it's a waitlist response (HTTP 200 with waitlisted flag)
+      if (response.ok && data.data?.waitlisted) {
+        return data.data as AuthRegisterResponse
+      }
+
       if (!response.ok || !data.data) {
         throw new Error(data.error?.message || 'Registration failed')
       }
@@ -171,7 +198,18 @@ export function useRegister() {
       return data.data as AuthRegisterResponse
     },
     onSuccess: data => {
+      // Check if user is waitlisted
+      if (data.waitlisted) {
+        // Don't set token or user for waitlisted users
+        return
+      }
+
       const { user, token, starship } = data
+
+      if (!user || !token) {
+        console.error('[AUTH] Registration successful but missing user or token')
+        return
+      }
 
       // Store token
       setStoredToken(token)
@@ -270,9 +308,12 @@ export function useAuth() {
 
   // Login function
   const login = useCallback(
-    async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    async (email: string, password: string): Promise<{ success: boolean; error?: string; waitlisted?: boolean; status?: 'pending' | 'approved'; message?: string }> => {
       try {
-        await loginMutation.mutateAsync({ email, password })
+        const result = await loginMutation.mutateAsync({ email, password })
+        if (result.waitlisted) {
+          return { success: true, waitlisted: true, status: result.status, message: result.message }
+        }
         return { success: true }
       } catch (error: any) {
         return { success: false, error: error.message || 'Login failed' }
@@ -283,9 +324,12 @@ export function useAuth() {
 
   // Register function
   const register = useCallback(
-    async (email: string, password: string, name?: string): Promise<{ success: boolean; error?: string }> => {
+    async (email: string, password: string, name?: string): Promise<{ success: boolean; error?: string; waitlisted?: boolean; status?: 'pending' | 'approved'; message?: string }> => {
       try {
-        await registerMutation.mutateAsync({ email, password, name })
+        const result = await registerMutation.mutateAsync({ email, password, name })
+        if (result.waitlisted) {
+          return { success: true, waitlisted: true, status: result.status, message: result.message }
+        }
         return { success: true }
       } catch (error: any) {
         return { success: false, error: error.message || 'Registration failed' }

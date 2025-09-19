@@ -93,6 +93,104 @@ export class WaitlistRepository extends BaseRepository {
   }
 
   /**
+   * Add a new pending email to the waitlist
+   */
+  async addPendingEmail(email: string, notes?: string): Promise<WaitlistEntryModel> {
+    const normalizedEmail = this.normalizeEmail(email);
+
+    if (!this.isValidEmail(normalizedEmail)) {
+      throw new ValidationError('Invalid email format', 'email', { field: 'email', value: email });
+    }
+
+    try {
+      const query = `
+        CREATE (w:Waitlist {
+          email: $email,
+          status: 'pending',
+          createdAt: datetime(),
+          notes: $notes
+        })
+        RETURN w {.email, .status, .createdAt, .notes} as entry
+      `;
+
+      const result = await this.getConnection().executeWrite<{ entry: WaitlistEntryModel }>(query, {
+        email: normalizedEmail,
+        notes: notes || null,
+      });
+
+      if (result.length === 0) {
+        throw new DatabaseError('addPendingEmail');
+      }
+
+      return result[0].entry;
+    } catch (error) {
+      // Check if it's a unique constraint violation
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'Neo.ClientError.Schema.ConstraintValidationFailed') {
+        // Email already exists, return existing entry
+        const existing = await this.getByEmail(normalizedEmail);
+        if (existing) {
+          return existing;
+        }
+      }
+      this.handleDatabaseError(error, 'addPendingEmail', 'Waitlist', normalizedEmail);
+    }
+  }
+
+  /**
+   * Get status by email
+   */
+  async getStatusByEmail(email: string): Promise<'approved' | 'pending' | null> {
+    const normalizedEmail = this.normalizeEmail(email);
+
+    if (!this.isValidEmail(normalizedEmail)) {
+      throw new ValidationError('Invalid email format', 'email', { field: 'email', value: email });
+    }
+
+    try {
+      const query = `
+        MATCH (w:Waitlist {email: $email})
+        RETURN w.status as status
+      `;
+
+      const result = await this.getConnection().executeQuery<{ status: 'approved' | 'pending' }>(query, {
+        email: normalizedEmail,
+      });
+
+      return result.length > 0 ? result[0].status : null;
+    } catch (error) {
+      this.handleDatabaseError(error, 'getStatusByEmail', 'Waitlist', normalizedEmail);
+    }
+  }
+
+  /**
+   * Update waitlist status
+   */
+  async updateStatus(email: string, status: 'approved' | 'pending'): Promise<boolean> {
+    const normalizedEmail = this.normalizeEmail(email);
+
+    if (!this.isValidEmail(normalizedEmail)) {
+      throw new ValidationError('Invalid email format', 'email', { field: 'email', value: email });
+    }
+
+    try {
+      const query = `
+        MATCH (w:Waitlist {email: $email})
+        SET w.status = $status
+        RETURN w IS NOT NULL as updated
+      `;
+
+      const result = await this.getConnection().executeWrite<{ updated: boolean }>(query, {
+        email: normalizedEmail,
+        status,
+      });
+
+      return result.length > 0 && result[0].updated;
+    } catch (error) {
+      this.handleDatabaseError(error, 'updateStatus', 'Waitlist', normalizedEmail);
+    }
+  }
+
+  /**
    * Get all approved emails
    */
   async getAllApproved(): Promise<WaitlistEntryModel[]> {
@@ -142,6 +240,12 @@ export class WaitlistRepository extends BaseRepository {
       await this.getConnection().executeWrite(
         `CREATE INDEX waitlist_status IF NOT EXISTS
          FOR (w:Waitlist) ON (w.status)`
+      );
+
+      // Create composite index on email and status for efficient queries
+      await this.getConnection().executeWrite(
+        `CREATE INDEX waitlist_email_status IF NOT EXISTS
+         FOR (w:Waitlist) ON (w.email, w.status)`
       );
     } catch (error) {
       console.warn('Waitlist schema initialization warning:', error);

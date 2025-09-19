@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { cn } from '@/lib/utils'
 import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -51,19 +51,29 @@ export function ConversationMessageContent({
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
-  const [isToolCallsOpen, setIsToolCallsOpen] = useState(true)
 
-  // Auto-collapse tool calls with delay after results are available
+  // Initial state: closed if there are already results (existing conversation), open otherwise
+  const [isToolCallsOpen, setIsToolCallsOpen] = useState(() => {
+    return !(toolResults && toolResults.length > 0)
+  })
+
+  // Track when tool results first appear to trigger auto-collapse delay
+  const prevToolResultsLength = useRef(toolResults?.length || 0)
+
+  // Auto-collapse tool calls with delay when results complete (transition from no results to having results)
   useEffect(() => {
-    if (toolResults && toolResults.length > 0) {
+    const currentResultsLength = toolResults?.length || 0
+    const previousResultsLength = prevToolResultsLength.current
+
+    // Update the ref for next render
+    prevToolResultsLength.current = currentResultsLength
+
+    // Only trigger delay when results first appear (0 -> >0)
+    if (currentResultsLength > 0 && previousResultsLength === 0) {
       const timer = setTimeout(() => {
         setIsToolCallsOpen(false)
       }, 300)
-
       return () => clearTimeout(timer)
-    } else {
-      // Keep open if no results yet (tool call in progress)
-      setIsToolCallsOpen(true)
     }
   }, [toolResults])
 

@@ -108,7 +108,6 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       password, // Pass plain password - UserService will hash it
       name,
       displayName: name,
-      username: email.split('@')[0],
     });
 
     // Check final waitlist status to determine response
@@ -150,7 +149,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     const token = await new SignJWT({
       sub: user.id,
       email: user.email,
-      name: user.displayName || user.username,
+      name: user.displayName || user.email?.split('@')[0],
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(JWT_ISSUER)
@@ -165,7 +164,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
         user: {
           id: user.id,
           email: user.email,
-          name: user.displayName || user.username,
+          name: user.displayName || user.email?.split('@')[0],
           avatar: user.avatar,
         },
         token,
@@ -290,7 +289,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     const token = await new SignJWT({
       sub: user.id,
       email: user.email,
-      name: user.displayName || user.username,
+      name: user.displayName || user.email?.split('@')[0],
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(JWT_ISSUER)
@@ -303,7 +302,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       user: {
         id: user.id,
         email: user.email,
-        name: user.displayName || user.username,
+        name: user.displayName || user.email?.split('@')[0],
         avatar: user.avatar,
       },
       token,
@@ -352,7 +351,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
     sendSuccess(res, {
       id: user.id,
       email: user.email,
-      name: user.displayName || user.username,
+      name: user.displayName || user.email?.split('@')[0],
       avatar: user.avatar,
     });
   } catch (error: any) {

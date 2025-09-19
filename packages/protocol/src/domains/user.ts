@@ -13,7 +13,6 @@
  */
 export interface UserModel {
   id: string;
-  username: string;
   email?: string;
   displayName?: string;
   avatar?: string;
@@ -32,7 +31,6 @@ export interface UserModel {
  * Request to create a new user
  */
 export interface CreateUserRequest {
-  username: string;
   email?: string;
   displayName?: string;
   avatar?: string;
@@ -44,7 +42,6 @@ export interface CreateUserRequest {
  * Request to update user information
  */
 export interface UpdateUserRequest {
-  username?: string;
   email?: string;
   displayName?: string;
   avatar?: string;
@@ -74,7 +71,6 @@ export interface UserListResponse {
  * Filters for querying users
  */
 export interface UserFilters {
-  username?: string;
   email?: string;
 }
 
@@ -82,6 +78,6 @@ export interface UserFilters {
  * Sorting options for users
  */
 export interface UserSort {
-  field: 'createdAt' | 'username' | 'displayName';
+  field: 'createdAt' | 'displayName';
   direction: 'asc' | 'desc';
 }

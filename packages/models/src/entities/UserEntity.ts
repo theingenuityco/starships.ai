@@ -15,19 +15,6 @@ import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, Va
  */
 export class UserTransformers {
   /**
-   * Transform username to ensure consistency (lowercase, no spaces)
-   */
-  static UsernameTransform() {
-    return Transform(({ value }) => {
-      if (!value) return value;
-      if (typeof value === 'string') {
-        return value.toLowerCase().replace(/\s+/g, '').trim();
-      }
-      return value;
-    });
-  }
-
-  /**
    * Transform email to ensure consistency (lowercase, trim)
    */
   static EmailTransform() {
@@ -92,14 +79,6 @@ export class UserEntity implements UserModel {
   createdAt!: string;
 
   // User profile fields
-  @Expose()
-  @UserTransformers.UsernameTransform()
-  @IsString()
-  @Length(1, 50)
-  @Matches(/^[a-zA-Z0-9_-]+$/, {
-    message: 'Username can only contain letters, numbers, underscores, and hyphens',
-  })
-  username!: string;
 
   @Expose()
   @IsOptional()
@@ -159,7 +138,6 @@ export class UserEntity implements UserModel {
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
-        username: dataRecord.username || '',
         email: dataRecord.email,
         displayName: dataRecord.displayName,
         avatar: dataRecord.avatar,
@@ -188,7 +166,7 @@ export class UserEntity implements UserModel {
    * Helper method to check if user has a complete profile
    */
   hasCompleteProfile(): boolean {
-    return !!(this.email && this.displayName && this.username);
+    return !!(this.email && this.displayName);
   }
 
   /**
@@ -209,9 +187,6 @@ export class UserEntity implements UserModel {
         .slice(0, 2)
         .join('');
     }
-    if (this.username) {
-      return this.username.charAt(0).toUpperCase();
-    }
     if (this.email) {
       return this.email.charAt(0).toUpperCase();
     }
@@ -222,7 +197,7 @@ export class UserEntity implements UserModel {
    * Helper method to get user's display name or fallback
    */
   getDisplayName(): string {
-    return this.displayName || this.username || this.email?.split('@')[0] || 'Unknown User';
+    return this.displayName || this.email?.split('@')[0] || 'Unknown User';
   }
 
   /**
@@ -268,15 +243,6 @@ export class UserEntity implements UserModel {
     };
 
     return providers[domain] || 'Other';
-  }
-
-  /**
-   * Helper method to generate username suggestion from email
-   */
-  static generateUsernameFromEmail(email: string): string {
-    const localPart = email.split('@')[0];
-    // Remove non-alphanumeric characters except underscore and hyphen
-    return localPart.replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
   }
 
   /**

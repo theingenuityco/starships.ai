@@ -25,7 +25,6 @@ export interface UserStats {
 export interface CreateUserWithPasswordRequest {
   email: string;
   password: string;
-  username?: string;
   displayName?: string;
   name?: string; // Legacy support
 }
@@ -53,14 +52,6 @@ export class UserService {
    * Create a new user
    */
   async createUser(request: CreateUserRequest): Promise<UserModel> {
-    // Business validation: Check for duplicate username
-    if (request.username) {
-      const existingUser = await this.userRepository.findByUsername(request.username);
-      if (existingUser) {
-        throw new ValidationError(`Username "${request.username}" is already taken`, 'username');
-      }
-    }
-
     // Business validation: Check for duplicate email
     if (request.email) {
       const existingUser = await this.userRepository.findByEmail(request.email);
@@ -91,26 +82,9 @@ export class UserService {
     // Business logic: Hash password
     const hashedPassword = await bcrypt.hash(request.password, 10);
 
-    // Business logic: Generate username if not provided
-    let username = request.username;
-    if (!username) {
-      const baseUsername = request.email
-        .split('@')[0]
-        .toLowerCase()
-        .replace(/[^a-zA-Z0-9_-]/g, '');
-      username = await this.generateUniqueUsername(baseUsername);
-    } else {
-      // Business validation: Check username uniqueness
-      const existingUserByUsername = await this.userRepository.findByUsername(username);
-      if (existingUserByUsername) {
-        throw new ValidationError(`Username "${username}" is already taken`, 'username');
-      }
-    }
-
     const userData = {
       email: request.email,
       password: hashedPassword,
-      username: username,
       displayName: request.displayName || request.name,
     };
 
@@ -144,17 +118,6 @@ export class UserService {
   }
 
   /**
-   * Get user by username
-   */
-  async getUserByUsername(username: string, options: UserOptions = {}): Promise<UserModel | null> {
-    const user = await this.userRepository.findByUsername(username);
-    if (!user) {
-      return null;
-    }
-    return this.transformUserForResponse(user, options);
-  }
-
-  /**
    * Get all users (admin operation)
    */
   async getAllUsers(options: UserOptions = {}): Promise<UserModel[]> {
@@ -170,14 +133,6 @@ export class UserService {
     const existingUser = await this.userRepository.findById(userId);
     if (!existingUser) {
       throw new NotFoundError('User', userId);
-    }
-
-    // Business validation: Username uniqueness (if changing)
-    if (updates.username && updates.username !== existingUser.username) {
-      const existingUserByUsername = await this.userRepository.findByUsername(updates.username);
-      if (existingUserByUsername) {
-        throw new ValidationError(`Username "${updates.username}" is already taken`, 'username');
-      }
     }
 
     // Business validation: Email uniqueness (if changing)
@@ -319,20 +274,6 @@ export class UserService {
   // ============================================================================
   // PRIVATE HELPER METHODS
   // ============================================================================
-
-  /**
-   * Generate unique username from base string
-   */
-  private async generateUniqueUsername(baseUsername: string, attempt: number = 0): Promise<string> {
-    const username = attempt === 0 ? baseUsername : `${baseUsername}${attempt}`;
-
-    const existingUser = await this.userRepository.findByUsername(username);
-    if (existingUser) {
-      return this.generateUniqueUsername(baseUsername, attempt + 1);
-    }
-
-    return username;
-  }
 
   /**
    * Transform user data for response based on options

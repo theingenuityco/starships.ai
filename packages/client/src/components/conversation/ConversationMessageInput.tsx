@@ -52,39 +52,35 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
-    // Auto-focus on textarea when component mounts and when agent is selected
+    // Consolidated focus management - handles all focus scenarios
     useEffect(() => {
-      if (textareaRef.current && selectedAgent && !disabled) {
-        // Small delay to ensure the component is fully rendered
+      const shouldFocus = () => {
+        // Don't focus if disabled, streaming, or sending
+        if (disabled || isStreamingEffective || sending) return false
+
+        // Always focus on component mount or navigation changes
+        return true
+      }
+
+      // Handle streaming completion focus
+      const wasStreaming = prevIsStreamingRef.current
+      const streamingCompleted = wasStreaming && !isStreamingEffective
+
+      if (textareaRef.current && shouldFocus()) {
+        const delay = streamingCompleted ? 50 : 100 // Faster focus after streaming completes
         const timer = setTimeout(() => {
           textareaRef.current?.focus()
-        }, 100)
+        }, delay)
+
+        // Update streaming ref
+        prevIsStreamingRef.current = isStreamingEffective
+
         return () => clearTimeout(timer)
       }
-    }, [selectedAgent, disabled])
 
-    // When streaming completes, re-enable and focus the textarea
-    useEffect(() => {
-      const wasStreaming = prevIsStreamingRef.current
-      if (wasStreaming && !isStreamingEffective && !disabled && !sending) {
-        const t = setTimeout(() => {
-          textareaRef.current?.focus()
-        }, 50)
-        prevIsStreamingRef.current = isStreamingEffective
-        return () => clearTimeout(t)
-      }
+      // Always update the streaming ref
       prevIsStreamingRef.current = isStreamingEffective
-    }, [isStreamingEffective, disabled, sending])
-
-    // Secondary guard: whenever input becomes enabled, ensure focus
-    useEffect(() => {
-      if (!isStreamingEffective && !sending && !disabled && selectedAgent) {
-        const t = setTimeout(() => {
-          textareaRef.current?.focus()
-        }, 80)
-        return () => clearTimeout(t)
-      }
-    }, [isStreamingEffective, sending, disabled, selectedAgent])
+    }, [disabled, isStreamingEffective, sending, selectedAgent, conversationId])
 
     // Sync local 'sending' with streaming completion to avoid stuck disabled/loading state
     useEffect(() => {
@@ -122,11 +118,31 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           onConversationStart?.(currentConversationId!)
         }
 
+        // Set agent information in store
+        const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
+        setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
+
         // Clear input and reset UI immediately for better UX
         setMessage('')
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
         }
+
+        // Add optimistic user message to UI store immediately
+        const optimisticMessage = {
+          id: `temp-user-${Date.now()}`,
+          content: messageToSend,
+          role: 'user' as const,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          messageType: 'user_input' as const,
+          sending: true, // Mark as sending so UI can show loading state
+        }
+
+        appendMessage(currentConversationId!, optimisticMessage)
+
+        // Now toggle responding so the indicator renders after the user message
+        setConversationResponding(currentConversationId!, true)
 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
@@ -143,11 +159,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         })
           .catch(error => {
             console.error('Failed to send message:', error)
-            // Restore message on error
+            // Restore message on error and remove optimistic message
             setMessage(messageToSend)
+            const { conversations } = useStarshipUIStore.getState()
+            const currentMessages = conversations[currentConversationId!]?.messages || []
+            const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
+            setConversationSnapshot(currentConversationId!, {
+              messages: filteredMessages,
+              total: filteredMessages.length,
+            })
+            setConversationResponding(currentConversationId!, false)
           })
           .finally(() => {
             setSending(false)
+            setConversationResponding(currentConversationId!, false)
           })
 
         // Exit early to avoid hitting catch/finally paths
@@ -157,6 +182,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
+        if (conversationId) {
+          useStarshipUIStore.getState().setConversationResponding(conversationId, false)
+        }
       }
     }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId])
 
@@ -190,6 +218,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             onConversationStart?.(currentConversationId!)
           }
 
+          // Set agent information in store
+          const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
+          setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
+
+          // Add optimistic user message to UI store immediately
+          const optimisticMessage = {
+            id: `temp-user-${Date.now()}`,
+            content: suggestionText,
+            role: 'user' as const,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            messageType: 'user_input' as const,
+            sending: true, // Mark as sending so UI can show loading state
+          }
+
+          appendMessage(currentConversationId!, optimisticMessage)
+
+          // Now toggle responding so the indicator renders after the user message
+          setConversationResponding(currentConversationId!, true)
+
           // Notify parent about message activity immediately (for UI state updates)
           onMessageSent?.()
 
@@ -205,15 +253,28 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
             .catch(error => {
               console.error('Failed to send suggestion:', error)
+              // Remove optimistic message on error
+              const { conversations } = useStarshipUIStore.getState()
+              const currentMessages = conversations[currentConversationId!]?.messages || []
+              const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
+              setConversationSnapshot(currentConversationId!, {
+                messages: filteredMessages,
+                total: filteredMessages.length,
+              })
+              setConversationResponding(currentConversationId!, false)
             })
             .finally(() => {
               setSending(false)
+              setConversationResponding(currentConversationId!, false)
             })
 
           return
         } catch (error) {
           console.error('Failed to send suggestion:', error)
           setSending(false)
+          if (conversationId) {
+            useStarshipUIStore.getState().setConversationResponding(conversationId, false)
+          }
         }
       },
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
@@ -241,7 +302,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     const getPlaceholder = () => {
-      if (isStreamingEffective) return 'AI is thinking...'
+      if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
+      if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
@@ -266,7 +328,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           className={cn(
             'relative transition-all',
             minimal
-              ? 'frosted-glass-light rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
+              ? 'frosted-glass-card rounded-xl shadow-frosted-xl focus-within:ring-1 focus-within:ring-primary/15'
               : 'frosted-glass-card rounded-2xl shadow-frosted-xl focus-within:ring-2 focus-within:ring-primary/20',
             'focus-within:border-primary/40',
             disabled && 'opacity-50'
@@ -357,7 +419,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         {/* Agent Indicator - Only show in non-minimal mode */}
         {!minimal && selectedAgent && (
           <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
-            {isStreamingEffective ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
+            {isStreamingEffective ? `${selectedAgent.name} is responding...` : sending ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
           </div>
         )}
       </div>

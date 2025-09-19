@@ -32,11 +32,59 @@ export class Tool extends BaseNode<ToolParams> {
       const execArgs = this.getArgsFromExecutionContext(params.name);
       const toolArgs = this.mergeArgs(inputArgs, execArgs);
 
+      // Extract tool call ID from the execution context for proper linking
+      const toolCallId = this.getToolCallIdFromExecutionContext(params.name);
+
+      // Emit tool_started event
+      const eventCallback = this.getOptions()?.eventCallback;
+      if (eventCallback) {
+        await eventCallback({
+          type: 'tool_started',
+          timestamp: new Date().toISOString(),
+          data: {
+            toolName: params.name,
+            toolCallId: toolCallId,
+            arguments: toolArgs,
+          },
+        });
+      }
+
       // Execute the tool based on its name and parameters
       const result = await this.executeToolLogic(params, toolArgs);
 
+      // Emit tool_complete event
+      if (eventCallback) {
+        const resultData = result && typeof result === 'object' ? (result as Record<string, unknown>) : { value: result };
+        await eventCallback({
+          type: 'tool_complete',
+          timestamp: new Date().toISOString(),
+          data: {
+            toolName: params.name,
+            toolCallId: toolCallId,
+            arguments: toolArgs,
+            result: resultData,
+          },
+        });
+      }
+
       return ExecutionItemUtils.wrapSingle(result, input?.[0]);
     } catch (error) {
+      // Emit tool_complete event with error
+      const eventCallback = this.getOptions()?.eventCallback;
+      if (eventCallback) {
+        try {
+          await eventCallback({
+            type: 'tool_complete',
+            timestamp: new Date().toISOString(),
+            data: {
+              toolName: params.name,
+              error: error instanceof Error ? error.message : 'Unknown tool error',
+            },
+          });
+        } catch {
+          // Ignore callback errors to avoid masking the original error
+        }
+      }
       throw this.handleExecutionError(error, `Tool '${params.name}' execution failed`);
     }
   }
@@ -117,6 +165,36 @@ export class Tool extends BaseNode<ToolParams> {
    */
   private mergeArgs(primary: Record<string, unknown>, fallback: Record<string, unknown>): Record<string, unknown> {
     return { ...fallback, ...primary };
+  }
+
+  /**
+   * Extract tool call ID from the last LLM output in execution context
+   * This links the tool result back to the original tool call
+   */
+  private getToolCallIdFromExecutionContext(toolName: string): string | undefined {
+    const exec = this.getOptions()?.execution;
+    if (!exec || !Array.isArray(exec.results)) return undefined;
+
+    // Walk backwards over results to find the most recent LLM response with tool_calls
+    for (let i = exec.results.length - 1; i >= 0; i--) {
+      const items = exec.results[i]?.items;
+      const firstJson = items?.[0]?.json;
+      if (!firstJson || typeof firstJson !== 'object') continue;
+
+      // Narrow shape to partial LLMResponse
+      const resp = firstJson as Partial<LLMResponse>;
+      const choices = resp.choices;
+      if (Array.isArray(choices) && choices[0]?.message) {
+        const msg = choices[0].message as LlmMessage;
+        const toolCalls = msg.tool_calls as LlmToolCall[] | undefined;
+        if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+          // Find the tool call that matches this tool name
+          const match = toolCalls.find((tc) => tc?.function?.name === toolName);
+          return match?.id;
+        }
+      }
+    }
+    return undefined;
   }
 
   /**

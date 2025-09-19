@@ -123,6 +123,7 @@ export function useConversation(conversationId: string | null) {
   const updateMessageAt = useStarshipUIStore(s => s.updateMessageAt)
   const endStreaming = useStarshipUIStore(s => s.endStreaming)
   const clearStreaming = useStarshipUIStore(s => s.clearStreaming)
+  const setConversationResponding = useStarshipUIStore(s => s.setConversationResponding)
   const existingConversation = useStarshipUIStore(s => (conversationId ? s.conversations[conversationId] : undefined))
   // Get conversation messages
   const messagesQuery = useQuery({
@@ -179,9 +180,31 @@ export function useConversation(conversationId: string | null) {
         if (sameLen && sameActivity) return
       }
 
+      // Preserve optimistic user messages when syncing from TanStack Query
+      let finalMessages = data.messages as any[]
+
+      if (existing && Array.isArray(existing.messages)) {
+        // Find any optimistic messages that should be preserved
+        const optimisticMessages = existing.messages.filter((msg: any) => {
+          if (!msg.sending || !msg.id || !msg.id.startsWith('temp-user-')) {
+            return false
+          }
+
+          // Only preserve if there's no matching server message with same content
+          const hasMatchingServerMessage = data.messages.some((serverMsg: any) => serverMsg.role === 'user' && serverMsg.content === msg.content)
+
+          return !hasMatchingServerMessage
+        })
+
+        if (optimisticMessages.length > 0) {
+          // Add optimistic messages to the end of the synced messages
+          finalMessages = [...data.messages, ...optimisticMessages]
+        }
+      }
+
       setConversationSnapshot(conversationId, {
-        messages: data.messages as any,
-        total: data.total,
+        messages: finalMessages,
+        total: finalMessages.length,
         lastActivityAt: data.lastActivityAt,
       })
     } catch {}
@@ -220,6 +243,10 @@ export function useConversation(conversationId: string | null) {
           if (text) {
             startStreaming(cid, version)
             appendStreamingChunk(cid, text, version)
+            // Flip responding off once streaming actually starts
+            try {
+              setConversationResponding(cid, false)
+            } catch {}
           }
 
           // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
@@ -514,6 +541,8 @@ export function useConversation(conversationId: string | null) {
           }))
           try {
             startStreaming(cid)
+            // Ensure responding indicator is cleared when assistant stream begins
+            setConversationResponding(cid, false)
           } catch {}
 
           // Add streaming message to cache (append; ascending order)
@@ -537,9 +566,30 @@ export function useConversation(conversationId: string | null) {
         // Regular message - add to cache (append; ascending order)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
           if (!old) return { messages: [message], total: 1, conversationId: cid }
+
+          // Check if this is a user message that should replace an optimistic message
+          const isUserMessage = message.role === 'user'
+          let messages = [...old.messages]
+
+          if (isUserMessage) {
+            // Find and replace any optimistic user message with similar content and sending=true
+            const optimisticIndex = messages.findIndex(msg => msg.role === 'user' && msg.sending === true && msg.content === message.content && msg.id && msg.id.startsWith('temp-user-'))
+
+            if (optimisticIndex !== -1) {
+              // Replace optimistic message with real server message
+              messages[optimisticIndex] = { ...message, sending: false }
+              return {
+                ...old,
+                messages,
+                total: messages.length,
+              }
+            }
+          }
+
+          // No optimistic message found, append normally
           return {
             ...old,
-            messages: [...old.messages, message],
+            messages: [...messages, message],
             total: old.total + 1,
           }
         })
@@ -1071,6 +1121,22 @@ export function useDeleteMessage() {
         description: errorMessage,
       })
     },
+  })
+}
+
+// Get conversation agents (for agent restoration on refresh)
+export function useConversationAgents(conversationId: string | null) {
+  return useQuery({
+    queryKey: [...CONVERSATION_QUERY_KEYS.messages(conversationId!), 'agents'],
+    queryFn: async (): Promise<any[]> => {
+      const response: FetchResponse<any> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
+        params: { limit: 1, page: 1 }, // We only need agents, not all messages
+      })
+      return response.data.data.agents || []
+    },
+    enabled: !!conversationId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   })
 }
 

@@ -1,15 +1,18 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
+import type { MessageModel } from '@starships/protocol'
 
 interface ContentChunk {
   content: string
@@ -26,6 +29,10 @@ interface MessageContentProps {
   enableLinkPreview?: boolean
   isStreaming?: boolean
   contentChunks?: ContentChunk[]
+  agentName?: string
+  toolCalls?: NonNullable<MessageModel['tool_calls']>
+  toolResults?: any[]
+  messageType?: MessageModel['messageType']
 }
 
 export function ConversationMessageContent({
@@ -37,9 +44,56 @@ export function ConversationMessageContent({
   enableLinkPreview = true,
   isStreaming = false,
   contentChunks = [],
+  agentName,
+  toolCalls,
+  toolResults = [],
+  messageType,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
+
+  // Initial state: closed if there are already results (existing conversation), open otherwise
+  const [isToolCallsOpen, setIsToolCallsOpen] = useState(() => {
+    return !(toolResults && toolResults.length > 0)
+  })
+
+  // Track when tool results first appear to trigger auto-collapse delay
+  // Always start with 0 to properly detect the first results appearing
+  const prevToolResultsLength = useRef(0)
+  const hasTriggeredCollapseRef = useRef(false)
+  // Skip first effect run to avoid triggering on initial mount/refresh
+  const isFirstRenderRef = useRef(true)
+
+  // Auto-collapse tool calls with delay after result completion.
+  // - Adds a 300ms delay
+  // - Triggers only on transition from 0 -> >0 results (i.e., completion)
+  // - Skips initial mount to avoid triggering on refresh/remount
+  useEffect(() => {
+    const currentResultsLength = toolResults?.length || 0
+    const previousResultsLength = prevToolResultsLength.current
+
+    // Update the ref for next render
+    prevToolResultsLength.current = currentResultsLength
+
+    // Skip the first effect run (initial mount) to avoid triggering on refresh/remount
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false
+      return
+    }
+
+    // Only trigger when:
+    // 1) results first appear (0 -> >0)
+    // 2) we haven't already triggered collapse for this message
+    // 3) the collapsible is currently open (avoid redundant state updates)
+    if (currentResultsLength > 0 && previousResultsLength === 0 && !hasTriggeredCollapseRef.current && isToolCallsOpen) {
+      hasTriggeredCollapseRef.current = true
+      const delayMs = 300
+      const timer = setTimeout(() => {
+        setIsToolCallsOpen(false)
+      }, delayMs)
+      return () => clearTimeout(timer)
+    }
+  }, [toolResults, isToolCallsOpen, messageId])
 
   // Build display content from chunks when streaming, use final content when complete
   const displayContent = useMemo(() => {
@@ -58,6 +112,16 @@ export function ConversationMessageContent({
 
     return result
   }, [content, contentChunks, isStreaming])
+
+  const parsedJson = useMemo(() => {
+    try {
+      const t = (displayContent || '').trim()
+      if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+        return JSON.parse(t)
+      }
+    } catch {}
+    return null as any
+  }, [displayContent])
 
   const handleCopyContent = async () => {
     try {
@@ -188,24 +252,173 @@ export function ConversationMessageContent({
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
     <div className={cn('relative group', className)}>
-      {/* Streaming indicator - shows above content while streaming */}
-      {isStreaming && (
-        <div className="flex items-center gap-2 mb-2 text-muted-foreground">
-          <Loader2 className="w-3 h-3 animate-spin" />
-          <span className="text-xs font-medium">Assistant is responding...</span>
-          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
+      {/* Unified markdown rendering - same for both streaming and completed, but skip for tool_result messages */}
+      {messageType !== 'tool_result' && (
+        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {displayContent}
+          </ReactMarkdown>
         </div>
       )}
 
-      {/* Unified markdown rendering - same for both streaming and completed */}
-      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content">
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {displayContent}
-        </ReactMarkdown>
+      {/* Tool calls and results rendering for assistant messages */}
+      {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
+        <div className="mt-3">
+          <Collapsible key={`tool-calls-${isToolCallsOpen}`} defaultOpen={isToolCallsOpen}>
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
+              <Wrench className="w-3 h-3" />
+              Tool Calls ({toolCalls.length})
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-2">
+                {toolCalls.map((tc, idx) => {
+                  const rawArgs = (tc as any)?.function?.arguments ?? ''
+                  let prettyArgs = ''
+                  try {
+                    prettyArgs = JSON.stringify(JSON.parse(rawArgs), null, 2)
+                  } catch {
+                    prettyArgs = String(rawArgs)
+                  }
+                  const argsBlockId = `${messageId}-tool-args-${idx}`
+                  const funcName = (tc as any)?.function?.name || 'unknown'
 
-        {/* Streaming cursor - appears after content while streaming */}
-        {isStreaming && displayContent && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
-      </div>
+                  // Normalize tool call id from multiple potential fields to be resilient across providers
+                  const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.tool_call_id ?? (tc as any)?.function?.id ?? null
+
+                  const toolCallId = rawCallId != null ? String(rawCallId) : ''
+
+                  // Find matching tool result using multiple possible id fields, normalized to strings
+                  const matchingResult = toolResults?.find((result: any) => {
+                    const rid = (result as any)?.tool_call_id ?? (result as any)?.call_id ?? (result as any)?.id
+                    if (rid == null) return false
+                    return String(rid) === toolCallId
+                  })
+
+                  return (
+                    <div key={idx}>
+                      <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
+                        <div className="flex items-center justify-between px-3 py-2 border-b">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Function</span>
+                            <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
+                            {toolCallId && (
+                              <span className="text-xs text-muted-foreground">
+                                ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
+                              {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            </Button>
+                            {matchingResult && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => {
+                                  const resultContent = matchingResult.content || ''
+                                  let parsedResultJson = null as any
+                                  try {
+                                    const t = (resultContent || '').trim()
+                                    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                      parsedResultJson = JSON.parse(t)
+                                    }
+                                  } catch {}
+                                  handleCopyCodeBlock(parsedResultJson ? JSON.stringify(parsedResultJson, null, 2) : resultContent, `${messageId}-tool-result-${idx}`)
+                                }}
+                              >
+                                {copiedStates[`${messageId}-tool-result-${idx}`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
+                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                            <code>{prettyArgs}</code>
+                          </pre>
+
+                          {matchingResult && (
+                            <>
+                              <div className="border-t border-border/50" />
+                              <div className="flex items-center gap-2 px-3 pt-2">
+                                <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
+                                  <Check className="w-3 h-3" />
+                                  Result
+                                </div>
+                              </div>
+                              <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                                <code>
+                                  {(() => {
+                                    const resultContent = matchingResult.content || ''
+                                    try {
+                                      const t = (resultContent || '').trim()
+                                      if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                        return JSON.stringify(JSON.parse(t), null, 2)
+                                      }
+                                    } catch {}
+                                    return resultContent
+                                  })()}
+                                </code>
+                              </pre>
+                            </>
+                          )}
+                        </div>
+                      </Card>
+                    </div>
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
+
+      {/* Tool result message rendering - fallback for unmatched results */}
+      {messageType === 'tool_result' && (
+        <Card className="mt-3 border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
+            <div className="flex items-center gap-2">
+              <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
+                <Check className="w-3 h-3" />
+                Tool Result (Standalone)
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>
+              {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            </Button>
+          </div>
+          <pre className="text-xs p-3 overflow-x-auto">
+            <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
+          </pre>
+        </Card>
+      )}
+
+      {/* Workflow output without tool calls */}
+      {messageType === 'workflow_output' && (!toolCalls || toolCalls.length === 0) && parsedJson && (
+        <Card className="mt-3 border bg-blue-50 dark:bg-blue-950/20">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800">
+            <div className="text-xs uppercase text-blue-700 dark:text-blue-300 tracking-wide font-medium">Workflow Output</div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(JSON.stringify(parsedJson, null, 2), `${messageId}-workflow-result`)}>
+              {copiedStates[`${messageId}-workflow-result`] ? <Check className="w-3 h-3 text-blue-500" /> : <Copy className="w-3 h-3" />}
+            </Button>
+          </div>
+          <pre className="text-xs p-3 overflow-x-auto">
+            <code>{JSON.stringify(parsedJson, null, 2)}</code>
+          </pre>
+        </Card>
+      )}
+
+      {/* Streaming indicator - shows after all content including tool calls while streaming */}
+      {isStreaming && (
+        <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+          <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
+          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
+          <Loader2 className="w-3 h-3 animate-spin" />
+        </div>
+      )}
 
       {/* Copy button for entire message */}
       {enableCopy && !isStreaming && (

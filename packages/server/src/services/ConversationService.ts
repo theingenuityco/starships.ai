@@ -214,15 +214,13 @@ export class ConversationService {
       case 'content_chunk': {
         // Stream content chunks in real-time
         const chunkContent = event.data?.chunk;
-        if (
-          chunkContent &&
-          Array.isArray(chunkContent.choices) &&
-          chunkContent.choices.length > 0 &&
-          chunkContent.choices[0]?.delta?.content
-        ) {
-          // Guard: if no active accumulator, start a new placeholder stream only when SSE connection is active.
-          // This supports multiple assistant responses within a single streaming session.
-          if (!this.streamingContent.has(conversationId)) {
+        if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
+          const delta = chunkContent.choices[0]?.delta;
+          const hasContent = delta?.content;
+          const hasToolCalls = delta?.tool_calls && Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0;
+
+          // Guard: if no active accumulator and we have content, start a new placeholder stream
+          if (hasContent && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
               const assistantMessage: MessageModel = {
                 id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -236,7 +234,12 @@ export class ConversationService {
               const shell: Operation = {
                 op: 'add',
                 path: '/messages/-',
-                value: { ...assistantMessage, streaming: true, contentChunks: [] },
+                value: {
+                  ...assistantMessage,
+                  streaming: true,
+                  contentChunks: [],
+                  tool_calls: [], // Initialize empty tool_calls array for replace operations
+                },
               };
               await this.streamingService.broadcastDelta(conversationId, shell);
 
@@ -247,31 +250,35 @@ export class ConversationService {
             }
           }
 
-          const content = String(chunkContent.choices[0].delta.content);
+          // Process content if present
+          if (hasContent) {
+            const content = String(delta.content);
 
-          // Track accumulated content server-side for completion event
-          const currentContent = this.streamingContent.get(conversationId) || '';
-          const currentLength = currentContent.length;
-          const newContent = currentContent + content;
-          this.streamingContent.set(conversationId, newContent);
+            // Track accumulated content server-side for completion event
+            const currentContent = this.streamingContent.get(conversationId) || '';
+            const currentLength = currentContent.length;
+            const newContent = currentContent + content;
+            this.streamingContent.set(conversationId, newContent);
 
-          // Send content chunk with positional information for client-side accumulation
-          const delta: Operation = {
-            op: 'add',
-            path: '/messages/-1/contentChunks/-',
-            value: {
-              content: content,
-              position: currentLength,
-              timestamp: Date.now(),
-            },
-          };
-          await this.streamingService.broadcastDelta(conversationId, delta);
+            // Send content chunk with positional information for client-side accumulation
+            const contentDelta: Operation = {
+              op: 'add',
+              path: '/messages/-1/contentChunks/-',
+              value: {
+                content: content,
+                position: currentLength,
+                timestamp: Date.now(),
+              },
+            };
+            await this.streamingService.broadcastDelta(conversationId, contentDelta);
+          }
 
-          // Also stream tool_calls if present in this chunk (OpenAI/OpenRouter style)
-          try {
-            const toolCallsDelta = Array.isArray(chunkContent.choices) ? chunkContent.choices[0]?.delta?.tool_calls || [] : [];
-            if (toolCallsDelta.length > 0) {
+          // Process tool_calls if present (separate from content processing)
+          if (hasToolCalls) {
+            try {
+              const toolCallsDelta = delta.tool_calls || [];
               const acc = this.streamingToolCalls.get(conversationId) || [];
+
               for (const rawTc of toolCallsDelta as any[]) {
                 const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
                 while (acc.length <= idx) {
@@ -284,23 +291,37 @@ export class ConversationService {
                   target.function.arguments = (target.function.arguments || '') + rawTc.function.arguments;
                 }
               }
+
               this.streamingToolCalls.set(conversationId, acc);
-              const toolCallsReplace: Operation = {
-                op: 'add',
+
+              // Use replace operation to set/update the tool_calls field
+              const toolCallsValue = acc.map((tc) => ({
+                id: tc.id,
+                type: 'function',
+                function: {
+                  name: tc.function?.name || '',
+                  arguments: tc.function?.arguments || '',
+                },
+              }));
+
+              const toolCallsOperation: Operation = {
+                op: 'replace',
                 path: '/messages/-1/tool_calls',
-                value: acc.map((tc) => ({
-                  id: tc.id,
-                  type: 'function',
-                  function: {
-                    name: tc.function?.name || '',
-                    arguments: tc.function?.arguments || '',
-                  },
-                })),
+                value: toolCallsValue,
               };
-              await this.streamingService.broadcastDelta(conversationId, toolCallsReplace);
+
+              console.log('[STREAMING] Broadcasting tool_calls delta:', {
+                conversationId,
+                path: toolCallsOperation.path,
+                toolCallsCount: toolCallsValue.length,
+                toolCalls: toolCallsValue,
+              });
+
+              await this.streamingService.broadcastDelta(conversationId, toolCallsOperation);
+            } catch (e) {
+              // ignore tool_call parse errors to avoid breaking streaming
+              console.warn('[STREAMING] Tool call processing error:', e);
             }
-          } catch (e) {
-            // ignore tool_call parse errors to avoid breaking content streaming
           }
         }
         break;

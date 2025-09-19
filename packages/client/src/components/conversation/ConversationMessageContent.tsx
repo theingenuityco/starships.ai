@@ -213,15 +213,6 @@ export function ConversationMessageContent({
         </ReactMarkdown>
       </div>
 
-      {/* Streaming indicator - shows below content while streaming to minimize layout shift */}
-      {isStreaming && (
-        <div className="flex items-center gap-2 mt-2 text-muted-foreground">
-          <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
-          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
-          <Loader2 className="w-3 h-3 animate-spin" />
-        </div>
-      )}
-
       {/* Tool calls (function calling) - rendered after message content */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && (
         <div className="mt-3 space-y-2">
@@ -272,6 +263,15 @@ export function ConversationMessageContent({
             <code>{JSON.stringify(parsedJson, null, 2)}</code>
           </pre>
         </Card>
+      )}
+
+      {/* Streaming indicator - shows after all content including tool calls while streaming */}
+      {isStreaming && (
+        <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+          <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
+          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
+          <Loader2 className="w-3 h-3 animate-spin" />
+        </div>
       )}
 
       {/* Copy button for entire message */}

@@ -138,15 +138,16 @@ export class Agent implements NodeHandler {
   /**
    * Create tool-enabled blueprint with tool calling loop
    * SIMPLE ARCHITECTURE: Everything flows through state.messages chain naturally
+   * FIXED: Assistant message is now added before tool execution to maintain conversation flow
    */
   private createToolEnabledBlueprint(): void {
     const llmNodeRef = `llm_${this.nodeCounter++}`;
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
     const toolNodeRef = `tool_${this.nodeCounter++}`;
-    const mutateNodeRef = `mutate_${this.nodeCounter++}`;
+    const mutateToolResultNodeRef = `mutate_tool_result_${this.nodeCounter++}`;
     const mutateAppendNodeRef = `mutate_${this.nodeCounter++}`;
 
-    // Create LLM node with tools
+    // Create LLM node with tools and INLINE assistant message mutation
     const llmParams: LlmParams = {
       model: this.params.model,
       messages: '{{ state.messages }}',
@@ -154,6 +155,18 @@ export class Agent implements NodeHandler {
       ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
       ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
       ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+      // Add inline mutation to immediately add assistant message after LLM responds
+      mutations: [
+        {
+          operation: 'add' as const,
+          path: '/state/messages/-',
+          value: {
+            role: 'assistant',
+            content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
+            tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
+          },
+        },
+      ],
     };
 
     const llmNode = {
@@ -192,25 +205,14 @@ export class Agent implements NodeHandler {
       },
     };
 
-    // Create mutate node to add assistant tool_calls + tool result to conversation chain
-    const mutateNode = {
-      ref: mutateNodeRef,
+    // MODIFIED: Create mutate node to add ONLY tool result (assistant message already added)
+    const mutateToolResultNode = {
+      ref: mutateToolResultNodeRef,
       type: 'mutate' as const,
-      name: 'Add Tool Call and Result',
-      description: 'Add assistant tool_call and tool result to conversation chain',
+      name: 'Add Tool Result',
+      description: 'Add tool result to conversation chain',
       parameters: {
         mutations: [
-          // Add assistant message with tool call
-          {
-            operation: 'add' as const,
-            path: '/state/messages/-',
-            value: {
-              role: 'assistant',
-              content: null,
-              tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
-            },
-          },
-          // Add tool result message
           {
             operation: 'add' as const,
             path: '/state/messages/-',
@@ -248,37 +250,37 @@ export class Agent implements NodeHandler {
     // Find the end node
     const endNode = this.params.blueprint!.nodes.find((node) => node.type === 'end')!;
 
-    // Update blueprint nodes
-    this.params.blueprint!.nodes.push(llmNode, conditionalNode, toolNode, mutateNode, mutateAppendNode);
+    // Update blueprint nodes (mutateAssistantNode removed - now using inline mutations)
+    this.params.blueprint!.nodes.push(llmNode, conditionalNode, toolNode, mutateToolResultNode, mutateAppendNode);
 
     // Update blueprint edges to create tool calling loop
     const startToLLMEdge = this.params.blueprint!.edges.find((edge) => edge.to === endNode.ref)!;
     startToLLMEdge.to = llmNodeRef;
 
     this.params.blueprint!.edges.push(
-      // LLM -> Conditional
+      // LLM -> Conditional (assistant message already added via inline mutation)
       {
         ref: `edge_${this.params.blueprint!.edges.length + 1}`,
         from: llmNodeRef,
         to: conditionalNodeRef,
       },
-      // Conditional -> Tool (if tool calls exist)
+      // Conditional -> Tool (if tool calls exist) - assistant message already in conversation
       {
         ref: `edge_${this.params.blueprint!.edges.length + 2}`,
         from: conditionalNodeRef,
         to: toolNodeRef,
         condition: 'true',
       },
-      // Tool -> Mutate (add to conversation chain)
+      // Tool -> MutateToolResult (add tool result to conversation chain)
       {
         ref: `edge_${this.params.blueprint!.edges.length + 3}`,
         from: toolNodeRef,
-        to: mutateNodeRef,
+        to: mutateToolResultNodeRef,
       },
-      // Mutate -> LLM (loop back with updated chain)
+      // MutateToolResult -> LLM (loop back with updated chain)
       {
         ref: `edge_${this.params.blueprint!.edges.length + 4}`,
-        from: mutateNodeRef,
+        from: mutateToolResultNodeRef,
         to: llmNodeRef,
       },
       // Conditional -> MutateAppend (if no tool calls)

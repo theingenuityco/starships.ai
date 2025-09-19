@@ -12,10 +12,18 @@ import type { LlmMessage } from '@starships/autopilot';
 // DATABASE MESSAGE INTERFACE
 // ============================================================================
 
-export type MessageType = 'user_input' | 'agent_response' | 'system_notification' | 'system_instruction' | 'workflow_output' | 'error';
+export type MessageType =
+  | 'user_input'
+  | 'agent_response'
+  | 'system_notification'
+  | 'system_instruction'
+  | 'workflow_output'
+  | 'error'
+  | 'tool_result';
 
 export interface Message extends LlmMessage {
   messageType: MessageType;
+  tool_call_id?: string; // Reference to the tool call that generated this result (for tool result messages)
 }
 
 /**

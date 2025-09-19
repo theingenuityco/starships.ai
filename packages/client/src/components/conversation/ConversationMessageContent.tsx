@@ -224,7 +224,7 @@ export function ConversationMessageContent({
           <Collapsible defaultOpen={true}>
             <CollapsibleTrigger className="text-xs uppercase text-muted-foreground tracking-wide font-medium mb-2">
               <Wrench className="w-3 h-3" />
-              Tool Calls ({toolCalls.length}) {toolResults && toolResults.length > 0 && `& Results (${toolResults.length})`}
+              Tool Calls ({toolCalls.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-2">
@@ -252,9 +252,8 @@ export function ConversationMessageContent({
                   })
 
                   return (
-                    <div key={idx} className="space-y-2">
-                      {/* Tool Call */}
-                      <Card className="border bg-muted/20">
+                    <div key={idx}>
+                      <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
                         <div className="flex items-center justify-between px-3 py-2 border-b">
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">Function</span>
@@ -265,60 +264,66 @@ export function ConversationMessageContent({
                               </span>
                             )}
                           </div>
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
-                            {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                          </Button>
-                        </div>
-                        <pre className="text-xs p-3 overflow-x-auto">
-                          <code>{prettyArgs}</code>
-                        </pre>
-                      </Card>
-
-                      {/* Tool Result (if available) */}
-                      {matchingResult && (
-                        <Card className="border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20 ml-4">
-                          <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
-                            <div className="flex items-center gap-2">
-                              <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
-                                <Check className="w-3 h-3" />
-                                Result
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => {
-                                const resultContent = matchingResult.content || ''
-                                let parsedResultJson = null
-                                try {
-                                  const t = (resultContent || '').trim()
-                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                    parsedResultJson = JSON.parse(t)
-                                  }
-                                } catch {}
-                                handleCopyCodeBlock(parsedResultJson ? JSON.stringify(parsedResultJson, null, 2) : resultContent, `${messageId}-tool-result-${idx}`)
-                              }}
-                            >
-                              {copiedStates[`${messageId}-tool-result-${idx}`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
+                              {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                             </Button>
+                            {matchingResult && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => {
+                                  const resultContent = matchingResult.content || ''
+                                  let parsedResultJson = null as any
+                                  try {
+                                    const t = (resultContent || '').trim()
+                                    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                      parsedResultJson = JSON.parse(t)
+                                    }
+                                  } catch {}
+                                  handleCopyCodeBlock(parsedResultJson ? JSON.stringify(parsedResultJson, null, 2) : resultContent, `${messageId}-tool-result-${idx}`)
+                                }}
+                              >
+                                {copiedStates[`${messageId}-tool-result-${idx}`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                              </Button>
+                            )}
                           </div>
-                          <pre className="text-xs p-3 overflow-x-auto">
-                            <code>
-                              {(() => {
-                                const resultContent = matchingResult.content || ''
-                                try {
-                                  const t = (resultContent || '').trim()
-                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                    return JSON.stringify(JSON.parse(t), null, 2)
-                                  }
-                                } catch {}
-                                return resultContent
-                              })()}
-                            </code>
+                        </div>
+
+                        <div>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
+                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                            <code>{prettyArgs}</code>
                           </pre>
-                        </Card>
-                      )}
+
+                          {matchingResult && (
+                            <>
+                              <div className="border-t border-border/50" />
+                              <div className="flex items-center gap-2 px-3 pt-2">
+                                <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
+                                  <Check className="w-3 h-3" />
+                                  Result
+                                </div>
+                              </div>
+                              <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                                <code>
+                                  {(() => {
+                                    const resultContent = matchingResult.content || ''
+                                    try {
+                                      const t = (resultContent || '').trim()
+                                      if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                        return JSON.stringify(JSON.parse(t), null, 2)
+                                      }
+                                    } catch {}
+                                    return resultContent
+                                  })()}
+                                </code>
+                              </pre>
+                            </>
+                          )}
+                        </div>
+                      </Card>
                     </div>
                   )
                 })}

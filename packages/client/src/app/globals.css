@@ -238,6 +238,31 @@
     'onum' 1;
 }
 
+/* Inline streaming caret appended at the end of the last text line */
+.message-content.streaming-caret p:last-child::after,
+.message-content.streaming-caret li:last-child::after {
+  content: '';
+  display: inline-block;
+  width: 0.25rem;
+  height: 1rem;
+  margin-left: 0.25rem;
+  background-color: hsl(var(--primary));
+  vertical-align: -0.2em;
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+/* Blinking animation for caret */
+@keyframes caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
 .message-timestamp {
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.025em;

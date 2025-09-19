@@ -154,11 +154,12 @@ export class ConversationService {
       const agent = new Agent(agentModel, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
       });
-      // Convert database messages to LLM format, preserving tool_calls
+      // Convert database messages to LLM format, preserving tool_calls and tool results
       const llmMessages = messages.map((msg) => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
+        role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
         ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
+        ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
 
       // Create input execution item with the conversation messages
@@ -362,10 +363,7 @@ export class ConversationService {
         }
 
         try {
-          // STEP 1: Persist any tool result messages from the execution context first
-          await this.persistToolResultMessages(event, conversationId);
-
-          // STEP 2: Persist the assistant message
+          // Persist the assistant message
           const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
           const assistantMessage = await this.messageService.createMessage({
             conversationId,
@@ -452,32 +450,48 @@ export class ConversationService {
         break;
       }
 
+      case 'tool_started': {
+        console.log('[STREAMING] Tool started:', event.data?.toolName);
+        // Tool started - we can optionally broadcast this or track it
+        break;
+      }
+
+      case 'tool_complete': {
+        console.log('[STREAMING] Tool completed:', event.data?.toolName);
+
+        try {
+          // Persist tool result message to database when tool completes
+          if (event.data?.toolName && event.data?.result) {
+            const toolContent = typeof event.data.result === 'string' ? event.data.result : JSON.stringify(event.data.result);
+
+            const toolResultMessage = await this.messageService.createMessage({
+              conversationId,
+              role: 'tool',
+              content: toolContent,
+              messageType: 'tool_result',
+              ...(event.data.toolCallId && { tool_call_id: event.data.toolCallId }),
+            });
+
+            console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);
+
+            // Broadcast tool result message via streaming
+            if (this.streamingService && this.streamingService.isActive(conversationId)) {
+              const toolResultDelta: Operation = {
+                op: 'add',
+                path: '/messages/-',
+                value: toolResultMessage,
+              };
+              await this.streamingService.broadcastDelta(conversationId, toolResultDelta);
+            }
+          }
+        } catch (error) {
+          console.error('[STREAMING] Error persisting tool result message:', error);
+        }
+        break;
+      }
+
       default:
         break;
-    }
-  }
-
-  /**
-   * Placeholder for persisting tool result messages from content_complete event
-   * Tool result messages have role: 'tool' and contain the results of tool executions
-   *
-   * NOTE: In the current architecture, tool result messages are created during agent execution
-   * but are not directly accessible from events due to type constraints.
-   *
-   * The system currently works as follows:
-   * 1. Agent creates tool result messages in its execution state (role: 'tool')
-   * 2. These messages are used by the LLM for subsequent requests
-   * 3. However, they are not persisted to the database automatically
-   *
-   * This implementation provides the foundation for tool result persistence.
-   * Tool result messages can be persisted via direct API calls or enhanced event handling.
-   */
-  private async persistToolResultMessages(event: AutopilotEvent, conversationId: string): Promise<void> {
-    try {
-      console.log('[STREAMING] Tool result message persistence - foundation implemented');
-      // TODO: Enhanced implementation when event system provides tool execution results
-    } catch (error) {
-      console.error('[STREAMING] Error in tool result message persistence:', error);
     }
   }
 }

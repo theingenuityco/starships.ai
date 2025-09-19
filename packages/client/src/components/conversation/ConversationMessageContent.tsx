@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -217,66 +218,90 @@ export function ConversationMessageContent({
 
       {/* Tool calls rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
-        <div className="mt-3 space-y-2">
-          <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-2">
-            <Wrench className="w-3 h-3" />
-            Tool calls
-          </div>
-          {toolCalls.map((tc, idx) => {
-            const rawArgs = (tc as any)?.function?.arguments ?? ''
-            let prettyArgs = ''
-            try {
-              prettyArgs = JSON.stringify(JSON.parse(rawArgs), null, 2)
-            } catch {
-              prettyArgs = String(rawArgs)
-            }
-            const argsBlockId = `${messageId}-tool-args-${idx}`
-            const funcName = (tc as any)?.function?.name || 'unknown'
-            const toolCallId = (tc as any)?.id
+        <div className="mt-3">
+          <Collapsible defaultOpen={true}>
+            <CollapsibleTrigger className="text-xs uppercase text-muted-foreground tracking-wide font-medium mb-2">
+              <Wrench className="w-3 h-3" />
+              Tool Calls ({toolCalls.length})
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="space-y-2">
+                {toolCalls.map((tc, idx) => {
+                  const rawArgs = (tc as any)?.function?.arguments ?? ''
+                  let prettyArgs = ''
+                  try {
+                    prettyArgs = JSON.stringify(JSON.parse(rawArgs), null, 2)
+                  } catch {
+                    prettyArgs = String(rawArgs)
+                  }
+                  const argsBlockId = `${messageId}-tool-args-${idx}`
+                  const funcName = (tc as any)?.function?.name || 'unknown'
+                  const toolCallId = (tc as any)?.id
 
-            return (
-              <Card key={idx} className="border bg-muted/20">
-                <div className="flex items-center justify-between px-3 py-2 border-b">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Function</span>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
-                    {toolCallId && (
-                      <span className="text-xs text-muted-foreground">
-                        ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
-                      </span>
-                    )}
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
-                    {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                  </Button>
-                </div>
-                <pre className="text-xs p-3 overflow-x-auto">
-                  <code>{prettyArgs}</code>
-                </pre>
-              </Card>
-            )
-          })}
+                  return (
+                    <Card key={idx} className="border bg-muted/20">
+                      <div className="flex items-center justify-between px-3 py-2 border-b">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Function</span>
+                          <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
+                          {toolCallId && (
+                            <span className="text-xs text-muted-foreground">
+                              ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
+                            </span>
+                          )}
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
+                          {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                        </Button>
+                      </div>
+                      <pre className="text-xs p-3 overflow-x-auto">
+                        <code>{prettyArgs}</code>
+                      </pre>
+                    </Card>
+                  )
+                })}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       )}
 
       {/* Tool result message rendering */}
       {messageType === 'tool_result' && (
-        <Card className="mt-3 border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
-            <div className="flex items-center gap-2">
-              <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
-                <Check className="w-3 h-3" />
-                Tool Result
-              </div>
-            </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>
-              {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-            </Button>
-          </div>
-          <pre className="text-xs p-3 overflow-x-auto">
-            <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
-          </pre>
-        </Card>
+        <div className="mt-3">
+          <Collapsible defaultOpen={true}>
+            <CollapsibleTrigger className="w-full">
+              <Card className="border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20 hover:bg-green-50/50 dark:hover:bg-green-950/30 transition-colors">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
+                      <Check className="w-3 h-3" />
+                      Tool Result
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <Card className="border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20 mt-2">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
+                  <div className="text-xs text-muted-foreground">Result Content</div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}
+                  >
+                    {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                </div>
+                <pre className="text-xs p-3 overflow-x-auto">
+                  <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
+                </pre>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
       )}
 
       {/* Workflow output without tool calls */}

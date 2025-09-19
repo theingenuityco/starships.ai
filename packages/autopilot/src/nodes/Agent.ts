@@ -137,6 +137,7 @@ export class Agent implements NodeHandler {
 
   /**
    * Create tool-enabled blueprint with tool calling loop
+   * SIMPLE ARCHITECTURE: Everything flows through state.messages chain naturally
    */
   private createToolEnabledBlueprint(): void {
     const llmNodeRef = `llm_${this.nodeCounter++}`;
@@ -163,19 +164,14 @@ export class Agent implements NodeHandler {
       parameters: llmParams,
     };
 
-    // Create conditional node to check for tool calls
+    // Create conditional node to check for tool calls from current LLM response
     const conditionalNode = {
       ref: conditionalNodeRef,
       type: 'conditional' as const,
       name: 'Check Tool Calls',
       description: 'Check if LLM wants to call any tools',
       parameters: {
-        // Evaluate to true only if there's a tool_call AND it hasn't been processed in this execution loop
-        condition: `{{
-          exists(lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls)
-          and
-          (lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id != $.state.lastProcessedToolCallId)
-        }}`,
+        condition: `{{ exists(lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls) }}`,
       },
     };
 
@@ -196,16 +192,15 @@ export class Agent implements NodeHandler {
       },
     };
 
-    // Create mutate node to append assistant tool_calls + tool result AND mark processed id
-    // Server only injects history once; Agent manages tool/tool_call conversation messages internally
+    // Create mutate node to add assistant tool_calls + tool result to conversation chain
     const mutateNode = {
       ref: mutateNodeRef,
       type: 'mutate' as const,
-      name: 'Update Messages and Mark Tool Processed',
-      description: 'Add assistant tool_calls and tool result to state.messages, then mark tool_call as processed',
+      name: 'Add Tool Call and Result',
+      description: 'Add assistant tool_call and tool result to conversation chain',
       parameters: {
         mutations: [
-          // Add assistant message with tool call (as produced by LLM)
+          // Add assistant message with tool call
           {
             operation: 'add' as const,
             path: '/state/messages/-',
@@ -226,22 +221,16 @@ export class Agent implements NodeHandler {
               content: `{{ string(lastOutputOf("${toolNodeRef}")[0].json) }}`,
             },
           },
-          // Mark tool_call as processed to prevent duplicate execution in this loop
-          {
-            operation: 'add' as const,
-            path: '/state/lastProcessedToolCallId',
-            value: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
-          },
         ],
       },
     };
 
-    // When no tool_calls are present, append the assistant's textual content to state.messages
+    // When no tool_calls are present, add the assistant's final response
     const mutateAppendNode = {
       ref: mutateAppendNodeRef,
       type: 'mutate' as const,
-      name: 'Append Assistant Content',
-      description: 'Append assistant textual reply to state.messages when no tool calls are present',
+      name: 'Add Final Assistant Response',
+      description: 'Add assistant final response to conversation chain',
       parameters: {
         mutations: [
           {
@@ -280,13 +269,13 @@ export class Agent implements NodeHandler {
         to: toolNodeRef,
         condition: 'true',
       },
-      // Tool -> Mutate
+      // Tool -> Mutate (add to conversation chain)
       {
         ref: `edge_${this.params.blueprint!.edges.length + 3}`,
         from: toolNodeRef,
         to: mutateNodeRef,
       },
-      // Mutate -> LLM (loop back)
+      // Mutate -> LLM (loop back with updated chain)
       {
         ref: `edge_${this.params.blueprint!.edges.length + 4}`,
         from: mutateNodeRef,

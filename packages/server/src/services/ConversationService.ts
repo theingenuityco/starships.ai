@@ -152,10 +152,11 @@ export class ConversationService {
       const agent = new Agent(agentModel, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
       });
-      // Convert database messages to LLM format
+      // Convert database messages to LLM format, preserving tool_calls
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system',
         content: msg.content,
+        ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
       }));
 
       // Create input execution item with the conversation messages

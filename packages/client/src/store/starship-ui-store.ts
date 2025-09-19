@@ -29,6 +29,9 @@ interface ConversationData {
   messages: UIMessage[]
   total: number
   lastActivityAt?: string
+  agentId?: string
+  agentName?: string
+  isResponding?: boolean // Gap between message send and streaming start
 }
 
 interface StarshipUIState {
@@ -53,6 +56,8 @@ interface StarshipUIState {
   appendMessageChunk: (conversationId: string, index: number, chunk: UIContentChunk) => void
   markMessageStreaming: (conversationId: string, index: number, isStreaming: boolean) => void
   clearConversation: (conversationId: string) => void
+  setConversationAgent: (conversationId: string, agentId: string, agentName: string) => void
+  setConversationResponding: (conversationId: string, isResponding: boolean) => void
 
   // Streaming actions (ephemeral)
   startStreaming: (conversationId: string, version?: number) => void
@@ -91,10 +96,14 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         setConversationSnapshot: (conversationId: string, data: ConversationData) =>
           set(
             state => {
+              const prev = state.conversations[conversationId]
               return {
                 conversations: {
                   ...state.conversations,
                   [conversationId]: {
+                    // Preserve existing per-conversation UI metadata (agentId, agentName, isResponding, etc.)
+                    ...(prev || {}),
+                    // Override with the latest snapshot fields
                     messages: Array.isArray(data.messages) ? data.messages : [],
                     total: typeof data.total === 'number' ? data.total : Array.isArray(data.messages) ? data.messages.length : 0,
                     lastActivityAt: data.lastActivityAt,
@@ -190,6 +199,36 @@ export const useStarshipUIStore = create<StarshipUIState>()(
             },
             false,
             'convo/clear'
+          ),
+
+        setConversationAgent: (conversationId: string, agentId: string, agentName: string) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId] || { messages: [], total: 0 }
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, agentId, agentName },
+                },
+              }
+            },
+            false,
+            'convo/setAgent'
+          ),
+
+        setConversationResponding: (conversationId: string, isResponding: boolean) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId] || { messages: [], total: 0 }
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, isResponding },
+                },
+              }
+            },
+            false,
+            'convo/setResponding'
           ),
 
         // Streaming actions (ephemeral)

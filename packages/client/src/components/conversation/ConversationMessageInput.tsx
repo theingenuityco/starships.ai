@@ -122,6 +122,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           onConversationStart?.(currentConversationId!)
         }
 
+        // Set agent information and responding state in store
+        const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
+        setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
+        setConversationResponding(currentConversationId!, true)
+
         // Clear input and reset UI immediately for better UX
         setMessage('')
         if (textareaRef.current) {
@@ -139,8 +144,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           sending: true, // Mark as sending so UI can show loading state
         }
 
-        // Get UI store actions
-        const { appendMessage } = useStarshipUIStore.getState()
         appendMessage(currentConversationId!, optimisticMessage)
 
         // Notify parent about message activity immediately (for UI state updates)
@@ -163,13 +166,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const { conversations } = useStarshipUIStore.getState()
             const currentMessages = conversations[currentConversationId!]?.messages || []
             const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
-            useStarshipUIStore.getState().setConversationSnapshot(currentConversationId!, {
+            setConversationSnapshot(currentConversationId!, {
               messages: filteredMessages,
               total: filteredMessages.length,
             })
+            setConversationResponding(currentConversationId!, false)
           })
           .finally(() => {
             setSending(false)
+            setConversationResponding(currentConversationId!, false)
           })
 
         // Exit early to avoid hitting catch/finally paths
@@ -179,6 +184,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
+        if (conversationId) {
+          useStarshipUIStore.getState().setConversationResponding(conversationId, false)
+        }
       }
     }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId])
 
@@ -212,6 +220,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             onConversationStart?.(currentConversationId!)
           }
 
+          // Set agent information and responding state in store
+          const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
+          setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
+          setConversationResponding(currentConversationId!, true)
+
           // Add optimistic user message to UI store immediately
           const optimisticMessage = {
             id: `temp-user-${Date.now()}`,
@@ -223,8 +236,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             sending: true, // Mark as sending so UI can show loading state
           }
 
-          // Get UI store actions
-          const { appendMessage } = useStarshipUIStore.getState()
           appendMessage(currentConversationId!, optimisticMessage)
 
           // Notify parent about message activity immediately (for UI state updates)
@@ -246,19 +257,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               const { conversations } = useStarshipUIStore.getState()
               const currentMessages = conversations[currentConversationId!]?.messages || []
               const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
-              useStarshipUIStore.getState().setConversationSnapshot(currentConversationId!, {
+              setConversationSnapshot(currentConversationId!, {
                 messages: filteredMessages,
                 total: filteredMessages.length,
               })
+              setConversationResponding(currentConversationId!, false)
             })
             .finally(() => {
               setSending(false)
+              setConversationResponding(currentConversationId!, false)
             })
 
           return
         } catch (error) {
           console.error('Failed to send suggestion:', error)
           setSending(false)
+          if (conversationId) {
+            useStarshipUIStore.getState().setConversationResponding(conversationId, false)
+          }
         }
       },
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
@@ -286,7 +302,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }
 
     const getPlaceholder = () => {
-      if (isStreamingEffective) return 'AI is thinking...'
+      if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'AI is thinking...'
+      if (sending) return selectedAgent ? `${selectedAgent.name} is responding...` : 'Responding...'
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 
@@ -402,7 +419,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         {/* Agent Indicator - Only show in non-minimal mode */}
         {!minimal && selectedAgent && (
           <div className="absolute -top-3 left-4 px-2 py-1 frosted-glass-light text-primary text-xs rounded-full">
-            {isStreamingEffective ? `${selectedAgent.name} is thinking...` : `Chatting with ${selectedAgent.name}`}
+            {isStreamingEffective ? `${selectedAgent.name} is thinking...` : sending ? `${selectedAgent.name} is responding...` : `Chatting with ${selectedAgent.name}`}
           </div>
         )}
       </div>

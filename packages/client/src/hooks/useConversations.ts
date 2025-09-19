@@ -123,6 +123,7 @@ export function useConversation(conversationId: string | null) {
   const updateMessageAt = useStarshipUIStore(s => s.updateMessageAt)
   const endStreaming = useStarshipUIStore(s => s.endStreaming)
   const clearStreaming = useStarshipUIStore(s => s.clearStreaming)
+  const setConversationResponding = useStarshipUIStore(s => s.setConversationResponding)
   const existingConversation = useStarshipUIStore(s => (conversationId ? s.conversations[conversationId] : undefined))
   // Get conversation messages
   const messagesQuery = useQuery({
@@ -242,6 +243,10 @@ export function useConversation(conversationId: string | null) {
           if (text) {
             startStreaming(cid, version)
             appendStreamingChunk(cid, text, version)
+            // Flip responding off once streaming actually starts
+            try {
+              setConversationResponding(cid, false)
+            } catch {}
           }
 
           // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
@@ -536,6 +541,8 @@ export function useConversation(conversationId: string | null) {
           }))
           try {
             startStreaming(cid)
+            // Ensure responding indicator is cleared when assistant stream begins
+            setConversationResponding(cid, false)
           } catch {}
 
           // Add streaming message to cache (append; ascending order)

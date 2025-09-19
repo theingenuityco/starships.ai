@@ -266,42 +266,24 @@ export function ConversationMessageContent({
         </div>
       )}
 
-      {/* Tool result message rendering */}
+      {/* Tool result message rendering - now as simple card */}
       {messageType === 'tool_result' && (
-        <div className="mt-3">
-          <Collapsible defaultOpen={true}>
-            <CollapsibleTrigger className="w-full">
-              <Card className="border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20 hover:bg-green-50/50 dark:hover:bg-green-950/30 transition-colors">
-                <div className="flex items-center justify-between px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
-                      <Check className="w-3 h-3" />
-                      Tool Result
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <Card className="border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20 mt-2">
-                <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
-                  <div className="text-xs text-muted-foreground">Result Content</div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}
-                  >
-                    {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                  </Button>
-                </div>
-                <pre className="text-xs p-3 overflow-x-auto">
-                  <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
-                </pre>
-              </Card>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
+        <Card className="mt-3 border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-green-200/50 dark:border-green-800/50">
+            <div className="flex items-center gap-2">
+              <div className="text-xs uppercase text-green-700 dark:text-green-300 tracking-wide font-medium flex items-center gap-2">
+                <Check className="w-3 h-3" />
+                Tool Result
+              </div>
+            </div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>
+              {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            </Button>
+          </div>
+          <pre className="text-xs p-3 overflow-x-auto">
+            <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
+          </pre>
+        </Card>
       )}
 
       {/* Workflow output without tool calls */}

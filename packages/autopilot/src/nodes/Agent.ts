@@ -92,7 +92,7 @@ export class Agent implements NodeHandler {
           path: '/state/messages/-',
           value: {
             role: 'assistant',
-            content: `{{ exists(lastOutputOf("${nodeRef}")[0].json.choices[0].message.content) ? lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "" }}`,
+            content: `{{ $exists($lastOutputOf("${nodeRef}")[0].json.choices[0].message.content) ? $lastOutputOf("${nodeRef}")[0].json.choices[0].message.content : "" }}`,
           },
         },
       ],
@@ -171,7 +171,7 @@ export class Agent implements NodeHandler {
       name: 'Check Tool Calls',
       description: 'Check if LLM wants to call any tools',
       parameters: {
-        condition: `{{ exists(lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls) }}`,
+        condition: `{{ $exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls) }}`,
       },
     };
 
@@ -182,7 +182,7 @@ export class Agent implements NodeHandler {
       name: 'Execute Tool',
       description: 'Execute the requested tool',
       parameters: {
-        name: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+        name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
         description: 'Dynamic tool execution',
         parameters: {
           type: 'object',
@@ -207,7 +207,7 @@ export class Agent implements NodeHandler {
             value: {
               role: 'assistant',
               content: null,
-              tool_calls: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
+              tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
             },
           },
           // Add tool result message
@@ -216,9 +216,9 @@ export class Agent implements NodeHandler {
             path: '/state/messages/-',
             value: {
               role: 'tool',
-              tool_call_id: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
-              name: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
-              content: `{{ string(lastOutputOf("${toolNodeRef}")[0].json) }}`,
+              tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+              name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+              content: `{{ $string($lastOutputOf("${toolNodeRef}")[0].json) }}`,
             },
           },
         ],
@@ -238,7 +238,7 @@ export class Agent implements NodeHandler {
             path: '/state/messages/-',
             value: {
               role: 'assistant',
-              content: `{{ lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
+              content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
             },
           },
         ],

@@ -132,6 +132,7 @@ export class AgentRepository extends BaseRepository {
           timeout: data.timeout,
           memoryState: data.memoryState,
           blueprint: data.blueprint,
+          tools: data.tools, // Include tools for function calling
 
           // Database-specific fields
           createdAt: now,

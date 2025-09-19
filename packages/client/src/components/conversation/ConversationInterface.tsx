@@ -4,6 +4,8 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useConversationAgents } from '@/hooks/useConversations'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
@@ -31,6 +33,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Track streaming state for current conversation to focus input on completion
   const uiStreaming = useStarshipUIStore(s => (currentConversationId ? s.conversationsStreaming[currentConversationId]?.isStreaming === true : false))
   const prevStreamingRef = useRef(false)
+
+  // Get agents data from starship and conversation
+  const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
+  const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
+  const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
 
   // Memoized agent change handler to prevent AgentSelector from remounting
   const handleAgentChange = useCallback((agent: Agent | null) => {
@@ -68,6 +75,34 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
     setHasMessages(Boolean(externalConversationId))
   }, [externalConversationId])
+
+  // Restore selected agent from conversation data (fixes refresh issue)
+  useEffect(() => {
+    if (!currentConversationId) return
+
+    // First priority: Use conversation agents from API (persisted agent relationships)
+    if (conversationAgents.length > 0) {
+      const conversationAgent = conversationAgents[0] // Use first agent from conversation
+      if (conversationAgent && (!selectedAgent || selectedAgent.id !== conversationAgent.id)) {
+        setSelectedAgent(conversationAgent)
+        return
+      }
+    }
+
+    // Second priority: Try to restore from UI store conversation data
+    if (conversationData?.agentId && starshipAgentsData.length > 0) {
+      const storedAgent = starshipAgentsData.find(agent => agent.id === conversationData.agentId)
+      if (storedAgent && (!selectedAgent || selectedAgent.id !== storedAgent.id)) {
+        setSelectedAgent(storedAgent)
+        return
+      }
+    }
+
+    // Fallback: auto-select first agent if none selected (for new conversations)
+    if (!selectedAgent && starshipAgentsData.length > 0) {
+      setSelectedAgent(starshipAgentsData[0])
+    }
+  }, [currentConversationId, conversationAgents, conversationData?.agentId, starshipAgentsData, selectedAgent])
 
   // Focus input when streaming transitions from true -> false
   useEffect(() => {

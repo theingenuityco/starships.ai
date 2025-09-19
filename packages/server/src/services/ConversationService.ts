@@ -15,6 +15,8 @@ export class ConversationService {
   private streamingService: StreamingService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
+  // Track accumulated tool_calls during streaming per conversation
+  private streamingToolCalls: Map<string, any[]> = new Map();
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
@@ -152,11 +154,12 @@ export class ConversationService {
       const agent = new Agent(agentModel, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
       });
-      // Convert database messages to LLM format, preserving tool_calls
+      // Convert database messages to LLM format, preserving tool_calls and tool results
       const llmMessages = messages.map((msg) => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
+        role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
         ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
+        ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
 
       // Create input execution item with the conversation messages
@@ -205,21 +208,20 @@ export class ConversationService {
         // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
+        this.streamingToolCalls.delete(conversationId);
         break;
       }
 
       case 'content_chunk': {
         // Stream content chunks in real-time
         const chunkContent = event.data?.chunk;
-        if (
-          chunkContent &&
-          Array.isArray(chunkContent.choices) &&
-          chunkContent.choices.length > 0 &&
-          chunkContent.choices[0]?.delta?.content
-        ) {
-          // Guard: if no active accumulator, start a new placeholder stream only when SSE connection is active.
-          // This supports multiple assistant responses within a single streaming session.
-          if (!this.streamingContent.has(conversationId)) {
+        if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
+          const delta = chunkContent.choices[0]?.delta;
+          const hasContent = delta?.content;
+          const hasToolCalls = delta?.tool_calls && Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0;
+
+          // Guard: if no active accumulator and we have content, start a new placeholder stream
+          if (hasContent && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
               const assistantMessage: MessageModel = {
                 id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -233,36 +235,90 @@ export class ConversationService {
               const shell: Operation = {
                 op: 'add',
                 path: '/messages/-',
-                value: { ...assistantMessage, streaming: true, contentChunks: [] },
+                value: {
+                  ...assistantMessage,
+                  streaming: true,
+                  contentChunks: [],
+                  tool_calls: [], // Initialize empty tool_calls array for replace operations
+                },
               };
               await this.streamingService.broadcastDelta(conversationId, shell);
 
               // Initialize server-side accumulator for this new stream
               this.streamingContent.set(conversationId, '');
+              // Clear tool_calls for this new stream to prevent reuse from previous LLM calls
+              this.streamingToolCalls.delete(conversationId);
             } else {
               break;
             }
           }
 
-          const content = String(chunkContent.choices[0].delta.content);
+          // Process content if present
+          if (hasContent) {
+            const content = String(delta.content);
 
-          // Track accumulated content server-side for completion event
-          const currentContent = this.streamingContent.get(conversationId) || '';
-          const currentLength = currentContent.length;
-          const newContent = currentContent + content;
-          this.streamingContent.set(conversationId, newContent);
+            // Track accumulated content server-side for completion event
+            const currentContent = this.streamingContent.get(conversationId) || '';
+            const currentLength = currentContent.length;
+            const newContent = currentContent + content;
+            this.streamingContent.set(conversationId, newContent);
 
-          // Send content chunk with positional information for client-side accumulation
-          const delta: Operation = {
-            op: 'add',
-            path: '/messages/-1/contentChunks/-',
-            value: {
-              content: content,
-              position: currentLength,
-              timestamp: Date.now(),
-            },
-          };
-          await this.streamingService.broadcastDelta(conversationId, delta);
+            // Send content chunk with positional information for client-side accumulation
+            const contentDelta: Operation = {
+              op: 'add',
+              path: '/messages/-1/contentChunks/-',
+              value: {
+                content: content,
+                position: currentLength,
+                timestamp: Date.now(),
+              },
+            };
+            await this.streamingService.broadcastDelta(conversationId, contentDelta);
+          }
+
+          // Process tool_calls if present (separate from content processing)
+          if (hasToolCalls) {
+            try {
+              const toolCallsDelta = delta.tool_calls || [];
+              const acc = this.streamingToolCalls.get(conversationId) || [];
+
+              for (const rawTc of toolCallsDelta as any[]) {
+                const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
+                while (acc.length <= idx) {
+                  acc.push({ id: undefined, type: 'function', function: { name: undefined, arguments: '' } });
+                }
+                const target = acc[idx];
+                if (rawTc?.id) target.id = rawTc.id;
+                if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+                if (typeof rawTc?.function?.arguments === 'string') {
+                  target.function.arguments = (target.function.arguments || '') + rawTc.function.arguments;
+                }
+              }
+
+              this.streamingToolCalls.set(conversationId, acc);
+
+              // Use replace operation to set/update the tool_calls field
+              const toolCallsValue = acc.map((tc) => ({
+                id: tc.id,
+                type: 'function',
+                function: {
+                  name: tc.function?.name || '',
+                  arguments: tc.function?.arguments || '',
+                },
+              }));
+
+              const toolCallsOperation: Operation = {
+                op: 'replace',
+                path: '/messages/-1/tool_calls',
+                value: toolCallsValue,
+              };
+
+              await this.streamingService.broadcastDelta(conversationId, toolCallsOperation);
+            } catch (e) {
+              // ignore tool_call parse errors to avoid breaking streaming
+              console.warn('[STREAMING] Tool call processing error:', e);
+            }
+          }
         }
         break;
       }
@@ -301,17 +357,32 @@ export class ConversationService {
         // Persist the final assistant message to the database and patch stable fields
         // Skip persistence when content is empty to avoid DB validation errors
         if (!finalContent || finalContent.trim().length === 0) {
+          console.log('[STREAMING] Skipping persistence - empty content');
           this.streamingContent.delete(conversationId);
           break;
         }
 
         try {
+          // Persist the assistant message
+          const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
           const assistantMessage = await this.messageService.createMessage({
             conversationId,
             role: 'assistant',
             content: finalContent,
             messageType: 'agent_response',
+            ...(finalToolCallsAcc.length > 0 && {
+              tool_calls: finalToolCallsAcc.map((tc) => ({
+                id: tc.id,
+                type: 'function',
+                function: {
+                  name: tc.function?.name || '',
+                  arguments: tc.function?.arguments || '',
+                },
+              })),
+            }),
           });
+
+          console.log('[STREAMING] Successfully created assistant message:', assistantMessage.id);
 
           const finalizeOps: Operation[] = [
             {
@@ -335,6 +406,8 @@ export class ConversationService {
 
         // Clear streaming content tracker
         this.streamingContent.delete(conversationId);
+        // Also clear tool calls tracker to prevent reuse
+        this.streamingToolCalls.delete(conversationId);
         break;
       }
 
@@ -344,7 +417,10 @@ export class ConversationService {
       }
 
       case 'node_completed': {
-        // Persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.
+        // Handle tool node completion - persist tool result messages
+        // Note: Due to type constraints, we'll handle tool result persistence differently
+        console.log('[STREAMING] Node completed event received');
+        // Other persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.
         break;
       }
 
@@ -371,6 +447,46 @@ export class ConversationService {
           value: errorMessage,
         };
         await this.streamingService.broadcastDelta(conversationId, delta);
+        break;
+      }
+
+      case 'tool_started': {
+        console.log('[STREAMING] Tool started:', event.data?.toolName);
+        // Tool started - we can optionally broadcast this or track it
+        break;
+      }
+
+      case 'tool_complete': {
+        console.log('[STREAMING] Tool completed:', event.data?.toolName);
+
+        try {
+          // Persist tool result message to database when tool completes
+          if (event.data?.toolName && event.data?.result) {
+            const toolContent = typeof event.data.result === 'string' ? event.data.result : JSON.stringify(event.data.result);
+
+            const toolResultMessage = await this.messageService.createMessage({
+              conversationId,
+              role: 'tool',
+              content: toolContent,
+              messageType: 'tool_result',
+              ...(event.data.toolCallId && { tool_call_id: event.data.toolCallId }),
+            });
+
+            console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);
+
+            // Broadcast tool result message via streaming
+            if (this.streamingService && this.streamingService.isActive(conversationId)) {
+              const toolResultDelta: Operation = {
+                op: 'add',
+                path: '/messages/-',
+                value: toolResultMessage,
+              };
+              await this.streamingService.broadcastDelta(conversationId, toolResultDelta);
+            }
+          }
+        } catch (error) {
+          console.error('[STREAMING] Error persisting tool result message:', error);
+        }
         break;
       }
 

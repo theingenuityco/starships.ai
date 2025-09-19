@@ -22,7 +22,23 @@ The conversation system has been significantly enhanced to provide better UX and
 - **Processing Feedback**: Real-time status updates during message processing
 - **Metadata Footer**: Timestamp, performance metrics, and other contextual information
 
-### 2. Conversation Management
+### 2. Tool Calls and Results Integration
+
+#### Enhanced Tool Interaction Display
+
+- **Tool Call Cards**: Clean, structured display of function calls with arguments
+- **Tool Result Rendering**: Separate, visually distinct cards for tool execution results
+- **Theme-Appropriate Colors**: Uses emerald accent colors that complement the dark/light theme
+- **Improved UX**: Tool results are no longer rendered as raw JSON but as properly formatted content
+- **Copy Functionality**: Individual copy buttons for both tool arguments and results
+
+#### Message Type Handling
+
+- **Separate Message Rendering**: Tool calls (assistant messages) and tool results (system messages) are properly separated
+- **Conditional Content**: Prevents duplicate rendering of content for different message types
+- **Clean JSON Formatting**: Proper JSON syntax highlighting and formatting for tool arguments
+
+### 3. Conversation Management
 
 #### Conversation Header
 
@@ -70,6 +86,15 @@ The conversation system has been significantly enhanced to provide better UX and
 - Enhanced message bubble rendering
 - Rich metadata display
 - Threading and performance indicators
+- Specialized rendering for tool calls and tool results
+
+#### `ConversationMessageContent`
+
+- Individual message rendering with full metadata
+- Status indicators and importance badges
+- Tool calls and results integration
+- Theme-appropriate styling for different message types
+- Conditional content rendering based on message type
 
 #### `MessageBubble` (within ConversationMessageList)
 
@@ -105,7 +130,7 @@ interface Message {
   agentId?: string
 
   // Enhanced backend properties
-  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output'
+  messageType?: 'user_input' | 'agent_response' | 'system_message' | 'workflow_output' | 'tool_result'
   importance?: 'low' | 'medium' | 'high' | 'critical'
   processingStatus?: 'pending' | 'processing' | 'completed' | 'failed'
   processingTimeMs?: number
@@ -226,11 +251,14 @@ const handleStatusChange = async status => {
 
 - [ ] Create new conversation
 - [ ] Send messages and verify rich display
+- [ ] Test tool calls and results display
+- [ ] Verify tool result cards with proper styling
 - [ ] Test conversation status changes
 - [ ] Verify processing status indicators
 - [ ] Check importance badges
 - [ ] Test conversation deletion
 - [ ] Verify metrics display
+- [ ] Test copy functionality for tool calls and results
 
 ### Automated Testing
 

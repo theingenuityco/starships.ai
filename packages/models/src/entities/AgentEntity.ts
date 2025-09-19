@@ -6,7 +6,7 @@
  */
 
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
-import { AgentMemoryState } from '@starships/autopilot';
+import { AgentMemoryState, ToolParams } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
@@ -78,6 +78,12 @@ export class AgentEntity implements AgentModel {
   @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
+
+  // Optional tools for function calling (enables tool_calls in LLM responses)
+  @Expose()
+  @IsOptional()
+  @Transformers.JsonTransform()
+  tools?: ToolParams[];
 
   /**
    * Simple validation function using class-validator

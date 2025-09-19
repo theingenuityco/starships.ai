@@ -15,7 +15,7 @@ const NanoidSchema = z.string().regex(/^[a-z0-9_-]{10,30}$/i, 'Invalid ID format
 // });
 
 const CreateMessageSchema = z.object({
-  role: z.enum(['system', 'user', 'assistant']),
+  role: z.enum(['system', 'user', 'assistant', 'tool']),
   content: z.string().min(1, 'Content is required').max(50000, 'Content too long'),
   starshipId: NanoidSchema,
   agentId: NanoidSchema.optional(),
@@ -24,12 +24,13 @@ const CreateMessageSchema = z.object({
   parentMessageId: NanoidSchema.optional(),
   threadDepth: z.number().min(0).max(100).optional(),
   processingStatus: z.enum(['pending', 'processing', 'completed', 'failed']).optional(),
-  messageType: z.enum(['user_input', 'agent_response', 'system_message', 'workflow_output']).optional(),
+  messageType: z.enum(['user_input', 'agent_response', 'system_message', 'workflow_output', 'tool_result']).optional(),
   importance: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   metadata: z.object({}).passthrough().optional(),
   hasAttachments: z.boolean().optional(),
   tokenCount: z.number().min(0).optional(),
   processingTimeMs: z.number().min(0).optional(),
+  tool_call_id: z.string().optional(), // Reference to the tool call that generated this result
 });
 
 const UpdateMessageSchema = CreateMessageSchema.partial().omit({ starshipId: true });

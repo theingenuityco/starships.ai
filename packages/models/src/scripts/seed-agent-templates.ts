@@ -105,7 +105,7 @@ function createCodeReviewBlueprint(): Blueprint {
  */
 function createStarshipNavigatorBlueprint(): Blueprint {
   const agent = new Agent({
-    name: 'Sibyl Navigator',
+    name: 'Sybil Navigator',
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.4,
     maxTokens: 2000,
@@ -243,8 +243,8 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     timeout: 30000,
   },
   {
-    name: 'Sibyl',
-    slug: 'sibyl',
+    name: 'Sybil',
+    slug: 'sybil',
     description:
       'Your expert starship navigator and first officer who helps new captains get started, configure their crew, and begin their journey.',
     category: 'general',
@@ -261,8 +261,8 @@ const DEFAULT_TEMPLATES: Array<Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     ],
     blueprint: createStarshipNavigatorBlueprint(),
     memoryState: {
-      systemPrompt: `<character name="Sibyl">
-You are Sibyl, Starships.ai's onboarding and navigation assistant.
+      systemPrompt: `<character name="Sybil">
+You are Sybil, Starships.ai's onboarding and navigation assistant.
 Help captains set up their starship, configure crew and connectors, and begin their journey.
 Be concise, product-focused, and actionable.
 

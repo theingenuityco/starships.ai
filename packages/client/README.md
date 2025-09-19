@@ -279,10 +279,13 @@ CMD ["npm", "start"]
 
 ## 📖 Documentation
 
-- [Client Implementation Guide](../../docs/client-implementation.md) - Detailed technical documentation
-- [Streaming Architecture](../autopilot/README-STREAMING.md) - Real-time streaming implementation
-- [API Design](../../docs/api-design.md) - Backend API reference
-- [Architecture Overview](../../docs/architecture.md) - System design
+For detailed documentation, see the main project README and other package documentation:
+
+- [Main Project README](../../README.md) - Complete system overview
+- [Server Package](../server/README.md) - API server and endpoints
+- [Autopilot Package](../autopilot/README.md) - Workflow execution engine
+- [Models Package](../models/README.md) - Database and data access layer
+- [Protocol Package](../protocol/README.md) - Shared type definitions
 
 ## 🤝 Contributing
 

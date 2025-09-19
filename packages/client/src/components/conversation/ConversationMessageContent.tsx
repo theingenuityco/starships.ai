@@ -193,13 +193,10 @@ export function ConversationMessageContent({
       {/* Streaming indicator moved to the end of the content to avoid layout shift */}
 
       {/* Unified markdown rendering - same for both streaming and completed */}
-      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content">
+      <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {displayContent}
         </ReactMarkdown>
-
-        {/* Streaming cursor - appears after content while streaming */}
-        {isStreaming && displayContent && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
       </div>
 
       {/* Streaming indicator - shows below content while streaming to minimize layout shift */}

@@ -63,14 +63,15 @@ pnpm lint         # Run ESLint
 
 ## 📦 Package Architecture
 
-| Package                                                  | Description                                                                                  |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with starship management, agent control, and conversation interfaces     |
-| [`@starships/server`](./packages/server/README.md)       | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints   |
-| [`@starships/autopilot`](./packages/autopilot/README.md) | Workflow execution engine with DAG-based flows, agent system, and AI model integration       |
-| [`@starships/models`](./packages/models/README.md)       | Neo4j database models, repositories, migration system, and comprehensive data access layer   |
-| [`@starships/protocol`](./packages/protocol/README.md)   | Shared TypeScript types, domain models, and API contracts                                    |
-| [`@starships/errors`](./packages/errors/README.md)       | Comprehensive error handling system with automatic categorization and developer-friendly API |
+| Package                                                          | Description                                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [`@starships/client`](./packages/client/README.md)               | Next.js 15 frontend with starship management, agent control, and conversation interfaces             |
+| [`@starships/server`](./packages/server/README.md)               | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints           |
+| [`@starships/autopilot`](./packages/autopilot/README.md)         | Workflow execution engine with DAG-based flows, agent system, AI model integration, and tool calling |
+| [`@starships/models`](./packages/models/README.md)               | Neo4j database models, repositories, migration system, and comprehensive data access layer           |
+| [`@starships/reverse-proxy`](./packages/reverse-proxy/README.md) | Development reverse proxy for unified local development routing                                      |
+| [`@starships/protocol`](./packages/protocol/README.md)           | Shared TypeScript types, domain models, and API contracts                                            |
+| [`@starships/errors`](./packages/errors/README.md)               | Comprehensive error handling system with automatic categorization and developer-friendly API         |
 
 ---
 

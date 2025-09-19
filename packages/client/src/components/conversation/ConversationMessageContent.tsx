@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { cn } from '@/lib/utils'
 import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -51,6 +51,21 @@ export function ConversationMessageContent({
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
+  const [isToolCallsOpen, setIsToolCallsOpen] = useState(true)
+
+  // Auto-collapse tool calls with delay after results are available
+  useEffect(() => {
+    if (toolResults && toolResults.length > 0) {
+      const timer = setTimeout(() => {
+        setIsToolCallsOpen(false)
+      }, 300)
+
+      return () => clearTimeout(timer)
+    } else {
+      // Keep open if no results yet (tool call in progress)
+      setIsToolCallsOpen(true)
+    }
+  }, [toolResults])
 
   // Build display content from chunks when streaming, use final content when complete
   const displayContent = useMemo(() => {
@@ -221,7 +236,7 @@ export function ConversationMessageContent({
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="mt-3">
-          <Collapsible defaultOpen={true}>
+          <Collapsible key={`tool-calls-${isToolCallsOpen}`} defaultOpen={isToolCallsOpen}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
               <Wrench className="w-3 h-3" />
               Tool Calls ({toolCalls.length})

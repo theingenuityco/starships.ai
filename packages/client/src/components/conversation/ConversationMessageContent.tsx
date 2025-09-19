@@ -1,8 +1,9 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -10,6 +11,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
+import type { MessageModel } from '@starships/protocol'
 
 interface ContentChunk {
   content: string
@@ -27,6 +29,8 @@ interface MessageContentProps {
   isStreaming?: boolean
   contentChunks?: ContentChunk[]
   agentName?: string
+  toolCalls?: NonNullable<MessageModel['tool_calls']>
+  messageType?: MessageModel['messageType']
 }
 
 export function ConversationMessageContent({
@@ -39,6 +43,8 @@ export function ConversationMessageContent({
   isStreaming = false,
   contentChunks = [],
   agentName,
+  toolCalls,
+  messageType,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
@@ -60,6 +66,16 @@ export function ConversationMessageContent({
 
     return result
   }, [content, contentChunks, isStreaming])
+
+  const parsedJson = useMemo(() => {
+    try {
+      const t = (displayContent || '').trim()
+      if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+        return JSON.parse(t)
+      }
+    } catch {}
+    return null as any
+  }, [displayContent])
 
   const handleCopyContent = async () => {
     try {
@@ -191,6 +207,58 @@ export function ConversationMessageContent({
   return (
     <div className={cn('relative group', className)}>
       {/* Streaming indicator moved to the end of the content to avoid layout shift */}
+
+      {/* Tool calls (function calling) */}
+      {Array.isArray(toolCalls) && toolCalls.length > 0 && (
+        <div className="mb-3 space-y-2">
+          <div className="text-xs uppercase text-muted-foreground tracking-wide flex items-center gap-2">
+            <Wrench className="w-3 h-3" />
+            Tool calls
+          </div>
+          {toolCalls.map((tc, idx) => {
+            const rawArgs = (tc as any)?.function?.arguments ?? ''
+            let pretty = ''
+            try {
+              pretty = JSON.stringify(JSON.parse(rawArgs), null, 2)
+            } catch {
+              pretty = String(rawArgs)
+            }
+            const blockId = `${messageId}-tool-${idx}`
+            const funcName = (tc as any)?.function?.name || 'unknown'
+            return (
+              <Card key={idx} className="border bg-muted/20">
+                <div className="flex items-center justify-between px-3 py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Function</span>
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(pretty, blockId)}>
+                    {copiedStates[blockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                </div>
+                <pre className="text-xs p-3 overflow-x-auto">
+                  <code>{pretty}</code>
+                </pre>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Tool result (parsed JSON) */}
+      {(messageType === 'workflow_output' || (parsedJson && Array.isArray(toolCalls) && toolCalls.length > 0)) && parsedJson && (
+        <Card className="mb-3 border bg-muted/20">
+          <div className="flex items-center justify-between px-3 py-2 border-b">
+            <div className="text-xs uppercase text-muted-foreground tracking-wide">Tool result</div>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(JSON.stringify(parsedJson, null, 2), `${messageId}-tool-result`)}>
+              {copiedStates[`${messageId}-tool-result`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+            </Button>
+          </div>
+          <pre className="text-xs p-3 overflow-x-auto">
+            <code>{JSON.stringify(parsedJson, null, 2)}</code>
+          </pre>
+        </Card>
+      )}
 
       {/* Unified markdown rendering - same for both streaming and completed */}
       <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>

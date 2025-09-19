@@ -15,6 +15,8 @@ export class ConversationService {
   private streamingService: StreamingService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
+  // Track accumulated tool_calls during streaming per conversation
+  private streamingToolCalls: Map<string, any[]> = new Map();
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
@@ -205,6 +207,7 @@ export class ConversationService {
         // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
+        this.streamingToolCalls.delete(conversationId);
         break;
       }
 
@@ -263,6 +266,42 @@ export class ConversationService {
             },
           };
           await this.streamingService.broadcastDelta(conversationId, delta);
+
+          // Also stream tool_calls if present in this chunk (OpenAI/OpenRouter style)
+          try {
+            const toolCallsDelta = Array.isArray(chunkContent.choices) ? chunkContent.choices[0]?.delta?.tool_calls || [] : [];
+            if (toolCallsDelta.length > 0) {
+              const acc = this.streamingToolCalls.get(conversationId) || [];
+              for (const rawTc of toolCallsDelta as any[]) {
+                const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
+                while (acc.length <= idx) {
+                  acc.push({ id: undefined, type: 'function', function: { name: undefined, arguments: '' } });
+                }
+                const target = acc[idx];
+                if (rawTc?.id) target.id = rawTc.id;
+                if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+                if (typeof rawTc?.function?.arguments === 'string') {
+                  target.function.arguments = (target.function.arguments || '') + rawTc.function.arguments;
+                }
+              }
+              this.streamingToolCalls.set(conversationId, acc);
+              const toolCallsReplace: Operation = {
+                op: 'add',
+                path: '/messages/-1/tool_calls',
+                value: acc.map((tc) => ({
+                  id: tc.id,
+                  type: 'function',
+                  function: {
+                    name: tc.function?.name || '',
+                    arguments: tc.function?.arguments || '',
+                  },
+                })),
+              };
+              await this.streamingService.broadcastDelta(conversationId, toolCallsReplace);
+            }
+          } catch (e) {
+            // ignore tool_call parse errors to avoid breaking content streaming
+          }
         }
         break;
       }
@@ -306,11 +345,22 @@ export class ConversationService {
         }
 
         try {
+          const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
           const assistantMessage = await this.messageService.createMessage({
             conversationId,
             role: 'assistant',
             content: finalContent,
             messageType: 'agent_response',
+            ...(finalToolCallsAcc.length > 0 && {
+              tool_calls: finalToolCallsAcc.map((tc) => ({
+                id: tc.id,
+                type: 'function',
+                function: {
+                  name: tc.function?.name || '',
+                  arguments: tc.function?.arguments || '',
+                },
+              })),
+            }),
           });
 
           const finalizeOps: Operation[] = [

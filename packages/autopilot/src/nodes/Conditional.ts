@@ -1,7 +1,7 @@
 /**
  * Conditional Class
  *
- * Evaluates JSONata expressions to determine workflow branching.
+ * Evaluates JavaScript expressions to determine workflow branching.
  * Works as both standalone node and embedded parameter in other nodes.
  */
 
@@ -68,7 +68,7 @@ export class Conditional implements NodeHandler {
         } else if (typeof result === 'boolean') {
           edgeCondition = result.toString();
         } else if (typeof result === 'object' && result !== null) {
-          // Handle regex match objects from JSONata ~> operator
+          // Handle legacy regex match-like results (kept for backward compatibility)
           if (this.isRegexMatchResult(result)) {
             edgeCondition = result.match;
             result = result.match; // Also update the result value
@@ -79,16 +79,16 @@ export class Conditional implements NodeHandler {
           edgeCondition = String(result);
         }
       } else {
-        // Check if condition contains JSONata template expressions via Eval
+        // Check if condition contains template expressions via Eval
         const hasTemplateExpression = this.eval.hasTemplateExpressions(this.params.condition);
 
         if (hasTemplateExpression) {
-          // Ensure we have execution context for JSONata evaluation
+          // Ensure we have execution context for evaluation
           if (!this.options?.execution) {
             throw new Error('Execution context is required for conditional evaluation');
           }
 
-          // Evaluate JSONata expression using centralized Eval class with input data
+          // Evaluate expression using centralized Eval class with input data
           const inputData = ExecutionItemUtils.unwrapSingle(input);
           result = await this.eval.resolveTemplates(this.params.condition, this.options.execution, inputData);
 
@@ -98,7 +98,7 @@ export class Conditional implements NodeHandler {
           } else if (typeof result === 'boolean') {
             edgeCondition = result.toString();
           } else if (typeof result === 'object' && result !== null) {
-            // Handle regex match objects from JSONata ~> operator
+            // Handle legacy regex match-like results (kept for backward compatibility)
             if (this.isRegexMatchResult(result)) {
               edgeCondition = result.match;
               result = result.match; // Also update the result value

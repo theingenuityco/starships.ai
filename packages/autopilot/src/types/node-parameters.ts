@@ -28,7 +28,7 @@ export interface TransformOperation {
 export interface BaseParams {
   transforms?: TransformOperation[];
   mutations?: TransformOperation[];
-  condition?: string; // JSONata expression for conditional evaluation
+  condition?: string; // JavaScript expression for conditional evaluation
 }
 
 /**

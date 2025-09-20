@@ -243,7 +243,7 @@ describe('State Management Features', () => {
             name: 'HTTP Call',
             description: 'Call with invalid expression',
             parameters: {
-              url: '{{ state.invalidFunction(unclosed }', // Invalid JSONata
+              url: '{{ state.invalidFunction(unclosed }', // Invalid expression
               method: 'GET',
             },
           },

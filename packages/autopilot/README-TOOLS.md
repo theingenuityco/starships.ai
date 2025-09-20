@@ -85,7 +85,7 @@ Start -> LLM -> Conditional(has tool_calls?)
 
 ### Template Expressions
 
-The system uses JSONata template expressions for dynamic data access:
+The system uses JavaScript template expressions for dynamic data access:
 
 ```javascript
 // Check for tool calls
@@ -93,7 +93,7 @@ The system uses JSONata template expressions for dynamic data access:
 // Get tool name
 `{{ $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].function.name }}`
 // Convert tool result to string
-`{{ $string($lastOutputOf("tool_1")[0].json) }}`;
+`{{ String($lastOutputOf("tool_1")[0].json) }}`;
 ```
 
 ## Usage Examples

@@ -7,7 +7,7 @@ Lean workflow execution engine for starships.ai - executes blueprint-based workf
 Autopilot executes workflows defined as node graphs (blueprints) with support for:
 
 - **Dynamic Node Loading** - AI agents, LLM calls, HTTP requests, conditionals, transforms, mutations
-- **Template Expressions** - `{{ jsonataExpression }}` syntax for dynamic parameters
+- **Template Expressions** - `{{ jsExpression }}` JavaScript expression syntax for dynamic parameters
 - **State Management** - JSON Patch transforms for workflow state mutations
 - **Memory System** - Structured memory for AI agent interactions
 - **Credential Management** - Secure API key handling
@@ -123,7 +123,7 @@ When `failOnNodeError` is false:
 | `llm`          | LLM API calls            | `model`, `messages`, `temperature`                      |
 | `agent`        | AI agent with memory     | `name`, `model`, `memoryState` (systemPrompt, messages) |
 | `http_request` | HTTP API calls           | `url`, `method`, `headers`, `body`                      |
-| `conditional`  | Branch workflows         | `condition` (JSONata expression)                        |
+| `conditional`  | Branch workflows         | `condition` (JavaScript expression)                     |
 | `transform`    | Input transformations    | `transforms` (JSON Patch operations)                    |
 | `mutate`       | State mutations          | `mutations` (JSON Patch operations)                     |
 | `tool`         | Function calling support | `name`, `description`, `parameters`                     |
@@ -132,7 +132,7 @@ When `failOnNodeError` is false:
 
 ## Template Expressions
 
-Use `{{ }}` syntax for JSONata expressions:
+Use `{{ }}` syntax for JavaScript expressions:
 
 ```typescript
 {
@@ -486,7 +486,6 @@ pnpm run test         # Run tests
 
 ## Dependencies
 
-- **jsonata** - JSONata expressions for templates/conditions
 - **fast-json-patch** - JSON Patch operations for transforms/mutations
 - **nanoid** - Unique ID generation
 

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/useAuth'
 import { LogOut, User } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import React, { useState } from 'react'
 
 interface UserProfileProps {
@@ -15,8 +16,15 @@ interface UserProfileProps {
  * Shows user name and email with logout functionality via tooltip
  */
 export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }: UserProfileProps) {
-  const { user, userName, userEmail, isAuthenticated } = useAuth()
+  const { user, userName, userEmail, isAuthenticated, logout } = useAuth()
+  const router = useRouter()
   const [showTooltip, setShowTooltip] = useState(false)
+
+  const handleLogout = async () => {
+    await logout()
+    // Redirect to home page after logout
+    router.push('/')
+  }
 
   if (!isAuthenticated || !user) {
     return null
@@ -54,11 +62,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
                 variant="ghost"
                 size="sm"
                 className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={async () => {
-                  const { useAuth } = await import('@/hooks/useAuth')
-                  // This won't work in onClick, let's use a different approach
-                  window.location.href = '/logout'
-                }}
+                onClick={handleLogout}
               >
                 <LogOut className="w-4 h-4 mr-3" />
                 Sign Out
@@ -102,10 +106,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
               variant="ghost"
               size="sm"
               className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={async () => {
-                // Since we can't use hooks in onClick, redirect to logout page
-                window.location.href = '/logout'
-              }}
+              onClick={handleLogout}
             >
               <LogOut className="w-4 h-4 mr-3" />
               Sign Out

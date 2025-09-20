@@ -50,22 +50,6 @@ export class UserRepository extends BaseRepository {
     );
   }
 
-  async findByUsername(username: string): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.username = $username RETURN u', {
-          username: username,
-        });
-        const user = result[0]?.u || null;
-        return user ? fromDatabase(UserEntity, user) : null;
-      },
-      'findByUsername',
-      'User',
-      username
-    );
-  }
-
   async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -221,20 +205,12 @@ export class UserRepository extends BaseRepository {
     );
   }
 
-  async createWithPassword(userData: {
-    email: string;
-    password: string;
-    name?: string;
-    displayName?: string;
-    username?: string;
-  }): Promise<UserModel> {
+  async createWithPassword(userData: { email: string; password: string; name?: string; displayName?: string }): Promise<UserModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
-        const username = userData.username || UserEntity.generateUsernameFromEmail(userData.email);
 
         const entityData = {
-          username: username,
           email: userData.email,
           displayName: userData.displayName || userData.name,
           password: userData.password,

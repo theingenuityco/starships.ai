@@ -21,7 +21,6 @@ export interface ClientUser extends UserModel {
 // User filters for search and filtering
 export interface UserFilters {
   email?: string
-  username?: string
   hasStripe?: boolean
   isNewUser?: boolean
 }
@@ -30,14 +29,12 @@ export interface UserFilters {
 export interface RegisterUserRequest {
   email: string
   password: string
-  username?: string
   displayName?: string
   name?: string // Legacy support
 }
 
 // User profile update request (includes password change)
 export interface UpdateUserProfileRequest {
-  username?: string
   email?: string
   displayName?: string
   avatar?: string
@@ -66,7 +63,6 @@ export const USER_QUERY_KEYS = {
   details: () => [...USER_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...USER_QUERY_KEYS.details(), id] as const,
   byEmail: (email: string) => [...USER_QUERY_KEYS.all, 'email', email] as const,
-  byUsername: (username: string) => [...USER_QUERY_KEYS.all, 'username', username] as const,
   byStripe: (stripeCustomerId: string) => [...USER_QUERY_KEYS.all, 'stripe', stripeCustomerId] as const,
   stats: () => [...USER_QUERY_KEYS.all, 'stats'] as const,
   currentUser: () => [...USER_QUERY_KEYS.all, 'current'] as const,
@@ -100,23 +96,6 @@ export function useUserByEmail(email: string, enabled: boolean = true) {
       return response.data.data
     },
     enabled: !!email && email.includes('@') && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: 2,
-  })
-}
-
-/**
- * Get user by username
- */
-export function useUserByUsername(username: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: USER_QUERY_KEYS.byUsername(username),
-    queryFn: async (): Promise<UserModel> => {
-      const response: FetchResponse<ApiResponse<UserModel>> = await api.get(`/api/v1/users/username/${encodeURIComponent(username)}`)
-      return response.data.data
-    },
-    enabled: !!username && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
     retry: 2,
@@ -220,7 +199,7 @@ export function useRegisterUser() {
       })
 
       toast.success('Registration successful!', {
-        description: `Welcome ${user.displayName || user.username}! Your account has been created.`,
+        description: `Welcome ${user.displayName || user.email?.split('@')[0]}! Your account has been created.`,
       })
     },
     onError: (error: any) => {
@@ -258,7 +237,7 @@ export function useCreateUser() {
       })
 
       toast.success('User created successfully!', {
-        description: `${user.displayName || user.username} has been added to the system.`,
+        description: `${user.displayName || user.email?.split('@')[0]} has been added to the system.`,
       })
     },
     onError: (error: any) => {
@@ -317,12 +296,9 @@ export function useUpdateUserProfile() {
         return old.map(user => (user.id === variables.userId ? updatedUser : user))
       })
 
-      // If email or username changed, update those caches too
+      // If email changed, update those caches too
       if (variables.updates.email) {
         queryClient.setQueryData(USER_QUERY_KEYS.byEmail(variables.updates.email), updatedUser)
-      }
-      if (variables.updates.username) {
-        queryClient.setQueryData(USER_QUERY_KEYS.byUsername(variables.updates.username), updatedUser)
       }
 
       toast.success('Profile updated successfully!', {
@@ -364,7 +340,7 @@ export function useUpdateUser() {
       })
 
       toast.success('User updated successfully!', {
-        description: `${updatedUser.displayName || updatedUser.username} has been updated.`,
+        description: `${updatedUser.displayName || updatedUser.email?.split('@')[0]} has been updated.`,
       })
     },
     onError: (error: any) => {
@@ -409,7 +385,7 @@ export function useDeleteUser() {
 
       if (context?.user) {
         toast.success('User deleted successfully!', {
-          description: `${context.user.displayName || context.user.username} has been removed from the system.`,
+          description: `${context.user.displayName || context.user.email?.split('@')[0]} has been removed from the system.`,
         })
       } else {
         toast.success('User deleted successfully!')
@@ -474,7 +450,7 @@ export function useAuthenticateUser() {
       queryClient.setQueryData(USER_QUERY_KEYS.currentUser(), user)
 
       toast.success('Welcome back!', {
-        description: `Hello ${user.displayName || user.username}`,
+        description: `Hello ${user.displayName || user.email?.split('@')[0]}`,
       })
     },
     onError: (error: any) => {
@@ -529,10 +505,6 @@ export function useUserValidation() {
     return email.includes('@') && email.length > 0
   }
 
-  const validateUsername = (username: string): boolean => {
-    return /^[a-zA-Z0-9_-]+$/.test(username) && username.length > 0 && username.length <= 50
-  }
-
   const validatePassword = (
     password: string
   ): {
@@ -565,7 +537,6 @@ export function useUserValidation() {
 
   return {
     validateEmail,
-    validateUsername,
     validatePassword,
   }
 }

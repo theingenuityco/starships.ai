@@ -99,11 +99,11 @@ export class Eval {
     try {
       const jsonataExpr = jsonata(expression.trim());
 
-      // Register custom functions with JSONata
-      jsonataExpr.registerFunction('lastOutputOf', context.$lastOutputOf);
-      jsonataExpr.registerFunction('input', context.$input);
-      jsonataExpr.registerFunction('random', context.$random);
-      jsonataExpr.registerFunction('exists', context.$exists);
+      // Register custom functions with JSONata (use $-prefixed only)
+      jsonataExpr.registerFunction('$lastOutputOf', context.$lastOutputOf);
+      jsonataExpr.registerFunction('$input', context.$input);
+      jsonataExpr.registerFunction('$random', context.$random);
+      jsonataExpr.registerFunction('$exists', context.$exists);
 
       // Note: JSONata timeout would need to be implemented differently if needed
       // For now, we rely on JavaScript's natural execution timeout
@@ -165,11 +165,11 @@ export class Eval {
       // Test JSONata syntax
       const jsonataExpr = jsonata(expression.trim());
 
-      // Register custom functions for validation (with dummy implementations)
-      jsonataExpr.registerFunction('lastOutputOf', () => null);
-      jsonataExpr.registerFunction('input', () => null);
-      jsonataExpr.registerFunction('random', () => 0);
-      jsonataExpr.registerFunction('exists', () => false);
+      // Register custom functions for validation (with dummy implementations, $-prefixed only)
+      jsonataExpr.registerFunction('$lastOutputOf', () => null);
+      jsonataExpr.registerFunction('$input', () => null);
+      jsonataExpr.registerFunction('$random', () => 0);
+      jsonataExpr.registerFunction('$exists', () => false);
 
       // Additional validation checks
       if (options?.forbiddenFunctions) {

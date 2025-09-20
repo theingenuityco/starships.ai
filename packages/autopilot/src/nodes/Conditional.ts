@@ -79,8 +79,8 @@ export class Conditional implements NodeHandler {
           edgeCondition = String(result);
         }
       } else {
-        // Check if condition contains JSONata template expressions ({{ ... }})
-        const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
+        // Check if condition contains JSONata template expressions via Eval
+        const hasTemplateExpression = this.eval.hasTemplateExpressions(this.params.condition);
 
         if (hasTemplateExpression) {
           // Ensure we have execution context for JSONata evaluation
@@ -149,7 +149,7 @@ export class Conditional implements NodeHandler {
           });
         } else {
           // Check for template expressions and validate them
-          const hasTemplateExpression = /\{\{.*?\}\}/.test(this.params.condition);
+          const hasTemplateExpression = this.eval.hasTemplateExpressions(this.params.condition);
           if (hasTemplateExpression) {
             const validation = this.eval.validateTemplateExpressions(this.params.condition);
             if (!validation.valid) {

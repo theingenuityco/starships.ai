@@ -6,6 +6,7 @@ import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
+import { createRequire } from 'node:module';
 
 /**
  * Clean conversation service with proper error handling
@@ -26,7 +27,17 @@ export class ConversationService {
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
     // Choose default runner for non-streaming paths
-    const bundlePath = process.env.AUTOPILOT_BUNDLE_PATH;
+    let bundlePath = process.env.AUTOPILOT_BUNDLE_PATH;
+    if (!bundlePath) {
+      try {
+        // Resolve published isolated bundle subpath export from @starships/autopilot
+        const rr = createRequire(__filename);
+        bundlePath = rr.resolve('@starships/autopilot/isolated');
+      } catch (err) {
+        console.error(err);
+        // ignore if resolution fails; we'll fall back to LocalRunner
+      }
+    }
     if (bundlePath) {
       this.defaultRunner = new IsolatedVmRunner({
         bundlePath,
@@ -181,7 +192,7 @@ export class ConversationService {
 
     try {
       // Prepare runner and engine config
-      const runner = this.getRunnerFor(data.conversationId);
+      const runner = this.defaultRunner;
       const engineConfig: EngineConfig = {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
         failOnNodeError: true,

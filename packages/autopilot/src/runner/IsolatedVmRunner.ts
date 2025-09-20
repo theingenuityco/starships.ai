@@ -10,6 +10,7 @@
 
 import type { Blueprint, Execution, ExecutionItem } from '@/types';
 import type { EngineConfig } from '@/engine/Engine';
+import type { AutopilotEvent } from '@/types/events';
 import type { Runner } from './Runner';
 
 /**
@@ -30,8 +31,13 @@ type IsolateInstance = {
   compileScript: (code: string) => Promise<Script>;
 };
 
+type IvmReference = {
+  applyIgnored: (receiver?: unknown, args?: unknown[], opts?: { arguments?: { copy?: boolean } }) => void;
+};
+
 type IvmModule = {
   Isolate: new (opts: { memoryLimit: number }) => IsolateInstance;
+  Reference: new (fn: (evt: unknown) => unknown) => IvmReference;
 };
 
 export interface IsolatedVmRunnerOptions {
@@ -112,6 +118,16 @@ export class IsolatedVmRunner implements Runner {
       { copy: true }
     );
 
+    // Bridge event callback to host if provided
+    if (config?.eventCallback) {
+      const eventRef = new ivm.Reference((evt: unknown) => {
+        const cb = config.eventCallback!;
+        // fire-and-forget to avoid blocking the isolate
+        Promise.resolve(cb(evt as AutopilotEvent)).catch(() => {});
+      });
+      await jail.set('__EVENT_REF__', eventRef);
+    }
+
     // Inject serialized data for blueprint/execution/config into the isolate's global scope.
     // Note: Functions (like eventCallback) cannot be copied into the isolate. Strip them for now.
     const safeConfig = config ? { ...config, eventCallback: undefined } : undefined;
@@ -132,6 +148,11 @@ export class IsolatedVmRunner implements Runner {
           throw new Error('Bundle did not define globalThis.__autopilot_run_engine__');
         }
         const input = globalThis.ENGINE_INPUT;
+        const hostRef = globalThis.__EVENT_REF__;
+        if (hostRef) {
+          const bridged = (e) => hostRef.applyIgnored(undefined, [e], { arguments: { copy: true } });
+          input.config = Object.assign({}, input.config, { eventCallback: bridged });
+        }
         const result = await globalThis.__autopilot_run_engine__(input);
         // Return result to host
         result;

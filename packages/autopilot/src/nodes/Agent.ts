@@ -250,6 +250,8 @@ export class Agent implements NodeHandler {
 
     // Commit ordered messages to execution state
     (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
+    // Provide tool definitions (with blueprints) to execution state for Tool node resolution
+    (execution.state as Record<string, unknown>)['tools'] = this.params.tools || [];
 
     // Create a new Engine instance for executing the agent's blueprint
     const engine = new Engine({

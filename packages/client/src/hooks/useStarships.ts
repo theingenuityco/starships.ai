@@ -76,7 +76,7 @@ export function useStarshipBySlug(slug: string, enabled: boolean = true) {
  * Get all starships (for backward compatibility)
  * @deprecated Use useUserStarships instead
  */
-export function useStarships() {
+export function useStarships(options?: { enabled?: boolean }) {
   // Since we don't have a user context here, we'll need to get it from auth
   // For now, return a mock structure that matches the expected API
   return useQuery({
@@ -85,6 +85,7 @@ export function useStarships() {
       const response: FetchResponse<ApiResponse<StarshipModel[]>> = await api.get('/api/v1/starships')
       return { starships: response.data.data }
     },
+    enabled: options?.enabled ?? true, // Add enabled option with default true for backward compatibility
     staleTime: 10 * 1000, // 10 seconds
     gcTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: true,

@@ -64,11 +64,6 @@ const dbConnection = createConnection({
   password: config.NEO4J_PASSWORD,
   database: config.NEO4J_DATABASE,
 });
-
-// Core repositories
-const agentRepository = new AgentRepository();
-const userRepository = new UserRepository();
-
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
 // Middleware - Order is important!

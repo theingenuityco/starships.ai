@@ -12,6 +12,7 @@ import type { Blueprint, Execution, ExecutionItem } from '@/types';
 import type { EngineConfig } from '@/engine/Engine';
 import type { AutopilotEvent } from '@/types/events';
 import type { Runner } from './Runner';
+import { createRequire } from 'node:module';
 
 /**
  * Minimal type surface for isolated-vm usage to avoid broad `any` types.
@@ -69,16 +70,27 @@ export class IsolatedVmRunner implements Runner {
 
   async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {
     // Attempt to load isolated-vm dynamically to keep it optional
-    let ivm: IvmModule;
+    let ivm: IvmModule | undefined;
     try {
-      // Use a computed specifier to avoid TypeScript module resolution errors
-      // when isolated-vm is not installed in all environments.
+      // Prefer dynamic import (works in ESM/CJS with TS transpilation)
       const moduleName = 'isolated' + '-vm';
       ivm = (await import(moduleName)) as unknown as IvmModule;
-    } catch {
-      throw new Error(
-        'isolated-vm is not installed. Install it or use LocalRunner. Add it as an optional dependency and ensure native build succeeds.'
-      );
+    } catch (err1) {
+      // Fallback to CJS require via createRequire for environments where import() fails
+      try {
+        const rr = createRequire(__filename);
+        const mod = rr('isolated-vm');
+        ivm = mod as IvmModule;
+      } catch (err2) {
+        const m1 = err1 instanceof Error ? err1.message : String(err1);
+        const m2 = err2 instanceof Error ? err2.message : String(err2);
+        throw new Error(
+          `isolated-vm load failed. First import() error: ${m1}. Fallback require() error: ${m2}. Ensure isolated-vm@6.0.1 is installed and built.`
+        );
+      }
+    }
+    if (!ivm) {
+      throw new Error('isolated-vm could not be loaded (unknown error).');
     }
 
     // If no bundlePath provided, surface a clear, actionable message.

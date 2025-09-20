@@ -26,17 +26,13 @@ export class ConversationService {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
-    // Choose default runner for non-streaming paths
-    let bundlePath = process.env.AUTOPILOT_BUNDLE_PATH;
-    if (!bundlePath) {
-      try {
-        // Resolve published isolated bundle subpath export from @starships/autopilot
-        const rr = createRequire(__filename);
-        bundlePath = rr.resolve('@starships/autopilot/isolated');
-      } catch (err) {
-        console.error(err);
-        // ignore if resolution fails; we'll fall back to LocalRunner
-      }
+    // Choose default runner (auto-resolve bundled isolate; fallback to LocalRunner)
+    let bundlePath: string | undefined;
+    try {
+      const rr = createRequire(__filename);
+      bundlePath = rr.resolve('@starships/autopilot/isolated');
+    } catch {
+      // ignore resolution failures and fall back to LocalRunner
     }
     if (bundlePath) {
       this.defaultRunner = new IsolatedVmRunner({

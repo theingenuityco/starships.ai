@@ -316,10 +316,23 @@ export class Engine {
       const initialInputItems = this.findNodeResult(execution, '__initial__');
       const nodeInputItems = currentNode.type === 'start' && initialInputItems ? initialInputItems : this.getNodeInput(execution);
 
-      // Resolve node parameters with templates
+      // Resolve node parameters with templates (exclude inline fields until after execution)
       const inputData = ExecutionItemUtils.unwrapSingle(nodeInputItems);
 
-      const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, execution, inputData)) as NodeParameters;
+      let resolvedParams: NodeParameters;
+      const rawParams = (currentNode.parameters || {}) as Record<string, unknown>;
+
+      if (currentNode.type === 'transform' || currentNode.type === 'mutate' || currentNode.type === 'conditional') {
+        // Dedicated nodes: resolve everything up front
+        resolvedParams = (await this.eval.resolveTemplates(rawParams, execution, inputData)) as NodeParameters;
+      } else {
+        // Non-inline nodes: resolve only handler params, defer inline fields to post-execution helpers
+        const handlerParams = { ...rawParams } as Record<string, unknown>;
+        delete (handlerParams as Record<string, unknown>).transforms;
+        delete (handlerParams as Record<string, unknown>).mutations;
+        delete (handlerParams as Record<string, unknown>).condition;
+        resolvedParams = (await this.eval.resolveTemplates(handlerParams, execution, inputData)) as NodeParameters;
+      }
 
       // Create and validate handler
       const handler = await this.createHandler(currentNode, resolvedParams, execution);

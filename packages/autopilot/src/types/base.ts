@@ -24,7 +24,9 @@ export type NodeType =
   | 'http_request'
   | 'llm'
   | 'workflow'
-  | 'transform';
+  | 'transform'
+  | 'mutate'
+  | 'tool';
 
 /**
  * Base node interface (untyped parameters)

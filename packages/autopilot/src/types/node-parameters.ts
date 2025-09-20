@@ -27,6 +27,7 @@ export interface TransformOperation {
  */
 export interface BaseParams {
   transforms?: TransformOperation[];
+  mutations?: TransformOperation[];
   condition?: string; // JSONata expression for conditional evaluation
 }
 
@@ -67,19 +68,45 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
 }
 
 /**
+ * Tool parameter schema for function calling
+ */
+export interface ToolParameterSchema {
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  description: string;
+  enum?: string[];
+  items?: ToolParameterSchema; // For array type
+  properties?: Record<string, ToolParameterSchema>; // For object type
+}
+
+/**
+ * Tool node parameters for function execution
+ */
+export interface ToolParams extends BaseParams {
+  name: string;
+  description: string;
+  parameters: {
+    type: 'object';
+    properties: Record<string, ToolParameterSchema>;
+    required?: string[];
+  };
+  // Tool-specific execution parameters can be added here
+}
+
+/**
  * LLM node parameters for AI model interactions via OpenRouter
  * Note: API key is now managed by the Autopilot singleton
  * Template expressions ({{ }}) are supported for all numeric and string fields
  */
 export interface LlmParams extends BaseParams {
   model: string;
-  messages: { role: string; content: string }[];
+  messages: { role: string; content: string }[] | string;
   temperature?: number | string; // Supports template expressions
   maxTokens?: number | string; // Supports template expressions
   timeout?: number | string; // Supports template expressions
   topP?: number | string; // Supports template expressions
   frequencyPenalty?: number | string; // Supports template expressions
   presencePenalty?: number | string; // Supports template expressions
+  tools?: ToolParams[]; // Optional tools for function calling schema
 }
 
 /**
@@ -123,6 +150,9 @@ export interface AgentParams extends BaseParams {
   // Blueprint execution (optional - Agent will create default if not provided)
   blueprint?: Blueprint;
 
+  // Tool support (optional - enables function calling)
+  tools?: ToolParams[];
+
   // Metadata
   metadata?: Record<string, unknown>;
 }
@@ -146,10 +176,17 @@ export interface EndParams extends BaseParams {
 }
 
 /**
- * Transform node parameters
+ * Transform node parameters for input->output transformations
  */
 export type TransformParams = BaseParams;
 // Inherits transforms?: TransformOperation[] from BaseParams
+// No additional parameters needed
+
+/**
+ * Mutate node parameters for state mutation operations
+ */
+export type MutateParams = BaseParams;
+// Inherits mutations?: TransformOperation[] from BaseParams
 // No additional parameters needed
 
 /**
@@ -161,7 +198,9 @@ export type NodeParameters =
   | HttpRequestParams
   | LlmParams
   | WorkflowParams
+  | ToolParams
   | StartParams
   | EndParams
   | ConditionalParams
-  | TransformParams;
+  | TransformParams
+  | MutateParams;

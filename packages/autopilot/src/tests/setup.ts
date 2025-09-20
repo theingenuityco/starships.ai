@@ -3,7 +3,7 @@
  */
 
 import { AgentMemory } from '@/memory/AgentMemory';
-import type { Blueprint, Execution, Node } from '@/types';
+import type { Blueprint, Execution, Node, ExecutionItem } from '@/types';
 
 // Mock nanoid for consistent ID generation in tests
 let nanoidCounter = 0;
@@ -11,14 +11,7 @@ jest.mock('nanoid', () => ({
   nanoid: jest.fn(() => `mock-nanoid-autopilot-${++nanoidCounter}`),
 }));
 
-// Mock console methods to reduce noise in tests
-const mockConsole = {
-  ...console,
-  log: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-};
-global.console = mockConsole;
+// Console methods are not mocked to allow debug logging
 
 // Global test utilities with type assertions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,7 +33,7 @@ global.console = mockConsole;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).createAgentMemory = (): AgentMemory => {
   const memory = new AgentMemory();
-  memory.addMessageToHistory({ role: 'system', content: 'Test system prompt' });
+  memory.addMessage({ role: 'system', content: 'Test system prompt' });
   return memory;
 };
 
@@ -62,6 +55,33 @@ global.console = mockConsole;
   parameters: {},
   ...overrides,
 });
+
+// Helper functions for ExecutionItem testing
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).createMockExecutionItem = (data: unknown, overrides: Partial<ExecutionItem> = {}): ExecutionItem => ({
+  json: data,
+  pairedItem: { item: 0 },
+  ...overrides,
+});
+
+// Extract data from ExecutionItem array for easy testing
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).extractExecutionData = (items: ExecutionItem[]): unknown[] => {
+  return items.map((item) => item.json);
+};
+
+// Extract single data from ExecutionItem array
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).extractSingleExecutionData = (items: ExecutionItem[]): unknown => {
+  return items.length > 0 ? items[0].json : undefined;
+};
+
+// Custom matcher for ExecutionItem arrays
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).expectExecutionItemData = (items: ExecutionItem[], expectedData: unknown): void => {
+  expect(items).toHaveLength(1);
+  expect(items[0].json).toEqual(expectedData);
+};
 
 // Setup common test timeouts
 jest.setTimeout(10000);

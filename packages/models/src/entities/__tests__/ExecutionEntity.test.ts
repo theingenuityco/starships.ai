@@ -35,7 +35,7 @@ describe('ExecutionEntity', () => {
       execution.startTime = '2024-01-01T00:00:00.000Z';
       execution.endTime = '2024-01-01T00:05:00.000Z';
       execution.pausedAt = '2024-01-01T00:02:30.000Z';
-      execution.results = [{ nodeRef: 'node-1', data: { success: true } }];
+      execution.results = [{ nodeRef: 'node-1', items: [{ json: { success: true } }] }];
       execution.state = { currentStep: 1, variables: { count: 42 } };
       execution.createdAt = '2024-01-01T00:00:00.000Z';
       execution.updatedAt = '2024-01-01T00:05:00.000Z';
@@ -58,7 +58,7 @@ describe('ExecutionEntity', () => {
         startTime: '2024-01-01T00:00:00.000Z',
         endTime: '2024-01-01T00:05:00.000Z',
         pausedAt: '2024-01-01T00:02:30.000Z',
-        results: JSON.stringify([{ nodeRef: 'node-1', data: { success: true } }]),
+        results: JSON.stringify([{ nodeRef: 'node-1', items: [{ json: { success: true } }] }]),
         state: JSON.stringify({ currentStep: 1, variables: { count: 42 } }),
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:05:00.000Z',
@@ -108,8 +108,8 @@ describe('ExecutionEntity', () => {
         endTime: '2024-01-01T00:05:00.000Z',
         pausedAt: null,
         results: JSON.stringify([
-          { nodeRef: 'node-1', data: { success: true } },
-          { nodeRef: 'node-2', data: { processed: 100 } },
+          { nodeRef: 'node-1', items: [{ json: { success: true } }] },
+          { nodeRef: 'node-2', items: [{ json: { processed: 100 } }] },
         ]),
         state: JSON.stringify({
           currentStep: 5,
@@ -139,8 +139,8 @@ describe('ExecutionEntity', () => {
       expect(entity.endTime).toBe('2024-01-01T00:05:00.000Z');
       expect(entity.pausedAt).toBeUndefined();
       expect(entity.results).toEqual([
-        { nodeRef: 'node-1', data: { success: true } },
-        { nodeRef: 'node-2', data: { processed: 100 } },
+        { nodeRef: 'node-1', items: [{ json: { success: true } }] },
+        { nodeRef: 'node-2', items: [{ json: { processed: 100 } }] },
       ]);
       expect(entity.state).toEqual({
         currentStep: 5,
@@ -326,8 +326,8 @@ describe('ExecutionEntity', () => {
         endTime: null,
         pausedAt: '2024-01-01T00:02:30.000Z',
         results: JSON.stringify([
-          { nodeRef: 'start', data: { initialized: true }, timestamp: '2024-01-01T00:00:01.000Z' },
-          { nodeRef: 'validate', data: { valid: true, errors: [] }, timestamp: '2024-01-01T00:00:05.000Z' },
+          { nodeRef: 'start', items: [{ json: { initialized: true, timestamp: '2024-01-01T00:00:01.000Z' } }] },
+          { nodeRef: 'validate', items: [{ json: { valid: true, errors: [], timestamp: '2024-01-01T00:00:05.000Z' } }] },
         ]),
         state: JSON.stringify({
           currentStep: 3,

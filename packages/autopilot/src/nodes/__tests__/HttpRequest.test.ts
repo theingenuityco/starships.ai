@@ -41,7 +41,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -87,7 +88,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 201,
         statusText: 'Created',
         headers: { 'content-type': 'application/json' },
@@ -137,7 +139,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -185,7 +188,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -233,7 +237,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -273,7 +278,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 204,
         statusText: 'No Content',
         headers: { 'content-type': 'application/json' },
@@ -313,7 +319,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -357,7 +364,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'text/plain' },
@@ -392,7 +400,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 204,
         statusText: 'No Content',
         headers: { 'content-length': '0' },
@@ -416,8 +425,11 @@ describe('HttpRequest Node Handler', () => {
       });
 
       const httpRequest = new HttpRequest(params);
+      const result = await httpRequest.execute();
 
-      await expect(httpRequest.execute()).rejects.toThrow('HTTP 404: Not Found');
+      expect(result).toHaveLength(1);
+      expect(result[0].error).toBe('HTTP 404: Not Found');
+      expect(result[0].json).toBeUndefined();
     });
 
     it('should handle network errors', async () => {
@@ -429,8 +441,11 @@ describe('HttpRequest Node Handler', () => {
       mockFetch.mockRejectedValueOnce(new Error('Network failure'));
 
       const httpRequest = new HttpRequest(params);
+      const result = await httpRequest.execute();
 
-      await expect(httpRequest.execute()).rejects.toThrow('HTTP request failed: Network failure');
+      expect(result).toHaveLength(1);
+      expect(result[0].error).toBe('HTTP request failed: Network failure');
+      expect(result[0].json).toBeUndefined();
     });
 
     it('should handle timeout errors', async () => {
@@ -455,8 +470,11 @@ describe('HttpRequest Node Handler', () => {
       );
 
       const httpRequest = new HttpRequest(params);
+      const result = await httpRequest.execute();
 
-      await expect(httpRequest.execute()).rejects.toThrow('HTTP request timeout after 100ms');
+      expect(result).toHaveLength(1);
+      expect(result[0].error).toBe('HTTP request timeout after 100ms');
+      expect(result[0].json).toBeUndefined();
     }, 2000);
 
     it('should handle invalid URLs', async () => {
@@ -468,8 +486,11 @@ describe('HttpRequest Node Handler', () => {
       mockFetch.mockRejectedValueOnce(new TypeError('Invalid URL'));
 
       const httpRequest = new HttpRequest(params);
+      const result = await httpRequest.execute();
 
-      await expect(httpRequest.execute()).rejects.toThrow('HTTP request failed: Invalid URL');
+      expect(result).toHaveLength(1);
+      expect(result[0].error).toBe('HTTP request failed: Invalid URL');
+      expect(result[0].json).toBeUndefined();
     });
   });
 
@@ -498,8 +519,11 @@ describe('HttpRequest Node Handler', () => {
       );
 
       const httpRequest = new HttpRequest(params);
+      const result = await httpRequest.execute();
 
-      await expect(httpRequest.execute()).rejects.toThrow('HTTP request timeout after 2000ms');
+      expect(result).toHaveLength(1);
+      expect(result[0].error).toBe('HTTP request timeout after 2000ms');
+      expect(result[0].json).toBeUndefined();
     });
 
     it('should use default timeout when not specified', async () => {
@@ -526,7 +550,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -562,7 +587,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -618,7 +644,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(params);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },
@@ -699,7 +726,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(createParams);
       const created = await httpRequest.execute();
 
-      expect(created).toEqual({
+      expect(created).toHaveLength(1);
+      expect(created[0].json).toEqual({
         status: 201,
         statusText: 'Created',
         headers: { 'content-type': 'application/json' },
@@ -741,7 +769,8 @@ describe('HttpRequest Node Handler', () => {
       const httpRequest = new HttpRequest(webhookParams);
       const result = await httpRequest.execute();
 
-      expect(result).toEqual({
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/json' },

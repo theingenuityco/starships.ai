@@ -11,13 +11,10 @@ import type { Blueprint } from '@/types';
 // Mock Engine to avoid actual workflow execution in unit tests
 jest.mock('@/engine/Engine', () => ({
   Engine: jest.fn().mockImplementation(() => ({
-    execute: jest.fn(),
-    getExecution: jest.fn().mockReturnValue({
-      results: [
-        { nodeRef: 'start', data: {} },
-        { nodeRef: 'end', data: {} },
-      ],
-    }),
+    executeBlueprint: jest.fn().mockResolvedValue([
+      { json: { result: 'start' }, pairedItem: { item: 0 } },
+      { json: { result: 'end' }, pairedItem: { item: 1 } },
+    ]),
     hasHandler: jest.fn().mockReturnValue(true),
   })),
 }));
@@ -43,8 +40,8 @@ describe('Agent Node Handler', () => {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: { name: 'TestBot', role: 'Assistant' },
-          purpose: { primary: 'Help users' },
+          systemPrompt: 'You are TestBot, an assistant. Help users with their needs.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
       };
@@ -58,8 +55,8 @@ describe('Agent Node Handler', () => {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: { name: 'TestBot', role: 'Assistant' },
-          purpose: { primary: 'Help users' },
+          systemPrompt: 'You are TestBot, an assistant. Help users with their needs.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
       };
@@ -69,9 +66,9 @@ describe('Agent Node Handler', () => {
 
       const execution = await agent.execute();
 
-      expect(execution.results).toHaveLength(2);
-      expect(execution.results[0].nodeRef).toBe('start');
-      expect(execution.results[1].nodeRef).toBe('end');
+      expect(execution).toHaveLength(2);
+      expect(execution[0].json).toEqual({ result: 'start' });
+      expect(execution[1].json).toEqual({ result: 'end' });
     });
 
     it('should handle custom agent parameters', () => {
@@ -83,8 +80,8 @@ describe('Agent Node Handler', () => {
         maxTokens: 2000,
         timeout: 60000,
         memoryState: {
-          identity: { name: 'Custom', role: 'Specialist' },
-          purpose: { primary: 'Specialized tasks' },
+          systemPrompt: 'You are Custom, a specialist. Handle specialized tasks.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
         metadata: { version: '1.0', category: 'custom' },
@@ -113,19 +110,12 @@ describe('Agent Node Handler', () => {
         name: 'Memory Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: {
-            name: 'Sarah',
-            role: 'Customer Support Agent',
-            personality: 'Professional and empathetic',
-            expertise: ['customer service', 'technical support'],
-          },
-          purpose: {
-            primary: 'Resolve customer issues efficiently',
-            constraints: ['Be professional', 'Escalate complex issues'],
-          },
-          space: {
-            description: 'Customer support chat environment',
-          },
+          systemPrompt:
+            'You are Sarah, a customer support agent. Be professional and empathetic. Resolve customer issues efficiently and escalate complex issues when needed.',
+          messages: [
+            { role: 'user', content: 'I need help with my account' },
+            { role: 'assistant', content: "I'd be happy to help you with your account. What specific issue are you experiencing?" },
+          ],
         },
         blueprint: createMockBlueprint(),
       };
@@ -161,31 +151,13 @@ describe('Agent Node Handler', () => {
       );
     });
 
-    it('should validate memory state requirement', () => {
-      const params = {
-        name: 'Test Agent',
-        model: 'anthropic/claude-3.5-sonnet',
-        // Missing memoryState
-        blueprint: createMockBlueprint(),
-      } as AgentParams;
-
-      const agent = new Agent(params);
-      const validation = agent.validate();
-
-      expect(validation.valid).toBe(false);
-      expect(validation.errors).toContainEqual(
-        expect.objectContaining({
-          code: 'MISSING_REQUIRED_FIELD',
-          message: 'Agent memory is required',
-        })
-      );
-    });
-
     it('should create default blueprint when none provided', () => {
       const params = {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {},
+        memoryState: {
+          systemPrompt: 'You are a test agent.',
+        },
         // Missing blueprint - should create default
       } as AgentParams;
 
@@ -198,17 +170,21 @@ describe('Agent Node Handler', () => {
 
       // Verify default blueprint was created
       const blueprint = agent.getCurrentBlueprint();
-      expect(blueprint.nodes).toHaveLength(2); // start and end
+      expect(blueprint.nodes).toHaveLength(4); // start, end, llm, and conditional
       expect(blueprint.nodes.some((node) => node.type === 'start')).toBe(true);
+      expect(blueprint.nodes.some((node) => node.type === 'llm')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'end')).toBe(true);
-      expect(blueprint.edges).toHaveLength(1); // edge from start to end
+      expect(blueprint.nodes.some((node) => node.type === 'conditional')).toBe(true);
+      expect(blueprint.edges).toHaveLength(3); // edges: start->llm->conditional->end
     });
 
     it('should validate blueprint structure', () => {
       const params: AgentParams = {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {},
+        memoryState: {
+          systemPrompt: 'You are a test agent.',
+        },
         blueprint: {
           nodes: [
             // Missing start node
@@ -235,7 +211,9 @@ describe('Agent Node Handler', () => {
       const params: AgentParams = {
         name: 'Test Agent',
         model: 'anthropic/claude-3.5-sonnet',
-        memoryState: {},
+        memoryState: {
+          systemPrompt: 'You are a test agent.',
+        },
         blueprint: createMockBlueprint(),
         timeout: 500, // Too low
         temperature: 3.0, // Too high
@@ -275,8 +253,8 @@ describe('Agent Node Handler', () => {
         maxTokens: 1000,
         timeout: 30000,
         memoryState: {
-          identity: { name: 'ValidBot', role: 'Assistant' },
-          purpose: { primary: 'Help users' },
+          systemPrompt: 'You are ValidBot, an assistant. Help users with their needs.',
+          messages: [],
         },
         blueprint: createMockBlueprint(),
         metadata: { version: '1.0' },
@@ -311,7 +289,7 @@ describe('Agent Node Handler', () => {
             name: 'Check',
             description: 'Conditional',
             parameters: {
-              expression: 'results[-1].data.success = true',
+              condition: 'results[-1].data.success = true',
             },
           },
           {
@@ -339,16 +317,9 @@ describe('Agent Node Handler', () => {
         name: 'Complex Agent',
         model: 'anthropic/claude-3.5-sonnet',
         memoryState: {
-          identity: {
-            name: 'ComplexBot',
-            role: 'Multi-step Assistant',
-            expertise: ['reasoning', 'decision-making'],
-          },
-          purpose: {
-            primary: 'Handle complex multi-step tasks',
-            secondary: ['Analyze', 'Decide', 'Execute'],
-            constraints: ['Be thorough', 'Explain reasoning'],
-          },
+          systemPrompt:
+            'You are ComplexBot, a multi-step assistant with expertise in reasoning and decision-making. Handle complex multi-step tasks by analyzing, deciding, and executing. Be thorough and explain your reasoning.',
+          messages: [],
         },
         blueprint: complexBlueprint,
       };

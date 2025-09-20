@@ -269,9 +269,10 @@ describe('WaitlistRepository', () => {
 
       await repository.initializeSchema();
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2);
+      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(3);
       expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(1, expect.stringContaining('CREATE CONSTRAINT waitlist_email_unique'));
       expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(2, expect.stringContaining('CREATE INDEX waitlist_status'));
+      expect(mockConnection.executeWrite).toHaveBeenNthCalledWith(3, expect.stringContaining('CREATE INDEX waitlist_email_status'));
     });
 
     it('should handle schema initialization errors gracefully', async () => {

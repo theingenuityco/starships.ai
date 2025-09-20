@@ -6,14 +6,16 @@
 
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
+import { WaitlistService } from '@/services/WaitlistService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { getEnvConfig } from '@starships/env';
-import { StarshipRepository } from '@starships/models';
+import { getConnection, StarshipRepository, WaitlistRepository } from '@starships/models';
 import bcrypt from 'bcrypt';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { jwtVerify, SignJWT } from 'jose';
 import { z, ZodError } from 'zod';
+import { logger } from '@/utils/logger';
 
 const router: Router = Router();
 const env = getEnvConfig();
@@ -22,6 +24,13 @@ const env = getEnvConfig();
 const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET);
 const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
+
+// Initialize waitlist service
+const initWaitlistService = () => {
+  const connection = getConnection();
+  const waitlistRepo = new WaitlistRepository(connection);
+  return new WaitlistService(waitlistRepo);
+};
 
 // Zod schemas for validation
 const RegisterSchema = z.object({
@@ -71,13 +80,27 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     if (!bodyValidation) return;
 
     const { email, password, name } = bodyValidation;
-
-    // Check if user exists
+    
+    // Check if user already exists
     const existingUser = await UserService.getUserByEmail(email);
     if (existingUser) {
       sendError(res, 'RESOURCE_CONFLICT', 'User already exists', 409);
       return;
     }
+    
+    // Initialize waitlist service
+    const waitlistService = initWaitlistService();
+    
+    // Check waitlist status
+    const waitlistStatus = await waitlistService.getDetailedStatus(email);
+    
+    // If not in waitlist, add as pending
+    if (!waitlistStatus.exists) {
+      await waitlistService.addToPendingWaitlist(email);
+    }
+    
+    // Create user regardless of waitlist status (stores credentials for future)
+    // User creation happens for both pending and approved users
 
     // Create user (password will be hashed in UserService)
     const user = await UserService.createUser({
@@ -85,34 +108,48 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       password, // Pass plain password - UserService will hash it
       name,
       displayName: name,
-      username: email.split('@')[0],
     });
 
-    // Create default starship for the new user
+    // Check final waitlist status to determine response
+    const finalStatus = await waitlistService.getDetailedStatus(email);
+    
+    // If user is pending, return waitlist message (don't provide token)
+    if (finalStatus.status === 'pending') {
+      return sendSuccess(res, {
+        waitlisted: true,
+        status: 'pending',
+        message: 'Thanks for signing up! Please wait for approval to access the app.',
+      }, 200);
+    }
+    
+    // Only create starship and provide token for approved users
     let defaultStarship;
     let defaultAgent;
-    try {
-      defaultStarship = await StarshipService.createDefaultStarship(user.id);
+    
+    if (finalStatus.status === 'approved') {
+      try {
+        defaultStarship = await StarshipService.createDefaultStarship(user.id);
 
-      // Create default agent from "General Assistant" template
-      if (defaultStarship) {
-        try {
-          defaultAgent = await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
-        } catch (agentError) {
-          console.error(`[AUTH] Failed to create default agent for user ${user.id}:`, agentError);
-          // Continue even if agent creation fails
+        // Create default agent from "General Assistant" template
+        if (defaultStarship) {
+          try {
+            defaultAgent = await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
+          } catch (agentError) {
+            console.error(`[AUTH] Failed to create default agent for user ${user.id}:`, agentError);
+            // Continue even if agent creation fails
+          }
         }
+      } catch (error) {
+        console.error(`[AUTH] Failed to create default starship for user ${user.id}:`, error);
+        // Continue with registration even if starship creation fails
       }
-    } catch (error) {
-      console.error(`[AUTH] Failed to create default starship for user ${user.id}:`, error);
-      // Continue with registration even if starship creation fails
     }
 
-    // Generate JWT token
+    // Generate JWT token only for approved users
     const token = await new SignJWT({
       sub: user.id,
       email: user.email,
-      name: user.displayName || user.username,
+      name: user.displayName || user.email?.split('@')[0],
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(JWT_ISSUER)
@@ -127,7 +164,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
         user: {
           id: user.id,
           email: user.email,
-          name: user.displayName || user.username,
+          name: user.displayName || user.email?.split('@')[0],
           avatar: user.avatar,
         },
         token,
@@ -149,7 +186,7 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
       201
     );
   } catch (error: any) {
-    console.error('[AUTH] Registration error:', error);
+    logger.error('[AUTH] Registration error:', error);
     handleError(error, res, 'user registration');
   }
 });
@@ -169,8 +206,26 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     // Get user with password
     const user = await UserService.getUserByEmailWithPassword(email);
     if (!user || !user.password) {
-      sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
-      return;
+      // Check waitlist status when user doesn't exist
+      const waitlistService = initWaitlistService();
+      const waitlistStatus = await waitlistService.getDetailedStatus(email);
+      
+      if (!waitlistStatus.exists) {
+        // Not in system at all
+        return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
+      }
+      
+      if (waitlistStatus.status === 'pending') {
+        // On waitlist but not approved
+        return sendSuccess(res, {
+          waitlisted: true,
+          status: 'pending',
+          message: 'Please wait for approval to access the app.',
+        }, 200);
+      }
+      
+      // Approved but no account - suggest registration
+      return sendError(res, 'AUTHENTICATION_FAILED', 'No account found. Please sign up first.', 401);
     }
 
     // Verify password
@@ -179,14 +234,52 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
       return;
     }
+    
+    // Check waitlist status for existing user
+    const waitlistService = initWaitlistService();
+    const waitlistStatus = await waitlistService.getDetailedStatus(email);
+    
+    // If user exists but is still pending on waitlist, deny access
+    if (waitlistStatus.status === 'pending') {
+      return sendSuccess(res, {
+        waitlisted: true,
+        status: 'pending',
+        message: 'Please wait for approval to access the app.',
+      }, 200);
+    }
 
     // Get user's starships for redirect purpose
     let firstStarship = null;
+    let defaultAgent = null;
     try {
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
       firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
+      
+      // If approved user has no starship (was pending when registered), create one now
+      if (!firstStarship && waitlistStatus.status === 'approved') {
+        logger.info(`[AUTH] Creating starship for newly approved user ${user.email}`);
+        try {
+          firstStarship = await StarshipService.createDefaultStarship(user.id);
+          
+          // Also create default agent
+          if (firstStarship) {
+            try {
+              defaultAgent = await StarshipService.createDefaultAgent(user.id, firstStarship.id);
+              logger.info(`[AUTH] Created default agent for user ${user.email}`);
+            } catch (agentError) {
+              logger.error(`[AUTH] Failed to create default agent for user ${user.id}:`, {
+                error: agentError instanceof Error ? agentError.message : 'Unknown error'
+              });
+            }
+          }
+        } catch (createError) {
+          logger.error(`[AUTH] Failed to create default starship for newly approved user ${user.id}:`, {
+            error: createError instanceof Error ? createError.message : 'Unknown error'
+          });
+        }
+      }
     } catch (error) {
       console.error(`[AUTH] Failed to fetch starships for user ${user.id}:`, error);
       // Continue with login even if starship fetch fails
@@ -196,7 +289,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
     const token = await new SignJWT({
       sub: user.id,
       email: user.email,
-      name: user.displayName || user.username,
+      name: user.displayName || user.email?.split('@')[0],
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuer(JWT_ISSUER)
@@ -209,7 +302,7 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       user: {
         id: user.id,
         email: user.email,
-        name: user.displayName || user.username,
+        name: user.displayName || user.email?.split('@')[0],
         avatar: user.avatar,
       },
       token,
@@ -258,7 +351,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
     sendSuccess(res, {
       id: user.id,
       email: user.email,
-      name: user.displayName || user.username,
+      name: user.displayName || user.email?.split('@')[0],
       avatar: user.avatar,
     });
   } catch (error: any) {

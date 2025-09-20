@@ -1,13 +1,31 @@
 // uuid import removed as it's no longer used in constructor
 
-export type LLMMessageRole = 'user' | 'assistant' | 'system';
+export type LLMMessageRole = 'user' | 'assistant' | 'system' | 'tool';
 
 /**
  * Message entry with metadata
  */
+export interface LlmFunctionCall {
+  name: string;
+  arguments: string;
+}
+
+export interface LlmToolCall {
+  id?: string;
+  type?: 'function';
+  function: LlmFunctionCall;
+}
+
 export interface LlmMessage {
   role: LLMMessageRole;
   content: string;
+  /**
+   * The ID of the tool call this message is a result of.
+   * For tool role messages emitted after executing a function/tool, providers use this to link
+   * the tool result back to the originating assistant tool_call.
+   */
+  tool_call_id?: string;
+  tool_calls?: LlmToolCall[];
 }
 
 export interface LLMUsage {

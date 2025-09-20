@@ -5,8 +5,9 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import { HttpRequestParams, ValidationResult, ValidationError } from '@/types';
+import { HttpRequestParams, ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
+import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export interface HttpResponse {
   status: number;
@@ -28,9 +29,9 @@ export class HttpRequest implements NodeHandler {
   }
 
   /**
-   * Execute the HTTP request
+   * Execute the HTTP request with optional input items
    */
-  async execute(): Promise<HttpResponse> {
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // Setup headers - convert HeadersInit to Record<string, string>
     let headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -59,10 +60,17 @@ export class HttpRequest implements NodeHandler {
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
     try {
-      // Use the body directly from params (already in correct fetch format)
-      let body = this.params.body;
-      if (typeof body === 'object' && body !== null) {
-        body = JSON.stringify(body);
+      // Use input data as body if available and no explicit body set
+      const inputData = ExecutionItemUtils.unwrapSingle(input);
+      const bodyData = this.params.body !== undefined ? this.params.body : inputData;
+      let body: string | null = null;
+
+      if (bodyData !== undefined) {
+        if (typeof bodyData === 'string') {
+          body = bodyData;
+        } else if (typeof bodyData === 'object' && bodyData !== null) {
+          body = JSON.stringify(bodyData);
+        }
       }
 
       // Build fetch options using all RequestInit properties from params
@@ -87,7 +95,8 @@ export class HttpRequest implements NodeHandler {
 
         // Handle HTTP error status codes
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
         }
         // Parse response body
         let responseBody: unknown;
@@ -112,19 +121,24 @@ export class HttpRequest implements NodeHandler {
           });
         }
 
-        return {
+        const httpResponse = {
           status: response.status,
           statusText: response.statusText,
           headers: responseHeaders,
           body: responseBody,
           url: response.url,
         };
+
+        return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
       } catch (error) {
-        // Handle fetch errors and timeout
+        // Handle fetch errors and timeout - return error ExecutionItem instead of throwing
+        let errorMessage: string;
         if (controller.signal.aborted) {
-          throw new Error(`HTTP request timeout after ${timeout}ms`);
+          errorMessage = `HTTP request timeout after ${timeout}ms`;
+        } else {
+          errorMessage = `HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
         }
-        throw new Error(`HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
       }
     } finally {
       // Always clear timeout to prevent open handles

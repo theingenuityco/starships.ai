@@ -32,6 +32,9 @@ export const config = {
 
   // Maximum depth of conditional nesting to prevent infinite loops
   MAX_CONDITIONAL_DEPTH: 10,
+
+  // Maximum visits per node to prevent infinite cycles
+  MAX_NODE_VISITS: 3,
 } as const;
 
 export type ConfigKey = keyof typeof config;

@@ -110,7 +110,7 @@ export function Navigation(props: NavigationProps) {
 
   // Floating mode - expandable layout
   return (
-    <div className="flex flex-row frosted-glass rounded-2xl overflow-hidden shadow-frosted-xl transition-all duration-300 ease-in-out">
+    <div className="flex flex-row frosted-glass-card rounded-2xl overflow-hidden shadow-frosted-xl transition-all duration-300 ease-in-out">
       <div
         className="flex flex-col w-16 flex-shrink-0 transition-all duration-300 ease-in-out"
         style={{

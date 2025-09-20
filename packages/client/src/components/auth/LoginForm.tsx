@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { WaitlistMessage } from '@/components/auth/WaitlistMessage'
 import { useAuth } from '@/hooks/useAuth'
 import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
 import { motion } from 'motion/react'
@@ -33,10 +34,15 @@ export function LoginForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
   const [formError, setFormError] = useState<string | null>(null)
+  const [waitlistStatus, setWaitlistStatus] = useState<{
+    isWaitlisted: boolean
+    message: string
+  } | null>(null)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
+    setWaitlistStatus(null)
 
     if (!loginData.email || !loginData.password) {
       setFormError('Please fill in all fields')
@@ -44,6 +50,16 @@ export function LoginForm() {
     }
 
     const result = await login(loginData.email, loginData.password)
+    
+    // Check if waitlisted response
+    if (result.waitlisted) {
+      setWaitlistStatus({
+        isWaitlisted: true,
+        message: result.message || 'You are on our waitlist. Stay tuned!'
+      })
+      return
+    }
+    
     if (!result.success) {
       setFormError(result.error || 'Login failed')
     }
@@ -52,6 +68,7 @@ export function LoginForm() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
+    setWaitlistStatus(null)
 
     if (!registerData.email || !registerData.password || !registerData.name) {
       setFormError('Please fill in all fields')
@@ -69,6 +86,18 @@ export function LoginForm() {
     }
 
     const result = await register(registerData.email, registerData.password, registerData.name)
+    
+    // Check if waitlisted response
+    if (result.waitlisted) {
+      setWaitlistStatus({
+        isWaitlisted: true,
+        message: result.message || 'You have been added to the waitlist!'
+      })
+      // Optionally clear form
+      setRegisterData({ email: '', password: '', name: '', confirmPassword: '' })
+      return
+    }
+    
     if (!result.success) {
       setFormError(result.error || 'Registration failed')
     }
@@ -83,6 +112,15 @@ export function LoginForm() {
         </CardHeader>
 
         <CardContent>
+          {waitlistStatus && (
+            <div className="mb-4">
+              <WaitlistMessage
+                message={waitlistStatus.message}
+                onClose={() => setWaitlistStatus(null)}
+              />
+            </div>
+          )}
+          
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Sign In</TabsTrigger>

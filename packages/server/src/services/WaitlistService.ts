@@ -7,6 +7,13 @@ export interface WaitlistCheckResult {
   redirectUrl?: string;
 }
 
+export interface WaitlistStatusResult {
+  exists: boolean;
+  status: 'approved' | 'pending' | null;
+  message: string;
+  email?: string;
+}
+
 export class WaitlistService {
   private waitlistRepo: WaitlistRepository;
 
@@ -17,40 +24,53 @@ export class WaitlistService {
   /**
    * Check if an email is approved for early access
    */
-  async checkApproval(email: string): Promise<WaitlistCheckResult> {
+  async checkApproval(email: string): Promise<WaitlistStatusResult> {
     try {
       const normalizedEmail = this.normalizeEmail(email);
 
       // Validate email format
       if (!this.isValidEmail(normalizedEmail)) {
         return {
-          isApproved: false,
+          exists: false,
+          status: null,
           message: 'Please provide a valid email address',
         };
       }
 
-      // Check approval status
-      const isApproved = await this.waitlistRepo.checkApproval(normalizedEmail);
+      // Get status from repository
+      const status = await this.waitlistRepo.getStatusByEmail(normalizedEmail);
 
-      if (isApproved) {
+      if (!status) {
+        return {
+          exists: false,
+          status: null,
+          message: 'Email not found in waitlist',
+          email: normalizedEmail,
+        };
+      }
+
+      if (status === 'approved') {
         logger.info('Waitlist: Approved email validated', {
           email: normalizedEmail,
         });
 
         return {
-          isApproved: true,
-          message: "Great news! You don't have to wait. Redirecting...",
-          redirectUrl: '/',
+          exists: true,
+          status: 'approved',
+          message: 'Email is approved for registration',
+          email: normalizedEmail,
         };
       }
 
-      logger.info('Waitlist: Non-approved email checked', {
+      logger.info('Waitlist: Pending email checked', {
         email: normalizedEmail,
       });
 
       return {
-        isApproved: false,
+        exists: true,
+        status: 'pending',
         message: "Thanks for your interest in Starships.ai! We're currently in private alpha. We'll notify you as soon as we're ready.",
+        email: normalizedEmail,
       };
     } catch (error) {
       logger.error('WaitlistService: Error checking approval', {
@@ -60,7 +80,8 @@ export class WaitlistService {
 
       // Return generic error message
       return {
-        isApproved: false,
+        exists: false,
+        status: null,
         message: 'Service temporarily unavailable. Please try again.',
       };
     }
@@ -130,6 +151,91 @@ export class WaitlistService {
    */
   private normalizeEmail(email: string): string {
     return email.toLowerCase().trim();
+  }
+
+  /**
+   * Add email to pending waitlist
+   */
+  async addToPendingWaitlist(email: string): Promise<WaitlistStatusResult> {
+    try {
+      const normalizedEmail = this.normalizeEmail(email);
+      
+      // Check if already exists
+      const existingStatus = await this.waitlistRepo.getStatusByEmail(normalizedEmail);
+      if (existingStatus) {
+        return {
+          exists: true,
+          status: existingStatus,
+          message: existingStatus === 'approved' 
+            ? 'Email is approved for registration'
+            : 'Please wait for approval to access the app.',
+          email: normalizedEmail
+        };
+      }
+      
+      // Add to waitlist
+      await this.waitlistRepo.addPendingEmail(normalizedEmail, 'Auto-added via signup');
+      logger.info(`Added ${normalizedEmail} to waitlist with pending status`);
+      
+      return {
+        exists: false,
+        status: 'pending',
+        message: 'Thanks for your interest! We have added you to the waitlist. Stay tuned!',
+        email: normalizedEmail
+      };
+    } catch (error) {
+      logger.error('Error adding to waitlist:', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get detailed waitlist status
+   */
+  async getDetailedStatus(email: string): Promise<WaitlistStatusResult> {
+    try {
+      const normalizedEmail = this.normalizeEmail(email);
+      
+      // Validate email format
+      if (!this.isValidEmail(normalizedEmail)) {
+        return {
+          exists: false,
+          status: null,
+          message: 'Please provide a valid email address',
+        };
+      }
+      
+      const status = await this.waitlistRepo.getStatusByEmail(normalizedEmail);
+      
+      if (!status) {
+        return {
+          exists: false,
+          status: null,
+          message: 'Email not found in system',
+          email: normalizedEmail,
+        };
+      }
+      
+      return {
+        exists: true,
+        status,
+        message: status === 'approved' 
+          ? 'Email is approved for registration'
+          : 'Please wait for approval to access the app.',
+        email: normalizedEmail,
+      };
+    } catch (error) {
+      logger.error('Error getting detailed status:', {
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return {
+        exists: false,
+        status: null,
+        message: 'Service temporarily unavailable. Please try again.',
+      };
+    }
   }
 
   /**

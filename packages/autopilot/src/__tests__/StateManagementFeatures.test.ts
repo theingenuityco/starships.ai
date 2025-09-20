@@ -6,6 +6,7 @@
  */
 
 import { Engine } from '../engine/Engine';
+import { ExecutionItemUtils } from '../utils/ExecutionItemUtils';
 import { Blueprint } from '../types';
 
 // Mock fetch
@@ -43,7 +44,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize workflow',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/userId', value: 'user-123' },
                 { operation: 'add', path: '/state/sessionStart', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/counter', value: 0 },
@@ -67,7 +68,7 @@ describe('State Management Features', () => {
                 counter: '{{ state.counter }}',
                 userAgent: 'Starships-Autopilot/1.0',
               },
-              transforms: [
+              mutations: [
                 { operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' },
                 { operation: 'add', path: '/state/lastApiCall', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/apiCallHistory', value: [{ url: '{{ state.userId }}', timestamp: '{{ $now() }}' }] },
@@ -80,7 +81,7 @@ describe('State Management Features', () => {
             name: 'End',
             description: 'Complete workflow',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/completedAt', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/totalCalls', value: '{{ state.counter }}' },
               ],
@@ -97,27 +98,14 @@ describe('State Management Features', () => {
         },
       };
 
-      // Mock initial execution state
-      const initialExecution = {
-        status: 'not_started' as const,
-        state: {
-          apiToken: 'abc123token',
-        },
-        results: [],
-      };
-
       const engine = new Engine({
-        blueprint,
-        execution: initialExecution,
-        eventCallback: async (event) => {
-          console.log(`Event: ${event.type} at ${event.timestamp}`);
-        },
+        eventCallback: async () => {},
       });
+      const execution = ExecutionItemUtils.createExecution();
+      execution.state = { apiToken: 'abc123token' };
 
       // Execute workflow
-      await engine.execute();
-
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify state transformations were applied
       expect(execution.state.userId).toBe('user-123');
@@ -129,7 +117,7 @@ describe('State Management Features', () => {
 
       // Verify execution completed successfully
       expect(execution.status).toBe('completed');
-      expect(execution.results).toHaveLength(3); // start, http-call, end
+      expect(execution.results).toHaveLength(6); // start, inline_mutate, http-call, inline_mutate, end, inline_mutate
     });
   });
 
@@ -143,7 +131,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/userTier', value: 'premium' },
                 { operation: 'add', path: '/state/requestCount', value: 5 },
               ],
@@ -155,8 +143,8 @@ describe('State Management Features', () => {
             name: 'Check User Tier',
             description: 'Determine user privileges',
             parameters: {
-              condition: 'state.userTier = "premium" and state.requestCount > 3',
-              transforms: [
+              condition: '{{ state.userTier = "premium" and state.requestCount > 3 }}',
+              mutations: [
                 { operation: 'add', path: '/state/conditionEvaluated', value: '{{ $now() }}' },
                 { operation: 'add', path: '/state/isPremiumUser', value: '{{ state.userTier = "premium" }}' },
               ],
@@ -170,7 +158,7 @@ describe('State Management Features', () => {
             parameters: {
               url: 'https://api.example.com/premium/{{ state.userTier }}',
               method: 'GET',
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/premiumActionExecuted', value: true },
                 { operation: 'add', path: '/state/executionPath', value: 'premium' },
               ],
@@ -184,7 +172,7 @@ describe('State Management Features', () => {
             parameters: {
               url: 'https://api.example.com/standard',
               method: 'GET',
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/standardActionExecuted', value: true },
                 { operation: 'add', path: '/state/executionPath', value: 'standard' },
               ],
@@ -212,14 +200,11 @@ describe('State Management Features', () => {
       };
 
       const engine = new Engine({
-        blueprint,
-        eventCallback: async (event) => {
-          console.log(`Conditional Event: ${event.type}`);
-        },
+        eventCallback: async () => {},
       });
+      const execution = ExecutionItemUtils.createExecution();
 
-      await engine.execute();
-      const execution = engine.getExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify conditional logic executed correctly
       expect(execution.state.userTier).toBe('premium');
@@ -246,7 +231,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Start with invalid transform',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/invalidPath', value: 'test' }, // Invalid: doesn't start with /state
                 { operation: 'invalid' as 'add', path: '/state/test', value: 'test' }, // Invalid operation
               ],
@@ -277,10 +262,11 @@ describe('State Management Features', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint: invalidBlueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
       // Should throw validation error before execution
-      await expect(engine.execute()).rejects.toThrow(/validation failed/i);
+      await expect(engine.executeBlueprint(invalidBlueprint, execution)).rejects.toThrow(/validation failed/i);
     });
 
     test('should validate transform structure', async () => {
@@ -292,7 +278,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Start with invalid transform structure',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/valid', value: 'test' },
                 { operation: 'copy', path: '/state/copied' } as unknown as { operation: 'copy'; path: string; from: string }, // Missing required 'from' property
                 { operation: 'replace', path: '/state/noValue' } as unknown as { operation: 'replace'; path: string; value: unknown }, // Missing required 'value' property
@@ -311,10 +297,11 @@ describe('State Management Features', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint: invalidTransformBlueprint });
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
 
       // Should throw validation error for invalid transforms
-      await expect(engine.execute()).rejects.toThrow(/validation failed/i);
+      await expect(engine.executeBlueprint(invalidTransformBlueprint, execution)).rejects.toThrow(/validation failed/i);
     });
   });
 
@@ -328,7 +315,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Initialize complex state',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/metrics', value: { requests: 0, errors: 0, successRate: 0 } },
                 { operation: 'add', path: '/state/userSessions', value: [] },
                 { operation: 'add', path: '/state/startTime', value: '{{ $now() }}' },
@@ -347,18 +334,19 @@ describe('State Management Features', () => {
                 sessionCount: '{{ $count(state.userSessions) }}',
                 metrics: '{{ state.metrics }}',
               },
-              transforms: [
+              mutations: [
                 // Increment metrics counter
                 { operation: 'replace', path: '/state/metrics/requests', value: '{{ state.metrics.requests + 1 }}' },
 
                 // Add new session data
                 { operation: 'add', path: '/state/userSessions/-', value: { id: '{{ $random() }}', timestamp: '{{ $now() }}' } },
 
-                // Calculate success rate
+                // Calculate success rate (after incrementing requests)
                 {
                   operation: 'replace',
                   path: '/state/metrics/successRate',
-                  value: '{{ state.metrics.requests > 0 ? (state.metrics.requests - state.metrics.errors) / state.metrics.requests : 0 }}',
+                  value:
+                    '{{ (state.metrics.requests + 1) > 0 ? ((state.metrics.requests + 1) - state.metrics.errors) / (state.metrics.requests + 1) : 0 }}',
                 },
 
                 // Add to execution history
@@ -377,7 +365,7 @@ describe('State Management Features', () => {
             name: 'End',
             description: 'Finalize',
             parameters: {
-              transforms: [
+              mutations: [
                 { operation: 'add', path: '/state/endTime', value: '{{ $now() }}' },
                 { operation: 'copy', path: '/state/finalMetrics', from: '/state/metrics' },
               ],
@@ -390,10 +378,9 @@ describe('State Management Features', () => {
         ],
         metadata: {},
       };
-
-      const engine = new Engine({ blueprint });
-      await engine.execute();
-      const execution = engine.getExecution();
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
 
       // Verify complex state mutations
       expect(execution.state.metrics).toEqual({
@@ -427,7 +414,7 @@ describe('State Management Features', () => {
             name: 'Start',
             description: 'Test JSON Patch operations',
             parameters: {
-              transforms: [
+              mutations: [
                 // Add operations
                 { operation: 'add', path: '/state/original', value: { name: 'test', count: 5 } },
                 { operation: 'add', path: '/state/list', value: [1, 2, 3] },
@@ -455,7 +442,7 @@ describe('State Management Features', () => {
             name: 'Cleanup',
             description: 'Remove some data',
             parameters: {
-              transforms: [
+              mutations: [
                 // Remove operation
                 { operation: 'remove', path: '/state/original/count' },
               ],
@@ -476,10 +463,9 @@ describe('State Management Features', () => {
         metadata: {},
       };
 
-      const engine = new Engine({ blueprint });
-      await engine.execute();
-      const execution = engine.getExecution();
-
+      const engine = new Engine();
+      const execution = ExecutionItemUtils.createExecution();
+      await engine.executeBlueprint(blueprint, execution);
       // Verify all operations worked correctly
       expect(execution.state.original).toEqual({ name: 'updated' }); // count removed
       expect(execution.state.backup).toEqual({ name: 'updated', count: 5 }); // copied before count removal

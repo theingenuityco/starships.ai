@@ -24,7 +24,6 @@ import { UserEntity } from '@/entities/UserEntity';
 
 // Mock only the methods that need mocking to avoid validation in tests
 jest.spyOn(UserEntity, 'validate').mockResolvedValue(undefined);
-jest.spyOn(UserEntity, 'generateUsernameFromEmail').mockImplementation((email: string) => email.split('@')[0]);
 describe('UserRepository', () => {
   let repository: UserRepository;
   let testHelper: RepositoryTestHelper;
@@ -132,29 +131,10 @@ describe('UserRepository', () => {
     });
   });
 
-  describe('findByUsername', () => {
-    it('should return user by username', async () => {
-      const mockUser = global.createMockUser({ username: 'testuser' });
-      testHelper.mockFindQuery(mockUser, 'u');
-
-      const result = await repository.findByUsername('testuser');
-
-      expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.username = $username RETURN u', {
-        username: 'testuser',
-      });
-      expect(result).toBeInstanceOf(UserEntity);
-      expect(result).not.toBeNull();
-      expect(result!.id).toBe(mockUser.id);
-      expect(result!.email).toBe(mockUser.email);
-      expect(result!.displayName).toBe(mockUser.displayName);
-    });
-  });
-
   describe('create', () => {
     it('should create new user with required fields', async () => {
       const userData = {
         email: 'test@example.com',
-        username: 'testuser',
         displayName: 'Test User',
         avatar: 'avatar-url',
       };
@@ -176,34 +156,19 @@ describe('UserRepository', () => {
         expect.objectContaining({
           id: 'generated-test-id-123',
           email: 'test@example.com',
-          username: 'testuser',
           displayName: 'Test User',
           createdAt: expect.any(String),
         })
       );
     });
 
-    it('should validate required fields', async () => {
-      const incompleteData = {
-        username: 'testuser',
-        // Missing email
-      };
-
-      (UserEntity.validate as jest.Mock).mockRejectedValueOnce(new Error('Email is required for user creation'));
-
-      await expect(repository.create(incompleteData as unknown as Omit<UserModel, 'id' | 'createdAt'>)).rejects.toThrow(DatabaseError);
-      expect(UserEntity.validate).toHaveBeenCalledWith(incompleteData, 'create');
-    });
-
     it('should handle merge operation for existing email', async () => {
       const userData = {
-        username: 'existinguser',
         email: 'updated@example.com',
         displayName: 'Updated Name',
       };
 
       const existingUser = global.createMockUser({
-        username: 'existinguser',
         email: 'updated@example.com',
         displayName: 'Updated Name',
       });
@@ -229,7 +194,6 @@ describe('UserRepository', () => {
       const updatedUser = global.createMockUser({
         id: 'user-123',
         email: 'test@example.com',
-        username: 'testuser',
         displayName: 'Updated Name',
         avatar: 'new-avatar-url',
         createdAt: '2024-01-01T00:00:00.000Z',
@@ -247,7 +211,6 @@ describe('UserRepository', () => {
       expect(result!.id).toBe(updatedUser.id);
       expect(result!.displayName).toBe(updatedUser.displayName);
       expect(result!.email).toBe(updatedUser.email);
-      expect(result!.username).toBe(updatedUser.username);
       expect(result!.createdAt).toBe(updatedUser.createdAt);
       // Note: avatar might be undefined due to strict serialization
     });
@@ -257,7 +220,6 @@ describe('UserRepository', () => {
       const existingUser = global.createMockUser({
         id: 'user-123',
         email: 'test@example.com',
-        username: 'testuser',
         displayName: 'Test User',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: mockTimestamp,
@@ -297,7 +259,6 @@ describe('UserRepository', () => {
       const updatedUser = global.createMockUser({
         id: 'user-123',
         email: 'test@example.com',
-        username: 'testuser',
         displayName: 'Valid Update',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
@@ -402,7 +363,6 @@ describe('UserRepository', () => {
       testHelper.mockConstraintError();
 
       const duplicateUser = {
-        username: 'existinguser',
         email: 'existing@example.com',
       };
 
@@ -422,7 +382,6 @@ describe('UserRepository', () => {
   describe('integration scenarios', () => {
     it('should handle user registration flow', async () => {
       const userData = {
-        username: 'newuser',
         email: 'new@example.com',
         displayName: 'New User',
       };
@@ -446,7 +405,6 @@ describe('UserRepository', () => {
         expect.objectContaining({
           id: 'generated-test-id-123',
           email: 'new@example.com',
-          username: 'newuser',
           displayName: 'New User',
           createdAt: expect.any(String),
         })

@@ -10,12 +10,15 @@ export { Eval } from './engine/Eval';
 export type { EvalContext, EvalOptions } from './engine/Eval';
 
 // Nodes
+export { BaseNode } from './nodes/BaseNode';
 export { Workflow } from './nodes/Workflow';
 export { LLM } from './nodes/LLM';
 export { HttpRequest } from './nodes/HttpRequest';
 export { Agent } from './nodes/Agent';
 export { Conditional } from './nodes/Conditional';
 export { Transform } from './nodes/Transform';
+export { Mutate } from './nodes/Mutate';
+export { Tool } from './nodes/Tool';
 
 // Node result types
 export type { ConditionalResult } from './nodes/Conditional';
@@ -24,7 +27,9 @@ export type { ConditionalResult } from './nodes/Conditional';
 export { Memory } from './memory/Memory';
 export type { MemoryState } from './memory/Memory';
 export { AgentMemory } from './memory/AgentMemory';
-export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from './memory/AgentMemory';
+
+// Utils
+export { ExecutionItemUtils } from './utils/ExecutionItemUtils';
 
 // Types
 export * from './types';

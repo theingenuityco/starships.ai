@@ -150,7 +150,6 @@ export class Neo4jConnection {
 
       const indexes = [
         'CREATE INDEX agent_name_index IF NOT EXISTS FOR (a:Agent) ON (a.name)',
-        'CREATE INDEX user_username_index IF NOT EXISTS FOR (u:User) ON (u.username)',
         'CREATE INDEX user_email_index IF NOT EXISTS FOR (u:User) ON (u.email)',
         'CREATE INDEX llm_provider_index IF NOT EXISTS FOR (l:LLM) ON (l.provider)',
         'CREATE INDEX starship_owner_index IF NOT EXISTS FOR (s:Starship) ON (s.ownerId)',

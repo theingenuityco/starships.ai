@@ -13,6 +13,8 @@ export { ExecutionEntity } from './entities/ExecutionEntity';
 export { MessageEntity } from './entities/MessageEntity';
 export { NativeToolApiKeyEntity } from './entities/NativeToolApiKeyEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
+export { ToolEntity } from './entities/ToolEntity';
+export { ToolTemplateEntity } from './entities/ToolTemplateEntity';
 export { UserEntity } from './entities/UserEntity';
 export { WorkflowEntity } from './entities/WorkflowEntity';
 
@@ -27,6 +29,8 @@ export { MessageRepository } from './repositories/MessageRepository';
 export { NativeToolApiKeyRepository } from './repositories/NativeToolApiKeyRepository';
 export { NodeRepository } from './repositories/NodeRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
+export { ToolRepository } from './repositories/ToolRepository';
+export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
 export { WorkflowRepository } from './repositories/WorkflowRepository';

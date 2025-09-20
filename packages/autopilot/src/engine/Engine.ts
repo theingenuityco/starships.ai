@@ -318,6 +318,7 @@ export class Engine {
 
       // Resolve node parameters with templates
       const inputData = ExecutionItemUtils.unwrapSingle(nodeInputItems);
+
       const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, execution, inputData)) as NodeParameters;
 
       // Create and validate handler

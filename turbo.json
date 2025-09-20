@@ -1,12 +1,25 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
-  "globalEnv": ["NODE_ENV", "NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD", "STRIPE_SECRET_KEY", "STRIPE_PUBLISHABLE_KEY"],
+  "globalEnv": [
+    "NODE_ENV",
+    "NEO4J_URI",
+    "NEO4J_USERNAME",
+    "NEO4J_PASSWORD",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PUBLISHABLE_KEY",
+    "AUTOPILOT_ISOLATE_MEM_MB",
+    "AUTOPILOT_ISOLATE_TIMEOUT_MS"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**", ".next/**", "build/**"]
+    },
+    "@starships/autopilot#build": {
+      "inputs": ["$TURBO_DEFAULT$", "scripts/**", ".env", ".env.local"],
+      "outputs": ["dist/**"]
     },
     "@starships/protocol#build": {
       "dependsOn": ["@starships/autopilot#build"],
@@ -43,7 +56,13 @@
       "outputs": []
     },
     "@starships/server#lint": {
-      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
+      "dependsOn": [
+        "@starships/env#build",
+        "@starships/errors#build",
+        "@starships/models#build",
+        "@starships/protocol#build",
+        "@starships/autopilot#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -71,7 +90,13 @@
       "outputs": []
     },
     "@starships/server#type-check": {
-      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/models#build", "@starships/protocol#build"],
+      "dependsOn": [
+        "@starships/env#build",
+        "@starships/errors#build",
+        "@starships/models#build",
+        "@starships/protocol#build",
+        "@starships/autopilot#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },

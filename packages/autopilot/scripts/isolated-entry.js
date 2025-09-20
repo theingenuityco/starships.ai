@@ -2,11 +2,15 @@
  * Single-file bundle entry for isolated-vm.
  * This registers a global function that IsolatedVmRunner will call inside the isolate.
  * Build this file with esbuild into an IIFE bundle.
+ *
+ * IMPORTANT: Do NOT import the root dist/index.js here since it re-exports runners which
+ * pull in 'node:module'. Instead import the Engine directly from its dist path so the
+ * bundle does not include any Node-specific modules.
  */
 (() => {
-  // Import the compiled library API (ensure `pnpm --filter @starships/autopilot build` ran first)
+  // Import the compiled Engine only (avoid pulling runner exports)
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Engine } = require('../dist/index.js');
+  const { Engine } = require('../dist/engine/Engine.js');
 
   // Contract required by IsolatedVmRunner:
   // input = { blueprint, execution, config }

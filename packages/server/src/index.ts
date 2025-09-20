@@ -9,6 +9,7 @@ import {
   AgentRepository,
   createConnection,
   migrationRunner,
+  seedToolTemplates,
   seedAgentTemplates,
   seedWaitlist,
   StarshipRepository,
@@ -144,6 +145,14 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
+
+    // Initialize Tool Templates (seeds default templates)
+    try {
+      await seedToolTemplates();
+    } catch (error) {
+      console.error('⚠️ Failed to seed tool templates:', error);
+      // Continue - seeding is not critical for startup
+    }
 
     // Initialize Agent Templates (seeds default templates)
     try {

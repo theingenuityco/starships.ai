@@ -17,10 +17,12 @@ import { createRequire } from 'node:module';
 /**
  * Minimal type surface for isolated-vm usage to avoid broad `any` types.
  */
+type IvmRefObject = {
+  set: (name: string, value: unknown, opts?: { copy?: boolean }) => Promise<void>;
+};
+
 type IsolateContext = {
-  global: {
-    set: (name: string, value: unknown, opts?: { copy?: boolean }) => Promise<void>;
-  };
+  globalReference: () => IvmRefObject;
 };
 
 type Script = {
@@ -69,28 +71,15 @@ export class IsolatedVmRunner implements Runner {
   }
 
   async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {
-    // Attempt to load isolated-vm dynamically to keep it optional
-    let ivm: IvmModule | undefined;
-    try {
-      // Prefer dynamic import (works in ESM/CJS with TS transpilation)
-      const moduleName = 'isolated' + '-vm';
-      ivm = (await import(moduleName)) as unknown as IvmModule;
-    } catch (err1) {
-      // Fallback to CJS require via createRequire for environments where import() fails
-      try {
-        const rr = createRequire(__filename);
-        const mod = rr('isolated-vm');
-        ivm = mod as IvmModule;
-      } catch (err2) {
-        const m1 = err1 instanceof Error ? err1.message : String(err1);
-        const m2 = err2 instanceof Error ? err2.message : String(err2);
-        throw new Error(
-          `isolated-vm load failed. First import() error: ${m1}. Fallback require() error: ${m2}. Ensure isolated-vm@6.0.1 is installed and built.`
-        );
-      }
-    }
-    if (!ivm) {
-      throw new Error('isolated-vm could not be loaded (unknown error).');
+    // Load isolated-vm via CJS require to avoid ESM/CJS interop issues
+    const rr = createRequire(__filename);
+    const loaded = rr('isolated-vm') as unknown as IvmModule | { default: IvmModule };
+    const ivm: IvmModule = (loaded as { default?: IvmModule }).default ?? (loaded as IvmModule);
+
+    if (typeof ivm.Isolate !== 'function') {
+      throw new Error(
+        'isolated-vm loaded but Isolate constructor unavailable. Verify isolated-vm@6.0.1 install/build and module resolution.'
+      );
     }
 
     // If no bundlePath provided, attempt to resolve published subpath export
@@ -118,22 +107,17 @@ export class IsolatedVmRunner implements Runner {
     const context = await isolate.createContext();
 
     // Get a Reference to the global object within the context.
-    const jail = context.global;
+    // Support both API shapes:
+    //  - v6+: context.globalReference()
+    //  - older: context.global
+    const anyContext = context as unknown as {
+      globalReference?: () => { set: (name: string, value: unknown, opts?: { copy?: boolean }) => Promise<void> };
+      global?: { set: (name: string, value: unknown, opts?: { copy?: boolean }) => Promise<void> };
+    };
+    const jail = typeof anyContext.globalReference === 'function' ? anyContext.globalReference() : anyContext.global!;
 
-    // Expose a minimal console for debugging (no-op if not desired)
-    await jail.set(
-      'console',
-      {
-        log: (...args: unknown[]) => {
-          // Mark args as used to satisfy no-unused-vars
-          void args.length;
-        },
-        error: (...args: unknown[]) => {
-          void args.length;
-        },
-      },
-      { copy: true }
-    );
+    // NOTE: Do NOT inject host console functions here; host functions can't be copied into the isolate.
+    // We'll define a minimal no-op console inside the isolate in the bootstrap code below.
 
     // Bridge event callback to host if provided
     if (config?.eventCallback) {
@@ -159,6 +143,16 @@ export class IsolatedVmRunner implements Runner {
     // This avoids leaking host objects into the isolate.
     const bootstrap = `
       (async () => {
+        // Define a minimal console inside the isolate to avoid cloning host functions
+        if (typeof globalThis.console !== 'object') {
+          globalThis.console = {
+            log() {},
+            error() {},
+            warn() {},
+            info() {},
+          };
+        }
+
         // Evaluate the provided bundle which must register globalThis.__autopilot_run_engine__
         ${source}
         if (typeof globalThis.__autopilot_run_engine__ !== 'function') {

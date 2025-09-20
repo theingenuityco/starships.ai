@@ -8,6 +8,17 @@
  * bundle does not include any Node-specific modules.
  */
 (() => {
+  // Polyfill structuredClone with a proven lightweight polyfill (bundled via esbuild)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const sc = require('core-js-pure/actual/structured-clone');
+    if (typeof globalThis.structuredClone !== 'function') {
+      globalThis.structuredClone = sc;
+    }
+  } catch (e) {
+    // If core-js-pure is unavailable at build-time, ignore (but our build bundles it)
+  }
+
   // Import the compiled Engine only (avoid pulling runner exports)
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { Engine } = require('../dist/engine/Engine.js');

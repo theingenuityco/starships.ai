@@ -7,6 +7,7 @@
 
 import { Transformers } from '@/helpers/serializer';
 import { ToolParams } from '@starships/autopilot';
+import type { Blueprint } from '@starships/autopilot';
 import type { ToolModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsBoolean, IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
@@ -47,6 +48,12 @@ export class ToolEntity implements ToolModel {
   @IsObject()
   parameters!: ToolParams['parameters'];
 
+  // Blueprint (execution logic)
+  @Expose()
+  @Transformers.JsonTransform()
+  @IsObject()
+  blueprint!: Blueprint;
+
   // User configuration
   @Expose()
   @IsOptional()
@@ -79,6 +86,7 @@ export class ToolEntity implements ToolModel {
         name: dataRecord.name || '',
         description: dataRecord.description || '',
         parameters: dataRecord.parameters || { type: 'object', properties: {}, required: [] },
+        blueprint: (dataRecord as { blueprint?: Blueprint }).blueprint || { nodes: [], edges: [], metadata: {} },
         configuration: dataRecord.configuration || {},
         isEnabled: dataRecord.isEnabled ?? true,
         ...dataRecord,

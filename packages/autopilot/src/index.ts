@@ -6,6 +6,7 @@
 
 // Engine
 export { Engine } from './engine/Engine';
+export type { EngineConfig } from './engine/Engine';
 export { Eval } from './engine/Eval';
 export type { EvalContext, EvalOptions } from './engine/Eval';
 
@@ -36,6 +37,11 @@ export * from './types';
 
 // Configuration
 export { config } from './constants';
+
+// Runners
+export type { Runner } from './runner/Runner';
+export { LocalRunner } from './runner/LocalRunner';
+export { IsolatedVmRunner } from './runner/IsolatedVmRunner';
 
 // Autopilot configuration manager
 export { autopilot, AutopilotManager } from './Autopilot';

@@ -11,10 +11,14 @@
     },
     "./types": {
       "types": "./dist/types/index.d.ts"
+    },
+    "./isolated": {
+      "default": "./dist/autopilot.isolated.js"
     }
   },
   "scripts": {
-    "build": "tsc && tsc-alias -p tsconfig.json",
+    "build": "tsc && tsc-alias -p tsconfig.json && pnpm run bundle:isolate",
+    "bundle:isolate": "esbuild scripts/isolated-entry.js --bundle --platform=node --format=iife --target=node18 --minify --outfile=dist/autopilot.isolated.js",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
@@ -28,6 +32,7 @@
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "esbuild": "^0.23.0",
     "jest": "^30.1.1",
     "ts-jest": "^29.4.1",
     "tsc-alias": "^1.8.16",

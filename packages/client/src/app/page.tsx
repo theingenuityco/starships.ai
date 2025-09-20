@@ -92,7 +92,9 @@ export default function HomePage() {
   const { isAuthenticated, isLoading, userName } = useAuth()
 
   // Use TanStack Query to fetch starships - only when authenticated
-  const { data: starshipsData, isLoading: starshipsLoading } = useStarships()
+  const { data: starshipsData, isLoading: starshipsLoading } = useStarships({
+    enabled: isAuthenticated
+  })
 
   const starships = starshipsData?.starships || []
   const hasExistingStarships = starships.length > 0

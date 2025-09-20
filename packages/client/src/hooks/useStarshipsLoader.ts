@@ -15,7 +15,7 @@ interface UseStarshipsLoaderOptions {
 export function useStarshipsLoader(options: UseStarshipsLoaderOptions = {}) {
   const { enabled = true, refetchOnWindowFocus = false, refetchOnVisibilityChange = false, refetchInterval = 0 } = options
 
-  const { data: starshipsResponse, isLoading: loadingStarships, refetch } = useStarships()
+  const { data: starshipsResponse, isLoading: loadingStarships, refetch } = useStarships({ enabled })
   const starships = starshipsResponse?.starships || []
 
   const isLoadingRef = useRef(false)

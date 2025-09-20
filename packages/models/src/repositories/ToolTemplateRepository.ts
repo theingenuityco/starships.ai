@@ -1,6 +1,7 @@
 import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
+import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type {
   ToolTemplateModel,
@@ -108,8 +109,12 @@ export class ToolTemplateRepository extends BaseRepository {
   async create(data: CreateToolTemplateRequest): Promise<ToolTemplateModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate using entity
-        await ToolTemplateEntity.validate(data, 'create');
+        // Generate slug from name (slug is required by entity)
+        const slug = generateSlug(data.name);
+
+        // Validate using entity with slug included
+        const dataWithSlug = { ...data, slug };
+        await ToolTemplateEntity.validate(dataWithSlug, 'create');
 
         const now = new Date().toISOString();
 
@@ -117,6 +122,7 @@ export class ToolTemplateRepository extends BaseRepository {
         const toolTemplateProps = {
           // Core ToolParams fields
           name: data.name,
+          slug,
           description: data.description,
           parameters: data.parameters,
 

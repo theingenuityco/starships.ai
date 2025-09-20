@@ -108,6 +108,9 @@ pnpm run migrate
 # Seed waitlist data
 pnpm run seed:waitlist
 
+# Seed tool templates
+pnpm run seed:tool-templates
+
 # Seed agent templates
 pnpm run seed:agent-templates
 ```

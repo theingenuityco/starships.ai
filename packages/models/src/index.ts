@@ -40,7 +40,8 @@ export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } fro
 
 export type { HealthStatus, LogContext, LogLevel, PerformanceMetrics } from './helpers/logging';
 
-// Management scripts
+/* Management scripts */
 export { migrationRunner } from './scripts/migration-runner';
+export { seedToolTemplates } from './scripts/seed-tool-templates';
 export { seedAgentTemplates } from './scripts/seed-agent-templates';
 export { seedWaitlist } from './scripts/seed-waitlist';

@@ -133,7 +133,6 @@ function createStarshipNavigatorBlueprint(): Blueprint {
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.4,
     maxTokens: 2000,
-    tools: [calculatorTool, timeTool, echoTool],
   });
 
   // Use the single default LLM chain created by Agent constructor

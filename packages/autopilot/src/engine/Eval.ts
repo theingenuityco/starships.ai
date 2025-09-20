@@ -136,7 +136,9 @@ export class Eval {
    */
   hasTemplateExpressions(value: unknown): boolean {
     if (typeof value === 'string') {
-      return Eval.TEMPLATE_REGEX.test(value);
+      // Create fresh regex to avoid global flag state issues
+      const regex = /\{\{\s*(.*?)\s*\}\}/;
+      return regex.test(value);
     } else if (Array.isArray(value)) {
       return value.some((item) => this.hasTemplateExpressions(item));
     } else if (value && typeof value === 'object') {
@@ -233,7 +235,9 @@ export class Eval {
    * Resolve template expressions in a string
    */
   private async resolveStringTemplates(str: string, context: EvalContext, options?: EvalOptions): Promise<unknown> {
-    const matches = Array.from(str.matchAll(Eval.TEMPLATE_REGEX));
+    // Create fresh regex to avoid global flag state issues
+    const regex = /\{\{\s*(.*?)\s*\}\}/g;
+    const matches = Array.from(str.matchAll(regex));
 
     if (matches.length === 0) return str;
 
@@ -286,7 +290,9 @@ export class Eval {
    * Validate template expressions in a string
    */
   private validateStringTemplates(str: string, errors: ValidationError[], options?: EvalOptions, path = ''): void {
-    const matches = Array.from(str.matchAll(Eval.TEMPLATE_REGEX));
+    // Create fresh regex to avoid global flag state issues
+    const regex = /\{\{\s*(.*?)\s*\}\}/g;
+    const matches = Array.from(str.matchAll(regex));
 
     for (const match of matches) {
       const expression = match[1];

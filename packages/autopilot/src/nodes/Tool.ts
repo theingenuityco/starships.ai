@@ -10,6 +10,7 @@ import type { ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
+import { Engine } from '@/engine/Engine';
 import type { LLMResponse, LlmMessage, LlmToolCall } from '@/types/llm';
 
 export class Tool extends BaseNode<ToolParams> {
@@ -201,9 +202,18 @@ export class Tool extends BaseNode<ToolParams> {
    * Execute tool logic based on tool name and arguments
    */
   private async executeToolLogic(params: ToolParams, args: Record<string, unknown>): Promise<unknown> {
-    const { name } = params;
+    const { name, blueprint } = params;
 
-    // Built-in tools - can be extended with more tools
+    // If a blueprint is provided, execute it like Workflow does (fresh Engine + Execution)
+    if (blueprint && Array.isArray(blueprint.nodes) && blueprint.nodes.length > 0) {
+      const engine = new Engine({ eventCallback: this.getEventCallback() });
+      // Pass tool args as the initial input to the sub-workflow
+      const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(args));
+      const items = await engine.executeBlueprint(blueprint, subExec);
+      return ExecutionItemUtils.unwrapSingle(items);
+    }
+
+    // Built-in tools fallback
     switch (name) {
       case 'calculator':
         return this.executeCalculator(args);
@@ -347,15 +357,27 @@ export class Tool extends BaseNode<ToolParams> {
       }
     }
 
-    // Tool name validation (must be one of supported tools)
-    // Skip validation if name contains template syntax (will be resolved at execution time)
-    const supportedTools = ['calculator', 'get_current_time', 'echo'];
-    const isTemplate = params.name.includes('{{') && params.name.includes('}}');
-    if (!isTemplate && !supportedTools.includes(params.name)) {
-      errors.push({
-        code: 'INVALID_PARAMETERS',
-        message: `Unsupported tool '${params.name}'. Supported tools: ${supportedTools.join(', ')}`,
-      });
+    // If a custom blueprint is provided, validate its minimal structure and skip supported tool-name enforcement
+    if (params.blueprint) {
+      const nodes = params.blueprint.nodes || [];
+      const hasStartNode = Array.isArray(nodes) && nodes.some((n) => n.type === 'start');
+      if (!hasStartNode) {
+        errors.push({
+          code: 'MISSING_START_NODE',
+          message: 'Tool blueprint must have a start node',
+        });
+      }
+    } else {
+      // Tool name validation (must be one of supported tools)
+      // Skip validation if name contains template syntax (will be resolved at execution time)
+      const supportedTools = ['calculator', 'get_current_time', 'echo'];
+      const isTemplate = params.name.includes('{{') && params.name.includes('}}');
+      if (!isTemplate && !supportedTools.includes(params.name)) {
+        errors.push({
+          code: 'INVALID_PARAMETERS',
+          message: `Unsupported tool '${params.name}'. Supported tools: ${supportedTools.join(', ')}`,
+        });
+      }
     }
 
     return {

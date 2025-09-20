@@ -93,13 +93,18 @@ export class IsolatedVmRunner implements Runner {
       throw new Error('isolated-vm could not be loaded (unknown error).');
     }
 
-    // If no bundlePath provided, surface a clear, actionable message.
+    // If no bundlePath provided, attempt to resolve published subpath export
     if (!this.options.bundlePath) {
-      throw new Error(
-        'IsolatedVmRunner requires a single-file bundle of @starships/autopilot to execute the engine inside the isolate. ' +
-          'Provide options.bundlePath (IIFE/UMD) or switch to LocalRunner. ' +
-          'Rationale: isolated-vm does not expose Node.js require; a bundle avoids custom module loaders.'
-      );
+      try {
+        const rr = createRequire(__filename);
+        this.options.bundlePath = rr.resolve('@starships/autopilot/isolated');
+      } catch {
+        throw new Error(
+          'IsolatedVmRunner requires a single-file bundle of @starships/autopilot. ' +
+            'Unable to resolve "@starships/autopilot/isolated". Ensure the Autopilot build emitted the isolated bundle ' +
+            '(dist/autopilot.isolated.js) or pass options.bundlePath explicitly.'
+        );
+      }
     }
 
     const fs = await import('node:fs/promises');

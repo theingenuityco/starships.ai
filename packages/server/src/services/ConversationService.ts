@@ -1,12 +1,11 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, LocalRunner, IsolatedVmRunner } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, IsolatedVmRunner } from '@starships/autopilot';
 import type { Runner, EngineConfig } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
-import { createRequire } from 'node:module';
 
 /**
  * Clean conversation service with proper error handling
@@ -26,39 +25,11 @@ export class ConversationService {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
-    // Choose default runner (auto-resolve bundled isolate; fallback to LocalRunner)
-    let bundlePath: string | undefined;
-    try {
-      const rr = createRequire(__filename);
-      bundlePath = rr.resolve('@starships/autopilot/isolated');
-    } catch {
-      // ignore resolution failures and fall back to LocalRunner
-    }
-    if (bundlePath) {
-      this.defaultRunner = new IsolatedVmRunner({
-        bundlePath,
-        memoryLimitMB: Number(process.env.AUTOPILOT_ISOLATE_MEM_MB) || 64,
-        timeoutMs: Number(process.env.AUTOPILOT_ISOLATE_TIMEOUT_MS) || 0,
-      });
-    } else {
-      this.defaultRunner = new LocalRunner();
-    }
-  }
-
-  /**
-   * Select runner for this conversation:
-   * - If streaming is active for this conversation, use LocalRunner to preserve eventCallback streaming.
-   * - Otherwise use the default runner (IsolatedVmRunner when configured, else LocalRunner).
-   */
-  private getRunnerFor(conversationId: string): Runner {
-    try {
-      if (this.streamingService && this.streamingService.isActive(conversationId)) {
-        return new LocalRunner();
-      }
-    } catch {
-      // ignore
-    }
-    return this.defaultRunner;
+    // Choose default runner; IsolatedVmRunner resolves its own bundle path if not provided
+    this.defaultRunner = new IsolatedVmRunner({
+      memoryLimitMB: Number(process.env.AUTOPILOT_ISOLATE_MEM_MB) || 64,
+      timeoutMs: Number(process.env.AUTOPILOT_ISOLATE_TIMEOUT_MS) || 0,
+    });
   }
 
   /**

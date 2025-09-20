@@ -16,7 +16,7 @@ describe('Configuration Constants', () => {
         'MAX_EDGES',
         'DEFAULT_RETRIES',
         'RETRY_BACKOFF_MS',
-        'JSONATA_EXPRESSION_TIMEOUT_MS',
+        'EXPRESSION_TIMEOUT_MS',
         'MAX_CONDITIONAL_DEPTH',
         'MAX_NODE_VISITS',
       ];
@@ -43,8 +43,8 @@ describe('Configuration Constants', () => {
       expect(config.RETRY_BACKOFF_MS).toBe(1000);
     });
 
-    it('should have JSONata timeout configured', () => {
-      expect(config.JSONATA_EXPRESSION_TIMEOUT_MS).toBe(5000);
+    it('should have expression timeout configured', () => {
+      expect(config.EXPRESSION_TIMEOUT_MS).toBe(5000);
     });
 
     it('should have all values as numbers', () => {
@@ -99,7 +99,7 @@ describe('Configuration Constants', () => {
         'MAX_EDGES',
         'DEFAULT_RETRIES',
         'RETRY_BACKOFF_MS',
-        'JSONATA_EXPRESSION_TIMEOUT_MS',
+        'EXPRESSION_TIMEOUT_MS',
         'MAX_CONDITIONAL_DEPTH',
         'MAX_NODE_VISITS',
       ];
@@ -139,10 +139,10 @@ describe('Configuration Constants', () => {
       expect(config.RETRY_BACKOFF_MS).toBeLessThanOrEqual(5000); // But not too long
     });
 
-    it('should provide reasonable JSONata timeout', () => {
-      // JSONata should have enough time but not hang
-      expect(config.JSONATA_EXPRESSION_TIMEOUT_MS).toBeGreaterThanOrEqual(1000); // At least 1 second
-      expect(config.JSONATA_EXPRESSION_TIMEOUT_MS).toBeLessThanOrEqual(30000); // But not more than 30 seconds
+    it('should provide reasonable expression timeout', () => {
+      // Expression evaluation should have enough time but not hang
+      expect(config.EXPRESSION_TIMEOUT_MS).toBeGreaterThanOrEqual(1000); // At least 1 second
+      expect(config.EXPRESSION_TIMEOUT_MS).toBeLessThanOrEqual(30000); // But not more than 30 seconds
     });
   });
 
@@ -154,7 +154,7 @@ describe('Configuration Constants', () => {
         'USER_PROMPT_TIMEOUT',
         'AGENT_EXECUTION_TIMEOUT',
         'RETRY_BACKOFF_MS',
-        'JSONATA_EXPRESSION_TIMEOUT_MS',
+        'EXPRESSION_TIMEOUT_MS',
       ];
 
       timeoutKeys.forEach((key) => {

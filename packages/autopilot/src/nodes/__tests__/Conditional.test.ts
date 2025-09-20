@@ -444,7 +444,7 @@ describe('Conditional Node Handler', () => {
       expect(validation.errors).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            code: 'INVALID_JSONATA_EXPRESSION',
+            code: 'INVALID_EXPRESSION',
           }),
         ])
       );

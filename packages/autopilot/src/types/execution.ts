@@ -64,4 +64,4 @@ export type ExecutionErrorCode =
   | 'WORKFLOW_CANCELLED'
   | 'SYSTEM_ERROR'
   | 'VALIDATION_FAILED'
-  | 'JSONATA_ERROR';
+  | 'EXPRESSION_ERROR';

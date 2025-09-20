@@ -1,15 +1,22 @@
 /**
  * Expression Evaluation Engine
  *
- * Centralized template expression evaluation and JSONata processing system.
- * Handles {{ jsonataExpression }} syntax and provides context-aware evaluation.
+ * Centralized template expression evaluation system.
+ * Handles {{ jsExpression }} syntax and provides context-aware evaluation.
  */
 
-import jsonata from 'jsonata';
-import type { Execution, ExecutionState, ExecutionStatus, ValidationResult, ValidationError, ExecutionItem } from '@/types';
+import type {
+  Execution,
+  ExecutionState,
+  ExecutionStatus,
+  ValidationResult,
+  ValidationError,
+  ExecutionItem,
+  ValidationErrorCode,
+} from '@/types';
 
 /**
- * Evaluation context available to JSONata expressions
+ * Evaluation context available to JavaScript expressions
  */
 export interface EvalContext {
   state: ExecutionState;
@@ -18,7 +25,7 @@ export interface EvalContext {
   currentNodeRef?: string;
   input?: unknown;
 
-  // Only custom helper functions that aren't built into JSONata
+  // Only custom helper functions used within expressions
   $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
   $random: () => number; // Custom random function since JSONata's might not be available in all versions
@@ -93,26 +100,30 @@ export class Eval {
   }
 
   /**
-   * Evaluate a JSONata expression with context
+   * Evaluate a JS expression with context
+   * Note: For production, execute inside a hardened sandbox (e.g., isolated-vm).
+   * This host implementation is minimal and intended for development use only.
    */
   async evaluateExpression(expression: string, context: EvalContext, options?: EvalOptions): Promise<unknown> {
     try {
-      const jsonataExpr = jsonata(expression.trim());
+      const expr = String(expression ?? '').trim();
+      if (!expr) return undefined;
 
-      // Register custom functions with JSONata (use $-prefixed only)
-      jsonataExpr.registerFunction('$lastOutputOf', context.$lastOutputOf);
-      jsonataExpr.registerFunction('$input', context.$input);
-      jsonataExpr.registerFunction('$random', context.$random);
-      jsonataExpr.registerFunction('$exists', context.$exists);
+      // Build a tiny evaluator. Using `with(ctx)` to make context keys available as identifiers.
+      // IMPORTANT: This should run inside an isolate in production.
+      const fn = new Function('ctx', `with (ctx) { return (${expr}); }`);
 
-      // Note: JSONata timeout would need to be implemented differently if needed
-      // For now, we rely on JavaScript's natural execution timeout
-      if (options?.timeout) {
-        // Could implement Promise.race with setTimeout if timeout is critical
-        console.warn('JSONata timeout option is not currently supported');
+      const execPromise = Promise.resolve().then(() => fn(context));
+
+      if (options?.timeout && Number.isFinite(options.timeout)) {
+        const timeoutMs = Number(options.timeout);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Expression evaluation timed out')), timeoutMs)
+        );
+        return await Promise.race([execPromise, timeoutPromise]);
       }
 
-      return await jsonataExpr.evaluate(context);
+      return await execPromise;
     } catch (error) {
       // Dead simple - just log everything raw
       console.error('Expression evaluation failed:', expression, error);
@@ -156,25 +167,17 @@ export class Eval {
   }
 
   /**
-   * Validate a JSONata expression syntax
+   * Validate a JS expression syntax
    */
   validateExpression(expression: string, options?: EvalOptions): ValidationResult {
     const errors: ValidationError[] = [];
+    const expr = String(expression ?? '').trim();
 
     try {
-      // Test JSONata syntax
-      const jsonataExpr = jsonata(expression.trim());
-
-      // Register custom functions for validation (with dummy implementations, $-prefixed only)
-      jsonataExpr.registerFunction('$lastOutputOf', () => null);
-      jsonataExpr.registerFunction('$input', () => null);
-      jsonataExpr.registerFunction('$random', () => 0);
-      jsonataExpr.registerFunction('$exists', () => false);
-
-      // Additional validation checks
+      // Additional validation checks (string-level)
       if (options?.forbiddenFunctions) {
         for (const forbiddenFunc of options.forbiddenFunctions) {
-          if (expression.includes(forbiddenFunc)) {
+          if (expr.includes(forbiddenFunc)) {
             errors.push({
               code: 'FORBIDDEN_FUNCTION',
               message: `Forbidden function "${forbiddenFunc}" used in expression`,
@@ -185,20 +188,24 @@ export class Eval {
 
       if (options?.allowedContextKeys) {
         // Basic check for context key usage
-        const usesDisallowedKey = options.allowedContextKeys.every((key) => !expression.includes(key));
-        if (usesDisallowedKey) {
+        const usesAllowed = options.allowedContextKeys.some((key) => expr.includes(key));
+        if (!usesAllowed) {
           errors.push({
             code: 'INVALID_CONTEXT_ACCESS',
             message: 'Expression uses disallowed context keys',
           });
         }
       }
+
+      // Compile-time syntax check (no execution)
+      // new Function throws on syntax errors
+      new Function('ctx', `with (ctx) { return (${expr}); }`);
     } catch (error) {
       // Dead simple - just log everything raw
-      console.error('JSONata validation failed:', expression, error);
+      console.error('Expression validation failed:', expression, error);
       errors.push({
-        code: 'INVALID_JSONATA_EXPRESSION',
-        message: `Invalid JSONata expression: ${error instanceof Error ? error.message : String(error)}`,
+        code: 'INVALID_EXPRESSION' as ValidationErrorCode,
+        message: `Invalid expression: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
 

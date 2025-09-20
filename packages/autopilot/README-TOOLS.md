@@ -57,27 +57,11 @@ const agent = new Agent({
 const result = await agent.execute('What is 25 * 4 + 17?');
 ```
 
-### 3. Built-in Tools
+### 3. Tool Execution
 
-The system includes several built-in tools:
-
-#### Calculator
-
-- **Name**: `calculator`
-- **Purpose**: Mathematical calculations
-- **Parameters**: `expression` (string)
-
-#### Current Time
-
-- **Name**: `get_current_time`
-- **Purpose**: Get current date/time
-- **Parameters**: `timezone` (optional), `format` (optional)
-
-#### Echo
-
-- **Name**: `echo`
-- **Purpose**: Testing and debugging
-- **Parameters**: `message` (string), `metadata` (optional object)
+- Tools must include a `blueprint` in `ToolParams`.
+- The Tool node executes that blueprint using a fresh Engine + Execution (same pattern as the Workflow node).
+- Pass any runtime configuration as regular tool arguments; they will be available as initial input (`$json`) to the tool blueprint.
 
 ## Architecture Details
 

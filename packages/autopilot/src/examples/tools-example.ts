@@ -26,6 +26,14 @@ const calculatorTool: ToolParams = {
     },
     required: ['expression'],
   },
+  blueprint: {
+    nodes: [
+      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+    ],
+    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    metadata: {},
+  },
 };
 
 const timeTool: ToolParams = {
@@ -47,6 +55,14 @@ const timeTool: ToolParams = {
     },
     required: [],
   },
+  blueprint: {
+    nodes: [
+      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+    ],
+    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    metadata: {},
+  },
 };
 
 const echoTool: ToolParams = {
@@ -66,6 +82,14 @@ const echoTool: ToolParams = {
       },
     },
     required: ['message'],
+  },
+  blueprint: {
+    nodes: [
+      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+    ],
+    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    metadata: {},
   },
 };
 
@@ -148,7 +172,7 @@ export async function customToolExample() {
 
   // Example of how you could extend the Tool class for custom tools
   const customTool: ToolParams = {
-    name: 'echo', // Using built-in echo for demonstration
+    name: 'echo',
     description: 'Process user data with custom logic',
     parameters: {
       type: 'object',
@@ -164,6 +188,14 @@ export async function customToolExample() {
         },
       },
       required: ['action', 'text'],
+    },
+    blueprint: {
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+        { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+      ],
+      edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+      metadata: {},
     },
   };
 

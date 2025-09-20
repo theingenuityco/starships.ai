@@ -1,6 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { Agent, AutopilotEvent, ExecutionItemUtils } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, LocalRunner, IsolatedVmRunner } from '@starships/autopilot';
+import type { Runner, EngineConfig } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -17,11 +18,40 @@ export class ConversationService {
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
+  // Default runner for non-streaming paths (isolated-vm when configured, else local)
+  private defaultRunner: Runner;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
+    // Choose default runner for non-streaming paths
+    const bundlePath = process.env.AUTOPILOT_BUNDLE_PATH;
+    if (bundlePath) {
+      this.defaultRunner = new IsolatedVmRunner({
+        bundlePath,
+        memoryLimitMB: Number(process.env.AUTOPILOT_ISOLATE_MEM_MB) || 64,
+        timeoutMs: Number(process.env.AUTOPILOT_ISOLATE_TIMEOUT_MS) || 0,
+      });
+    } else {
+      this.defaultRunner = new LocalRunner();
+    }
+  }
+
+  /**
+   * Select runner for this conversation:
+   * - If streaming is active for this conversation, use LocalRunner to preserve eventCallback streaming.
+   * - Otherwise use the default runner (IsolatedVmRunner when configured, else LocalRunner).
+   */
+  private getRunnerFor(conversationId: string): Runner {
+    try {
+      if (this.streamingService && this.streamingService.isActive(conversationId)) {
+        return new LocalRunner();
+      }
+    } catch {
+      // ignore
+    }
+    return this.defaultRunner;
   }
 
   /**
@@ -150,10 +180,16 @@ export class ConversationService {
     const messages = await this.getConversationMessages(data.conversationId);
 
     try {
-      // Create agent instance with enhanced options
-      const agent = new Agent(agentModel, {
+      // Prepare runner and engine config
+      const runner = this.getRunnerFor(data.conversationId);
+      const engineConfig: EngineConfig = {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
-      });
+        failOnNodeError: true,
+      };
+
+      // Build Agent to materialize blueprint (tools, nodes, etc.)
+      const agent = new Agent(agentModel);
+
       // Convert database messages to LLM format, preserving tool_calls and tool results
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
@@ -162,11 +198,33 @@ export class ConversationService {
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
 
-      // Create input execution item with the conversation messages
-      // The LLM node will use this as fallback when state.messages is empty
-      const input = llmMessages.length > 0 ? ExecutionItemUtils.wrapSingle(llmMessages) : undefined;
-      // Execute agent with conversation messages
-      await agent.execute(input);
+      // Create execution with ordered messages in state (system -> memory -> conversation)
+      const execution = ExecutionItemUtils.createExecution();
+      const orderedMessages: Array<{
+        role: 'user' | 'assistant' | 'system' | 'tool';
+        content: string;
+        tool_calls?: any;
+        tool_call_id?: string;
+      }> = [];
+
+      const memory = (agentModel as any).memoryState;
+      if (memory?.systemPrompt) {
+        orderedMessages.push({ role: 'system', content: memory.systemPrompt });
+      }
+      if (Array.isArray(memory?.messages) && memory!.messages.length > 0) {
+        orderedMessages.push(...(memory!.messages as any));
+      }
+      if (llmMessages.length > 0) {
+        orderedMessages.push(...(llmMessages as any));
+      }
+
+      // Commit ordered messages and tools to execution state
+      (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
+      (execution.state as Record<string, unknown>)['tools'] = (agentModel as any).tools || [];
+
+      // Execute blueprint via runner
+      const blueprint = agent.getCurrentBlueprint();
+      await runner.run(blueprint, execution, engineConfig);
 
       // Send completion event
       if (this.streamingService) {

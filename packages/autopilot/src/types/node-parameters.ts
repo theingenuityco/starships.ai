@@ -89,6 +89,7 @@ export interface ToolParams extends BaseParams {
     properties: Record<string, ToolParameterSchema>;
     required?: string[];
   };
+  blueprint?: Blueprint; // Optional: when provided, Tool executes this nested workflow
   // Tool-specific execution parameters can be added here
 }
 

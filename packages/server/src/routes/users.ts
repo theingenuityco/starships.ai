@@ -26,11 +26,6 @@ const PaginationSchema = z.object({
 });
 
 const CreateUserSchema = z.object({
-  username: z
-    .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens'),
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
   avatar: z.string().url().max(500).optional(),
@@ -41,12 +36,6 @@ const CreateUserSchema = z.object({
 });
 
 const UpdateUserSchema = z.object({
-  username: z
-    .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
-    .optional(),
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
   avatar: z.string().url().max(500).optional(),
@@ -57,12 +46,6 @@ const UpdateUserSchema = z.object({
 });
 
 const UpdateUserProfileSchema = z.object({
-  username: z
-    .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
-    .optional(),
   email: z.string().email().max(255).optional(),
   displayName: z.string().min(1).max(100).optional(),
   avatar: z.string().url().max(500).optional(),
@@ -73,12 +56,6 @@ const UpdateUserProfileSchema = z.object({
 const CreateUserWithPasswordSchema = z.object({
   email: z.string().email().max(255),
   password: z.string().min(6).max(255),
-  username: z
-    .string()
-    .min(1)
-    .max(50)
-    .regex(/^[a-zA-Z0-9_-]+$/, 'Username can only contain letters, numbers, underscores, and hyphens')
-    .optional(),
   displayName: z.string().min(1).max(100).optional(),
   name: z.string().min(1).max(100).optional(), // Legacy support
 });
@@ -173,38 +150,6 @@ router.get('/users/email/:email', jwtAuthMiddleware, async (req: Request, res: R
     sendSuccess(res, user);
   } catch (error) {
     handleError(error, res, 'fetching user by email');
-  }
-});
-
-// GET /users/username/:username - Get user by username (OpenAPI pattern)
-router.get('/users/username/:username', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    if (!checkAuth(req, res)) return;
-
-    const { username } = req.params;
-
-    if (!username || username.length < 1) {
-      sendError(res, 'VALIDATION_ERROR', 'Username is required', 400, {
-        field: 'username',
-        provided: username,
-      });
-      return;
-    }
-
-    const userService = new UserService();
-    const user = await userService.getUserByUsername(username);
-
-    if (!user) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, {
-        resource: 'user',
-        username: username,
-      });
-      return;
-    }
-
-    sendSuccess(res, user);
-  } catch (error) {
-    handleError(error, res, 'fetching user by username');
   }
 });
 

@@ -209,8 +209,8 @@ describe('Serialization Helper', () => {
 
     it('should work with real entities', () => {
       const userRecords = [
-        { id: 'user-1', username: 'user1', createdAt: '2024-01-01T00:00:00.000Z' },
-        { id: 'user-2', username: 'user2', createdAt: '2024-01-01T00:00:00.000Z' },
+        { id: 'user-1', email: 'user1@example.com', createdAt: '2024-01-01T00:00:00.000Z' },
+        { id: 'user-2', email: 'user2@example.com', createdAt: '2024-01-01T00:00:00.000Z' },
       ];
 
       const users = fromDatabaseArray(UserEntity, userRecords);
@@ -218,8 +218,8 @@ describe('Serialization Helper', () => {
       expect(users).toHaveLength(2);
       expect(users[0]).toBeInstanceOf(UserEntity);
       expect(users[1]).toBeInstanceOf(UserEntity);
-      expect(users[0].username).toBe('user1');
-      expect(users[1].username).toBe('user2');
+      expect(users[0].email).toBe('user1@example.com');
+      expect(users[1].email).toBe('user2@example.com');
     });
   });
 

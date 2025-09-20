@@ -29,7 +29,6 @@ const mockDriver = {
 // Mock user data
 (global as Record<string, unknown>).createMockUser = (overrides: Record<string, unknown> = {}) => ({
   id: 'user-123',
-  username: 'testuser',
   email: 'test@example.com',
   displayName: 'Test User',
   createdAt: '2024-01-01T00:00:00.000Z',

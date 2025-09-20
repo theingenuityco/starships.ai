@@ -298,7 +298,6 @@ export function useAuth() {
     if (!user) return null
     return {
       id: user.id,
-      username: user.name || user.email.split('@')[0],
       email: user.email,
       displayName: user.name,
       avatar: user.avatar,

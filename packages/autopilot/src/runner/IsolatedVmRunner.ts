@@ -153,6 +153,8 @@ export class IsolatedVmRunner implements Runner {
           };
         }
 
+        // structuredClone polyfill is provided by the bundled entry (core-js-pure) before engine evaluation.
+
         // Evaluate the provided bundle which must register globalThis.__autopilot_run_engine__
         ${source}
         if (typeof globalThis.__autopilot_run_engine__ !== 'function') {

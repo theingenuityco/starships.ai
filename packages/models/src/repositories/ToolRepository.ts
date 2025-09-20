@@ -1,0 +1,238 @@
+import { ToolEntity } from '@/entities/ToolEntity';
+import { Neo4jConnection } from '@/helpers/database';
+import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
+import { BaseRepository } from '@/repositories/BaseRepository';
+import type { ToolModel, CreateToolRequest, UpdateToolRequest, ToolSearchParams } from '@starships/protocol';
+
+export class ToolRepository extends BaseRepository {
+  constructor(connection?: Neo4jConnection) {
+    super('ToolRepository', connection);
+  }
+
+  async findAll(): Promise<ToolModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ t: ToolModel }>('MATCH (t:Tool) RETURN t ORDER BY t.createdAt DESC');
+        return fromDatabaseArray(
+          ToolEntity,
+          result.map((record) => record.t)
+        );
+      },
+      'findAll',
+      'Tool'
+    );
+  }
+
+  async findById(id: string): Promise<ToolModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ t: ToolModel }>('MATCH (t:Tool) WHERE t.id = $id RETURN t', { id });
+        const tool = result[0]?.t || null;
+        return tool ? fromDatabase(ToolEntity, tool) : null;
+      },
+      'findById',
+      'Tool',
+      id
+    );
+  }
+
+  async findByStarship(starshipId: string): Promise<ToolModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeQuery<{ t: ToolModel }>(
+          'MATCH (t:Tool)-[:DEPLOYED_ON]->(s:Starship) WHERE s.id = $starshipId RETURN t ORDER BY t.createdAt DESC',
+          { starshipId }
+        );
+        return result && result.length > 0
+          ? fromDatabaseArray(
+              ToolEntity,
+              result.map((record) => record.t)
+            )
+          : [];
+      },
+      'findByStarship',
+      'Tool'
+    );
+  }
+
+  async search(params: ToolSearchParams): Promise<ToolModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        let query = 'MATCH (t:Tool)';
+        const whereConditions: string[] = [];
+        const queryParams: Record<string, unknown> = {};
+
+        if (params.isEnabled !== undefined) {
+          whereConditions.push('t.isEnabled = $isEnabled');
+          queryParams.isEnabled = params.isEnabled;
+        }
+
+        if (params.query) {
+          whereConditions.push('(t.name CONTAINS $query OR t.description CONTAINS $query)');
+          queryParams.query = params.query;
+        }
+
+        if (whereConditions.length > 0) {
+          query += ' WHERE ' + whereConditions.join(' AND ');
+        }
+
+        query += ' RETURN t ORDER BY t.createdAt DESC';
+
+        const result = await connection.executeQuery<{ t: ToolModel }>(query, queryParams);
+        return result && result.length > 0
+          ? fromDatabaseArray(
+              ToolEntity,
+              result.map((record) => record.t)
+            )
+          : [];
+      },
+      'search',
+      'Tool'
+    );
+  }
+
+  async create(data: CreateToolRequest, starshipId: string): Promise<ToolModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        // Validate using entity
+        await ToolEntity.validate(data, 'create');
+
+        const now = new Date().toISOString();
+
+        // Create tool properties without ID (Neo4j will generate it)
+        const toolProps = {
+          // Core ToolParams fields
+          name: data.name,
+          description: data.description,
+          parameters: data.parameters,
+
+          // Tool instance fields
+          configuration: data.configuration,
+          isEnabled: data.isEnabled ?? true,
+
+          // Database-specific fields
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        // Create entity instance from plain object, then serialize
+        const toolEntity = toEntityInstance(ToolEntity, toolProps);
+        const tool = await this.createEntityWithAutoId<ToolModel>('Tool', toDatabase(toolEntity));
+
+        // Create relationship to starship
+        const connection = this.getConnection();
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (t:Tool {id: $toolId})
+           CREATE (t)-[:DEPLOYED_ON { key: $key }]->(s)`,
+          {
+            starshipId: starshipId,
+            toolId: tool.id,
+            key: `${tool.id}_${starshipId}`,
+          }
+        );
+
+        return fromDatabase(ToolEntity, tool);
+      },
+      'create',
+      'Tool'
+    );
+  }
+
+  async update(id: string, updates: UpdateToolRequest): Promise<ToolModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const updateProps = {
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
+
+        const result = await connection.executeWrite<{ t: ToolModel }>('MATCH (t:Tool) WHERE t.id = $id SET t += $updates RETURN t', {
+          id,
+          updates: toDatabase(toEntityInstance(ToolEntity, updateProps)),
+        });
+
+        const tool = result[0]?.t || null;
+        return tool ? fromDatabase(ToolEntity, tool) : null;
+      },
+      'update',
+      'Tool',
+      id
+    );
+  }
+
+  async updateStarship(toolId: string, starshipId: string): Promise<ToolModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        // Validate starshipId exists
+        const starshipCheck = await connection.executeQuery('MATCH (s:Starship) WHERE s.id = $starshipId RETURN count(s) as count', {
+          starshipId,
+        });
+
+        if (!starshipCheck[0] || starshipCheck[0].count === 0) {
+          this.handleNotFound('Starship', starshipId);
+        }
+
+        // Remove existing DEPLOYED_ON relationships
+        await connection.executeWrite('MATCH (t:Tool {id: $toolId})-[r:DEPLOYED_ON]->() DELETE r', { toolId });
+
+        // Create new DEPLOYED_ON relationship
+        await connection.executeWrite(
+          `MATCH (s:Starship {id: $starshipId}), (t:Tool {id: $toolId})
+           CREATE (t)-[:DEPLOYED_ON {
+             deployedAt: $timestamp,
+             isActive: true
+           }]->(s)`,
+          {
+            starshipId,
+            toolId,
+            timestamp: new Date().toISOString(),
+          }
+        );
+
+        // Update updatedAt
+        const result = await connection.executeWrite<{ t: ToolModel }>(
+          `MATCH (t:Tool) WHERE t.id = $toolId
+           SET t.updatedAt = $timestamp
+           RETURN t`,
+          {
+            toolId,
+            timestamp: new Date().toISOString(),
+          }
+        );
+
+        if (!result[0].t) {
+          this.handleNotFound('Tool', toolId);
+        }
+
+        return fromDatabase(ToolEntity, result[0].t);
+      },
+      'updateStarship',
+      'Tool',
+      toolId
+    );
+  }
+
+  async delete(id: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.executeWrite<{ deletedCount: number }>(
+          'MATCH (t:Tool) WHERE t.id = $id DETACH DELETE t RETURN count(t) as deletedCount',
+          { id }
+        );
+
+        return result[0]?.deletedCount > 0;
+      },
+      'delete',
+      'Tool',
+      id
+    );
+  }
+}

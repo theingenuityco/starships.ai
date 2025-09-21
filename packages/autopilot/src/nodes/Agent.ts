@@ -215,51 +215,6 @@ export class Agent implements NodeHandler {
    * Uses the configured runner to execute the agent's blueprint
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    // Create execution context for the agent's blueprint
-    const execution = ExecutionItemUtils.createExecution(input);
-
-    // Initialize messages in the required order:
-    // 1) systemMessage from this.params.memoryState
-    // 2) messages from this.params.memoryState
-    // 3) message(s) from execute args
-    const orderedMessages: LlmMessage[] = [];
-
-    const memory = this.params.memoryState;
-    if (memory?.systemPrompt) {
-      orderedMessages.push({ role: 'system', content: memory.systemPrompt });
-    }
-    if (memory?.messages?.length) {
-      orderedMessages.push(...memory.messages);
-    }
-
-    // Type guard to detect LlmMessage[]
-    const isLlmMessageArray = (val: unknown): val is LlmMessage[] => {
-      return (
-        Array.isArray(val) &&
-        val.every((m) => {
-          if (typeof m !== 'object' || m === null) return false;
-          const obj = m as Record<string, unknown>;
-          return typeof obj.role === 'string' && typeof obj.content === 'string';
-        })
-      );
-    };
-
-    if (input && input.length > 0) {
-      const inputData = ExecutionItemUtils.unwrapSingle(input);
-      // If input contains an array of LlmMessage, append them; otherwise create a user message from the input
-      if (isLlmMessageArray(inputData)) {
-        orderedMessages.push(...inputData);
-      } else {
-        const content = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
-        orderedMessages.push({ role: 'user', content });
-      }
-    }
-
-    // Commit ordered messages to execution state
-    (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
-    // Provide tool definitions (with blueprints) to execution state for Tool node resolution
-    (execution.state as Record<string, unknown>)['tools'] = this.params.tools || [];
-
     try {
       // Create execution with ordered messages in state (system -> memory -> conversation)
       const execution = ExecutionItemUtils.createExecution();

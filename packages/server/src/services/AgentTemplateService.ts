@@ -63,29 +63,53 @@ export class AgentTemplateService {
     }
 
     // Deploy assigned tool templates to the starship as tool instances
+    const deployedToolIds: string[] = [];
+
+    console.log(`[AGENT-TEMPLATE-SERVICE] Template assignedToolSlugs:`, template.assignedToolSlugs);
+
     if (template.assignedToolSlugs && template.assignedToolSlugs.length > 0) {
       console.log(`[AGENT-TEMPLATE-SERVICE] Deploying ${template.assignedToolSlugs.length} tools to starship ${starshipId}`);
 
       for (const toolSlug of template.assignedToolSlugs) {
         try {
           // Check if tool is already deployed to this starship
-          const existingTool = await this.toolRepository.findBySlugAndStarship(toolSlug, starshipId);
+          let existingTool = await this.toolRepository.findBySlugAndStarship(toolSlug, starshipId);
           if (!existingTool) {
             // Deploy tool from template
-            await this.toolRepository.createFromTemplate(toolSlug, starshipId);
+            existingTool = await this.toolRepository.createFromTemplate(toolSlug, starshipId);
             console.log(`[AGENT-TEMPLATE-SERVICE] Deployed tool '${toolSlug}' to starship ${starshipId}`);
           } else {
             console.log(`[AGENT-TEMPLATE-SERVICE] Tool '${toolSlug}' already deployed to starship ${starshipId}`);
+          }
+
+          // Track deployed tool ID for relationship creation
+          if (existingTool) {
+            deployedToolIds.push(existingTool.id);
+            console.log(`[AGENT-TEMPLATE-SERVICE] Added tool ${existingTool.id} to deployment list`);
           }
         } catch (error) {
           console.error(`[AGENT-TEMPLATE-SERVICE] Failed to deploy tool '${toolSlug}':`, error);
           // Continue with other tools instead of failing completely
         }
       }
+    } else {
+      console.log(`[AGENT-TEMPLATE-SERVICE] No assignedToolSlugs found in template for ${templateId}`);
     }
 
     // Create the agent from template using the proper method that establishes CREATED_FROM relationship
     const agent = await this.agentRepository.createFromTemplate(templateId, starshipId);
+
+    // Establish Agent→Tool relationships with deployed tool instances
+    if (deployedToolIds.length > 0) {
+      console.log(`[AGENT-TEMPLATE-SERVICE] Establishing relationships between agent ${agent.id} and ${deployedToolIds.length} tools`);
+      for (const toolId of deployedToolIds) {
+        try {
+          await this.agentRepository.addToolRelationship(agent.id, toolId);
+        } catch (error) {
+          console.error(`[AGENT-TEMPLATE-SERVICE] Failed to create agent-tool relationship:`, error);
+        }
+      }
+    }
 
     return agent;
   }

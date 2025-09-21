@@ -360,6 +360,9 @@ export class ToolRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
+
+        // Clean up all relationships including Agent-[:USES_TOOL]->Tool relationships
+        // DETACH DELETE will automatically remove all relationships
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (t:Tool) WHERE t.id = $id DETACH DELETE t RETURN count(t) as deletedCount',
           { id }

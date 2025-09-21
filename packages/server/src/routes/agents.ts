@@ -332,18 +332,25 @@ router.put('/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Res
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
-    // Validate request body
-    const bodyValidation = validateData(ToolAssignmentSchema, req.body, res, 'tool assignment data');
+    // Validate request body with starshipId
+    const bodyValidation = validateData(
+      ToolAssignmentSchema.extend({
+        starshipId: IdSchema,
+      }),
+      req.body,
+      res,
+      'tool assignment data'
+    );
     if (!bodyValidation) return;
 
     const { id: agentId } = paramValidation;
-    const { toolSlugs } = bodyValidation;
+    const { toolSlugs, starshipId } = bodyValidation;
 
-    console.log(`[AGENTS] Assigning ${toolSlugs.length} tools to agent ${agentId}: ${toolSlugs.join(', ')}`);
+    console.log(`[AGENTS] Assigning ${toolSlugs.length} tools to agent ${agentId} on starship ${starshipId}: ${toolSlugs.join(', ')}`);
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const agent = await agentService.assignToolSlugs(agentId, toolSlugs);
+    const agent = await agentService.assignToolSlugs(agentId, toolSlugs, starshipId);
 
     sendSuccess(res, {
       message: 'Tools assigned to agent successfully',
@@ -370,13 +377,25 @@ router.post('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Reques
     );
     if (!paramValidation) return;
 
-    const { id: agentId, toolSlug } = paramValidation;
+    // Validate request body for starshipId
+    const bodyValidation = validateData(
+      z.object({
+        starshipId: IdSchema,
+      }),
+      req.body,
+      res,
+      'starship data'
+    );
+    if (!bodyValidation) return;
 
-    console.log(`[AGENTS] Adding tool ${toolSlug} to agent ${agentId}`);
+    const { id: agentId, toolSlug } = paramValidation;
+    const { starshipId } = bodyValidation;
+
+    console.log(`[AGENTS] Adding tool ${toolSlug} to agent ${agentId} on starship ${starshipId}`);
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const agent = await agentService.addToolSlug(agentId, toolSlug);
+    const agent = await agentService.addToolSlug(agentId, toolSlug, starshipId);
 
     sendSuccess(res, {
       message: `Tool ${toolSlug} assigned to agent successfully`,
@@ -403,13 +422,25 @@ router.delete('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Requ
     );
     if (!paramValidation) return;
 
-    const { id: agentId, toolSlug } = paramValidation;
+    // Validate query parameters for starshipId
+    const queryValidation = validateData(
+      z.object({
+        starshipId: IdSchema,
+      }),
+      req.query,
+      res,
+      'query parameters'
+    );
+    if (!queryValidation) return;
 
-    console.log(`[AGENTS] Removing tool ${toolSlug} from agent ${agentId}`);
+    const { id: agentId, toolSlug } = paramValidation;
+    const { starshipId } = queryValidation;
+
+    console.log(`[AGENTS] Removing tool ${toolSlug} from agent ${agentId} on starship ${starshipId}`);
 
     // Delegate to service layer
     const agentService = new AgentService();
-    const agent = await agentService.removeToolSlug(agentId, toolSlug);
+    const agent = await agentService.removeToolSlug(agentId, toolSlug, starshipId);
 
     sendSuccess(res, {
       message: `Tool ${toolSlug} removed from agent successfully`,

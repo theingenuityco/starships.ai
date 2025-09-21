@@ -1,6 +1,7 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { ToolEntity } from '@/entities/ToolEntity';
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
+import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
 import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
@@ -118,8 +119,15 @@ export class AgentRepository extends BaseRepository {
   async create(data: CreateAgentRequest, starshipId: string): Promise<AgentModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Validate using data
-        await AgentEntity.validate(data, 'create');
+        // Extract assignedToolSlugs for relationship creation
+        const toolSlugsForRelationships = data.assignedToolSlugs || [];
+
+        // Remove assignedToolSlugs from data before validation since AgentEntity doesn't have this field
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { assignedToolSlugs: _, ...dataWithoutToolSlugs } = data;
+
+        // Validate using cleaned data
+        await AgentEntity.validate(dataWithoutToolSlugs, 'create');
 
         const now = new Date().toISOString();
 
@@ -156,8 +164,9 @@ export class AgentRepository extends BaseRepository {
         );
 
         // Create tool relationships if assignedToolSlugs provided
-        if (data.assignedToolSlugs && data.assignedToolSlugs.length > 0) {
-          await this.assignToolsToAgent(agent.id, data.assignedToolSlugs, starshipId);
+        if (toolSlugsForRelationships.length > 0) {
+          console.log(`[AGENT-REPOSITORY] Creating relationships for ${toolSlugsForRelationships.length} tools for agent ${agent.id}`);
+          await this.assignToolsToAgent(agent.id, toolSlugsForRelationships, starshipId);
         }
 
         return fromDatabase(AgentEntity, agent);
@@ -194,6 +203,9 @@ export class AgentRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
+
+        // Clean up relationships first, then delete the agent
+        // DETACH DELETE will automatically remove all relationships
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (a:Agent) WHERE a.id = $id DETACH DELETE a RETURN count(a) as deletedCount',
           { id }
@@ -270,20 +282,27 @@ export class AgentRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
 
-        // Find the template
-        const templateResult = await connection.executeQuery<{ at: AgentTemplateModel }>(
-          'MATCH (at:AgentTemplate) WHERE at.id = $templateId RETURN at',
-          { templateId }
-        );
+        // Use AgentTemplateRepository to get template with relationships populated
+        const templateRepository = new AgentTemplateRepository(connection);
+        const template = await templateRepository.findById(templateId);
 
-        if (!templateResult[0]?.at) {
+        if (!template) {
           this.handleNotFound('AgentTemplate', templateId);
         }
 
-        const template = fromDatabase(AgentTemplateEntity, templateResult[0].at);
+        console.log(`[AGENT-REPOSITORY] Template loaded:`, {
+          id: template.id,
+          name: template.name,
+          assignedToolSlugs: template.assignedToolSlugs,
+        });
 
-        // Create agent from template with optional customizations
-        const agentData: CreateAgentRequest = {
+        // Get tool slugs for relationship creation but don't include in agent data
+        const toolSlugsForRelationships = customizations?.assignedToolSlugs || template.assignedToolSlugs || [];
+
+        console.log(`[AGENT-REPOSITORY] Tool slugs for relationships:`, toolSlugsForRelationships);
+
+        // Create agent from template with optional customizations (without assignedToolSlugs)
+        const agentData = {
           name: customizations?.name || template.name,
           description: customizations?.description || template.description,
           model: customizations?.model || template.model,
@@ -292,7 +311,6 @@ export class AgentRepository extends BaseRepository {
           timeout: customizations?.timeout ?? template.timeout,
           memoryState: customizations?.memoryState || template.memoryState,
           blueprint: customizations?.blueprint || template.blueprint,
-          assignedToolSlugs: customizations?.assignedToolSlugs || template.assignedToolSlugs || [],
         };
 
         const agent = await this.create(agentData, starshipId);
@@ -307,6 +325,16 @@ export class AgentRepository extends BaseRepository {
             createdAt: new Date().toISOString(),
           }
         );
+
+        // Create tool relationships if tool slugs were specified
+        if (toolSlugsForRelationships.length > 0) {
+          console.log(
+            `[AGENT-REPOSITORY] Creating tool relationships for agent ${agent.id} with ${toolSlugsForRelationships.length} tools`
+          );
+          await this.assignToolsToAgent(agent.id, toolSlugsForRelationships, starshipId);
+        } else {
+          console.log(`[AGENT-REPOSITORY] No tool slugs to create relationships for agent ${agent.id}`);
+        }
 
         // Increment template usage count
         await connection.executeWrite('MATCH (at:AgentTemplate) WHERE at.id = $templateId SET at.usageCount = at.usageCount + 1', {

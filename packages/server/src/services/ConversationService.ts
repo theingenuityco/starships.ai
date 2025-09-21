@@ -1,7 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { ToolParams, ExecutionItem } from '@starships/autopilot';
+import type { ToolParams, ExecutionItem, AgentParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -217,9 +217,12 @@ export class ConversationService {
       console.log('>>>Resolved tools', { resolvedTools });
 
       // Build Agent to materialize blueprint (tools, nodes, etc.)
-      const agentWithTools = {
+      const agentWithTools: AgentParams = {
         ...agentModel,
-        tools: resolvedTools,
+        state: {
+          ...agentModel.state,
+          tools: resolvedTools,
+        },
       };
 
       // Create Agent with ChildProcessRunner for isolation

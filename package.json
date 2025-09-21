@@ -65,7 +65,6 @@
       "bcrypt",
       "cpu-features",
       "esbuild",
-      "isolated-vm",
       "protobufjs",
       "sharp",
       "ssh2",

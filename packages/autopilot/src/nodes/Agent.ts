@@ -110,16 +110,18 @@ export class Agent implements NodeHandler {
             condition: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== undefined && $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== null }}`,
           },
         },
-        // Tool execution node
+        // Tool execution node - receives the complete tool definition via template resolution
         {
           ref: toolNodeRef,
           type: 'tool' as const,
           name: 'Execute Tool',
           description: 'Execute tool and add result to conversation',
           parameters: {
-            name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
-            description: 'State-driven tool execution',
-            parameters: { type: 'object', properties: {}, required: [] },
+            // Resolve tool definition from state using the tool name from LLM response
+            name: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).name }}`,
+            description: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).description }}`,
+            parameters: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).parameters }}`,
+            blueprint: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).blueprint }}`,
             mutations: [
               {
                 operation: 'add' as const,

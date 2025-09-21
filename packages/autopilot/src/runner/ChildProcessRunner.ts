@@ -187,6 +187,9 @@ export class ChildProcessRunner implements Runner {
         openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined,
       };
 
+      // Signal parent is ready to receive events (prevents race condition)
+      child.send({ type: 'parent_ready' });
+
       // Kick off work
       child.send({
         type: 'start',

@@ -14,16 +14,50 @@
  *   { type: 'error', error: { message, stack } }
  */
 
+// Event buffering to prevent race conditions with early events
+let isParentReady = false;
+let eventBuffer = [];
+
 function safeSend(msg) {
   try {
-    if (process.send) process.send(msg);
+    if (process.send) {
+      // Buffer events until parent is ready, except for critical messages
+      if (!isParentReady && msg.type === 'event') {
+        eventBuffer.push(msg);
+        return;
+      }
+      process.send(msg);
+    }
   } catch (e) {
     // ignore send errors (parent may have exited)
   }
 }
 
+function flushEventBuffer() {
+  if (eventBuffer.length > 0) {
+    // Send all buffered events
+    eventBuffer.forEach((bufferedEvent) => {
+      try {
+        if (process.send) process.send(bufferedEvent);
+      } catch (e) {
+        // ignore send errors
+      }
+    });
+    eventBuffer = [];
+  }
+}
+
 process.on('message', async (msg) => {
-  if (!msg || typeof msg !== 'object' || msg.type !== 'start') return;
+  if (!msg || typeof msg !== 'object') return;
+
+  // Handle parent ready signal
+  if (msg.type === 'parent_ready') {
+    isParentReady = true;
+    flushEventBuffer();
+    return;
+  }
+
+  if (msg.type !== 'start') return;
   const payload = msg.payload || {};
   const blueprint = payload.blueprint;
   const execution = payload.execution;

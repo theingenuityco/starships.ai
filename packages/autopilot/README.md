@@ -385,8 +385,7 @@ export type {
   ConditionalResult,
   TransformOperation,
   AgentParams,
-  AgentMemoryState,
-  MemoryState,
+  AgentState,
   ValidationResult,
   NodeParameters,
 } from '@starships/autopilot';

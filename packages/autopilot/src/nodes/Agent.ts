@@ -6,7 +6,7 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmMessage } from '@/types';
+import { AgentParams, AgentState, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmMessage } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
@@ -19,6 +19,7 @@ export class Agent implements NodeHandler {
   private options?: NodeHandlerOptions;
   private nodeCounter: number = 1;
   private runner: Runner;
+  private state: AgentState;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
@@ -26,6 +27,12 @@ export class Agent implements NodeHandler {
 
     // Create options
     this.options = options;
+
+    // Initialize state from params.state first
+    this.state = {
+      messages: params.state?.messages || [],
+      tools: params.state?.tools || [],
+    };
 
     // Initialize runner - defaults to LocalRunner for nested execution safety
     // ConversationService or other top-level callers can provide a ChildProcessRunner via options
@@ -168,13 +175,14 @@ export class Agent implements NodeHandler {
       const execution = ExecutionItemUtils.createExecution();
       const orderedMessages: LlmMessage[] = [];
 
-      // Always add memory state first (system prompt and memory messages)
-      const memory = this.params.memoryState;
-      if (memory?.systemPrompt) {
-        orderedMessages.push({ role: 'system', content: memory.systemPrompt });
+      // Add system prompt from params root first
+      if (this.params.systemPrompt) {
+        orderedMessages.push({ role: 'system', content: this.params.systemPrompt });
       }
-      if (memory?.messages?.length) {
-        orderedMessages.push(...memory.messages);
+
+      // Add state messages
+      if (this.state.messages?.length) {
+        orderedMessages.push(...this.state.messages);
       }
 
       // Type guard to detect LlmMessage[]
@@ -201,7 +209,7 @@ export class Agent implements NodeHandler {
       // Commit ordered messages to execution state
       (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
       // Store tools in state so LLM nodes can reference them via {{ state.tools }}
-      (execution.state as Record<string, unknown>)['tools'] = this.params.tools || [];
+      (execution.state as Record<string, unknown>)['tools'] = this.state.tools || [];
 
       // Prepare engine config with event callback
       const engineConfig: EngineConfig = {

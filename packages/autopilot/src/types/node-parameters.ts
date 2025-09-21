@@ -5,8 +5,8 @@
  * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
+import type { LlmMessage } from '@/types';
 
 /**
  * Transform operation for state mutations using JSON Patch-like operations
@@ -129,6 +129,14 @@ export interface WorkflowParams extends BaseParams {
 }
 
 /**
+ * Agent state containing runtime data (messages and tools)
+ */
+export interface AgentState {
+  messages?: LlmMessage[]; // Message history
+  tools?: ToolParams[]; // Available tools
+}
+
+/**
  * Agent-specific node parameters
  * Contains full agent configuration for workflow execution
  */
@@ -145,14 +153,14 @@ export interface AgentParams extends BaseParams {
   // Execution parameters
   timeout?: number;
 
-  // Memory system (optional - Agent will create default if not provided)
-  memoryState?: AgentMemoryState;
+  // System prompt (configuration - set once)
+  systemPrompt?: string;
+
+  // Runtime state (optional - Agent will create default if not provided)
+  state?: AgentState;
 
   // Blueprint execution (optional - Agent will create default if not provided)
   blueprint?: Blueprint;
-
-  // Tool support (optional - enables function calling)
-  tools?: ToolParams[];
 
   // Metadata
   metadata?: Record<string, unknown>;

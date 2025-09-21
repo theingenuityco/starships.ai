@@ -1,4 +1,5 @@
 import { ToolEntity } from '@/entities/ToolEntity';
+import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
@@ -291,7 +292,8 @@ export class ToolRepository extends BaseRepository {
           this.handleNotFound('ToolTemplate', templateSlug);
         }
 
-        const template = templateResult[0].tt;
+        // Properly deserialize template data using ToolTemplateEntity
+        const template = fromDatabase(ToolTemplateEntity, templateResult[0].tt);
 
         // Create tool from template
         const toolData: CreateToolRequest = {

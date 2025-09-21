@@ -32,7 +32,8 @@ export class Agent implements NodeHandler {
     this.runner = options?.runner ?? new LocalRunner();
 
     // Initialize blueprint if not provided - creates Start -> End workflow (minimal)
-    if (!this.params.blueprint) {
+    const shouldCreateBlueprint = !this.params.blueprint;
+    if (shouldCreateBlueprint) {
       this.params.blueprint = {
         nodes: [
           {
@@ -63,12 +64,43 @@ export class Agent implements NodeHandler {
         },
       };
       this.nodeCounter = 2; // start_1 and end_1 are taken
+    }
 
-      // Create the appropriate blueprint based on configuration
+    // ALWAYS ensure tools are properly configured in existing blueprints
+    // This handles the case where ConversationService provides a blueprint but tools need to be configured
+    const hasTools = this.params.tools && this.params.tools.length > 0;
+    if (hasTools) {
+      this.ensureToolsInBlueprint();
+    }
+
+    // Create default blueprint only if none was provided initially
+    if (shouldCreateBlueprint) {
       this.createDefaultBlueprint();
     }
 
     // Blueprint is guaranteed to exist after constructor logic above
+  }
+
+  /**
+   * Ensure tools are properly configured in existing blueprint LLM nodes
+   * This handles cases where ConversationService provides a blueprint but tools need to be added
+   */
+  private ensureToolsInBlueprint(): void {
+    if (!this.params.blueprint || !this.params.tools || this.params.tools.length === 0) {
+      return;
+    }
+
+    // Find all LLM nodes in the existing blueprint
+    const llmNodes = this.params.blueprint.nodes.filter((node) => node.type === 'llm');
+
+    // Configure tools for each LLM node that doesn't already have them
+    llmNodes.forEach((llmNode) => {
+      const llmParams = llmNode.parameters as LlmParams;
+      if (!llmParams.tools) {
+        llmParams.tools = this.params.tools;
+        console.log(`[AGENT] Added ${this.params.tools!.length} tools to existing LLM node: ${llmNode.ref}`);
+      }
+    });
   }
 
   /**
@@ -80,7 +112,7 @@ export class Agent implements NodeHandler {
     const llmNodeRef = `llm_${this.nodeCounter++}`;
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
     const hasTools = this.params.tools && this.params.tools.length > 0;
-
+    console.log({ params: this.params, hasTools });
     // Create unified LLM node that handles both simple and tool-enabled cases
     const llmParams: LlmParams = {
       model: this.params.model,
@@ -220,6 +252,7 @@ export class Agent implements NodeHandler {
       const execution = ExecutionItemUtils.createExecution();
       const orderedMessages: LlmMessage[] = [];
 
+      // Always add memory state first (system prompt and memory messages)
       const memory = this.params.memoryState;
       if (memory?.systemPrompt) {
         orderedMessages.push({ role: 'system', content: memory.systemPrompt });
@@ -240,15 +273,13 @@ export class Agent implements NodeHandler {
         );
       };
 
+      // Add input messages (conversation messages from ConversationService)
       if (input && input.length > 0) {
         const inputData = ExecutionItemUtils.unwrapSingle(input);
-        // If input contains an array of LlmMessage, append them; otherwise create a user message from the input
         if (isLlmMessageArray(inputData)) {
           orderedMessages.push(...inputData);
-        } else {
-          const content = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
-          orderedMessages.push({ role: 'user', content });
         }
+        // Silently ignore non-LlmMessage inputs
       }
 
       // Commit ordered messages to execution state

@@ -6,6 +6,7 @@
 
 import { Execution, NodeParameters, ValidationResult, ExecutionItem } from '@/types';
 import { EventCallback } from '@/types/events';
+import { Runner } from '@/runner/Runner';
 
 /**
  * Base interface for workflow node handlers
@@ -22,6 +23,7 @@ export interface NodeHandler {
 export interface NodeHandlerOptions {
   eventCallback?: EventCallback;
   execution?: Execution;
+  runner?: Runner;
 }
 /**
  * Constructor type for handlers that accept the full node object

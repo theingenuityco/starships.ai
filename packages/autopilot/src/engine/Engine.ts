@@ -9,6 +9,7 @@ import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
+import type { Runner } from '@/runner/Runner';
 import { Eval } from './Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { config } from '@/constants';
@@ -31,6 +32,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
 export interface EngineConfig {
   eventCallback?: EventCallback;
   failOnNodeError?: boolean;
+  runner?: Runner;
 }
 
 export class Engine {

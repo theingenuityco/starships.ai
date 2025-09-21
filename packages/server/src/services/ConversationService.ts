@@ -1,7 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { Runner, EngineConfig, ToolParams } from '@starships/autopilot';
+import type { ToolParams, ExecutionItem, LlmToolCall } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -29,7 +29,7 @@ export class ConversationService {
   // Track accumulated tool_calls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
   // Default runner for non-streaming paths (child process)
-  private defaultRunner: Runner;
+  private defaultRunner: ChildProcessRunner;
 
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
@@ -206,13 +206,6 @@ export class ConversationService {
     const messages = await this.getConversationMessages(data.conversationId);
 
     try {
-      // Prepare runner and engine config
-      const runner = this.defaultRunner;
-      const engineConfig: EngineConfig = {
-        eventCallback: (event) => this.eventCallback(data.conversationId, event),
-        failOnNodeError: true,
-      };
-
       // Get starship for context
       const starship = await this.getConversationStarship(data.conversationId);
       if (!starship) {
@@ -221,13 +214,19 @@ export class ConversationService {
 
       // Get deployed tools for this agent using ToolService
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+      console.log('>>>Resolved tools', { resolvedTools });
 
       // Build Agent to materialize blueprint (tools, nodes, etc.)
       const agentWithTools = {
         ...agentModel,
         tools: resolvedTools,
       };
-      const agent = new Agent(agentWithTools);
+
+      // Create Agent with ChildProcessRunner for isolation
+      const agent = new Agent(agentWithTools, {
+        eventCallback: (event) => this.eventCallback(data.conversationId, event),
+        runner: this.defaultRunner,
+      });
 
       // Convert database messages to LLM format, preserving tool_calls and tool results
       const llmMessages = messages.map((msg) => ({
@@ -237,12 +236,11 @@ export class ConversationService {
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
 
-      // Create execution with ordered messages in state (system -> memory -> conversation)
-      const execution = ExecutionItemUtils.createExecution();
+      // Create ordered messages in the required order (system -> memory -> conversation)
       const orderedMessages: Array<{
         role: 'user' | 'assistant' | 'system' | 'tool';
         content: string;
-        tool_calls?: any;
+        tool_calls?: LlmToolCall[];
         tool_call_id?: string;
       }> = [];
 
@@ -257,13 +255,11 @@ export class ConversationService {
         orderedMessages.push(...llmMessages);
       }
 
-      // Commit ordered messages and resolved tools to execution state
-      (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
-      (execution.state as Record<string, unknown>)['tools'] = resolvedTools;
+      // Prepare input for agent execution
+      const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(orderedMessages);
 
-      // Execute blueprint via runner
-      const blueprint = agent.getCurrentBlueprint();
-      await runner.run(blueprint, execution, engineConfig);
+      // Execute via agent - runner and event callback are configured in the Agent constructor
+      await agent.execute(input);
 
       // Note: broadcastComplete is now called at the end of content_complete event handler
       // to ensure all delta operations are sent before the complete event

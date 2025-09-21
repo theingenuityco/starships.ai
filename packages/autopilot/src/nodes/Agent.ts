@@ -10,12 +10,15 @@ import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, Exe
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
-import { Engine } from '@/engine/Engine';
+import { EngineConfig } from '@/engine/Engine';
+import { Runner } from '@/runner/Runner';
+import { LocalRunner } from '@/runner/LocalRunner';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
   private nodeCounter: number = 1;
+  private runner: Runner;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
@@ -23,6 +26,10 @@ export class Agent implements NodeHandler {
 
     // Create options
     this.options = options;
+
+    // Initialize runner - defaults to LocalRunner for nested execution safety
+    // ConversationService or other top-level callers can provide a ChildProcessRunner via options
+    this.runner = options?.runner ?? new LocalRunner();
 
     // Initialize blueprint if not provided - creates Start -> End workflow (minimal)
     if (!this.params.blueprint) {
@@ -205,7 +212,7 @@ export class Agent implements NodeHandler {
 
   /**
    * Execute the agent with optional input items
-   * Creates a new Engine instance and executes the agent's blueprint
+   * Uses the configured runner to execute the agent's blueprint
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     // Create execution context for the agent's blueprint
@@ -253,14 +260,56 @@ export class Agent implements NodeHandler {
     // Provide tool definitions (with blueprints) to execution state for Tool node resolution
     (execution.state as Record<string, unknown>)['tools'] = this.params.tools || [];
 
-    // Create a new Engine instance for executing the agent's blueprint
-    const engine = new Engine({
-      eventCallback: this.options?.eventCallback,
-    });
-
     try {
-      // Execute the agent's blueprint using the new Engine
-      return await engine.executeBlueprint(this.params.blueprint!, execution);
+      // Create execution with ordered messages in state (system -> memory -> conversation)
+      const execution = ExecutionItemUtils.createExecution();
+      const orderedMessages: LlmMessage[] = [];
+
+      const memory = this.params.memoryState;
+      if (memory?.systemPrompt) {
+        orderedMessages.push({ role: 'system', content: memory.systemPrompt });
+      }
+      if (memory?.messages?.length) {
+        orderedMessages.push(...memory.messages);
+      }
+
+      // Type guard to detect LlmMessage[]
+      const isLlmMessageArray = (val: unknown): val is LlmMessage[] => {
+        return (
+          Array.isArray(val) &&
+          val.every((m) => {
+            if (typeof m !== 'object' || m === null) return false;
+            const obj = m as Record<string, unknown>;
+            return typeof obj.role === 'string' && typeof obj.content === 'string';
+          })
+        );
+      };
+
+      if (input && input.length > 0) {
+        const inputData = ExecutionItemUtils.unwrapSingle(input);
+        // If input contains an array of LlmMessage, append them; otherwise create a user message from the input
+        if (isLlmMessageArray(inputData)) {
+          orderedMessages.push(...inputData);
+        } else {
+          const content = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
+          orderedMessages.push({ role: 'user', content });
+        }
+      }
+
+      // Commit ordered messages to execution state
+      (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
+      // Provide tool definitions (with blueprints) to execution state for Tool node resolution
+      (execution.state as Record<string, unknown>)['tools'] = this.params.tools || [];
+
+      // Prepare engine config with event callback
+      const engineConfig: EngineConfig = {
+        eventCallback: this.options?.eventCallback,
+        failOnNodeError: true,
+      };
+
+      // Execute using the configured runner
+      const blueprint = this.getCurrentBlueprint();
+      return await this.runner.run(blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

@@ -215,6 +215,42 @@ export class AgentService {
   // MODEL ↔ INSTANCE CONVERSION METHODS
   // ============================================================================
 
+  // ============================================================================
+  // TOOL ASSIGNMENT METHODS
+  // ============================================================================
+
+  /**
+   * Get tools assigned to an agent
+   */
+  async getAgentTools(agentId: string, starshipId: string): Promise<import('@starships/protocol').ToolModel[]> {
+    return await this.agentRepository.getAgentTools(agentId, starshipId);
+  }
+
+  /**
+   * Assign multiple tools to an agent (replaces existing assignments)
+   */
+  async assignToolSlugs(agentId: string, toolSlugs: string[]): Promise<AgentModel> {
+    return await this.agentRepository.assignToolSlugs(agentId, toolSlugs);
+  }
+
+  /**
+   * Add a single tool to an agent's existing assignments
+   */
+  async addToolSlug(agentId: string, toolSlug: string): Promise<AgentModel> {
+    return await this.agentRepository.addToolSlug(agentId, toolSlug);
+  }
+
+  /**
+   * Remove a single tool from an agent's assignments
+   */
+  async removeToolSlug(agentId: string, toolSlug: string): Promise<AgentModel> {
+    return await this.agentRepository.removeToolSlug(agentId, toolSlug);
+  }
+
+  // ============================================================================
+  // MODEL ↔ INSTANCE CONVERSION METHODS
+  // ============================================================================
+
   /**
    * Convert AgentModel to Agent instance, storing model ID in instance metadata
    */

@@ -1,5 +1,8 @@
+import { Engine, ExecutionItemUtils } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
-import { NativeToolApiKeyRepository } from '@starships/models';
+import { AgentRepository, ToolRepository, NativeToolApiKeyRepository } from '@starships/models';
+import type { ToolModel } from '@starships/protocol';
+
 // Note: LLMToolDefinition type needs to be defined based on the actual interface needed
 // For now, creating a local interface until the proper type is available
 interface LLMToolDefinition {
@@ -38,60 +41,75 @@ interface AgentTool {
 
 /**
  * Tool Service for managing agent tools
- * Follows the same pattern as other services, replaces NativeToolWrapper
+ * Now works with database-stored tools instead of hardcoded implementations
  */
 export class ToolService {
   private starshipId: string;
   private agentId: string;
   private enableLogging: boolean;
   private toolUsageStats: Map<string, number> = new Map();
+  private agentRepository: AgentRepository;
+  private toolRepository: ToolRepository;
+  private apiKeyRepository: NativeToolApiKeyRepository;
 
   constructor(config: { starshipId: string; agentId: string; enableLogging?: boolean }) {
     this.starshipId = config.starshipId;
     this.agentId = config.agentId;
     this.enableLogging = config.enableLogging || false;
+    this.agentRepository = new AgentRepository();
+    this.toolRepository = new ToolRepository();
+    this.apiKeyRepository = new NativeToolApiKeyRepository();
   }
 
   /**
-   * Get all available tools for the starship
+   * Get all tools assigned to the agent from the database
    */
-  async getAllTools(): Promise<AgentTool[]> {
+  async getAgentTools(): Promise<AgentTool[]> {
     try {
-      const apiKeyRepo = new NativeToolApiKeyRepository();
-      const apiKeys = await apiKeyRepo.getAllApiKeys(this.starshipId);
+      // Get tools assigned to the agent
+      const dbTools = await this.agentRepository.getAgentTools(this.agentId, this.starshipId);
 
+      if (!dbTools || dbTools.length === 0) {
+        if (this.enableLogging) {
+          console.log(`[TOOL-SERVICE] No tools assigned to agent ${this.agentId} in starship ${this.starshipId}`);
+        }
+        return [];
+      }
+
+      // Get API keys for tools that need them
+      const apiKeys = await this.apiKeyRepository.getAllApiKeys(this.starshipId);
+
+      // Convert database tools to executable AgentTools
       const tools: AgentTool[] = [];
 
-      // Add Brave Search if API key exists
-      if (apiKeys.brave) {
-        tools.push(await this.createBraveSearchTool(apiKeys.brave));
-      }
+      for (const dbTool of dbTools) {
+        if (!dbTool.isEnabled) {
+          continue; // Skip disabled tools
+        }
 
-      // Add Firecrawl if API key exists
-      if (apiKeys.firecrawl) {
-        tools.push(await this.createFirecrawlTool(apiKeys.firecrawl));
-      }
-
-      // Add Notion if API key exists
-      if (apiKeys.notion) {
-        tools.push(await this.createNotionTool(apiKeys.notion));
-      }
-
-      // Add Tavily if API key exists
-      if (apiKeys.tavily) {
-        tools.push(await this.createTavilySearchTool(apiKeys.tavily));
+        const agentTool = await this.createAgentToolFromDatabase(dbTool, apiKeys);
+        if (agentTool) {
+          tools.push(agentTool);
+        }
       }
 
       if (this.enableLogging) {
         const toolNames = tools.map((t) => t.name).join(', ');
-        console.log(`[TOOL-SERVICE] Created ${tools.length} tools for starship ${this.starshipId}: ${toolNames}`);
+        console.log(`[TOOL-SERVICE] Created ${tools.length} tools for agent ${this.agentId}: ${toolNames}`);
       }
 
       return tools;
     } catch (error) {
-      console.error('[TOOL-SERVICE] Error loading tools:', error);
+      console.error('[TOOL-SERVICE] Error loading agent tools:', error);
       return [];
     }
+  }
+
+  /**
+   * Get all available tools for the starship (legacy method for backward compatibility)
+   */
+  async getAllTools(): Promise<AgentTool[]> {
+    return this.getAgentTools();
   }
 
   /**
@@ -121,11 +139,81 @@ export class ToolService {
     const input = JSON.stringify(args);
 
     if (this.enableLogging) {
-      console.log(`[TOOL-SERVICE] Executing ${toolName} for starship ${this.starshipId}: ${input}`);
+      console.log(`[TOOL-SERVICE] Executing ${toolName} for agent ${this.agentId}: ${input}`);
     }
 
     this.trackUsage(toolName);
     return await tool.execute(input);
+  }
+
+  /**
+   * Create an executable AgentTool from a database ToolModel
+   */
+  private async createAgentToolFromDatabase(dbTool: ToolModel, apiKeys: Record<string, string>): Promise<AgentTool | null> {
+    try {
+      // Merge tool configuration with available API keys
+      const toolConfig = {
+        ...dbTool.configuration,
+        // Provide API keys that might be needed by the tool
+        apiKeys: apiKeys,
+      };
+
+      return {
+        name: dbTool.name,
+        description: dbTool.description,
+        parameters: dbTool.parameters,
+        execute: async (input: string): Promise<string> => {
+          try {
+            // Parse input arguments
+            const inputArgs = JSON.parse(input);
+
+            // Create execution context with tool configuration and input
+            const executionContext = {
+              ...inputArgs,
+              config: toolConfig,
+            };
+
+            // Execute the tool's blueprint using the autopilot Engine
+            const engine = new Engine({
+              failOnNodeError: true, // Fail fast on tool errors
+            });
+
+            // Create an execution context and add initial input
+            const execution = ExecutionItemUtils.createExecution();
+            const initialItems = ExecutionItemUtils.wrapSingle(executionContext);
+            execution.results.push({ nodeRef: '__initial__', items: initialItems });
+
+            const resultItems = await engine.executeBlueprint(dbTool.blueprint, execution);
+            const result = ExecutionItemUtils.unwrapSingle(resultItems);
+
+            // Return the result as a string
+            if (typeof result === 'string') {
+              return result;
+            } else if (result && typeof result === 'object') {
+              // If result is an object, try to get a meaningful string representation
+              if ('output' in result) {
+                return String(result.output);
+              } else if ('result' in result) {
+                return String(result.result);
+              } else {
+                return JSON.stringify(result);
+              }
+            } else {
+              return String(result || 'Tool executed successfully');
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            if (this.enableLogging) {
+              console.error(`[TOOL-SERVICE] Error executing tool ${dbTool.name}:`, error);
+            }
+            return `Error executing ${dbTool.name}: ${errorMessage}`;
+          }
+        },
+      };
+    } catch (error) {
+      console.error(`[TOOL-SERVICE] Failed to create tool ${dbTool.name}:`, error);
+      return null;
+    }
   }
 
   /**

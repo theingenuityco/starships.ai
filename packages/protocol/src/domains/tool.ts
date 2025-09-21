@@ -58,7 +58,7 @@ export interface ToolTemplateModel extends ToolParams {
 export interface ToolModel extends ToolParams {
   // Core database fields
   id: string;
-  slug: string; // Human-readable identifier for tool instances
+  slug: string; // Human-readable identifier for tool instances (copied from template)
   createdAt: string;
   updatedAt: string;
 
@@ -99,7 +99,7 @@ export type UpdateToolTemplateRequest = Partial<CreateToolTemplateRequest>;
  * Request to create a new tool instance
  */
 export interface CreateToolRequest extends ToolParams {
-  slug: string; // Required for creating tool instances
+  slug: string; // Required for creating tool instances (copied from template)
   configuration?: Record<string, unknown>;
   isEnabled?: boolean;
 }

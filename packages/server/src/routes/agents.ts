@@ -49,6 +49,14 @@ const StarshipAssignmentSchema = z.object({
   starshipId: z.string().regex(/^[a-z0-9]{10,30}$/i, 'Invalid starship ID'),
 });
 
+const ToolAssignmentSchema = z.object({
+  toolSlugs: z.array(z.string().min(1)).min(1, 'At least one tool slug is required'),
+});
+
+const SingleToolAssignmentSchema = z.object({
+  toolSlug: z.string().min(1, 'Tool slug is required'),
+});
+
 // Helper function for Zod validation
 const validateData = <T>(schema: z.ZodSchema<T>, data: unknown, res: Response, context: string): T | null => {
   try {
@@ -285,6 +293,131 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
   } catch (error) {
     console.error('[AGENTS] Error deleting agent:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to delete agent');
+  }
+});
+
+// ============================================================================
+// TOOL ASSIGNMENT ENDPOINTS
+// ============================================================================
+
+// GET /agents/:id/tools - Get tools assigned to an agent (OpenAPI pattern)
+router.get('/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate agent ID parameter
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    // Validate starshipId query parameter
+    const queryValidation = validateData(z.object({ starshipId: IdSchema }), req.query, res, 'query parameters');
+    if (!queryValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const { starshipId } = queryValidation;
+
+    // Delegate to service layer
+    const agentService = new AgentService();
+    const tools = await agentService.getAgentTools(agentId, starshipId);
+
+    sendSuccess(res, tools);
+  } catch (error) {
+    console.error('[AGENTS] Error getting agent tools:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent tools');
+  }
+});
+
+// PUT /agents/:id/tools - Assign tools to an agent (OpenAPI pattern)
+router.put('/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate agent ID parameter
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    // Validate request body
+    const bodyValidation = validateData(ToolAssignmentSchema, req.body, res, 'tool assignment data');
+    if (!bodyValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const { toolSlugs } = bodyValidation;
+
+    console.log(`[AGENTS] Assigning ${toolSlugs.length} tools to agent ${agentId}: ${toolSlugs.join(', ')}`);
+
+    // Delegate to service layer
+    const agentService = new AgentService();
+    const agent = await agentService.assignToolSlugs(agentId, toolSlugs);
+
+    sendSuccess(res, {
+      message: 'Tools assigned to agent successfully',
+      agent,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error assigning tools to agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to assign tools to agent');
+  }
+});
+
+// POST /agents/:id/tools/:toolSlug - Assign a specific tool to agent (OpenAPI pattern)
+router.post('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate parameters
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+        toolSlug: z.string().min(1, 'Tool slug is required'),
+      }),
+      req.params,
+      res,
+      'agent and tool parameters'
+    );
+    if (!paramValidation) return;
+
+    const { id: agentId, toolSlug } = paramValidation;
+
+    console.log(`[AGENTS] Adding tool ${toolSlug} to agent ${agentId}`);
+
+    // Delegate to service layer
+    const agentService = new AgentService();
+    const agent = await agentService.addToolSlug(agentId, toolSlug);
+
+    sendSuccess(res, {
+      message: `Tool ${toolSlug} assigned to agent successfully`,
+      agent,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error adding tool to agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to add tool to agent');
+  }
+});
+
+// DELETE /agents/:id/tools/:toolSlug - Remove a tool from agent (OpenAPI pattern)
+router.delete('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Validate parameters
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+        toolSlug: z.string().min(1, 'Tool slug is required'),
+      }),
+      req.params,
+      res,
+      'agent and tool parameters'
+    );
+    if (!paramValidation) return;
+
+    const { id: agentId, toolSlug } = paramValidation;
+
+    console.log(`[AGENTS] Removing tool ${toolSlug} from agent ${agentId}`);
+
+    // Delegate to service layer
+    const agentService = new AgentService();
+    const agent = await agentService.removeToolSlug(agentId, toolSlug);
+
+    sendSuccess(res, {
+      message: `Tool ${toolSlug} removed from agent successfully`,
+      agent,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error removing tool from agent:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to remove tool from agent');
   }
 });
 

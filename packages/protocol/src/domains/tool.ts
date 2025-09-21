@@ -75,6 +75,7 @@ export interface ToolModel extends ToolParams {
  * Request to create a new tool template
  */
 export interface CreateToolTemplateRequest extends ToolParams {
+  slug?: string; // Optional explicit slug (if not provided, will be generated from name)
   category: ToolTemplateCategory;
   exampleUsage?: string;
   requiresApiKey?: boolean;

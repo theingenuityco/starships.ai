@@ -109,8 +109,8 @@ export class ToolTemplateRepository extends BaseRepository {
   async create(data: CreateToolTemplateRequest): Promise<ToolTemplateModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Generate slug from name (slug is required by entity)
-        const slug = generateSlug(data.name);
+        // Use provided slug or generate from name (slug is required by entity)
+        const slug = data.slug || generateSlug(data.name);
 
         // Validate using entity with slug included
         const dataWithSlug = { ...data, slug };

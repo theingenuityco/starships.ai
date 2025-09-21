@@ -78,8 +78,8 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const now = new Date().toISOString();
 
-        // Generate slug if not provided
-        const slug = generateSlug(data.name);
+        // Use provided slug or generate from name
+        const slug = data.slug || generateSlug(data.name);
 
         // Build template data for database storage
         const templateProps = {

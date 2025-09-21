@@ -45,6 +45,7 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
  * Request to create a new agent template
  */
 export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
+  slug?: string; // Optional explicit slug (if not provided, will be generated from name)
   category: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];

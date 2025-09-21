@@ -174,7 +174,8 @@ export class Agent implements NodeHandler {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     try {
       // Create execution with ordered messages in state (system -> memory -> conversation)
-      const execution = ExecutionItemUtils.createExecution();
+      const parentExecution = this.options?.execution;
+      const execution = ExecutionItemUtils.createExecution(undefined, parentExecution);
       const orderedMessages: LlmMessage[] = [];
 
       // Add system prompt from params root first

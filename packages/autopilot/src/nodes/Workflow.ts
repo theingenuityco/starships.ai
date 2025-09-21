@@ -31,7 +31,8 @@ export class Workflow extends BaseNode<WorkflowParams> {
     });
 
     // Create execution context for the workflow's blueprint
-    const execution = ExecutionItemUtils.createExecution(input);
+    const parentExecution = this.options?.execution;
+    const execution = ExecutionItemUtils.createExecution(input, parentExecution);
 
     try {
       // Execute the workflow's blueprint using the new Engine

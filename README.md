@@ -168,7 +168,7 @@ graph TD
 
 - DAG-based workflow execution with conditional routing
 - Extensible node system (HTTP, LLM, Agent, Conditional, etc.)
-- Advanced memory management (Memory and AgentMemory classes)
+- AI agent state management and conversation persistence
 - JSON-based workflow definitions with validation
 
 **Payment & Billing System**

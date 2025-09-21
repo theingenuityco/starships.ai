@@ -149,7 +149,6 @@ export function useCreateExecution() {
         status: 'pending' as any,
         // Add required fields with defaults
         executionResults: new Map(),
-        agentMemory: {},
         creating: true, // Add a flag to show loading state
       } as any
 

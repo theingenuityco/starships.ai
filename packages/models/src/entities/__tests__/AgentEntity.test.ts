@@ -478,7 +478,7 @@ describe('AgentEntity', () => {
     });
 
     it('should handle complex blueprint and memory state', async () => {
-      const complexMemoryState = {
+      const complexState = {
         messages: [
           { role: 'system', content: 'You are a helpful assistant' },
           { role: 'user', content: 'Hello' },
@@ -509,18 +509,18 @@ describe('AgentEntity', () => {
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
         systemPrompt: 'Test agent',
-        state: JSON.stringify(complexMemoryState),
+        state: JSON.stringify(complexState),
         blueprint: JSON.stringify(complexBlueprint),
       };
 
       const entity = fromDatabase(AgentEntity, databaseRecord);
-      expect(entity.state).toEqual(complexMemoryState);
+      expect(entity.state).toEqual(complexState);
       expect(entity.blueprint).toEqual(complexBlueprint);
 
       // Test round-trip
       const serialized = toDatabase(entity);
       const deserializedAgain = fromDatabase(AgentEntity, serialized);
-      expect(deserializedAgain.state).toEqual(complexMemoryState);
+      expect(deserializedAgain.state).toEqual(complexState);
       expect(deserializedAgain.blueprint).toEqual(complexBlueprint);
     });
   });

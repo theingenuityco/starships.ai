@@ -9,7 +9,6 @@ Autopilot executes workflows defined as node graphs (blueprints) with support fo
 - **Dynamic Node Loading** - AI agents, LLM calls, HTTP requests, conditionals, transforms, mutations
 - **Template Expressions** - `{{ jsExpression }}` JavaScript expression syntax for dynamic parameters
 - **State Management** - JSON Patch transforms for workflow state mutations
-- **Memory System** - Structured memory for AI agent interactions
 - **Credential Management** - Secure API key handling
 - **Error Handling** - Configurable failure modes with resilient execution options
 
@@ -235,60 +234,23 @@ agent
 const execution = await agent.execute();
 ```
 
-### Agent Memory System
+### Agent State Management
+
+Agents manage their state directly using the `state` parameter:
 
 ```typescript
-import { AgentMemory, Memory } from '@starships/autopilot';
-
-// Create agent memory with identity and purpose
-const memory = new AgentMemory({
-  identity: {
-    name: 'Sarah',
-    role: 'Support Agent',
-    personality: 'helpful and professional',
-  },
-  purpose: {
-    goal: 'Assist customers with their inquiries',
-    capabilities: ['answer questions', 'provide guidance', 'escalate issues'],
-    limitations: ['cannot process payments', 'cannot access external systems'],
-  },
-  systemPrompt: 'You are Sarah, a helpful support agent.',
-  messages: [
-    { role: 'user', content: 'I need help' },
-    { role: 'assistant', content: "I'm here to help! What can I assist you with?" },
-  ],
-});
-
-// Memory operations
-memory.setSystemPrompt('You are a helpful assistant specialized in customer support.');
-memory.addMessage({ role: 'user', content: 'New user message' });
-
-const messages = memory.toMessages(); // Format for LLM (systemPrompt + messages)
-
-// Use memory in agent constructor
 const agent = new Agent({
   name: 'Sarah',
   model: 'anthropic/claude-3-haiku',
-  systemPrompt: 'You are a helpful assistant.',
-  state: { messages: [], tools: [] },
+  systemPrompt: 'You are a helpful support agent.',
+  state: {
+    messages: [
+      { role: 'user', content: 'I need help' },
+      { role: 'assistant', content: "I'm here to help! What can I assist you with?" },
+    ],
+    tools: [],
+  },
 });
-```
-
-### Base Memory Class
-
-```typescript
-import { Memory } from '@starships/autopilot';
-
-// Simple message-only memory
-const simpleMemory = new Memory({
-  messages: [
-    { role: 'user', content: 'Hello!' },
-    { role: 'assistant', content: 'Hi! How can I help you today?' },
-  ],
-});
-
-simpleMemory.addMessage({ role: 'user', content: 'What can you do?' });
-const allMessages = simpleMemory.toMessages();
 ```
 
 ## Events & Streaming
@@ -366,9 +328,6 @@ export { Engine, Agent, BaseNode } from '@starships/autopilot';
 
 // Node handlers
 export { LLM, HttpRequest, Tool, Workflow, Conditional, Transform, Mutate } from '@starships/autopilot';
-
-// Memory system
-export { Memory, AgentMemory } from '@starships/autopilot';
 
 // Evaluation engine
 export { Eval } from '@starships/autopilot';

@@ -101,7 +101,7 @@ export class Eval {
 
   /**
    * Evaluate a JS expression with context
-   * Note: For production, execute inside a hardened sandbox (e.g., isolated-vm).
+   * Note: For production, execute inside a hardened sandbox (e.g., child process or container).
    * This host implementation is minimal and intended for development use only.
    */
   async evaluateExpression(expression: string, context: EvalContext, options?: EvalOptions): Promise<unknown> {

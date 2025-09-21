@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
@@ -41,9 +41,6 @@
     "stripe": "^18.4.0",
     "ws": "^8.18.3",
     "zod": "^4.1.5"
-  },
-  "optionalDependencies": {
-    "isolated-vm": "6.0.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",

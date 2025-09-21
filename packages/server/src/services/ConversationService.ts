@@ -1,6 +1,6 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, IsolatedVmRunner } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
 import type { Runner, EngineConfig } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository } from '@starships/models';
@@ -18,15 +18,15 @@ export class ConversationService {
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
-  // Default runner for non-streaming paths (isolated-vm when configured, else local)
+  // Default runner for non-streaming paths (child process)
   private defaultRunner: Runner;
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
-    // Choose default runner; IsolatedVmRunner resolves its own bundle path if not provided
-    this.defaultRunner = new IsolatedVmRunner({
+    // Choose default runner (child process) configured via env
+    this.defaultRunner = new ChildProcessRunner({
       memoryLimitMB: Number(process.env.AUTOPILOT_ISOLATE_MEM_MB) || 64,
       timeoutMs: Number(process.env.AUTOPILOT_ISOLATE_TIMEOUT_MS) || 0,
     });

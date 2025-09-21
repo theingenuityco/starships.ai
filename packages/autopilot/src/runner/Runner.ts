@@ -9,7 +9,7 @@ import type { EngineConfig } from '@/engine/Engine';
 export interface Runner {
   /**
    * Execute a blueprint with the provided execution context.
-   * Implementations control the runtime isolation (local vs. isolated-vm).
+   * Implementations control the runtime isolation (local vs. child-process).
    */
   run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]>;
 }

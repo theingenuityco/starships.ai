@@ -57,9 +57,9 @@ export class Tool extends BaseNode<ToolParams> {
 
       // Execute the tool's blueprint like Workflow does (fresh Engine + Execution)
       const engine = new Engine({ eventCallback: this.getEventCallback() });
-      const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs));
-      // Mark this as a nested workflow execution to avoid duplicate events
-      subExec.nested = true;
+      const parentExecution = this.getOptions()?.execution;
+      const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
+      // Depth is automatically calculated based on parent execution
       const items = await engine.executeBlueprint(params.blueprint, subExec);
       const result = ExecutionItemUtils.unwrapSingle(items);
 

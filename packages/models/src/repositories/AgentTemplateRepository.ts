@@ -58,11 +58,6 @@ export class AgentTemplateRepository extends BaseRepository {
         const toolResults = await connection.executeQuery<{ slug: string }>(toolTemplatesQuery, { id });
         const assignedToolSlugs = toolResults.map((result) => result.slug);
 
-        console.log(
-          `[AGENT-TEMPLATE-REPO] findById - Found ${assignedToolSlugs.length} tool relationships for template ${id}:`,
-          assignedToolSlugs
-        );
-
         return {
           ...baseTemplate,
           assignedToolSlugs,
@@ -135,9 +130,6 @@ export class AgentTemplateRepository extends BaseRepository {
 
         // Create relationships for assigned tool templates
         if (data.assignedToolSlugs && data.assignedToolSlugs.length > 0) {
-          console.log(
-            `[AGENT-TEMPLATE-REPO] Creating relationships for ${data.assignedToolSlugs.length} tool templates for agent template ${template.id}`
-          );
           const connection = this.getConnection();
 
           for (const toolSlug of data.assignedToolSlugs) {
@@ -149,12 +141,8 @@ export class AgentTemplateRepository extends BaseRepository {
 
             if (toolTemplateResult.length > 0) {
               // Create relationship
-              console.log(
-                `[AGENT-TEMPLATE-REPO] Creating USES_TOOL_TEMPLATE relationship: ${template.id} -> ${toolTemplateResult[0].id} (${toolSlug})`
-              );
+
               await this.addToolTemplateRelationship(template.id, toolTemplateResult[0].id);
-            } else {
-              console.warn(`[AGENT-TEMPLATE-REPO] Tool template not found for slug: ${toolSlug}`);
             }
           }
         } else {

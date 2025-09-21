@@ -41,7 +41,7 @@ export { config } from './constants';
 // Runners
 export type { Runner } from './runner/Runner';
 export { LocalRunner } from './runner/LocalRunner';
-export { IsolatedVmRunner } from './runner/IsolatedVmRunner';
+export { ChildProcessRunner } from './runner/ChildProcessRunner';
 
 // Autopilot configuration manager
 export { autopilot, AutopilotManager } from './Autopilot';

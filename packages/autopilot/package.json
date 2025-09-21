@@ -11,14 +11,11 @@
     },
     "./types": {
       "types": "./dist/types/index.d.ts"
-    },
-    "./isolated": {
-      "default": "./dist/autopilot.isolated.js"
     }
   },
   "scripts": {
-    "build": "tsc && tsc-alias -p tsconfig.json && pnpm run bundle:isolate",
-    "bundle:isolate": "esbuild scripts/isolated-entry.js --bundle --platform=node --format=iife --target=node18 --minify --outfile=dist/autopilot.isolated.js",
+    "build": "tsc && tsc-alias -p tsconfig.json && pnpm run copy:child-entry",
+    "copy:child-entry": "mkdir -p dist/scripts && cp scripts/child-entry.js dist/scripts/child-entry.js",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
@@ -38,9 +35,7 @@
     "ts-jest": "^29.4.1",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.0.0",
-    "web-streams-polyfill": "3.3.3"
-  },
-  "optionalDependencies": {
-    "isolated-vm": "6.0.1"
+    "web-streams-polyfill": "3.3.3",
+    "fast-text-encoding": "1.0.6"
   }
 }

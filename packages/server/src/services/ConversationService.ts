@@ -480,9 +480,14 @@ export class ConversationService {
         // Also clear tool calls tracker to prevent reuse
         this.streamingToolCalls.delete(conversationId);
 
-        // Note: Do not call broadcastComplete here - this is called after every LLM response,
-        // but the workflow may continue (e.g., tool execution → loop back to LLM).
-        // Only call broadcastComplete when the entire workflow is finished.
+        // Send completion event AFTER all delta operations are complete
+        if (this.streamingService) {
+          await this.streamingService.broadcastComplete(conversationId, {
+            source: 'agent',
+            content: 'Workflow completed',
+            agentId: 'agent', // We don't have agentModel available here, but it's not critical
+          });
+        }
         break;
       }
 
@@ -500,14 +505,7 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
-        // Send completion event when the entire workflow is actually finished
-        if (this.streamingService) {
-          await this.streamingService.broadcastComplete(conversationId, {
-            source: 'agent',
-            content: 'Workflow completed',
-            agentId: 'agent', // We don't have agentModel available here, but it's not critical
-          });
-        }
+        // Final completion will be handled by the main addConversationMessage method
         break;
       }
 

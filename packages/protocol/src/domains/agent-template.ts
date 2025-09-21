@@ -49,6 +49,7 @@ export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
   category: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];
+  assignedToolSlugs?: string[]; // Tool templates to assign to this agent template
 }
 
 /**
@@ -58,4 +59,5 @@ export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMe
   category?: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];
+  assignedToolSlugs?: string[];
 }

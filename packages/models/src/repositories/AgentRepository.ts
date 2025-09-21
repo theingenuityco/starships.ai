@@ -380,7 +380,7 @@ export class AgentRepository extends BaseRepository {
           timeout: customizations?.timeout ?? template.timeout,
           memoryState: customizations?.memoryState || template.memoryState,
           blueprint: customizations?.blueprint || template.blueprint,
-          assignedToolSlugs: customizations?.assignedToolSlugs || template.assignedToolSlugs,
+          assignedToolSlugs: customizations?.assignedToolSlugs || template.assignedToolSlugs || [],
         };
 
         const agent = await this.create(agentData, starshipId);

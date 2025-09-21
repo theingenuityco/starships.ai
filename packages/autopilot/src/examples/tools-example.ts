@@ -102,7 +102,9 @@ export async function calculatorExample() {
   const agent = new Agent({
     name: 'MathAssistant',
     model: 'anthropic/claude-3-haiku',
-    tools: [calculatorTool],
+    state: {
+      tools: [calculatorTool],
+    },
   });
 
   const result = await agent.execute(ExecutionItemUtils.wrapSingle('What is 15 * 7 + 23? Please calculate this for me.'));
@@ -121,7 +123,9 @@ export async function multiToolExample() {
     name: 'GeneralAssistant',
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.7,
-    tools: [calculatorTool, timeTool, echoTool],
+    state: {
+      tools: [calculatorTool, timeTool, echoTool],
+    },
   });
 
   const result = await agent.execute(
@@ -202,7 +206,9 @@ export async function customToolExample() {
   const agent = new Agent({
     name: 'TextProcessor',
     model: 'anthropic/claude-3-haiku',
-    tools: [customTool],
+    state: {
+      tools: [customTool],
+    },
   });
 
   const result = await agent.execute(ExecutionItemUtils.wrapSingle('Please process the text "Hello World" by making it uppercase.'));

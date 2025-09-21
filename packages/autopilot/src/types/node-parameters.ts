@@ -107,7 +107,7 @@ export interface LlmParams extends BaseParams {
   topP?: number | string; // Supports template expressions
   frequencyPenalty?: number | string; // Supports template expressions
   presencePenalty?: number | string; // Supports template expressions
-  tools?: ToolParams[]; // Optional tools for function calling schema
+  tools?: ToolParams[] | string; // Optional tools for function calling schema, supports template expressions
 }
 
 /**

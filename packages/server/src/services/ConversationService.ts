@@ -286,10 +286,10 @@ export class ConversationService {
       event.type === 'node_failed'
     ) {
       const executionEvent = event as ExecutionEvent;
-      const isNestedExecution = executionEvent.data?.execution.nested === true;
+      const executionDepth = executionEvent.data?.execution.depth || 0;
 
-      if (isNestedExecution) {
-        // Skip these events from nested workflows to prevent duplication
+      if (executionDepth > 0) {
+        // Skip these events from nested workflows (depth > 0) to prevent duplication
         return;
       }
     }

@@ -9,7 +9,7 @@ import { Transformers } from '@/helpers/serializer';
 import type { ToolModel } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean } from 'class-validator';
+import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean, IsArray } from 'class-validator';
 
 export class ToolEntity implements ToolModel {
   // Core database fields
@@ -62,13 +62,13 @@ export class ToolEntity implements ToolModel {
   @Expose()
   @IsOptional()
   @Transformers.JsonTransform()
-  @IsObject()
+  @IsArray()
   transforms?: TransformOperation[];
 
   @Expose()
   @IsOptional()
   @Transformers.JsonTransform()
-  @IsObject()
+  @IsArray()
   mutations?: TransformOperation[];
 
   @Expose()

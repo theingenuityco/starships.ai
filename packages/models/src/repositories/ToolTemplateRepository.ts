@@ -125,6 +125,10 @@ export class ToolTemplateRepository extends BaseRepository {
           slug,
           description: data.description,
           parameters: data.parameters,
+          blueprint: data.blueprint,
+          transforms: data.transforms,
+          mutations: data.mutations,
+          condition: data.condition,
 
           // Template-specific fields
           category: data.category,

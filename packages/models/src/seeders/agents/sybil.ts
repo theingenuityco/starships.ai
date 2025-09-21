@@ -1,4 +1,4 @@
-import { AgentMemoryState, Blueprint, Agent } from '@starships/autopilot';
+import { AgentState, Blueprint, Agent } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
 
 /**
@@ -20,7 +20,7 @@ function createStarshipNavigatorBlueprint(): Blueprint {
 /**
  * Create memory configuration for Sybil
  */
-function createSybilMemoryConfig(): AgentMemoryState {
+function createSybilConfig(): { systemPrompt: string; state: AgentState } {
   return {
     systemPrompt: `<character name="Sybil">
 You are Sybil, Starships.ai's onboarding and navigation assistant.
@@ -46,7 +46,10 @@ Safety:
 - Refuse illegal or unsafe requests.
 - Do not disclose secrets or sensitive data.
 </character>`,
-    messages: [],
+    state: {
+      messages: [],
+      tools: [],
+    },
   };
 }
 
@@ -75,6 +78,6 @@ export const sybilTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updat
     'How do I configure my first AI agents?',
   ],
   blueprint: createStarshipNavigatorBlueprint(),
-  memoryState: createSybilMemoryConfig(),
+  ...createSybilConfig(),
   timeout: 45000,
 };

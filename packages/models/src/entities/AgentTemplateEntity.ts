@@ -6,7 +6,7 @@
  */
 
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
-import type { AgentMemoryState, Blueprint } from '@starships/autopilot';
+import type { AgentState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
 import {
@@ -113,9 +113,14 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   timeout!: number;
 
   @Expose()
+  @IsOptional()
+  @IsString()
+  systemPrompt?: string;
+
+  @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  memoryState!: AgentMemoryState;
+  state!: AgentState;
 
   @Expose()
   @Transformers.JsonTransform()

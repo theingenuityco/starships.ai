@@ -8,7 +8,7 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { EntityTestHelper } from './entity-test-helper';
-import { AgentMemoryState, Blueprint } from '@starships/autopilot';
+import { AgentState, Blueprint } from '@starships/autopilot';
 
 describe('AgentEntity', () => {
   let testHelper: EntityTestHelper<AgentEntity>;
@@ -30,7 +30,8 @@ describe('AgentEntity', () => {
       agent.timeout = 30000;
       agent.createdAt = '2024-01-01T00:00:00.000Z';
       agent.updatedAt = '2024-01-01T00:00:00.000Z';
-      agent.memoryState = { messageHistory: [] } as AgentMemoryState;
+      agent.systemPrompt = 'You are a helpful assistant.';
+      agent.state = { messages: [], tools: [] } as AgentState;
       agent.blueprint = { nodes: [], edges: [] } as Blueprint;
 
       const serialized = toDatabase(agent);
@@ -58,7 +59,7 @@ describe('AgentEntity', () => {
       agent.timeout = 30000;
       agent.createdAt = '2024-01-01T00:00:00.000Z';
       agent.updatedAt = '2024-01-01T00:00:00.000Z';
-      agent.memoryState = {} as AgentMemoryState;
+      agent.state = { messages: [], tools: [] } as AgentState;
       agent.blueprint = { nodes: [], edges: [] };
       // temperature, maxTokens, description are undefined
 
@@ -99,7 +100,7 @@ describe('AgentEntity', () => {
       expect(entity.timeout).toBe(30000);
       expect(entity.createdAt).toBe('2024-01-01T00:00:00.000Z');
       expect(entity.updatedAt).toBe('2024-01-01T00:00:00.000Z');
-      expect(entity.memoryState).toEqual({ messageHistory: [] });
+      expect(entity.state).toEqual({ messages: [], tools: [] });
       expect(entity.blueprint).toEqual({ nodes: [], edges: [] });
     });
 
@@ -158,7 +159,8 @@ describe('AgentEntity', () => {
         name: 'Test Agent',
         model: 'gpt-4',
         timeout: 30000,
-        memoryState: {} as AgentMemoryState,
+        systemPrompt: 'Test prompt',
+        state: { messages: [], tools: [] } as AgentState,
         blueprint: { nodes: [], edges: [] } as Blueprint,
       };
 
@@ -400,7 +402,7 @@ describe('AgentEntity', () => {
 
       // Verify specific transformations worked correctly
       const entity = results[0].entity as AgentEntity;
-      expect(entity.memoryState).toEqual({ messages: [{ role: 'system', content: 'Hello' }] });
+      expect(entity.state).toEqual({ messages: [{ role: 'system', content: 'Hello' }], tools: [] });
       expect(entity.blueprint).toEqual({
         nodes: [{ id: 'node1', type: 'start' }],
         edges: [{ id: 'edge1', source: 'node1', target: 'node2' }],
@@ -491,13 +493,13 @@ describe('AgentEntity', () => {
       };
 
       const entity = fromDatabase(AgentEntity, databaseRecord);
-      expect(entity.memoryState).toEqual(complexMemoryState);
+      expect(entity.state).toEqual(complexMemoryState);
       expect(entity.blueprint).toEqual(complexBlueprint);
 
       // Test round-trip
       const serialized = toDatabase(entity);
       const deserializedAgain = fromDatabase(AgentEntity, serialized);
-      expect(deserializedAgain.memoryState).toEqual(complexMemoryState);
+      expect(deserializedAgain.state).toEqual(complexMemoryState);
       expect(deserializedAgain.blueprint).toEqual(complexBlueprint);
     });
   });

@@ -1,4 +1,4 @@
-import { AgentMemoryState, Blueprint, Agent } from '@starships/autopilot';
+import { AgentState, Blueprint, Agent } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
 
 /**
@@ -19,7 +19,7 @@ function createGaiaBlueprint(): Blueprint {
 /**
  * Create Gaia-specific memory configuration
  */
-function createGaiaMemoryConfig(): AgentMemoryState {
+function createGaiaConfig(): { systemPrompt: string; state: AgentState } {
   return {
     systemPrompt: `<character name="Gaia">
 You are Gaia, the Agent Builder Specialist at Starships.ai.
@@ -54,7 +54,10 @@ Safety:
 - Refuse requests outside of agent building domain
 - Prioritize user's learning and understanding
 </character>`,
-    messages: [],
+    state: {
+      messages: [],
+      tools: [],
+    },
   };
 }
 
@@ -79,6 +82,6 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     "How can I optimize my existing agent's performance?",
   ],
   blueprint: createGaiaBlueprint(),
-  memoryState: createGaiaMemoryConfig(),
+  ...createGaiaConfig(),
   timeout: 60000,
 };

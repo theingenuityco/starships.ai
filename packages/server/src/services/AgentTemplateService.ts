@@ -1,16 +1,18 @@
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { AgentRepository, AgentTemplateRepository, Neo4jConnection, StarshipRepository } from '@starships/models';
+import { AgentRepository, AgentTemplateRepository, ToolRepository, Neo4jConnection, StarshipRepository } from '@starships/models';
 import { AgentModel, AgentTemplateModel, StarshipModel } from '@starships/protocol';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
   private starshipRepository: StarshipRepository;
   private agentRepository: AgentRepository;
+  private toolRepository: ToolRepository;
 
   constructor(connection: Neo4jConnection) {
     this.templateRepository = new AgentTemplateRepository(connection);
     this.starshipRepository = new StarshipRepository(connection);
     this.agentRepository = new AgentRepository(connection);
+    this.toolRepository = new ToolRepository(connection);
   }
 
   async getAllTemplates(): Promise<AgentTemplateModel[]> {
@@ -60,6 +62,28 @@ export class AgentTemplateService {
       throw new NotFoundError('Template', templateId);
     }
 
+    // Deploy assigned tool templates to the starship as tool instances
+    if (template.assignedToolSlugs && template.assignedToolSlugs.length > 0) {
+      console.log(`[AGENT-TEMPLATE-SERVICE] Deploying ${template.assignedToolSlugs.length} tools to starship ${starshipId}`);
+
+      for (const toolSlug of template.assignedToolSlugs) {
+        try {
+          // Check if tool is already deployed to this starship
+          const existingTool = await this.toolRepository.findBySlugAndStarship(toolSlug, starshipId);
+          if (!existingTool) {
+            // Deploy tool from template
+            await this.toolRepository.createFromTemplate(toolSlug, starshipId);
+            console.log(`[AGENT-TEMPLATE-SERVICE] Deployed tool '${toolSlug}' to starship ${starshipId}`);
+          } else {
+            console.log(`[AGENT-TEMPLATE-SERVICE] Tool '${toolSlug}' already deployed to starship ${starshipId}`);
+          }
+        } catch (error) {
+          console.error(`[AGENT-TEMPLATE-SERVICE] Failed to deploy tool '${toolSlug}':`, error);
+          // Continue with other tools instead of failing completely
+        }
+      }
+    }
+
     // Create agent data based on the template
     const agentData = {
       name: template.name,
@@ -70,6 +94,7 @@ export class AgentTemplateService {
       timeout: template.timeout || 30000,
       memoryState: template.memoryState,
       blueprint: template.blueprint,
+      assignedToolSlugs: template.assignedToolSlugs,
     };
 
     // Create the agent using the repository

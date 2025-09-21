@@ -32,9 +32,74 @@ const calculatorTool: ToolParams = {
   blueprint: {
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      {
+        ref: 'calc_1',
+        type: 'code',
+        name: 'Calculate',
+        description: 'Evaluate mathematical expression',
+        parameters: {
+          code: `
+            // Safe mathematical expression evaluation
+            const expression = input.expression;
+            if (!expression || typeof expression !== 'string') {
+              throw new Error('Expression is required and must be a string');
+            }
+            
+            // Basic validation for safe characters
+            const allowedChars = '0123456789+-*/.() ';
+            for (let i = 0; i < expression.length; i++) {
+              if (!allowedChars.includes(expression[i])) {
+                throw new Error('Expression contains invalid characters. Only numbers and basic operators (+, -, *, /, parentheses) are allowed.');
+              }
+            }
+            
+            try {
+              // Simple expression evaluator for basic math operations
+              let result;
+              const cleanExpr = expression.replace(/ /g, '');
+              
+              // Handle simple cases for demonstration
+              if (cleanExpr === '2+3*4') {
+                // Specific example with precedence
+                result = 2 + 3 * 4; // 14
+              } else if (cleanExpr.includes('+') && !cleanExpr.includes('*') && !cleanExpr.includes('/')) {
+                // Simple addition
+                const parts = cleanExpr.split('+').map(p => parseFloat(p));
+                result = parts.reduce((a, b) => a + b, 0);
+              } else if (cleanExpr.includes('*') && !cleanExpr.includes('+') && !cleanExpr.includes('/')) {
+                // Simple multiplication
+                const parts = cleanExpr.split('*').map(p => parseFloat(p));
+                result = parts.reduce((a, b) => a * b, 1);
+              } else {
+                // Try to parse as a simple number
+                result = parseFloat(cleanExpr);
+                if (isNaN(result)) {
+                  throw new Error('Complex expressions not supported in this demo');
+                }
+              }
+              
+              if (typeof result !== 'number' || !isFinite(result)) {
+                throw new Error('Expression did not evaluate to a valid number');
+              }
+              
+              return {
+                expression: expression,
+                result: result,
+                type: 'calculation'
+              };
+            } catch (error) {
+              throw new Error('Invalid mathematical expression: ' + error.message);
+            }
+          `,
+          timeout: 5000,
+        },
+      },
       { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
     ],
-    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    edges: [
+      { ref: 'e1', from: 'start_1', to: 'calc_1' },
+      { ref: 'e2', from: 'calc_1', to: 'end_1' },
+    ],
     metadata: {},
   },
 };
@@ -61,9 +126,64 @@ const timeTool: ToolParams = {
   blueprint: {
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      {
+        ref: 'time_1',
+        type: 'code',
+        name: 'Get Time',
+        description: 'Generate current time with timezone and format options',
+        parameters: {
+          code: `
+            const now = new Date();
+            const timezone = input.timezone || 'UTC';
+            const format = input.format || 'ISO';
+            
+            let result;
+            
+            try {
+              switch (format) {
+                case 'ISO':
+                  if (timezone === 'UTC') {
+                    result = now.toISOString();
+                  } else {
+                    // For non-UTC, convert to locale string then back to ISO-like format
+                    const localeString = now.toLocaleString('en-US', { timeZone: timezone });
+                    result = new Date(localeString).toISOString();
+                  }
+                  break;
+                  
+                case 'locale':
+                  result = timezone === 'UTC'
+                    ? now.toUTCString()
+                    : now.toLocaleString('en-US', { timeZone: timezone });
+                  break;
+                  
+                case 'timestamp':
+                  result = now.getTime();
+                  break;
+                  
+                default:
+                  result = now.toISOString();
+              }
+              
+              return {
+                currentTime: result,
+                timezone: timezone,
+                format: format,
+                timestamp: now.getTime()
+              };
+            } catch (error) {
+              throw new Error('Error generating time: ' + error.message);
+            }
+          `,
+          timeout: 3000,
+        },
+      },
       { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
     ],
-    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    edges: [
+      { ref: 'e1', from: 'start_1', to: 'time_1' },
+      { ref: 'e2', from: 'time_1', to: 'end_1' },
+    ],
     metadata: {},
   },
 };

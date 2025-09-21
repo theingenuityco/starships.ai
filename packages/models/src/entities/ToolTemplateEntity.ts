@@ -1,20 +1,28 @@
 /**
- * Tool Template Entity - Layer 2
+ * ToolTemplate Entity - Layer 2
  *
  * Bridges between database records and domain models with validation and transformation capabilities.
- * Follows the layered architecture pattern established by ConversationEntity and AgentTemplateEntity.
+ * Follows the layered architecture pattern established by AgentEntity.
  */
 
 import { Transformers } from '@/helpers/serializer';
-import { ToolParams } from '@starships/autopilot';
-import type { Blueprint } from '@starships/autopilot';
 import type { ToolTemplateModel, ToolTemplateCategory } from '@starships/protocol';
+import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
+import {
+  IsISO8601,
+  IsString,
+  Length,
+  validate,
+  ValidationError,
+  IsOptional,
+  IsObject,
+  IsNumber,
+  IsBoolean,
+  IsArray,
+} from 'class-validator';
 
 export class ToolTemplateEntity implements ToolTemplateModel {
-  [key: string]: unknown;
-
   // Core database fields
   @Expose()
   @IsString()
@@ -43,7 +51,6 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   name!: string;
 
   @Expose()
-  @IsOptional()
   @IsString()
   @Length(0, 500)
   description!: string;
@@ -51,39 +58,60 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  parameters!: ToolParams['parameters'];
+  parameters!: {
+    type: 'object';
+    properties: Record<string, ToolParameterSchema>;
+    required?: string[];
+  };
 
-  // Blueprint (execution logic)
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint;
 
+  // BaseParams fields
+  @Expose()
+  @IsOptional()
+  @Transformers.JsonTransform()
+  @IsArray()
+  transforms?: TransformOperation[];
+
+  @Expose()
+  @IsOptional()
+  @Transformers.JsonTransform()
+  @IsArray()
+  mutations?: TransformOperation[];
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  condition?: string;
+
   // Template metadata
   @Expose()
-  @IsEnum(['general', 'api', 'utility', 'data', 'communication', 'automation'])
+  @IsString()
   category!: ToolTemplateCategory;
 
   @Expose()
   @IsNumber()
-  @Min(0)
   usageCount!: number;
 
   // Template preview
   @Expose()
   @IsOptional()
   @IsString()
-  @Length(0, 1000)
   exampleUsage?: string;
 
+  // Configuration hints
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
+  @IsBoolean()
   requiresApiKey?: boolean;
 
   @Expose()
   @IsOptional()
   @Transformers.JsonTransform()
+  @IsArray()
   configurationFields?: Array<{
     name: string;
     type: 'string' | 'number' | 'boolean';
@@ -111,12 +139,15 @@ export class ToolTemplateEntity implements ToolTemplateModel {
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         name: dataRecord.name || '',
         description: dataRecord.description || '',
-        parameters: dataRecord.parameters || { type: 'object', properties: {}, required: [] },
-        blueprint: (dataRecord as { blueprint?: Blueprint }).blueprint || { nodes: [], edges: [], metadata: {} },
+        parameters: dataRecord.parameters || { type: 'object', properties: {} },
+        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
+        transforms: dataRecord.transforms,
+        mutations: dataRecord.mutations,
+        condition: dataRecord.condition,
         category: dataRecord.category || 'general',
-        usageCount: dataRecord.usageCount ?? 0,
+        usageCount: dataRecord.usageCount || 0,
         exampleUsage: dataRecord.exampleUsage,
-        requiresApiKey: dataRecord.requiresApiKey ?? false,
+        requiresApiKey: dataRecord.requiresApiKey,
         configurationFields: dataRecord.configurationFields || [],
         ...dataRecord,
       });

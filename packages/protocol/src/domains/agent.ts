@@ -38,4 +38,8 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata;
 /**
  * Request to update an agent
  */
-export type UpdateAgentRequest = Partial<AgentParamsWithoutMetadata>;
+export type UpdateAgentRequest = Partial<
+  AgentParamsWithoutMetadata & {
+    assignedToolIds?: string[];
+  }
+>;

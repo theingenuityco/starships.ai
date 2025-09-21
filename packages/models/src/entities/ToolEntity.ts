@@ -2,24 +2,26 @@
  * Tool Entity - Layer 2
  *
  * Bridges between database records and domain models with validation and transformation capabilities.
- * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
+ * Follows the layered architecture pattern established by AgentEntity.
  */
 
 import { Transformers } from '@/helpers/serializer';
-import { ToolParams } from '@starships/autopilot';
-import type { Blueprint } from '@starships/autopilot';
 import type { ToolModel } from '@starships/protocol';
+import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsBoolean, IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean } from 'class-validator';
 
 export class ToolEntity implements ToolModel {
-  [key: string]: unknown;
-
   // Core database fields
   @Expose()
   @IsString()
   @Length(1, 255)
   id!: string;
+
+  @Expose()
+  @IsString()
+  @Length(1, 100)
+  slug!: string;
 
   @Expose()
   @Transformers.DateTransform()
@@ -38,7 +40,6 @@ export class ToolEntity implements ToolModel {
   name!: string;
 
   @Expose()
-  @IsOptional()
   @IsString()
   @Length(0, 500)
   description!: string;
@@ -46,15 +47,36 @@ export class ToolEntity implements ToolModel {
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  parameters!: ToolParams['parameters'];
+  parameters!: {
+    type: 'object';
+    properties: Record<string, ToolParameterSchema>;
+    required?: string[];
+  };
 
-  // Blueprint (execution logic)
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint;
 
-  // User configuration
+  // BaseParams fields
+  @Expose()
+  @IsOptional()
+  @Transformers.JsonTransform()
+  @IsObject()
+  transforms?: TransformOperation[];
+
+  @Expose()
+  @IsOptional()
+  @Transformers.JsonTransform()
+  @IsObject()
+  mutations?: TransformOperation[];
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  condition?: string;
+
+  // Tool-specific fields
   @Expose()
   @IsOptional()
   @Transformers.JsonTransform()
@@ -81,12 +103,16 @@ export class ToolEntity implements ToolModel {
     if (operation === 'create') {
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        slug: dataRecord.slug || '',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         name: dataRecord.name || '',
         description: dataRecord.description || '',
-        parameters: dataRecord.parameters || { type: 'object', properties: {}, required: [] },
-        blueprint: (dataRecord as { blueprint?: Blueprint }).blueprint || { nodes: [], edges: [], metadata: {} },
+        parameters: dataRecord.parameters || { type: 'object', properties: {} },
+        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
+        transforms: dataRecord.transforms,
+        mutations: dataRecord.mutations,
+        condition: dataRecord.condition,
         configuration: dataRecord.configuration || {},
         isEnabled: dataRecord.isEnabled ?? true,
         ...dataRecord,

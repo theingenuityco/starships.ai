@@ -27,9 +27,6 @@ export * from './events';
 export * from './validation';
 export * from './llm';
 
-// Legacy agent types (deprecated)
-export type { AgentIdentity, AgentPurpose, AgentSpace } from '@/memory/AgentMemory';
-
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)
 export type { BaseBlueprint, BaseNode } from './base';

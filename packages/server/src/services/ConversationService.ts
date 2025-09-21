@@ -1,7 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { ToolParams, ExecutionItem, LlmToolCall } from '@starships/autopilot';
+import type { ToolParams, ExecutionItem } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -236,27 +236,8 @@ export class ConversationService {
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
 
-      // Create ordered messages in the required order (system -> memory -> conversation)
-      const orderedMessages: Array<{
-        role: 'user' | 'assistant' | 'system' | 'tool';
-        content: string;
-        tool_calls?: LlmToolCall[];
-        tool_call_id?: string;
-      }> = [];
-
-      const memory = agentModel.memoryState;
-      if (memory?.systemPrompt) {
-        orderedMessages.push({ role: 'system', content: memory.systemPrompt });
-      }
-      if (Array.isArray(memory?.messages) && memory.messages.length > 0) {
-        orderedMessages.push(...memory.messages);
-      }
-      if (llmMessages.length > 0) {
-        orderedMessages.push(...llmMessages);
-      }
-
-      // Prepare input for agent execution
-      const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(orderedMessages);
+      // Prepare input for agent execution - Agent will handle memory state and ordering internally
+      const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
 
       // Execute via agent - runner and event callback are configured in the Agent constructor
       await agent.execute(input);

@@ -117,18 +117,18 @@ When `failOnNodeError` is false:
 
 ## Node Types
 
-| Type           | Description              | Key Parameters                                          |
-| -------------- | ------------------------ | ------------------------------------------------------- |
-| `start/end`    | Flow control             | `{}`                                                    |
-| `llm`          | LLM API calls            | `model`, `messages`, `temperature`                      |
-| `agent`        | AI agent with memory     | `name`, `model`, `memoryState` (systemPrompt, messages) |
-| `http_request` | HTTP API calls           | `url`, `method`, `headers`, `body`                      |
-| `conditional`  | Branch workflows         | `condition` (JavaScript expression)                     |
-| `transform`    | Input transformations    | `transforms` (JSON Patch operations)                    |
-| `mutate`       | State mutations          | `mutations` (JSON Patch operations)                     |
-| `tool`         | Function calling support | `name`, `description`, `parameters`                     |
-| `workflow`     | Nested workflows         | `blueprint`                                             |
-| `user_prompt`  | User interaction         | Platform-specific                                       |
+| Type           | Description              | Key Parameters                                             |
+| -------------- | ------------------------ | ---------------------------------------------------------- |
+| `start/end`    | Flow control             | `{}`                                                       |
+| `llm`          | LLM API calls            | `model`, `messages`, `temperature`                         |
+| `agent`        | AI agent with memory     | `name`, `model`, `systemPrompt`, `state` (messages, tools) |
+| `http_request` | HTTP API calls           | `url`, `method`, `headers`, `body`                         |
+| `conditional`  | Branch workflows         | `condition` (JavaScript expression)                        |
+| `transform`    | Input transformations    | `transforms` (JSON Patch operations)                       |
+| `mutate`       | State mutations          | `mutations` (JSON Patch operations)                        |
+| `tool`         | Function calling support | `name`, `description`, `parameters`                        |
+| `workflow`     | Nested workflows         | `blueprint`                                                |
+| `user_prompt`  | User interaction         | Platform-specific                                          |
 
 ## Template Expressions
 
@@ -269,7 +269,8 @@ const messages = memory.toMessages(); // Format for LLM (systemPrompt + messages
 const agent = new Agent({
   name: 'Sarah',
   model: 'anthropic/claude-3-haiku',
-  memoryState: memory.getState(),
+  systemPrompt: 'You are a helpful assistant.',
+  state: { messages: [], tools: [] },
 });
 ```
 

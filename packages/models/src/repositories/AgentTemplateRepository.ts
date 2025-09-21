@@ -115,7 +115,8 @@ export class AgentTemplateRepository extends BaseRepository {
           timeout: data.timeout,
           icon: data.icon,
           previewPrompts: data.previewPrompts,
-          memoryState: data.memoryState,
+          systemPrompt: data.systemPrompt,
+          state: data.state,
           blueprint: data.blueprint,
           usageCount: 0,
 

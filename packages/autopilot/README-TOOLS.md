@@ -128,9 +128,9 @@ const result = await agent.execute('What time is it in Tokyo and what is 42 * 17
 const agent = new Agent({
   name: 'ConversationAssistant',
   model: 'anthropic/claude-3.5-sonnet',
-  tools: [calculatorTool],
-  memoryState: {
-    systemPrompt: 'You are a helpful math assistant.',
+  systemPrompt: 'You are a helpful math assistant.',
+  state: {
+    tools: [calculatorTool],
     messages: [],
   },
 });

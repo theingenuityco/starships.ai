@@ -191,6 +191,14 @@ export type MutateParams = BaseParams;
 // No additional parameters needed
 
 /**
+ * Code node parameters for JavaScript function execution
+ */
+export interface CodeParams extends BaseParams {
+  code: string; // JavaScript code to execute
+  timeout?: number; // Execution timeout in milliseconds (default: 5000)
+}
+
+/**
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
@@ -204,4 +212,5 @@ export type NodeParameters =
   | EndParams
   | ConditionalParams
   | TransformParams
-  | MutateParams;
+  | MutateParams
+  | CodeParams;

@@ -185,6 +185,11 @@ export class ToolTemplateRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
+
+        // Clean up all relationships:
+        // - AgentTemplate-[:USES_TOOL_TEMPLATE]->ToolTemplate
+        // - Tool-[:CREATED_FROM]->ToolTemplate
+        // DETACH DELETE will automatically remove all relationships
         const result = await connection.executeWrite<{ deletedCount: number }>(
           'MATCH (tt:ToolTemplate) WHERE tt.id = $id DETACH DELETE tt RETURN count(tt) as deletedCount',
           { id }

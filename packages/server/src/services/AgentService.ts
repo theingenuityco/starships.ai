@@ -227,24 +227,66 @@ export class AgentService {
   }
 
   /**
-   * Assign multiple tools to an agent (replaces existing assignments)
+   * Assign multiple tools to an agent via relationships (replaces existing assignments)
    */
-  async assignToolSlugs(agentId: string, toolSlugs: string[]): Promise<AgentModel> {
-    return await this.agentRepository.assignToolSlugs(agentId, toolSlugs);
+  async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {
+    // Use the new relationship-based approach
+    await this.agentRepository.assignToolsToAgent(agentId, toolSlugs, starshipId);
+
+    // Return the updated agent
+    const updatedAgent = await this.agentRepository.findById(agentId);
+    if (!updatedAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    return updatedAgent;
   }
 
   /**
-   * Add a single tool to an agent's existing assignments
+   * Add a single tool to an agent's existing assignments via relationships
    */
-  async addToolSlug(agentId: string, toolSlug: string): Promise<AgentModel> {
-    return await this.agentRepository.addToolSlug(agentId, toolSlug);
+  async addToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    // Find the deployed tool instance by slug and starship
+    const { ToolRepository } = await import('@starships/models');
+    const toolRepository = new ToolRepository();
+
+    const tool = await toolRepository.findBySlugAndStarship(toolSlug, starshipId);
+    if (!tool) {
+      throw new NotFoundError('Tool', `${toolSlug} on starship ${starshipId}`);
+    }
+
+    // Create the relationship
+    await this.agentRepository.addToolRelationship(agentId, tool.id);
+
+    // Return the updated agent
+    const updatedAgent = await this.agentRepository.findById(agentId);
+    if (!updatedAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    return updatedAgent;
   }
 
   /**
-   * Remove a single tool from an agent's assignments
+   * Remove a single tool from an agent's assignments via relationships
    */
-  async removeToolSlug(agentId: string, toolSlug: string): Promise<AgentModel> {
-    return await this.agentRepository.removeToolSlug(agentId, toolSlug);
+  async removeToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    // Find the deployed tool instance by slug and starship
+    const { ToolRepository } = await import('@starships/models');
+    const toolRepository = new ToolRepository();
+
+    const tool = await toolRepository.findBySlugAndStarship(toolSlug, starshipId);
+    if (!tool) {
+      throw new NotFoundError('Tool', `${toolSlug} on starship ${starshipId}`);
+    }
+
+    // Remove the relationship
+    await this.agentRepository.removeToolRelationship(agentId, tool.id);
+
+    // Return the updated agent
+    const updatedAgent = await this.agentRepository.findById(agentId);
+    if (!updatedAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    return updatedAgent;
   }
 
   // ============================================================================

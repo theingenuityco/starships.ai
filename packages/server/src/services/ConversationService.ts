@@ -140,15 +140,15 @@ export class ConversationService {
 
   /**
    * Get deployed tool instances with their actual blueprints for the agent
-   * Uses proper repository pattern following layered architecture
+   * Uses relationship-based tool resolution for accurate results
    */
   private async getAgentTools(agentId: string, starshipId: string): Promise<ToolParams[]> {
     try {
-      // Use AgentRepository.getAgentTools() - follows proper layered architecture
+      // Use relationship-based approach: Agent-[:USES_TOOL]->Tool-[:DEPLOYED_ON]->Starship
       const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
 
       if (deployedTools.length === 0) {
-        console.log(`[CONVERSATION-SERVICE] No deployed tool instances found for agent ${agentId} on starship ${starshipId}`);
+        console.log(`[CONVERSATION-SERVICE] No tools found for agent ${agentId} on starship ${starshipId} via relationships`);
         return [];
       }
 
@@ -163,10 +163,10 @@ export class ConversationService {
         ...(tool.condition && { condition: tool.condition }),
       }));
 
-      console.log(`[CONVERSATION-SERVICE] Found ${toolParams.length} deployed tools with blueprints for agent ${agentId}`);
+      console.log(`[CONVERSATION-SERVICE] Found ${toolParams.length} tools via Agent→Tool relationships for agent ${agentId}`);
       return toolParams;
     } catch (error) {
-      console.error(`[CONVERSATION-SERVICE] Error getting agent tool instances:`, error);
+      console.error(`[CONVERSATION-SERVICE] Error getting agent tools via relationships:`, error);
       return [];
     }
   }

@@ -65,8 +65,6 @@ export class AgentTemplateService {
     // Deploy assigned tool templates to the starship as tool instances
     const deployedToolIds: string[] = [];
 
-    console.log(`[AGENT-TEMPLATE-SERVICE] Template assignedToolSlugs:`, template.assignedToolSlugs);
-
     if (template.assignedToolSlugs && template.assignedToolSlugs.length > 0) {
       console.log(`[AGENT-TEMPLATE-SERVICE] Deploying ${template.assignedToolSlugs.length} tools to starship ${starshipId}`);
 
@@ -85,7 +83,6 @@ export class AgentTemplateService {
           // Track deployed tool ID for relationship creation
           if (existingTool) {
             deployedToolIds.push(existingTool.id);
-            console.log(`[AGENT-TEMPLATE-SERVICE] Added tool ${existingTool.id} to deployment list`);
           }
         } catch (error) {
           console.error(`[AGENT-TEMPLATE-SERVICE] Failed to deploy tool '${toolSlug}':`, error);

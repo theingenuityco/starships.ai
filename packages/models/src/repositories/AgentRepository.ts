@@ -165,7 +165,6 @@ export class AgentRepository extends BaseRepository {
 
         // Create tool relationships if assignedToolSlugs provided
         if (toolSlugsForRelationships.length > 0) {
-          console.log(`[AGENT-REPOSITORY] Creating relationships for ${toolSlugsForRelationships.length} tools for agent ${agent.id}`);
           await this.assignToolsToAgent(agent.id, toolSlugsForRelationships, starshipId);
         }
 
@@ -290,16 +289,8 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('AgentTemplate', templateId);
         }
 
-        console.log(`[AGENT-REPOSITORY] Template loaded:`, {
-          id: template.id,
-          name: template.name,
-          assignedToolSlugs: template.assignedToolSlugs,
-        });
-
         // Get tool slugs for relationship creation but don't include in agent data
         const toolSlugsForRelationships = customizations?.assignedToolSlugs || template.assignedToolSlugs || [];
-
-        console.log(`[AGENT-REPOSITORY] Tool slugs for relationships:`, toolSlugsForRelationships);
 
         // Create agent from template with optional customizations (without assignedToolSlugs)
         const agentData = {
@@ -328,12 +319,7 @@ export class AgentRepository extends BaseRepository {
 
         // Create tool relationships if tool slugs were specified
         if (toolSlugsForRelationships.length > 0) {
-          console.log(
-            `[AGENT-REPOSITORY] Creating tool relationships for agent ${agent.id} with ${toolSlugsForRelationships.length} tools`
-          );
           await this.assignToolsToAgent(agent.id, toolSlugsForRelationships, starshipId);
-        } else {
-          console.log(`[AGENT-REPOSITORY] No tool slugs to create relationships for agent ${agent.id}`);
         }
 
         // Increment template usage count

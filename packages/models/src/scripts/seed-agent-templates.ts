@@ -51,8 +51,23 @@ export async function seedAgentTemplates(): Promise<void> {
           existingCount++;
           logger.info(`Agent template updated: ${template.name} (slug: ${template.slug})`);
         } else {
-          // Create the template
-          await templateRepo.create(template);
+          // Create the template - explicitly construct payload with slug
+          const payload = {
+            name: template.name,
+            slug: template.slug, // Ensure explicit slug is passed
+            description: template.description,
+            category: template.category,
+            model: template.model,
+            temperature: template.temperature,
+            maxTokens: template.maxTokens,
+            timeout: template.timeout,
+            icon: template.icon,
+            previewPrompts: template.previewPrompts,
+            blueprint: template.blueprint,
+            memoryState: template.memoryState,
+            assignedToolSlugs: template.assignedToolSlugs,
+          };
+          await templateRepo.create(payload);
           addedCount++;
           logger.info(`Agent template created: ${template.name} (slug: ${template.slug})`);
         }

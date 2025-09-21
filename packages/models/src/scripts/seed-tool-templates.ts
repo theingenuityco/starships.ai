@@ -55,6 +55,7 @@ export async function seedToolTemplates(): Promise<void> {
           // Create new template
           const payload: CreateToolTemplateRequest = {
             name: template.name,
+            slug: slug, // Include the explicit or generated slug
             description: template.description,
             parameters: template.parameters,
             category: template.category,

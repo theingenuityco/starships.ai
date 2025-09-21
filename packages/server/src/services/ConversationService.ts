@@ -204,14 +204,8 @@ export class ConversationService {
       const blueprint = agent.getCurrentBlueprint();
       await runner.run(blueprint, execution, engineConfig);
 
-      // Send completion event
-      if (this.streamingService) {
-        await this.streamingService.broadcastComplete(data.conversationId, {
-          source: 'agent',
-          content: 'Workflow completed',
-          agentId: agentModel.id,
-        });
-      }
+      // Note: broadcastComplete is now called at the end of content_complete event handler
+      // to ensure all delta operations are sent before the complete event
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
         agentId: agentModel.id,
@@ -444,6 +438,15 @@ export class ConversationService {
         this.streamingContent.delete(conversationId);
         // Also clear tool calls tracker to prevent reuse
         this.streamingToolCalls.delete(conversationId);
+
+        // Send completion event AFTER all delta operations are complete
+        if (this.streamingService) {
+          await this.streamingService.broadcastComplete(conversationId, {
+            source: 'agent',
+            content: 'Workflow completed',
+            agentId: 'agent', // We don't have agentModel available here, but it's not critical
+          });
+        }
         break;
       }
 

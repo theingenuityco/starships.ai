@@ -35,6 +35,7 @@ export interface Execution {
   results: Array<{ nodeRef: string; items: ExecutionItem[] }>; // Chronological execution results
   visitCounts?: Record<string, number>; // Track node visit counts for cycle support
   error?: ExecutionError;
+  nested?: boolean; // Flag to indicate this is a nested workflow execution (e.g., from a tool)
 }
 
 /**

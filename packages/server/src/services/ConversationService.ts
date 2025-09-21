@@ -1,9 +1,9 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { Runner, EngineConfig } from '@starships/autopilot';
+import type { Runner, EngineConfig, ToolParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
-import { ConversationRepository } from '@starships/models';
+import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
 
@@ -21,6 +21,7 @@ interface AutopilotConfig {
  */
 export class ConversationService {
   private conversationRepository: ConversationRepository;
+  private agentRepository: AgentRepository;
   private messageService: MessageService;
   private streamingService: StreamingService;
   // Track accumulated content for streaming messages by conversation ID
@@ -39,6 +40,7 @@ export class ConversationService {
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
+    this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
     // Choose default runner (child process) with proper limits
@@ -136,6 +138,39 @@ export class ConversationService {
     return this.conversationRepository.delete(conversationId);
   }
 
+  /**
+   * Get deployed tool instances with their actual blueprints for the agent
+   * Uses proper repository pattern following layered architecture
+   */
+  private async getAgentTools(agentId: string, starshipId: string): Promise<ToolParams[]> {
+    try {
+      // Use AgentRepository.getAgentTools() - follows proper layered architecture
+      const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
+
+      if (deployedTools.length === 0) {
+        console.log(`[CONVERSATION-SERVICE] No deployed tool instances found for agent ${agentId} on starship ${starshipId}`);
+        return [];
+      }
+
+      // Convert ToolModel instances to ToolParams with their actual blueprints
+      const toolParams: ToolParams[] = deployedTools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+        blueprint: tool.blueprint, // Use the actual blueprint from the deployed instance
+        ...(tool.transforms && { transforms: tool.transforms }),
+        ...(tool.mutations && { mutations: tool.mutations }),
+        ...(tool.condition && { condition: tool.condition }),
+      }));
+
+      console.log(`[CONVERSATION-SERVICE] Found ${toolParams.length} deployed tools with blueprints for agent ${agentId}`);
+      return toolParams;
+    } catch (error) {
+      console.error(`[CONVERSATION-SERVICE] Error getting agent tool instances:`, error);
+      return [];
+    }
+  }
+
   async addConversationMessage(data: Message & { conversationId: string }): Promise<void> {
     // Save user message to database
     const userMessage = await this.messageService.createMessage({
@@ -178,8 +213,21 @@ export class ConversationService {
         failOnNodeError: true,
       };
 
+      // Get starship for context
+      const starship = await this.getConversationStarship(data.conversationId);
+      if (!starship) {
+        throw new NotFoundError('Starship', 'for conversation');
+      }
+
+      // Get deployed tools for this agent using ToolService
+      const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+
       // Build Agent to materialize blueprint (tools, nodes, etc.)
-      const agent = new Agent(agentModel);
+      const agentWithTools = {
+        ...agentModel,
+        tools: resolvedTools,
+      };
+      const agent = new Agent(agentWithTools);
 
       // Convert database messages to LLM format, preserving tool_calls and tool results
       const llmMessages = messages.map((msg) => ({
@@ -198,20 +246,20 @@ export class ConversationService {
         tool_call_id?: string;
       }> = [];
 
-      const memory = (agentModel as any).memoryState;
+      const memory = agentModel.memoryState;
       if (memory?.systemPrompt) {
         orderedMessages.push({ role: 'system', content: memory.systemPrompt });
       }
-      if (Array.isArray(memory?.messages) && memory!.messages.length > 0) {
-        orderedMessages.push(...(memory!.messages as any));
+      if (Array.isArray(memory?.messages) && memory.messages.length > 0) {
+        orderedMessages.push(...memory.messages);
       }
       if (llmMessages.length > 0) {
-        orderedMessages.push(...(llmMessages as any));
+        orderedMessages.push(...llmMessages);
       }
 
-      // Commit ordered messages and tools to execution state
+      // Commit ordered messages and resolved tools to execution state
       (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
-      (execution.state as Record<string, unknown>)['tools'] = (agentModel as any).tools || [];
+      (execution.state as Record<string, unknown>)['tools'] = resolvedTools;
 
       // Execute blueprint via runner
       const blueprint = agent.getCurrentBlueprint();

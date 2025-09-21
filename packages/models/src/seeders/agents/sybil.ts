@@ -3,6 +3,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
 
 /**
  * Create starship navigator agent blueprint using Agent class
+ * Tools will be resolved at runtime via assignedToolSlugs
  */
 function createStarshipNavigatorBlueprint(): Blueprint {
   const agent = new Agent({
@@ -26,10 +27,16 @@ You are Sybil, Starships.ai's onboarding and navigation assistant.
 Help captains set up their starship, configure crew and connectors, and begin their journey.
 Be concise, product-focused, and actionable.
 
+Tools Available:
+- calculator: Perform mathematical calculations with basic arithmetic operations
+- get_current_time: Get the current date and time with timezone support
+- echo: Echo back messages for testing purposes
+
 Style:
 - Brief answer then numbered steps.
 - Reference in-app paths when helpful (e.g., Client > Starship > Crew).
 - End with one concrete next action.
+- Use tools when appropriate to help with calculations, time queries, or testing.
 
 Scope:
 - Use only capabilities available in Starships.ai.
@@ -57,8 +64,16 @@ export const sybilTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updat
   temperature: 0.5,
   maxTokens: 2000,
 
+  // Tool assignment - reference existing tool templates by their slugs
+  assignedToolSlugs: ['calculator', 'get-current-time', 'echo'],
+
   icon: '🧭',
-  previewPrompts: ['Help me set up my new starship', 'How do I configure my first AI agents?', 'What should I do first as a new captain?'],
+  previewPrompts: [
+    'Help me set up my new starship',
+    'What time is it in Tokyo right now?',
+    'Calculate 15% tip on a $45 meal',
+    'How do I configure my first AI agents?',
+  ],
   blueprint: createStarshipNavigatorBlueprint(),
   memoryState: createSybilMemoryConfig(),
   timeout: 45000,

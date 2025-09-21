@@ -25,6 +25,9 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
   createdAt: string;
   updatedAt: string;
 
+  // Tool assignment - reference by slugs instead of embedding
+  assignedToolSlugs?: string[];
+
   // Template metadata
   category: AgentTemplateCategory;
   usageCount: number;

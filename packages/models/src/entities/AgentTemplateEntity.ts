@@ -9,7 +9,20 @@ import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import type { AgentMemoryState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsISO8601,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  Max,
+  Min,
+  validate,
+  ValidationError,
+} from 'class-validator';
 
 /**
  * Custom transformers for the AgentTemplateEntity
@@ -109,6 +122,13 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @IsObject()
   blueprint!: Blueprint;
 
+  // Tool assignment - reference by slugs instead of embedding
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  assignedToolSlugs?: string[];
+
   // Template metadata
   @Expose()
   @IsEnum(['general', 'coding', 'creative', 'analysis', 'support'])
@@ -157,6 +177,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
         timeout: dataRecord.timeout ?? 30000,
         memoryState: dataRecord.memoryState || {},
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
+        assignedToolSlugs: dataRecord.assignedToolSlugs || [],
         category: dataRecord.category || 'general',
         usageCount: dataRecord.usageCount ?? 0,
         icon: dataRecord.icon,

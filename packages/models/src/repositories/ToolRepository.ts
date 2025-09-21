@@ -311,6 +311,17 @@ export class ToolRepository extends BaseRepository {
 
         const tool = await this.create(toolData, starshipId);
 
+        // Create CREATED_FROM relationship
+        await connection.executeWrite(
+          `MATCH (t:Tool {id: $toolId}), (tt:ToolTemplate {id: $templateId})
+           CREATE (t)-[:CREATED_FROM {createdAt: $createdAt}]->(tt)`,
+          {
+            toolId: tool.id,
+            templateId: template.id,
+            createdAt: new Date().toISOString(),
+          }
+        );
+
         // Increment template usage count
         await connection.executeWrite('MATCH (tt:ToolTemplate) WHERE tt.slug = $templateSlug SET tt.usageCount = tt.usageCount + 1', {
           templateSlug,
@@ -320,6 +331,28 @@ export class ToolRepository extends BaseRepository {
       },
       'createFromTemplate',
       'Tool'
+    );
+  }
+
+  /**
+   * Get the ToolTemplate that this Tool was created from
+   */
+  async getSourceTemplate(toolId: string): Promise<ToolTemplateModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const query = `
+          MATCH (t:Tool {id: $toolId})-[:CREATED_FROM]->(tt:ToolTemplate)
+          RETURN tt
+        `;
+
+        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>(query, { toolId });
+        const template = result[0]?.tt || null;
+        return template ? fromDatabase(ToolTemplateEntity, template) : null;
+      },
+      'getSourceTemplate',
+      'Tool',
+      toolId
     );
   }
 

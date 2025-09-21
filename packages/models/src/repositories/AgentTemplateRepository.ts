@@ -1,9 +1,10 @@
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
+import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest } from '@starships/protocol';
+import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest, ToolTemplateModel } from '@starships/protocol';
 
 export class AgentTemplateRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -245,6 +246,110 @@ export class AgentTemplateRepository extends BaseRepository {
       'incrementUsageCount',
       'AgentTemplate',
       id
+    );
+  }
+
+  // ============================================================================
+  // RELATIONSHIP MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Create a USES_TOOL_TEMPLATE relationship between AgentTemplate and ToolTemplate
+   */
+  async addToolTemplateRelationship(agentTemplateId: string, toolTemplateId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentTemplateId?.trim() || !toolTemplateId?.trim()) {
+          throw new Error('Both agentTemplateId and toolTemplateId are required');
+        }
+
+        const connection = this.getConnection();
+
+        // Check if both entities exist
+        const checkQuery = `
+          MATCH (at:AgentTemplate {id: $agentTemplateId})
+          MATCH (tt:ToolTemplate {id: $toolTemplateId})
+          RETURN at.id, tt.id
+        `;
+
+        const checkResult = await connection.executeQuery<{ 'at.id': string; 'tt.id': string }>(checkQuery, {
+          agentTemplateId,
+          toolTemplateId,
+        });
+
+        if (!checkResult || checkResult.length === 0) {
+          throw new Error('AgentTemplate or ToolTemplate not found');
+        }
+
+        // Create relationship if it doesn't exist
+        const relationshipQuery = `
+          MATCH (at:AgentTemplate {id: $agentTemplateId})
+          MATCH (tt:ToolTemplate {id: $toolTemplateId})
+          MERGE (at)-[:USES_TOOL_TEMPLATE {createdAt: $createdAt}]->(tt)
+        `;
+
+        await connection.executeWrite(relationshipQuery, {
+          agentTemplateId,
+          toolTemplateId,
+          createdAt: new Date().toISOString(),
+        });
+      },
+      'addToolTemplateRelationship',
+      'AgentTemplate',
+      agentTemplateId
+    );
+  }
+
+  /**
+   * Remove a USES_TOOL_TEMPLATE relationship between AgentTemplate and ToolTemplate
+   */
+  async removeToolTemplateRelationship(agentTemplateId: string, toolTemplateId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentTemplateId?.trim() || !toolTemplateId?.trim()) {
+          throw new Error('Both agentTemplateId and toolTemplateId are required');
+        }
+
+        const connection = this.getConnection();
+        const query = `
+          MATCH (at:AgentTemplate {id: $agentTemplateId})-[r:USES_TOOL_TEMPLATE]->(tt:ToolTemplate {id: $toolTemplateId})
+          DELETE r
+        `;
+
+        await connection.executeWrite(query, { agentTemplateId, toolTemplateId });
+      },
+      'removeToolTemplateRelationship',
+      'AgentTemplate',
+      agentTemplateId
+    );
+  }
+
+  /**
+   * Get all ToolTemplates used by an AgentTemplate
+   */
+  async getToolTemplates(agentTemplateId: string): Promise<ToolTemplateModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentTemplateId?.trim()) {
+          throw new Error('agentTemplateId is required');
+        }
+
+        const connection = this.getConnection();
+        const query = `
+          MATCH (at:AgentTemplate {id: $agentTemplateId})-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate)
+          RETURN tt
+          ORDER BY tt.name
+        `;
+
+        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>(query, { agentTemplateId });
+        return fromDatabaseArray(
+          ToolTemplateEntity,
+          result.map((record) => record.tt)
+        );
+      },
+      'getToolTemplates',
+      'AgentTemplate',
+      agentTemplateId
     );
   }
 }

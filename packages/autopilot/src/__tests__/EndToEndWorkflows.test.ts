@@ -599,7 +599,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Validate Data',
             description: 'Check data quality',
             parameters: {
-              condition: 'results[nodeRef = "extract-data"].items[0].json ? "true" : "false"',
+              condition: 'results.find(r => r.nodeRef === "extract-data")?.items?.[0]?.json ? "true" : "false"',
             },
           },
 

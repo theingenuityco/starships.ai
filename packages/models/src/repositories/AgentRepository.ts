@@ -289,9 +289,6 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('AgentTemplate', templateId);
         }
 
-        // Get tool slugs for relationship creation but don't include in agent data
-        const toolSlugsForRelationships = customizations?.assignedToolSlugs || template.assignedToolSlugs || [];
-
         // Create agent from template with optional customizations (without assignedToolSlugs)
         const agentData = {
           name: customizations?.name || template.name,
@@ -317,10 +314,8 @@ export class AgentRepository extends BaseRepository {
           }
         );
 
-        // Create tool relationships if tool slugs were specified
-        if (toolSlugsForRelationships.length > 0) {
-          await this.assignToolsToAgent(agent.id, toolSlugsForRelationships, starshipId);
-        }
+        // Note: Tool relationships are already created in the create() method
+        // No need to assign them again here to avoid duplicates
 
         // Increment template usage count
         await connection.executeWrite('MATCH (at:AgentTemplate) WHERE at.id = $templateId SET at.usageCount = at.usageCount + 1', {
@@ -385,16 +380,17 @@ export class AgentRepository extends BaseRepository {
           throw new Error('Agent or Tool not found');
         }
 
-        // Create relationship if it doesn't exist
+        // Create relationship if it doesn't exist with required key
         const relationshipQuery = `
           MATCH (a:Agent {id: $agentId})
           MATCH (t:Tool {id: $toolId})
-          MERGE (a)-[:USES_TOOL {createdAt: $createdAt}]->(t)
+          MERGE (a)-[:USES_TOOL {key: $key, createdAt: $createdAt}]->(t)
         `;
 
         await connection.executeWrite(relationshipQuery, {
           agentId,
           toolId,
+          key: `${agentId}_${toolId}`,
           createdAt: new Date().toISOString(),
         });
       },

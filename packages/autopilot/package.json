@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc && tsc-alias -p tsconfig.json && pnpm run copy:child-entry",
+    "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc --build && tsc-alias -p tsconfig.json && pnpm run copy:child-entry",
     "copy:child-entry": "mkdir -p dist/scripts && cp scripts/child-entry.js dist/scripts/child-entry.js",
     "dev": "tsc --watch",
     "type-check": "tsc --noEmit",

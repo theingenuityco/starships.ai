@@ -38,9 +38,34 @@ type IvmReference = {
   applyIgnored: (receiver?: unknown, args?: unknown[], opts?: { arguments?: { copy?: boolean } }) => void;
 };
 
+// Minimal types to avoid 'any' in host fetch bridge
+type HostFetchInit = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: unknown;
+};
+type HostFetchRequest = string | { url: string; init?: HostFetchInit };
+type HostFetchMeta = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  bodyText: string;
+};
+type HostReadableStreamReader = {
+  read: () => Promise<{ done: boolean; value?: Uint8Array }>;
+};
+type HostFetchResponse = {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers?: { forEach?: (cb: (v: string, k: string) => void) => void };
+  body?: { getReader?: () => HostReadableStreamReader };
+};
+
 type IvmModule = {
   Isolate: new (opts: { memoryLimit: number }) => IsolateInstance;
-  Reference: new (fn: (evt: unknown) => unknown) => IvmReference;
+  Reference: new (fn: (...args: unknown[]) => unknown) => IvmReference;
 };
 
 export interface IsolatedVmRunnerOptions {
@@ -129,10 +154,72 @@ export class IsolatedVmRunner implements Runner {
       await jail.set('__EVENT_REF__', eventRef);
     }
 
+    // Provide host fetch bridge to support globalThis.fetch inside the isolate (non-streaming body)
+    const hostFetchRef = new (ivm as unknown as { Reference: new (fn: (...args: unknown[]) => unknown) => IvmReference }).Reference(
+      async (...args: unknown[]) => {
+        try {
+          const request = (args[0] as HostFetchRequest) ?? '';
+          const url: string = typeof request === 'string' ? request : request.url;
+          const init: HostFetchInit | undefined = typeof request === 'string' ? undefined : request.init;
+
+          // Use host's global fetch (Node 18+)
+          const fetchFn = (globalThis as unknown as { fetch: (u: string, i?: unknown) => Promise<Response> }).fetch;
+          const resp = (await fetchFn(url, init as unknown)) as unknown as HostFetchResponse;
+
+          const headers: Record<string, string> = {};
+          if (resp.headers?.forEach) {
+            resp.headers.forEach((v: string, k: string) => {
+              headers[k] = v;
+            });
+          }
+
+          // Read entire body text (SSE will arrive concatenated)
+          let bodyText = '';
+          if (resp.body?.getReader) {
+            const reader = resp.body.getReader() as HostReadableStreamReader;
+            const decoder = new TextDecoder();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value) {
+                bodyText += decoder.decode(value, { stream: true });
+              }
+            }
+            bodyText += decoder.decode();
+          } else {
+            const anyResp = resp as unknown as { text?: () => Promise<string> };
+            if (anyResp.text) {
+              bodyText = await anyResp.text();
+            }
+          }
+
+          const meta: HostFetchMeta = {
+            ok: !!resp.ok,
+            status: resp.status ?? 0,
+            statusText: resp.statusText ?? '',
+            headers,
+            bodyText,
+          };
+          return meta;
+        } catch (err) {
+          const e = err as { message?: string } | undefined;
+          const msg = e?.message ?? String(err);
+          throw new Error('Fetch failed: ' + msg);
+        }
+      }
+    );
+    await jail.set('__HOST_FETCH__', hostFetchRef);
+
     // Inject serialized data for blueprint/execution/config into the isolate's global scope.
     // Note: Functions (like eventCallback) cannot be copied into the isolate. Strip them for now.
     const safeConfig = config ? { ...config, eventCallback: undefined } : undefined;
-    await jail.set('ENGINE_INPUT', { blueprint, execution, config: safeConfig }, { copy: true });
+
+    // Provide credentials to the isolate (host side), if available
+    const autopilotCredentials = {
+      openrouterApiKey: process.env.OPENROUTER_API_KEY ?? undefined,
+    };
+
+    await jail.set('ENGINE_INPUT', { blueprint, execution, config: safeConfig, autopilotCredentials }, { copy: true });
 
     // The bundle is expected to expose a global function:
     //   globalThis.__autopilot_run_engine__(ENGINE_INPUT): Promise<ExecutionItem[]>
@@ -161,6 +248,8 @@ export class IsolatedVmRunner implements Runner {
           throw new Error('Bundle did not define globalThis.__autopilot_run_engine__');
         }
         const input = globalThis.ENGINE_INPUT;
+
+
         const hostRef = globalThis.__EVENT_REF__;
         if (hostRef) {
           const bridged = (e) => hostRef.applyIgnored(undefined, [e], { arguments: { copy: true } });

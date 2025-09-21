@@ -1,9 +1,10 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { ToolEntity } from '@/entities/ToolEntity';
+import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel } from '@starships/protocol';
+import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
   constructor(connection?: Neo4jConnection) {
@@ -340,6 +341,90 @@ export class AgentRepository extends BaseRepository {
           : [];
       },
       'getAgentTools',
+      'Agent',
+      agentId
+    );
+  }
+
+  // ============================================================================
+  // AGENT TEMPLATE RELATIONSHIPS
+  // ============================================================================
+
+  /**
+   * Create Agent from AgentTemplate with proper relationship
+   */
+  async createFromTemplate(templateId: string, starshipId: string, customizations?: Partial<CreateAgentRequest>): Promise<AgentModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        // Find the template
+        const templateResult = await connection.executeQuery<{ at: AgentTemplateModel }>(
+          'MATCH (at:AgentTemplate) WHERE at.id = $templateId RETURN at',
+          { templateId }
+        );
+
+        if (!templateResult[0]?.at) {
+          this.handleNotFound('AgentTemplate', templateId);
+        }
+
+        const template = fromDatabase(AgentTemplateEntity, templateResult[0].at);
+
+        // Create agent from template with optional customizations
+        const agentData: CreateAgentRequest = {
+          name: customizations?.name || template.name,
+          description: customizations?.description || template.description,
+          model: customizations?.model || template.model,
+          temperature: customizations?.temperature ?? template.temperature,
+          maxTokens: customizations?.maxTokens ?? template.maxTokens,
+          timeout: customizations?.timeout ?? template.timeout,
+          memoryState: customizations?.memoryState || template.memoryState,
+          blueprint: customizations?.blueprint || template.blueprint,
+          assignedToolSlugs: customizations?.assignedToolSlugs || template.assignedToolSlugs,
+        };
+
+        const agent = await this.create(agentData, starshipId);
+
+        // Create CREATED_FROM relationship
+        await connection.executeWrite(
+          `MATCH (a:Agent {id: $agentId}), (at:AgentTemplate {id: $templateId})
+           CREATE (a)-[:CREATED_FROM {createdAt: $createdAt}]->(at)`,
+          {
+            agentId: agent.id,
+            templateId: templateId,
+            createdAt: new Date().toISOString(),
+          }
+        );
+
+        // Increment template usage count
+        await connection.executeWrite('MATCH (at:AgentTemplate) WHERE at.id = $templateId SET at.usageCount = at.usageCount + 1', {
+          templateId,
+        });
+
+        return agent;
+      },
+      'createFromTemplate',
+      'Agent'
+    );
+  }
+
+  /**
+   * Get the AgentTemplate that this Agent was created from
+   */
+  async getSourceTemplate(agentId: string): Promise<AgentTemplateModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const query = `
+          MATCH (a:Agent {id: $agentId})-[:CREATED_FROM]->(at:AgentTemplate)
+          RETURN at
+        `;
+
+        const result = await connection.executeQuery<{ at: AgentTemplateModel }>(query, { agentId });
+        const template = result[0]?.at || null;
+        return template ? fromDatabase(AgentTemplateEntity, template) : null;
+      },
+      'getSourceTemplate',
       'Agent',
       agentId
     );

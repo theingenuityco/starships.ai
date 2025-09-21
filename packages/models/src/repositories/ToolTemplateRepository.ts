@@ -1,4 +1,5 @@
 import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
+import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
@@ -8,6 +9,7 @@ import type {
   CreateToolTemplateRequest,
   UpdateToolTemplateRequest,
   ToolTemplateSearchParams,
+  AgentTemplateModel,
 } from '@starships/protocol';
 
 export class ToolTemplateRepository extends BaseRepository {
@@ -214,6 +216,64 @@ export class ToolTemplateRepository extends BaseRepository {
       'incrementUsageCount',
       'ToolTemplate',
       id
+    );
+  }
+
+  // ============================================================================
+  // RELATIONSHIP MANAGEMENT (Back-references)
+  // ============================================================================
+
+  /**
+   * Get all AgentTemplates that use this ToolTemplate
+   */
+  async getUsedByAgentTemplates(toolTemplateId: string): Promise<AgentTemplateModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!toolTemplateId?.trim()) {
+          throw new Error('toolTemplateId is required');
+        }
+
+        const connection = this.getConnection();
+        const query = `
+          MATCH (at:AgentTemplate)-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate {id: $toolTemplateId})
+          RETURN at
+          ORDER BY at.name
+        `;
+
+        const result = await connection.executeQuery<{ at: AgentTemplateModel }>(query, { toolTemplateId });
+        return fromDatabaseArray(
+          AgentTemplateEntity,
+          result.map((record) => record.at)
+        );
+      },
+      'getUsedByAgentTemplates',
+      'ToolTemplate',
+      toolTemplateId
+    );
+  }
+
+  /**
+   * Check if a ToolTemplate is used by any AgentTemplate
+   */
+  async isUsedByAgentTemplates(toolTemplateId: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!toolTemplateId?.trim()) {
+          throw new Error('toolTemplateId is required');
+        }
+
+        const connection = this.getConnection();
+        const query = `
+          MATCH (at:AgentTemplate)-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate {id: $toolTemplateId})
+          RETURN count(at) as count
+        `;
+
+        const result = await connection.executeQuery<{ count: number }>(query, { toolTemplateId });
+        return (result[0]?.count || 0) > 0;
+      },
+      'isUsedByAgentTemplates',
+      'ToolTemplate',
+      toolTemplateId
     );
   }
 }

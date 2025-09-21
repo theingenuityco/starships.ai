@@ -1,89 +1,5 @@
 import { AgentMemoryState, Blueprint, Agent } from '@starships/autopilot';
-import type { ToolParams } from '@starships/autopilot';
 import type { AgentTemplateModel } from '@starships/protocol';
-
-/**
- * Built-in tool definitions for Gaia agent
- */
-const calculatorTool: ToolParams = {
-  name: 'calculator',
-  description: 'Perform mathematical calculations with basic arithmetic operations',
-  parameters: {
-    type: 'object',
-    properties: {
-      expression: {
-        type: 'string',
-        description: 'Mathematical expression to evaluate (e.g., "2 + 3 * 4")',
-      },
-    },
-    required: ['expression'],
-  },
-  blueprint: {
-    nodes: [
-      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
-    ],
-    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
-    metadata: {},
-  },
-};
-
-const timeTool: ToolParams = {
-  name: 'get_current_time',
-  description: 'Get the current date and time',
-  parameters: {
-    type: 'object',
-    properties: {
-      timezone: {
-        type: 'string',
-        description: 'Timezone for the time (default: UTC)',
-        enum: ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'],
-      },
-      format: {
-        type: 'string',
-        description: 'Format for the time output',
-        enum: ['ISO', 'locale', 'timestamp'],
-      },
-    },
-    required: [],
-  },
-  blueprint: {
-    nodes: [
-      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
-    ],
-    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
-    metadata: {},
-  },
-};
-
-const echoTool: ToolParams = {
-  name: 'echo',
-  description: 'Echo back the provided input for testing purposes',
-  parameters: {
-    type: 'object',
-    properties: {
-      message: {
-        type: 'string',
-        description: 'Message to echo back',
-      },
-      metadata: {
-        type: 'object',
-        description: 'Additional metadata to include',
-        properties: {},
-      },
-    },
-    required: ['message'],
-  },
-  blueprint: {
-    nodes: [
-      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
-    ],
-    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
-    metadata: {},
-  },
-};
 
 /**
  * Create Gaia agent builder blueprint using Agent class
@@ -94,7 +10,6 @@ function createGaiaBlueprint(): Blueprint {
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.4,
     maxTokens: 3000,
-    tools: [calculatorTool, timeTool, echoTool],
   });
 
   // Use the single default LLM chain created by Agent constructor
@@ -118,7 +33,6 @@ Expertise:
 - Agent template analysis and recommendations
 
 Available Agent Categories: general, coding, creative, analysis, support
-Built-in Tools: calculator, get_current_time, echo
 Node Types: start, end, llm, agent, http_request, conditional, transform, mutate, tool, workflow, user_prompt
 
 Approach:

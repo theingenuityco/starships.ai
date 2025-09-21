@@ -642,8 +642,10 @@ describe('Sophisticated Workflows', () => {
             parameters: {
               name: 'Data Analyzer',
               model: 'anthropic/claude-3.5-sonnet',
-              memoryState: {
-                identity: { name: 'AnalyzerBot', role: 'Data Analyst' },
+              systemPrompt: 'You are AnalyzerBot, a Data Analyst expert.',
+              state: {
+                messages: [],
+                tools: [],
                 purpose: { primary: 'Analyze and categorize data' },
               },
               blueprint: {

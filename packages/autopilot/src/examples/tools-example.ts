@@ -143,11 +143,11 @@ export async function conversationExample() {
   const agent = new Agent({
     name: 'ConversationAssistant',
     model: 'anthropic/claude-3.5-sonnet',
-    tools: [calculatorTool, timeTool],
-    memoryState: {
-      systemPrompt:
-        'You are a helpful assistant that can perform calculations and tell time. Be conversational and remember context from previous interactions.',
+    systemPrompt:
+      'You are a helpful assistant that can perform calculations and tell time. Be conversational and remember context from previous interactions.',
+    state: {
       messages: [],
+      tools: [calculatorTool, timeTool],
     },
   });
 

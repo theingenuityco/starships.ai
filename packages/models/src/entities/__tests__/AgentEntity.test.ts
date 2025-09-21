@@ -46,7 +46,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: JSON.stringify({ messageHistory: [] }),
+        systemPrompt: 'Test agent',
+        state: JSON.stringify({ messages: [], tools: [] }),
         blueprint: JSON.stringify({ nodes: [], edges: [] }),
       });
     });
@@ -68,7 +69,7 @@ describe('AgentEntity', () => {
       expect(serialized.temperature).toBeUndefined();
       expect(serialized.maxTokens).toBeUndefined();
       expect(serialized.description).toBeUndefined();
-      expect(serialized.memoryState).toBe('{}');
+      expect(serialized.state).toBe('{"messages":[],"tools":[]}');
     });
   });
 
@@ -84,7 +85,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{"messageHistory":[]}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -112,7 +114,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: 'invalid-json',
+        systemPrompt: 'Test agent',
+        state: 'invalid-json',
         blueprint: '{"invalid": json}',
       };
 
@@ -245,7 +248,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           maxTokens: 100001,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -303,7 +307,8 @@ describe('AgentEntity', () => {
             timeout: '30000', // String that should be converted to number
             createdAt: '2024-01-01T00:00:00.000Z',
             updatedAt: '2024-01-01T00:00:00.000Z',
-            memoryState: '{}',
+            systemPrompt: 'Test agent',
+            state: '{"messages":[],"tools":[]}',
             blueprint: '{"nodes":[],"edges":[]}',
           },
           expected: {

@@ -34,10 +34,11 @@ export async function seedAgentTemplates(): Promise<void> {
         const existingTemplate = await templateRepo.findBySlug(template.slug as string);
 
         if (existingTemplate) {
-          // Force-update blueprint and memoryState so agent logic/template fixes are applied
+          // Force-update blueprint and state so agent logic/template fixes are applied
           await templateRepo.update(existingTemplate.id, {
             blueprint: template.blueprint,
-            memoryState: template.memoryState,
+            systemPrompt: template.systemPrompt,
+            state: template.state,
             model: template.model,
             temperature: template.temperature,
             maxTokens: template.maxTokens,
@@ -64,7 +65,8 @@ export async function seedAgentTemplates(): Promise<void> {
             icon: template.icon,
             previewPrompts: template.previewPrompts,
             blueprint: template.blueprint,
-            memoryState: template.memoryState,
+            systemPrompt: template.systemPrompt,
+            state: template.state,
             assignedToolSlugs: template.assignedToolSlugs,
           };
           await templateRepo.create(payload);

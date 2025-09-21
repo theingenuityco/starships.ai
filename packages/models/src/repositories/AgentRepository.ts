@@ -140,7 +140,8 @@ export class AgentRepository extends BaseRepository {
           temperature: data.temperature,
           maxTokens: data.maxTokens,
           timeout: data.timeout,
-          memoryState: data.memoryState,
+          systemPrompt: data.systemPrompt,
+          state: data.state,
           blueprint: data.blueprint,
 
           // Database-specific fields
@@ -297,7 +298,8 @@ export class AgentRepository extends BaseRepository {
           temperature: customizations?.temperature ?? template.temperature,
           maxTokens: customizations?.maxTokens ?? template.maxTokens,
           timeout: customizations?.timeout ?? template.timeout,
-          memoryState: customizations?.memoryState || template.memoryState,
+          systemPrompt: customizations?.systemPrompt || template.systemPrompt,
+          state: customizations?.state || template.state,
           blueprint: customizations?.blueprint || template.blueprint,
         };
 

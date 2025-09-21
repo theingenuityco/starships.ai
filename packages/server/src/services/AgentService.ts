@@ -63,7 +63,8 @@ export class AgentService {
       maxTokens: data.maxTokens,
       timeout: data.timeout || 30000,
       blueprint: data.blueprint,
-      memoryState: data.memoryState,
+      systemPrompt: data.systemPrompt,
+      state: data.state,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -304,7 +305,8 @@ export class AgentService {
       temperature: agentModel.temperature,
       maxTokens: agentModel.maxTokens,
       timeout: agentModel.timeout,
-      memoryState: agentModel.memoryState,
+      systemPrompt: agentModel.systemPrompt,
+      state: agentModel.state,
       blueprint: agentModel.blueprint,
       metadata: {
         id: agentModel.id,

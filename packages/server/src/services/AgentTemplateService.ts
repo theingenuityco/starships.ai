@@ -84,24 +84,8 @@ export class AgentTemplateService {
       }
     }
 
-    // Create agent data based on the template
-    const agentData = {
-      name: template.name,
-      description: template.description,
-      model: template.model,
-      temperature: template.temperature,
-      maxTokens: template.maxTokens,
-      timeout: template.timeout || 30000,
-      memoryState: template.memoryState,
-      blueprint: template.blueprint,
-      assignedToolSlugs: template.assignedToolSlugs,
-    };
-
-    // Create the agent using the repository
-    const agent = await this.agentRepository.create(agentData, starshipId);
-
-    // Increment the template usage count
-    await this.templateRepository.incrementUsageCount(templateId);
+    // Create the agent from template using the proper method that establishes CREATED_FROM relationship
+    const agent = await this.agentRepository.createFromTemplate(templateId, starshipId);
 
     return agent;
   }

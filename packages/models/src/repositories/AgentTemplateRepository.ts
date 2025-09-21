@@ -41,7 +41,27 @@ export class AgentTemplateRepository extends BaseRepository {
         const connection = this.getConnection();
         const results = await connection.executeQuery<{ t: AgentTemplateModel }>(query, { id });
         const template = results.length > 0 ? results[0].t : null;
-        return template ? fromDatabase(AgentTemplateEntity, template) : null;
+
+        if (!template) {
+          return null;
+        }
+
+        const baseTemplate = fromDatabase(AgentTemplateEntity, template);
+
+        // Get assigned tool template slugs from relationships
+        const toolTemplatesQuery = `
+          MATCH (at:AgentTemplate {id: $id})-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate)
+          RETURN tt.slug as slug
+          ORDER BY tt.name
+        `;
+
+        const toolResults = await connection.executeQuery<{ slug: string }>(toolTemplatesQuery, { id });
+        const assignedToolSlugs = toolResults.map((result) => result.slug);
+
+        return {
+          ...baseTemplate,
+          assignedToolSlugs,
+        };
       },
       'findById',
       'AgentTemplate',
@@ -108,6 +128,24 @@ export class AgentTemplateRepository extends BaseRepository {
         const templateEntity = toEntityInstance(AgentTemplateEntity, templateProps);
         const template = await this.createEntityWithAutoId<AgentTemplateModel>('AgentTemplate', toDatabase(templateEntity));
 
+        // Create relationships for assigned tool templates
+        if (data.assignedToolSlugs && data.assignedToolSlugs.length > 0) {
+          const connection = this.getConnection();
+
+          for (const toolSlug of data.assignedToolSlugs) {
+            // Find tool template by slug
+            const toolTemplateResult = await connection.executeQuery<{ id: string }>(
+              'MATCH (tt:ToolTemplate {slug: $toolSlug}) RETURN tt.id as id',
+              { toolSlug }
+            );
+
+            if (toolTemplateResult.length > 0) {
+              // Create relationship
+              await this.addToolTemplateRelationship(template.id, toolTemplateResult[0].id);
+            }
+          }
+        }
+
         // Transform database result back to domain model
         return fromDatabase(AgentTemplateEntity, template);
       },
@@ -122,16 +160,43 @@ export class AgentTemplateRepository extends BaseRepository {
         await AgentTemplateEntity.validate(updates, 'update');
 
         const connection = this.getConnection();
+
+        // Handle tool template relationships if assignedToolSlugs is being updated
+        if (updates.assignedToolSlugs !== undefined) {
+          // Remove existing relationships
+          await connection.executeWrite('MATCH (at:AgentTemplate {id: $id})-[r:USES_TOOL_TEMPLATE]->() DELETE r', { id });
+
+          // Add new relationships
+          if (updates.assignedToolSlugs.length > 0) {
+            for (const toolSlug of updates.assignedToolSlugs) {
+              // Find tool template by slug
+              const toolTemplateResult = await connection.executeQuery<{ id: string }>(
+                'MATCH (tt:ToolTemplate {slug: $toolSlug}) RETURN tt.id as id',
+                { toolSlug }
+              );
+
+              if (toolTemplateResult.length > 0) {
+                // Create relationship
+                await this.addToolTemplateRelationship(id, toolTemplateResult[0].id);
+              }
+            }
+          }
+        }
+
         const updateProps = {
           ...updates,
           updatedAt: new Date().toISOString(),
         };
 
+        // Remove assignedToolSlugs from updates since we handle it via relationships
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { assignedToolSlugs: _, ...propsWithoutToolSlugs } = updateProps;
+
         const result = await connection.executeWrite<{ t: AgentTemplateModel }>(
           'MATCH (t:AgentTemplate) WHERE t.id = $id SET t += $updates RETURN t',
           {
             id,
-            updates: toDatabase(toEntityInstance(AgentTemplateEntity, updateProps)),
+            updates: toDatabase(toEntityInstance(AgentTemplateEntity, propsWithoutToolSlugs)),
           }
         );
 

@@ -134,7 +134,6 @@ export class AgentRepository extends BaseRepository {
           timeout: data.timeout,
           memoryState: data.memoryState,
           blueprint: data.blueprint,
-          assignedToolSlugs: data.assignedToolSlugs, // Tool assignment via slugs
 
           // Database-specific fields
           createdAt: now,
@@ -155,6 +154,11 @@ export class AgentRepository extends BaseRepository {
             key: `${agent.id}_${starshipId}`,
           }
         );
+
+        // Create tool relationships if assignedToolSlugs provided
+        if (data.assignedToolSlugs && data.assignedToolSlugs.length > 0) {
+          await this.assignToolsToAgent(agent.id, data.assignedToolSlugs, starshipId);
+        }
 
         return fromDatabase(AgentEntity, agent);
       },
@@ -223,120 +227,28 @@ export class AgentRepository extends BaseRepository {
     );
   }
 
-  async assignToolSlugs(agentId: string, toolSlugs: string[]): Promise<AgentModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ a: AgentModel }>(
-          `MATCH (a:Agent) WHERE a.id = $agentId
-           SET a.assignedToolSlugs = $toolSlugs, a.updatedAt = $timestamp
-           RETURN a`,
-          {
-            agentId,
-            toolSlugs,
-            timestamp: new Date().toISOString(),
-          }
-        );
-
-        if (!result[0]?.a) {
-          this.handleNotFound('Agent', agentId);
-        }
-
-        return fromDatabase(AgentEntity, result[0].a);
-      },
-      'assignToolSlugs',
-      'Agent',
-      agentId
-    );
-  }
-
-  async addToolSlug(agentId: string, toolSlug: string): Promise<AgentModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ a: AgentModel }>(
-          `MATCH (a:Agent) WHERE a.id = $agentId
-           SET a.assignedToolSlugs = CASE
-             WHEN a.assignedToolSlugs IS NULL THEN [$toolSlug]
-             WHEN NOT $toolSlug IN a.assignedToolSlugs THEN a.assignedToolSlugs + [$toolSlug]
-             ELSE a.assignedToolSlugs
-           END,
-           a.updatedAt = $timestamp
-           RETURN a`,
-          {
-            agentId,
-            toolSlug,
-            timestamp: new Date().toISOString(),
-          }
-        );
-
-        if (!result[0]?.a) {
-          this.handleNotFound('Agent', agentId);
-        }
-
-        return fromDatabase(AgentEntity, result[0].a);
-      },
-      'addToolSlug',
-      'Agent',
-      agentId
-    );
-  }
-
-  async removeToolSlug(agentId: string, toolSlug: string): Promise<AgentModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ a: AgentModel }>(
-          `MATCH (a:Agent) WHERE a.id = $agentId
-           SET a.assignedToolSlugs = [slug IN a.assignedToolSlugs WHERE slug <> $toolSlug],
-           a.updatedAt = $timestamp
-           RETURN a`,
-          {
-            agentId,
-            toolSlug,
-            timestamp: new Date().toISOString(),
-          }
-        );
-
-        if (!result[0]?.a) {
-          this.handleNotFound('Agent', agentId);
-        }
-
-        return fromDatabase(AgentEntity, result[0].a);
-      },
-      'removeToolSlug',
-      'Agent',
-      agentId
-    );
-  }
-
   async getAgentTools(agentId: string, starshipId: string): Promise<ToolModel[]> {
     return this.executeWithErrorHandling(
       async () => {
+        // Use relationship-based approach instead of slug matching
+        const tools = await this.getAgentToolsByRelationships(agentId);
+
+        // Filter tools that are deployed on the specified starship
         const connection = this.getConnection();
-
-        // First get the agent with its assigned tool slugs
-        const agentResult = await connection.executeQuery<{ a: AgentModel }>('MATCH (a:Agent) WHERE a.id = $agentId RETURN a', { agentId });
-
-        if (!agentResult[0]?.a) {
-          this.handleNotFound('Agent', agentId);
-        }
-
-        const agent = agentResult[0].a;
-        if (!agent.assignedToolSlugs || agent.assignedToolSlugs.length === 0) {
+        if (tools.length === 0) {
           return [];
         }
 
-        // Get tools by slugs for the specific starship using relationships
-        const toolsResult = await connection.executeQuery<{ t: ToolModel }>(
-          'MATCH (t:Tool)-[:DEPLOYED_ON]->(s:Starship) WHERE t.slug IN $slugs AND s.id = $starshipId RETURN t ORDER BY t.createdAt DESC',
-          { slugs: agent.assignedToolSlugs, starshipId }
+        const toolIds = tools.map((t) => t.id);
+        const deployedToolsResult = await connection.executeQuery<{ t: ToolModel }>(
+          'MATCH (t:Tool)-[:DEPLOYED_ON]->(s:Starship) WHERE t.id IN $toolIds AND s.id = $starshipId RETURN t ORDER BY t.createdAt DESC',
+          { toolIds, starshipId }
         );
 
-        return toolsResult && toolsResult.length > 0
+        return deployedToolsResult && deployedToolsResult.length > 0
           ? fromDatabaseArray(
               ToolEntity,
-              toolsResult.map((record) => record.t)
+              deployedToolsResult.map((record) => record.t)
             )
           : [];
       },
@@ -425,6 +337,138 @@ export class AgentRepository extends BaseRepository {
         return template ? fromDatabase(AgentTemplateEntity, template) : null;
       },
       'getSourceTemplate',
+      'Agent',
+      agentId
+    );
+  }
+
+  // ============================================================================
+  // AGENT→TOOL DIRECT RELATIONSHIPS
+  // ============================================================================
+
+  /**
+   * Create a USES_TOOL relationship between Agent and Tool
+   */
+  async addToolRelationship(agentId: string, toolId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentId?.trim() || !toolId?.trim()) {
+          throw new Error('Both agentId and toolId are required');
+        }
+
+        const connection = this.getConnection();
+
+        // Check if both entities exist
+        const checkQuery = `
+          MATCH (a:Agent {id: $agentId})
+          MATCH (t:Tool {id: $toolId})
+          RETURN a.id, t.id
+        `;
+
+        const checkResult = await connection.executeQuery<{ 'a.id': string; 't.id': string }>(checkQuery, { agentId, toolId });
+
+        if (!checkResult || checkResult.length === 0) {
+          throw new Error('Agent or Tool not found');
+        }
+
+        // Create relationship if it doesn't exist
+        const relationshipQuery = `
+          MATCH (a:Agent {id: $agentId})
+          MATCH (t:Tool {id: $toolId})
+          MERGE (a)-[:USES_TOOL {createdAt: $createdAt}]->(t)
+        `;
+
+        await connection.executeWrite(relationshipQuery, {
+          agentId,
+          toolId,
+          createdAt: new Date().toISOString(),
+        });
+      },
+      'addToolRelationship',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Remove a USES_TOOL relationship between Agent and Tool
+   */
+  async removeToolRelationship(agentId: string, toolId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentId?.trim() || !toolId?.trim()) {
+          throw new Error('Both agentId and toolId are required');
+        }
+
+        const connection = this.getConnection();
+        const query = `
+          MATCH (a:Agent {id: $agentId})-[r:USES_TOOL]->(t:Tool {id: $toolId})
+          DELETE r
+        `;
+
+        await connection.executeWrite(query, { agentId, toolId });
+      },
+      'removeToolRelationship',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Get all Tools that an Agent uses via relationships (replaces slug-based matching)
+   */
+  async getAgentToolsByRelationships(agentId: string): Promise<ToolModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentId?.trim()) {
+          throw new Error('agentId is required');
+        }
+
+        const connection = this.getConnection();
+        const query = `
+          MATCH (a:Agent {id: $agentId})-[:USES_TOOL]->(t:Tool)
+          RETURN t
+          ORDER BY t.name
+        `;
+
+        const result = await connection.executeQuery<{ t: ToolModel }>(query, { agentId });
+        return fromDatabaseArray(
+          ToolEntity,
+          result.map((record) => record.t)
+        );
+      },
+      'getAgentToolsByRelationships',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Assign tools to an agent by their slugs and starship - creates USES_TOOL relationships
+   */
+  async assignToolsToAgent(agentId: string, toolSlugs: string[], starshipId: string): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        // Remove existing tool relationships for this agent
+        await connection.executeWrite('MATCH (a:Agent {id: $agentId})-[r:USES_TOOL]->() DELETE r', { agentId });
+
+        // Create new relationships for each tool slug
+        for (const toolSlug of toolSlugs) {
+          // Find the tool by slug and starship
+          const toolResult = await connection.executeQuery<{ id: string }>(
+            'MATCH (t:Tool)-[:DEPLOYED_ON]->(s:Starship) WHERE t.slug = $toolSlug AND s.id = $starshipId RETURN t.id as id',
+            { toolSlug, starshipId }
+          );
+
+          if (toolResult.length > 0) {
+            // Create USES_TOOL relationship
+            await this.addToolRelationship(agentId, toolResult[0].id);
+          }
+        }
+      },
+      'assignToolsToAgent',
       'Agent',
       agentId
     );

@@ -24,9 +24,6 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   id: string;
   createdAt: string;
   updatedAt: string;
-
-  // Tool assignment - reference by slugs instead of embedding
-  assignedToolSlugs?: string[];
 }
 
 // ============================================================================
@@ -37,14 +34,10 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
  * Request to create a new agent
  */
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
-  assignedToolSlugs?: string[];
+  assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
 };
 
 /**
  * Request to update an agent
  */
-export type UpdateAgentRequest = Partial<
-  AgentParamsWithoutMetadata & {
-    assignedToolSlugs?: string[];
-  }
->;
+export type UpdateAgentRequest = Partial<AgentParamsWithoutMetadata>;

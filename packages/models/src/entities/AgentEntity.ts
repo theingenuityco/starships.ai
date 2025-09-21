@@ -10,7 +10,7 @@ import { AgentMemoryState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError, IsArray } from 'class-validator';
+import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 export class AgentEntity implements AgentModel {
   // Core database fields
@@ -79,13 +79,6 @@ export class AgentEntity implements AgentModel {
   @IsObject()
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
 
-  // Tool assignment - reference by slugs instead of embedding
-  @Expose()
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  assignedToolSlugs?: string[];
-
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
@@ -111,7 +104,6 @@ export class AgentEntity implements AgentModel {
         timeout: dataRecord.timeout ?? 30000,
         memoryState: dataRecord.memoryState || {},
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
-        assignedToolSlugs: dataRecord.assignedToolSlugs || [],
         ...dataRecord,
       });
     } else {

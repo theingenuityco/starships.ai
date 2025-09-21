@@ -123,7 +123,7 @@ export class LLM extends BaseNode<LlmParams> {
       }
 
       const llmResponse = await this.processStreamingResponse(reader);
-      // console.log('<<RESPONSE<< ', JSON.stringify(llmResponse, null, 2));
+      console.log('<<RESPONSE<< ', JSON.stringify(llmResponse, null, 2));
       return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
       throw this.handleExecutionError(error, 'LLM execution failed');

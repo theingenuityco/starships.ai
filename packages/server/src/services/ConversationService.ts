@@ -1,7 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { ToolParams, ExecutionItem, AgentParams } from '@starships/autopilot';
+import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -272,6 +272,26 @@ export class ConversationService {
   async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
     if (!this.streamingService) {
       return;
+    }
+
+    // Skip workflow control events from nested executions (e.g., tool blueprints) to avoid duplicates
+    if (
+      event.type === 'workflow_started' ||
+      event.type === 'workflow_completed' ||
+      event.type === 'workflow_failed' ||
+      event.type === 'workflow_paused' ||
+      event.type === 'workflow_resumed' ||
+      event.type === 'node_started' ||
+      event.type === 'node_completed' ||
+      event.type === 'node_failed'
+    ) {
+      const executionEvent = event as ExecutionEvent;
+      const isNestedExecution = executionEvent.data?.execution.nested === true;
+
+      if (isNestedExecution) {
+        // Skip these events from nested workflows to prevent duplication
+        return;
+      }
     }
 
     switch (event.type) {

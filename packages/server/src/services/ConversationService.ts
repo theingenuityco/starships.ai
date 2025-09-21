@@ -8,6 +8,15 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 import { Operation } from 'fast-json-patch';
 
 /**
+ * Autopilot child process configuration
+ */
+interface AutopilotConfig {
+  memoryLimitMB: number;
+  timeoutMs: number;
+  killGraceMs: number;
+}
+
+/**
  * Clean conversation service with proper error handling
  */
 export class ConversationService {
@@ -21,15 +30,19 @@ export class ConversationService {
   // Default runner for non-streaming paths (child process)
   private defaultRunner: Runner;
 
+  // Autopilot configuration
+  private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
+    memoryLimitMB: 256, // 256MB memory limit
+    timeoutMs: 60000, // 60 second timeout
+    killGraceMs: 5000, // 5 second grace period
+  };
+
   constructor() {
     this.conversationRepository = new ConversationRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
-    // Choose default runner (child process) configured via env
-    this.defaultRunner = new ChildProcessRunner({
-      memoryLimitMB: Number(process.env.AUTOPILOT_ISOLATE_MEM_MB) || 64,
-      timeoutMs: Number(process.env.AUTOPILOT_ISOLATE_TIMEOUT_MS) || 0,
-    });
+    // Choose default runner (child process) with proper limits
+    this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
   }
 
   /**

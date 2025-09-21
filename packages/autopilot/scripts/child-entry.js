@@ -1,0 +1,92 @@
+'use strict';
+
+/**
+ * Child process entry for executing Autopilot Engine via IPC.
+ * This file is bundled/copied to dist/scripts/child-entry.js during build.
+ *
+ * Protocol:
+ * Parent sends:
+ *   { type: 'start', payload: { blueprint, execution, config, autopilotCredentials } }
+ *
+ * Child responds with:
+ *   { type: 'event', event }
+ *   { type: 'done', result }
+ *   { type: 'error', error: { message, stack } }
+ */
+
+function safeSend(msg) {
+  try {
+    if (process.send) process.send(msg);
+  } catch (e) {
+    // ignore send errors (parent may have exited)
+  }
+}
+
+process.on('message', async (msg) => {
+  if (!msg || typeof msg !== 'object' || msg.type !== 'start') return;
+  const payload = msg.payload || {};
+  const blueprint = payload.blueprint;
+  const execution = payload.execution;
+  const config = payload.config || {};
+  const autopilotCredentials = payload.autopilotCredentials || undefined;
+
+  try {
+    // Optional: set credentials if provided
+    try {
+      const mod = require('../Autopilot.js');
+      const autopilot = mod && (mod.autopilot || (mod.default && mod.default.autopilot));
+      if (autopilot && typeof autopilot.setCredentials === 'function' && autopilotCredentials) {
+        autopilot.setCredentials(autopilotCredentials);
+      }
+    } catch (_e) {
+      // ignore if Autopilot manager is not available
+    }
+
+    const { Engine } = require('../engine/Engine.js');
+
+    // Bridge event callback to parent
+    const bridgedConfig = Object.assign({}, config, {
+      eventCallback: async (event) => {
+        safeSend({ type: 'event', event });
+      },
+    });
+
+    const engine = new Engine(bridgedConfig);
+    const result = await engine.executeBlueprint(blueprint, execution);
+
+    safeSend({ type: 'done', result });
+  } catch (err) {
+    const errorPayload = {
+      message: err && err.message ? String(err.message) : String(err),
+      stack: err && err.stack ? String(err.stack) : undefined,
+    };
+    safeSend({ type: 'error', error: errorPayload });
+  }
+});
+
+// Improve robustness: forward top-level errors
+process.on('uncaughtException', (err) => {
+  safeSend({
+    type: 'error',
+    error: {
+      message: err && err.message ? String(err.message) : 'uncaughtException',
+      stack: err && err.stack ? String(err.stack) : undefined,
+    },
+  });
+});
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  safeSend({
+    type: 'error',
+    error: { message: err.message, stack: err.stack },
+  });
+});
+
+// Exit cleanly on parent disconnect
+process.on('disconnect', () => {
+  try {
+    process.exit(0);
+  } catch (_e) {
+    // ignore
+  }
+});

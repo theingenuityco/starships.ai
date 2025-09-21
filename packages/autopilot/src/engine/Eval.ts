@@ -25,11 +25,9 @@ export interface EvalContext {
   currentNodeRef?: string;
   input?: unknown;
 
-  // Only custom helper functions used within expressions
+  // Helper functions for workflow-specific operations
   $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
-  $random: () => number; // Custom random function since JSONata's might not be available in all versions
-  $exists: (value: unknown) => boolean; // Re-add since it's used in tests and might not be available in all JSONata versions
 }
 
 /**
@@ -58,11 +56,9 @@ export class Eval {
       currentNodeRef: execution.currentNodeRef,
       input: inputData,
 
-      // Only custom helper functions
+      // Workflow-specific helper functions
       $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
       $input: (path?: string) => this.extractPath(inputData, path),
-      $random: () => Math.random(), // Simple custom random function
-      $exists: (value: unknown) => value !== null && value !== undefined,
     };
 
     return context;

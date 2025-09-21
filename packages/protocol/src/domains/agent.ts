@@ -17,13 +17,16 @@ import type { AgentParams } from '@starships/autopilot';
  * Extends AgentParams to be a superset with additional database/marketplace fields
  */
 
-export type AgentParamsWithoutMetadata = Omit<AgentParams, 'metadata'>;
+export type AgentParamsWithoutMetadata = Omit<AgentParams, 'metadata' | 'tools'>;
 
 export interface AgentModel extends AgentParamsWithoutMetadata {
   // Core database fields
   id: string;
   createdAt: string;
   updatedAt: string;
+
+  // Tool assignment - reference by slugs instead of embedding
+  assignedToolSlugs?: string[];
 }
 
 // ============================================================================
@@ -33,13 +36,15 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
 /**
  * Request to create a new agent
  */
-export type CreateAgentRequest = AgentParamsWithoutMetadata;
+export type CreateAgentRequest = AgentParamsWithoutMetadata & {
+  assignedToolSlugs?: string[];
+};
 
 /**
  * Request to update an agent
  */
 export type UpdateAgentRequest = Partial<
   AgentParamsWithoutMetadata & {
-    assignedToolIds?: string[];
+    assignedToolSlugs?: string[];
   }
 >;

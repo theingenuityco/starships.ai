@@ -56,7 +56,11 @@ CREATE CONSTRAINT tool_id_unique IF NOT EXISTS FOR (t:Tool) REQUIRE t.id IS UNIQ
 
 // Tool indexes
 CREATE INDEX tool_name IF NOT EXISTS FOR (t:Tool) ON (t.name);
+CREATE INDEX tool_slug IF NOT EXISTS FOR (t:Tool) ON (t.slug);
 CREATE INDEX tool_enabled IF NOT EXISTS FOR (t:Tool) ON (t.isEnabled);
+
+// Tool-Starship relationship constraints (ensures unique slug per starship via relationship)
+CREATE CONSTRAINT unique_tool_starship_slug IF NOT EXISTS FOR ()-[r:DEPLOYED_ON]-() REQUIRE r.toolSlug IS UNIQUE;
 
 // ============================================================================
 // TOOL TEMPLATE COLLECTION

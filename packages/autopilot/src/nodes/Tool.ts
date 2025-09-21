@@ -50,16 +50,15 @@ export class Tool extends BaseNode<ToolParams> {
         });
       }
 
-      // Resolve the selected tool's definition (with blueprint) from execution state
-      const toolDef = this.getToolDefinitionFromState(params.name);
-      if (!toolDef) {
-        throw new Error(`Tool definition '${params.name}' not found in execution state`);
+      // Use the tool blueprint from parameters (passed via template resolution from Agent)
+      if (!params.blueprint) {
+        throw new Error(`Tool '${params.name}' missing blueprint parameter`);
       }
 
       // Execute the tool's blueprint like Workflow does (fresh Engine + Execution)
       const engine = new Engine({ eventCallback: this.getEventCallback() });
       const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs));
-      const items = await engine.executeBlueprint(toolDef.blueprint, subExec);
+      const items = await engine.executeBlueprint(params.blueprint, subExec);
       const result = ExecutionItemUtils.unwrapSingle(items);
 
       // Emit tool_complete event
@@ -178,25 +177,6 @@ export class Tool extends BaseNode<ToolParams> {
   }
 
   /**
-   * Find the Tool definition by name from execution.state.tools
-   * Supports both array-of-ToolParams and map keyed by name.
-   */
-  private getToolDefinitionFromState(toolName: string): ToolParams | undefined {
-    const exec = this.getOptions()?.execution;
-    const state = exec?.state as Record<string, unknown> | undefined;
-    const tools = state?.['tools'] as unknown;
-
-    if (Array.isArray(tools)) {
-      return (tools as ToolParams[]).find((t) => t?.name === toolName);
-    }
-    if (tools && typeof tools === 'object') {
-      const maybe = (tools as Record<string, ToolParams>)[toolName];
-      if (maybe) return maybe;
-    }
-    return undefined;
-  }
-
-  /**
    * Extract tool call ID from the last LLM output in execution context
    * This links the tool result back to the original tool call
    */
@@ -262,14 +242,21 @@ export class Tool extends BaseNode<ToolParams> {
       }
     }
 
-    // Blueprint is required; validate minimal structure
-    const nodes = params.blueprint.nodes || [];
-    const hasStartNode = Array.isArray(nodes) && nodes.some((n) => n.type === 'start');
-    if (!hasStartNode) {
+    // Blueprint is required for all Tool nodes
+    if (!params.blueprint) {
       errors.push({
-        code: 'MISSING_START_NODE',
-        message: 'Tool blueprint must have a start node',
+        code: 'MISSING_REQUIRED_FIELD',
+        message: 'Tool blueprint is required',
       });
+    } else {
+      const nodes = params.blueprint.nodes || [];
+      const hasStartNode = Array.isArray(nodes) && nodes.some((n) => n.type === 'start');
+      if (!hasStartNode) {
+        errors.push({
+          code: 'MISSING_START_NODE',
+          message: 'Tool blueprint must have a start node',
+        });
+      }
     }
 
     return {

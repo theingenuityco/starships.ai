@@ -131,7 +131,8 @@ describe('AgentEntity', () => {
           timeout: 30000,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          memoryState: '{}',
+          systemPrompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
           blueprint: '{"nodes":[],"edges":[]}',
         },
         {
@@ -141,7 +142,8 @@ describe('AgentEntity', () => {
           timeout: 30000,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          memoryState: '{}',
+          systemPrompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
           blueprint: '{"nodes":[],"edges":[]}',
         },
       ];
@@ -185,7 +187,8 @@ describe('AgentEntity', () => {
           name: '',
           model: 'gpt-4',
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -196,7 +199,8 @@ describe('AgentEntity', () => {
           name: 'a'.repeat(101),
           model: 'gpt-4',
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -210,7 +214,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           temperature: -1,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -222,7 +227,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           temperature: 3,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -236,7 +242,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           maxTokens: 0,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -262,7 +269,8 @@ describe('AgentEntity', () => {
           name: 'Test Agent',
           model: 'gpt-4',
           timeout: 500,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -273,7 +281,8 @@ describe('AgentEntity', () => {
           name: 'Test Agent',
           model: 'gpt-4',
           timeout: 300001,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -336,7 +345,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -353,7 +363,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -369,7 +380,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -393,7 +405,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: JSON.stringify({ messages: [{ role: 'system', content: 'Hello' }] }),
+        systemPrompt: 'Test agent',
+        state: JSON.stringify({ messages: [{ role: 'system', content: 'Hello' }], tools: [] }),
         blueprint: JSON.stringify({
           nodes: [{ id: 'node1', type: 'start' }],
           edges: [{ id: 'edge1', source: 'node1', target: 'node2' }],
@@ -431,7 +444,8 @@ describe('AgentEntity', () => {
           timeout: 30000,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          memoryState: '{}',
+          systemPrompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
           blueprint: '{"nodes":[],"edges":[]}',
         },
         null, // Invalid item
@@ -450,7 +464,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -493,7 +508,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: JSON.stringify(complexMemoryState),
+        systemPrompt: 'Test agent',
+        state: JSON.stringify(complexMemoryState),
         blueprint: JSON.stringify(complexBlueprint),
       };
 

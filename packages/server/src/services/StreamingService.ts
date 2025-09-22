@@ -6,6 +6,8 @@ interface ConversationResponse {
   source: 'agent';
   content: string;
   agentId: string;
+  scope?: 'turn' | 'workflow';
+  conversationId?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;

@@ -26,7 +26,20 @@ export const echoTool: ToolParams = {
   blueprint: {
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+      {
+        ref: 'end_1',
+        type: 'end',
+        name: 'End',
+        description: '',
+        parameters: {
+          output: {
+            type: 'echo',
+            message: '{{ ($lastOutputOf("__initial__")?.[0]?.json?.message) ?? input?.message ?? "" }}',
+            metadata: '{{ ($lastOutputOf("__initial__")?.[0]?.json?.metadata) ?? input?.metadata ?? {} }}',
+            echoedAt: '{{ new Date().toISOString() }}',
+          },
+        },
+      },
     ],
     edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
     metadata: {},

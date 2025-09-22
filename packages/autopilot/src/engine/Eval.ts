@@ -41,6 +41,15 @@ export interface EvalOptions {
   allowedContextKeys?: string[];
   forbiddenFunctions?: string[];
   timeout?: number;
+
+  // Controls how string templates are resolved:
+  // - 'full-only': evaluate only when the entire string is a single {{ ... }} template
+  // - 'allow-partial' (default): also replace inline {{ ... }} segments inside larger strings
+  stringEvaluationMode?: 'full-only' | 'allow-partial';
+
+  // Limit recursion depth when traversing objects/arrays during resolution
+  // (useful to avoid evaluating deeply nested/embedded definitions like tool blueprints)
+  maxDepth?: number;
 }
 
 /**
@@ -200,7 +209,8 @@ export class Eval {
    */
   async resolveTemplates(value: unknown, execution: Execution, inputData?: unknown, options?: EvalOptions): Promise<unknown> {
     const context = this.buildContext(execution, inputData);
-    return await this.processValue(value, context, options);
+    const depth = options?.maxDepth ?? Number.POSITIVE_INFINITY;
+    return await this.processValue(value, context, options, depth);
   }
 
   /**
@@ -269,13 +279,20 @@ export class Eval {
   /**
    * Process any value type for template resolution
    */
-  private async processValue(value: unknown, context: EvalContext, options?: EvalOptions): Promise<unknown> {
+  private async processValue(
+    value: unknown,
+    context: EvalContext,
+    options?: EvalOptions,
+    depth: number = Number.POSITIVE_INFINITY
+  ): Promise<unknown> {
+    if (depth <= 0) return value;
+
     if (typeof value === 'string') {
       return await this.resolveStringTemplates(value, context, options);
     } else if (Array.isArray(value)) {
-      return await Promise.all(value.map((item) => this.processValue(item, context, options)));
+      return await Promise.all(value.map((item) => this.processValue(item, context, options, depth - 1)));
     } else if (value && typeof value === 'object') {
-      return await this.resolveObjectTemplates(value as Record<string, unknown>, context, options);
+      return await this.resolveObjectTemplates(value as Record<string, unknown>, context, options, depth);
     }
     return value;
   }
@@ -295,6 +312,12 @@ export class Eval {
       // Full string is a template - return the actual resolved type
       return await this.evaluateExpression(matches[0][1], context, options);
     } else {
+      // If configured to avoid partial replacements (safer for embedded JSON strings),
+      // leave the string as-is to prevent cross-scope evaluation of serialized templates.
+      if (options?.stringEvaluationMode === 'full-only') {
+        return str;
+      }
+
       // Partial replacement - substitute within string
       let result = str;
       for (const match of matches) {
@@ -323,7 +346,8 @@ export class Eval {
   private async resolveObjectTemplates(
     obj: Record<string, unknown>,
     context: EvalContext,
-    options?: EvalOptions
+    options?: EvalOptions,
+    depth: number = Number.POSITIVE_INFINITY
   ): Promise<Record<string, unknown>> {
     // If the entire object looks like a blueprint, return it as-is (opaque)
     if (this.isBlueprintLikeObject(obj)) {
@@ -337,8 +361,25 @@ export class Eval {
         result[key] = value;
         continue;
       }
-      // Otherwise resolve recursively
-      result[key] = await this.processValue(value, context, options);
+
+      // If this key holds tool definitions (array of objects that contain blueprint-like structures), keep opaque
+      if (
+        key === 'tools' &&
+        Array.isArray(value) &&
+        value.every(
+          (v) =>
+            v &&
+            typeof v === 'object' &&
+            'blueprint' in (v as Record<string, unknown>) &&
+            this.isBlueprintLikeObject((v as Record<string, unknown>).blueprint)
+        )
+      ) {
+        result[key] = value;
+        continue;
+      }
+
+      // Otherwise resolve recursively with depth limiting
+      result[key] = await this.processValue(value, context, options, depth - 1);
     }
     return result;
   }
@@ -350,9 +391,26 @@ export class Eval {
     if (typeof value === 'string') {
       this.validateStringTemplates(value, errors, options, path);
     } else if (Array.isArray(value)) {
-      value.forEach((item, index) => this.validateValue(item, errors, options, `${path}[${index}]`));
+      // Skip validation for arrays that look like tool definitions (objects each containing a blueprint)
+      const looksLikeToolArray =
+        value.length > 0 &&
+        value.every(
+          (v) =>
+            v &&
+            typeof v === 'object' &&
+            'blueprint' in (v as Record<string, unknown>) &&
+            this.isBlueprintLikeObject((v as Record<string, unknown>).blueprint)
+        );
+      if (!looksLikeToolArray) {
+        value.forEach((item, index) => this.validateValue(item, errors, options, `${path}[${index}]`));
+      }
     } else if (value && typeof value === 'object') {
+      // Skip validation recursion for blueprint-like objects entirely
+      if (this.isBlueprintLikeObject(value)) return;
+
       for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+        // Skip child 'blueprint' keys that are blueprint-like
+        if (key === 'blueprint' && this.isBlueprintLikeObject(val)) continue;
         this.validateValue(val, errors, options, path ? `${path}.${key}` : key);
       }
     }

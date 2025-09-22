@@ -160,20 +160,19 @@ export class Mutate implements NodeHandler {
    */
   private async convertSingleTransformToJsonPatch(
     transform: TransformOperation,
-    execution: Execution,
-    evalInstance: Eval
+    _execution: Execution,
+    _evalInstance: Eval
   ): Promise<Operation[]> {
-    // Resolve template expressions in the value using fresh evaluation
-    let resolvedValue = transform.value;
-    if (transform.value !== undefined) {
-      resolvedValue = await evalInstance.resolveTemplates(transform.value, execution);
-    }
+    // Silence unused parameter warnings explicitly
+    void _execution;
+    void _evalInstance;
 
-    // Resolve template expressions in the from path (for copy/move operations)
-    let resolvedFrom = transform.from;
-    if (transform.from !== undefined) {
-      resolvedFrom = (await evalInstance.resolveTemplates(transform.from, execution)) as string;
-    }
+    // Values are expected to be resolved by the Engine prior to Mutate execution
+    // (both for dedicated Mutate nodes and inline_mutate). Avoid re-resolving here
+    // to prevent double template expansion, which can mistakenly evaluate nested
+    // {{ ... }} inside serialized JSON payloads.
+    const resolvedValue = transform.value;
+    const resolvedFrom = transform.from;
 
     // Create JSON Patch operation based on operation type
     let operation: Operation;

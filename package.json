@@ -62,7 +62,7 @@
     },
     "onlyBuiltDependencies": [
       "@tailwindcss/oxide",
-      "core-js-pure",
+      "bcrypt",
       "cpu-features",
       "esbuild",
       "protobufjs",

@@ -5,8 +5,8 @@
  * This file contains ONLY parameter definitions to avoid circular dependencies
  */
 
-import type { AgentMemoryState } from '@/memory/AgentMemory';
 import { Blueprint } from './blueprint';
+import type { LlmMessage } from '@/types';
 
 /**
  * Transform operation for state mutations using JSON Patch-like operations
@@ -28,7 +28,7 @@ export interface TransformOperation {
 export interface BaseParams {
   transforms?: TransformOperation[];
   mutations?: TransformOperation[];
-  condition?: string; // JSONata expression for conditional evaluation
+  condition?: string; // JavaScript expression for conditional evaluation
 }
 
 /**
@@ -89,6 +89,8 @@ export interface ToolParams extends BaseParams {
     properties: Record<string, ToolParameterSchema>;
     required?: string[];
   };
+  blueprint: Blueprint; // Required: Tool executes this nested workflow
+  toolCallId?: string; // Optional: ID linking this execution to the originating assistant tool_call
   // Tool-specific execution parameters can be added here
 }
 
@@ -106,7 +108,7 @@ export interface LlmParams extends BaseParams {
   topP?: number | string; // Supports template expressions
   frequencyPenalty?: number | string; // Supports template expressions
   presencePenalty?: number | string; // Supports template expressions
-  tools?: ToolParams[]; // Optional tools for function calling schema
+  tools?: ToolParams[] | string; // Optional tools for function calling schema, supports template expressions
 }
 
 /**
@@ -128,6 +130,14 @@ export interface WorkflowParams extends BaseParams {
 }
 
 /**
+ * Agent state containing runtime data (messages and tools)
+ */
+export interface AgentState {
+  messages?: LlmMessage[]; // Message history
+  tools?: ToolParams[]; // Available tools
+}
+
+/**
  * Agent-specific node parameters
  * Contains full agent configuration for workflow execution
  */
@@ -144,14 +154,14 @@ export interface AgentParams extends BaseParams {
   // Execution parameters
   timeout?: number;
 
-  // Memory system (optional - Agent will create default if not provided)
-  memoryState?: AgentMemoryState;
+  // System prompt (configuration - set once)
+  systemPrompt?: string;
+
+  // Runtime state (optional - Agent will create default if not provided)
+  state?: AgentState;
 
   // Blueprint execution (optional - Agent will create default if not provided)
   blueprint?: Blueprint;
-
-  // Tool support (optional - enables function calling)
-  tools?: ToolParams[];
 
   // Metadata
   metadata?: Record<string, unknown>;
@@ -172,7 +182,11 @@ export interface StartParams extends BaseParams {
 }
 
 export interface EndParams extends BaseParams {
-  [key: string]: unknown;
+  /**
+   * Optional output to return from the engine when this End node completes.
+   * Accepts static values or template expressions using {{ ... }} which are resolved at runtime.
+   */
+  output?: unknown;
 }
 
 /**
@@ -190,6 +204,14 @@ export type MutateParams = BaseParams;
 // No additional parameters needed
 
 /**
+ * Code node parameters for JavaScript function execution
+ */
+export interface CodeParams extends BaseParams {
+  code: string; // JavaScript code to execute
+  timeout?: number; // Execution timeout in milliseconds (default: 5000)
+}
+
+/**
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
@@ -203,4 +225,5 @@ export type NodeParameters =
   | EndParams
   | ConditionalParams
   | TransformParams
-  | MutateParams;
+  | MutateParams
+  | CodeParams;

@@ -57,27 +57,14 @@ const agent = new Agent({
 const result = await agent.execute('What is 25 * 4 + 17?');
 ```
 
-### 3. Built-in Tools
+### 3. Tool Execution
 
-The system includes several built-in tools:
+- Tools must include a `blueprint` in `ToolParams`.
+- The Tool node executes that blueprint using a fresh Engine + Execution (same pattern as the Workflow node).
+- Pass any runtime configuration as regular tool arguments; they will be available as initial input (`$json`) to the tool blueprint.
 
-#### Calculator
-
-- **Name**: `calculator`
-- **Purpose**: Mathematical calculations
-- **Parameters**: `expression` (string)
-
-#### Current Time
-
-- **Name**: `get_current_time`
-- **Purpose**: Get current date/time
-- **Parameters**: `timezone` (optional), `format` (optional)
-
-#### Echo
-
-- **Name**: `echo`
-- **Purpose**: Testing and debugging
-- **Parameters**: `message` (string), `metadata` (optional object)
+- The Tool node is a lightweight wrapper and is intentionally stateless. It has no knowledge of LLMs, execution context, or agent state.
+- The Tool node does not inspect prior LLM outputs or tool_calls. Orchestrators must pass tool arguments explicitly via the Tool node's input; these will be available as the initial `$json` for the tool blueprint.
 
 ## Architecture Details
 
@@ -101,7 +88,7 @@ Start -> LLM -> Conditional(has tool_calls?)
 
 ### Template Expressions
 
-The system uses JSONata template expressions for dynamic data access:
+The system uses JavaScript template expressions for dynamic data access:
 
 ```javascript
 // Check for tool calls
@@ -109,7 +96,7 @@ The system uses JSONata template expressions for dynamic data access:
 // Get tool name
 `{{ $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].function.name }}`
 // Convert tool result to string
-`{{ $string($lastOutputOf("tool_1")[0].json) }}`;
+`{{ String($lastOutputOf("tool_1")[0].json) }}`;
 ```
 
 ## Usage Examples
@@ -144,9 +131,9 @@ const result = await agent.execute('What time is it in Tokyo and what is 42 * 17
 const agent = new Agent({
   name: 'ConversationAssistant',
   model: 'anthropic/claude-3.5-sonnet',
-  tools: [calculatorTool],
-  memoryState: {
-    systemPrompt: 'You are a helpful math assistant.',
+  systemPrompt: 'You are a helpful math assistant.',
+  state: {
+    tools: [calculatorTool],
     messages: [],
   },
 });
@@ -160,15 +147,63 @@ await agent.execute('Now multiply that by 3');
 
 ## Extending with Custom Tools
 
-To add custom tools, extend the Tool class and add to the HANDLER_MAP:
+Define a custom tool entirely in data by embedding a Blueprint in `ToolParams`. When a `blueprint` is present, the Tool node executes it using the same Engine + Execution pattern as the Workflow node. The tool call arguments (from the LLM or provided input) are passed as the initial input to the blueprint.
+
+Example:
 
 ```typescript
-// 1. Add tool type to NodeType union in types/base.ts
-// 2. Add tool to HANDLER_MAP in engine/Engine.ts
-// 3. Implement custom logic in Tool.executeToolLogic()
+import { ToolParams } from '@starships/autopilot';
+
+export const sendEmailTool: ToolParams = {
+  name: 'send_email',
+  description: 'Send an email via HTTP API',
+  parameters: {
+    type: 'object',
+    properties: {
+      to: { type: 'string', description: 'Recipient email address' },
+      subject: { type: 'string', description: 'Email subject' },
+      body: { type: 'string', description: 'Email body (text)' },
+      apiKey: { type: 'string', description: 'API key for the provider' },
+    },
+    required: ['to', 'subject', 'body', 'apiKey'],
+  },
+  blueprint: {
+    nodes: [
+      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      {
+        ref: 'http_1',
+        type: 'http_request',
+        name: 'Send Email',
+        description: 'Call provider API',
+        parameters: {
+          url: 'https://example-mail.api/send',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer {{ $json.apiKey }}',
+          } as unknown as HeadersInit,
+          body: {
+            to: '{{ $json.to }}',
+            subject: '{{ $json.subject }}',
+            body: '{{ $json.body }}',
+          },
+        },
+      },
+      { ref: 'end_1', type: 'end', name: 'Done', description: '', parameters: {} },
+    ],
+    edges: [
+      { ref: 'e1', from: 'start_1', to: 'http_1' },
+      { ref: 'e2', from: 'http_1', to: 'end_1' },
+    ],
+    metadata: {},
+  },
+};
 ```
 
-The current implementation supports built-in tools. For custom tools, modify the Tool class's `executeToolLogic` method to handle your specific tool names.
+Notes:
+
+- No code changes required for new tools. Provide `ToolParams` with a `blueprint`, and include it in the agent’s `tools` array for function calling schema.
+- Pass any configuration/secrets as normal tool arguments (e.g., `apiKey`). The Tool node forwards arguments as the initial input (`$json`) of the blueprint.
 
 ## Key Benefits
 

@@ -89,7 +89,7 @@ export class LLM extends BaseNode<LlmParams> {
       };
 
       // Add function calling support if tools are provided
-      if (params.tools && params.tools.length > 0) {
+      if (params.tools && Array.isArray(params.tools) && params.tools.length > 0) {
         requestBody.tools = this.convertToOpenRouterTools(params.tools);
         requestBody.tool_choice = 'auto';
       }
@@ -320,6 +320,14 @@ export class LLM extends BaseNode<LlmParams> {
 
     const messagesError = this.validateArrayParameter(params.messages, 'Messages', 1);
     if (messagesError) errors.push(messagesError);
+
+    // Tools validation - handle both array and string (template expression)
+    if (params.tools !== undefined && !Array.isArray(params.tools) && typeof params.tools !== 'string') {
+      errors.push({
+        code: 'INVALID_PARAMETERS',
+        message: 'Tools must be an array of ToolParams or a template expression string',
+      });
+    }
 
     // API key validation
     if (!autopilot.getOpenRouterApiKey()) {

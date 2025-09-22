@@ -123,7 +123,8 @@ describe('Serialization Helper', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[], "tools":[]}',
         blueprint: '{"nodes":[], "edges":[]}',
       };
 
@@ -131,7 +132,8 @@ describe('Serialization Helper', () => {
 
       expect(agent).toBeInstanceOf(AgentEntity);
       expect(agent.name).toBe('Test Agent');
-      expect(agent.memoryState).toEqual({});
+      expect(agent.systemPrompt).toBe('Test agent');
+      expect(agent.state).toEqual({ messages: [], tools: [] });
       expect(agent.blueprint).toEqual({ nodes: [], edges: [] });
     });
 

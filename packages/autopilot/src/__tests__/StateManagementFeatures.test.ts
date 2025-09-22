@@ -46,7 +46,7 @@ describe('State Management Features', () => {
             parameters: {
               mutations: [
                 { operation: 'add', path: '/state/userId', value: 'user-123' },
-                { operation: 'add', path: '/state/sessionStart', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/sessionStart', value: '{{ new Date().toISOString() }}' },
                 { operation: 'add', path: '/state/counter', value: 0 },
               ],
             },
@@ -70,8 +70,12 @@ describe('State Management Features', () => {
               },
               mutations: [
                 { operation: 'replace', path: '/state/counter', value: '{{ state.counter + 1 }}' },
-                { operation: 'add', path: '/state/lastApiCall', value: '{{ $now() }}' },
-                { operation: 'add', path: '/state/apiCallHistory', value: [{ url: '{{ state.userId }}', timestamp: '{{ $now() }}' }] },
+                { operation: 'add', path: '/state/lastApiCall', value: '{{ new Date().toISOString() }}' },
+                {
+                  operation: 'add',
+                  path: '/state/apiCallHistory',
+                  value: [{ url: '{{ state.userId }}', timestamp: '{{ new Date().toISOString() }}' }],
+                },
               ],
             },
           },
@@ -82,7 +86,7 @@ describe('State Management Features', () => {
             description: 'Complete workflow',
             parameters: {
               mutations: [
-                { operation: 'add', path: '/state/completedAt', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/completedAt', value: '{{ new Date().toISOString() }}' },
                 { operation: 'add', path: '/state/totalCalls', value: '{{ state.counter }}' },
               ],
             },
@@ -143,10 +147,10 @@ describe('State Management Features', () => {
             name: 'Check User Tier',
             description: 'Determine user privileges',
             parameters: {
-              condition: '{{ state.userTier = "premium" and state.requestCount > 3 }}',
+              condition: '{{ state.userTier === "premium" && state.requestCount > 3 }}',
               mutations: [
-                { operation: 'add', path: '/state/conditionEvaluated', value: '{{ $now() }}' },
-                { operation: 'add', path: '/state/isPremiumUser', value: '{{ state.userTier = "premium" }}' },
+                { operation: 'add', path: '/state/conditionEvaluated', value: '{{ new Date().toISOString() }}' },
+                { operation: 'add', path: '/state/isPremiumUser', value: '{{ state.userTier === "premium" }}' },
               ],
             },
           },
@@ -243,7 +247,7 @@ describe('State Management Features', () => {
             name: 'HTTP Call',
             description: 'Call with invalid expression',
             parameters: {
-              url: '{{ state.invalidFunction(unclosed }', // Invalid JSONata
+              url: '{{ state.invalidFunction(unclosed }', // Invalid expression
               method: 'GET',
             },
           },
@@ -318,7 +322,7 @@ describe('State Management Features', () => {
               mutations: [
                 { operation: 'add', path: '/state/metrics', value: { requests: 0, errors: 0, successRate: 0 } },
                 { operation: 'add', path: '/state/userSessions', value: [] },
-                { operation: 'add', path: '/state/startTime', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/startTime', value: '{{ new Date().toISOString() }}' },
               ],
             },
           },
@@ -331,7 +335,7 @@ describe('State Management Features', () => {
               url: 'https://api.example.com/process',
               method: 'POST',
               body: {
-                sessionCount: '{{ $count(state.userSessions) }}',
+                sessionCount: '{{ state.userSessions.length }}',
                 metrics: '{{ state.metrics }}',
               },
               mutations: [
@@ -339,7 +343,11 @@ describe('State Management Features', () => {
                 { operation: 'replace', path: '/state/metrics/requests', value: '{{ state.metrics.requests + 1 }}' },
 
                 // Add new session data
-                { operation: 'add', path: '/state/userSessions/-', value: { id: '{{ $random() }}', timestamp: '{{ $now() }}' } },
+                {
+                  operation: 'add',
+                  path: '/state/userSessions/-',
+                  value: { id: '{{ Math.random() }}', timestamp: '{{ new Date().toISOString() }}' },
+                },
 
                 // Calculate success rate (after incrementing requests)
                 {
@@ -354,7 +362,7 @@ describe('State Management Features', () => {
                 {
                   operation: 'add',
                   path: '/state/executionHistory/-',
-                  value: { node: 'process-data', timestamp: '{{ $now() }}', success: true },
+                  value: { node: 'process-data', timestamp: '{{ new Date().toISOString() }}', success: true },
                 },
               ],
             },
@@ -366,7 +374,7 @@ describe('State Management Features', () => {
             description: 'Finalize',
             parameters: {
               mutations: [
-                { operation: 'add', path: '/state/endTime', value: '{{ $now() }}' },
+                { operation: 'add', path: '/state/endTime', value: '{{ new Date().toISOString() }}' },
                 { operation: 'copy', path: '/state/finalMetrics', from: '/state/metrics' },
               ],
             },

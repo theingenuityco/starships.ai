@@ -9,6 +9,7 @@ import {
   AgentRepository,
   createConnection,
   migrationRunner,
+  seedToolTemplates,
   seedAgentTemplates,
   seedWaitlist,
   StarshipRepository,
@@ -63,11 +64,6 @@ const dbConnection = createConnection({
   password: config.NEO4J_PASSWORD,
   database: config.NEO4J_DATABASE,
 });
-
-// Core repositories
-const agentRepository = new AgentRepository();
-const userRepository = new UserRepository();
-
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
 // Middleware - Order is important!
@@ -144,6 +140,14 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
+
+    // Initialize Tool Templates (seeds default templates)
+    try {
+      await seedToolTemplates();
+    } catch (error) {
+      console.error('⚠️ Failed to seed tool templates:', error);
+      // Continue - seeding is not critical for startup
+    }
 
     // Initialize Agent Templates (seeds default templates)
     try {

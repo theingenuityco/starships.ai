@@ -27,9 +27,10 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
     model: agent?.model || 'gpt-4',
     temperature: agent?.temperature,
     maxTokens: agent?.maxTokens,
-    memoryState: agent?.memoryState || {
-      systemPrompt: '',
+    systemPrompt: agent?.systemPrompt || '',
+    state: agent?.state || {
       messages: [],
+      tools: [],
     },
     blueprint: agent?.blueprint || {
       nodes: [],

@@ -479,7 +479,6 @@ NEO4J_PASSWORD=password
 # LLM Provider Configuration
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
-DEFAULT_LLM_PROVIDER=openai
 
 # Authentication (JWT)
 JWT_SECRET=your_jwt_secret_key_32_chars_min
@@ -492,15 +491,9 @@ STRIPE_PRODUCT_SCOUT_ID=prod_scout_...
 STRIPE_PRODUCT_CRUISER_ID=prod_cruiser_...
 STRIPE_PRODUCT_DRAUGHT_ID=prod_draught_...
 
-# MCP Integration
-MCP_HTTP_BRIDGE_PORT=3001
-MCP_DOCKER_NETWORK=starships-mcp
-MCP_DOCKER_REGISTRY=starships
-
-# Native Tool APIs
+# Native Tool APIs (for encrypted storage)
 FIRECRAWL_API_KEY=your_firecrawl_key
 NOTION_API_KEY=your_notion_key
-BRAVE_SEARCH_API_KEY=your_brave_key
 
 # Security & Encryption
 ENCRYPTION_KEY=your_32_byte_encryption_key
@@ -663,7 +656,7 @@ tests/
 ├── testUtils.ts             # Test utilities
 ├── mocks/                   # Mock implementations
 │   └── @starships/
-│       └── agent-engine.ts  # Engine mocks
+│       └── autopilot.ts     # Autopilot engine mocks
 └── unit/                    # Unit tests
     ├── agents.spec.ts       # Agent endpoints
     ├── chat.spec.ts         # Chat endpoints
@@ -882,7 +875,7 @@ node --inspect-brk dist/index.js
 - **express**: Web framework for Node.js
 - **stripe**: Payment processing and subscription management
 - **jose**: JWT token validation and management
-- **@starships/agent-engine**: Advanced AI orchestration with MCP tools
+- **@starships/autopilot**: Workflow execution engine with AI integration
 - **@starships/models**: Neo4j database with migration system
 - **@starships/protocol**: Shared types for agents and workflows
 - **@starships/core**: MCP HTTP bridge services

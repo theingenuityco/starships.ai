@@ -8,7 +8,7 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { EntityTestHelper } from './entity-test-helper';
-import { AgentMemoryState, Blueprint } from '@starships/autopilot';
+import { AgentState, Blueprint } from '@starships/autopilot';
 
 describe('AgentEntity', () => {
   let testHelper: EntityTestHelper<AgentEntity>;
@@ -30,7 +30,8 @@ describe('AgentEntity', () => {
       agent.timeout = 30000;
       agent.createdAt = '2024-01-01T00:00:00.000Z';
       agent.updatedAt = '2024-01-01T00:00:00.000Z';
-      agent.memoryState = { messageHistory: [] } as AgentMemoryState;
+      agent.systemPrompt = 'You are a helpful assistant.';
+      agent.state = { messages: [], tools: [] } as AgentState;
       agent.blueprint = { nodes: [], edges: [] } as Blueprint;
 
       const serialized = toDatabase(agent);
@@ -45,7 +46,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: JSON.stringify({ messageHistory: [] }),
+        systemPrompt: 'You are a helpful assistant.',
+        state: JSON.stringify({ messages: [], tools: [] }),
         blueprint: JSON.stringify({ nodes: [], edges: [] }),
       });
     });
@@ -58,7 +60,7 @@ describe('AgentEntity', () => {
       agent.timeout = 30000;
       agent.createdAt = '2024-01-01T00:00:00.000Z';
       agent.updatedAt = '2024-01-01T00:00:00.000Z';
-      agent.memoryState = {} as AgentMemoryState;
+      agent.state = { messages: [], tools: [] } as AgentState;
       agent.blueprint = { nodes: [], edges: [] };
       // temperature, maxTokens, description are undefined
 
@@ -67,7 +69,7 @@ describe('AgentEntity', () => {
       expect(serialized.temperature).toBeUndefined();
       expect(serialized.maxTokens).toBeUndefined();
       expect(serialized.description).toBeUndefined();
-      expect(serialized.memoryState).toBe('{}');
+      expect(serialized.state).toBe('{"messages":[],"tools":[]}');
     });
   });
 
@@ -83,7 +85,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{"messageHistory":[]}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -99,7 +102,7 @@ describe('AgentEntity', () => {
       expect(entity.timeout).toBe(30000);
       expect(entity.createdAt).toBe('2024-01-01T00:00:00.000Z');
       expect(entity.updatedAt).toBe('2024-01-01T00:00:00.000Z');
-      expect(entity.memoryState).toEqual({ messageHistory: [] });
+      expect(entity.state).toEqual({ messages: [], tools: [] });
       expect(entity.blueprint).toEqual({ nodes: [], edges: [] });
     });
 
@@ -111,7 +114,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: 'invalid-json',
+        systemPrompt: 'Test agent',
+        state: 'invalid-json',
         blueprint: '{"invalid": json}',
       };
 
@@ -127,7 +131,8 @@ describe('AgentEntity', () => {
           timeout: 30000,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          memoryState: '{}',
+          systemPrompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
           blueprint: '{"nodes":[],"edges":[]}',
         },
         {
@@ -137,7 +142,8 @@ describe('AgentEntity', () => {
           timeout: 30000,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          memoryState: '{}',
+          systemPrompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
           blueprint: '{"nodes":[],"edges":[]}',
         },
       ];
@@ -158,7 +164,8 @@ describe('AgentEntity', () => {
         name: 'Test Agent',
         model: 'gpt-4',
         timeout: 30000,
-        memoryState: {} as AgentMemoryState,
+        systemPrompt: 'Test prompt',
+        state: { messages: [], tools: [] } as AgentState,
         blueprint: { nodes: [], edges: [] } as Blueprint,
       };
 
@@ -180,7 +187,8 @@ describe('AgentEntity', () => {
           name: '',
           model: 'gpt-4',
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -191,7 +199,8 @@ describe('AgentEntity', () => {
           name: 'a'.repeat(101),
           model: 'gpt-4',
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -205,7 +214,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           temperature: -1,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -217,7 +227,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           temperature: 3,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -231,7 +242,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           maxTokens: 0,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -243,7 +255,8 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           maxTokens: 100001,
           timeout: 30000,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -256,7 +269,8 @@ describe('AgentEntity', () => {
           name: 'Test Agent',
           model: 'gpt-4',
           timeout: 500,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -267,7 +281,8 @@ describe('AgentEntity', () => {
           name: 'Test Agent',
           model: 'gpt-4',
           timeout: 300001,
-          memoryState: {},
+          systemPrompt: 'Test agent',
+          state: { messages: [], tools: [] },
           blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
@@ -301,7 +316,8 @@ describe('AgentEntity', () => {
             timeout: '30000', // String that should be converted to number
             createdAt: '2024-01-01T00:00:00.000Z',
             updatedAt: '2024-01-01T00:00:00.000Z',
-            memoryState: '{}',
+            systemPrompt: 'Test agent',
+            state: '{"messages":[],"tools":[]}',
             blueprint: '{"nodes":[],"edges":[]}',
           },
           expected: {
@@ -329,7 +345,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -346,7 +363,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -362,7 +380,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -386,7 +405,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: JSON.stringify({ messages: [{ role: 'system', content: 'Hello' }] }),
+        systemPrompt: 'Test agent',
+        state: JSON.stringify({ messages: [{ role: 'system', content: 'Hello' }], tools: [] }),
         blueprint: JSON.stringify({
           nodes: [{ id: 'node1', type: 'start' }],
           edges: [{ id: 'edge1', source: 'node1', target: 'node2' }],
@@ -400,7 +420,7 @@ describe('AgentEntity', () => {
 
       // Verify specific transformations worked correctly
       const entity = results[0].entity as AgentEntity;
-      expect(entity.memoryState).toEqual({ messages: [{ role: 'system', content: 'Hello' }] });
+      expect(entity.state).toEqual({ messages: [{ role: 'system', content: 'Hello' }], tools: [] });
       expect(entity.blueprint).toEqual({
         nodes: [{ id: 'node1', type: 'start' }],
         edges: [{ id: 'edge1', source: 'node1', target: 'node2' }],
@@ -424,7 +444,8 @@ describe('AgentEntity', () => {
           timeout: 30000,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T00:00:00.000Z',
-          memoryState: '{}',
+          systemPrompt: 'Test agent',
+          state: '{"messages":[],"tools":[]}',
           blueprint: '{"nodes":[],"edges":[]}',
         },
         null, // Invalid item
@@ -443,7 +464,8 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: '{}',
+        systemPrompt: 'Test agent',
+        state: '{"messages":[],"tools":[]}',
         blueprint: '{"nodes":[],"edges":[]}',
       };
 
@@ -456,7 +478,7 @@ describe('AgentEntity', () => {
     });
 
     it('should handle complex blueprint and memory state', async () => {
-      const complexMemoryState = {
+      const complexState = {
         messages: [
           { role: 'system', content: 'You are a helpful assistant' },
           { role: 'user', content: 'Hello' },
@@ -486,18 +508,19 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        memoryState: JSON.stringify(complexMemoryState),
+        systemPrompt: 'Test agent',
+        state: JSON.stringify(complexState),
         blueprint: JSON.stringify(complexBlueprint),
       };
 
       const entity = fromDatabase(AgentEntity, databaseRecord);
-      expect(entity.memoryState).toEqual(complexMemoryState);
+      expect(entity.state).toEqual(complexState);
       expect(entity.blueprint).toEqual(complexBlueprint);
 
       // Test round-trip
       const serialized = toDatabase(entity);
       const deserializedAgain = fromDatabase(AgentEntity, serialized);
-      expect(deserializedAgain.memoryState).toEqual(complexMemoryState);
+      expect(deserializedAgain.state).toEqual(complexState);
       expect(deserializedAgain.blueprint).toEqual(complexBlueprint);
     });
   });

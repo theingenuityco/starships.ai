@@ -10,7 +10,9 @@ import { BaseNode } from './BaseNode';
 import { NodeHandlerOptions, ValidationResult, WorkflowParams, ExecutionItem } from '@/types';
 import { ValidationError } from '@/types/validation';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
-import { Engine } from '@/engine/Engine';
+import type { EngineConfig } from '@/engine/Engine';
+import { LocalRunner } from '@/runner/LocalRunner';
+import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
 
 export class Workflow extends BaseNode<WorkflowParams> {
   constructor(params: WorkflowParams, options?: NodeHandlerOptions) {
@@ -25,17 +27,21 @@ export class Workflow extends BaseNode<WorkflowParams> {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
 
-    // Create a new Engine instance for executing the workflow's blueprint
-    const engine = new Engine({
-      eventCallback: this.options?.eventCallback,
-    });
+    // Prepare workflow execution; runner is selected based on execution.depth in try-block
 
     // Create execution context for the workflow's blueprint
-    const execution = ExecutionItemUtils.createExecution(input);
+    const parentExecution = this.options?.execution;
+    const execution = ExecutionItemUtils.createExecution(input, parentExecution);
 
     try {
-      // Execute the workflow's blueprint using the new Engine
-      return await engine.executeBlueprint(params.blueprint, execution);
+      // Execute the workflow's blueprint using depth-aware Runner selection
+      const engineConfig: EngineConfig = {
+        eventCallback: this.options?.eventCallback,
+        failOnNodeError: true,
+      };
+      const depth = execution.depth ?? 0;
+      const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
+      return await runner.run(params.blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

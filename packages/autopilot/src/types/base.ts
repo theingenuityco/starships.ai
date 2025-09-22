@@ -26,7 +26,8 @@ export type NodeType =
   | 'workflow'
   | 'transform'
   | 'mutate'
-  | 'tool';
+  | 'tool'
+  | 'code';
 
 /**
  * Base node interface (untyped parameters)

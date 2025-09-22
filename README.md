@@ -14,11 +14,7 @@ A comprehensive TypeScript monorepo for orchestrating AI-driven agents and workf
 
 ## 📚 Documentation
 
-- **[Deployment Guide](./docs/DEPLOYMENT_GUIDE.md)** - Production deployment instructions
-- **[Environment Configuration](./docs/ENVIRONMENT_CONFIGURATION.md)** - Environment variables setup guide
-- **[Production Status](./docs/PRODUCTION_DEPLOYMENT_STATUS.md)** - Current deployment status
 - **[ER Diagram](./docs/er-diagram.md)** - Database schema and relationships
-- **[Waitlist Implementation](./docs/waitlist-implementation-plan.md)** - Early access system
 
 ---
 
@@ -67,14 +63,15 @@ pnpm lint         # Run ESLint
 
 ## 📦 Package Architecture
 
-| Package                                                  | Description                                                                                  |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| [`@starships/client`](./packages/client/README.md)       | Next.js 15 frontend with starship management, agent control, and conversation interfaces     |
-| [`@starships/server`](./packages/server/README.md)       | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints   |
-| [`@starships/autopilot`](./packages/autopilot/README.md) | Workflow execution engine with DAG-based flows, agent system, and AI model integration       |
-| [`@starships/models`](./packages/models/README.md)       | Neo4j database models, repositories, migration system, and comprehensive data access layer   |
-| [`@starships/protocol`](./packages/protocol/README.md)   | Shared TypeScript types, domain models, and API contracts                                    |
-| [`@starships/errors`](./packages/errors/README.md)       | Comprehensive error handling system with automatic categorization and developer-friendly API |
+| Package                                                          | Description                                                                                          |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [`@starships/client`](./packages/client/README.md)               | Next.js 15 frontend with starship management, agent control, and conversation interfaces             |
+| [`@starships/server`](./packages/server/README.md)               | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints           |
+| [`@starships/autopilot`](./packages/autopilot/README.md)         | Workflow execution engine with DAG-based flows, agent system, AI model integration, and tool calling |
+| [`@starships/models`](./packages/models/README.md)               | Neo4j database models, repositories, migration system, and comprehensive data access layer           |
+| [`@starships/reverse-proxy`](./packages/reverse-proxy/README.md) | Development reverse proxy for unified local development routing                                      |
+| [`@starships/protocol`](./packages/protocol/README.md)           | Shared TypeScript types, domain models, and API contracts                                            |
+| [`@starships/errors`](./packages/errors/README.md)               | Comprehensive error handling system with automatic categorization and developer-friendly API         |
 
 ---
 
@@ -171,7 +168,7 @@ graph TD
 
 - DAG-based workflow execution with conditional routing
 - Extensible node system (HTTP, LLM, Agent, Conditional, etc.)
-- Advanced memory management (Memory and AgentMemory classes)
+- AI agent state management and conversation persistence
 - JSON-based workflow definitions with validation
 
 **Payment & Billing System**

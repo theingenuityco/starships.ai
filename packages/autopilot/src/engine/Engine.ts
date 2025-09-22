@@ -9,6 +9,7 @@ import { NodeHandler, NodeHandlerConstructor } from '@/types/node-handler';
 import { Blueprint, Execution, NodeHandlerOptions, Node as Node, NodeParameters, ExecutionItem } from '@/types';
 import type { EventCallback, ExecutionEvent, ExecutionEventType } from '@/types/events';
 import type { TransformOperation } from '@/types/node-parameters';
+import type { Runner } from '@/runner/Runner';
 import { Eval } from './Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { config } from '@/constants';
@@ -25,11 +26,13 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   transform: () => import('@/nodes/Transform').then((m) => m.Transform as NodeHandlerConstructor),
   mutate: () => import('@/nodes/Mutate').then((m) => m.Mutate as NodeHandlerConstructor),
   tool: () => import('@/nodes/Tool').then((m) => m.Tool as NodeHandlerConstructor),
+  code: () => import('@/nodes/Code').then((m) => m.Code as NodeHandlerConstructor),
 };
 
 export interface EngineConfig {
   eventCallback?: EventCallback;
   failOnNodeError?: boolean;
+  runner?: Runner;
 }
 
 export class Engine {
@@ -228,7 +231,13 @@ export class Engine {
             execution.status = 'completed';
             await this.emitEvent('workflow_completed', execution);
           }
-          // Return execution results as ExecutionItem array for proper workflow composition
+          // If End node provided a final result, return it; otherwise return full execution results
+          {
+            const maybeFinal = this.extractEndOutputIfAny(blueprint, execution, currentNode);
+            if (maybeFinal) {
+              return maybeFinal;
+            }
+          }
           return ExecutionItemUtils.wrapSingle(execution.results);
         }
 
@@ -251,6 +260,13 @@ export class Engine {
           // If we've reached the end, complete the workflow even though we had failures
           execution.status = 'completed';
           await this.emitEvent('workflow_completed', execution);
+          // If End node provided a final result, return it; otherwise return full execution results
+          {
+            const maybeFinal = this.extractEndOutputIfAny(blueprint, execution, currentNode);
+            if (maybeFinal) {
+              return maybeFinal;
+            }
+          }
           return ExecutionItemUtils.wrapSingle(execution.results);
         }
         currentNode = nextNode;
@@ -258,7 +274,13 @@ export class Engine {
     }
 
     execution.currentNodeRef = undefined;
-    // Return execution results as ExecutionItem array for proper workflow composition
+    // If End node provided a final result, return it; otherwise return full execution results
+    {
+      const maybeFinal = this.extractEndOutputIfAny(blueprint, execution);
+      if (maybeFinal) {
+        return maybeFinal;
+      }
+    }
     return ExecutionItemUtils.wrapSingle(execution.results);
   }
 
@@ -316,9 +338,23 @@ export class Engine {
       const initialInputItems = this.findNodeResult(execution, '__initial__');
       const nodeInputItems = currentNode.type === 'start' && initialInputItems ? initialInputItems : this.getNodeInput(execution);
 
-      // Resolve node parameters with templates
+      // Resolve node parameters with templates (exclude inline fields until after execution)
       const inputData = ExecutionItemUtils.unwrapSingle(nodeInputItems);
-      const resolvedParams = (await this.eval.resolveTemplates(currentNode.parameters, execution, inputData)) as NodeParameters;
+
+      let resolvedParams: NodeParameters;
+      const rawParams = (currentNode.parameters || {}) as Record<string, unknown>;
+
+      if (currentNode.type === 'transform' || currentNode.type === 'mutate' || currentNode.type === 'conditional') {
+        // Dedicated nodes: resolve everything up front
+        resolvedParams = (await this.eval.resolveTemplates(rawParams, execution, inputData)) as NodeParameters;
+      } else {
+        // Non-inline nodes: resolve only handler params, defer inline fields to post-execution helpers
+        const handlerParams = { ...rawParams } as Record<string, unknown>;
+        delete (handlerParams as Record<string, unknown>).transforms;
+        delete (handlerParams as Record<string, unknown>).mutations;
+        delete (handlerParams as Record<string, unknown>).condition;
+        resolvedParams = (await this.eval.resolveTemplates(handlerParams, execution, inputData)) as NodeParameters;
+      }
 
       // Create and validate handler
       const handler = await this.createHandler(currentNode, resolvedParams, execution);
@@ -436,6 +472,22 @@ export class Engine {
     }
 
     return targetEdge ? blueprint.nodes.find((node) => node.ref === targetEdge.to) || null : null;
+  }
+
+  // Extract final output from End node (if its handler produced a result)
+  private extractEndOutputIfAny(blueprint: Blueprint, execution: Execution, currentNode?: Node): ExecutionItem[] | null {
+    const endNode = currentNode?.type === 'end' ? currentNode : blueprint.nodes.find((n) => n.type === 'end') || null;
+    if (!endNode) return null;
+
+    const items = this.findNodeResult(execution, endNode.ref);
+    const firstJson = items?.[0]?.json;
+
+    if (firstJson && typeof firstJson === 'object' && 'result' in (firstJson as Record<string, unknown>)) {
+      const final = (firstJson as Record<string, unknown>).result;
+      return ExecutionItemUtils.wrapSingle(final);
+    }
+
+    return null;
   }
 
   private async validateForExecution(blueprint: Blueprint): Promise<void> {

@@ -60,7 +60,7 @@ export type WorkflowErrorCode =
   | 'WORKFLOW_CANCELLED'
   | 'SYSTEM_ERROR'
   | 'VALIDATION_FAILED'
-  | 'JSONATA_ERROR';
+  | 'EXPRESSION_ERROR';
 
 // ============================================================================
 // EXECUTION REQUEST/RESPONSE TYPES

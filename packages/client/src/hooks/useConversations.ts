@@ -20,7 +20,7 @@ interface ClientMessage extends MessageModel {
   sending?: boolean
   streaming?: boolean
   error?: boolean
-  contentChunks?: Array<{
+  chunks?: Array<{
     content: string
     position: number
     timestamp: number
@@ -28,16 +28,16 @@ interface ClientMessage extends MessageModel {
 }
 
 // Content chunk processing utility
-const processContentChunks = (data: any) => {
+const processChunks = (data: any) => {
   if (!data.messages || !Array.isArray(data.messages)) {
     return data
   }
 
   const processedMessages = data.messages.map((message: ClientMessage) => {
-    // If message has contentChunks, build the streamed content
-    if (message.contentChunks && Array.isArray(message.contentChunks)) {
+    // If message has chunks, build the streamed content
+    if (message.chunks && Array.isArray(message.chunks)) {
       // Sort chunks by position to ensure correct order
-      const sortedChunks = [...message.contentChunks].sort((a, b) => a.position - b.position)
+      const sortedChunks = [...message.chunks].sort((a, b) => a.position - b.position)
 
       // Build content from chunks
       let streamedContent = ''
@@ -231,7 +231,7 @@ export function useConversation(conversationId: string | null) {
         const version = (data as any).version
 
         // Split chunk-add ops from others to avoid blocking event loop with frequent cache writes
-        const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/contentChunks\/-$/.test(op.path))
+        const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/chunks\/-$/.test(op.path))
         const nonChunkOps = ops.filter(op => !chunkOps.includes(op))
 
         // Fast path: update ephemeral streaming state in zustand for chunk adds
@@ -258,16 +258,21 @@ export function useConversation(conversationId: string | null) {
 
             for (const op of chunkOps) {
               const path = String((op as any).path || '')
-              // Expect path like: /messages/{index}/contentChunks/-
-              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              // Expect path like: /messages/{index}/chunks/- where index can be a concrete number or -1 for last
+              const match = path.match(/^\/messages\/(-?\d+)\/chunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/chunks\/-$/)
               if (!match) continue
-              const msgIndex = Number(match[1])
-              if (!Number.isInteger(msgIndex) || msgIndex < 0 || msgIndex >= updated.messages.length) continue
+              let msgIndex = Number(match[1])
+              if (!Number.isInteger(msgIndex)) continue
+              if (msgIndex < 0) {
+                // Map -1 sentinel to the last message index
+                msgIndex = updated.messages.length - 1
+              }
+              if (msgIndex < 0 || msgIndex >= updated.messages.length) continue
 
               const target = { ...updated.messages[msgIndex] }
               const chunkVal = (op as any).value
-              // Ensure contentChunks array
-              const chunks = Array.isArray(target.contentChunks) ? [...target.contentChunks] : []
+              // Ensure chunks array
+              const chunks = Array.isArray(target.chunks) ? [...target.chunks] : []
               if (chunkVal && typeof chunkVal.content === 'string') {
                 chunks.push({
                   content: String(chunkVal.content),
@@ -275,7 +280,7 @@ export function useConversation(conversationId: string | null) {
                   timestamp: typeof chunkVal.timestamp === 'number' ? chunkVal.timestamp : Date.now(),
                 })
               }
-              target.contentChunks = chunks
+              target.chunks = chunks
               // Ensure streaming flag is true while chunks are arriving
               target.streaming = true
               // Write back
@@ -290,9 +295,16 @@ export function useConversation(conversationId: string | null) {
           try {
             for (const op of chunkOps) {
               const path = String((op as any).path || '')
-              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              const match = path.match(/^\/messages\/(-?\d+)\/chunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/chunks\/-$/)
               if (!match) continue
-              const msgIndex = Number(match[1])
+              let msgIndex = Number(match[1])
+              if (!Number.isInteger(msgIndex)) continue
+              if (msgIndex < 0) {
+                // Resolve last message index from cache
+                const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
+                const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+                msgIndex = Math.max(msgs.length - 1, 0)
+              }
               const val = (op as any).value || {}
               appendMessageChunk(cid, msgIndex, {
                 content: typeof val.content === 'string' ? val.content : '',
@@ -383,7 +395,7 @@ export function useConversation(conversationId: string | null) {
                   total: Array.isArray(patched.messages) ? patched.messages.length : 0,
                 }
 
-                return processContentChunks(updatedData)
+                return processChunks(updatedData)
               } catch (error) {
                 console.error('[STREAMING] Failed to apply operations to initial data:', error)
                 return initialData
@@ -399,7 +411,7 @@ export function useConversation(conversationId: string | null) {
                 lastActivityAt: new Date().toISOString(),
               }
 
-              return processContentChunks(updatedData)
+              return processChunks(updatedData)
             } catch (error) {
               console.error('[STREAMING] Failed to apply operations:', error, { operations: nonChunkOps, target: old })
               return old // Return unchanged data on operation failure
@@ -448,8 +460,11 @@ export function useConversation(conversationId: string | null) {
               try {
                 for (const idx of completedIdxs) {
                   markMessageStreaming(cid, idx, false)
-                  // Remove ephemeral chunks on the UI side to stop any spinners tied to chunks
-                  updateMessageAt(cid, idx, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                  // Preserve chunks if final content wasn't persisted; they'll be used for display fallback.
+                  updateMessageAt(cid, idx, (m: any) => {
+                    const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                    return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+                  })
                 }
               } catch {}
             }
@@ -471,7 +486,9 @@ export function useConversation(conversationId: string | null) {
 
       // Handle completion by SSE event name
       if (data && (data as any).__event === 'complete') {
-        // Mark streaming finished
+        const scope = (data as any).scope || 'workflow'
+
+        // Mark streaming finished for the current turn/workflow
         setStreamingState(prev => ({
           ...prev,
           status: 'complete',
@@ -495,7 +512,10 @@ export function useConversation(conversationId: string | null) {
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
               markMessageStreaming(cid, i, false)
-              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              updateMessageAt(cid, i, (m: any) => {
+                const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+              })
               break
             }
           }
@@ -514,14 +534,17 @@ export function useConversation(conversationId: string | null) {
             } catch {}
           }, 500)
         }
-        // Mark complete and hard-stop the SSE client to avoid POST retries
-        completedRef.current = true
-        shouldRetryRef.current = false
-        if (abortControllerRef.current) {
-          try {
-            abortControllerRef.current.abort()
-          } catch {}
-          abortControllerRef.current = null
+
+        if (scope === 'workflow') {
+          // Only hard-stop the SSE client for full workflow completion
+          completedRef.current = true
+          shouldRetryRef.current = false
+          if (abortControllerRef.current) {
+            try {
+              abortControllerRef.current.abort()
+            } catch {}
+            abortControllerRef.current = null
+          }
         }
         return
       }
@@ -563,9 +586,14 @@ export function useConversation(conversationId: string | null) {
           return
         }
 
-        // Regular message - add to cache (append; ascending order)
+        // Regular message - add to cache (append; ascending order, with de-duplication)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
           if (!old) return { messages: [message], total: 1, conversationId: cid }
+
+          // Dedupe by message id if already present (prevents duplicates when SSE replays existing messages)
+          if (message.id && Array.isArray(old.messages) && old.messages.some((m: any) => m.id === message.id)) {
+            return old
+          }
 
           // Check if this is a user message that should replace an optimistic message
           const isUserMessage = message.role === 'user'
@@ -621,7 +649,10 @@ export function useConversation(conversationId: string | null) {
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
               markMessageStreaming(cid, i, false)
-              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              updateMessageAt(cid, i, (m: any) => {
+                const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+              })
               break
             }
           }
@@ -727,7 +758,7 @@ export function useConversation(conversationId: string | null) {
       }
     ): Promise<ClientMessage> => {
       if (data.stream) {
-        // Use industry-standard fetch-event-source for POST SSE streaming
+        // Use a single, long-polling GET SSE channel per send; POST only kicks off processing
         const token = await getCurrentToken()
         if (!token) {
           throw new Error('No authentication token available')
@@ -764,16 +795,12 @@ export function useConversation(conversationId: string | null) {
           const optimisticCount = messagesSnapshot.filter((m: any) => m?.sending === true).length
           const baselineLength = Math.max(messagesSnapshot.length - optimisticCount, 0)
 
-          fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
-            method: 'POST',
+          // Start GET SSE subscription for this conversation
+          fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true&baselineLength=${baselineLength}`, {
+            method: 'GET',
             headers: {
-              'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-              content: data.content,
-              baselineLength,
-            }),
             signal: abortControllerRef.current?.signal,
             openWhenHidden: true,
             async onopen(response) {
@@ -836,7 +863,10 @@ export function useConversation(conversationId: string | null) {
                 for (let i = msgs.length - 1; i >= 0; i--) {
                   if (msgs[i]?.streaming === true) {
                     markMessageStreaming(data.conversationId!, i, false)
-                    updateMessageAt(data.conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                    updateMessageAt(data.conversationId!, i, (m: any) => {
+                      const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                      return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+                    })
                     break
                   }
                 }
@@ -879,6 +909,26 @@ export function useConversation(conversationId: string | null) {
               reject(error)
             }
           })
+
+          // Kick off processing asynchronously via POST (no SSE on this request)
+          api
+            .post(`/api/v1/conversations/${data.conversationId}/messages`, {
+              content: data.content,
+            })
+            .catch(err => {
+              console.error('[STREAMING] Failed to start conversation processing:', err)
+              // Stop SSE subscription on failure
+              if (abortControllerRef.current) {
+                try {
+                  abortControllerRef.current.abort()
+                } catch {}
+                abortControllerRef.current = null
+              }
+              if (!resolved) {
+                resolved = true
+                reject(err)
+              }
+            })
         })
       } else {
         // Regular message creation

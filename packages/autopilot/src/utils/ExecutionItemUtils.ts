@@ -114,11 +114,12 @@ export class ExecutionItemUtils {
    * Create a new execution context with optional initial input
    * This is a common pattern used when nodes need to execute nested blueprints
    */
-  static createExecution(input?: ExecutionItem[]): Execution {
+  static createExecution(input?: ExecutionItem[], parentExecution?: Execution): Execution {
     const execution: Execution = {
       status: 'not_started',
       state: {},
       results: [],
+      depth: parentExecution ? (parentExecution.depth || 0) + 1 : 0, // Auto-calculate depth
     };
 
     // Set initial input for the blueprint if provided

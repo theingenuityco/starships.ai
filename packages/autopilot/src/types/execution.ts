@@ -35,6 +35,7 @@ export interface Execution {
   results: Array<{ nodeRef: string; items: ExecutionItem[] }>; // Chronological execution results
   visitCounts?: Record<string, number>; // Track node visit counts for cycle support
   error?: ExecutionError;
+  depth?: number; // Execution depth: 0 = main workflow, 1+ = nested workflows (e.g., from tools)
 }
 
 /**
@@ -64,4 +65,4 @@ export type ExecutionErrorCode =
   | 'WORKFLOW_CANCELLED'
   | 'SYSTEM_ERROR'
   | 'VALIDATION_FAILED'
-  | 'JSONATA_ERROR';
+  | 'EXPRESSION_ERROR';

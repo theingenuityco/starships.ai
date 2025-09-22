@@ -6,7 +6,7 @@
  */
 
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
-import { AgentMemoryState, ToolParams } from '@starships/autopilot';
+import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
@@ -70,20 +70,19 @@ export class AgentEntity implements AgentModel {
   timeout!: number;
 
   @Expose()
+  @IsOptional()
+  @IsString()
+  systemPrompt?: string; // System prompt moved to root level
+
+  @Expose()
   @Transformers.JsonTransform()
   @IsObject()
-  memoryState!: AgentMemoryState; // AgentMemoryState - keeping flexible for now
+  state!: AgentState; // Runtime state with messages and tools
 
   @Expose()
   @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
-
-  // Optional tools for function calling (enables tool_calls in LLM responses)
-  @Expose()
-  @IsOptional()
-  @Transformers.JsonTransform()
-  tools?: ToolParams[];
 
   /**
    * Simple validation function using class-validator
@@ -108,7 +107,8 @@ export class AgentEntity implements AgentModel {
         temperature: dataRecord.temperature,
         maxTokens: dataRecord.maxTokens,
         timeout: dataRecord.timeout ?? 30000,
-        memoryState: dataRecord.memoryState || {},
+        systemPrompt: dataRecord.systemPrompt,
+        state: dataRecord.state || { messages: [], tools: [] },
         blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         ...dataRecord,
       });

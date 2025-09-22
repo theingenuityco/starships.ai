@@ -54,19 +54,47 @@ export const toolListTool: ToolParams = {
         },
       },
       {
+        ref: 'summarize',
+        type: 'code',
+        name: 'Summarize Tools',
+        description: 'Strip heavy fields (e.g., blueprint) and return a lean list',
+        parameters: {
+          code: `
+            // Input is the HttpResponse from http_list (see HttpRequest node contract)
+            const http = input;
+            const body = http && typeof http === 'object' ? (http as any).body : http;
+            // Server sendSuccess returns { data: T }, so prefer body.data when present
+            const data = body && typeof body === 'object' && Array.isArray((body as any).data)
+              ? (body as any).data
+              : (Array.isArray(body) ? body : []);
+
+            // Return a lean summary to avoid leaking large/templated blueprint contents
+            return data.map((t: any) => ({
+              id: t.id,
+              slug: t.slug,
+              name: t.name,
+              description: t.description,
+              isEnabled: t.isEnabled,
+            }));
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ $lastOutputOf("http_list")[0].json }}',
+          output: '{{ $lastOutputOf("summarize")[0].json }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'http_list' },
-      { ref: 'e3', from: 'http_list', to: 'end_1' },
+      { ref: 'e3', from: 'http_list', to: 'summarize' },
+      { ref: 'e4', from: 'summarize', to: 'end_1' },
     ],
     metadata: {},
   },

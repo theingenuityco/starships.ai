@@ -128,23 +128,30 @@ export class HttpRequest implements NodeHandler {
           url: response.url,
         };
 
+        // Fail the workflow on non-2xx responses
+        if (!response.ok) {
+          const snippet =
+            typeof responseBody === 'string'
+              ? responseBody.slice(0, 300)
+              : (() => {
+                  try {
+                    return JSON.stringify(responseBody).slice(0, 300);
+                  } catch {
+                    return '';
+                  }
+                })();
+          throw new Error(
+            `HTTP request failed: ${method} ${this.params.url} -> ${response.status} ${response.statusText}${
+              snippet ? ` | body: ${snippet}` : ''
+            }`
+          );
+        }
+
         return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
       } catch (error) {
-        // Handle fetch errors and timeout - return structured HttpResponse-like object
-        let statusText: string;
-        if (controller.signal.aborted) {
-          statusText = `HTTP request timeout after ${timeout}ms`;
-        } else {
-          statusText = `HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        }
-        const httpResponse = {
-          status: 0,
-          statusText,
-          headers: {} as Record<string, string>,
-          body: null as unknown,
-          url: this.params.url,
-        };
-        return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
+        // Network/timeout errors should fail the workflow
+        const reason = controller.signal.aborted ? `timeout after ${timeout}ms` : error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`HTTP request failed: ${method} ${this.params.url} -> ${reason}`);
       }
     } finally {
       // Always clear timeout to prevent open handles

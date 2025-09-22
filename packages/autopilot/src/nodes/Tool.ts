@@ -10,7 +10,9 @@ import type { ToolParams } from '@/types/node-parameters';
 import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
-import { Engine } from '@/engine/Engine';
+import type { EngineConfig } from '@/engine/Engine';
+import { LocalRunner } from '@/runner/LocalRunner';
+import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
 
 export class Tool extends BaseNode<ToolParams> {
   constructor(params: ToolParams, options?: NodeHandlerOptions) {
@@ -47,13 +49,18 @@ export class Tool extends BaseNode<ToolParams> {
         throw new Error(`Tool '${params.name}' missing blueprint parameter`);
       }
 
-      // Execute the tool's blueprint using a fresh Engine + sub-execution
+      // Execute the tool's blueprint using depth-aware Runner selection
       // IMPORTANT: propagate parent execution to set correct execution.depth (nested = depth>0)
-      const engine = new Engine({ eventCallback: this.getEventCallback() });
       const parentExecution = this.getOptions()?.execution;
       const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
-      const items = await engine.executeBlueprint(params.blueprint, subExec);
+      const engineConfig: EngineConfig = {
+        eventCallback: this.getEventCallback(),
+        failOnNodeError: true,
+      };
+      const depth = subExec.depth ?? 0;
+      const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
+      const items = await runner.run(params.blueprint, subExec, engineConfig);
       const result = ExecutionItemUtils.unwrapSingle(items);
 
       // Emit tool_complete event

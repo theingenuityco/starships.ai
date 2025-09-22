@@ -34,10 +34,10 @@ export const toolSmokeTestTool: ToolParams = {
         description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
         parameters: {
           code: `
-            const baseUrl = ((state && (state as any).baseUrl) || '').replace(/\\/+$/, '');
+            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
             if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = (state && (state as any).authToken);
-            const starshipId = (state && (state as any).starshipId);
+            const authToken = env('AUTH_TOKEN');
+            const starshipId = env('STARSHIP_ID');
             const targetSlug = input.targetSlug;
             if (!authToken) throw new Error('authToken is required');
             if (!starshipId) throw new Error('starshipId is required');

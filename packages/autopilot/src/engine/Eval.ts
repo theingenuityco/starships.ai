@@ -28,6 +28,10 @@ export interface EvalContext {
   // Helper functions for workflow-specific operations
   $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
+
+  // Unified env/secret system
+  $env: (key: string) => unknown;
+  $envAll: () => Record<string, unknown>;
 }
 
 /**
@@ -45,6 +49,8 @@ export interface EvalOptions {
 export class Eval {
   private static readonly TEMPLATE_REGEX = /\{\{\s*(.*?)\s*\}\}/g;
 
+  constructor(private readonly secureEnv?: Record<string, string>) {}
+
   /**
    * Build evaluation context from execution state
    */
@@ -59,6 +65,15 @@ export class Eval {
       // Workflow-specific helper functions
       $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
       $input: (path?: string) => this.extractPath(inputData, path),
+
+      // Unified env/secret system (available everywhere)
+      $env: (key: string) => {
+        if (!key || typeof key !== 'string') return undefined;
+        return this.secureEnv?.[key];
+      },
+      $envAll: () => {
+        return { ...(this.secureEnv ?? {}) };
+      },
     };
 
     return context;

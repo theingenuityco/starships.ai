@@ -182,7 +182,11 @@ export interface StartParams extends BaseParams {
 }
 
 export interface EndParams extends BaseParams {
-  [key: string]: unknown;
+  /**
+   * Optional output to return from the engine when this End node completes.
+   * Accepts static values or template expressions using {{ ... }} which are resolved at runtime.
+   */
+  output?: unknown;
 }
 
 /**

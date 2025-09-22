@@ -95,9 +95,10 @@ export function ConversationMessageContent({
     }
   }, [toolResults, isToolCallsOpen, messageId])
 
-  // Build display content from chunks when streaming, use final content when complete
+  // Build display content from chunks when streaming; after completion fall back to chunks if final content wasn't persisted
   const displayContent = useMemo(() => {
-    if (!isStreaming || !chunks.length) {
+    const hasChunks = Array.isArray(chunks) && chunks.length > 0
+    if (!hasChunks) {
       return content
     }
 
@@ -105,12 +106,16 @@ export function ConversationMessageContent({
     const sortedChunks = [...chunks].sort((a, b) => a.position - b.position)
 
     // Build content from chunks
-    let result = ''
+    let aggregated = ''
     for (const chunk of sortedChunks) {
-      result += chunk.content
+      aggregated += chunk.content
     }
 
-    return result
+    // While streaming, always render aggregated chunks
+    if (isStreaming) return aggregated
+
+    // After completion, prefer server-finalized content; if missing, fall back to aggregated chunks
+    return content && content.trim().length > 0 ? content : aggregated
   }, [content, chunks, isStreaming])
 
   const parsedJson = useMemo(() => {

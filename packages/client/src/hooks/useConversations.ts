@@ -460,8 +460,11 @@ export function useConversation(conversationId: string | null) {
               try {
                 for (const idx of completedIdxs) {
                   markMessageStreaming(cid, idx, false)
-                  // Remove ephemeral chunks on the UI side to stop any spinners tied to chunks
-                  updateMessageAt(cid, idx, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
+                  // Preserve chunks if final content wasn't persisted; they'll be used for display fallback.
+                  updateMessageAt(cid, idx, (m: any) => {
+                    const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                    return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+                  })
                 }
               } catch {}
             }
@@ -509,7 +512,10 @@ export function useConversation(conversationId: string | null) {
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
               markMessageStreaming(cid, i, false)
-              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
+              updateMessageAt(cid, i, (m: any) => {
+                const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+              })
               break
             }
           }
@@ -643,7 +649,10 @@ export function useConversation(conversationId: string | null) {
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
               markMessageStreaming(cid, i, false)
-              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
+              updateMessageAt(cid, i, (m: any) => {
+                const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+              })
               break
             }
           }
@@ -854,7 +863,10 @@ export function useConversation(conversationId: string | null) {
                 for (let i = msgs.length - 1; i >= 0; i--) {
                   if (msgs[i]?.streaming === true) {
                     markMessageStreaming(data.conversationId!, i, false)
-                    updateMessageAt(data.conversationId!, i, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
+                    updateMessageAt(data.conversationId!, i, (m: any) => {
+                      const hasFinal = typeof m.content === 'string' && m.content.trim().length > 0
+                      return hasFinal ? { ...m, streaming: false, chunks: undefined } : { ...m, streaming: false }
+                    })
                     break
                   }
                 }

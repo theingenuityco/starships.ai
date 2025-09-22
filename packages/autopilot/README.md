@@ -82,6 +82,47 @@ await engine.executeBlueprint(blueprint, execution);
 console.log('Results:', execution.results);
 ```
 
+### End Node Output
+
+You can optionally specify an `output` parameter on the End node. If present, the engine will resolve it (supports `{{ ... }}` template expressions) and return that value wrapped as an `ExecutionItem[]` from `executeBlueprint`, instead of the entire `execution.results`.
+
+Example:
+
+```typescript
+const blueprint = {
+  nodes: [
+    { ref: 'start', type: 'start', name: 'Begin', parameters: {} },
+    {
+      ref: 'llm',
+      type: 'llm',
+      name: 'AI Response',
+      parameters: {
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [{ role: 'user', content: 'Hello!' }],
+      },
+    },
+    {
+      ref: 'end',
+      type: 'end',
+      name: 'Complete',
+      parameters: {
+        // Static or template expression. Resolved with full execution context.
+        output: '{{ $lastOutputOf("llm")?.[0]?.json }}',
+      },
+    },
+  ],
+  edges: [
+    { ref: 'edge-1', from: 'start', to: 'llm' },
+    { ref: 'edge-2', from: 'llm', to: 'end' },
+  ],
+};
+
+const engine = new Engine();
+const exec = ExecutionItemUtils.createExecution();
+const final = await engine.executeBlueprint(blueprint, exec);
+// When End.parameters.output is set, `final` contains that resolved value as a single ExecutionItem[].
+```
+
 ## Error Handling
 
 The Engine supports configurable error handling through the `failOnNodeError` flag:

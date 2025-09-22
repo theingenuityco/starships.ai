@@ -231,7 +231,13 @@ export class Engine {
             execution.status = 'completed';
             await this.emitEvent('workflow_completed', execution);
           }
-          // Return execution results as ExecutionItem array for proper workflow composition
+          // If End node provided a final result, return it; otherwise return full execution results
+          {
+            const maybeFinal = this.extractEndOutputIfAny(blueprint, execution, currentNode);
+            if (maybeFinal) {
+              return maybeFinal;
+            }
+          }
           return ExecutionItemUtils.wrapSingle(execution.results);
         }
 
@@ -254,6 +260,13 @@ export class Engine {
           // If we've reached the end, complete the workflow even though we had failures
           execution.status = 'completed';
           await this.emitEvent('workflow_completed', execution);
+          // If End node provided a final result, return it; otherwise return full execution results
+          {
+            const maybeFinal = this.extractEndOutputIfAny(blueprint, execution, currentNode);
+            if (maybeFinal) {
+              return maybeFinal;
+            }
+          }
           return ExecutionItemUtils.wrapSingle(execution.results);
         }
         currentNode = nextNode;
@@ -261,7 +274,13 @@ export class Engine {
     }
 
     execution.currentNodeRef = undefined;
-    // Return execution results as ExecutionItem array for proper workflow composition
+    // If End node provided a final result, return it; otherwise return full execution results
+    {
+      const maybeFinal = this.extractEndOutputIfAny(blueprint, execution);
+      if (maybeFinal) {
+        return maybeFinal;
+      }
+    }
     return ExecutionItemUtils.wrapSingle(execution.results);
   }
 
@@ -453,6 +472,22 @@ export class Engine {
     }
 
     return targetEdge ? blueprint.nodes.find((node) => node.ref === targetEdge.to) || null : null;
+  }
+
+  // Extract final output from End node (if its handler produced a result)
+  private extractEndOutputIfAny(blueprint: Blueprint, execution: Execution, currentNode?: Node): ExecutionItem[] | null {
+    const endNode = currentNode?.type === 'end' ? currentNode : blueprint.nodes.find((n) => n.type === 'end') || null;
+    if (!endNode) return null;
+
+    const items = this.findNodeResult(execution, endNode.ref);
+    const firstJson = items?.[0]?.json;
+
+    if (firstJson && typeof firstJson === 'object' && 'result' in (firstJson as Record<string, unknown>)) {
+      const final = (firstJson as Record<string, unknown>).result;
+      return ExecutionItemUtils.wrapSingle(final);
+    }
+
+    return null;
   }
 
   private async validateForExecution(blueprint: Blueprint): Promise<void> {

@@ -17,7 +17,7 @@ import type { AgentParams } from '@starships/autopilot';
  * Extends AgentParams to be a superset with additional database/marketplace fields
  */
 
-export type AgentParamsWithoutMetadata = Omit<AgentParams, 'metadata'>;
+export type AgentParamsWithoutMetadata = Omit<AgentParams, 'metadata' | 'tools'>;
 
 export interface AgentModel extends AgentParamsWithoutMetadata {
   // Core database fields
@@ -33,7 +33,9 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
 /**
  * Request to create a new agent
  */
-export type CreateAgentRequest = AgentParamsWithoutMetadata;
+export type CreateAgentRequest = AgentParamsWithoutMetadata & {
+  assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
+};
 
 /**
  * Request to update an agent

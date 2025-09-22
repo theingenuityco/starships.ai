@@ -63,7 +63,8 @@ export class AgentService {
       maxTokens: data.maxTokens,
       timeout: data.timeout || 30000,
       blueprint: data.blueprint,
-      memoryState: data.memoryState,
+      systemPrompt: data.systemPrompt,
+      state: data.state,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -215,6 +216,84 @@ export class AgentService {
   // MODEL ↔ INSTANCE CONVERSION METHODS
   // ============================================================================
 
+  // ============================================================================
+  // TOOL ASSIGNMENT METHODS
+  // ============================================================================
+
+  /**
+   * Get tools assigned to an agent
+   */
+  async getAgentTools(agentId: string, starshipId: string): Promise<import('@starships/protocol').ToolModel[]> {
+    return await this.agentRepository.getAgentTools(agentId, starshipId);
+  }
+
+  /**
+   * Assign multiple tools to an agent via relationships (replaces existing assignments)
+   */
+  async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {
+    // Use the new relationship-based approach
+    await this.agentRepository.assignToolsToAgent(agentId, toolSlugs, starshipId);
+
+    // Return the updated agent
+    const updatedAgent = await this.agentRepository.findById(agentId);
+    if (!updatedAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    return updatedAgent;
+  }
+
+  /**
+   * Add a single tool to an agent's existing assignments via relationships
+   */
+  async addToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    // Find the deployed tool instance by slug and starship
+    const { ToolRepository } = await import('@starships/models');
+    const toolRepository = new ToolRepository();
+
+    const tool = await toolRepository.findBySlugAndStarship(toolSlug, starshipId);
+    if (!tool) {
+      throw new NotFoundError('Tool', `${toolSlug} on starship ${starshipId}`);
+    }
+
+    // Create the relationship
+    await this.agentRepository.addToolRelationship(agentId, tool.id);
+
+    // Return the updated agent
+    const updatedAgent = await this.agentRepository.findById(agentId);
+    if (!updatedAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    return updatedAgent;
+  }
+
+  /**
+   * Remove a single tool from an agent's assignments via relationships
+   */
+  async removeToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    // Find the deployed tool instance by slug and starship
+    const { ToolRepository } = await import('@starships/models');
+    const toolRepository = new ToolRepository();
+
+    const tool = await toolRepository.findBySlugAndStarship(toolSlug, starshipId);
+    if (!tool) {
+      throw new NotFoundError('Tool', `${toolSlug} on starship ${starshipId}`);
+    }
+
+    // Remove the relationship
+    await this.agentRepository.removeToolRelationship(agentId, tool.id);
+
+    // Return the updated agent
+    const updatedAgent = await this.agentRepository.findById(agentId);
+    if (!updatedAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    return updatedAgent;
+  }
+
+  // ============================================================================
+  // MODEL ↔ INSTANCE CONVERSION METHODS
+  // ============================================================================
+
   /**
    * Convert AgentModel to Agent instance, storing model ID in instance metadata
    */
@@ -226,7 +305,8 @@ export class AgentService {
       temperature: agentModel.temperature,
       maxTokens: agentModel.maxTokens,
       timeout: agentModel.timeout,
-      memoryState: agentModel.memoryState,
+      systemPrompt: agentModel.systemPrompt,
+      state: agentModel.state,
       blueprint: agentModel.blueprint,
       metadata: {
         id: agentModel.id,

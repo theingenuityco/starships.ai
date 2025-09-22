@@ -27,9 +27,6 @@ export * from './events';
 export * from './validation';
 export * from './llm';
 
-// Agent memory types only (no classes)
-export type { AgentIdentity, AgentMemoryState, AgentPurpose, AgentSpace } from '@/memory/AgentMemory';
-
 // ===== INTERNAL TYPES =====
 // Internal base types (for internal package use only)
 export type { BaseBlueprint, BaseNode } from './base';

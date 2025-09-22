@@ -6,6 +6,8 @@ interface ConversationResponse {
   source: 'agent';
   content: string;
   agentId: string;
+  scope?: 'turn' | 'workflow';
+  conversationId?: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -65,10 +67,26 @@ export class StreamingService {
 
     // Set up SSE headers
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
     });
+
+    // Immediately flush headers and send a comment prelude to stabilize SSE across proxies
+    try {
+      if (typeof (res as any).flushHeaders === 'function') {
+        (res as any).flushHeaders();
+      }
+    } catch {
+      // ignore
+    }
+    // SSE prelude/comment to ensure the connection is established before first event
+    try {
+      res.write(':ok\n\n');
+    } catch {
+      // ignore
+    }
 
     // Send connection confirmation
     this.sendEventToStream(streamId, res, 'connection', { streamId, status: 'connected' });
@@ -92,6 +110,7 @@ export class StreamingService {
 
     // Handle connection close
     res.on('close', () => {
+      console.log(`[StreamingService] <<CLOSED BY CLOSE EVENT>> streamId=${streamId}`);
       this.cleanupConnection(streamId);
     });
 
@@ -241,17 +260,25 @@ export class StreamingService {
         return;
       }
 
+      // Ensure headers are sent before first chunk (prevents proxy buffering)
+      try {
+        if (!res.headersSent && typeof (res as any).flushHeaders === 'function') {
+          (res as any).flushHeaders();
+        }
+      } catch (flushError) {
+        console.debug(`[StreamingService] flushHeaders failed for ${streamId}:`, flushError);
+      }
+
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
 
-      // Force flush to prevent buffering and ensure real-time streaming
+      // Best-effort body flush for environments with compression middleware
       try {
-        if (!res.headersSent) {
-          res.flushHeaders();
+        if (typeof (res as any).flush === 'function') {
+          (res as any).flush();
         }
       } catch (flushError) {
-        // Ignore flush errors to prevent breaking the stream
-        console.debug(`[StreamingService] Flush failed for ${streamId}:`, flushError);
+        console.debug(`[StreamingService] flush failed for ${streamId}:`, flushError);
       }
     } catch (error) {
       console.error(`[StreamingService] Failed to send event to ${streamId}:`, error);

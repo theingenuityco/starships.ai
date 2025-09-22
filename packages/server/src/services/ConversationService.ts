@@ -1,27 +1,50 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { Agent, AutopilotEvent, ExecutionItemUtils } from '@starships/autopilot';
+import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
+import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
-import { ConversationRepository } from '@starships/models';
+import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
+
+/**
+ * Autopilot child process configuration
+ */
+interface AutopilotConfig {
+  memoryLimitMB: number;
+  timeoutMs: number;
+  killGraceMs: number;
+}
 
 /**
  * Clean conversation service with proper error handling
  */
 export class ConversationService {
   private conversationRepository: ConversationRepository;
+  private agentRepository: AgentRepository;
   private messageService: MessageService;
   private streamingService: StreamingService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
+  // Default runner for non-streaming paths (child process)
+  private defaultRunner: ChildProcessRunner;
+
+  // Autopilot configuration
+  private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
+    memoryLimitMB: 256, // 256MB memory limit
+    timeoutMs: 60000, // 60 second timeout
+    killGraceMs: 5000, // 5 second grace period
+  };
 
   constructor() {
     this.conversationRepository = new ConversationRepository();
+    this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
+    // Choose default runner (child process) with proper limits
+    this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
   }
 
   /**
@@ -115,6 +138,39 @@ export class ConversationService {
     return this.conversationRepository.delete(conversationId);
   }
 
+  /**
+   * Get deployed tool instances with their actual blueprints for the agent
+   * Uses relationship-based tool resolution for accurate results
+   */
+  private async getAgentTools(agentId: string, starshipId: string): Promise<ToolParams[]> {
+    try {
+      // Use relationship-based approach: Agent-[:USES_TOOL]->Tool-[:DEPLOYED_ON]->Starship
+      const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
+
+      if (deployedTools.length === 0) {
+        console.log(`[CONVERSATION-SERVICE] No tools found for agent ${agentId} on starship ${starshipId} via relationships`);
+        return [];
+      }
+
+      // Convert ToolModel instances to ToolParams with their actual blueprints
+      const toolParams: ToolParams[] = deployedTools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.parameters,
+        blueprint: tool.blueprint, // Use the actual blueprint from the deployed instance
+        ...(tool.transforms && { transforms: tool.transforms }),
+        ...(tool.mutations && { mutations: tool.mutations }),
+        ...(tool.condition && { condition: tool.condition }),
+      }));
+
+      console.log(`[CONVERSATION-SERVICE] Found ${toolParams.length} tools via Agent→Tool relationships for agent ${agentId}`);
+      return toolParams;
+    } catch (error) {
+      console.error(`[CONVERSATION-SERVICE] Error getting agent tools via relationships:`, error);
+      return [];
+    }
+  }
+
   async addConversationMessage(data: Message & { conversationId: string }): Promise<void> {
     // Save user message to database
     const userMessage = await this.messageService.createMessage({
@@ -150,10 +206,30 @@ export class ConversationService {
     const messages = await this.getConversationMessages(data.conversationId);
 
     try {
-      // Create agent instance with enhanced options
-      const agent = new Agent(agentModel, {
+      // Get starship for context
+      const starship = await this.getConversationStarship(data.conversationId);
+      if (!starship) {
+        throw new NotFoundError('Starship', 'for conversation');
+      }
+
+      // Get deployed tools for this agent using ToolService
+      const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+      // console.log('>>>Resolved tools', { resolvedTools });
+
+      // Build Agent to materialize blueprint (tools, nodes, etc.)
+      const agentWithTools: AgentParams = {
+        ...agentModel,
+        state: {
+          ...agentModel.state,
+          tools: resolvedTools,
+        },
+      };
+
+      // Create Agent with ChildProcessRunner for isolation
+      const agent = new Agent(agentWithTools, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
       });
+
       // Convert database messages to LLM format, preserving tool_calls and tool results
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
@@ -162,20 +238,14 @@ export class ConversationService {
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
 
-      // Create input execution item with the conversation messages
-      // The LLM node will use this as fallback when state.messages is empty
-      const input = llmMessages.length > 0 ? ExecutionItemUtils.wrapSingle(llmMessages) : undefined;
-      // Execute agent with conversation messages
+      // Prepare input for agent execution - Agent will handle memory state and ordering internally
+      const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);
+
+      // Execute via agent - runner and event callback are configured in the Agent constructor
       await agent.execute(input);
 
-      // Send completion event
-      if (this.streamingService) {
-        await this.streamingService.broadcastComplete(data.conversationId, {
-          source: 'agent',
-          content: 'Workflow completed',
-          agentId: agentModel.id,
-        });
-      }
+      // Note: broadcastComplete is now called at the end of content_complete event handler
+      // to ensure all delta operations are sent before the complete event
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
         agentId: agentModel.id,
@@ -203,12 +273,33 @@ export class ConversationService {
       return;
     }
 
+    // Skip workflow control events from nested executions (e.g., tool blueprints) to avoid duplicates
+    if (
+      event.type === 'workflow_started' ||
+      event.type === 'workflow_completed' ||
+      event.type === 'workflow_failed' ||
+      event.type === 'workflow_paused' ||
+      event.type === 'workflow_resumed' ||
+      event.type === 'node_started' ||
+      event.type === 'node_completed' ||
+      event.type === 'node_failed'
+    ) {
+      const executionEvent = event as ExecutionEvent;
+      const executionDepth = executionEvent.data?.execution.depth || 0;
+
+      if (executionDepth > 0) {
+        // Skip these events from nested workflows (depth > 0) to prevent duplication
+        return;
+      }
+    }
+
     switch (event.type) {
       case 'workflow_started': {
         // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
+        // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
 
@@ -220,9 +311,15 @@ export class ConversationService {
           const hasContent = delta?.content;
           const hasToolCalls = delta?.tool_calls && Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0;
 
-          // Guard: if no active accumulator and we have content, start a new placeholder stream
+          // Guard: if no active accumulator and we have content, start a new placeholder stream.
+          // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
           if (hasContent && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
+              // Acquire lock upfront to avoid race between parallel content_chunk events
+              this.streamingContent.set(conversationId, '');
+              // Clear tool_calls accumulator for this new stream to prevent reuse from previous LLM calls
+              this.streamingToolCalls.delete(conversationId);
+
               const assistantMessage: MessageModel = {
                 id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
@@ -238,16 +335,11 @@ export class ConversationService {
                 value: {
                   ...assistantMessage,
                   streaming: true,
-                  contentChunks: [],
+                  chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
                   tool_calls: [], // Initialize empty tool_calls array for replace operations
                 },
               };
               await this.streamingService.broadcastDelta(conversationId, shell);
-
-              // Initialize server-side accumulator for this new stream
-              this.streamingContent.set(conversationId, '');
-              // Clear tool_calls for this new stream to prevent reuse from previous LLM calls
-              this.streamingToolCalls.delete(conversationId);
             } else {
               break;
             }
@@ -263,17 +355,17 @@ export class ConversationService {
             const newContent = currentContent + content;
             this.streamingContent.set(conversationId, newContent);
 
-            // Send content chunk with positional information for client-side accumulation
-            const contentDelta: Operation = {
+            // Stream delta chunk as JSON Patch add into chunks array (no cumulative replace)
+            const chunkDelta: Operation = {
               op: 'add',
-              path: '/messages/-1/contentChunks/-',
+              path: '/messages/-1/chunks/-',
               value: {
-                content: content,
+                content,
                 position: currentLength,
                 timestamp: Date.now(),
               },
             };
-            await this.streamingService.broadcastDelta(conversationId, contentDelta);
+            await this.streamingService.broadcastDelta(conversationId, chunkDelta);
           }
 
           // Process tool_calls if present (separate from content processing)
@@ -329,85 +421,64 @@ export class ConversationService {
           break;
         }
 
-        // Set the final accumulated content and mark as complete
         const finalContent = this.streamingContent.get(conversationId) || '';
 
-        const completionOperations: Operation[] = [
-          {
-            op: 'replace',
-            path: '/messages/-1/content',
-            value: finalContent,
-          },
-          {
-            op: 'replace',
-            path: '/messages/-1/streaming',
-            value: false,
-          },
-          {
-            op: 'remove',
-            path: '/messages/-1/contentChunks',
-          },
-        ];
-
-        // Send all completion operations together
-        for (const operation of completionOperations) {
-          await this.streamingService.broadcastDelta(conversationId, operation);
-        }
-
-        // Persist the final assistant message to the database and patch stable fields
-        // Skip persistence when content is empty to avoid DB validation errors
-        if (!finalContent || finalContent.trim().length === 0) {
-          console.log('[STREAMING] Skipping persistence - empty content');
-          this.streamingContent.delete(conversationId);
-          break;
-        }
-
+        // Build finalization task: ensure final patches and persistence complete in order.
         try {
-          // Persist the assistant message
-          const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
-          const assistantMessage = await this.messageService.createMessage({
-            conversationId,
-            role: 'assistant',
-            content: finalContent,
-            messageType: 'agent_response',
-            ...(finalToolCallsAcc.length > 0 && {
-              tool_calls: finalToolCallsAcc.map((tc) => ({
-                id: tc.id,
-                type: 'function',
-                function: {
-                  name: tc.function?.name || '',
-                  arguments: tc.function?.arguments || '',
-                },
-              })),
-            }),
-          });
+          // Content was already incrementally streamed to /messages/-1/content during chunks
 
-          console.log('[STREAMING] Successfully created assistant message:', assistantMessage.id);
+          // Persist and patch id/updatedAt while placeholder is still active
+          if (finalContent && finalContent.trim().length > 0) {
+            try {
+              const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
+              const assistantMessage = await this.messageService.createMessage({
+                conversationId,
+                role: 'assistant',
+                content: finalContent,
+                messageType: 'agent_response',
+                ...(finalToolCallsAcc.length > 0 && {
+                  tool_calls: finalToolCallsAcc.map((tc) => ({
+                    id: tc.id,
+                    type: 'function',
+                    function: {
+                      name: tc.function?.name || '',
+                      arguments: tc.function?.arguments || '',
+                    },
+                  })),
+                }),
+              });
 
-          const finalizeOps: Operation[] = [
-            {
-              op: 'replace',
-              path: '/messages/-1/id',
-              value: assistantMessage.id,
-            },
-            {
-              op: 'replace',
-              path: '/messages/-1/updatedAt',
-              value: assistantMessage.updatedAt,
-            },
-          ];
+              await this.streamingService.broadcastDelta(conversationId, {
+                op: 'replace',
+                path: '/messages/-1/id',
+                value: assistantMessage.id,
+              });
 
-          for (const op of finalizeOps) {
-            await this.streamingService.broadcastDelta(conversationId, op);
+              await this.streamingService.broadcastDelta(conversationId, {
+                op: 'replace',
+                path: '/messages/-1/updatedAt',
+                value: assistantMessage.updatedAt,
+              });
+
+              // Finalize message content with one replace of the full text (clients will stop using chunks)
+              await this.streamingService.broadcastDelta(conversationId, {
+                op: 'replace',
+                path: '/messages/-1/content',
+                value: finalContent,
+              });
+            } catch (persistError) {
+              console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
+            }
+          } else {
+            console.log('[STREAMING] Skipping persistence - empty content');
           }
-        } catch (persistError) {
-          console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
-        }
 
-        // Clear streaming content tracker
-        this.streamingContent.delete(conversationId);
-        // Also clear tool calls tracker to prevent reuse
-        this.streamingToolCalls.delete(conversationId);
+          // Defer streaming=false and chunks removal to workflow_completed to avoid premature client close
+        } finally {
+          // Always clear trackers when we are done with finalization
+          this.streamingContent.delete(conversationId);
+          this.streamingToolCalls.delete(conversationId);
+        }
         break;
       }
 
@@ -425,7 +496,37 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
-        // Final completion will be handled by the main addConversationMessage method
+        // Just before emitting "complete", finalize the assistant placeholder so UIs see the finished state
+        // (but not earlier to avoid client prematurely closing the SSE on streaming=false).
+        if (this.streamingService && this.streamingService.isActive(conversationId)) {
+          try {
+            await this.streamingService.broadcastDelta(conversationId, {
+              op: 'replace',
+              path: '/messages/-1/streaming',
+              value: false,
+            });
+          } catch (_) {
+            // ignore
+          }
+
+          // Yield a tick to allow the streaming=false patch to flush before emitting 'complete'
+          await new Promise<void>((resolve) => {
+            if (typeof setImmediate !== 'undefined') {
+              setImmediate(resolve);
+            } else {
+              setTimeout(resolve, 0);
+            }
+          });
+
+          // Now emit stream completion for the entire workflow (top-level only)
+          await this.streamingService.broadcastComplete(conversationId, {
+            source: 'agent',
+            content: 'Workflow completed',
+            agentId: 'agent', // agent id not critical for client-side terminal handling
+            scope: 'workflow',
+            conversationId,
+          });
+        }
         break;
       }
 
@@ -459,34 +560,39 @@ export class ConversationService {
       case 'tool_complete': {
         console.log('[STREAMING] Tool completed:', event.data?.toolName);
 
-        try {
-          // Persist tool result message to database when tool completes
-          if (event.data?.toolName && event.data?.result) {
-            const toolContent = typeof event.data.result === 'string' ? event.data.result : JSON.stringify(event.data.result);
+        // Track persistence as an async task so workflow_completed can await before emitting "complete"
+        const persistTask = (async () => {
+          try {
+            if (event.data?.toolName && event.data?.result) {
+              const toolContent = typeof event.data.result === 'string' ? event.data.result : JSON.stringify(event.data.result);
 
-            const toolResultMessage = await this.messageService.createMessage({
-              conversationId,
-              role: 'tool',
-              content: toolContent,
-              messageType: 'tool_result',
-              ...(event.data.toolCallId && { tool_call_id: event.data.toolCallId }),
-            });
+              const toolResultMessage = await this.messageService.createMessage({
+                conversationId,
+                role: 'tool',
+                content: toolContent,
+                messageType: 'tool_result',
+                ...(event.data.toolCallId && { tool_call_id: event.data.toolCallId }),
+              });
 
-            console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);
+              console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);
 
-            // Broadcast tool result message via streaming
-            if (this.streamingService && this.streamingService.isActive(conversationId)) {
-              const toolResultDelta: Operation = {
-                op: 'add',
-                path: '/messages/-',
-                value: toolResultMessage,
-              };
-              await this.streamingService.broadcastDelta(conversationId, toolResultDelta);
+              if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                const toolResultDelta: Operation = {
+                  op: 'add',
+                  path: '/messages/-',
+                  value: toolResultMessage,
+                };
+                await this.streamingService.broadcastDelta(conversationId, toolResultDelta);
+              }
             }
+          } catch (error) {
+            console.error('[STREAMING] Error persisting tool result message:', error);
           }
-        } catch (error) {
-          console.error('[STREAMING] Error persisting tool result message:', error);
-        }
+        })();
+
+        // Optionally await to preserve event order for this handler
+        await persistTask;
+
         break;
       }
 

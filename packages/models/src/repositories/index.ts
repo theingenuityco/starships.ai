@@ -8,6 +8,8 @@ export { MessageRepository } from './MessageRepository';
 export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 export { NodeRepository } from './NodeRepository';
 export { StarshipRepository } from './StarshipRepository';
+export { ToolRepository } from './ToolRepository';
+export { ToolTemplateRepository } from './ToolTemplateRepository';
 export { UserRepository } from './UserRepository';
 export { WaitlistRepository } from './WaitlistRepository';
 export { WorkflowRepository } from './WorkflowRepository';

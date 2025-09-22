@@ -751,15 +751,6 @@ export const userAPI = {
   getById: (id: string): Promise<SyncedUser> => api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
 }
 
-// Memory API
-export const memoryAPI = {
-  // Reset memory for agent and user
-  resetMemory: async (agentId: string): Promise<{ message: string }> => {
-    const response = await api.post('/api/v1/memory/reset', { agentId })
-    return extractResponseData<{ message: string }>(response)
-  },
-}
-
 // Utility function for generating client-side IDs
 function generateId(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)

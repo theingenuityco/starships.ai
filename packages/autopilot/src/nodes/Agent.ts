@@ -6,16 +6,19 @@
  * Enhanced with consistent two-word method naming for semantic grouping.
  */
 
-import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmParams, LlmMessage } from '@/types';
+import { AgentParams, AgentState, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmMessage } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
-import { Engine } from '@/engine/Engine';
+import { EngineConfig } from '@/engine/Engine';
+import { LocalRunner } from '@/runner/LocalRunner';
+import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
   private nodeCounter: number = 1;
+  private state: AgentState;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
@@ -24,172 +27,131 @@ export class Agent implements NodeHandler {
     // Create options
     this.options = options;
 
-    // Initialize blueprint if not provided - creates Start -> End workflow (minimal)
-    if (!this.params.blueprint) {
-      this.params.blueprint = {
-        nodes: [
-          {
-            ref: 'start_1',
-            type: 'start',
-            name: 'Start',
-            description: 'Start node',
-            parameters: {},
-          },
-          {
-            ref: 'end_1',
-            type: 'end',
-            name: 'End',
-            description: 'End node',
-            parameters: {},
-          },
-        ],
-        edges: [
-          {
-            ref: 'edge_1',
-            from: 'start_1',
-            to: 'end_1',
-          },
-        ],
-        metadata: {
-          generatedBy: 'Agent constructor',
-          createdAt: new Date().toISOString(),
-        },
-      };
-      this.nodeCounter = 2; // start_1 and end_1 are taken
+    // Initialize state from params.state first
+    this.state = {
+      messages: params.state?.messages || [],
+      tools: params.state?.tools || [],
+    };
 
-      // Create the appropriate blueprint based on configuration
+    // Runner selection deferred to execute() based on execution.depth to avoid nested runners
+
+    // Create complete tool-enabled blueprint if none was provided
+    if (!this.params.blueprint) {
       this.createDefaultBlueprint();
     }
-
-    // Blueprint is guaranteed to exist after constructor logic above
   }
 
   /**
-   * Create default blueprint - unified approach for all agent types
-   * Simple agents: Start -> LLM -> Conditional -> End (conditional always false)
-   * Tool agents: Start -> LLM -> Conditional -> Tool -> LLM (conditional routes based on tool_calls)
+   * Create complete blueprint from scratch - includes scaffolding and tool execution infrastructure
+   * Since tools are driven entirely by state, all blueprints are tool-ready
    */
   private createDefaultBlueprint(): void {
+    const startRef = `start_${this.nodeCounter++}`;
+    const endRef = `end_${this.nodeCounter++}`;
     const llmNodeRef = `llm_${this.nodeCounter++}`;
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
-    const hasTools = this.params.tools && this.params.tools.length > 0;
+    const toolNodeRef = `tool_${this.nodeCounter++}`;
 
-    // Create unified LLM node that handles both simple and tool-enabled cases
-    const llmParams: LlmParams = {
-      model: this.params.model,
-      messages: '{{ state.messages }}',
-      ...(hasTools && { tools: this.params.tools }),
-      ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
-      ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
-      ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
-      // Always add assistant message via inline mutation
-      mutations: [
+    // Create complete blueprint with all nodes
+    this.params.blueprint = {
+      nodes: [
+        // Start node
         {
-          operation: 'add' as const,
-          path: '/state/messages/-',
-          value: {
-            role: 'assistant',
-            content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
-            tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
+          ref: startRef,
+          type: 'start',
+          name: 'Start',
+          description: 'Start node',
+          parameters: {},
+        },
+        // End node
+        {
+          ref: endRef,
+          type: 'end',
+          name: 'End',
+          description: 'End node',
+          parameters: {},
+        },
+        // LLM node with state-driven tools
+        {
+          ref: llmNodeRef,
+          type: 'llm' as const,
+          name: 'AI Assistant',
+          description: 'AI model with state-driven tool support',
+          parameters: {
+            model: this.params.model,
+            messages: '{{ state.messages }}',
+            tools: '{{ state.tools }}', // Always use state - Engine handles empty arrays
+            ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
+            ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
+            ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+            mutations: [
+              {
+                operation: 'add' as const,
+                path: '/state/messages/-',
+                value: {
+                  role: 'assistant',
+                  content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
+                  tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
+                },
+              },
+            ],
+          },
+        },
+        // Conditional node for tool call detection
+        {
+          ref: conditionalNodeRef,
+          type: 'conditional' as const,
+          name: 'Check Tool Calls',
+          description: 'Check if LLM made any tool calls',
+          parameters: {
+            condition: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== undefined && $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== null }}`,
+          },
+        },
+        // Tool execution node - receives the complete tool definition via template resolution
+        {
+          ref: toolNodeRef,
+          type: 'tool' as const,
+          name: 'Execute Tool',
+          description: 'Execute tool and add result to conversation',
+          parameters: {
+            // Resolve tool definition from state using the tool name from LLM response
+            name: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).name }}`,
+            description: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).description }}`,
+            parameters: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).parameters }}`,
+            blueprint: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).blueprint }}`,
+            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+            mutations: [
+              {
+                operation: 'add' as const,
+                path: '/state/messages/-',
+                value: {
+                  role: 'tool',
+                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+                  name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+                  content: `{{ JSON.stringify($lastOutputOf("${toolNodeRef}")[0].json) }}`,
+                },
+              },
+            ],
           },
         },
       ],
-    };
-
-    const llmNode = {
-      ref: llmNodeRef,
-      type: 'llm' as const,
-      name: hasTools ? 'LLM with Tools' : 'Respond',
-      description: hasTools ? 'AI model with function calling capability' : 'AI response node',
-      parameters: llmParams,
-    };
-
-    // Create conditional node to check for tool calls from current LLM response
-    const conditionalNode = {
-      ref: conditionalNodeRef,
-      type: 'conditional' as const,
-      name: 'Check Tool Calls',
-      description: 'Check if LLM wants to call any tools',
-      parameters: {
-        condition: `{{ $exists($lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls) }}`,
+      edges: [
+        // Start -> LLM
+        { ref: 'edge_start_llm', from: startRef, to: llmNodeRef },
+        // LLM -> Conditional
+        { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
+        // Conditional -> Tool (if tool_calls exist)
+        { ref: 'edge_conditional_tool', from: conditionalNodeRef, to: toolNodeRef, condition: 'true' },
+        // Tool -> LLM (loop back)
+        { ref: 'edge_tool_llm', from: toolNodeRef, to: llmNodeRef },
+        // Conditional -> End (if no tool_calls)
+        { ref: 'edge_conditional_end', from: conditionalNodeRef, to: endRef, condition: 'false' },
+      ],
+      metadata: {
+        generatedBy: 'Agent constructor',
+        createdAt: new Date().toISOString(),
       },
     };
-
-    // Find the end node
-    const endNode = this.params.blueprint!.nodes.find((node) => node.type === 'end')!;
-
-    // Always create the unified blueprint structure
-    this.params.blueprint!.nodes.push(llmNode, conditionalNode);
-
-    // Update start edge to point to LLM
-    const startToEndEdge = this.params.blueprint!.edges.find((edge) => edge.to === endNode.ref)!;
-    startToEndEdge.to = llmNodeRef;
-
-    // Add LLM -> Conditional edge
-    this.params.blueprint!.edges.push({
-      ref: `edge_${this.params.blueprint!.edges.length + 1}`,
-      from: llmNodeRef,
-      to: conditionalNodeRef,
-    });
-
-    // Create tool node and edges only if tools exist
-    if (hasTools) {
-      const toolNodeRef = `tool_${this.nodeCounter++}`;
-      const toolNode = {
-        ref: toolNodeRef,
-        type: 'tool' as const,
-        name: 'Execute Tool',
-        description: 'Execute the requested tool',
-        parameters: {
-          name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
-          description: 'Dynamic tool execution',
-          parameters: {
-            type: 'object',
-            properties: {},
-            required: [],
-          },
-          // Add tool result via inline mutation
-          mutations: [
-            {
-              operation: 'add' as const,
-              path: '/state/messages/-',
-              value: {
-                role: 'tool',
-                tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
-                name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
-                content: `{{ $string($lastOutputOf("${toolNodeRef}")[0].json) }}`,
-              },
-            },
-          ],
-        },
-      };
-
-      this.params.blueprint!.nodes.push(toolNode);
-
-      this.params.blueprint!.edges.push(
-        // Conditional -> Tool (if tool calls exist)
-        {
-          ref: `edge_${this.params.blueprint!.edges.length + 2}`,
-          from: conditionalNodeRef,
-          to: toolNodeRef,
-          condition: 'true',
-        },
-        // Tool -> LLM (loop back after adding tool result)
-        {
-          ref: `edge_${this.params.blueprint!.edges.length + 3}`,
-          from: toolNodeRef,
-          to: llmNodeRef,
-        }
-      );
-    }
-
-    // Conditional -> End (always present - if no tools or no tool_calls)
-    this.params.blueprint!.edges.push({
-      ref: `edge_${this.params.blueprint!.edges.length + 4}`,
-      from: conditionalNodeRef,
-      to: endNode.ref,
-      condition: 'false',
-    });
   }
 
   /**
@@ -205,60 +167,63 @@ export class Agent implements NodeHandler {
 
   /**
    * Execute the agent with optional input items
-   * Creates a new Engine instance and executes the agent's blueprint
+   * Uses the configured runner to execute the agent's blueprint
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
-    // Create execution context for the agent's blueprint
-    const execution = ExecutionItemUtils.createExecution(input);
-
-    // Initialize messages in the required order:
-    // 1) systemMessage from this.params.memoryState
-    // 2) messages from this.params.memoryState
-    // 3) message(s) from execute args
-    const orderedMessages: LlmMessage[] = [];
-
-    const memory = this.params.memoryState;
-    if (memory?.systemPrompt) {
-      orderedMessages.push({ role: 'system', content: memory.systemPrompt });
-    }
-    if (memory?.messages?.length) {
-      orderedMessages.push(...memory.messages);
-    }
-
-    // Type guard to detect LlmMessage[]
-    const isLlmMessageArray = (val: unknown): val is LlmMessage[] => {
-      return (
-        Array.isArray(val) &&
-        val.every((m) => {
-          if (typeof m !== 'object' || m === null) return false;
-          const obj = m as Record<string, unknown>;
-          return typeof obj.role === 'string' && typeof obj.content === 'string';
-        })
-      );
-    };
-
-    if (input && input.length > 0) {
-      const inputData = ExecutionItemUtils.unwrapSingle(input);
-      // If input contains an array of LlmMessage, append them; otherwise create a user message from the input
-      if (isLlmMessageArray(inputData)) {
-        orderedMessages.push(...inputData);
-      } else {
-        const content = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
-        orderedMessages.push({ role: 'user', content });
-      }
-    }
-
-    // Commit ordered messages to execution state
-    (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
-
-    // Create a new Engine instance for executing the agent's blueprint
-    const engine = new Engine({
-      eventCallback: this.options?.eventCallback,
-    });
-
     try {
-      // Execute the agent's blueprint using the new Engine
-      return await engine.executeBlueprint(this.params.blueprint!, execution);
+      // Create execution with ordered messages in state (system -> memory -> conversation)
+      const parentExecution = this.options?.execution;
+      const execution = ExecutionItemUtils.createExecution(undefined, parentExecution);
+      const orderedMessages: LlmMessage[] = [];
+
+      // Add system prompt from params root first
+      if (this.params.systemPrompt) {
+        orderedMessages.push({ role: 'system', content: this.params.systemPrompt });
+      }
+
+      // Add state messages
+      if (this.state.messages?.length) {
+        orderedMessages.push(...this.state.messages);
+      }
+
+      // Type guard to detect LlmMessage[]
+      const isLlmMessageArray = (val: unknown): val is LlmMessage[] => {
+        return (
+          Array.isArray(val) &&
+          val.every((m) => {
+            if (typeof m !== 'object' || m === null) return false;
+            const obj = m as Record<string, unknown>;
+            return typeof obj.role === 'string' && typeof obj.content === 'string';
+          })
+        );
+      };
+
+      // Add input messages (conversation messages from ConversationService)
+      if (input && input.length > 0) {
+        const inputData = ExecutionItemUtils.unwrapSingle(input);
+        if (isLlmMessageArray(inputData)) {
+          orderedMessages.push(...inputData);
+        }
+        // Silently ignore non-LlmMessage inputs
+      }
+
+      // Commit ordered messages to execution state
+      (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
+      // Store tools in state so LLM nodes can reference them via {{ state.tools }}
+      (execution.state as Record<string, unknown>)['tools'] = this.state.tools || [];
+
+      // Prepare engine config with event callback
+      const engineConfig: EngineConfig = {
+        eventCallback: this.options?.eventCallback,
+        failOnNodeError: true,
+      };
+
+      // Execute using runner chosen by current execution depth
+      const blueprint = this.getCurrentBlueprint();
+      const depth = execution.depth ?? 0;
+      // Use ChildProcessRunner for top-level Agent executions (depth 0) and LocalRunner for nested (depth > 0)
+      const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
+      return await runner.run(blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

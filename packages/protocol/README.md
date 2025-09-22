@@ -125,7 +125,8 @@ This package is imported across the entire starships.ai platform:
 - **`@starships/server`** - API route definitions, middleware, and services
 - **`@starships/client`** - Frontend API calls, forms, and user interfaces
 - **`@starships/models`** - Repository interfaces, database collection mapping
-- **`@starships/agent-engine`** - Chat processing, LLM integration
+- **`@starships/autopilot`** - Workflow execution and agent coordination
+- **`@starships/errors`** - Error type definitions and contracts
 
 ## Type Safety
 
@@ -149,6 +150,8 @@ const workflow: Workflow = {
 
 ## Development
 
+This package contains only TypeScript type definitions and interfaces - no runtime code.
+
 ```bash
 # Type checking
 pnpm run type-check
@@ -156,9 +159,18 @@ pnpm run type-check
 # Linting
 pnpm run lint
 
-# Build
+# Build (generates .d.ts files)
 pnpm run build
 ```
+
+### Adding New Types
+
+When adding new domain types or contracts:
+
+1. Create the interface in the appropriate `domains/` or `contracts/` directory
+2. Export it from the relevant module's index file
+3. Add it to the main `src/index.ts` exports
+4. Update consuming packages to use the new types
 
 ## API Reference
 

@@ -25,6 +25,9 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
   createdAt: string;
   updatedAt: string;
 
+  // Tool assignment - reference by slugs instead of embedding
+  assignedToolSlugs?: string[];
+
   // Template metadata
   category: AgentTemplateCategory;
   usageCount: number;
@@ -42,9 +45,11 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
  * Request to create a new agent template
  */
 export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
+  slug?: string; // Optional explicit slug (if not provided, will be generated from name)
   category: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];
+  assignedToolSlugs?: string[]; // Tool templates to assign to this agent template
 }
 
 /**
@@ -54,4 +59,5 @@ export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMe
   category?: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];
+  assignedToolSlugs?: string[];
 }

@@ -34,12 +34,45 @@ CREATE CONSTRAINT unique_agent_id IF NOT EXISTS FOR (a:Agent) REQUIRE a.id IS UN
 // Agent relationship constraints
 CREATE CONSTRAINT unique_agent_starship IF NOT EXISTS FOR ()-[r:DEPLOYED_ON]-() REQUIRE r.key IS UNIQUE;
 
+// Tool-Agent relationship constraints
+CREATE CONSTRAINT unique_agent_tool IF NOT EXISTS FOR ()-[r:USES_TOOL]-() REQUIRE r.key IS UNIQUE;
+
+// Tool-Template relationship constraints
+CREATE CONSTRAINT unique_tool_template IF NOT EXISTS FOR ()-[r:BASED_ON]-() REQUIRE r.key IS UNIQUE;
+
 // ============================================================================
 // AGENT TEMPLATE COLLECTION
 // ============================================================================
 
 // Agent Template constraints
 CREATE CONSTRAINT unique_agent_template_id IF NOT EXISTS FOR (at:AgentTemplate) REQUIRE at.id IS UNIQUE;
+
+// ============================================================================
+// TOOL COLLECTION
+// ============================================================================
+
+// Tool constraints
+CREATE CONSTRAINT tool_id_unique IF NOT EXISTS FOR (t:Tool) REQUIRE t.id IS UNIQUE;
+
+// Tool indexes
+CREATE INDEX tool_name IF NOT EXISTS FOR (t:Tool) ON (t.name);
+CREATE INDEX tool_slug IF NOT EXISTS FOR (t:Tool) ON (t.slug);
+CREATE INDEX tool_enabled IF NOT EXISTS FOR (t:Tool) ON (t.isEnabled);
+
+// Tool-Starship relationship constraints (ensures unique slug per starship via relationship)
+CREATE CONSTRAINT unique_tool_starship_slug IF NOT EXISTS FOR ()-[r:DEPLOYED_ON]-() REQUIRE r.toolSlug IS UNIQUE;
+
+// ============================================================================
+// TOOL TEMPLATE COLLECTION
+// ============================================================================
+
+// Tool Template constraints
+CREATE CONSTRAINT tool_template_id_unique IF NOT EXISTS FOR (tt:ToolTemplate) REQUIRE tt.id IS UNIQUE;
+CREATE CONSTRAINT tool_template_slug_unique IF NOT EXISTS FOR (tt:ToolTemplate) REQUIRE tt.slug IS UNIQUE;
+
+// Tool Template indexes
+CREATE INDEX tool_template_category IF NOT EXISTS FOR (tt:ToolTemplate) ON (tt.category);
+CREATE INDEX tool_template_usage_count IF NOT EXISTS FOR (tt:ToolTemplate) ON (tt.usageCount);
 
 // ============================================================================
 // WORKFLOW COLLECTION
@@ -150,6 +183,8 @@ CREATE FULLTEXT INDEX messageSearch IF NOT EXISTS FOR (n:Message) ON EACH [n.con
 CREATE FULLTEXT INDEX workflowSearch IF NOT EXISTS FOR (n:Workflow) ON EACH [n.name, n.description, n.category, n.tags];
 CREATE FULLTEXT INDEX userSearch IF NOT EXISTS FOR (n:User) ON EACH [n.username, n.displayName, n.email];
 CREATE FULLTEXT INDEX starshipSearch IF NOT EXISTS FOR (n:Starship) ON EACH [n.name, n.description];
+CREATE FULLTEXT INDEX toolSearch IF NOT EXISTS FOR (n:Tool) ON EACH [n.name, n.description];
+CREATE FULLTEXT INDEX toolTemplateSearch IF NOT EXISTS FOR (n:ToolTemplate) ON EACH [n.name, n.description, n.category];
 
 // ============================================================================
 // MIGRATION RECORD
@@ -167,6 +202,9 @@ CREATE (m:Migration {
     'starship_system',
     'agent_deployment',
     'agent_templates',
+    'tool_system',
+    'tool_templates',
+    'tool_agent_relationships',
     'workflow_dsl',
     'blueprint_management',
     'memory_management',

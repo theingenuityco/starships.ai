@@ -172,7 +172,7 @@ case 'content_chunk': {
   // Send ONLY the delta chunk with position metadata
   const delta: Operation = {
     op: 'add',
-    path: '/messages/-1/contentChunks/-',
+    path: '/messages/-1/chunks/-',
     value: {
       content: content,        // ✅ Only the new chunk
       position: currentLength, // ✅ Position for ordering
@@ -182,11 +182,11 @@ case 'content_chunk': {
   await this.streamingService.broadcastDelta(conversationId, delta);
 }
 
-// Initialize streaming message with contentChunks array
+// Initialize streaming message with chunks array
 const delta: Operation = {
   op: 'add',
   path: '/messages/-',
-  value: { ...assistantMessage, streaming: true, contentChunks: [] },
+  value: { ...assistantMessage, streaming: true, chunks: [] },
 };
 ```
 
@@ -196,12 +196,12 @@ const delta: Operation = {
 
 ```typescript
 // In useConversations hook - Content chunk accumulation
-const processContentChunks = (data: any) => {
+const processChunk = (data: any) => {
   const processedMessages = data.messages.map((message: ClientMessage) => {
-    // If message has contentChunks, build the streamed content
-    if (message.contentChunks && Array.isArray(message.contentChunks)) {
+    // If message has chunks, build the streamed content
+    if (message.chunks && Array.isArray(message.chunks)) {
       // Sort chunks by position to ensure correct order
-      const sortedChunks = [...message.contentChunks].sort((a, b) => a.position - b.position);
+      const sortedChunks = [...message.chunks].sort((a, b) => a.position - b.position);
 
       // Build content from individual delta chunks
       let streamedContent = '';
@@ -222,12 +222,12 @@ const processContentChunks = (data: any) => {
 
 // In MessageContent component - Display delta-built content
 const displayContent = useMemo(() => {
-  if (!isStreaming || !contentChunks.length) return content;
+  if (!isStreaming || !chunks.length) return content;
 
   // Build from sorted delta chunks
-  const sortedChunks = [...contentChunks].sort((a, b) => a.position - b.position);
+  const sortedChunks = [...chunks].sort((a, b) => a.position - b.position);
   return sortedChunks.reduce((acc, chunk) => acc + chunk.content, '');
-}, [content, contentChunks, isStreaming]);
+}, [content, chunks, isStreaming]);
 ```
 
 **Key Improvement**: Client efficiently accumulates individual content deltas, eliminating redundant data transmission.

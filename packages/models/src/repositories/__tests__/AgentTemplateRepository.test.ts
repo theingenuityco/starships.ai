@@ -43,9 +43,9 @@ describe('AgentTemplateRepository', () => {
     timeout: 30000,
     usageCount: 10,
     icon: '🤖',
+    systemPrompt: 'You are a helpful assistant.',
     previewPrompts: ['Hello', 'How can I help?'],
-    memoryState: {
-      systemPrompt: 'You are a helpful assistant.',
+    state: {
       messages: [],
     },
     blueprint: {
@@ -63,7 +63,8 @@ describe('AgentTemplateRepository', () => {
     const template = createMockTemplate(overrides as Partial<AgentTemplateModel>);
     return {
       ...template,
-      memoryState: template.memoryState ? JSON.stringify(template.memoryState) : null,
+      systemPrompt: template.systemPrompt || null,
+      state: template.state ? JSON.stringify(template.state) : null,
       blueprint: template.blueprint ? JSON.stringify(template.blueprint) : null,
       ...overrides,
     };
@@ -79,9 +80,9 @@ describe('AgentTemplateRepository', () => {
     maxTokens: 2000,
     timeout: 30000,
     icon: '🤖',
+    systemPrompt: 'You are a helpful assistant.',
     previewPrompts: ['Hello'],
-    memoryState: {
-      systemPrompt: 'You are a helpful assistant.',
+    state: {
       messages: [],
     },
     blueprint: {
@@ -242,7 +243,7 @@ describe('AgentTemplateRepository', () => {
         category: 'general' as const,
         blueprint: { type: 'test', nodes: [], edges: [] },
         model: 'gpt-4',
-        memoryState: {},
+        state: { messages: [], tools: [] },
       };
       const mockCreatedRaw = createMockRawTemplate(minimalInput);
       mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedRaw }]);
@@ -312,7 +313,8 @@ describe('AgentTemplateRepository', () => {
 
     it('should serialize complex objects in updates', async () => {
       const complexUpdates = {
-        memoryState: { systemPrompt: 'You are an updated assistant.' },
+        systemPrompt: 'You are an updated assistant.',
+        state: { messages: [], tools: [] },
         blueprint: { nodes: [], edges: [] },
       };
       const mockUpdatedRaw = createMockRawTemplate(complexUpdates);

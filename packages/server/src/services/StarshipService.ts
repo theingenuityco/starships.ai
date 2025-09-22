@@ -1,6 +1,6 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, getConnection, StarshipRepository } from '@starships/models';
+import { AgentRepository, getConnection, StarshipRepository, ToolRepository } from '@starships/models';
 import { CreateStarshipRequest, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 
@@ -310,6 +310,32 @@ export class StarshipService {
   }
 
   /**
+   * Deploy default tools to a starship for Sybil agent
+   */
+  static async createDefaultTools(starshipId: string): Promise<void> {
+    try {
+      const toolRepository = new ToolRepository();
+
+      // Deploy the three default tools that Sybil needs
+      const defaultToolSlugs = ['calculator', 'get-current-time', 'echo'];
+
+      for (const toolSlug of defaultToolSlugs) {
+        try {
+          await toolRepository.createFromTemplate(toolSlug, starshipId);
+          console.log(`[STARSHIP-SERVICE] Deployed tool '${toolSlug}' to starship ${starshipId}`);
+        } catch (error) {
+          console.error(`[STARSHIP-SERVICE] Failed to deploy tool '${toolSlug}':`, error);
+        }
+      }
+
+      console.log(`[STARSHIP-SERVICE] Successfully deployed ${defaultToolSlugs.length} default tools to starship ${starshipId}`);
+    } catch (error) {
+      console.error('[STARSHIP-SERVICE] Failed to deploy default tools:', error);
+      // Don't throw error - tool deployment is optional during registration
+    }
+  }
+
+  /**
    * Create a default agent from template for a new user's starship
    */
   static async createDefaultAgent(userId: string, starshipId: string): Promise<any | null> {
@@ -325,6 +351,9 @@ export class StarshipService {
         console.error('[STARSHIP-SERVICE] Sybil agent template not found - skipping agent creation');
         return null;
       }
+
+      // Deploy default tools first so Sybil can use them
+      await StarshipService.createDefaultTools(starshipId);
 
       // Create agent from template with Sybil as the default navigator
       const defaultAgent = await templateService.createAgentFromTemplate(defaultTemplate.id, starshipId);

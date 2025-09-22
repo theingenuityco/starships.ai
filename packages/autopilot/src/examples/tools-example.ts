@@ -26,6 +26,14 @@ const calculatorTool: ToolParams = {
     },
     required: ['expression'],
   },
+  blueprint: {
+    nodes: [
+      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+    ],
+    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    metadata: {},
+  },
 };
 
 const timeTool: ToolParams = {
@@ -47,6 +55,14 @@ const timeTool: ToolParams = {
     },
     required: [],
   },
+  blueprint: {
+    nodes: [
+      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+    ],
+    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    metadata: {},
+  },
 };
 
 const echoTool: ToolParams = {
@@ -67,6 +83,14 @@ const echoTool: ToolParams = {
     },
     required: ['message'],
   },
+  blueprint: {
+    nodes: [
+      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+    ],
+    edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+    metadata: {},
+  },
 };
 
 /**
@@ -78,7 +102,9 @@ export async function calculatorExample() {
   const agent = new Agent({
     name: 'MathAssistant',
     model: 'anthropic/claude-3-haiku',
-    tools: [calculatorTool],
+    state: {
+      tools: [calculatorTool],
+    },
   });
 
   const result = await agent.execute(ExecutionItemUtils.wrapSingle('What is 15 * 7 + 23? Please calculate this for me.'));
@@ -97,7 +123,9 @@ export async function multiToolExample() {
     name: 'GeneralAssistant',
     model: 'anthropic/claude-3.5-sonnet',
     temperature: 0.7,
-    tools: [calculatorTool, timeTool, echoTool],
+    state: {
+      tools: [calculatorTool, timeTool, echoTool],
+    },
   });
 
   const result = await agent.execute(
@@ -119,11 +147,11 @@ export async function conversationExample() {
   const agent = new Agent({
     name: 'ConversationAssistant',
     model: 'anthropic/claude-3.5-sonnet',
-    tools: [calculatorTool, timeTool],
-    memoryState: {
-      systemPrompt:
-        'You are a helpful assistant that can perform calculations and tell time. Be conversational and remember context from previous interactions.',
+    systemPrompt:
+      'You are a helpful assistant that can perform calculations and tell time. Be conversational and remember context from previous interactions.',
+    state: {
       messages: [],
+      tools: [calculatorTool, timeTool],
     },
   });
 
@@ -148,7 +176,7 @@ export async function customToolExample() {
 
   // Example of how you could extend the Tool class for custom tools
   const customTool: ToolParams = {
-    name: 'echo', // Using built-in echo for demonstration
+    name: 'echo',
     description: 'Process user data with custom logic',
     parameters: {
       type: 'object',
@@ -165,12 +193,22 @@ export async function customToolExample() {
       },
       required: ['action', 'text'],
     },
+    blueprint: {
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+        { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+      ],
+      edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+      metadata: {},
+    },
   };
 
   const agent = new Agent({
     name: 'TextProcessor',
     model: 'anthropic/claude-3-haiku',
-    tools: [customTool],
+    state: {
+      tools: [customTool],
+    },
   });
 
   const result = await agent.execute(ExecutionItemUtils.wrapSingle('Please process the text "Hello World" by making it uppercase.'));

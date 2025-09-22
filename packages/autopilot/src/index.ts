@@ -6,6 +6,7 @@
 
 // Engine
 export { Engine } from './engine/Engine';
+export type { EngineConfig } from './engine/Engine';
 export { Eval } from './engine/Eval';
 export type { EvalContext, EvalOptions } from './engine/Eval';
 
@@ -23,11 +24,6 @@ export { Tool } from './nodes/Tool';
 // Node result types
 export type { ConditionalResult } from './nodes/Conditional';
 
-// Memory
-export { Memory } from './memory/Memory';
-export type { MemoryState } from './memory/Memory';
-export { AgentMemory } from './memory/AgentMemory';
-
 // Utils
 export { ExecutionItemUtils } from './utils/ExecutionItemUtils';
 
@@ -36,6 +32,11 @@ export * from './types';
 
 // Configuration
 export { config } from './constants';
+
+// Runners
+export type { Runner } from './runner/Runner';
+export { LocalRunner } from './runner/LocalRunner';
+export { ChildProcessRunner } from './runner/ChildProcessRunner';
 
 // Autopilot configuration manager
 export { autopilot, AutopilotManager } from './Autopilot';

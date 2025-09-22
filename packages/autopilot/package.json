@@ -14,8 +14,9 @@
     }
   },
   "scripts": {
-    "build": "tsc && tsc-alias -p tsconfig.json",
-    "dev": "tsc --watch",
+    "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc --build && tsc-alias -p tsconfig.json && pnpm run copy:child-entry",
+    "copy:child-entry": "mkdir -p dist/scripts && cp scripts/child-entry.js dist/scripts/child-entry.js",
+    "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "jest",
@@ -24,14 +25,18 @@
   },
   "dependencies": {
     "fast-json-patch": "^3.1.1",
-    "jsonata": "^2.0.3",
     "nanoid": "^5.1.5"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
+    "core-js-pure": "3.45.1",
+    "esbuild": "^0.23.0",
     "jest": "^30.1.1",
     "ts-jest": "^29.4.1",
     "tsc-alias": "^1.8.16",
-    "typescript": "^5.0.0"
+    "tsx": "^4.20.3",
+    "typescript": "^5.0.0",
+    "web-streams-polyfill": "3.3.3",
+    "fast-text-encoding": "1.0.6"
   }
 }

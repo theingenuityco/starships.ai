@@ -27,8 +27,8 @@ export const config = {
   DEFAULT_RETRIES: 3,
   RETRY_BACKOFF_MS: 1000,
 
-  // JSONata expression evaluation timeout to prevent hanging
-  JSONATA_EXPRESSION_TIMEOUT_MS: 5000,
+  // Expression evaluation timeout to prevent hanging
+  EXPRESSION_TIMEOUT_MS: 5000,
 
   // Maximum depth of conditional nesting to prevent infinite loops
   MAX_CONDITIONAL_DEPTH: 10,

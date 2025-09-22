@@ -14,6 +14,7 @@ export * from './domains/message';
 export * from './domains/native-tool';
 export * from './domains/node';
 export * from './domains/starship';
+export * from './domains/tool';
 export * from './domains/user';
 export * from './domains/waitlist';
 export * from './domains/workflow';

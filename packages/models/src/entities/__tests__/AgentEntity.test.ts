@@ -46,7 +46,7 @@ describe('AgentEntity', () => {
         timeout: 30000,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        systemPrompt: 'Test agent',
+        systemPrompt: 'You are a helpful assistant.',
         state: JSON.stringify({ messages: [], tools: [] }),
         blueprint: JSON.stringify({ nodes: [], edges: [] }),
       });

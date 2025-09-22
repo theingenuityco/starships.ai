@@ -52,6 +52,25 @@ export class Eval {
   constructor(private readonly secureEnv?: Record<string, string>) {}
 
   /**
+   * Normalize/sanitize an extracted JS expression before compiling.
+   * Some blueprint/template sources may JSON-escape quotes (e.g. \"lint\"),
+   * which breaks Function(...) parsing. We unescape common JSON-escaped sequences.
+   */
+  private sanitizeExpression(expression: string): string {
+    // Only operate on strings; keep it minimal and safe.
+    let expr = String(expression ?? '');
+
+    // Replace common JSON-escaped sequences first
+    expr = expr.replace(/\\\\/g, '\\'); // unescape backslashes first
+    expr = expr.replace(/\\"/g, '"'); // unescape double quotes
+    expr = expr.replace(/\\'/g, "'"); // unescape single quotes
+
+    // Trim whitespace
+    expr = expr.trim();
+    return expr;
+  }
+
+  /**
    * Build evaluation context from execution state
    */
   buildContext(execution: Execution, inputData?: unknown): EvalContext {
@@ -63,7 +82,23 @@ export class Eval {
       input: inputData,
 
       // Workflow-specific helper functions
-      $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
+      // IMPORTANT: Do not mask missing outputs. Surface a descriptive error
+      // so we can pinpoint why a nodeRef is unavailable in the current scope.
+      $lastOutputOf: (nodeRef: string) => {
+        const items = this.findLatestNodeResult(execution, nodeRef) as ExecutionItem[] | undefined;
+        if (!items) {
+          // Build small diagnostic to help locate root cause
+          const available = execution.results.map((r) => r.nodeRef);
+          const msg =
+            `No output found for nodeRef="${nodeRef}". ` +
+            `Current node="${execution.currentNodeRef ?? 'unknown'}". ` +
+            `Available outputs: [${available.join(', ')}]. ` +
+            `This typically occurs when a template references a node from a different workflow scope ` +
+            `(e.g., using a nested tool's nodeRef like "lint" from the outer agent), or when the node has not executed yet.`;
+          throw new Error(msg);
+        }
+        return items;
+      },
       $input: (path?: string) => this.extractPath(inputData, path),
 
       // Unified env/secret system (uniform naming across eval and code)
@@ -117,7 +152,9 @@ export class Eval {
    */
   async evaluateExpression(expression: string, context: EvalContext, options?: EvalOptions): Promise<unknown> {
     try {
-      const expr = String(expression ?? '').trim();
+      // Sanitize to handle JSON-escaped sequences like \"lint\"
+      const exprRaw = String(expression ?? '');
+      const expr = this.sanitizeExpression(exprRaw);
       if (!expr) return undefined;
 
       // Build a tiny evaluator. Using `with(ctx)` to make context keys available as identifiers.
@@ -184,7 +221,8 @@ export class Eval {
    */
   validateExpression(expression: string, options?: EvalOptions): ValidationResult {
     const errors: ValidationError[] = [];
-    const expr = String(expression ?? '').trim();
+    // Sanitize to support JSON-escaped sequences inside templates
+    const expr = this.sanitizeExpression(String(expression ?? ''));
 
     try {
       // Additional validation checks (string-level)
@@ -268,6 +306,18 @@ export class Eval {
   }
 
   /**
+   * Heuristic: detect blueprint-like objects (definitions), not runtime data.
+   * A blueprint has shape { nodes: [], edges: [] } where both are arrays.
+   * These structures may contain their own {{ ... }} placeholders that are only
+   * meaningful in their own (nested) execution scope. We must NOT resolve them here.
+   */
+  private isBlueprintLikeObject(val: unknown): boolean {
+    if (!val || typeof val !== 'object' || Array.isArray(val)) return false;
+    const o = val as Record<string, unknown>;
+    return Array.isArray(o.nodes) && Array.isArray(o.edges);
+  }
+
+  /**
    * Resolve template expressions in an object
    */
   private async resolveObjectTemplates(
@@ -275,8 +325,19 @@ export class Eval {
     context: EvalContext,
     options?: EvalOptions
   ): Promise<Record<string, unknown>> {
+    // If the entire object looks like a blueprint, return it as-is (opaque)
+    if (this.isBlueprintLikeObject(obj)) {
+      return obj;
+    }
+
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
+      // If a specific key appears to hold a blueprint, keep it opaque
+      if (key === 'blueprint' && this.isBlueprintLikeObject(value)) {
+        result[key] = value;
+        continue;
+      }
+      // Otherwise resolve recursively
       result[key] = await this.processValue(value, context, options);
     }
     return result;

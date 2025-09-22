@@ -149,10 +149,7 @@ export const toolUpdateTool: ToolParams = {
         name: 'End',
         description: '',
         parameters: {
-          output: {
-            ok: true,
-            tool: '{{ $lastOutputOf("http_update")[0].json }}',
-          },
+          output: '{{ $lastOutputOf("http_update")[0].json }}',
         },
       },
     ],

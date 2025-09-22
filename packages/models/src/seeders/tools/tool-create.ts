@@ -99,10 +99,7 @@ export const toolCreateTool: ToolParams = {
         name: 'End',
         description: '',
         parameters: {
-          output: {
-            ok: true,
-            tool: '{{ $lastOutputOf("http_create")[0].json }}',
-          },
+          output: '{{ $lastOutputOf("http_create")[0].json }}',
         },
       },
     ],

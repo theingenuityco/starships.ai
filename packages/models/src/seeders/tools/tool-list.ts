@@ -59,12 +59,7 @@ export const toolListTool: ToolParams = {
         name: 'End',
         description: '',
         parameters: {
-          output: {
-            ok: true,
-            status: '{{ $lastOutputOf("http_list")[0].json.status }}',
-            total: '{{ Array.isArray($lastOutputOf("http_list")[0].json.body) ? $lastOutputOf("http_list")[0].json.body.length : 0 }}',
-            tools: '{{ $lastOutputOf("http_list")[0].json.body }}',
-          },
+          output: '{{ $lastOutputOf("http_list")[0].json }}',
         },
       },
     ],

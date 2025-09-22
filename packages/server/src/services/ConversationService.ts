@@ -28,6 +28,10 @@ export class ConversationService {
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
+  // Pending finalization tasks to ensure "complete" is emitted last
+  private pendingFinalization: Map<string, Promise<void>> = new Map();
+  // Resolver handles for pending finalization barriers
+  private finalizeResolvers: Map<string, () => void> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner: ChildProcessRunner;
 
@@ -300,6 +304,7 @@ export class ConversationService {
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
+        // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
 
@@ -314,6 +319,26 @@ export class ConversationService {
           // Guard: if no active accumulator and we have content, start a new placeholder stream
           if (hasContent && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
+              // If previous turn is still finalizing, wait to avoid cross-turn index races
+              const pending = this.pendingFinalization.get(conversationId);
+              if (pending) {
+                try {
+                  await pending;
+                } catch (e) {
+                  console.warn('[STREAMING] Pending finalization overlapped with new turn; continuing:', e);
+                }
+              }
+
+              // Create finalization barrier for this turn now, so workflow_completed can await it even if it arrives early
+              if (!this.pendingFinalization.has(conversationId)) {
+                this.pendingFinalization.set(
+                  conversationId,
+                  new Promise<void>((resolve) => {
+                    this.finalizeResolvers.set(conversationId, resolve);
+                  })
+                );
+              }
+
               const assistantMessage: MessageModel = {
                 id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 role: 'assistant',
@@ -337,6 +362,7 @@ export class ConversationService {
 
               // Initialize server-side accumulator for this new stream
               this.streamingContent.set(conversationId, '');
+              // Turn lifecycle tracking removed
               // Clear tool_calls for this new stream to prevent reuse from previous LLM calls
               this.streamingToolCalls.delete(conversationId);
             } else {
@@ -420,88 +446,77 @@ export class ConversationService {
           break;
         }
 
-        // Set the final accumulated content and mark as complete
         const finalContent = this.streamingContent.get(conversationId) || '';
 
-        const completionOperations: Operation[] = [
-          {
-            op: 'replace',
-            path: '/messages/-1/content',
-            value: finalContent,
-          },
-          {
-            op: 'replace',
-            path: '/messages/-1/streaming',
-            value: false,
-          },
-          {
-            op: 'remove',
-            path: '/messages/-1/contentChunks',
-          },
-        ];
-
-        // Send all completion operations together
-        for (const operation of completionOperations) {
-          await this.streamingService.broadcastDelta(conversationId, operation);
-        }
-
-        // Persist the final assistant message to the database and patch stable fields
-        // Skip persistence when content is empty to avoid DB validation errors
-        if (!finalContent || finalContent.trim().length === 0) {
-          console.log('[STREAMING] Skipping persistence - empty content');
-          this.streamingContent.delete(conversationId);
-          break;
-        }
-
-        try {
-          // Persist the assistant message
-          const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
-          const assistantMessage = await this.messageService.createMessage({
-            conversationId,
-            role: 'assistant',
-            content: finalContent,
-            messageType: 'agent_response',
-            ...(finalToolCallsAcc.length > 0 && {
-              tool_calls: finalToolCallsAcc.map((tc) => ({
-                id: tc.id,
-                type: 'function',
-                function: {
-                  name: tc.function?.name || '',
-                  arguments: tc.function?.arguments || '',
-                },
-              })),
-            }),
-          });
-
-          console.log('[STREAMING] Successfully created assistant message:', assistantMessage.id);
-
-          const finalizeOps: Operation[] = [
-            {
+        // Build finalization task: ensure final patches and persistence complete in order.
+        const finalizePromise = (async () => {
+          try {
+            // Replace content with final accumulated content first
+            await this.streamingService.broadcastDelta(conversationId, {
               op: 'replace',
-              path: '/messages/-1/id',
-              value: assistantMessage.id,
-            },
-            {
-              op: 'replace',
-              path: '/messages/-1/updatedAt',
-              value: assistantMessage.updatedAt,
-            },
-          ];
+              path: '/messages/-1/content',
+              value: finalContent,
+            });
 
-          for (const op of finalizeOps) {
-            await this.streamingService.broadcastDelta(conversationId, op);
+            // Persist and patch id/updatedAt while placeholder is still active
+            if (finalContent && finalContent.trim().length > 0) {
+              try {
+                const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
+                const assistantMessage = await this.messageService.createMessage({
+                  conversationId,
+                  role: 'assistant',
+                  content: finalContent,
+                  messageType: 'agent_response',
+                  ...(finalToolCallsAcc.length > 0 && {
+                    tool_calls: finalToolCallsAcc.map((tc) => ({
+                      id: tc.id,
+                      type: 'function',
+                      function: {
+                        name: tc.function?.name || '',
+                        arguments: tc.function?.arguments || '',
+                      },
+                    })),
+                  }),
+                });
+
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/id',
+                  value: assistantMessage.id,
+                });
+
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/updatedAt',
+                  value: assistantMessage.updatedAt,
+                });
+              } catch (persistError) {
+                console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
+              }
+            } else {
+              console.log('[STREAMING] Skipping persistence - empty content');
+            }
+
+            // Mark streaming as complete and remove contentChunks
+            await this.streamingService.broadcastDelta(conversationId, {
+              op: 'replace',
+              path: '/messages/-1/streaming',
+              value: false,
+            });
+
+            await this.streamingService.broadcastDelta(conversationId, {
+              op: 'remove',
+              path: '/messages/-1/contentChunks',
+            });
+          } finally {
+            // Always clear trackers when we are done with finalization
+            this.streamingContent.delete(conversationId);
+            this.streamingToolCalls.delete(conversationId);
           }
-        } catch (persistError) {
-          console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
-        }
+        })();
 
-        // Clear streaming content tracker
-        this.streamingContent.delete(conversationId);
-        // Also clear tool calls tracker to prevent reuse
-        this.streamingToolCalls.delete(conversationId);
-
-        // Do not emit stream completion on turn content_complete.
-        // Final "complete" will be emitted on top-level workflow_completed.
+        // Register barrier for workflow_completed to await
+        this.pendingFinalization.set(conversationId, finalizePromise);
         break;
       }
 
@@ -519,6 +534,18 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // Ensure all pending finalization (e.g., ID/updatedAt patches) are flushed before completing
+        const pending = this.pendingFinalization.get(conversationId);
+        if (pending) {
+          try {
+            await pending;
+          } catch (e) {
+            console.warn('[STREAMING] Pending finalization failed before workflow_completed:', e);
+          } finally {
+            this.pendingFinalization.delete(conversationId);
+          }
+        }
+
         // Emit stream completion for the entire workflow (top-level only)
         if (this.streamingService && this.streamingService.isActive(conversationId)) {
           await this.streamingService.broadcastComplete(conversationId, {

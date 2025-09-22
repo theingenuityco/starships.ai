@@ -7,6 +7,7 @@
 import { Agent } from '../Agent';
 import type { AgentParams } from '@/types/node-parameters';
 import type { Blueprint } from '@/types';
+import type { Execution } from '@/types';
 
 // Mock Engine to avoid actual workflow execution in unit tests
 jest.mock('@/engine/Engine', () => ({
@@ -62,7 +63,8 @@ describe('Agent Node Handler', () => {
       };
 
       const eventCallback = jest.fn();
-      const agent = new Agent(params, { eventCallback });
+      const parentExecution: Execution = { status: 'not_started', state: {}, results: [], depth: 0 };
+      const agent = new Agent(params, { eventCallback, execution: parentExecution });
 
       const execution = await agent.execute();
 
@@ -169,12 +171,13 @@ describe('Agent Node Handler', () => {
 
       // Verify default blueprint was created
       const blueprint = agent.getCurrentBlueprint();
-      expect(blueprint.nodes).toHaveLength(4); // start, end, llm, and conditional
+      expect(blueprint.nodes).toHaveLength(5); // start, end, llm, conditional, tool
       expect(blueprint.nodes.some((node) => node.type === 'start')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'llm')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'end')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'conditional')).toBe(true);
-      expect(blueprint.edges).toHaveLength(3); // edges: start->llm->conditional->end
+      expect(blueprint.nodes.some((node) => node.type === 'tool')).toBe(true);
+      expect(blueprint.edges).toHaveLength(5); // edges: start->llm, llm->conditional, conditional->tool, tool->llm, conditional->end
     });
 
     it('should validate blueprint structure', () => {

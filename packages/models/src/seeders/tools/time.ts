@@ -79,7 +79,7 @@ export const timeTool: ToolParams = {
           timeout: 3000,
         },
       },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ input }}' } },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ $input() }}' } },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'time_1' },

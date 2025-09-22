@@ -34,8 +34,8 @@ export const echoTool: ToolParams = {
         parameters: {
           output: {
             type: 'echo',
-            message: '{{ ($lastOutputOf("__initial__")?.[0]?.json?.message) ?? input?.message ?? "" }}',
-            metadata: '{{ ($lastOutputOf("__initial__")?.[0]?.json?.metadata) ?? input?.metadata ?? {} }}',
+            message: '{{ $lastOutputOf("__initial__")[0].json.message }}',
+            metadata: '{{ $lastOutputOf("__initial__")[0].json.metadata ?? {} }}',
             echoedAt: '{{ new Date().toISOString() }}',
           },
         },

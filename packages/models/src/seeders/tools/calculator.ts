@@ -83,7 +83,7 @@ export const calculatorTool: ToolParams = {
           timeout: 5000,
         },
       },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ input }}' } },
+      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ $input() }}' } },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'calc_1' },

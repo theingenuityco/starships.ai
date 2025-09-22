@@ -362,6 +362,7 @@ export class ConversationService {
                 value: {
                   ...assistantMessage,
                   streaming: true,
+                  contentChunks: [], // Initialize array so JSON Patch add to /contentChunks/- is valid
                   tool_calls: [], // Initialize empty tool_calls array for replace operations
                 },
               };
@@ -387,13 +388,17 @@ export class ConversationService {
             const newContent = currentContent + content;
             this.streamingContent.set(conversationId, newContent);
 
-            // Stream directly into content to avoid chunk array and late content replacement
-            const contentDelta: Operation = {
-              op: 'replace',
-              path: '/messages/-1/content',
-              value: newContent,
+            // Stream delta chunk as JSON Patch add into contentChunks array (no cumulative replace)
+            const chunkDelta: Operation = {
+              op: 'add',
+              path: '/messages/-1/contentChunks/-',
+              value: {
+                content,
+                position: currentLength,
+                timestamp: Date.now(),
+              },
             };
-            await this.streamingService.broadcastDelta(conversationId, contentDelta);
+            await this.streamingService.broadcastDelta(conversationId, chunkDelta);
           }
 
           // Process tool_calls if present (separate from content processing)
@@ -487,6 +492,13 @@ export class ConversationService {
                   op: 'replace',
                   path: '/messages/-1/updatedAt',
                   value: assistantMessage.updatedAt,
+                });
+
+                // Finalize message content with one replace of the full text (clients will stop using chunks)
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/content',
+                  value: finalContent,
                 });
               } catch (persistError) {
                 console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);

@@ -258,11 +258,16 @@ export function useConversation(conversationId: string | null) {
 
             for (const op of chunkOps) {
               const path = String((op as any).path || '')
-              // Expect path like: /messages/{index}/contentChunks/-
-              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              // Expect path like: /messages/{index}/contentChunks/- where index can be a concrete number or -1 for last
+              const match = path.match(/^\/messages\/(-?\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/contentChunks\/-$/)
               if (!match) continue
-              const msgIndex = Number(match[1])
-              if (!Number.isInteger(msgIndex) || msgIndex < 0 || msgIndex >= updated.messages.length) continue
+              let msgIndex = Number(match[1])
+              if (!Number.isInteger(msgIndex)) continue
+              if (msgIndex < 0) {
+                // Map -1 sentinel to the last message index
+                msgIndex = updated.messages.length - 1
+              }
+              if (msgIndex < 0 || msgIndex >= updated.messages.length) continue
 
               const target = { ...updated.messages[msgIndex] }
               const chunkVal = (op as any).value
@@ -290,9 +295,16 @@ export function useConversation(conversationId: string | null) {
           try {
             for (const op of chunkOps) {
               const path = String((op as any).path || '')
-              const match = path.match(/^\/messages\/(\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(\d+)\/contentChunks\/-$/)
+              const match = path.match(/^\/messages\/(-?\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/contentChunks\/-$/)
               if (!match) continue
-              const msgIndex = Number(match[1])
+              let msgIndex = Number(match[1])
+              if (!Number.isInteger(msgIndex)) continue
+              if (msgIndex < 0) {
+                // Resolve last message index from cache
+                const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
+                const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+                msgIndex = Math.max(msgs.length - 1, 0)
+              }
               const val = (op as any).value || {}
               appendMessageChunk(cid, msgIndex, {
                 content: typeof val.content === 'string' ? val.content : '',
@@ -568,9 +580,14 @@ export function useConversation(conversationId: string | null) {
           return
         }
 
-        // Regular message - add to cache (append; ascending order)
+        // Regular message - add to cache (append; ascending order, with de-duplication)
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
           if (!old) return { messages: [message], total: 1, conversationId: cid }
+
+          // Dedupe by message id if already present (prevents duplicates when SSE replays existing messages)
+          if (message.id && Array.isArray(old.messages) && old.messages.some((m: any) => m.id === message.id)) {
+            return old
+          }
 
           // Check if this is a user message that should replace an optimistic message
           const isUserMessage = message.role === 'user'
@@ -732,7 +749,7 @@ export function useConversation(conversationId: string | null) {
       }
     ): Promise<ClientMessage> => {
       if (data.stream) {
-        // Use industry-standard fetch-event-source for POST SSE streaming
+        // Use a single, long-polling GET SSE channel per send; POST only kicks off processing
         const token = await getCurrentToken()
         if (!token) {
           throw new Error('No authentication token available')
@@ -769,16 +786,12 @@ export function useConversation(conversationId: string | null) {
           const optimisticCount = messagesSnapshot.filter((m: any) => m?.sending === true).length
           const baselineLength = Math.max(messagesSnapshot.length - optimisticCount, 0)
 
-          fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true`, {
-            method: 'POST',
+          // Start GET SSE subscription for this conversation
+          fetchEventSource(`/api/v1/conversations/${data.conversationId}/messages?stream=true&baselineLength=${baselineLength}`, {
+            method: 'GET',
             headers: {
-              'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
             },
-            body: JSON.stringify({
-              content: data.content,
-              baselineLength,
-            }),
             signal: abortControllerRef.current?.signal,
             openWhenHidden: true,
             async onopen(response) {
@@ -884,6 +897,26 @@ export function useConversation(conversationId: string | null) {
               reject(error)
             }
           })
+
+          // Kick off processing asynchronously via POST (no SSE on this request)
+          api
+            .post(`/api/v1/conversations/${data.conversationId}/messages`, {
+              content: data.content,
+            })
+            .catch(err => {
+              console.error('[STREAMING] Failed to start conversation processing:', err)
+              // Stop SSE subscription on failure
+              if (abortControllerRef.current) {
+                try {
+                  abortControllerRef.current.abort()
+                } catch {}
+                abortControllerRef.current = null
+              }
+              if (!resolved) {
+                resolved = true
+                reject(err)
+              }
+            })
         })
       } else {
         // Regular message creation

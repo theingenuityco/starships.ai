@@ -5,7 +5,7 @@
  * including validation of tool structure, blueprint validation, and parameter testing.
  */
 
-import type { ToolParams } from '@starships/autopilot';
+import type { ToolParams, Edge } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
@@ -133,7 +133,7 @@ export class ToolTestHelper {
 
     // Test edge structure
     if (blueprint.edges) {
-      blueprint.edges.forEach((edge, index) => {
+      blueprint.edges.forEach((edge: Edge, index: number) => {
         const nodeRefs = blueprint.nodes?.map((n) => n.ref) || [];
         results.push({
           description: `should have valid edge structure at index ${index}`,
@@ -207,8 +207,8 @@ export class ToolTestHelper {
 
       // Find all nodes reachable from current
       edges
-        .filter((e) => e.from === current)
-        .forEach((e) => {
+        .filter((e: Edge) => e.from === current)
+        .forEach((e: Edge) => {
           if (!visited.has(e.to)) {
             queue.push(e.to);
           }
@@ -290,10 +290,10 @@ export const CommonToolTestData = {
    * Generate common invalid parameter tests
    */
   commonInvalidInputs: [
-    { params: null, expectedError: 'invalid input', description: 'null input' },
-    { params: undefined, expectedError: 'invalid input', description: 'undefined input' },
-    { params: 'string', expectedError: 'invalid input', description: 'string input' },
-    { params: 123, expectedError: 'invalid input', description: 'number input' },
+    { params: {}, expectedError: 'invalid input', description: 'empty input object' },
+    { params: { invalidField: 'test' }, expectedError: 'invalid input', description: 'object with invalid fields' },
+    { params: { requiredField: null }, expectedError: 'invalid input', description: 'object with null values' },
+    { params: { requiredField: undefined }, expectedError: 'invalid input', description: 'object with undefined values' },
   ],
 
   /**

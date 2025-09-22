@@ -5,6 +5,7 @@
  * blueprint structure, and functionality verification.
  */
 
+import type { Edge } from '@starships/autopilot';
 import { calculatorTool, calculatorToolTemplate } from '../calculator';
 import { ToolTestHelper, CommonToolTestData, ToolMatchers } from './tool-test-helper';
 
@@ -124,7 +125,7 @@ describe('Calculator Tool', () => {
       const { edges, nodes } = calculatorTool.blueprint;
       const nodeRefs = nodes.map((n) => n.ref);
 
-      edges.forEach((edge) => {
+      edges.forEach((edge: Edge) => {
         expect(nodeRefs).toContain(edge.from);
         expect(nodeRefs).toContain(edge.to);
         expect(edge.ref).toBeTruthy();

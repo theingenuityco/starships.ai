@@ -5,6 +5,7 @@
  * blueprint structure, and functionality verification.
  */
 
+import type { Edge } from '@starships/autopilot';
 import { echoTool, echoToolTemplate } from '../echo';
 import { ToolTestHelper, CommonToolTestData, ToolMatchers } from './tool-test-helper';
 
@@ -150,7 +151,7 @@ describe('Echo Tool', () => {
       const { edges, nodes } = echoTool.blueprint;
       const nodeRefs = nodes.map((n) => n.ref);
 
-      edges.forEach((edge) => {
+      edges.forEach((edge: Edge) => {
         expect(nodeRefs).toContain(edge.from);
         expect(nodeRefs).toContain(edge.to);
         expect(edge.ref).toBeTruthy();

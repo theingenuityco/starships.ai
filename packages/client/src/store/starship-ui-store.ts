@@ -12,7 +12,7 @@ interface ConversationStreaming {
 }
 
 // UI conversation message shape (extends protocol with UI flags)
-interface UIContentChunk {
+interface UIStreamChunk {
   content: string
   position: number
   timestamp: number
@@ -21,7 +21,7 @@ export interface UIMessage extends MessageModel {
   sending?: boolean
   streaming?: boolean
   error?: boolean
-  contentChunks?: UIContentChunk[]
+  chunks?: UIStreamChunk[]
   streamedContent?: string
 }
 
@@ -53,7 +53,7 @@ interface StarshipUIState {
   setConversationSnapshot: (conversationId: string, data: ConversationData) => void
   appendMessage: (conversationId: string, message: UIMessage) => void
   updateMessageAt: (conversationId: string, index: number, updater: Partial<UIMessage> | ((m: UIMessage) => UIMessage)) => void
-  appendMessageChunk: (conversationId: string, index: number, chunk: UIContentChunk) => void
+  appendMessageChunk: (conversationId: string, index: number, chunk: UIStreamChunk) => void
   markMessageStreaming: (conversationId: string, index: number, isStreaming: boolean) => void
   clearConversation: (conversationId: string) => void
   setConversationAgent: (conversationId: string, agentId: string, agentName: string) => void
@@ -150,16 +150,16 @@ export const useStarshipUIStore = create<StarshipUIState>()(
             'convo/updateMessageAt'
           ),
 
-        appendMessageChunk: (conversationId: string, index: number, chunk: UIContentChunk) =>
+        appendMessageChunk: (conversationId: string, index: number, chunk: UIStreamChunk) =>
           set(
             state => {
               const current = state.conversations[conversationId]
               if (!current || index < 0 || index >= current.messages.length) return { conversations: state.conversations }
               const nextMessages = [...current.messages]
               const target = { ...nextMessages[index] }
-              const chunks = Array.isArray(target.contentChunks) ? [...target.contentChunks] : []
+              const chunks = Array.isArray(target.chunks) ? [...target.chunks] : []
               chunks.push({ content: chunk.content, position: chunk.position, timestamp: chunk.timestamp })
-              target.contentChunks = chunks
+              target.chunks = chunks
               target.streaming = true
               nextMessages[index] = target
               return {

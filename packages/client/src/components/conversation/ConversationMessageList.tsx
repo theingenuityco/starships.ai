@@ -9,7 +9,7 @@ import { ConversationMessageContent } from './ConversationMessageContent'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
-const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean }> = Object.freeze([])
+const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = Object.freeze([])
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -55,7 +55,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
     })
 
     // Second pass: group messages and attach matching tool results
-    const groupedMessages: Array<MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean; toolResults?: any[] }> = []
+    const groupedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }> = []
 
     for (const message of sortedMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
@@ -164,14 +164,14 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
   )
 }
 
-interface ContentChunk {
+interface StreamChunk {
   content: string
   position: number
   timestamp: number
 }
 
 interface ConversationMessageBubbleProps {
-  message: MessageModel & { streaming?: boolean; contentChunks?: ContentChunk[]; sending?: boolean; toolResults?: any[] }
+  message: MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }
   agentName?: string
 }
 
@@ -216,7 +216,7 @@ const MemoizedMessageBubble = memo(
                 enableLinkPreview={true}
                 isStreaming={message.streaming}
                 className="text-foreground"
-                contentChunks={message.contentChunks}
+                chunks={message.chunks}
                 agentName={agentName}
                 toolCalls={(message as any).tool_calls}
                 toolResults={(message as any).toolResults}
@@ -237,9 +237,9 @@ const MemoizedMessageBubble = memo(
     // Re-render when text changes
     if (prevProps.message.content !== nextProps.message.content) return false
 
-    // Re-render when contentChunks count changes
-    const prevChunks = prevProps.message.contentChunks?.length ?? 0
-    const nextChunks = nextProps.message.contentChunks?.length ?? 0
+    // Re-render when chunks count changes
+    const prevChunks = prevProps.message.chunks?.length ?? 0
+    const nextChunks = nextProps.message.chunks?.length ?? 0
     if (prevChunks !== nextChunks) return false
 
     // Re-render when tool calls count changes

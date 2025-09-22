@@ -20,7 +20,7 @@ interface ClientMessage extends MessageModel {
   sending?: boolean
   streaming?: boolean
   error?: boolean
-  contentChunks?: Array<{
+  chunks?: Array<{
     content: string
     position: number
     timestamp: number
@@ -28,16 +28,16 @@ interface ClientMessage extends MessageModel {
 }
 
 // Content chunk processing utility
-const processContentChunks = (data: any) => {
+const processChunks = (data: any) => {
   if (!data.messages || !Array.isArray(data.messages)) {
     return data
   }
 
   const processedMessages = data.messages.map((message: ClientMessage) => {
-    // If message has contentChunks, build the streamed content
-    if (message.contentChunks && Array.isArray(message.contentChunks)) {
+    // If message has chunks, build the streamed content
+    if (message.chunks && Array.isArray(message.chunks)) {
       // Sort chunks by position to ensure correct order
-      const sortedChunks = [...message.contentChunks].sort((a, b) => a.position - b.position)
+      const sortedChunks = [...message.chunks].sort((a, b) => a.position - b.position)
 
       // Build content from chunks
       let streamedContent = ''
@@ -231,7 +231,7 @@ export function useConversation(conversationId: string | null) {
         const version = (data as any).version
 
         // Split chunk-add ops from others to avoid blocking event loop with frequent cache writes
-        const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/contentChunks\/-$/.test(op.path))
+        const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/chunks\/-$/.test(op.path))
         const nonChunkOps = ops.filter(op => !chunkOps.includes(op))
 
         // Fast path: update ephemeral streaming state in zustand for chunk adds
@@ -258,8 +258,8 @@ export function useConversation(conversationId: string | null) {
 
             for (const op of chunkOps) {
               const path = String((op as any).path || '')
-              // Expect path like: /messages/{index}/contentChunks/- where index can be a concrete number or -1 for last
-              const match = path.match(/^\/messages\/(-?\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/contentChunks\/-$/)
+              // Expect path like: /messages/{index}/chunks/- where index can be a concrete number or -1 for last
+              const match = path.match(/^\/messages\/(-?\d+)\/chunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/chunks\/-$/)
               if (!match) continue
               let msgIndex = Number(match[1])
               if (!Number.isInteger(msgIndex)) continue
@@ -271,8 +271,8 @@ export function useConversation(conversationId: string | null) {
 
               const target = { ...updated.messages[msgIndex] }
               const chunkVal = (op as any).value
-              // Ensure contentChunks array
-              const chunks = Array.isArray(target.contentChunks) ? [...target.contentChunks] : []
+              // Ensure chunks array
+              const chunks = Array.isArray(target.chunks) ? [...target.chunks] : []
               if (chunkVal && typeof chunkVal.content === 'string') {
                 chunks.push({
                   content: String(chunkVal.content),
@@ -280,7 +280,7 @@ export function useConversation(conversationId: string | null) {
                   timestamp: typeof chunkVal.timestamp === 'number' ? chunkVal.timestamp : Date.now(),
                 })
               }
-              target.contentChunks = chunks
+              target.chunks = chunks
               // Ensure streaming flag is true while chunks are arriving
               target.streaming = true
               // Write back
@@ -295,7 +295,7 @@ export function useConversation(conversationId: string | null) {
           try {
             for (const op of chunkOps) {
               const path = String((op as any).path || '')
-              const match = path.match(/^\/messages\/(-?\d+)\/contentChunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/contentChunks\/-$/)
+              const match = path.match(/^\/messages\/(-?\d+)\/chunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/chunks\/-$/)
               if (!match) continue
               let msgIndex = Number(match[1])
               if (!Number.isInteger(msgIndex)) continue
@@ -395,7 +395,7 @@ export function useConversation(conversationId: string | null) {
                   total: Array.isArray(patched.messages) ? patched.messages.length : 0,
                 }
 
-                return processContentChunks(updatedData)
+                return processChunks(updatedData)
               } catch (error) {
                 console.error('[STREAMING] Failed to apply operations to initial data:', error)
                 return initialData
@@ -411,7 +411,7 @@ export function useConversation(conversationId: string | null) {
                 lastActivityAt: new Date().toISOString(),
               }
 
-              return processContentChunks(updatedData)
+              return processChunks(updatedData)
             } catch (error) {
               console.error('[STREAMING] Failed to apply operations:', error, { operations: nonChunkOps, target: old })
               return old // Return unchanged data on operation failure
@@ -461,7 +461,7 @@ export function useConversation(conversationId: string | null) {
                 for (const idx of completedIdxs) {
                   markMessageStreaming(cid, idx, false)
                   // Remove ephemeral chunks on the UI side to stop any spinners tied to chunks
-                  updateMessageAt(cid, idx, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                  updateMessageAt(cid, idx, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
                 }
               } catch {}
             }
@@ -509,7 +509,7 @@ export function useConversation(conversationId: string | null) {
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
               markMessageStreaming(cid, i, false)
-              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
               break
             }
           }
@@ -643,7 +643,7 @@ export function useConversation(conversationId: string | null) {
           for (let i = msgs.length - 1; i >= 0; i--) {
             if (msgs[i]?.streaming === true) {
               markMessageStreaming(cid, i, false)
-              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+              updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
               break
             }
           }
@@ -854,7 +854,7 @@ export function useConversation(conversationId: string | null) {
                 for (let i = msgs.length - 1; i >= 0; i--) {
                   if (msgs[i]?.streaming === true) {
                     markMessageStreaming(data.conversationId!, i, false)
-                    updateMessageAt(data.conversationId!, i, (m: any) => ({ ...m, streaming: false, contentChunks: undefined }))
+                    updateMessageAt(data.conversationId!, i, (m: any) => ({ ...m, streaming: false, chunks: undefined }))
                     break
                   }
                 }

@@ -93,7 +93,18 @@ export const toolCreateTool: ToolParams = {
           timeout: 10000,
         },
       },
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ $input() }}' } },
+      {
+        ref: 'end_1',
+        type: 'end',
+        name: 'End',
+        description: '',
+        parameters: {
+          output: {
+            ok: true,
+            tool: '{{ $lastOutputOf("http_create")[0].json }}',
+          },
+        },
+      },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },

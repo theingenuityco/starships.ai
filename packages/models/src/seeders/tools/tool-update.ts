@@ -38,15 +38,15 @@ export const toolUpdateTool: ToolParams = {
         description: 'Ensure we have either id or slug',
         parameters: {
           code: `
-            const baseUrl = ((state && (state as any).baseUrl) || '').replace(/\\/+$/, '');
+            const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
             if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = (state && (state as any).authToken);
+            const authToken = env('AUTH_TOKEN');
             if (!authToken) throw new Error('authToken is required');
 
             // Determine if we have id or need to resolve via slug (starship is inferred from state)
             const hasId = typeof input.id === 'string' && input.id.length > 0;
             const slug = input.slug;
-            const starshipId = (state && (state as any).starshipId);
+            const starshipId = env('STARSHIP_ID') || (state && (state as any).starshipId);
             const hasSlugResolve = !!slug;
 
             if (!hasId && !hasSlugResolve) {
@@ -143,7 +143,18 @@ export const toolUpdateTool: ToolParams = {
         },
       },
 
-      { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ $input() }}' } },
+      {
+        ref: 'end_1',
+        type: 'end',
+        name: 'End',
+        description: '',
+        parameters: {
+          output: {
+            ok: true,
+            tool: '{{ $lastOutputOf("http_update")[0].json }}',
+          },
+        },
+      },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'validate' },

@@ -62,22 +62,26 @@ export class HttpRequest implements NodeHandler {
     try {
       // Use input data as body if available and no explicit body set
       const inputData = ExecutionItemUtils.unwrapSingle(input);
+      const method = (this.params.method || 'GET').toUpperCase();
       const bodyData = this.params.body !== undefined ? this.params.body : inputData;
-      let body: string | null = null;
+      let body: string | undefined = undefined;
 
-      if (bodyData !== undefined) {
-        if (typeof bodyData === 'string') {
-          body = bodyData;
-        } else if (typeof bodyData === 'object' && bodyData !== null) {
-          body = JSON.stringify(bodyData);
+      // Do not send a body for GET/HEAD requests
+      if (method !== 'GET' && method !== 'HEAD') {
+        if (bodyData !== undefined) {
+          if (typeof bodyData === 'string') {
+            body = bodyData;
+          } else if (typeof bodyData === 'object' && bodyData !== null) {
+            body = JSON.stringify(bodyData);
+          }
         }
       }
 
       // Build fetch options using all RequestInit properties from params
-      const fetchOptions = {
-        method: this.params.method,
+      const fetchOptions: RequestInit = {
+        method,
         headers,
-        body,
+        ...(body !== undefined ? { body } : {}),
         signal: controller.signal,
         mode: this.params.mode,
         credentials: this.params.credentials,

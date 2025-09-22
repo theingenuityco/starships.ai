@@ -74,9 +74,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // Establish SSE connection with normalized baseline
       streamingService.addConnection(conversationId, res, { baseLength });
 
-      // Send existing messages via StreamingService (complete message events)
-      if (conversationMessages.length > 0) {
-        for (const message of conversationMessages) {
+      // Send only messages the client may be missing based on their baselineLength hint
+      const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
+      const messagesToSend = conversationMessages.slice(startIndexForSend);
+
+      if (messagesToSend.length > 0) {
+        for (const message of messagesToSend) {
           await streamingService.broadcastMessage(conversationId, message);
         }
       }
@@ -154,6 +157,7 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const bodyValidation = validateData(
       z.object({
         content: z.string().min(1, 'content is required'),
+        // baselineLength is no longer used on POST (streaming happens over GET SSE)
         baselineLength: z.coerce.number().int().min(0).optional(),
       }),
       req.body,
@@ -165,98 +169,21 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const { conversationId } = paramValidation;
     const { content } = bodyValidation;
 
-    // Detect streaming request via Accept header
-    const wantsStreaming = req.get('Accept')?.includes('text/event-stream');
-
+    // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
     const conversationService = new ConversationService();
-
-    if (wantsStreaming) {
-      // Streaming requested via POST.
-      const streamingService = new StreamingService();
-
-      // If a stream already exists for this conversation (e.g., GET SSE), do not hijack it by opening another SSE.
-      if (streamingService.isActive(conversationId)) {
-        // Kick off processing asynchronously and acknowledge. Client will receive deltas on the existing SSE channel.
-        const streamingConversationService = new ConversationService();
-
-        streamingConversationService
-          .addConversationMessage({
-            conversationId,
-            content,
-            role: 'user',
-            messageType: 'user_input',
-          })
-          .catch((error) => {
-            console.error('[ROUTE] Streaming conversation processing failed:', error);
-            // Send error to client via existing streaming channel
-            streamingService.broadcastError(conversationId, {
-              streamId: conversationId,
-              errorCode: 'CONVERSATION_PROCESSING_FAILED',
-              message: error instanceof Error ? error.message : 'Unknown conversation processing error',
-              timestamp: new Date().toISOString(),
-              recoverable: false,
-            });
-          });
-
-        // Acknowledge without creating a second SSE channel
-        sendSuccess(res, { status: 'accepted', streaming: true, stream: 'existing', conversationId }, 202);
-        return;
-      }
-
-      // No active stream exists; open a new SSE stream on this POST connection
-      // Determine a reliable baseline:
-      // - client hint (body.baselineLength) if provided
-      // - server truth (current messages count)
-      const clientBase = Number((req.body as any).baselineLength ?? 0) || 0;
-
-      // Fetch existing messages to compute server-side count
-      const conversationServiceForBaseline = new ConversationService();
-      const existingMessages = await conversationServiceForBaseline.getConversationMessages(conversationId);
-      const serverCount = existingMessages.length;
-
-      // Use the larger of client hint and server truth to avoid undercounting
-      const baseLength = Math.max(clientBase, serverCount);
-
-      // Establish SSE connection with normalized baseline
-      streamingService.addConnection(conversationId, res, { baseLength });
-
-      // Create ConversationService - it will use the singleton StreamingService internally
-      const streamingConversationService = new ConversationService();
-
-      // Process conversation with streaming (async - don't await)
-      // Using conversationId as stream identifier - much simpler!
-      streamingConversationService
-        .addConversationMessage({
-          conversationId,
-          content,
-          role: 'user',
-          messageType: 'user_input',
-        })
-        .catch((error) => {
-          console.error('[ROUTE] Streaming conversation processing failed:', error);
-          // Send error to client via streaming
-          streamingService.broadcastError(conversationId, {
-            streamId: conversationId,
-            errorCode: 'CONVERSATION_PROCESSING_FAILED',
-            message: error instanceof Error ? error.message : 'Unknown conversation processing error',
-            timestamp: new Date().toISOString(),
-            recoverable: false,
-          });
-        });
-
-      // Return early to keep connection open (similar to GET endpoint)
-      return;
-    } else {
-      // Handle regular JSON response
-      const result = await conversationService.addConversationMessage({
+    conversationService
+      .addConversationMessage({
         conversationId,
         content,
         role: 'user',
         messageType: 'user_input',
+      })
+      .catch((error) => {
+        console.error('[ROUTE] Conversation processing failed:', error);
       });
 
-      sendSuccess(res, result);
-    }
+    // Acknowledge request; client should be listening on GET SSE channel for updates
+    sendSuccess(res, { status: 'accepted', streaming: true, conversationId }, 202);
   } catch (error) {
     handleError(error, res, 'processing conversation message');
   }

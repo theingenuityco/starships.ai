@@ -33,17 +33,20 @@ export interface EngineConfig {
   eventCallback?: EventCallback;
   failOnNodeError?: boolean;
   runner?: Runner;
+  secureEnv?: Record<string, string>;
 }
 
 export class Engine {
   private eventCallback?: EventCallback;
   private eval: Eval;
   private failOnNodeError: boolean;
+  private secureEnv?: Record<string, string>;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
     this.failOnNodeError = config.failOnNodeError ?? true;
-    this.eval = new Eval();
+    this.secureEnv = config.secureEnv;
+    this.eval = new Eval(this.secureEnv);
   }
 
   async createHandler(node: Node, resolvedParams: NodeParameters, execution: Execution): Promise<NodeHandler> {
@@ -56,6 +59,7 @@ export class Engine {
     const handlerOptions = {
       eventCallback: this.eventCallback,
       execution: execution,
+      secureEnv: this.secureEnv,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);
@@ -571,9 +575,32 @@ export class Engine {
         timestamp: new Date().toISOString(),
         data: { execution },
       };
-      await this.eventCallback(event);
+      // Redact any secureEnv values from outgoing events/logs by default
+      const redacted = this.redactSensitive(event);
+      await this.eventCallback(redacted);
     } catch (error) {
       console.error('Error in external streaming emitter:', error);
+    }
+  }
+
+  private redactSensitive<T = unknown>(payload: T): T {
+    try {
+      const secretValues = Object.values(this.secureEnv ?? {}).filter((v) => typeof v === 'string' && v.length > 0) as string[];
+      if (secretValues.length === 0) return payload;
+
+      let json = JSON.stringify(payload);
+      for (const value of secretValues) {
+        // Replace all occurrences; keep it simple for now
+        try {
+          const safe = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          json = json.replace(new RegExp(safe, 'g'), '[REDACTED]');
+        } catch {
+          json = json.split(value).join('[REDACTED]');
+        }
+      }
+      return JSON.parse(json) as T;
+    } catch {
+      return payload;
     }
   }
 }

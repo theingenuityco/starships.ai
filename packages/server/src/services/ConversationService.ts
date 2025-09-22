@@ -218,26 +218,33 @@ export class ConversationService {
       // console.log('>>>Resolved tools', { resolvedTools });
 
       // Build Agent to materialize blueprint (tools, nodes, etc.)
-      // Inject implicit context for host tools: starshipId, baseUrl, authToken
       const env = getEnvConfig();
       const baseUrl = `${env.SERVER_URL}/api/v1`;
       const rawAuth = ctx?.authorization ?? '';
       const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
+      const openRouterKey = env.OPENROUTER_API_KEY || '';
+
+      const secureEnv: Record<string, string> = {
+        STARSHIP_ID: starship.id,
+        BASE_URL: baseUrl,
+        ...(authToken ? { AUTH_TOKEN: authToken } : {}),
+        ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
+      };
 
       const agentWithTools: AgentParams = {
         ...agentModel,
         state: {
           ...agentModel.state,
           tools: resolvedTools,
+          // Do not inject secrets into state
           starshipId: starship.id,
-          baseUrl,
-          ...(authToken ? { authToken } : {}),
         },
       };
 
-      // Create Agent with ChildProcessRunner for isolation
+      // Create Agent with secureEnv for eval across all nodes
       const agent = new Agent(agentWithTools, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
+        secureEnv,
       });
 
       // Convert database messages to LLM format, preserving tool_calls and tool results

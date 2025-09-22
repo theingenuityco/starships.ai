@@ -30,9 +30,12 @@ export class Code extends BaseNode<CodeParams> {
       const execution = this.getOptions()?.execution;
 
       // Create the execution context for the code
+      const secureEnv = this.getOptions()?.secureEnv || {};
       const context = {
         input: inputData,
         state: execution?.state || {},
+        env: (key: string) => (typeof key === 'string' ? secureEnv[key] : undefined),
+        envAll: () => ({ ...secureEnv }),
         console: {
           log: (...args: unknown[]) => console.log('[Code Node]:', ...args),
           error: (...args: unknown[]) => console.error('[Code Node]:', ...args),

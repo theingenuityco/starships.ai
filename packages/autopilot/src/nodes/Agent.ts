@@ -220,6 +220,7 @@ export class Agent implements NodeHandler {
       const engineConfig: EngineConfig = {
         eventCallback: this.options?.eventCallback,
         failOnNodeError: true,
+        secureEnv: this.options?.secureEnv,
       };
 
       // Execute using runner chosen by current execution depth

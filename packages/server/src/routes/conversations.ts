@@ -171,10 +171,39 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     const conversationService = new ConversationService();
 
     if (wantsStreaming) {
-      // Add connection to streaming service - it will handle SSE headers and setup
-      // This automatically sends connection confirmation via sendEvent('connection', ...)
+      // Streaming requested via POST.
       const streamingService = new StreamingService();
 
+      // If a stream already exists for this conversation (e.g., GET SSE), do not hijack it by opening another SSE.
+      if (streamingService.isActive(conversationId)) {
+        // Kick off processing asynchronously and acknowledge. Client will receive deltas on the existing SSE channel.
+        const streamingConversationService = new ConversationService();
+
+        streamingConversationService
+          .addConversationMessage({
+            conversationId,
+            content,
+            role: 'user',
+            messageType: 'user_input',
+          })
+          .catch((error) => {
+            console.error('[ROUTE] Streaming conversation processing failed:', error);
+            // Send error to client via existing streaming channel
+            streamingService.broadcastError(conversationId, {
+              streamId: conversationId,
+              errorCode: 'CONVERSATION_PROCESSING_FAILED',
+              message: error instanceof Error ? error.message : 'Unknown conversation processing error',
+              timestamp: new Date().toISOString(),
+              recoverable: false,
+            });
+          });
+
+        // Acknowledge without creating a second SSE channel
+        sendSuccess(res, { status: 'accepted', streaming: true, stream: 'existing', conversationId }, 202);
+        return;
+      }
+
+      // No active stream exists; open a new SSE stream on this POST connection
       // Determine a reliable baseline:
       // - client hint (body.baselineLength) if provided
       // - server truth (current messages count)

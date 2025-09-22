@@ -4,11 +4,11 @@ import type { ToolTemplateModel } from '@starships/protocol';
 /**
  * Tool: tool_update
  * Update an existing Tool instance on a starship via server REST API
- * Accepts either direct "id" or ("starshipId" + "slug") to resolve the tool ID first.
+ * Accepts either direct "id" or "slug" (uses state.starshipId) to resolve the tool ID first.
  */
 export const toolUpdateTool: ToolParams = {
   name: 'tool_update',
-  description: 'Update an existing Tool instance. Provide id directly or resolve by (starshipId, slug).',
+  description: 'Update an existing Tool instance. Provide id directly or resolve by slug (uses state.starshipId).',
   parameters: {
     type: 'object',
     properties: {
@@ -17,7 +17,6 @@ export const toolUpdateTool: ToolParams = {
 
       // Identifier options
       id: { type: 'string', description: 'Tool ID to update (preferred when known)' },
-      starshipId: { type: 'string', description: 'Starship ID (required if resolving by slug)' },
       slug: { type: 'string', description: 'Tool slug (required if resolving by slug)' },
 
       // Patchable fields (all optional)
@@ -39,20 +38,21 @@ export const toolUpdateTool: ToolParams = {
         ref: 'validate',
         type: 'code',
         name: 'Validate Inputs',
-        description: 'Ensure we have either id or (starshipId + slug)',
+        description: 'Ensure we have either id or slug',
         parameters: {
           code: `
             const baseUrl = (input.baseUrl || '').replace(/\\/+$/, '');
             if (!baseUrl) throw new Error('baseUrl is required');
             if (!input.authToken) throw new Error('authToken is required');
 
-            // Determine if we have id or need to resolve via (starshipId, slug)
+            // Determine if we have id or need to resolve via slug (starship is inferred from state)
             const hasId = typeof input.id === 'string' && input.id.length > 0;
-            const starshipId = input.starshipId ?? (state && (state as any).starshipId);
-            const hasSlugResolve = !!starshipId && !!input.slug;
+            const slug = input.slug;
+            const starshipId = (state && (state as any).starshipId);
+            const hasSlugResolve = !!slug;
 
             if (!hasId && !hasSlugResolve) {
-              throw new Error('Provide "id" OR both "starshipId" and "slug" to resolve the tool.');
+              throw new Error('Provide "id" OR "slug" to resolve the tool (starship inferred from state).');
             }
 
             // Build partial patch body from provided fields (ignore undefined)
@@ -73,7 +73,7 @@ export const toolUpdateTool: ToolParams = {
               hasId,
               hasSlugResolve,
               starshipId,
-              slug: input.slug,
+              slug,
               id: input.id,
               patch,
               headers: {
@@ -170,7 +170,7 @@ export const toolUpdateToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   slug: 'tool-update',
   category: 'automation',
   exampleUsage:
-    'Update by id: { "baseUrl": "...", "authToken": "...", "id": "...", "name": "New Name" } or resolve by slug: { "baseUrl": "...", "authToken": "...", "starshipId": "...", "slug": "...", "isEnabled": false }',
+    'Update by id: { "baseUrl": "...", "authToken": "...", "id": "...", "name": "New Name" } or resolve by slug: { "baseUrl": "...", "authToken": "...", "slug": "...", "isEnabled": false }',
   requiresApiKey: false,
   configurationFields: [],
 };

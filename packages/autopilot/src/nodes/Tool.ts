@@ -37,6 +37,7 @@ export class Tool extends BaseNode<ToolParams> {
           data: {
             toolName: params.name,
             arguments: toolArgs,
+            toolCallId: params.toolCallId,
           },
         });
       }
@@ -65,6 +66,7 @@ export class Tool extends BaseNode<ToolParams> {
             toolName: params.name,
             arguments: toolArgs,
             result: resultData,
+            toolCallId: params.toolCallId,
           },
         });
       }
@@ -81,6 +83,7 @@ export class Tool extends BaseNode<ToolParams> {
             data: {
               toolName: params.name,
               error: error instanceof Error ? error.message : 'Unknown tool error',
+              toolCallId: params.toolCallId,
             },
           });
         } catch {

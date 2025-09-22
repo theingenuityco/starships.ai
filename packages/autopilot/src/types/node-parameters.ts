@@ -90,6 +90,7 @@ export interface ToolParams extends BaseParams {
     required?: string[];
   };
   blueprint: Blueprint; // Required: Tool executes this nested workflow
+  toolCallId?: string; // Optional: ID linking this execution to the originating assistant tool_call
   // Tool-specific execution parameters can be added here
 }
 

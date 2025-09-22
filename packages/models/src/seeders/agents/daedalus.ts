@@ -70,17 +70,8 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   temperature: 0.3,
   maxTokens: 3200,
 
-  // Tool assignment - helpful utilities available during design
-  assignedToolSlugs: [
-    'calculator',
-    'get-current-time',
-    'echo',
-    'tool-list',
-    'tool-create',
-    'tool-update',
-    'tool-smoke-test',
-    'blueprint-lint',
-  ],
+  // Tool assignment - host tools for managing tools on the starship
+  assignedToolSlugs: ['tool-list', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'],
 
   icon: '🛠️',
   previewPrompts: [

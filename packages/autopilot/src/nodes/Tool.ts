@@ -47,8 +47,10 @@ export class Tool extends BaseNode<ToolParams> {
       }
 
       // Execute the tool's blueprint using a fresh Engine + sub-execution
+      // IMPORTANT: propagate parent execution to set correct execution.depth (nested = depth>0)
       const engine = new Engine({ eventCallback: this.getEventCallback() });
-      const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs));
+      const parentExecution = this.getOptions()?.execution;
+      const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
       const items = await engine.executeBlueprint(params.blueprint, subExec);
       const result = ExecutionItemUtils.unwrapSingle(items);

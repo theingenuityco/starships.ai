@@ -11,14 +11,13 @@ import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { EngineConfig } from '@/engine/Engine';
-import { Runner } from '@/runner/Runner';
 import { LocalRunner } from '@/runner/LocalRunner';
+import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
   private nodeCounter: number = 1;
-  private runner: Runner;
   private state: AgentState;
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
@@ -34,9 +33,7 @@ export class Agent implements NodeHandler {
       tools: params.state?.tools || [],
     };
 
-    // Initialize runner - defaults to LocalRunner for nested execution safety
-    // ConversationService or other top-level callers can provide a ChildProcessRunner via options
-    this.runner = options?.runner ?? new LocalRunner();
+    // Runner selection deferred to execute() based on execution.depth to avoid nested runners
 
     // Create complete tool-enabled blueprint if none was provided
     if (!this.params.blueprint) {
@@ -221,9 +218,12 @@ export class Agent implements NodeHandler {
         failOnNodeError: true,
       };
 
-      // Execute using the configured runner
+      // Execute using runner chosen by current execution depth
       const blueprint = this.getCurrentBlueprint();
-      return await this.runner.run(blueprint, execution, engineConfig);
+      const depth = execution.depth ?? 0;
+      // Use ChildProcessRunner for top-level Agent executions (depth 0) and LocalRunner for nested (depth > 0)
+      const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
+      return await runner.run(blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

@@ -62,19 +62,19 @@ export const toolListTool: ToolParams = {
           code: `
             // Input is the HttpResponse from http_list (see HttpRequest node contract)
             const http = input;
-            const body = http && typeof http === 'object' ? (http as any).body : http;
+            const body = http && typeof http === 'object' ? http.body : http;
             // Server sendSuccess returns { data: T }, so prefer body.data when present
-            const data = body && typeof body === 'object' && Array.isArray((body as any).data)
-              ? (body as any).data
+            const data = (body && typeof body === 'object' && Array.isArray(body.data))
+              ? body.data
               : (Array.isArray(body) ? body : []);
 
             // Return a lean summary to avoid leaking large/templated blueprint contents
-            return data.map((t: any) => ({
-              id: t.id,
-              slug: t.slug,
-              name: t.name,
-              description: t.description,
-              isEnabled: t.isEnabled,
+            return data.map((t) => ({
+              id: t && t.id,
+              slug: t && t.slug,
+              name: t && t.name,
+              description: t && t.description,
+              isEnabled: t && t.isEnabled,
             }));
           `,
           timeout: 2000,

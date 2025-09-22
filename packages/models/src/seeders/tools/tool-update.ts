@@ -46,7 +46,7 @@ export const toolUpdateTool: ToolParams = {
             // Determine if we have id or need to resolve via slug (starship is inferred from state)
             const hasId = typeof input.id === 'string' && input.id.length > 0;
             const slug = input.slug;
-            const starshipId = env('STARSHIP_ID') || (state && (state as any).starshipId);
+            const starshipId = env('STARSHIP_ID') || (state && typeof state === 'object' ? state.starshipId : undefined);
             const hasSlugResolve = !!slug;
 
             if (!hasId && !hasSlugResolve) {
@@ -54,7 +54,7 @@ export const toolUpdateTool: ToolParams = {
             }
 
             // Build partial patch body from provided fields (ignore undefined)
-            const patch: any = {};
+            const patch = {};
             const keys = ['name', 'description', 'parameters', 'blueprint', 'configuration', 'isEnabled'];
             for (const k of keys) {
               if (Object.prototype.hasOwnProperty.call(input, k) && input[k] !== undefined) {

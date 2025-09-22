@@ -48,7 +48,8 @@ export const toolUpdateTool: ToolParams = {
 
             // Determine if we have id or need to resolve via (starshipId, slug)
             const hasId = typeof input.id === 'string' && input.id.length > 0;
-            const hasSlugResolve = !!input.starshipId && !!input.slug;
+            const starshipId = input.starshipId ?? (state && (state as any).starshipId);
+            const hasSlugResolve = !!starshipId && !!input.slug;
 
             if (!hasId && !hasSlugResolve) {
               throw new Error('Provide "id" OR both "starshipId" and "slug" to resolve the tool.');
@@ -71,7 +72,7 @@ export const toolUpdateTool: ToolParams = {
               baseUrl,
               hasId,
               hasSlugResolve,
-              starshipId: input.starshipId,
+              starshipId,
               slug: input.slug,
               id: input.id,
               patch,

@@ -222,6 +222,7 @@ export class ConversationService {
         state: {
           ...agentModel.state,
           tools: resolvedTools,
+          starshipId: starship.id,
         },
       };
 

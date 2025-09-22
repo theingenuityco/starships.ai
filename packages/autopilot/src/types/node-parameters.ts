@@ -136,6 +136,8 @@ export interface AgentState {
   messages?: LlmMessage[]; // Message history
   tools?: ToolParams[]; // Available tools
   starshipId?: string; // Implicit context for host tools (e.g., Daedalus)
+  baseUrl?: string; // Server base URL for host tools (e.g., http://localhost:4000/api/v1)
+  authToken?: string; // JWT token for Authorization header (without "Bearer ")
 }
 
 /**

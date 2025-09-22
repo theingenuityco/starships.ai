@@ -6,6 +6,7 @@ import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
+import { getEnvConfig } from '@starships/env';
 
 /**
  * Autopilot child process configuration
@@ -171,7 +172,7 @@ export class ConversationService {
     }
   }
 
-  async addConversationMessage(data: Message & { conversationId: string }): Promise<void> {
+  async addConversationMessage(data: Message & { conversationId: string }, ctx?: { authorization?: string }): Promise<void> {
     // Save user message to database
     const userMessage = await this.messageService.createMessage({
       conversationId: data.conversationId,
@@ -217,12 +218,20 @@ export class ConversationService {
       // console.log('>>>Resolved tools', { resolvedTools });
 
       // Build Agent to materialize blueprint (tools, nodes, etc.)
+      // Inject implicit context for host tools: starshipId, baseUrl, authToken
+      const env = getEnvConfig();
+      const baseUrl = `${env.SERVER_URL}/api/v1`;
+      const rawAuth = ctx?.authorization ?? '';
+      const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
+
       const agentWithTools: AgentParams = {
         ...agentModel,
         state: {
           ...agentModel.state,
           tools: resolvedTools,
           starshipId: starship.id,
+          baseUrl,
+          ...(authToken ? { authToken } : {}),
         },
       };
 

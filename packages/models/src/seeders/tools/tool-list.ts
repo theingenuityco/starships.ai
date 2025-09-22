@@ -10,11 +10,7 @@ export const toolListTool: ToolParams = {
   description: 'List all tools for the specified starship.',
   parameters: {
     type: 'object',
-    properties: {
-      baseUrl: { type: 'string', description: 'Server base URL (e.g., http://localhost:3000/api)' },
-      authToken: { type: 'string', description: 'Bearer token for authenticated requests' },
-    },
-    required: ['baseUrl', 'authToken'],
+    properties: {},
   },
   blueprint: {
     nodes: [
@@ -26,17 +22,18 @@ export const toolListTool: ToolParams = {
         description: 'Build URL and headers',
         parameters: {
           code: `
-            const baseUrl = (input.baseUrl || '').replace(/\\/+$/, '');
+            const baseUrl = ((state && (state as any).baseUrl) || '').replace(/\\/+$/, '');
             if (!baseUrl) throw new Error('baseUrl is required');
+            const authToken = (state && (state as any).authToken);
             const starshipId = (state && (state as any).starshipId);
-            if (!input.authToken) throw new Error('authToken is required');
+            if (!authToken) throw new Error('authToken is required');
             if (!starshipId) throw new Error('starshipId is required');
 
             return {
               url: \`\${baseUrl}/starships/\${starshipId}/tools\`,
               method: 'GET',
               headers: {
-                'Authorization': \`Bearer \${input.authToken}\`,
+                'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
               }
             };
@@ -75,7 +72,7 @@ export const toolListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
 
   slug: 'tool-list',
   category: 'automation',
-  exampleUsage: 'Call with { "baseUrl": "...", "authToken": "..." } to list tools. starshipId is inferred from state.',
+  exampleUsage: 'Call with {} to list tools. starshipId/baseUrl/authToken are inferred from state.',
   requiresApiKey: false,
   configurationFields: [],
 };

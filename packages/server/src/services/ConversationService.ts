@@ -362,7 +362,7 @@ export class ConversationService {
                 value: {
                   ...assistantMessage,
                   streaming: true,
-                  contentChunks: [], // Initialize array so JSON Patch add to /contentChunks/- is valid
+                  chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
                   tool_calls: [], // Initialize empty tool_calls array for replace operations
                 },
               };
@@ -388,10 +388,10 @@ export class ConversationService {
             const newContent = currentContent + content;
             this.streamingContent.set(conversationId, newContent);
 
-            // Stream delta chunk as JSON Patch add into contentChunks array (no cumulative replace)
+            // Stream delta chunk as JSON Patch add into chunks array (no cumulative replace)
             const chunkDelta: Operation = {
               op: 'add',
-              path: '/messages/-1/contentChunks/-',
+              path: '/messages/-1/chunks/-',
               value: {
                 content,
                 position: currentLength,
@@ -507,7 +507,7 @@ export class ConversationService {
               console.log('[STREAMING] Skipping persistence - empty content');
             }
 
-            // Defer streaming=false and contentChunks removal to workflow_completed to avoid premature client close
+            // Defer streaming=false and chunks removal to workflow_completed to avoid premature client close
           } finally {
             // Always clear trackers when we are done with finalization
             this.streamingContent.delete(conversationId);

@@ -14,7 +14,7 @@ import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 
-interface ContentChunk {
+interface StreamChunk {
   content: string
   position: number
   timestamp: number
@@ -28,7 +28,7 @@ interface MessageContentProps {
   enableCopy?: boolean
   enableLinkPreview?: boolean
   isStreaming?: boolean
-  contentChunks?: ContentChunk[]
+  chunks?: StreamChunk[]
   agentName?: string
   toolCalls?: NonNullable<MessageModel['tool_calls']>
   toolResults?: any[]
@@ -43,7 +43,7 @@ export function ConversationMessageContent({
   enableCopy = true,
   enableLinkPreview = true,
   isStreaming = false,
-  contentChunks = [],
+  chunks = [],
   agentName,
   toolCalls,
   toolResults = [],
@@ -97,12 +97,12 @@ export function ConversationMessageContent({
 
   // Build display content from chunks when streaming, use final content when complete
   const displayContent = useMemo(() => {
-    if (!isStreaming || !contentChunks.length) {
+    if (!isStreaming || !chunks.length) {
       return content
     }
 
     // Sort chunks by position to ensure correct order
-    const sortedChunks = [...contentChunks].sort((a, b) => a.position - b.position)
+    const sortedChunks = [...chunks].sort((a, b) => a.position - b.position)
 
     // Build content from chunks
     let result = ''
@@ -111,7 +111,7 @@ export function ConversationMessageContent({
     }
 
     return result
-  }, [content, contentChunks, isStreaming])
+  }, [content, chunks, isStreaming])
 
   const parsedJson = useMemo(() => {
     try {
@@ -415,7 +415,7 @@ export function ConversationMessageContent({
       {isStreaming && (
         <div className="flex items-center gap-2 mt-2 text-muted-foreground">
           <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
-          {contentChunks.length > 0 && <span className="text-xs">({contentChunks.length} chunks)</span>}
+          {chunks.length > 0 && <span className="text-xs">({chunks.length} chunks)</span>}
           <Loader2 className="w-3 h-3 animate-spin" />
         </div>
       )}

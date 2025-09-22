@@ -135,6 +135,7 @@ export interface WorkflowParams extends BaseParams {
 export interface AgentState {
   messages?: LlmMessage[]; // Message history
   tools?: ToolParams[]; // Available tools
+  starshipId?: string; // Implicit context for host tools (e.g., Daedalus)
 }
 
 /**

@@ -13,7 +13,7 @@ export const toolCreateTool: ToolParams = {
     properties: {
       baseUrl: { type: 'string', description: 'Server base URL (e.g., http://localhost:3000/api)' },
       authToken: { type: 'string', description: 'Bearer token for authenticated requests' },
-      starshipId: { type: 'string', description: 'Starship ID to deploy the tool' },
+      starshipId: { type: 'string', description: 'Starship ID to deploy the tool (optional; defaults to state.starshipId)' },
 
       name: { type: 'string', description: 'Tool name' },
       slug: { type: 'string', description: 'Kebab-case slug for the tool instance' },
@@ -35,7 +35,7 @@ export const toolCreateTool: ToolParams = {
       },
       isEnabled: { type: 'boolean', description: 'Enable tool after creation (default: true)' },
     },
-    required: ['baseUrl', 'authToken', 'starshipId', 'name', 'slug', 'description', 'parameters', 'blueprint'],
+    required: ['baseUrl', 'authToken', 'name', 'slug', 'description', 'parameters', 'blueprint'],
   },
   blueprint: {
     nodes: [
@@ -49,7 +49,8 @@ export const toolCreateTool: ToolParams = {
           code: `
             const baseUrl = (input.baseUrl || '').replace(/\\/+$/, '');
             if (!baseUrl) throw new Error('baseUrl is required');
-            const { starshipId, authToken } = input;
+            const authToken = input.authToken;
+            const starshipId = input.starshipId ?? (state && (state as any).starshipId);
             if (!authToken) throw new Error('authToken is required');
             if (!starshipId) throw new Error('starshipId is required');
 
@@ -119,7 +120,7 @@ export const toolCreateToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   slug: 'tool-create',
   category: 'automation',
   exampleUsage:
-    'Create a tool: { "baseUrl": "...", "authToken": "...", "starshipId": "...", "name": "...", "slug": "...", "description": "...", "parameters": {...}, "blueprint": {...} }',
+    'Create a tool: { "baseUrl": "...", "authToken": "...", "name": "...", "slug": "...", "description": "...", "parameters": {...}, "blueprint": {...} } (starshipId inferred from state unless provided via args)',
   requiresApiKey: false,
   configurationFields: [],
 };

@@ -5,6 +5,7 @@
  * blueprint structure, and functionality verification.
  */
 
+import type { Edge } from '@starships/autopilot';
 import { toolSmokeTestTool, toolSmokeTestToolTemplate } from '../tool-smoke-test';
 import { ToolTestHelper, CommonToolTestData, ToolMatchers } from './tool-test-helper';
 
@@ -157,7 +158,7 @@ describe('Tool Smoke Test Tool', () => {
       const { edges, nodes } = toolSmokeTestTool.blueprint;
       const nodeRefs = nodes.map((n) => n.ref);
 
-      edges.forEach((edge) => {
+      edges.forEach((edge: Edge) => {
         expect(nodeRefs).toContain(edge.from);
         expect(nodeRefs).toContain(edge.to);
         expect(edge.ref).toBeTruthy();
@@ -425,7 +426,7 @@ describe('Tool Smoke Test Tool', () => {
       ];
 
       expectedFlow.forEach((expectedEdge) => {
-        const edge = edges.find((e) => e.from === expectedEdge.from && e.to === expectedEdge.to);
+        const edge = edges.find((e: Edge) => e.from === expectedEdge.from && e.to === expectedEdge.to);
         expect(edge).toBeDefined();
       });
     });
@@ -612,7 +613,7 @@ describe('Tool Smoke Test Tool', () => {
 
       // emit_args should be directly connected to run_tool
       const { edges } = toolSmokeTestTool.blueprint;
-      const connectingEdge = edges.find((e) => e.from === 'emit_args' && e.to === 'run_tool');
+      const connectingEdge = edges.find((e: Edge) => e.from === 'emit_args' && e.to === 'run_tool');
 
       expect(connectingEdge).toBeDefined();
       expect(emitNode?.description).toContain('Return plain args for nested workflow input');

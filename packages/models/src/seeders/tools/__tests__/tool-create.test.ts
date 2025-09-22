@@ -5,6 +5,7 @@
  * blueprint structure, and functionality verification.
  */
 
+import type { Edge } from '@starships/autopilot';
 import { toolCreateTool, toolCreateToolTemplate } from '../tool-create';
 import { ToolTestHelper, CommonToolTestData, ToolMatchers } from './tool-test-helper';
 
@@ -199,7 +200,7 @@ describe('Tool Create Tool', () => {
       const { edges, nodes } = toolCreateTool.blueprint;
       const nodeRefs = nodes.map((n) => n.ref);
 
-      edges.forEach((edge) => {
+      edges.forEach((edge: Edge) => {
         expect(nodeRefs).toContain(edge.from);
         expect(nodeRefs).toContain(edge.to);
         expect(edge.ref).toBeTruthy();

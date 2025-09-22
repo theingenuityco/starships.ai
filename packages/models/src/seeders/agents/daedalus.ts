@@ -71,7 +71,16 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   maxTokens: 3200,
 
   // Tool assignment - helpful utilities available during design
-  assignedToolSlugs: ['calculator', 'get-current-time', 'echo'],
+  assignedToolSlugs: [
+    'calculator',
+    'get-current-time',
+    'echo',
+    'tool-list',
+    'tool-create',
+    'tool-update',
+    'tool-smoke-test',
+    'blueprint-lint',
+  ],
 
   icon: '🛠️',
   previewPrompts: [

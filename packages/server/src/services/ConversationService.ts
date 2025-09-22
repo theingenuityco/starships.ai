@@ -34,6 +34,8 @@ export class ConversationService {
   private finalizeResolvers: Map<string, () => void> = new Map();
   // Track in-flight tool result persistence per conversation
   private pendingToolTasks: Map<string, Set<Promise<void>>> = new Map();
+  // Track whether any tool activity occurred in this turn (used to gate 'complete' for late content)
+  private toolActivity: Set<string> = new Set();
   // Default runner for non-streaming paths (child process)
   private defaultRunner: ChildProcessRunner;
 
@@ -308,6 +310,8 @@ export class ConversationService {
         this.streamingToolCalls.delete(conversationId);
         // Clear any in-flight tool persists from previous turn
         this.pendingToolTasks.delete(conversationId);
+        // Reset tool activity tracker for the new top-level turn
+        this.toolActivity.delete(conversationId);
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
@@ -553,6 +557,15 @@ export class ConversationService {
             // ignore
           }
 
+          // Yield a tick to allow the streaming=false patch to flush before emitting 'complete'
+          await new Promise<void>((resolve) => {
+            if (typeof setImmediate !== 'undefined') {
+              setImmediate(resolve);
+            } else {
+              setTimeout(resolve, 0);
+            }
+          });
+
           // Now emit stream completion for the entire workflow (top-level only)
           await this.streamingService.broadcastComplete(conversationId, {
             source: 'agent',
@@ -588,12 +601,16 @@ export class ConversationService {
 
       case 'tool_started': {
         console.log('[STREAMING] Tool started:', event.data?.toolName);
+        // Mark tool activity for this turn (used to gate premature completion)
+        this.toolActivity.add(conversationId);
         // Tool started - we can optionally broadcast this or track it
         break;
       }
 
       case 'tool_complete': {
         console.log('[STREAMING] Tool completed:', event.data?.toolName);
+        // Mark tool activity for this turn (used to gate premature completion)
+        this.toolActivity.add(conversationId);
 
         // Track persistence as an async task so workflow_completed can await before emitting "complete"
         const persistTask = (async () => {

@@ -12,8 +12,6 @@ export const toolSmokeTestTool: ToolParams = {
   parameters: {
     type: 'object',
     properties: {
-      baseUrl: { type: 'string', description: 'Server base URL (e.g., http://localhost:3000/api)' },
-      authToken: { type: 'string', description: 'Bearer token for authenticated requests' },
       targetSlug: { type: 'string', description: 'Slug of the tool to execute' },
       arguments: {
         type: 'object',
@@ -22,7 +20,7 @@ export const toolSmokeTestTool: ToolParams = {
       },
       timeoutMs: { type: 'number', description: 'Optional timeout for the nested run (ms)' },
     },
-    required: ['baseUrl', 'authToken', 'targetSlug'],
+    required: ['targetSlug'],
   },
   blueprint: {
     nodes: [
@@ -36,9 +34,9 @@ export const toolSmokeTestTool: ToolParams = {
         description: 'Build URL and headers for GET /starships/:starshipId/tools/:slug',
         parameters: {
           code: `
-            const baseUrl = (input.baseUrl || '').replace(/\\/+$/, '');
+            const baseUrl = ((state && (state as any).baseUrl) || '').replace(/\\/+$/, '');
             if (!baseUrl) throw new Error('baseUrl is required');
-            const authToken = input.authToken;
+            const authToken = (state && (state as any).authToken);
             const starshipId = (state && (state as any).starshipId);
             const targetSlug = input.targetSlug;
             if (!authToken) throw new Error('authToken is required');
@@ -176,8 +174,7 @@ export const toolSmokeTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
 
   slug: 'tool-smoke-test',
   category: 'automation',
-  exampleUsage:
-    'Smoke test: { "baseUrl": "...", "authToken": "...", "targetSlug": "my-tool", "arguments": { ... } } (starshipId is inferred from state)',
+  exampleUsage: 'Smoke test: { "targetSlug": "my-tool", "arguments": { ... } } (starshipId/baseUrl/authToken inferred from state)',
   requiresApiKey: false,
   configurationFields: [],
 };

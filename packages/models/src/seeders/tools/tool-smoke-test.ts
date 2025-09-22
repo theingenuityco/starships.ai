@@ -97,7 +97,7 @@ export const toolSmokeTestTool: ToolParams = {
           code: `
             return {
               t0: Date.now(),
-              args: (input && typeof input === 'object') ? (input as any).dummy ?? {} : {}
+              args: (input && typeof input === 'object' && input !== null) ? (input.dummy ?? {}) : {}
             };
           `,
           timeout: 2000,
@@ -112,7 +112,7 @@ export const toolSmokeTestTool: ToolParams = {
         description: 'Return plain args for nested workflow input',
         parameters: {
           code: `
-            return (input && typeof input === 'object') ? (input as any).args ?? {} : {};
+            return (input && typeof input === 'object' && input !== null) ? (input.args ?? {}) : {};
           `,
           timeout: 2000,
         },

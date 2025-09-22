@@ -122,6 +122,7 @@ export class Agent implements NodeHandler {
             description: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).description }}`,
             parameters: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).parameters }}`,
             blueprint: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).blueprint }}`,
+            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
             mutations: [
               {
                 operation: 'add' as const,

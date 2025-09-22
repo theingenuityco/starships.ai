@@ -29,9 +29,9 @@ export interface EvalContext {
   $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
 
-  // Unified env/secret system
-  $env: (key: string) => unknown;
-  $envAll: () => Record<string, unknown>;
+  // Unified env/secret system (uniform naming across eval and code)
+  env: (key: string) => unknown;
+  envAll: () => Record<string, unknown>;
 }
 
 /**
@@ -66,12 +66,12 @@ export class Eval {
       $lastOutputOf: (nodeRef: string) => this.findLatestNodeResult(execution, nodeRef),
       $input: (path?: string) => this.extractPath(inputData, path),
 
-      // Unified env/secret system (available everywhere)
-      $env: (key: string) => {
+      // Unified env/secret system (uniform naming across eval and code)
+      env: (key: string) => {
         if (!key || typeof key !== 'string') return undefined;
         return this.secureEnv?.[key];
       },
-      $envAll: () => {
+      envAll: () => {
         return { ...(this.secureEnv ?? {}) };
       },
     };

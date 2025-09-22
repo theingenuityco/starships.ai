@@ -500,14 +500,8 @@ export class ConversationService {
         // Also clear tool calls tracker to prevent reuse
         this.streamingToolCalls.delete(conversationId);
 
-        // Send completion event AFTER all delta operations are complete
-        if (this.streamingService) {
-          await this.streamingService.broadcastComplete(conversationId, {
-            source: 'agent',
-            content: 'Workflow completed',
-            agentId: 'agent', // We don't have agentModel available here, but it's not critical
-          });
-        }
+        // Do not emit stream completion on turn content_complete.
+        // Final "complete" will be emitted on top-level workflow_completed.
         break;
       }
 
@@ -525,7 +519,16 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
-        // Final completion will be handled by the main addConversationMessage method
+        // Emit stream completion for the entire workflow (top-level only)
+        if (this.streamingService && this.streamingService.isActive(conversationId)) {
+          await this.streamingService.broadcastComplete(conversationId, {
+            source: 'agent',
+            content: 'Workflow completed',
+            agentId: 'agent', // agent id not critical for client-side terminal handling
+            scope: 'workflow',
+            conversationId,
+          });
+        }
         break;
       }
 

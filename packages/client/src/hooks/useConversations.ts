@@ -471,7 +471,9 @@ export function useConversation(conversationId: string | null) {
 
       // Handle completion by SSE event name
       if (data && (data as any).__event === 'complete') {
-        // Mark streaming finished
+        const scope = (data as any).scope || 'workflow'
+
+        // Mark streaming finished for the current turn/workflow
         setStreamingState(prev => ({
           ...prev,
           status: 'complete',
@@ -514,14 +516,17 @@ export function useConversation(conversationId: string | null) {
             } catch {}
           }, 500)
         }
-        // Mark complete and hard-stop the SSE client to avoid POST retries
-        completedRef.current = true
-        shouldRetryRef.current = false
-        if (abortControllerRef.current) {
-          try {
-            abortControllerRef.current.abort()
-          } catch {}
-          abortControllerRef.current = null
+
+        if (scope === 'workflow') {
+          // Only hard-stop the SSE client for full workflow completion
+          completedRef.current = true
+          shouldRetryRef.current = false
+          if (abortControllerRef.current) {
+            try {
+              abortControllerRef.current.abort()
+            } catch {}
+            abortControllerRef.current = null
+          }
         }
         return
       }

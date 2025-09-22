@@ -214,7 +214,7 @@ export class ConversationService {
 
       // Get deployed tools for this agent using ToolService
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
-      console.log('>>>Resolved tools', { resolvedTools });
+      // console.log('>>>Resolved tools', { resolvedTools });
 
       // Build Agent to materialize blueprint (tools, nodes, etc.)
       const agentWithTools: AgentParams = {
@@ -228,7 +228,6 @@ export class ConversationService {
       // Create Agent with ChildProcessRunner for isolation
       const agent = new Agent(agentWithTools, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
-        runner: this.defaultRunner,
       });
 
       // Convert database messages to LLM format, preserving tool_calls and tool results

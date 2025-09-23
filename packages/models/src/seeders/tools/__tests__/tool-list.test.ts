@@ -428,6 +428,296 @@ describe('Tool List Tool', () => {
     });
   });
 
+  describe('Functional Testing - Node Execution', () => {
+    describe('Prepare Node Logic Execution', () => {
+      it('should execute prepare node with valid environment', () => {
+        // Mock environment variables for testing
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com/';
+        process.env.AUTH_TOKEN = 'test-token-123';
+        process.env.STARSHIP_ID = 'starship-456';
+
+        const { nodes } = toolListTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        // Create a function to execute the code
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('env', code);
+
+        const result = executeCode(env);
+
+        expect(result).toBeDefined();
+        expect(result.url).toBe('https://api.example.com/starships/starship-456/tools');
+        expect(result.method).toBe('GET');
+        expect(result.headers).toBeDefined();
+        expect(result.headers.Authorization).toBe('Bearer test-token-123');
+        expect(result.headers['Content-Type']).toBe('application/json');
+
+        // Restore environment
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing BASE_URL', () => {
+        const originalEnv = process.env;
+        process.env = { ...process.env };
+        delete process.env.BASE_URL;
+
+        const { nodes } = toolListTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('env', code);
+
+        expect(() => executeCode(env)).toThrow('baseUrl is required');
+
+        // Restore environment
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing AUTH_TOKEN', () => {
+        const originalEnv = process.env;
+        process.env = { ...process.env };
+        process.env.BASE_URL = 'https://api.example.com';
+        delete process.env.AUTH_TOKEN;
+
+        const { nodes } = toolListTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('env', code);
+
+        expect(() => executeCode(env)).toThrow('authToken is required');
+
+        // Restore environment
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing STARSHIP_ID', () => {
+        const originalEnv = process.env;
+        process.env = { ...process.env };
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        delete process.env.STARSHIP_ID;
+
+        const { nodes } = toolListTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('env', code);
+
+        expect(() => executeCode(env)).toThrow('starshipId is required');
+
+        // Restore environment
+        process.env = originalEnv;
+      });
+
+      it('should normalize URL by removing trailing slashes', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com///';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+
+        const { nodes } = toolListTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('env', code);
+
+        const result = executeCode(env);
+
+        expect(result.url).toBe('https://api.example.com/starships/starship-123/tools');
+
+        // Restore environment
+        process.env = originalEnv;
+      });
+    });
+
+    describe('Summarize Node Logic Execution', () => {
+      it('should execute summarize node with server success response format', () => {
+        const { nodes } = toolListTool.blueprint;
+        const summarizeNode = nodes.find((n) => n.ref === 'summarize');
+        const code = (summarizeNode?.parameters as Record<string, unknown>)?.code as string;
+
+        // Mock HTTP response in server format: { data: T }
+        const mockServerResponse = {
+          body: {
+            data: [
+              {
+                id: 'tool-1',
+                slug: 'calculator',
+                name: 'Calculator Tool',
+                description: 'Basic calculator',
+                isEnabled: true,
+                blueprint: {
+                  /* large object we want to exclude */
+                },
+                parameters: {
+                  /* large object we want to exclude */
+                },
+              },
+              {
+                id: 'tool-2',
+                slug: 'echo-tool',
+                name: 'Echo Tool',
+                description: 'Echo messages',
+                isEnabled: false,
+                blueprint: {
+                  /* large object we want to exclude */
+                },
+                parameters: {
+                  /* large object we want to exclude */
+                },
+              },
+            ],
+          },
+        };
+
+        const executeCode = new Function('input', code);
+        const result = executeCode(mockServerResponse);
+
+        expect(result).toEqual([
+          {
+            id: 'tool-1',
+            slug: 'calculator',
+            name: 'Calculator Tool',
+            description: 'Basic calculator',
+            isEnabled: true,
+          },
+          {
+            id: 'tool-2',
+            slug: 'echo-tool',
+            name: 'Echo Tool',
+            description: 'Echo messages',
+            isEnabled: false,
+          },
+        ]);
+      });
+
+      it('should execute summarize node with direct array response format', () => {
+        const { nodes } = toolListTool.blueprint;
+        const summarizeNode = nodes.find((n) => n.ref === 'summarize');
+        const code = (summarizeNode?.parameters as Record<string, unknown>)?.code as string;
+
+        // Mock direct array response
+        const mockArrayResponse = {
+          body: [
+            {
+              id: 'tool-1',
+              slug: 'test-tool',
+              name: 'Test Tool',
+              description: 'A test tool',
+              isEnabled: true,
+              extraField: 'should be excluded',
+            },
+          ],
+        };
+
+        const executeCode = new Function('input', code);
+        const result = executeCode(mockArrayResponse);
+
+        expect(result).toEqual([
+          {
+            id: 'tool-1',
+            slug: 'test-tool',
+            name: 'Test Tool',
+            description: 'A test tool',
+            isEnabled: true,
+          },
+        ]);
+      });
+
+      it('should handle empty or missing data gracefully', () => {
+        const { nodes } = toolListTool.blueprint;
+        const summarizeNode = nodes.find((n) => n.ref === 'summarize');
+        const code = (summarizeNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const executeCode = new Function('input', code);
+
+        // Test with empty data array
+        let result = executeCode({ body: { data: [] } });
+        expect(result).toEqual([]);
+
+        // Test with missing data property
+        result = executeCode({ body: {} });
+        expect(result).toEqual([]);
+
+        // Test with null body
+        result = executeCode({ body: null });
+        expect(result).toEqual([]);
+
+        // Test with undefined input
+        result = executeCode({});
+        expect(result).toEqual([]);
+      });
+
+      it('should handle malformed tool objects safely', () => {
+        const { nodes } = toolListTool.blueprint;
+        const summarizeNode = nodes.find((n) => n.ref === 'summarize');
+        const code = (summarizeNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const mockResponseWithMalformedTools = {
+          body: {
+            data: [
+              null, // null tool
+              { id: 'tool-1', slug: 'valid-tool', name: 'Valid Tool', description: 'Valid', isEnabled: true },
+              {
+                /* missing fields */
+              },
+              undefined, // undefined tool
+              { id: 'tool-2' }, // partial tool
+            ],
+          },
+        };
+
+        const executeCode = new Function('input', code);
+        const result = executeCode(mockResponseWithMalformedTools);
+
+        expect(result).toEqual([
+          {
+            id: null,
+            slug: null,
+            name: null,
+            description: null,
+            isEnabled: null,
+          },
+          {
+            id: 'tool-1',
+            slug: 'valid-tool',
+            name: 'Valid Tool',
+            description: 'Valid',
+            isEnabled: true,
+          },
+          {
+            id: undefined,
+            slug: undefined,
+            name: undefined,
+            description: undefined,
+            isEnabled: undefined,
+          },
+          {
+            id: undefined,
+            slug: undefined,
+            name: undefined,
+            description: undefined,
+            isEnabled: undefined,
+          },
+          {
+            id: 'tool-2',
+            slug: undefined,
+            name: undefined,
+            description: undefined,
+            isEnabled: undefined,
+          },
+        ]);
+      });
+    });
+  });
+
   describe('API Integration', () => {
     it('should use proper HTTP method for listing', () => {
       const { nodes } = toolListTool.blueprint;

@@ -518,6 +518,340 @@ describe('Tool Create Tool', () => {
     });
   });
 
+  describe('Functional Testing - Node Execution', () => {
+    describe('Prepare Node Logic Execution', () => {
+      it('should execute prepare node with valid environment and inputs', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com/';
+        process.env.AUTH_TOKEN = 'test-token-123';
+        process.env.STARSHIP_ID = 'starship-456';
+
+        const { nodes } = toolCreateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const validInput = {
+          name: 'Test Tool',
+          slug: 'test-tool',
+          description: 'A test tool for testing',
+          parameters: {
+            type: 'object',
+            properties: {
+              message: { type: 'string', description: 'Test message' },
+            },
+            required: ['message'],
+          },
+          blueprint: {
+            nodes: [
+              { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+              { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+            ],
+            edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+          },
+          configuration: { testFlag: true },
+          isEnabled: false,
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+        const result = executeCode(validInput, env);
+
+        expect(result).toBeDefined();
+        expect(result.url).toBe('https://api.example.com/starships/starship-456/tools');
+        expect(result.method).toBe('POST');
+        expect(result.headers).toBeDefined();
+        expect(result.headers.Authorization).toBe('Bearer test-token-123');
+        expect(result.headers['Content-Type']).toBe('application/json');
+        expect(result.body).toEqual({
+          name: 'Test Tool',
+          slug: 'test-tool',
+          description: 'A test tool for testing',
+          parameters: validInput.parameters,
+          blueprint: validInput.blueprint,
+          configuration: { testFlag: true },
+          isEnabled: false,
+        });
+
+        process.env = originalEnv;
+      });
+
+      it('should use default values for optional parameters', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+
+        const { nodes } = toolCreateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const minimalInput = {
+          name: 'Minimal Tool',
+          slug: 'minimal-tool',
+          description: 'A minimal tool',
+          parameters: { type: 'object', properties: {} },
+          blueprint: { nodes: [], edges: [] },
+          // configuration and isEnabled are optional
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+        const result = executeCode(minimalInput, env);
+
+        expect(result.body.configuration).toEqual({});
+        expect(result.body.isEnabled).toBe(true);
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing required parameters', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+
+        const { nodes } = toolCreateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+
+        // Test missing name
+        const missingName = {
+          slug: 'test-tool',
+          description: 'Test',
+          parameters: {},
+          blueprint: {},
+        };
+        expect(() => executeCode(missingName, env)).toThrow('name is required');
+
+        // Test missing slug
+        const missingSlug = {
+          name: 'Test Tool',
+          description: 'Test',
+          parameters: {},
+          blueprint: {},
+        };
+        expect(() => executeCode(missingSlug, env)).toThrow('slug is required');
+
+        // Test missing description
+        const missingDescription = {
+          name: 'Test Tool',
+          slug: 'test-tool',
+          parameters: {},
+          blueprint: {},
+        };
+        expect(() => executeCode(missingDescription, env)).toThrow('description is required');
+
+        // Test missing parameters
+        const missingParameters = {
+          name: 'Test Tool',
+          slug: 'test-tool',
+          description: 'Test',
+          blueprint: {},
+        };
+        expect(() => executeCode(missingParameters, env)).toThrow('parameters is required');
+
+        // Test missing blueprint
+        const missingBlueprint = {
+          name: 'Test Tool',
+          slug: 'test-tool',
+          description: 'Test',
+          parameters: {},
+        };
+        expect(() => executeCode(missingBlueprint, env)).toThrow('blueprint is required');
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error for null required parameters', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+
+        const { nodes } = toolCreateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+
+        const nullInput = {
+          name: null,
+          slug: 'test-tool',
+          description: 'Test',
+          parameters: {},
+          blueprint: {},
+        };
+
+        expect(() => executeCode(nullInput, env)).toThrow('name is required');
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing environment variables', () => {
+        const originalEnv = process.env;
+        const validInput = {
+          name: 'Test Tool',
+          slug: 'test-tool',
+          description: 'Test',
+          parameters: {},
+          blueprint: {},
+        };
+
+        const { nodes } = toolCreateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+        const executeCode = new Function('input', 'env', code);
+
+        // Test missing BASE_URL
+        process.env = { ...process.env };
+        delete process.env.BASE_URL;
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+        const env1 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env1)).toThrow('baseUrl is required');
+
+        // Test missing AUTH_TOKEN
+        process.env.BASE_URL = 'https://api.example.com';
+        delete process.env.AUTH_TOKEN;
+        process.env.STARSHIP_ID = 'starship-123';
+        const env2 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env2)).toThrow('authToken is required');
+
+        // Test missing STARSHIP_ID
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        delete process.env.STARSHIP_ID;
+        const env3 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env3)).toThrow('starshipId is required');
+
+        process.env = originalEnv;
+      });
+
+      it('should normalize URL by removing trailing slashes', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com///';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+
+        const { nodes } = toolCreateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const validInput = {
+          name: 'Test Tool',
+          slug: 'test-tool',
+          description: 'Test',
+          parameters: {},
+          blueprint: {},
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+        const result = executeCode(validInput, env);
+
+        expect(result.url).toBe('https://api.example.com/starships/starship-123/tools');
+
+        process.env = originalEnv;
+      });
+
+      it('should handle complex tool parameters and blueprints', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+
+        const { nodes } = toolCreateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const complexInput = {
+          name: 'Complex Calculator Tool',
+          slug: 'complex-calculator',
+          description: 'A calculator that performs complex mathematical operations',
+          parameters: {
+            type: 'object',
+            properties: {
+              expression: {
+                type: 'string',
+                description: 'Mathematical expression to evaluate',
+                pattern: '^[0-9+\\-*/\\(\\)\\.\\s]+$',
+              },
+              precision: {
+                type: 'number',
+                description: 'Number of decimal places in result',
+                minimum: 0,
+                maximum: 10,
+                default: 2,
+              },
+            },
+            required: ['expression'],
+            additionalProperties: false,
+          },
+          blueprint: {
+            nodes: [
+              { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+              {
+                ref: 'validate',
+                type: 'code',
+                name: 'Validate Input',
+                description: 'Validate the mathematical expression',
+                parameters: {
+                  code: 'const expr = input.expression; if (!expr || typeof expr !== "string") throw new Error("Invalid expression"); return { validExpression: expr, precision: input.precision || 2 };',
+                },
+              },
+              {
+                ref: 'calculate',
+                type: 'code',
+                name: 'Calculate',
+                description: 'Perform the calculation',
+                parameters: {
+                  code: 'const result = eval(input.validExpression); return { result: parseFloat(result.toFixed(input.precision)) };',
+                },
+              },
+              { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: '{{ result }}' } },
+            ],
+            edges: [
+              { ref: 'e1', from: 'start_1', to: 'validate' },
+              { ref: 'e2', from: 'validate', to: 'calculate' },
+              { ref: 'e3', from: 'calculate', to: 'end_1' },
+            ],
+            metadata: {
+              version: '1.0.0',
+              author: 'Test Suite',
+              tags: ['math', 'calculator', 'utility'],
+            },
+          },
+          configuration: {
+            maxCalculationTime: 5000,
+            allowedFunctions: ['sin', 'cos', 'tan', 'sqrt', 'abs'],
+            debugMode: false,
+          },
+          isEnabled: true,
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+        const result = executeCode(complexInput, env);
+
+        expect(result.body).toEqual({
+          name: 'Complex Calculator Tool',
+          slug: 'complex-calculator',
+          description: 'A calculator that performs complex mathematical operations',
+          parameters: complexInput.parameters,
+          blueprint: complexInput.blueprint,
+          configuration: complexInput.configuration,
+          isEnabled: true,
+        });
+
+        process.env = originalEnv;
+      });
+    });
+  });
+
   describe('API Integration', () => {
     it('should construct correct API endpoint', () => {
       const { nodes } = toolCreateTool.blueprint;

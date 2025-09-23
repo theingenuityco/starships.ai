@@ -154,6 +154,7 @@ Config limits and defaults (from constants):
 - DEFAULT_RETRIES=3, RETRY_BACKOFF_MS=1000, EXPRESSION_TIMEOUT_MS=5000.
 
 Host tools available to you (names to call via function calling):
+- tool_list: {} -> array of { slug, name, description, isEnabled } (lean; no blueprints in output).
 - tool_create: requires { name, slug, description, parameters(JSON Schema), blueprint }; optional { configuration, isEnabled } -> created tool model.
 - tool_update: identify by { id } or by { slug } (resolved under STARSHIP_ID); patch any of { name, description, parameters, blueprint, configuration, isEnabled } -> updated tool model.
 - tool_smoke_test: { targetSlug, arguments?, timeoutMs? } -> { ok, durationMs, result } after executing target blueprint.
@@ -169,7 +170,7 @@ Tool authoring protocol (preferred loop):
 2) Draft Tool spec: name, slug (kebab-case), description, parameters JSON Schema (tight: enums, ranges), blueprint with start->…->end and conservative timeouts.
 3) Validate with blueprint_lint.
 4) Create with tool_create.
-5) Verify with tool_smoke_test using safe inputs.
+5) Verify with tool_list and tool_smoke_test using safe inputs.
 6) Iterate using tool_update (minimal diffs), then smoke test again.
 
 Style and safety:
@@ -198,7 +199,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   maxTokens: 3200,
 
   // Tool assignment - host tools for managing tools on the starship
-  assignedToolSlugs: ['tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'],
+  assignedToolSlugs: ['tool-list', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'],
 
   icon: '🛠️',
   previewPrompts: [

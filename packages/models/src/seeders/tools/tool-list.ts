@@ -21,7 +21,7 @@ Implicit environment (do not pass as arguments):
 - STARSHIP_ID: derived from agent.state.starshipId
 
 Output:
-- Array of { id, slug, name, description, isEnabled } (deliberately lean; heavy fields like blueprint are omitted)
+- Array of { slug, name, description, isEnabled } (deliberately lean; heavy fields like blueprint are omitted)
 
 Behavior and limits:
 - Read-only and idempotent
@@ -89,7 +89,6 @@ Behavior and limits:
 
             // Return a lean summary to avoid leaking large/templated blueprint contents
             return data.map((t) => ({
-              id: t && t.id,
               slug: t && t.slug,
               name: t && t.name,
               description: t && t.description,

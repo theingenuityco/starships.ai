@@ -84,6 +84,9 @@ export function ConversationMessageContent({
     }
   }, [completedToolResults, totalToolCalls, messageId])
 
+  // Block id for header-level "copy all tool calls"
+  const combinedHeaderBlockId = `${messageId}-tool-calls-all`
+
   // Build display content from chunks when streaming; after completion fall back to chunks if final content wasn't persisted
   const displayContent = useMemo(() => {
     const hasChunks = Array.isArray(chunks) && chunks.length > 0
@@ -259,15 +262,75 @@ export function ConversationMessageContent({
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="mt-2">
           <Collapsible defaultOpen={false}>
-            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              ) : allToolCallsDone && showCompletionTick ? (
-                <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
-              ) : (
-                <Wrench className="w-3 h-3" />
-              )}
-              Tool Calls ({toolCalls.length})
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm inline-flex items-center w-full justify-between text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+              <span className="inline-flex items-center gap-2">
+                {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : allToolCallsDone && showCompletionTick ? (
+                  <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+                ) : (
+                  <Wrench className="w-3 h-3" />
+                )}
+                Tool Calls ({toolCalls.length})
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 ml-2"
+                title="Copy all tool calls"
+                onClick={e => {
+                  e.stopPropagation()
+                  try {
+                    const all = (toolCalls || []).map((tc: any) => {
+                      const rawArgs = (tc as any)?.function?.arguments ?? ''
+                      let argsParsed: any
+                      try {
+                        argsParsed = JSON.parse(rawArgs)
+                      } catch {
+                        argsParsed = rawArgs
+                      }
+                      const funcName = (tc as any)?.function?.name || 'unknown'
+                      const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.tool_call_id ?? (tc as any)?.function?.id ?? null
+                      const toolCallId = rawCallId != null ? String(rawCallId) : ''
+
+                      const matchingResult = (toolResults || []).find((result: any) => {
+                        const rid = (result as any)?.tool_call_id ?? (result as any)?.call_id ?? (result as any)?.id
+                        if (rid == null) return false
+                        return String(rid) === toolCallId
+                      })
+
+                      let resultParsed: any = undefined
+                      if (matchingResult) {
+                        const resultContent = matchingResult.content || ''
+                        try {
+                          const t = (resultContent || '').trim()
+                          if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                            resultParsed = JSON.parse(t)
+                          } else {
+                            resultParsed = resultContent
+                          }
+                        } catch {
+                          resultParsed = resultContent
+                        }
+                      }
+
+                      return {
+                        function: funcName,
+                        id: toolCallId || undefined,
+                        arguments: argsParsed,
+                        ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
+                      }
+                    })
+
+                    const payload = { tool_calls: all }
+                    handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedHeaderBlockId)
+                  } catch {
+                    // no-op; handleCopyCodeBlock already toasts errors
+                  }
+                }}
+              >
+                {copiedStates[combinedHeaderBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+              </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-1.5">
@@ -279,13 +342,13 @@ export function ConversationMessageContent({
                   } catch {
                     prettyArgs = String(rawArgs)
                   }
-                  const argsBlockId = `${messageId}-tool-args-${idx}`
                   const funcName = (tc as any)?.function?.name || 'unknown'
 
                   // Normalize tool call id from multiple potential fields to be resilient across providers
                   const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.tool_call_id ?? (tc as any)?.function?.id ?? null
 
                   const toolCallId = rawCallId != null ? String(rawCallId) : ''
+                  const combinedBlockId = `${messageId}-tool-all-${idx}`
 
                   // Find matching tool result using multiple possible id fields, normalized to strings
                   const matchingResult = toolResults?.find((result: any) => {
@@ -307,31 +370,7 @@ export function ConversationMessageContent({
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
-                              {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                            </Button>
-                            {matchingResult && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => {
-                                  const resultContent = matchingResult.content || ''
-                                  let parsedResultJson = null as any
-                                  try {
-                                    const t = (resultContent || '').trim()
-                                    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                      parsedResultJson = JSON.parse(t)
-                                    }
-                                  } catch {}
-                                  handleCopyCodeBlock(parsedResultJson ? JSON.stringify(parsedResultJson, null, 2) : resultContent, `${messageId}-tool-result-${idx}`)
-                                }}
-                              >
-                                {copiedStates[`${messageId}-tool-result-${idx}`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                              </Button>
-                            )}
-                          </div>
+                          <div className="flex items-center gap-1" />
                         </div>
 
                         <div>
@@ -343,7 +382,7 @@ export function ConversationMessageContent({
                           {matchingResult && (
                             <>
                               <div className="border-t border-border/50" />
-                              <div className="flex items-center gap-2 px-3 pt-2">
+                              <div className="flex items-center justify-between px-3 pt-2">
                                 <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
                                   <Check className="w-3 h-3" />
                                   Result

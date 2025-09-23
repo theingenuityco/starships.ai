@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -51,6 +51,36 @@ export function ConversationMessageContent({
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
+
+  // Tool call header icon state handling
+  const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
+  const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
+  const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
+
+  const [showCompletionTick, setShowCompletionTick] = useState(false)
+  const prevCompletedRef = useRef<number>(completedToolResults)
+  const isFirstRenderRef = useRef(true)
+  const hasShownTickRef = useRef(false)
+
+  useEffect(() => {
+    // Skip tick on initial mount even if results already exist (reloads)
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false
+      prevCompletedRef.current = completedToolResults
+      return
+    }
+
+    const prevCompleted = prevCompletedRef.current
+    prevCompletedRef.current = completedToolResults
+
+    // Trigger tick only on the first transition to "all done"
+    if (!hasShownTickRef.current && totalToolCalls > 0 && prevCompleted < totalToolCalls && completedToolResults >= totalToolCalls) {
+      hasShownTickRef.current = true
+      setShowCompletionTick(true)
+      const t = setTimeout(() => setShowCompletionTick(false), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [completedToolResults, totalToolCalls, messageId])
 
   // Build display content from chunks when streaming; after completion fall back to chunks if final content wasn't persisted
   const displayContent = useMemo(() => {
@@ -228,12 +258,13 @@ export function ConversationMessageContent({
         <div className="mt-3">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
-              {(() => {
-                const totalCalls = toolCalls?.length || 0
-                const completed = Array.isArray(toolResults) ? toolResults.length : 0
-                const allDone = totalCalls > 0 && completed >= totalCalls
-                return allDone ? <Check className="w-3 h-3 text-green-600 dark:text-green-400" /> : <Loader2 className="w-3 h-3 animate-spin" />
-              })()}
+              {!allToolCallsDone ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : showCompletionTick ? (
+                <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+              ) : (
+                <Wrench className="w-3 h-3" />
+              )}
               Tool Calls ({toolCalls.length})
             </CollapsibleTrigger>
             <CollapsibleContent>

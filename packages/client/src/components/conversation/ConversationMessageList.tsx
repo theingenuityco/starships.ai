@@ -44,13 +44,16 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
   const displayMessages = useMemo(() => {
     const sortedMessages = [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
-    // First pass: collect all tool result messages by their tool_call_id
+    // First pass: collect all tool result messages by normalized tool call id
     const toolResultsMap = new Map<string, any>()
     const processedResultIds = new Set<string>()
 
     sortedMessages.forEach(msg => {
-      if (msg.messageType === 'tool_result' && (msg as any).tool_call_id) {
-        toolResultsMap.set((msg as any).tool_call_id, msg)
+      if (msg.messageType === 'tool_result') {
+        const rid = (msg as any).tool_call_id ?? (msg as any).call_id ?? (msg as any).id
+        if (rid != null) {
+          toolResultsMap.set(String(rid), msg)
+        }
       }
     })
 
@@ -60,7 +63,10 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
     for (const message of sortedMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
       if (message.role === 'assistant' && (message as any).tool_calls?.length > 0) {
-        const toolCallIds = ((message as any).tool_calls || []).map((tc: any) => tc.id).filter(Boolean)
+        const toolCallIds = ((message as any).tool_calls || [])
+          .map((tc: any) => (tc as any).id ?? (tc as any).call_id ?? (tc as any).tool_call_id ?? (tc as any).function?.id)
+          .filter(Boolean)
+          .map((id: any) => String(id))
         const toolResults: any[] = []
 
         // Collect all matching tool results

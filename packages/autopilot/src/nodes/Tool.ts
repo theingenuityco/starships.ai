@@ -28,7 +28,9 @@ export class Tool extends BaseNode<ToolParams> {
     try {
       // Extract tool arguments from input
       const inputData = ExecutionItemUtils.unwrapSingle(input);
+      console.log(`[TOOL NODE ${params.name}] Input data:`, JSON.stringify(inputData));
       const toolArgs = this.extractToolArguments(inputData);
+      console.log(`[TOOL NODE ${params.name}] Extracted tool args:`, JSON.stringify(toolArgs));
 
       // Emit tool_started event
       const eventCallback = this.getOptions()?.eventCallback;
@@ -52,6 +54,7 @@ export class Tool extends BaseNode<ToolParams> {
       // Execute the tool's blueprint using depth-aware Runner selection
       // IMPORTANT: propagate parent execution to set correct execution.depth (nested = depth>0)
       const parentExecution = this.getOptions()?.execution;
+      console.log(`[TOOL NODE ${params.name}] Creating execution with toolArgs:`, JSON.stringify(toolArgs));
       const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
       const engineConfig: EngineConfig = {
@@ -105,10 +108,38 @@ export class Tool extends BaseNode<ToolParams> {
    * Extract tool arguments from input data
    */
   private extractToolArguments(inputData: unknown): Record<string, unknown> {
-    // Accept plain object as arguments
+    // Check if this is coming from a Conditional node (has result and edgeCondition)
     if (typeof inputData === 'object' && inputData !== null) {
-      return inputData as Record<string, unknown>;
+      const obj = inputData as Record<string, unknown>;
+      
+      // If this looks like Conditional node output, try to get arguments from params
+      if ('result' in obj && 'edgeCondition' in obj) {
+        const params = this.getParams() as any;
+        // Check if arguments were provided as a parameter
+        if (params.arguments) {
+          console.log(`[TOOL NODE ${params.name}] Using arguments from params:`, JSON.stringify(params.arguments));
+          
+          // Parse if it's a string
+          if (typeof params.arguments === 'string') {
+            try {
+              return JSON.parse(params.arguments);
+            } catch (e) {
+              console.error(`[TOOL NODE ${params.name}] Failed to parse arguments:`, e);
+            }
+          } else if (typeof params.arguments === 'object') {
+            return params.arguments as Record<string, unknown>;
+          }
+        }
+        
+        // No arguments provided, return empty (for tools that don't need input like time)
+        console.log(`[TOOL NODE ${params.name}] No arguments needed, using empty object`);
+        return {};
+      }
+      
+      // Normal object input
+      return obj;
     }
+    
     // Accept JSON string of arguments
     if (typeof inputData === 'string') {
       try {

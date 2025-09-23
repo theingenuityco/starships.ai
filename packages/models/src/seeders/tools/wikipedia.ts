@@ -38,7 +38,10 @@ export const wikipediaTool: ToolParams = {
         type: 'start', 
         name: 'Start', 
         description: 'Receive Wikipedia query parameters', 
-        parameters: {} 
+        parameters: {
+          // Pass through the input from Tool node
+          output: '{{ $input() }}'
+        } 
       },
       {
         ref: 'prepare_request',
@@ -47,17 +50,31 @@ export const wikipediaTool: ToolParams = {
         description: 'Build the appropriate Wikipedia API URL based on action',
         parameters: {
           code: `
+            // Debug logging to understand input structure
+            console.log('[WIKIPEDIA TOOL] Raw input:', JSON.stringify(input, null, 2));
+            console.log('[WIKIPEDIA TOOL] Input type:', typeof input);
+            console.log('[WIKIPEDIA TOOL] Input keys:', input ? Object.keys(input) : 'null/undefined');
+            console.log('[WIKIPEDIA TOOL] Check if input.json exists:', input && input.json ? 'YES' : 'NO');
+            if (input && input.json) {
+              console.log('[WIKIPEDIA TOOL] input.json content:', JSON.stringify(input.json));
+            }
+            
             // Extract and validate input parameters
+            // The input comes as a single object with all parameters
+            const params = input;
             const { 
               query, 
               action, 
               limit = 5, 
               language = 'en' 
-            } = input || {};
+            } = params || {};
+            
+            console.log('[WIKIPEDIA TOOL] Extracted params:', { query, action, limit, language });
             
             // Input validation
             if (!query || typeof query !== 'string') {
-              throw new Error('Query is required and must be a string');
+              console.error('[WIKIPEDIA TOOL] Validation failed - query:', query, 'type:', typeof query);
+              throw new Error('Query is required and must be a string. Received input: ' + JSON.stringify(input) + ', params: ' + JSON.stringify(params));
             }
             
             if (!action || !['search', 'summary', 'content', 'sections'].includes(action)) {

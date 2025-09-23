@@ -38,11 +38,16 @@ async function seedResearchAgent() {
   
   try {
     // Seed Wikipedia Tool
-    console.log('📚 Creating Wikipedia tool template...');
+    console.log('📚 Creating/Updating Wikipedia tool template...');
     const existingTool = await toolRepo.findBySlug('wikipedia-search');
     
     if (existingTool) {
-      console.log('  ✓ Wikipedia tool already exists');
+      // Update the existing tool with new blueprint
+      const updated = await toolRepo.update(existingTool.id, {
+        ...wikipediaToolTemplate,
+        blueprint: wikipediaToolTemplate.blueprint
+      });
+      console.log('  ✓ Wikipedia tool updated:', existingTool.id);
     } else {
       const tool = await toolRepo.create(wikipediaToolTemplate);
       console.log('  ✓ Wikipedia tool created:', tool.id);

@@ -120,6 +120,8 @@ export class Agent implements NodeHandler {
             parameters: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).parameters }}`,
             blueprint: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).blueprint }}`,
             toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+            // Pass the tool arguments as a parameter
+            arguments: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.arguments }}`,
             mutations: [
               {
                 operation: 'add' as const,

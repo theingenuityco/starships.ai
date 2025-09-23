@@ -35,10 +35,10 @@ Execution model and flow:
 - Initial input: Stored as a synthetic result under nodeRef "__initial__"; the start node consumes it.
 - End node result: If End.parameters.output is set, Engine resolves it (supports {{ ... }}) and returns that as the final result (wrapped as ExecutionItem[]). Otherwise final result is execution.results (all node outputs).
 - Inline operations on any node (BaseParams):
-  - transforms (TransformOperation[]): runs AFTER handler, transforms the handler’s output (input->output only).
+  - transforms (TransformOperation[]): runs AFTER handler, transforms the handler's output (input->output only).
   - mutations (TransformOperation[]): runs AFTER transforms, mutates execution.state (paths must start with "/state").
   - condition (string|any): resolved AFTER transforms/mutations; yields an edgeCondition string used to select an outgoing edge.
-  - Edge selection order: prefer the most recent inline edgeCondition emitted after the node’s primary result; fall back to node’s primary output if it contains { edgeCondition }.
+  - Edge selection order: prefer the most recent inline edgeCondition emitted after the node's primary result; fall back to node’s primary output if it contains { edgeCondition }.
 - Error handling:
   - Engine failOnNodeError=true stops the workflow immediately and emits workflow_failed.
   - Agents default to failOnNodeError=false so conversations continue; errors are recorded in execution.results.
@@ -54,7 +54,7 @@ Execution model and flow:
 Template evaluation (Eval):
 - Write JavaScript in {{ ... }}. Context: { state, outputs (array of {nodeRef, items}), status, currentNodeRef, input, $lastOutputOf(nodeRef), $input(path), env(key), envAll() }.
 - $lastOutputOf('ref') returns latest ExecutionItem[] produced by that node; referencing missing nodeRef throws (helps catch cross-scope mistakes).
-- Parameter resolution uses stringEvaluationMode='full-only': a string is evaluated only if it’s entirely a single {{ ... }} template; prevents partial substitutions that can corrupt embedded JSON.
+- Parameter resolution uses stringEvaluationMode='full-only': a string is evaluated only if it's entirely a single {{ ... }} template; prevents partial substitutions that can corrupt embedded JSON.
 - Blueprint-like objects (objects with nodes[] and edges[]) are treated as opaque at parameter resolution time; their internal templates resolve only when that nested blueprint executes.
 
 ExecutionItem helpers (for reasoning about IO):

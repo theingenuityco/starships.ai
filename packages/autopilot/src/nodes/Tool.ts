@@ -83,6 +83,7 @@ export class Tool extends BaseNode<ToolParams> {
     } catch (error) {
       // Emit tool_complete event with error
       const eventCallback = this.getOptions()?.eventCallback;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown tool error';
       if (eventCallback) {
         try {
           await eventCallback({
@@ -90,7 +91,7 @@ export class Tool extends BaseNode<ToolParams> {
             timestamp: new Date().toISOString(),
             data: {
               toolName: params.name,
-              error: error instanceof Error ? error.message : 'Unknown tool error',
+              error: errorMessage,
               toolCallId: params.toolCallId,
             },
           });

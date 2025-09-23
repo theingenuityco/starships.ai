@@ -8,7 +8,22 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolSmokeTestTool: ToolParams = {
   name: 'tool_smoke_test',
-  description: 'Execute another tool (by slug) with provided arguments and return pass/fail with duration.',
+  description: `Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.
+
+Inputs:
+- targetSlug: string (required)
+- arguments: object (optional; passed as initial input to the target blueprint)
+- timeoutMs: number (optional; default 60000 for the nested run)
+
+Implicit environment (do not pass):
+- BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
+
+Output:
+- { ok: boolean, durationMs: number, result: any }
+
+Notes:
+- Running a tool may cause side effects defined by its blueprint
+- Use safe, non-destructive test inputs`,
   parameters: {
     type: 'object',
     properties: {
@@ -174,7 +189,7 @@ export const toolSmokeTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
 
   slug: 'tool-smoke-test',
   category: 'automation',
-  exampleUsage: 'Smoke test: { "targetSlug": "my-tool", "arguments": { ... } } (starshipId/baseUrl/authToken inferred from state)',
+  exampleUsage: '{ "targetSlug": "my-tool", "arguments": { ... } } // returns { ok, durationMs, result } (env inferred)',
   requiresApiKey: false,
   configurationFields: [],
 };

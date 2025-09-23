@@ -7,7 +7,17 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintLintTool: ToolParams = {
   name: 'blueprint_lint',
-  description: 'Validate an Autopilot blueprint (nodes, edges, types, connectivity basics).',
+  description: `Validate an Autopilot blueprint’s basic structure and connectivity.
+
+Inputs:
+- blueprint: object with nodes[] and edges[] (or wrapper { blueprint })
+
+Output:
+- { ok: boolean, issues: string[], summary: { nodeCount: number, edgeCount: number, types: Record<string, number> } }
+
+When to use:
+- Before tool_create or tool_update
+- During review to catch structural issues early`,
   parameters: {
     type: 'object',
     properties: {
@@ -153,7 +163,7 @@ export const blueprintLintToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
 
   slug: 'blueprint-lint',
   category: 'automation',
-  exampleUsage: 'Validate blueprint: { "blueprint": { "nodes": [...], "edges": [...] } }',
+  exampleUsage: '{ "blueprint": { "nodes": [...], "edges": [...] } } // returns { ok, issues, summary }',
   requiresApiKey: false,
   configurationFields: [],
 };

@@ -117,9 +117,9 @@ export function ConversationMessageContent({
     return null as any
   }, [displayContent])
 
-  // Natural language header with tense and inline code chips for tool names:
-  // Ongoing: "<agent> is using tool `X`[, `Y`] [& some others...]"
-  // Completed: "<agent> used tool `X`[, `Y`] [& some others...]"
+  // Natural language header with tense and inline code chips for tool names (no 'tool' word):
+  // Ongoing: "<agent> is using `X`[, `Y`] [& some others...]"
+  // Completed: "<agent> used `X`[, `Y`] [& some others...]"
   const toolCallHeaderLabel = useMemo(() => {
     if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null
     const names = toolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
@@ -128,20 +128,20 @@ export function ConversationMessageContent({
 
     const isOngoing = hasPendingToolCalls || (isStreaming && hasAnyToolCalls && !allToolCallsDone)
     const verb = isOngoing ? 'is using' : 'used'
-    const noun = unique.length === 1 ? 'tool' : 'tools'
 
     const Chip = ({ children }: any) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
 
-    if (unique.length === 0)
+    if (unique.length === 0) {
       return (
         <>
-          {agent} {verb} {noun}
+          {agent} {verb}
         </>
       )
+    }
     if (unique.length === 1) {
       return (
         <>
-          {agent} {verb} {noun} <Chip>{unique[0]}</Chip>
+          {agent} {verb} <Chip>{unique[0]}</Chip>
         </>
       )
     }
@@ -149,13 +149,13 @@ export function ConversationMessageContent({
     if (unique.length > 2) {
       return (
         <>
-          {agent} {verb} {noun} <Chip>{visible[0]}</Chip>, <Chip>{visible[1]}</Chip> & some others...
+          {agent} {verb} <Chip>{visible[0]}</Chip>, <Chip>{visible[1]}</Chip> & some others...
         </>
       )
     }
     return (
       <>
-        {agent} {verb} {noun} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
+        {agent} {verb} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
       </>
     )
   }, [toolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])

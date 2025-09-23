@@ -527,4 +527,7 @@ describe('Blueprint Lint Tool', () => {
       expect(code).toContain('edgeCount');
     });
   });
+
+  // NOTE: Functional execution tests are in blueprint-lint-functional.test.ts
+  // This separation helps maintain clean code and avoids TypeScript complexity
 });

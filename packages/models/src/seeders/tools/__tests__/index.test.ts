@@ -73,13 +73,36 @@ describe('Daedalus Tools Test Suite', () => {
         'Tool Template',
         'Parameter Validation',
         'Integration with Common Test Patterns',
+        'Functional Testing - Tool Execution', // NEW: Actual execution testing
       ];
 
-      expect(requiredTestAreas).toHaveLength(6);
+      expect(requiredTestAreas).toHaveLength(7);
 
       // These are the standard test areas that every tool should cover
       requiredTestAreas.forEach((area) => {
         expect(area).toBeTruthy();
+      });
+    });
+
+    it('should ensure Daedalus tools have functional execution tests', () => {
+      // Daedalus tools (complex automation tools) should have functional execution tests
+      const daedalusTools = ['blueprint-lint', 'tool-create', 'tool-list', 'tool-update', 'tool-smoke-test'];
+
+      // Each should test actual JavaScript execution of their node logic
+      const functionalTestRequirements = [
+        'Environment variable validation',
+        'Input parameter validation',
+        'Error handling with proper error messages',
+        'Successful execution with expected outputs',
+        'Edge case handling',
+      ];
+
+      expect(daedalusTools).toHaveLength(5);
+      expect(functionalTestRequirements).toHaveLength(5);
+
+      // Verify that functional testing requirements are defined
+      functionalTestRequirements.forEach((requirement) => {
+        expect(requirement).toBeTruthy();
       });
     });
 

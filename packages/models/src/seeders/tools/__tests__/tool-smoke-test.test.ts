@@ -569,6 +569,358 @@ describe('Tool Smoke Test Tool', () => {
     });
   });
 
+  describe('Functional Testing - Node Execution', () => {
+    describe('Prepare Node Logic Execution', () => {
+      it('should execute prepare node with valid environment and target slug', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com/';
+        process.env.AUTH_TOKEN = 'test-token-123';
+        process.env.STARSHIP_ID = 'starship-456';
+
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const validInput = {
+          targetSlug: 'calculator-tool',
+          arguments: { expression: '2 + 3 * 4' },
+          timeoutMs: 30000,
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+        const result = executeCode(validInput, env);
+
+        expect(result).toBeDefined();
+        expect(result.url).toBe('https://api.example.com/starships/starship-456/tools/calculator-tool');
+        expect(result.method).toBe('GET');
+        expect(result.headers).toBeDefined();
+        expect(result.headers.Authorization).toBe('Bearer test-token-123');
+        expect(result.headers['Content-Type']).toBe('application/json');
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing targetSlug', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const inputWithoutTargetSlug = {
+          arguments: { expression: '1 + 1' },
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+
+        expect(() => executeCode(inputWithoutTargetSlug, env)).toThrow('targetSlug is required');
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing environment variables', () => {
+        const originalEnv = process.env;
+        const validInput = { targetSlug: 'test-tool' };
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+        const executeCode = new Function('input', 'env', code);
+
+        // Test missing BASE_URL
+        process.env = { ...process.env };
+        delete process.env.BASE_URL;
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-123';
+        const env1 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env1)).toThrow('baseUrl is required');
+
+        // Test missing AUTH_TOKEN
+        process.env.BASE_URL = 'https://api.example.com';
+        delete process.env.AUTH_TOKEN;
+        process.env.STARSHIP_ID = 'starship-123';
+        const env2 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env2)).toThrow('authToken is required');
+
+        // Test missing STARSHIP_ID
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        delete process.env.STARSHIP_ID;
+        const env3 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env3)).toThrow('starshipId is required');
+
+        process.env = originalEnv;
+      });
+
+      it('should build correct URL for different target slugs', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'token';
+        process.env.STARSHIP_ID = 'ship-123';
+
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', code);
+
+        const testCases = [
+          { targetSlug: 'simple-calculator', expectedPath: '/starships/ship-123/tools/simple-calculator' },
+          { targetSlug: 'echo-tool', expectedPath: '/starships/ship-123/tools/echo-tool' },
+          { targetSlug: 'complex-tool-name', expectedPath: '/starships/ship-123/tools/complex-tool-name' },
+        ];
+
+        testCases.forEach(({ targetSlug, expectedPath }) => {
+          const result = executeCode({ targetSlug }, env);
+          expect(result.url).toBe(`https://api.example.com${expectedPath}`);
+        });
+
+        process.env = originalEnv;
+      });
+    });
+
+    describe('Mark Time Node Logic Execution', () => {
+      it('should execute mark_time node and record timestamp with arguments', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const markTimeNode = nodes.find((n) => n.ref === 'mark_time');
+        const code = (markTimeNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const mockInput = {
+          dummy: { expression: '5 * 6', precision: 2 },
+          // other fields from transform node
+        };
+
+        const beforeTime = Date.now();
+        const executeCode = new Function('input', code);
+        const result = executeCode(mockInput);
+        const afterTime = Date.now();
+
+        expect(result).toBeDefined();
+        expect(result.t0).toBeGreaterThanOrEqual(beforeTime);
+        expect(result.t0).toBeLessThanOrEqual(afterTime);
+        expect(result.args).toEqual({ expression: '5 * 6', precision: 2 });
+      });
+
+      it('should handle null or undefined input gracefully', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const markTimeNode = nodes.find((n) => n.ref === 'mark_time');
+        const code = (markTimeNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const executeCode = new Function('input', code);
+
+        // Test with null input
+        let result = executeCode(null);
+        expect(result.t0).toBeDefined();
+        expect(result.args).toEqual({});
+
+        // Test with undefined input
+        result = executeCode(undefined);
+        expect(result.t0).toBeDefined();
+        expect(result.args).toEqual({});
+
+        // Test with input without dummy
+        result = executeCode({});
+        expect(result.t0).toBeDefined();
+        expect(result.args).toEqual({});
+
+        // Test with input with null dummy
+        result = executeCode({ dummy: null });
+        expect(result.t0).toBeDefined();
+        expect(result.args).toEqual({});
+      });
+
+      it('should extract args from dummy field correctly', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const markTimeNode = nodes.find((n) => n.ref === 'mark_time');
+        const code = (markTimeNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const executeCode = new Function('input', code);
+
+        const testCases = [
+          {
+            input: { dummy: { message: 'Hello World' } },
+            expectedArgs: { message: 'Hello World' },
+          },
+          {
+            input: { dummy: { expression: '10 / 2', format: 'decimal' } },
+            expectedArgs: { expression: '10 / 2', format: 'decimal' },
+          },
+          {
+            input: { dummy: {} },
+            expectedArgs: {},
+          },
+        ];
+
+        testCases.forEach(({ input, expectedArgs }) => {
+          const result = executeCode(input);
+          expect(result.args).toEqual(expectedArgs);
+          expect(typeof result.t0).toBe('number');
+        });
+      });
+    });
+
+    describe('Emit Args Node Logic Execution', () => {
+      it('should execute emit_args node and return clean arguments', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const emitNode = nodes.find((n) => n.ref === 'emit_args');
+        const code = (emitNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const mockInput = {
+          t0: Date.now(),
+          args: { expression: '2 + 2', precision: 0 },
+          // other fields that should be filtered out
+          someOtherField: 'should not appear',
+        };
+
+        const executeCode = new Function('input', code);
+        const result = executeCode(mockInput);
+
+        expect(result).toEqual({ expression: '2 + 2', precision: 0 });
+      });
+
+      it('should handle null or undefined input gracefully', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const emitNode = nodes.find((n) => n.ref === 'emit_args');
+        const code = (emitNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const executeCode = new Function('input', code);
+
+        // Test with null input
+        let result = executeCode(null);
+        expect(result).toEqual({});
+
+        // Test with undefined input
+        result = executeCode(undefined);
+        expect(result).toEqual({});
+
+        // Test with input without args
+        result = executeCode({ t0: Date.now() });
+        expect(result).toEqual({});
+
+        // Test with input with null args
+        result = executeCode({ args: null });
+        expect(result).toEqual({});
+      });
+
+      it('should return only the args field, filtering out other data', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const emitNode = nodes.find((n) => n.ref === 'emit_args');
+        const code = (emitNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const executeCode = new Function('input', code);
+
+        const complexInput = {
+          t0: 1640995200000,
+          args: {
+            targetSlug: 'nested-tool',
+            params: { x: 10, y: 20 },
+            options: { debug: true },
+          },
+          internalState: 'should be filtered',
+          metadata: { version: '1.0' },
+          executionContext: 'filtered',
+        };
+
+        const result = executeCode(complexInput);
+
+        expect(result).toEqual({
+          targetSlug: 'nested-tool',
+          params: { x: 10, y: 20 },
+          options: { debug: true },
+        });
+        expect(result.internalState).toBeUndefined();
+        expect(result.metadata).toBeUndefined();
+        expect(result.executionContext).toBeUndefined();
+        expect(result.t0).toBeUndefined();
+      });
+
+      it('should handle empty args object', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const emitNode = nodes.find((n) => n.ref === 'emit_args');
+        const code = (emitNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const executeCode = new Function('input', code);
+
+        const inputWithEmptyArgs = {
+          t0: Date.now(),
+          args: {},
+          otherData: 'filtered',
+        };
+
+        const result = executeCode(inputWithEmptyArgs);
+        expect(result).toEqual({});
+      });
+    });
+
+    describe('Integration Testing Scenarios', () => {
+      it('should handle complete smoke test data flow', () => {
+        // This test simulates the data flow through the nodes
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const markTimeNode = nodes.find((n) => n.ref === 'mark_time');
+        const emitNode = nodes.find((n) => n.ref === 'emit_args');
+
+        const markTimeCode = (markTimeNode?.parameters as Record<string, unknown>)?.code as string;
+        const emitCode = (emitNode?.parameters as Record<string, unknown>)?.code as string;
+
+        // Step 1: Arguments come from transform node (captured as dummy)
+        const initialArgs = { expression: '8 * 7', format: 'integer' };
+        const transformOutput = { dummy: initialArgs };
+
+        // Step 2: mark_time captures timestamp and args
+        const markTimeExec = new Function('input', markTimeCode);
+        const timeResult = markTimeExec(transformOutput);
+
+        expect(timeResult.args).toEqual(initialArgs);
+        expect(typeof timeResult.t0).toBe('number');
+
+        // Step 3: emit_args extracts clean args for workflow
+        const emitExec = new Function('input', emitCode);
+        const finalArgs = emitExec(timeResult);
+
+        expect(finalArgs).toEqual(initialArgs);
+      });
+
+      it('should maintain argument fidelity through the pipeline', () => {
+        const { nodes } = toolSmokeTestTool.blueprint;
+        const markTimeNode = nodes.find((n) => n.ref === 'mark_time');
+        const emitNode = nodes.find((n) => n.ref === 'emit_args');
+
+        const markTimeCode = (markTimeNode?.parameters as Record<string, unknown>)?.code as string;
+        const emitCode = (emitNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const complexArgs = {
+          expression: 'sqrt(16) + pow(2, 3)',
+          precision: 4,
+          options: {
+            angleMode: 'radians',
+            scientific: true,
+          },
+          metadata: {
+            source: 'smoke-test',
+            timestamp: new Date().toISOString(),
+          },
+        };
+
+        // Simulate the full pipeline
+        const transformedInput = { dummy: complexArgs };
+
+        const markTimeExec = new Function('input', markTimeCode);
+        const timeResult = markTimeExec(transformedInput);
+
+        const emitExec = new Function('input', emitCode);
+        const finalResult = emitExec(timeResult);
+
+        // Arguments should remain exactly the same throughout the pipeline
+        expect(finalResult).toEqual(complexArgs);
+      });
+    });
+  });
+
   describe('API Integration', () => {
     it('should fetch tool definition from correct endpoint', () => {
       const { nodes } = toolSmokeTestTool.blueprint;

@@ -590,6 +590,354 @@ describe('Tool Update Tool', () => {
     });
   });
 
+  describe('Functional Testing - Node Execution', () => {
+    describe('Validate Node Logic Execution', () => {
+      it('should execute validate node with ID-based update', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com/';
+        process.env.AUTH_TOKEN = 'test-token-123';
+
+        const { nodes } = toolUpdateTool.blueprint;
+        const validateNode = nodes.find((n) => n.ref === 'validate');
+        const code = (validateNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const inputWithId = {
+          id: 'tool-12345',
+          name: 'Updated Tool Name',
+          description: 'Updated description',
+          isEnabled: false,
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', 'state', code);
+        const result = executeCode(inputWithId, env, {});
+
+        expect(result).toBeDefined();
+        expect(result.baseUrl).toBe('https://api.example.com');
+        expect(result.hasId).toBe(true);
+        expect(result.hasSlugResolve).toBe(false);
+        expect(result.id).toBe('tool-12345');
+        expect(result.patch).toEqual({
+          name: 'Updated Tool Name',
+          description: 'Updated description',
+          isEnabled: false,
+        });
+        expect(result.headers).toBeDefined();
+        expect(result.headers.Authorization).toBe('Bearer test-token-123');
+
+        process.env = originalEnv;
+      });
+
+      it('should execute validate node with slug-based resolution', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        process.env.STARSHIP_ID = 'starship-456';
+
+        const { nodes } = toolUpdateTool.blueprint;
+        const validateNode = nodes.find((n) => n.ref === 'validate');
+        const code = (validateNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const inputWithSlug = {
+          slug: 'my-calculator-tool',
+          name: 'Updated Calculator',
+          parameters: {
+            type: 'object',
+            properties: {
+              expression: { type: 'string', description: 'Math expression' },
+            },
+            required: ['expression'],
+          },
+        };
+
+        const mockState = { starshipId: 'state-starship-789' };
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', 'state', code);
+        const result = executeCode(inputWithSlug, env, mockState);
+
+        expect(result.hasId).toBe(false);
+        expect(result.hasSlugResolve).toBe(true);
+        expect(result.slug).toBe('my-calculator-tool');
+        expect(result.starshipId).toBe('starship-456'); // env takes precedence over state
+        expect(result.patch).toEqual({
+          name: 'Updated Calculator',
+          parameters: inputWithSlug.parameters,
+        });
+
+        process.env = originalEnv;
+      });
+
+      it('should fall back to state for starship ID when env is missing', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+        delete process.env.STARSHIP_ID;
+
+        const { nodes } = toolUpdateTool.blueprint;
+        const validateNode = nodes.find((n) => n.ref === 'validate');
+        const code = (validateNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const inputWithSlug = {
+          slug: 'test-tool',
+          description: 'Updated description',
+        };
+
+        const mockState = { starshipId: 'state-starship-999' };
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', 'state', code);
+        const result = executeCode(inputWithSlug, env, mockState);
+
+        expect(result.starshipId).toBe('state-starship-999');
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error when neither ID nor slug provided', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+
+        const { nodes } = toolUpdateTool.blueprint;
+        const validateNode = nodes.find((n) => n.ref === 'validate');
+        const code = (validateNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const inputWithoutIdentifier = {
+          name: 'Some Tool',
+          description: 'Some description',
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', 'state', code);
+
+        expect(() => executeCode(inputWithoutIdentifier, env, {})).toThrow('Provide "id" OR "slug"');
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error when no update fields provided', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+
+        const { nodes } = toolUpdateTool.blueprint;
+        const validateNode = nodes.find((n) => n.ref === 'validate');
+        const code = (validateNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const inputWithOnlyId = {
+          id: 'tool-123',
+          // No update fields provided
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', 'state', code);
+
+        expect(() => executeCode(inputWithOnlyId, env, {})).toThrow('No update fields provided');
+
+        process.env = originalEnv;
+      });
+
+      it('should throw error for missing environment variables', () => {
+        const originalEnv = process.env;
+        const validInput = { id: 'tool-123', name: 'Updated Name' };
+        const { nodes } = toolUpdateTool.blueprint;
+        const validateNode = nodes.find((n) => n.ref === 'validate');
+        const code = (validateNode?.parameters as Record<string, unknown>)?.code as string;
+        const executeCode = new Function('input', 'env', 'state', code);
+
+        // Test missing BASE_URL
+        process.env = { ...process.env };
+        delete process.env.BASE_URL;
+        process.env.AUTH_TOKEN = 'test-token';
+        const env1 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env1, {})).toThrow('baseUrl is required');
+
+        // Test missing AUTH_TOKEN
+        process.env.BASE_URL = 'https://api.example.com';
+        delete process.env.AUTH_TOKEN;
+        const env2 = (key: string) => process.env[key];
+        expect(() => executeCode(validInput, env2, {})).toThrow('authToken is required');
+
+        process.env = originalEnv;
+      });
+
+      it('should handle all updateable fields correctly', () => {
+        const originalEnv = process.env;
+        process.env.BASE_URL = 'https://api.example.com';
+        process.env.AUTH_TOKEN = 'test-token';
+
+        const { nodes } = toolUpdateTool.blueprint;
+        const validateNode = nodes.find((n) => n.ref === 'validate');
+        const code = (validateNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const fullUpdateInput = {
+          id: 'tool-123',
+          name: 'Updated Name',
+          description: 'Updated description',
+          parameters: { type: 'object', properties: { input: { type: 'string' } } },
+          blueprint: { nodes: [], edges: [], metadata: {} },
+          configuration: { setting1: 'value1', setting2: 42 },
+          isEnabled: true,
+          // Extra field that should be ignored
+          extraField: 'should not appear in patch',
+        };
+
+        const env = (key: string) => process.env[key];
+        const executeCode = new Function('input', 'env', 'state', code);
+        const result = executeCode(fullUpdateInput, env, {});
+
+        expect(result.patch).toEqual({
+          name: 'Updated Name',
+          description: 'Updated description',
+          parameters: fullUpdateInput.parameters,
+          blueprint: fullUpdateInput.blueprint,
+          configuration: fullUpdateInput.configuration,
+          isEnabled: true,
+        });
+        expect(result.patch.extraField).toBeUndefined();
+
+        process.env = originalEnv;
+      });
+    });
+
+    describe('Prepare Update Node Logic Execution', () => {
+      it('should execute prepare_update node with direct ID', () => {
+        const { nodes } = toolUpdateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare_update');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        // Mock context from validate node
+        const mockValidateOutput = {
+          baseUrl: 'https://api.example.com',
+          hasId: true,
+          hasSlugResolve: false,
+          id: 'tool-456',
+          patch: { name: 'Updated Tool', isEnabled: false },
+          headers: { Authorization: 'Bearer test-token', 'Content-Type': 'application/json' },
+        };
+
+        // Mock $lastOutputOf function
+        const $lastOutputOf = (nodeRef: string) => {
+          if (nodeRef === 'validate') {
+            return [{ json: mockValidateOutput }];
+          }
+          return [];
+        };
+
+        const executeCode = new Function('$lastOutputOf', code);
+        const result = executeCode($lastOutputOf);
+
+        expect(result).toBeDefined();
+        expect(result.url).toBe('https://api.example.com/tools/tool-456');
+        expect(result.method).toBe('PUT');
+        expect(result.headers).toEqual(mockValidateOutput.headers);
+        expect(result.body).toEqual(mockValidateOutput.patch);
+      });
+
+      it('should execute prepare_update node with slug resolution', () => {
+        const { nodes } = toolUpdateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare_update');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        // Mock context from validate node (slug-based)
+        const mockValidateOutput = {
+          baseUrl: 'https://api.example.com',
+          hasId: false,
+          hasSlugResolve: true,
+          slug: 'my-tool-slug',
+          patch: { description: 'Updated via slug' },
+          headers: { Authorization: 'Bearer test-token', 'Content-Type': 'application/json' },
+        };
+
+        // Mock fetched tool data from maybe_fetch_by_slug
+        const mockFetchedTool = {
+          id: 'resolved-tool-789',
+          slug: 'my-tool-slug',
+          name: 'Existing Tool Name',
+        };
+
+        const $lastOutputOf = (nodeRef: string) => {
+          if (nodeRef === 'validate') {
+            return [{ json: mockValidateOutput }];
+          }
+          if (nodeRef === 'maybe_fetch_by_slug') {
+            return [{ json: mockFetchedTool }];
+          }
+          return [];
+        };
+
+        const executeCode = new Function('$lastOutputOf', code);
+        const result = executeCode($lastOutputOf);
+
+        expect(result.url).toBe('https://api.example.com/tools/resolved-tool-789');
+        expect(result.method).toBe('PUT');
+        expect(result.headers).toEqual(mockValidateOutput.headers);
+        expect(result.body).toEqual(mockValidateOutput.patch);
+      });
+
+      it('should throw error when slug resolution fails', () => {
+        const { nodes } = toolUpdateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare_update');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const mockValidateOutput = {
+          baseUrl: 'https://api.example.com',
+          hasId: false,
+          hasSlugResolve: true,
+          slug: 'non-existent-tool',
+          patch: { name: 'Updated Name' },
+        };
+
+        // Mock failed fetch (no tool found)
+        const mockFailedFetch = null;
+
+        const $lastOutputOf = (nodeRef: string) => {
+          if (nodeRef === 'validate') {
+            return [{ json: mockValidateOutput }];
+          }
+          if (nodeRef === 'maybe_fetch_by_slug') {
+            return [{ json: mockFailedFetch }];
+          }
+          return [];
+        };
+
+        const executeCode = new Function('$lastOutputOf', code);
+        expect(() => executeCode($lastOutputOf)).toThrow('Failed to resolve tool by slug');
+      });
+
+      it('should throw error when fetched tool has no ID', () => {
+        const { nodes } = toolUpdateTool.blueprint;
+        const prepareNode = nodes.find((n) => n.ref === 'prepare_update');
+        const code = (prepareNode?.parameters as Record<string, unknown>)?.code as string;
+
+        const mockValidateOutput = {
+          baseUrl: 'https://api.example.com',
+          hasId: false,
+          hasSlugResolve: true,
+        };
+
+        // Mock fetched tool without ID
+        const mockInvalidFetchedTool = {
+          slug: 'my-tool',
+          name: 'Tool Name',
+          // Missing id field
+        };
+
+        const $lastOutputOf = (nodeRef: string) => {
+          if (nodeRef === 'validate') {
+            return [{ json: mockValidateOutput }];
+          }
+          if (nodeRef === 'maybe_fetch_by_slug') {
+            return [{ json: mockInvalidFetchedTool }];
+          }
+          return [];
+        };
+
+        const executeCode = new Function('$lastOutputOf', code);
+        expect(() => executeCode($lastOutputOf)).toThrow('Failed to resolve tool by slug');
+      });
+    });
+  });
+
   describe('API Integration', () => {
     it('should use correct endpoints for different operations', () => {
       const { nodes } = toolUpdateTool.blueprint;

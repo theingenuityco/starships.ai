@@ -299,8 +299,11 @@ export class Engine {
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
     execution.results.push({ nodeRef: currentNode.ref, items: ExecutionItemUtils.wrapError(errorMessage) });
-    await this.setExecutionError(execution, errorMessage);
-    await this.emitEvent('workflow_failed', execution);
+    // Only mark the whole workflow as failed and emit workflow_failed when configured to fail on node errors.
+    if (this.failOnNodeError) {
+      await this.setExecutionError(execution, errorMessage);
+      await this.emitEvent('workflow_failed', execution);
+    }
   }
 
   private async handleExecutionError(error: unknown, execution: Execution): Promise<void> {

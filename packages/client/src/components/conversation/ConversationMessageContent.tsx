@@ -257,9 +257,9 @@ export function ConversationMessageContent({
 
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
-        <div className="mt-3">
+        <div className="mt-2">
           <Collapsible defaultOpen={false}>
-            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (

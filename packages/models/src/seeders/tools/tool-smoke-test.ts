@@ -8,22 +8,24 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolSmokeTestTool: ToolParams = {
   name: 'tool_smoke_test',
-  description: `Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.
+  description: `Execute another tool by slug and report pass/fail with timing.
 
-Inputs:
-- targetSlug: string (required)
-- arguments: object (optional; passed as initial input to the target blueprint)
-- timeoutMs: number (optional; default 60000 for the nested run)
+  Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.
 
-Implicit environment (do not pass):
-- BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
+  Inputs:
+  - targetSlug: string (required)
+  - arguments: object (optional; passed as initial input to the target blueprint)
+  - timeoutMs: number (optional; default 60000 for the nested run)
 
-Output:
-- { ok: boolean, durationMs: number, result: any }
+  Implicit environment (do not pass):
+  - BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
 
-Notes:
-- Running a tool may cause side effects defined by its blueprint
-- Use safe, non-destructive test inputs`,
+  Output:
+  - { ok: boolean, durationMs: number, result: any }
+
+  Notes:
+  - Running a tool may cause side effects defined by its blueprint
+  - Use safe, non-destructive test inputs`,
   parameters: {
     type: 'object',
     properties: {
@@ -143,7 +145,7 @@ Notes:
           name: 'Nested Tool Execution',
           description: 'Smoke test runner',
           // Blueprint reference from fetch step (server returns ApiResponse<ToolModel> { data: ToolModel })
-          blueprint: '{{ $lastOutputOf("http_get_tool")[0].json.body.data.blueprint }}',
+          blueprint: '{{ $lastOutputOf("http_get_tool")[0].json.body.blueprint }}',
           // If you want to allow timeout override via inputs:
           // timeout: '{{ $lastOutputOf("__initial__")[0].json.timeoutMs ?? 60000 }}'
           timeout: 60000,

@@ -57,6 +57,16 @@ export const toolCreateTool: ToolParams = {
               }
             }
 
+            // Validate blueprint shape strictly; do not normalize
+            if (
+              !input.blueprint ||
+              typeof input.blueprint !== 'object' ||
+              !Array.isArray(input.blueprint.nodes) ||
+              !Array.isArray(input.blueprint.edges)
+            ) {
+              throw new Error('Invalid blueprint: nodes and edges must be arrays');
+            }
+
             const body = {
               name: input.name,
               slug: input.slug,

@@ -19,7 +19,6 @@ describe('Tool Templates Test Suite', () => {
       expect(toolNames).toContain('echo');
       expect(toolNames).toContain('get_current_time');
       expect(toolNames).toContain('blueprint_lint');
-      expect(toolNames).toContain('tool_list');
     });
 
     it('should have unique tool names', () => {
@@ -104,7 +103,6 @@ describe('Tool Templates Test Suite', () => {
 
       const automationNames = automationTools.map((t) => t.name);
       expect(automationNames).toContain('blueprint_lint');
-      expect(automationNames).toContain('tool_list');
     });
 
     it('should have comprehensive test coverage', () => {

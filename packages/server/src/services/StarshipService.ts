@@ -317,7 +317,7 @@ export class StarshipService {
       const toolRepository = new ToolRepository();
 
       // Deploy the host tools that Daedalus needs
-      const defaultToolSlugs = ['tool-list', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'];
+      const defaultToolSlugs = ['tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'];
 
       for (const toolSlug of defaultToolSlugs) {
         try {

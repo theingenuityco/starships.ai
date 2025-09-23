@@ -15,6 +15,7 @@
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
     "seed:tool-templates": "tsx src/scripts/seed-tool-templates.ts",
     "seed:agent-templates": "tsx src/scripts/seed-agent-templates.ts",
+    "seed:research": "tsx src/scripts/seed-research-agent.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",
     "backup:validate": "tsx src/scripts/backup-cli.ts validate",

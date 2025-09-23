@@ -580,8 +580,14 @@ export class ConversationService {
         // Track persistence as an async task so workflow_completed can await before emitting "complete"
         const persistTask = (async () => {
           try {
-            if (event.data?.toolName && event.data?.result) {
-              const toolContent = typeof event.data.result === 'string' ? event.data.result : JSON.stringify(event.data.result);
+            // Persist tool_result for both success (result) and failure (error)
+            if (event.data?.toolName && (event.data?.result !== undefined || event.data?.error)) {
+              const toolContent =
+                event.data?.result !== undefined
+                  ? typeof event.data.result === 'string'
+                    ? event.data.result
+                    : JSON.stringify(event.data.result)
+                  : String(event.data?.error || 'Unknown tool error');
 
               const toolResultMessage = await this.messageService.createMessage({
                 conversationId,

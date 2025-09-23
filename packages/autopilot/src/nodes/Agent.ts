@@ -241,7 +241,7 @@ export class Agent implements NodeHandler {
       // Prepare engine config with event callback
       const engineConfig: EngineConfig = {
         eventCallback: this.options?.eventCallback,
-        failOnNodeError: true,
+        failOnNodeError: false,
         secureEnv: this.options?.secureEnv,
       };
 

@@ -310,14 +310,14 @@ export class StarshipService {
   }
 
   /**
-   * Deploy default tools to a starship for Sybil agent
+   * Deploy default host tools to a starship for Daedalus agent
    */
   static async createDefaultTools(starshipId: string): Promise<void> {
     try {
       const toolRepository = new ToolRepository();
 
-      // Deploy the three default tools that Sybil needs
-      const defaultToolSlugs = ['calculator', 'get-current-time', 'echo'];
+      // Deploy the host tools that Daedalus needs
+      const defaultToolSlugs = ['tool-list', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'];
 
       for (const toolSlug of defaultToolSlugs) {
         try {
@@ -336,26 +336,26 @@ export class StarshipService {
   }
 
   /**
-   * Create a default agent from template for a new user's starship
+   * Create the default Daedalus agent from template for a new user's starship
    */
   static async createDefaultAgent(userId: string, starshipId: string): Promise<any | null> {
     try {
       const connection = getConnection();
       const templateService = new AgentTemplateService(connection);
 
-      // Find the "Sybil" template to use as the default starship navigator
-      const templates = await templateService.searchTemplates('Sybil');
-      const defaultTemplate = templates.find((t) => t.name === 'Sybil');
+      // Find the "Daedalus" template to use as the default toolwright
+      const templates = await templateService.searchTemplates('Daedalus');
+      const defaultTemplate = templates.find((t) => t.name === 'Daedalus');
 
       if (!defaultTemplate) {
-        console.error('[STARSHIP-SERVICE] Sybil agent template not found - skipping agent creation');
+        console.error('[STARSHIP-SERVICE] Daedalus agent template not found - skipping agent creation');
         return null;
       }
 
-      // Deploy default tools first so Sybil can use them
+      // Deploy default tools first so Daedalus can use them
       await StarshipService.createDefaultTools(starshipId);
 
-      // Create agent from template with Sybil as the default navigator
+      // Create agent from template with Daedalus as the default toolwright
       const defaultAgent = await templateService.createAgentFromTemplate(defaultTemplate.id, starshipId);
 
       return defaultAgent;

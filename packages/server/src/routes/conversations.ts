@@ -172,12 +172,15 @@ router.post('/conversations/:conversationId/messages', jwtAuthMiddleware, async 
     // Fire-and-forget processing; live updates go over GET SSE channel (/conversations/:id/messages?stream=true)
     const conversationService = new ConversationService();
     conversationService
-      .addConversationMessage({
-        conversationId,
-        content,
-        role: 'user',
-        messageType: 'user_input',
-      })
+      .addConversationMessage(
+        {
+          conversationId,
+          content,
+          role: 'user',
+          messageType: 'user_input',
+        },
+        { authorization: req.headers.authorization as string | undefined }
+      )
       .catch((error) => {
         console.error('[ROUTE] Conversation processing failed:', error);
       });

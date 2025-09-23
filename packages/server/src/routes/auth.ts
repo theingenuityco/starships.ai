@@ -80,25 +80,25 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
     if (!bodyValidation) return;
 
     const { email, password, name } = bodyValidation;
-    
+
     // Check if user already exists
     const existingUser = await UserService.getUserByEmail(email);
     if (existingUser) {
       sendError(res, 'RESOURCE_CONFLICT', 'User already exists', 409);
       return;
     }
-    
+
     // Initialize waitlist service
     const waitlistService = initWaitlistService();
-    
+
     // Check waitlist status
     const waitlistStatus = await waitlistService.getDetailedStatus(email);
-    
+
     // If not in waitlist, add as pending
     if (!waitlistStatus.exists) {
       await waitlistService.addToPendingWaitlist(email);
     }
-    
+
     // Create user regardless of waitlist status (stores credentials for future)
     // User creation happens for both pending and approved users
 
@@ -112,25 +112,29 @@ router.post('/auth/register', async (req: Request, res: Response): Promise<void>
 
     // Check final waitlist status to determine response
     const finalStatus = await waitlistService.getDetailedStatus(email);
-    
+
     // If user is pending, return waitlist message (don't provide token)
     if (finalStatus.status === 'pending') {
-      return sendSuccess(res, {
-        waitlisted: true,
-        status: 'pending',
-        message: 'Thanks for signing up! Please wait for approval to access the app.',
-      }, 200);
+      return sendSuccess(
+        res,
+        {
+          waitlisted: true,
+          status: 'pending',
+          message: 'Thanks for signing up! Please wait for approval to access the app.',
+        },
+        200
+      );
     }
-    
+
     // Only create starship and provide token for approved users
     let defaultStarship;
     let defaultAgent;
-    
+
     if (finalStatus.status === 'approved') {
       try {
         defaultStarship = await StarshipService.createDefaultStarship(user.id);
 
-        // Create default agent from "General Assistant" template
+        // Create default Daedalus agent and host tools from template
         if (defaultStarship) {
           try {
             defaultAgent = await StarshipService.createDefaultAgent(user.id, defaultStarship.id);
@@ -209,21 +213,25 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       // Check waitlist status when user doesn't exist
       const waitlistService = initWaitlistService();
       const waitlistStatus = await waitlistService.getDetailedStatus(email);
-      
+
       if (!waitlistStatus.exists) {
         // Not in system at all
         return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
       }
-      
+
       if (waitlistStatus.status === 'pending') {
         // On waitlist but not approved
-        return sendSuccess(res, {
-          waitlisted: true,
-          status: 'pending',
-          message: 'Please wait for approval to access the app.',
-        }, 200);
+        return sendSuccess(
+          res,
+          {
+            waitlisted: true,
+            status: 'pending',
+            message: 'Please wait for approval to access the app.',
+          },
+          200
+        );
       }
-      
+
       // Approved but no account - suggest registration
       return sendError(res, 'AUTHENTICATION_FAILED', 'No account found. Please sign up first.', 401);
     }
@@ -234,18 +242,22 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       sendError(res, 'AUTHENTICATION_FAILED', 'Invalid credentials', 401);
       return;
     }
-    
+
     // Check waitlist status for existing user
     const waitlistService = initWaitlistService();
     const waitlistStatus = await waitlistService.getDetailedStatus(email);
-    
+
     // If user exists but is still pending on waitlist, deny access
     if (waitlistStatus.status === 'pending') {
-      return sendSuccess(res, {
-        waitlisted: true,
-        status: 'pending',
-        message: 'Please wait for approval to access the app.',
-      }, 200);
+      return sendSuccess(
+        res,
+        {
+          waitlisted: true,
+          status: 'pending',
+          message: 'Please wait for approval to access the app.',
+        },
+        200
+      );
     }
 
     // Get user's starships for redirect purpose
@@ -256,27 +268,27 @@ router.post('/auth/login', async (req: Request, res: Response): Promise<void> =>
       const userStarships = await starshipRepo.findByOwner(user.id);
       // Find the first active starship
       firstStarship = userStarships.find((ship: any) => ship.status === 'active') || userStarships[0] || null;
-      
+
       // If approved user has no starship (was pending when registered), create one now
       if (!firstStarship && waitlistStatus.status === 'approved') {
         logger.info(`[AUTH] Creating starship for newly approved user ${user.email}`);
         try {
           firstStarship = await StarshipService.createDefaultStarship(user.id);
-          
-          // Also create default agent
+
+          // Also create default Daedalus agent and host tools
           if (firstStarship) {
             try {
               defaultAgent = await StarshipService.createDefaultAgent(user.id, firstStarship.id);
               logger.info(`[AUTH] Created default agent for user ${user.email}`);
             } catch (agentError) {
               logger.error(`[AUTH] Failed to create default agent for user ${user.id}:`, {
-                error: agentError instanceof Error ? agentError.message : 'Unknown error'
+                error: agentError instanceof Error ? agentError.message : 'Unknown error',
               });
             }
           }
         } catch (createError) {
           logger.error(`[AUTH] Failed to create default starship for newly approved user ${user.id}:`, {
-            error: createError instanceof Error ? createError.message : 'Unknown error'
+            error: createError instanceof Error ? createError.message : 'Unknown error',
           });
         }
       }

@@ -52,48 +52,37 @@ export function ConversationMessageContent({
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 
-  // Initial state: closed if there are already results (existing conversation), open otherwise
-  const [isToolCallsOpen, setIsToolCallsOpen] = useState(() => {
-    return !(toolResults && toolResults.length > 0)
-  })
+  // Tool call header icon state handling
+  const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
+  const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
+  const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
+  const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
+  const hasAnyToolCalls = totalToolCalls > 0
 
-  // Track when tool results first appear to trigger auto-collapse delay
-  // Always start with 0 to properly detect the first results appearing
-  const prevToolResultsLength = useRef(0)
-  const hasTriggeredCollapseRef = useRef(false)
-  // Skip first effect run to avoid triggering on initial mount/refresh
+  const [showCompletionTick, setShowCompletionTick] = useState(false)
+  const prevCompletedRef = useRef<number>(completedToolResults)
   const isFirstRenderRef = useRef(true)
+  const hasShownTickRef = useRef(false)
 
-  // Auto-collapse tool calls with delay after result completion.
-  // - Adds a 300ms delay
-  // - Triggers only on transition from 0 -> >0 results (i.e., completion)
-  // - Skips initial mount to avoid triggering on refresh/remount
   useEffect(() => {
-    const currentResultsLength = toolResults?.length || 0
-    const previousResultsLength = prevToolResultsLength.current
-
-    // Update the ref for next render
-    prevToolResultsLength.current = currentResultsLength
-
-    // Skip the first effect run (initial mount) to avoid triggering on refresh/remount
+    // Skip tick on initial mount even if results already exist (reloads)
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false
+      prevCompletedRef.current = completedToolResults
       return
     }
 
-    // Only trigger when:
-    // 1) results first appear (0 -> >0)
-    // 2) we haven't already triggered collapse for this message
-    // 3) the collapsible is currently open (avoid redundant state updates)
-    if (currentResultsLength > 0 && previousResultsLength === 0 && !hasTriggeredCollapseRef.current && isToolCallsOpen) {
-      hasTriggeredCollapseRef.current = true
-      const delayMs = 300
-      const timer = setTimeout(() => {
-        setIsToolCallsOpen(false)
-      }, delayMs)
-      return () => clearTimeout(timer)
+    const prevCompleted = prevCompletedRef.current
+    prevCompletedRef.current = completedToolResults
+
+    // Trigger tick only on the first transition to "all done"
+    if (!hasShownTickRef.current && totalToolCalls > 0 && prevCompleted < totalToolCalls && completedToolResults >= totalToolCalls) {
+      hasShownTickRef.current = true
+      setShowCompletionTick(true)
+      const t = setTimeout(() => setShowCompletionTick(false), 2000)
+      return () => clearTimeout(t)
     }
-  }, [toolResults, isToolCallsOpen, messageId])
+  }, [completedToolResults, totalToolCalls, messageId])
 
   // Build display content from chunks when streaming; after completion fall back to chunks if final content wasn't persisted
   const displayContent = useMemo(() => {
@@ -127,6 +116,49 @@ export function ConversationMessageContent({
     } catch {}
     return null as any
   }, [displayContent])
+
+  // Natural language header with tense and inline code chips for tool names (no 'tool' word):
+  // Ongoing: "<agent> is using `X`[, `Y`] [& some others...]"
+  // Completed: "<agent> used `X`[, `Y`] [& some others...]"
+  const toolCallHeaderLabel = useMemo(() => {
+    if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null
+    const names = toolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
+    const unique = Array.from(new Set(names))
+    const agent = agentName || 'Assistant'
+
+    const isOngoing = hasPendingToolCalls || (isStreaming && hasAnyToolCalls && !allToolCallsDone)
+    const verb = isOngoing ? 'is using' : 'used'
+
+    const Chip = ({ children }: any) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+
+    if (unique.length === 0) {
+      return (
+        <>
+          {agent} {verb}
+        </>
+      )
+    }
+    if (unique.length === 1) {
+      return (
+        <>
+          {agent} {verb} <Chip>{unique[0]}</Chip>
+        </>
+      )
+    }
+    const visible = unique.slice(0, 2)
+    if (unique.length > 2) {
+      return (
+        <>
+          {agent} {verb} <Chip>{visible[0]}</Chip>, <Chip>{visible[1]}</Chip> & some others...
+        </>
+      )
+    }
+    return (
+      <>
+        {agent} {verb} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
+      </>
+    )
+  }, [toolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
 
   const handleCopyContent = async () => {
     try {
@@ -268,14 +300,20 @@ export function ConversationMessageContent({
 
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
-        <div className="mt-3">
-          <Collapsible key={`tool-calls-${isToolCallsOpen}`} defaultOpen={isToolCallsOpen}>
-            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
-              <Wrench className="w-3 h-3" />
-              Tool Calls ({toolCalls.length})
+        <div className="my-2.5">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+              {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : allToolCallsDone && showCompletionTick ? (
+                <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+              ) : (
+                <Wrench className="w-3 h-3" />
+              )}
+              {toolCallHeaderLabel ?? `Tool Calls (${toolCalls.length})`}
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {toolCalls.map((tc, idx) => {
                   const rawArgs = (tc as any)?.function?.arguments ?? ''
                   let prettyArgs = ''
@@ -284,13 +322,26 @@ export function ConversationMessageContent({
                   } catch {
                     prettyArgs = String(rawArgs)
                   }
-                  const argsBlockId = `${messageId}-tool-args-${idx}`
+                  const hasArgs = (() => {
+                    const raw = typeof rawArgs === 'string' ? rawArgs.trim() : ''
+                    if (!raw) return false
+                    try {
+                      const parsed = JSON.parse(raw)
+                      if (parsed && typeof parsed === 'object') {
+                        return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
+                      }
+                      return String(parsed).trim().length > 0
+                    } catch {
+                      return raw.length > 0
+                    }
+                  })()
                   const funcName = (tc as any)?.function?.name || 'unknown'
 
                   // Normalize tool call id from multiple potential fields to be resilient across providers
                   const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.tool_call_id ?? (tc as any)?.function?.id ?? null
 
                   const toolCallId = rawCallId != null ? String(rawCallId) : ''
+                  const combinedBlockId = `${messageId}-tool-all-${idx}`
 
                   // Find matching tool result using multiple possible id fields, normalized to strings
                   const matchingResult = toolResults?.find((result: any) => {
@@ -306,49 +357,67 @@ export function ConversationMessageContent({
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">Function</span>
                             <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
-                            {toolCallId && (
-                              <span className="text-xs text-muted-foreground">
-                                ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
-                              </span>
-                            )}
+                            {/* ID removed from header */}
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(prettyArgs, argsBlockId)}>
-                              {copiedStates[argsBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                            </Button>
-                            {matchingResult && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => {
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => {
+                                // Build a single payload that includes function, id, arguments and (optional) result
+                                let argsParsed: any
+                                try {
+                                  argsParsed = JSON.parse(rawArgs)
+                                } catch {
+                                  // Fallback to the prettified string for non-JSON args
+                                  argsParsed = prettyArgs
+                                }
+
+                                let resultParsed: any = undefined
+                                if (matchingResult) {
                                   const resultContent = matchingResult.content || ''
-                                  let parsedResultJson = null as any
                                   try {
                                     const t = (resultContent || '').trim()
                                     if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                      parsedResultJson = JSON.parse(t)
+                                      resultParsed = JSON.parse(t)
+                                    } else {
+                                      resultParsed = resultContent
                                     }
-                                  } catch {}
-                                  handleCopyCodeBlock(parsedResultJson ? JSON.stringify(parsedResultJson, null, 2) : resultContent, `${messageId}-tool-result-${idx}`)
-                                }}
-                              >
-                                {copiedStates[`${messageId}-tool-result-${idx}`] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                              </Button>
-                            )}
+                                  } catch {
+                                    resultParsed = resultContent
+                                  }
+                                }
+
+                                const payload: any = {
+                                  function: funcName,
+                                  id: toolCallId || undefined,
+                                  arguments: argsParsed,
+                                  ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
+                                }
+
+                                handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
+                              }}
+                            >
+                              {copiedStates[combinedBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            </Button>
                           </div>
                         </div>
 
                         <div>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
-                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
-                            <code>{prettyArgs}</code>
-                          </pre>
+                          {hasArgs && (
+                            <>
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
+                              <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                                <code>{prettyArgs}</code>
+                              </pre>
+                            </>
+                          )}
 
                           {matchingResult && (
                             <>
                               <div className="border-t border-border/50" />
-                              <div className="flex items-center gap-2 px-3 pt-2">
+                              <div className="flex items-center justify-between px-3 pt-2">
                                 <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
                                   <Check className="w-3 h-3" />
                                   Result
@@ -417,8 +486,8 @@ export function ConversationMessageContent({
       )}
 
       {/* Streaming indicator - shows after all content including tool calls while streaming */}
-      {isStreaming && (
-        <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+      {isStreaming && !hasAnyToolCalls && (
+        <div className="flex items-center gap-2 mt-1 text-muted-foreground">
           <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
           {chunks.length > 0 && <span className="text-xs">({chunks.length} chunks)</span>}
           <Loader2 className="w-3 h-3 animate-spin" />

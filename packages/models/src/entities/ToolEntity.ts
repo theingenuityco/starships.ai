@@ -41,7 +41,7 @@ export class ToolEntity implements ToolModel {
 
   @Expose()
   @IsString()
-  @Length(0, 500)
+  @Length(0, 4000)
   description!: string;
 
   @Expose()

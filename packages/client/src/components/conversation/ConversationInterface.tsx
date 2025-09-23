@@ -34,6 +34,33 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const uiStreaming = useStarshipUIStore(s => (currentConversationId ? s.conversationsStreaming[currentConversationId]?.isStreaming === true : false))
   const prevStreamingRef = useRef(false)
 
+  // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
+  const inputContainerRef = useRef<HTMLDivElement>(null)
+  const [inputHeight, setInputHeight] = useState<number>(160)
+
+  useEffect(() => {
+    const el = inputContainerRef.current
+    if (!el) return
+
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      setInputHeight(Math.ceil(rect.height))
+    }
+
+    update()
+
+    const ro = new ResizeObserver(() => update())
+    ro.observe(el)
+
+    const onResize = () => update()
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', onResize)
+    }
+  }, [hasMessages, currentConversationId])
+
   // Get agents data from starship and conversation
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
   const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
@@ -157,8 +184,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     <div className="relative flex flex-col h-screen bg-background">
       {/* Messages Area or Welcome Screen */}
       {hasMessages && currentConversationId ? (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} />
+        <div className="flex-1 min-h-0">
+          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
@@ -191,6 +218,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       {/* Floating Input - Position changes based on state */}
       <div
+        ref={inputContainerRef}
         className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out"
         style={{
           bottom: hasMessages && currentConversationId ? '0px' : 'calc(50% + 2rem)',

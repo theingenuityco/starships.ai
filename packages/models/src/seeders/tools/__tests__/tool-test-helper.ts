@@ -2,11 +2,13 @@
  * Tool Test Helper Utilities
  *
  * Provides common test utilities and patterns for testing Daedalus tools,
- * including validation of tool structure, blueprint validation, and parameter testing.
+ * including validation of tool structure, blueprint validation, parameter testing,
+ * and functional execution testing.
  */
 
 import type { ToolParams, Edge } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
+import { ToolTestRunner } from './tool-execution-helper';
 
 /**
  * Common test data patterns for tools
@@ -278,6 +280,99 @@ export class ToolTestHelper {
       descriptionMatch: this.tool.description === this.toolTemplate.description,
       parametersMatch: JSON.stringify(this.tool.parameters) === JSON.stringify(this.toolTemplate.parameters),
       blueprintMatch: JSON.stringify(this.tool.blueprint) === JSON.stringify(this.toolTemplate.blueprint),
+    };
+  }
+
+  /**
+   * Create a functional test runner for this tool
+   */
+  createFunctionalTestRunner(): ToolTestRunner {
+    return new ToolTestRunner(this.tool);
+  }
+
+  /**
+   * Run both structural and functional tests
+   */
+  async runComprehensiveTests(
+    functionalTestCases: Array<{
+      name: string;
+      input: Record<string, unknown>;
+      expectSuccess: boolean;
+      expectedError?: string;
+      validate?: (output: unknown) => boolean;
+    }>
+  ) {
+    const results = {
+      structural: {
+        toolStructure: this.testToolStructure(),
+        parameterSchema: this.testParameterSchema(),
+        blueprintStructure: this.testBlueprintStructure(),
+        startEndNodes: this.testStartEndNodes(),
+        connectivity: this.testConnectivity(),
+        templateConsistency: this.testTemplateConsistency(),
+      },
+      functional: [] as Array<{
+        name: string;
+        passed: boolean;
+        error?: string;
+        output?: unknown;
+      }>,
+    };
+
+    // Run functional tests
+    const testRunner = this.createFunctionalTestRunner();
+    results.functional = await testRunner.testScenarios(functionalTestCases);
+
+    return results;
+  }
+
+  /**
+   * Quick validation - combines key structural checks with basic functionality test
+   */
+  async validateToolComplete(basicInput: Record<string, unknown>) {
+    const issues = [];
+
+    // Structural validation
+    const toolStructure = this.testToolStructure();
+    const hasRequiredProps = toolStructure.find((r) => r.description === 'should have required tool properties');
+    if (
+      !hasRequiredProps?.hasName ||
+      !hasRequiredProps?.hasDescription ||
+      !hasRequiredProps?.hasParameters ||
+      !hasRequiredProps?.hasBlueprint
+    ) {
+      issues.push('Missing required tool properties');
+    }
+
+    const blueprint = this.testBlueprintStructure();
+    const hasValidBlueprint = blueprint.find((r) => r.description === 'should have valid blueprint structure');
+    if (!hasValidBlueprint?.hasNodes || !hasValidBlueprint?.hasEdges) {
+      issues.push('Invalid blueprint structure');
+    }
+
+    const connectivity = this.testConnectivity();
+    if (!connectivity.isConnected) {
+      issues.push('Blueprint nodes are not properly connected');
+    }
+
+    // Template consistency
+    const consistency = this.testTemplateConsistency();
+    if (!consistency.nameMatch || !consistency.parametersMatch || !consistency.blueprintMatch) {
+      issues.push('Tool and template are inconsistent');
+    }
+
+    // Functional validation
+    try {
+      const testRunner = this.createFunctionalTestRunner();
+      await testRunner.testValidInput(basicInput);
+    } catch (error) {
+      issues.push(`Functional test failed: ${(error as Error).message}`);
+    }
+
+    return {
+      isValid: issues.length === 0,
+      issues,
+      toolName: this.toolName,
     };
   }
 }

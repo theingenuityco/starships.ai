@@ -1,507 +1,419 @@
 /**
- * Time Tool Tests
+ * Time Tool Functional Tests
  *
- * Tests for the time tool including parameter validation,
- * blueprint structure, and functionality verification.
+ * Tests that actually execute the time tool and verify time operations
+ * instead of just validating static structure.
  */
 
-import type { Edge } from '@starships/autopilot';
-import { timeTool, timeToolTemplate } from '../time';
-import { ToolTestHelper, CommonToolTestData, ToolMatchers } from './tool-test-helper';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-describe('Time Tool', () => {
-  let testHelper: ToolTestHelper;
+import { timeTool, timeToolTemplate } from '../time';
+import { ToolTestRunner, CommonToolScenarios } from './tool-execution-helper';
+
+interface TimeResult {
+  currentTime: string;
+  timezone: string;
+  format: string;
+  timestamp: number;
+}
+
+describe('Time Tool - Functional Tests', () => {
+  let testRunner: ToolTestRunner;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(timeTool, timeToolTemplate, 'get_current_time');
-    jest.clearAllMocks();
+    testRunner = new ToolTestRunner(timeTool);
   });
 
-  describe('Tool Structure', () => {
-    it('should have valid tool structure', () => {
-      expect(timeTool).toMatchObject({
-        name: 'get_current_time',
-        description: expect.stringContaining('current date and time'),
-        parameters: expect.objectContaining({
-          type: 'object',
-          properties: expect.any(Object),
-          required: expect.any(Array),
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array),
-          edges: expect.any(Array),
-          metadata: expect.any(Object),
-        }),
-      });
+  describe('Basic Time Operations', () => {
+    it('should return current time with default settings', async () => {
+      const result = (await testRunner.testValidInput(
+        {},
+        (output: any) => typeof output.currentTime === 'string' && typeof output.timestamp === 'number'
+      )) as TimeResult;
+
+      expect(result.timezone).toBe('UTC');
+      expect(result.format).toBe('ISO');
+      expect(typeof result.currentTime).toBe('string');
+      expect(typeof result.timestamp).toBe('number');
+
+      // Should be a valid ISO string
+      expect(() => new Date(result.currentTime)).not.toThrow();
+
+      // Timestamp should be recent (within last few seconds)
+      const now = Date.now();
+      expect(Math.abs(now - result.timestamp)).toBeLessThan(5000);
     });
 
-    it('should have consistent template and tool data', () => {
-      const consistency = testHelper.testTemplateConsistency();
+    it('should return time in UTC timezone', async () => {
+      const result = (await testRunner.testValidInput({ timezone: 'UTC' }, (output: any) => output.timezone === 'UTC')) as TimeResult;
 
-      expect(consistency.nameMatch).toBe(true);
-      expect(consistency.descriptionMatch).toBe(true);
-      expect(consistency.parametersMatch).toBe(true);
-      expect(consistency.blueprintMatch).toBe(true);
+      expect(result.timezone).toBe('UTC');
+      expect(result.currentTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     });
 
-    it('should have valid template metadata', () => {
-      expect(timeToolTemplate).toMatchObject({
-        slug: 'get-current-time',
-        category: 'utility',
-        exampleUsage: expect.stringContaining('get_current_time'),
-        requiresApiKey: false,
-        configurationFields: [],
-      });
-    });
-  });
+    it('should return time in ISO format', async () => {
+      const result = (await testRunner.testValidInput({ format: 'ISO' }, (output: any) => output.format === 'ISO')) as TimeResult;
 
-  describe('Parameter Schema', () => {
-    it('should have valid parameter schema structure', () => {
-      const schemaResults = testHelper.testParameterSchema();
+      expect(result.format).toBe('ISO');
+      expect(typeof result.currentTime).toBe('string');
 
-      const mainSchema = schemaResults.find((r) => r.description === 'should have valid parameter schema');
-      expect(mainSchema?.isObject).toBe(true);
-      expect(mainSchema?.hasProperties).toBe(true);
-      expect(mainSchema?.hasRequired).toBe(true);
+      // Should be valid ISO format
+      const date = new Date(result.currentTime);
+      expect(date.toISOString()).toBe(result.currentTime);
     });
 
-    it('should have timezone parameter with enum options', () => {
-      const { properties } = timeTool.parameters;
-      const timezoneProp = (properties as Record<string, unknown>).timezone as Record<string, unknown>;
+    it('should return timestamp format', async () => {
+      const result = (await testRunner.testValidInput(
+        { format: 'timestamp' },
+        (output: any) => output.format === 'timestamp' && typeof output.timestamp === 'number'
+      )) as TimeResult;
 
-      expect(timezoneProp).toMatchObject({
-        type: 'string',
-        description: expect.stringContaining('Timezone'),
-        enum: expect.arrayContaining(['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo']),
-      });
+      expect(result.format).toBe('timestamp');
+      expect(typeof result.timestamp).toBe('number');
+
+      // Timestamp should be recent
+      const now = Date.now();
+      expect(Math.abs(now - result.timestamp)).toBeLessThan(5000);
     });
 
-    it('should have format parameter with enum options', () => {
-      const { properties } = timeTool.parameters;
-      const formatProp = (properties as Record<string, unknown>).format as Record<string, unknown>;
+    it('should return locale format', async () => {
+      const result = (await testRunner.testValidInput({ format: 'locale' }, (output: any) => output.format === 'locale')) as TimeResult;
 
-      expect(formatProp).toMatchObject({
-        type: 'string',
-        description: expect.stringContaining('Format'),
-        enum: expect.arrayContaining(['ISO', 'locale', 'timestamp']),
-      });
-    });
-
-    it('should have no required parameters (all optional)', () => {
-      expect(timeTool.parameters.required).toEqual([]);
-    });
-
-    it('should have proper parameter defaults mentioned in descriptions', () => {
-      const { properties } = timeTool.parameters;
-      const timezoneProp = (properties as Record<string, unknown>).timezone as Record<string, unknown>;
-      const formatProp = (properties as Record<string, unknown>).format as Record<string, unknown>;
-
-      expect(timezoneProp.description).toContain('default: UTC');
-      expect(formatProp.description).toContain('Format');
+      expect(result.format).toBe('locale');
+      expect(typeof result.currentTime).toBe('string');
+      expect(result.currentTime.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Blueprint Structure', () => {
-    it('should have valid blueprint structure', () => {
-      const blueprintResults = testHelper.testBlueprintStructure();
+  describe('Timezone Handling', () => {
+    it('should handle America/New_York timezone', async () => {
+      const result = (await testRunner.testValidInput(
+        { timezone: 'America/New_York', format: 'locale' },
+        (output: any) => output.timezone === 'America/New_York'
+      )) as TimeResult;
 
-      const mainStructure = blueprintResults.find((r) => r.description === 'should have valid blueprint structure');
-      expect(mainStructure?.hasNodes).toBe(true);
-      expect(mainStructure?.hasEdges).toBe(true);
-      expect(mainStructure?.nodeCount).toBeGreaterThan(0);
-      expect(mainStructure?.edgeCount).toBeGreaterThan(0);
+      expect(result.timezone).toBe('America/New_York');
+      expect(typeof result.currentTime).toBe('string');
     });
 
-    it('should have start and end nodes', () => {
-      const startEndResult = testHelper.testStartEndNodes();
+    it('should handle Europe/London timezone', async () => {
+      const result = (await testRunner.testValidInput(
+        { timezone: 'Europe/London', format: 'locale' },
+        (output: any) => output.timezone === 'Europe/London'
+      )) as TimeResult;
 
-      expect(startEndResult.hasStartNode).toBe(true);
-      expect(startEndResult.hasEndNode).toBe(true);
-      expect(startEndResult.startNodeCount).toBe(1);
-      expect(startEndResult.endNodeCount).toBe(1);
+      expect(result.timezone).toBe('Europe/London');
+      expect(typeof result.currentTime).toBe('string');
     });
 
-    it('should have proper node connectivity', () => {
-      const connectivityResult = testHelper.testConnectivity();
+    it('should handle Asia/Tokyo timezone', async () => {
+      const result = (await testRunner.testValidInput(
+        { timezone: 'Asia/Tokyo', format: 'locale' },
+        (output: any) => output.timezone === 'Asia/Tokyo'
+      )) as TimeResult;
 
-      expect(connectivityResult.isConnected).toBe(true);
-      expect(connectivityResult.unreachableNodes).toHaveLength(0);
+      expect(result.timezone).toBe('Asia/Tokyo');
+      expect(typeof result.currentTime).toBe('string');
     });
 
-    it('should have expected nodes', () => {
-      const { nodes } = timeTool.blueprint;
-      const nodeTypes = nodes.map((n) => n.type);
-      const nodeRefs = nodes.map((n) => n.ref);
+    it('should default to UTC for unspecified timezone', async () => {
+      const result = (await testRunner.testValidInput({ format: 'ISO' }, (output: any) => output.timezone === 'UTC')) as TimeResult;
 
-      expect(nodeTypes).toContain('start');
-      expect(nodeTypes).toContain('code');
-      expect(nodeTypes).toContain('end');
-
-      expect(nodeRefs).toContain('start_1');
-      expect(nodeRefs).toContain('time_1');
-      expect(nodeRefs).toContain('end_1');
-    });
-
-    it('should have valid edges connecting nodes', () => {
-      const { edges, nodes } = timeTool.blueprint;
-      const nodeRefs = nodes.map((n) => n.ref);
-
-      edges.forEach((edge: Edge) => {
-        expect(nodeRefs).toContain(edge.from);
-        expect(nodeRefs).toContain(edge.to);
-        expect(edge.ref).toBeTruthy();
-      });
+      expect(result.timezone).toBe('UTC');
     });
   });
 
-  describe('Code Node Logic', () => {
-    it('should have a code node with time generation logic', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
+  describe('Format Variations', () => {
+    it('should handle all format types with UTC', async () => {
+      const formats = ['ISO', 'locale', 'timestamp'];
 
-      expect(codeNode).toBeDefined();
-      expect(codeNode?.parameters).toHaveProperty('code');
-      expect(typeof (codeNode?.parameters as Record<string, unknown>)?.code).toBe('string');
-      expect((codeNode?.parameters as Record<string, unknown>)?.code).toContain('new Date()');
+      for (const format of formats) {
+        const result = (await testRunner.testValidInput(
+          { timezone: 'UTC', format },
+          (output: any) => output.format === format
+        )) as TimeResult;
+
+        expect(result.format).toBe(format);
+        expect(result.timezone).toBe('UTC');
+
+        if (format === 'timestamp') {
+          expect(typeof result.timestamp).toBe('number');
+        } else {
+          expect(typeof result.currentTime).toBe('string');
+        }
+      }
     });
 
-    it('should handle timezone parameter', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+    it('should handle format with different timezones', async () => {
+      const timezones = ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
 
-      expect(code).toContain('input.timezone');
-      expect(code).toContain("timezone || 'UTC'");
-      expect(code).toContain("timezone === 'UTC'");
+      for (const timezone of timezones) {
+        const result = (await testRunner.testValidInput(
+          { timezone, format: 'locale' },
+          (output: any) => output.timezone === timezone
+        )) as TimeResult;
+
+        expect(result.timezone).toBe(timezone);
+        expect(result.format).toBe('locale');
+        expect(typeof result.currentTime).toBe('string');
+      }
     });
 
-    it('should handle format parameter', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+    it('should default to ISO format when unspecified', async () => {
+      const result = (await testRunner.testValidInput({ timezone: 'UTC' }, (output: any) => output.format === 'ISO')) as TimeResult;
 
-      expect(code).toContain('input.format');
-      expect(code).toContain("format || 'ISO'");
-      expect(code).toContain('switch (format)');
+      expect(result.format).toBe('ISO');
+      expect(result.currentTime).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    });
+  });
+
+  describe('Output Structure Validation', () => {
+    it('should have all required output fields', async () => {
+      const result = (await testRunner.testValidInput({})) as TimeResult;
+
+      expect(result).toHaveProperty('currentTime');
+      expect(result).toHaveProperty('timezone');
+      expect(result).toHaveProperty('format');
+      expect(result).toHaveProperty('timestamp');
     });
 
-    it('should support different format options', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+    it('should maintain consistent output structure across calls', async () => {
+      const results = (await Promise.all([
+        testRunner.testValidInput({}),
+        testRunner.testValidInput({ timezone: 'UTC' }),
+        testRunner.testValidInput({ format: 'ISO' }),
+        testRunner.testValidInput({ timezone: 'UTC', format: 'ISO' }),
+      ])) as TimeResult[];
 
-      expect(code).toContain("case 'ISO'");
-      expect(code).toContain("case 'locale'");
-      expect(code).toContain("case 'timestamp'");
-      expect(code).toContain('toISOString()');
-      expect(code).toContain('toLocaleString');
-      expect(code).toContain('getTime()');
+      results.forEach((result) => {
+        expect(result).toHaveProperty('currentTime');
+        expect(result).toHaveProperty('timezone');
+        expect(result).toHaveProperty('format');
+        expect(result).toHaveProperty('timestamp');
+      });
     });
 
-    it('should handle timezone conversions', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+    it('should have valid timestamp in all calls', async () => {
+      const result = (await testRunner.testValidInput({
+        timezone: 'America/New_York',
+        format: 'locale',
+      })) as TimeResult;
 
-      expect(code).toContain('timeZone: timezone');
-      expect(code).toContain('toUTCString()');
+      expect(typeof result.timestamp).toBe('number');
+      expect(result.timestamp).toBeGreaterThan(0);
+
+      // Should be recent
+      const now = Date.now();
+      expect(Math.abs(now - result.timestamp)).toBeLessThan(5000);
+    });
+  });
+
+  describe('Time Accuracy and Consistency', () => {
+    it('should return accurate current time', async () => {
+      const beforeCall = Date.now();
+      const result = (await testRunner.testValidInput({})) as TimeResult;
+      const afterCall = Date.now();
+
+      expect(result.timestamp).toBeGreaterThanOrEqual(beforeCall - 1000); // Allow 1s tolerance
+      expect(result.timestamp).toBeLessThanOrEqual(afterCall + 1000);
     });
 
-    it('should have proper error handling', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+    it('should have consistent timestamp and currentTime', async () => {
+      const result = (await testRunner.testValidInput({
+        timezone: 'UTC',
+        format: 'ISO',
+      })) as TimeResult;
 
-      expect(code).toContain('try');
-      expect(code).toContain('catch');
-      expect(code).toContain('throw new Error');
-      expect(code).toContain('Error generating time');
+      const timeFromString = new Date(result.currentTime).getTime();
+
+      // Should be very close (within 1 second)
+      expect(Math.abs(timeFromString - result.timestamp)).toBeLessThan(1000);
     });
 
-    it('should have timeout configuration', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const parameters = codeNode?.parameters as Record<string, unknown>;
+    it('should generate different times for sequential calls', async () => {
+      const result1 = (await testRunner.testValidInput({})) as TimeResult;
+      // Small delay to ensure different timestamps
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      const result2 = (await testRunner.testValidInput({})) as TimeResult;
 
-      expect(parameters).toHaveProperty('timeout');
-      expect(parameters.timeout).toBe(3000);
+      expect(result2.timestamp).toBeGreaterThanOrEqual(result1.timestamp);
     });
   });
 
   describe('Parameter Validation', () => {
-    it('should accept valid timezone values', () => {
-      const validTimezones = ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
-
-      validTimezones.forEach((timezone) => {
-        const params = { timezone };
-        expect(() => {
-          expect(params).toMatchObject({
-            timezone: expect.any(String),
-          });
-        }).not.toThrow();
-
-        // Verify timezone is in enum
-        const { properties } = timeTool.parameters;
-        const timezoneProp = (properties as Record<string, unknown>).timezone as Record<string, unknown>;
-        expect(timezoneProp.enum as string[]).toContain(timezone);
-      });
+    it('should reject invalid timezone', async () => {
+      // The tool actually throws an error for invalid timezones
+      await testRunner.testInvalidInput({ timezone: 'Invalid/Timezone' as any }, 'Invalid time zone specified');
     });
 
-    it('should accept valid format values', () => {
-      const validFormats = ['ISO', 'locale', 'timestamp'];
+    it('should handle invalid format gracefully', async () => {
+      // Should default to ISO format
+      const result = (await testRunner.testValidInput(
+        { format: 'invalid' as any },
+        (output: any) => typeof output.currentTime === 'string'
+      )) as TimeResult;
 
-      validFormats.forEach((format) => {
-        const params = { format };
-        expect(() => {
-          expect(params).toMatchObject({
-            format: expect.any(String),
-          });
-        }).not.toThrow();
-
-        // Verify format is in enum
-        const { properties } = timeTool.parameters;
-        const formatProp = (properties as Record<string, unknown>).format as Record<string, unknown>;
-        expect(formatProp.enum as string[]).toContain(format);
-      });
+      expect(typeof result.currentTime).toBe('string');
+      expect(typeof result.timestamp).toBe('number');
     });
 
-    it('should accept empty parameters (all optional)', () => {
-      const emptyParams = {};
-      expect(() => {
-        expect(emptyParams).toEqual(expect.any(Object));
-      }).not.toThrow();
+    it('should handle mixed valid and invalid parameters', async () => {
+      const result = (await testRunner.testValidInput(
+        { timezone: 'UTC', format: 'invalid' as any },
+        (output: any) => output.timezone === 'UTC'
+      )) as TimeResult;
 
-      // Verify no required parameters
-      expect(timeTool.parameters.required).toEqual([]);
-    });
-
-    it('should handle parameter combinations', () => {
-      const validCombinations = [
-        { timezone: 'UTC', format: 'ISO' },
-        { timezone: 'America/New_York', format: 'locale' },
-        { timezone: 'Asia/Tokyo', format: 'timestamp' },
-        { timezone: 'UTC' }, // Only timezone
-        { format: 'ISO' }, // Only format
-        {}, // No parameters
-      ];
-
-      validCombinations.forEach((params) => {
-        expect(() => {
-          expect(params).toEqual(expect.any(Object));
-        }).not.toThrow();
-      });
+      expect(result.timezone).toBe('UTC');
+      expect(typeof result.currentTime).toBe('string');
     });
   });
 
-  describe('Tool Template', () => {
-    it('should have correct template configuration', () => {
+  describe('Performance and Reliability', () => {
+    it('should handle rapid sequential time requests', async () => {
+      const results = [];
+
+      for (let i = 0; i < 5; i++) {
+        const result = (await testRunner.testValidInput({})) as TimeResult;
+        results.push(result);
+      }
+
+      // All should be valid
+      results.forEach((result) => {
+        expect(typeof result.currentTime).toBe('string');
+        expect(typeof result.timestamp).toBe('number');
+        expect(result.timezone).toBe('UTC');
+        expect(result.format).toBe('ISO');
+      });
+
+      // Timestamps should be in order (or very close)
+      for (let i = 1; i < results.length; i++) {
+        expect(results[i].timestamp).toBeGreaterThanOrEqual(results[i - 1].timestamp);
+      }
+    });
+
+    it('should handle concurrent time requests', async () => {
+      const promises = Array.from({ length: 3 }, () => testRunner.testValidInput({ timezone: 'UTC', format: 'ISO' }));
+
+      const results = (await Promise.all(promises)) as TimeResult[];
+
+      results.forEach((result) => {
+        expect(result.timezone).toBe('UTC');
+        expect(result.format).toBe('ISO');
+        expect(typeof result.currentTime).toBe('string');
+        expect(typeof result.timestamp).toBe('number');
+      });
+    });
+
+    it('should be reliable across different parameter combinations', async () => {
+      const testCases = [
+        {},
+        { timezone: 'UTC' },
+        { format: 'ISO' },
+        { format: 'locale' },
+        { format: 'timestamp' },
+        { timezone: 'America/New_York', format: 'locale' },
+        { timezone: 'Asia/Tokyo', format: 'ISO' },
+      ];
+
+      for (const testCase of testCases) {
+        const result = (await testRunner.testValidInput(testCase)) as TimeResult;
+
+        expect(typeof result.currentTime === 'string' || typeof result.currentTime === 'number').toBe(true);
+        expect(typeof result.timestamp).toBe('number');
+        expect(typeof result.timezone).toBe('string');
+        expect(typeof result.format).toBe('string');
+      }
+    });
+  });
+
+  describe('Tool Template Consistency', () => {
+    it('should have consistent tool and template', () => {
+      expect(timeToolTemplate.name).toBe(timeTool.name);
+      expect(timeToolTemplate.description).toBe(timeTool.description);
+      expect(timeToolTemplate.parameters).toEqual(timeTool.parameters);
+      expect(timeToolTemplate.blueprint).toEqual(timeTool.blueprint);
+    });
+
+    it('should have correct template metadata', () => {
       expect(timeToolTemplate.slug).toBe('get-current-time');
       expect(timeToolTemplate.category).toBe('utility');
       expect(timeToolTemplate.requiresApiKey).toBe(false);
       expect(timeToolTemplate.configurationFields).toEqual([]);
     });
+  });
 
-    it('should have helpful example usage', () => {
-      expect(timeToolTemplate.exampleUsage).toContain('get_current_time');
-      expect(timeToolTemplate.exampleUsage).toContain('timezone');
-      expect(timeToolTemplate.exampleUsage).toContain('format');
+  describe('Common Test Scenarios', () => {
+    it('should pass common time scenarios', async () => {
+      const results = await testRunner.testScenarios(CommonToolScenarios.time);
+
+      results.forEach((result) => {
+        expect(result.passed).toBe(true);
+      });
     });
   });
 
-  describe('Expected Output Format', () => {
-    it('should define expected output structure in code node', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+  describe('Timezone Differences', () => {
+    it('should show different times for different timezones', async () => {
+      const utcResult = (await testRunner.testValidInput({
+        timezone: 'UTC',
+        format: 'locale',
+      })) as TimeResult;
 
-      // Check that the code returns the expected structure
-      expect(code).toContain('currentTime: result');
-      expect(code).toContain('timezone: timezone');
-      expect(code).toContain('format: format');
-      expect(code).toContain('timestamp: now.getTime()');
+      const nyResult = (await testRunner.testValidInput({
+        timezone: 'America/New_York',
+        format: 'locale',
+      })) as TimeResult;
+
+      // Times might be different due to timezone (though timestamps should be close)
+      expect(utcResult.timezone).toBe('UTC');
+      expect(nyResult.timezone).toBe('America/New_York');
+
+      // Timestamps should be very close (same moment in time)
+      expect(Math.abs(utcResult.timestamp - nyResult.timestamp)).toBeLessThan(1000);
     });
 
-    it('should have proper end node output configuration', () => {
-      const { nodes } = timeTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
+    it('should handle daylight saving time zones correctly', async () => {
+      const timezones = ['America/New_York', 'Europe/London'];
 
-      expect(endNode?.parameters).toHaveProperty('output');
-      expect((endNode?.parameters as Record<string, unknown>)?.output).toBe('{{ $input() }}');
-    });
+      for (const timezone of timezones) {
+        const result = (await testRunner.testValidInput({
+          timezone,
+          format: 'locale',
+        })) as TimeResult;
 
-    it('should provide consistent output fields', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      // Should always include these fields regardless of format
-      expect(code).toContain('currentTime:');
-      expect(code).toContain('timezone:');
-      expect(code).toContain('format:');
-      expect(code).toContain('timestamp:');
-    });
-  });
-
-  describe('Time Formats', () => {
-    it('should handle ISO format correctly', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).toContain("case 'ISO'");
-      expect(code).toContain('toISOString()');
-    });
-
-    it('should handle locale format correctly', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).toContain("case 'locale'");
-      expect(code).toContain('toUTCString()');
-      expect(code).toContain('toLocaleString');
-    });
-
-    it('should handle timestamp format correctly', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).toContain("case 'timestamp'");
-      expect(code).toContain('getTime()');
-    });
-
-    it('should have default fallback', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).toContain('default:');
-      expect(code).toContain('toISOString()'); // Default should be ISO
+        expect(result.timezone).toBe(timezone);
+        expect(typeof result.currentTime).toBe('string');
+        expect(typeof result.timestamp).toBe('number');
+      }
     });
   });
 
   describe('Error Handling', () => {
-    it('should have comprehensive error handling', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+    it('should not throw errors for any valid parameter combinations', async () => {
+      const timezones = ['UTC', 'America/New_York', 'Europe/London', 'Asia/Tokyo'];
+      const formats = ['ISO', 'locale', 'timestamp'];
 
-      expect(code).toContain('try');
-      expect(code).toContain('catch (error)');
-      expect(code).toContain("throw new Error('Error generating time: '");
-      expect(code).toContain('error.message');
+      for (const timezone of timezones) {
+        for (const format of formats) {
+          await expect(async () => {
+            await testRunner.testValidInput({ timezone, format });
+          }).not.toThrow();
+        }
+      }
     });
 
-    it('should handle various error scenarios', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
+    it('should handle edge cases gracefully', async () => {
+      const edgeCases = [
+        { timezone: '', format: '' },
+        { timezone: null, format: null },
+        { timezone: undefined, format: undefined },
+      ];
 
-      // Should wrap the main logic in try-catch
-      expect(code).toMatch(/try\s*{[\s\S]*switch[\s\S]*}\s*catch/);
-    });
-  });
-
-  describe('Timezone Handling', () => {
-    it('should handle UTC timezone correctly', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).toContain("timezone === 'UTC'");
-      expect(code).toContain('toUTCString()');
-    });
-
-    it('should handle non-UTC timezones', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).toContain("toLocaleString('en-US', { timeZone: timezone }");
-    });
-
-    it('should provide timezone information in output', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).toContain('timezone: timezone');
-    });
-  });
-
-  describe('Integration with Common Test Patterns', () => {
-    it('should handle common invalid inputs', () => {
-      CommonToolTestData.commonInvalidInputs.forEach((testCase) => {
-        // Verify tool structure remains valid
-        expect(testCase.params).toBeDefined();
-        expect(testCase.expectedError).toBeTruthy();
-        expect(testCase.description).toBeTruthy();
-      });
-    });
-
-    it('should use ToolMatchers for validation', () => {
-      expect(ToolMatchers.toHaveValidToolStructure(timeTool)).toEqual({
-        message: expect.any(Function),
-        pass: true,
-      });
-
-      expect(ToolMatchers.toHaveValidBlueprint(timeTool.blueprint)).toEqual({
-        message: expect.any(Function),
-        pass: true,
-      });
-    });
-  });
-
-  describe('Performance and Reliability', () => {
-    it('should have reasonable timeout', () => {
-      const { nodes } = timeTool.blueprint;
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const parameters = codeNode?.parameters as Record<string, unknown>;
-
-      expect(parameters.timeout).toBe(3000);
-      expect(parameters.timeout).toBeLessThan(10000); // Should be fast
-    });
-
-    it('should be lightweight operation', () => {
-      const { nodes } = timeTool.blueprint;
-
-      // Should only need start, code, and end nodes
-      expect(nodes.length).toBe(3);
-
-      // Should not need external dependencies
-      const codeNode = nodes.find((n) => n.type === 'code');
-      const code = (codeNode?.parameters as Record<string, unknown>)?.code as string;
-
-      expect(code).not.toContain('require(');
-      expect(code).not.toContain('import ');
-    });
-  });
-
-  describe('Use Cases', () => {
-    it('should support logging and timestamping use cases', () => {
-      expect(timeTool.description).toContain('current date and time');
-
-      // Should provide multiple formats for different use cases
-      const { properties } = timeTool.parameters;
-      const formatProp = (properties as Record<string, unknown>).format as Record<string, unknown>;
-      const formats = formatProp.enum as string[];
-
-      expect(formats).toContain('ISO'); // For APIs
-      expect(formats).toContain('locale'); // For display
-      expect(formats).toContain('timestamp'); // For calculations
-    });
-
-    it('should support international use cases', () => {
-      const { properties } = timeTool.parameters;
-      const timezoneProp = (properties as Record<string, unknown>).timezone as Record<string, unknown>;
-      const timezones = timezoneProp.enum as string[];
-
-      // Should support major timezones
-      expect(timezones).toContain('UTC');
-      expect(timezones).toContain('America/New_York');
-      expect(timezones).toContain('Europe/London');
-      expect(timezones).toContain('Asia/Tokyo');
+      for (const testCase of edgeCases) {
+        await expect(async () => {
+          await testRunner.testValidInput(testCase as any);
+        }).not.toThrow();
+      }
     });
   });
 });

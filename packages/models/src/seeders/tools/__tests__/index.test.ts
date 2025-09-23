@@ -1,17 +1,20 @@
 /**
  * Tools Test Suite Index
- * Comprehensive test coverage for all tool templates using autopilot Tool node
+ * Comprehensive test coverage for all tool templates using end-to-end testing
  */
 
 import { ALL_TOOL_TEMPLATES } from '../index';
-import { ToolTestHelper } from './tool-test-helper';
+import { E2EToolTestHelper } from './e2e-tool-test-helper';
+import type { Node } from '@starships/autopilot';
 
-// Import all individual test suites
-import './calculator.test';
-import './echo.test';
+// Import all individual E2E test suites
+import './calculator-e2e.test';
+import './echo-e2e.test';
+import './tool-list-e2e.test';
+
+// Legacy test suites (for backward compatibility during transition)
 import './time.test';
 import './blueprint-lint.test';
-import './tool-list.test';
 
 describe('Tool Templates Test Suite', () => {
   describe('Tool Suite Integration', () => {
@@ -76,7 +79,7 @@ describe('Tool Templates Test Suite', () => {
 
     it('should have connected blueprints', () => {
       for (const template of ALL_TOOL_TEMPLATES) {
-        const nodeRefs = new Set(template.blueprint.nodes.map((n: { ref: string }) => n.ref));
+        const nodeRefs = new Set(template.blueprint.nodes.map((n: Node) => n.ref));
 
         // All edges should reference existing nodes
         for (const edge of template.blueprint.edges) {
@@ -85,7 +88,7 @@ describe('Tool Templates Test Suite', () => {
         }
 
         // Should have start and end nodes
-        const nodeTypes = template.blueprint.nodes.map((n: { type: string }) => n.type);
+        const nodeTypes = template.blueprint.nodes.map((n: Node) => n.type);
         expect(nodeTypes).toContain('start');
         expect(nodeTypes).toContain('end');
       }
@@ -104,7 +107,7 @@ describe('Tool Templates Test Suite', () => {
         };
 
         expect(() => {
-          new ToolTestHelper(toolParams as never, template, template.name);
+          new E2EToolTestHelper(toolParams as never, template, template.name);
         }).not.toThrow();
       }
     });
@@ -118,7 +121,7 @@ describe('Tool Templates Test Suite', () => {
           blueprint: template.blueprint as never,
         };
 
-        const helper = new ToolTestHelper(toolParams as never, template, template.name);
+        const helper = new E2EToolTestHelper(toolParams as never, template, template.name);
         const validation = helper.runAllValidationTests();
 
         expect(validation.structureValid).toBe(true);

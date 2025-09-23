@@ -132,7 +132,15 @@ export const wikipediaTool: ToolParams = {
               }
             };
           `,
-          timeout: 5000
+          timeout: 5000,
+          // Store metadata in state for later nodes
+          mutations: [
+            {
+              operation: 'add',
+              path: '/state/wikipedia_metadata',
+              value: '{{ $lastOutputOf("prepare_request")[0].json.metadata }}'
+            }
+          ]
         }
       },
       {
@@ -143,10 +151,7 @@ export const wikipediaTool: ToolParams = {
         parameters: {
           url: '{{ $lastOutputOf("prepare_request")[0].json.request.url }}',
           method: '{{ $lastOutputOf("prepare_request")[0].json.request.method }}',
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'StarshipsAI-ResearchAgent/1.0'
-          },
+          headers: '{{ $lastOutputOf("prepare_request")[0].json.request.headers }}',
           timeout: 30000
         }
       },
@@ -157,47 +162,22 @@ export const wikipediaTool: ToolParams = {
         description: 'Combine request metadata with HTTP response',
         parameters: {
           code: `
-            // Get the HTTP response from the previous node
+            // Get the HTTP response from the previous node (fetch_wikipedia)
             const httpResponse = input || {};
             
-            // Get the original metadata from prepare_request node
-            // We need to access it via the state since we can't access other nodes directly
-            // Instead, we'll extract it from the URL
-            const responseUrl = httpResponse.url || '';
-            let action = 'unknown';
-            let query = '';
-            let language = 'en';
+            // Get metadata from state (stored by prepare_request)
+            const metadata = state.wikipedia_metadata || {};
             
-            // Determine action and params from URL pattern
-            if (responseUrl.includes('/api/rest_v1/page/summary/')) {
-              action = 'summary';
-              query = decodeURIComponent(responseUrl.split('/page/summary/')[1] || '');
-            } else if (responseUrl.includes('/api/rest_v1/page/mobile-html/')) {
-              action = 'content';
-              query = decodeURIComponent(responseUrl.split('/page/mobile-html/')[1] || '');
-            } else if (responseUrl.includes('action=opensearch')) {
-              action = 'search';
-              const urlParams = new URLSearchParams(responseUrl.split('?')[1]);
-              query = urlParams.get('search') || '';
-            } else if (responseUrl.includes('action=parse')) {
-              action = 'sections';
-              const urlParams = new URLSearchParams(responseUrl.split('?')[1]);
-              query = urlParams.get('page') || '';
-            }
-            
-            // Extract language from URL
-            const langMatch = responseUrl.match(/https:\\/\\/([a-z]{2})\\.wikipedia\\.org/);
-            if (langMatch) {
-              language = langMatch[1];
-            }
+            console.log('[COMBINE DATA] Metadata from state:', metadata);
+            console.log('[COMBINE DATA] HTTP Response received:', !!httpResponse);
             
             // Pass both response and metadata to next node
             return {
               httpResponse: httpResponse,
               metadata: {
-                action: action,
-                query: query,
-                language: language
+                action: metadata.action || 'unknown',
+                query: metadata.query || '',
+                language: metadata.language || 'en'
               }
             };
           `,

@@ -48,6 +48,7 @@ export async function seedAgentTemplates(): Promise<void> {
             previewPrompts: template.previewPrompts,
             category: template.category,
             name: template.name,
+            assignedToolSlugs: template.assignedToolSlugs,  // Include tool assignments in updates!
           });
           existingCount++;
           logger.info(`Agent template updated: ${template.name} (slug: ${template.slug})`);

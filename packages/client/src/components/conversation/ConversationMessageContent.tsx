@@ -56,6 +56,8 @@ export function ConversationMessageContent({
   const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
   const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
   const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
+  const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
+  const hasAnyToolCalls = totalToolCalls > 0
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)
   const prevCompletedRef = useRef<number>(completedToolResults)
@@ -258,9 +260,9 @@ export function ConversationMessageContent({
         <div className="mt-3">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
-              {!allToolCallsDone ? (
+              {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
-              ) : showCompletionTick ? (
+              ) : allToolCallsDone && showCompletionTick ? (
                 <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
               ) : (
                 <Wrench className="w-3 h-3" />
@@ -410,7 +412,7 @@ export function ConversationMessageContent({
       )}
 
       {/* Streaming indicator - shows after all content including tool calls while streaming */}
-      {isStreaming && (
+      {isStreaming && !hasAnyToolCalls && (
         <div className="flex items-center gap-2 mt-2 text-muted-foreground">
           <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
           {chunks.length > 0 && <span className="text-xs">({chunks.length} chunks)</span>}

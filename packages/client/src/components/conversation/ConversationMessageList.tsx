@@ -97,6 +97,17 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
     return groupedMessages
   }, [storeMessages])
 
+  // Determine which assistant message should display the streaming caret (latest streaming one)
+  const activeStreamingAssistantId = useMemo(() => {
+    let lastId: string | null = null
+    for (const m of displayMessages) {
+      if (m.role === 'assistant' && (m as any).streaming) {
+        lastId = m.id
+      }
+    }
+    return lastId
+  }, [displayMessages])
+
   // Optimized auto-scroll with debouncing
   useEffect(() => {
     if (!scrollContainerRef.current) return
@@ -140,17 +151,6 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
       </div>
     )
   }
-
-  // Determine which assistant message should display the streaming caret (latest streaming one)
-  const activeStreamingAssistantId = useMemo(() => {
-    let lastId: string | null = null
-    for (const m of displayMessages) {
-      if (m.role === 'assistant' && (m as any).streaming) {
-        lastId = m.id
-      }
-    }
-    return lastId
-  }, [displayMessages])
 
   return (
     <div className="h-full flex flex-col">

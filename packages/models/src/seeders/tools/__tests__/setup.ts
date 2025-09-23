@@ -3,6 +3,7 @@
  * Configuration and global setup for tool testing with autopilot
  */
 
+/* eslint-env jest */
 import 'reflect-metadata';
 
 // Mock console methods to reduce test noise
@@ -38,6 +39,7 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
+/* eslint-disable @typescript-eslint/no-namespace */
 // Global test utilities
 declare global {
   namespace jest {
@@ -47,6 +49,7 @@ declare global {
     }
   }
 }
+/* eslint-enable @typescript-eslint/no-namespace */
 
 // Add custom Jest matchers for tool testing
 beforeAll(() => {
@@ -70,8 +73,8 @@ beforeAll(() => {
         received &&
         Array.isArray(received.nodes) &&
         Array.isArray(received.edges) &&
-        received.nodes.some((n: any) => n.type === 'start') &&
-        received.nodes.some((n: any) => n.type === 'end');
+        received.nodes.some((n: { type?: string }) => n.type === 'start') &&
+        received.nodes.some((n: { type?: string }) => n.type === 'end');
 
       return {
         message: () => `Expected blueprint to be valid`,

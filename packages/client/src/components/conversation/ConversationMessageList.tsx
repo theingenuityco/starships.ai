@@ -203,7 +203,7 @@ const MemoizedMessageBubble = memo(
       // User message: Blue bubble on the right
       return (
         <div className="flex justify-end">
-          <div className="mb-4 flex items-end gap-3 max-w-[70%]">
+          <div className="mb-4 mt-4 flex items-end gap-3 max-w-[70%]">
             <div className={`bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
               <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
               {message.sending && (

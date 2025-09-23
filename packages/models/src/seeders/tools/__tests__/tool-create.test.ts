@@ -272,3 +272,56 @@ describe('Tool Create Tool', () => {
     });
   });
 });
+
+describe('Tool.execute return value - tool_create', () => {
+  it('should return a single ExecutionItem with HttpResponse and preserved pairedItem', async () => {
+    const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
+    const input = {
+      name: 'Calculator',
+      slug: 'calculator',
+      description: 'Perform calculations',
+      parameters: { type: 'object', properties: {} },
+      blueprint: {
+        nodes: [
+          { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+          { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: { output: 42 } },
+        ],
+        edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+        metadata: {},
+      },
+      configuration: {},
+      isEnabled: true,
+    };
+
+    global.fetch = jest.fn() as unknown as jest.Mock;
+    (global.fetch as jest.Mock).mockImplementation(async () =>
+      createMockResponse({ data: { id: 'tool-1' } }, { url: 'https://api.test.com/starships/star-1/tools' })
+    );
+
+    const options: NodeHandlerOptions = {
+      eventCallback: jest.fn(),
+      secureEnv: env,
+      execution: ExecutionItemUtils.createExecution(),
+    };
+
+    const toolNode = new Tool(toolCreateTool, options);
+    const raw = await toolNode.execute([{ json: input, pairedItem: { item: 2 } } as ExecutionItem]);
+
+    // Raw ExecutionItem[] assertions
+    expect(Array.isArray(raw)).toBe(true);
+    expect(raw).toHaveLength(1);
+
+    const item = raw[0];
+    expect(item.pairedItem).toEqual({ item: 2 });
+
+    // Ensure HttpResponse shape
+    const http = item.json as { status: number; url: string; body?: unknown };
+    expect(http).toBeDefined();
+    expect(typeof http.status).toBe('number');
+    expect(http.url).toBe('https://api.test.com/starships/star-1/tools');
+
+    // Body should contain server payload
+    const body = http.body as { data?: { id: string } } | undefined;
+    expect(body?.data?.id).toBe('tool-1');
+  });
+});

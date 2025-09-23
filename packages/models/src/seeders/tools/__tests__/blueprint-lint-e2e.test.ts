@@ -121,3 +121,39 @@ describe('Blueprint Lint Tool (E2E)', () => {
     });
   });
 });
+
+describe('Tool.execute return value - blueprint_lint', () => {
+  it('should return a single ExecutionItem with lint result and preserve pairedItem', async () => {
+    const VALID_BLUEPRINT = {
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+        { ref: 'end_1', type: 'end', name: 'End', description: '', parameters: {} },
+      ],
+      edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+      metadata: {},
+    };
+
+    const options: NodeHandlerOptions = {
+      eventCallback: jest.fn(),
+      execution: ExecutionItemUtils.createExecution(),
+    };
+
+    const toolNode = new Tool(blueprintLintTool, options);
+    const raw = await toolNode.execute([{ json: { blueprint: VALID_BLUEPRINT }, pairedItem: { item: 9 } } as ExecutionItem]);
+
+    // Raw ExecutionItem[] assertions
+    expect(Array.isArray(raw)).toBe(true);
+    expect(raw).toHaveLength(1);
+
+    const item = raw[0];
+    expect(item.pairedItem).toEqual({ item: 9 });
+
+    // Lint result shape
+    const lint = item.json as { ok: boolean; issues: string[]; summary: { nodeCount: number; edgeCount: number } };
+    expect(lint).toBeDefined();
+    expect(lint.ok).toBe(true);
+    expect(lint.issues).toEqual([]);
+    expect(lint.summary.nodeCount).toBe(2);
+    expect(lint.summary.edgeCount).toBe(1);
+  });
+});

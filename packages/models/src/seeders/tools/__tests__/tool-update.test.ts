@@ -257,3 +257,42 @@ describe('Tool Update Tool', () => {
     });
   });
 });
+
+describe('Tool.execute return value - tool_update', () => {
+  it('should return a single ExecutionItem with HttpResponse and preserve pairedItem (update by id)', async () => {
+    const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
+
+    // Mock update-by-id response
+    global.fetch = jest.fn() as unknown as jest.Mock;
+    (global.fetch as jest.Mock).mockImplementation(async () =>
+      createMockResponse({ id: 'tool-123', name: 'Updated' }, { url: 'https://api.test.com/tools/tool-123' })
+    );
+
+    const options: NodeHandlerOptions = {
+      eventCallback: jest.fn(),
+      secureEnv: env,
+      execution: ExecutionItemUtils.createExecution(),
+    };
+
+    const toolNode = new Tool(toolUpdateTool, options);
+    const raw = await toolNode.execute([{ json: { id: 'tool-123', name: 'Updated' }, pairedItem: { item: 5 } } as ExecutionItem]);
+
+    // Raw ExecutionItem[] assertions
+    expect(Array.isArray(raw)).toBe(true);
+    expect(raw).toHaveLength(1);
+
+    const item = raw[0];
+    expect(item.pairedItem).toEqual({ item: 5 });
+
+    // Ensure HttpResponse shape
+    const http = item.json as { status: number; url: string; body?: unknown };
+    expect(http).toBeDefined();
+    expect(typeof http.status).toBe('number');
+    expect(http.url).toBe('https://api.test.com/tools/tool-123');
+
+    // Body should contain server payload
+    const body = http.body as { id?: string; name?: string } | undefined;
+    expect(body?.id).toBe('tool-123');
+    expect(body?.name).toBe('Updated');
+  });
+});

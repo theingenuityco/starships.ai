@@ -203,7 +203,6 @@ describe('Tool List Tool', () => {
 
       // Verify the result structure shape produced by summarize node
       const toolList = result as Array<{
-        id: string;
         slug: string;
         name: string;
         description: string;
@@ -212,7 +211,6 @@ describe('Tool List Tool', () => {
 
       // Ensure we received an array and, when items exist, they have expected shape
       if (toolList.length > 0) {
-        expect(toolList[0]).toHaveProperty('id');
         expect(toolList[0]).toHaveProperty('slug');
         expect(toolList[0]).toHaveProperty('name');
         expect(toolList[0]).toHaveProperty('description');
@@ -334,7 +332,6 @@ describe('Tool List Tool', () => {
         const params = summarizeNode.parameters as { code: string };
         expect(params.code).toBeDefined();
         expect(params.code).toContain('map'); // Should process array
-        expect(params.code).toContain('id');
         expect(params.code).toContain('slug');
         expect(params.code).toContain('name');
         expect(params.code).toContain('description');
@@ -409,7 +406,6 @@ describe('Tool.execute return value - tool_list', () => {
 
     // Final result should be the summarized array produced by the "summarize" code node
     const expected = mockResponseData.data.map((t) => ({
-      id: t.id,
       slug: t.slug,
       name: t.name,
       description: t.description,

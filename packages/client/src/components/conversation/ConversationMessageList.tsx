@@ -14,9 +14,10 @@ const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; chunks
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  bottomPaddingPx?: number
 }
 
-export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, bottomPaddingPx }: ConversationMessageListProps) {
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
@@ -154,7 +155,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
 
   return (
     <div className="h-full flex flex-col">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="max-w-4xl mx-auto space-y-2">
           {displayMessages.map(message => (
             <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeStreamingAssistantId} />

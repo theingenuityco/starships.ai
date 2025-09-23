@@ -117,6 +117,25 @@ export function ConversationMessageContent({
     return null as any
   }, [displayContent])
 
+  // Natural language header with tense:
+  // Ongoing: "<agent> is using tool X[, Y] [& some others...]"
+  // Completed: "<agent> used tool X[, Y] [& some others...]"
+  const toolCallHeaderLabel = useMemo(() => {
+    if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null
+    const names = toolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
+    const unique = Array.from(new Set(names))
+    const agent = agentName || 'Assistant'
+
+    const isOngoing = hasPendingToolCalls || (isStreaming && hasAnyToolCalls && !allToolCallsDone)
+    const verb = isOngoing ? 'is using' : 'used'
+    const noun = unique.length === 1 ? 'tool' : 'tools'
+
+    if (unique.length === 0) return `${agent} ${verb} ${noun}`
+    if (unique.length === 1) return `${agent} ${verb} ${noun} ${unique[0]}`
+    const visible = unique.slice(0, 2)
+    return unique.length > 2 ? `${agent} ${verb} ${noun} ${visible.join(', ')} & some others...` : `${agent} ${verb} ${noun} ${visible.join(' & ')}`
+  }, [toolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
+
   const handleCopyContent = async () => {
     try {
       await navigator.clipboard.writeText(displayContent)
@@ -267,7 +286,7 @@ export function ConversationMessageContent({
               ) : (
                 <Wrench className="w-3 h-3" />
               )}
-              Tool Calls ({toolCalls.length})
+              {toolCallHeaderLabel ?? `Tool Calls (${toolCalls.length})`}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-1.5">
@@ -279,6 +298,19 @@ export function ConversationMessageContent({
                   } catch {
                     prettyArgs = String(rawArgs)
                   }
+                  const hasArgs = (() => {
+                    const raw = typeof rawArgs === 'string' ? rawArgs.trim() : ''
+                    if (!raw) return false
+                    try {
+                      const parsed = JSON.parse(raw)
+                      if (parsed && typeof parsed === 'object') {
+                        return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
+                      }
+                      return String(parsed).trim().length > 0
+                    } catch {
+                      return raw.length > 0
+                    }
+                  })()
                   const funcName = (tc as any)?.function?.name || 'unknown'
 
                   // Normalize tool call id from multiple potential fields to be resilient across providers
@@ -301,11 +333,7 @@ export function ConversationMessageContent({
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">Function</span>
                             <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted">{funcName}</span>
-                            {toolCallId && (
-                              <span className="text-xs text-muted-foreground">
-                                ID: <span className="font-mono text-[10px]">{toolCallId.slice(-6)}</span>
-                              </span>
-                            )}
+                            {/* ID removed from header */}
                           </div>
                           <div className="flex items-center gap-1">
                             <Button
@@ -353,10 +381,14 @@ export function ConversationMessageContent({
                         </div>
 
                         <div>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
-                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
-                            <code>{prettyArgs}</code>
-                          </pre>
+                          {hasArgs && (
+                            <>
+                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
+                              <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                                <code>{prettyArgs}</code>
+                              </pre>
+                            </>
+                          )}
 
                           {matchingResult && (
                             <>

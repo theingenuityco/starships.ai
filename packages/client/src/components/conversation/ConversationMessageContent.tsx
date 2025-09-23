@@ -117,9 +117,9 @@ export function ConversationMessageContent({
     return null as any
   }, [displayContent])
 
-  // Natural language header with tense:
-  // Ongoing: "<agent> is using tool X[, Y] [& some others...]"
-  // Completed: "<agent> used tool X[, Y] [& some others...]"
+  // Natural language header with tense and inline code chips for tool names:
+  // Ongoing: "<agent> is using tool `X`[, `Y`] [& some others...]"
+  // Completed: "<agent> used tool `X`[, `Y`] [& some others...]"
   const toolCallHeaderLabel = useMemo(() => {
     if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null
     const names = toolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
@@ -130,10 +130,34 @@ export function ConversationMessageContent({
     const verb = isOngoing ? 'is using' : 'used'
     const noun = unique.length === 1 ? 'tool' : 'tools'
 
-    if (unique.length === 0) return `${agent} ${verb} ${noun}`
-    if (unique.length === 1) return `${agent} ${verb} ${noun} ${unique[0]}`
+    const Chip = ({ children }: any) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+
+    if (unique.length === 0)
+      return (
+        <>
+          {agent} {verb} {noun}
+        </>
+      )
+    if (unique.length === 1) {
+      return (
+        <>
+          {agent} {verb} {noun} <Chip>{unique[0]}</Chip>
+        </>
+      )
+    }
     const visible = unique.slice(0, 2)
-    return unique.length > 2 ? `${agent} ${verb} ${noun} ${visible.join(', ')} & some others...` : `${agent} ${verb} ${noun} ${visible.join(' & ')}`
+    if (unique.length > 2) {
+      return (
+        <>
+          {agent} {verb} {noun} <Chip>{visible[0]}</Chip>, <Chip>{visible[1]}</Chip> & some others...
+        </>
+      )
+    }
+    return (
+      <>
+        {agent} {verb} {noun} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
+      </>
+    )
   }, [toolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
 
   const handleCopyContent = async () => {
@@ -276,7 +300,7 @@ export function ConversationMessageContent({
 
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
-        <div className="my-1.5">
+        <div className="my-2.5">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (

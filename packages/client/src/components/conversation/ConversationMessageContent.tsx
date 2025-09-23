@@ -257,7 +257,7 @@ export function ConversationMessageContent({
 
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
-        <div className="mt-2.5">
+        <div className="my-1.5">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
@@ -307,7 +307,49 @@ export function ConversationMessageContent({
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1" />
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={() => {
+                                // Build a single payload that includes function, id, arguments and (optional) result
+                                let argsParsed: any
+                                try {
+                                  argsParsed = JSON.parse(rawArgs)
+                                } catch {
+                                  // Fallback to the prettified string for non-JSON args
+                                  argsParsed = prettyArgs
+                                }
+
+                                let resultParsed: any = undefined
+                                if (matchingResult) {
+                                  const resultContent = matchingResult.content || ''
+                                  try {
+                                    const t = (resultContent || '').trim()
+                                    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                      resultParsed = JSON.parse(t)
+                                    } else {
+                                      resultParsed = resultContent
+                                    }
+                                  } catch {
+                                    resultParsed = resultContent
+                                  }
+                                }
+
+                                const payload: any = {
+                                  function: funcName,
+                                  id: toolCallId || undefined,
+                                  arguments: argsParsed,
+                                  ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
+                                }
+
+                                handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
+                              }}
+                            >
+                              {copiedStates[combinedBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+                            </Button>
+                          </div>
                         </div>
 
                         <div>

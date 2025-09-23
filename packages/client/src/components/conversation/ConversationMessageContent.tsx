@@ -4,9 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2 } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -51,49 +51,6 @@ export function ConversationMessageContent({
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
-
-  // Initial state: closed if there are already results (existing conversation), open otherwise
-  const [isToolCallsOpen, setIsToolCallsOpen] = useState(() => {
-    return !(toolResults && toolResults.length > 0)
-  })
-
-  // Track when tool results first appear to trigger auto-collapse delay
-  // Always start with 0 to properly detect the first results appearing
-  const prevToolResultsLength = useRef(0)
-  const hasTriggeredCollapseRef = useRef(false)
-  // Skip first effect run to avoid triggering on initial mount/refresh
-  const isFirstRenderRef = useRef(true)
-
-  // Auto-collapse tool calls with delay after result completion.
-  // - Adds a 300ms delay
-  // - Triggers only on transition from 0 -> >0 results (i.e., completion)
-  // - Skips initial mount to avoid triggering on refresh/remount
-  useEffect(() => {
-    const currentResultsLength = toolResults?.length || 0
-    const previousResultsLength = prevToolResultsLength.current
-
-    // Update the ref for next render
-    prevToolResultsLength.current = currentResultsLength
-
-    // Skip the first effect run (initial mount) to avoid triggering on refresh/remount
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false
-      return
-    }
-
-    // Only trigger when:
-    // 1) results first appear (0 -> >0)
-    // 2) we haven't already triggered collapse for this message
-    // 3) the collapsible is currently open (avoid redundant state updates)
-    if (currentResultsLength > 0 && previousResultsLength === 0 && !hasTriggeredCollapseRef.current && isToolCallsOpen) {
-      hasTriggeredCollapseRef.current = true
-      const delayMs = 300
-      const timer = setTimeout(() => {
-        setIsToolCallsOpen(false)
-      }, delayMs)
-      return () => clearTimeout(timer)
-    }
-  }, [toolResults, isToolCallsOpen, messageId])
 
   // Build display content from chunks when streaming; after completion fall back to chunks if final content wasn't persisted
   const displayContent = useMemo(() => {
@@ -269,9 +226,14 @@ export function ConversationMessageContent({
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="mt-3">
-          <Collapsible key={`tool-calls-${isToolCallsOpen}`} defaultOpen={isToolCallsOpen}>
+          <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-2 font-medium">
-              <Wrench className="w-3 h-3" />
+              {(() => {
+                const totalCalls = toolCalls?.length || 0
+                const completed = Array.isArray(toolResults) ? toolResults.length : 0
+                const allDone = totalCalls > 0 && completed >= totalCalls
+                return allDone ? <Check className="w-3 h-3 text-green-600 dark:text-green-400" /> : <Loader2 className="w-3 h-3 animate-spin" />
+              })()}
               Tool Calls ({toolCalls.length})
             </CollapsibleTrigger>
             <CollapsibleContent>

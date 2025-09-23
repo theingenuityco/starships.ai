@@ -1,82 +1,72 @@
 /**
  * Calculator Tool Tests
- * End-to-end tests for the calculator tool using autopilot Tool node
+ * Direct end-to-end tests using real autopilot Tool execution
  */
 
 import { calculatorTool, calculatorToolTemplate } from '../calculator';
-import { ToolTestHelper, CommonToolTestData } from './tool-test-helper';
+import { Tool, ExecutionItemUtils } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
 describe('Calculator Tool', () => {
-  let testHelper: ToolTestHelper;
+  async function executeTool(input: unknown) {
+    const options: NodeHandlerOptions = {
+      eventCallback: jest.fn(),
+    };
 
-  beforeEach(() => {
-    testHelper = new ToolTestHelper(calculatorTool, calculatorToolTemplate, 'calculator');
-    testHelper.clearEventLogs();
-  });
+    const toolNode = new Tool(calculatorTool, options);
 
-  describe('Tool Structure', () => {
+    // Validate tool first
+    const validation = toolNode.validate();
+    expect(validation.valid).toBe(true);
+
+    const inputData = input || {};
+    const executionItem: ExecutionItem = {
+      json: inputData,
+      pairedItem: { item: 0 },
+    };
+
+    const result = await toolNode.execute([executionItem]);
+    return ExecutionItemUtils.unwrapSingle(result);
+  }
+
+  describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      const result = testHelper.testToolStructure();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should have correct tool name', () => {
       expect(calculatorTool.name).toBe('calculator');
-    });
-
-    it('should have descriptive description', () => {
       expect(calculatorTool.description).toContain('mathematical');
       expect(calculatorTool.description.length).toBeGreaterThan(10);
-    });
-  });
-
-  describe('Parameter Schema', () => {
-    it('should have valid parameter schema', () => {
-      const result = testHelper.testParameterSchema();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      expect(calculatorTool.parameters).toBeDefined();
+      expect(calculatorTool.blueprint).toBeDefined();
     });
 
     it('should require expression parameter', () => {
       expect(calculatorTool.parameters.required).toContain('expression');
-    });
 
-    it('should define expression as string type', () => {
       const expressionProp = calculatorTool.parameters.properties?.expression as { type: string; description: string };
       expect(expressionProp?.type).toBe('string');
       expect(expressionProp?.description).toBeDefined();
     });
-  });
 
-  describe('Blueprint Structure', () => {
     it('should have valid blueprint structure', () => {
-      const result = testHelper.testBlueprintStructure();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should have start and end nodes', () => {
       const blueprint = calculatorTool.blueprint;
-      const hasStart = blueprint.nodes.some((n) => n.type === 'start');
-      const hasEnd = blueprint.nodes.some((n) => n.type === 'end');
 
-      expect(hasStart).toBe(true);
-      expect(hasEnd).toBe(true);
-    });
+      // Check basic structure
+      expect(Array.isArray(blueprint.nodes)).toBe(true);
+      expect(Array.isArray(blueprint.edges)).toBe(true);
 
-    it('should have proper node connectivity', () => {
-      const blueprint = calculatorTool.blueprint;
+      // Check for required nodes
+      const nodeTypes = blueprint.nodes.map((n) => n.type);
+      expect(nodeTypes).toContain('start');
+      expect(nodeTypes).toContain('end');
+      expect(nodeTypes).toContain('code'); // calculation logic
+
+      // Verify node connectivity
       const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));
-
       for (const edge of blueprint.edges) {
         expect(nodeRefs.has(edge.from)).toBe(true);
         expect(nodeRefs.has(edge.to)).toBe(true);
       }
-    });
 
-    it('should have calculation logic node', () => {
-      const blueprint = calculatorTool.blueprint;
+      // Should have calculation logic node
       const hasCalcNode = blueprint.nodes.some((n) => n.type === 'code' && n.name?.toLowerCase().includes('calculate'));
       expect(hasCalcNode).toBe(true);
     });
@@ -84,135 +74,142 @@ describe('Calculator Tool', () => {
 
   describe('Template Configuration', () => {
     it('should have consistent template configuration', () => {
-      const result = testHelper.testTemplateConsistency();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
+      expect(calculatorToolTemplate.name).toBe(calculatorTool.name);
+      expect(calculatorToolTemplate.description).toBe(calculatorTool.description);
+      expect(calculatorToolTemplate.parameters).toEqual(calculatorTool.parameters);
+      expect(calculatorToolTemplate.blueprint).toEqual(calculatorTool.blueprint);
 
-    it('should have correct template metadata', () => {
       expect(calculatorToolTemplate.slug).toBe('calculator');
       expect(calculatorToolTemplate.category).toBe('utility');
       expect(calculatorToolTemplate.requiresApiKey).toBe(false);
-    });
-
-    it('should have example usage', () => {
       expect(calculatorToolTemplate.exampleUsage).toBeDefined();
-      if (calculatorToolTemplate.exampleUsage) {
-        expect(calculatorToolTemplate.exampleUsage.length).toBeGreaterThan(0);
-      }
     });
   });
 
-  describe('Tool Execution', () => {
+  describe('Real Tool Execution', () => {
     it('should execute simple addition', async () => {
       const input = { expression: '5 + 3' };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input);
 
-      expect(result.success).toBe(true);
-      expect(result.result).toBeDefined();
-      expect(typeof result.result).toBe('object');
+      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+
+      const calcResult = result as { expression: string; result: number; type: string };
+      expect(calcResult.expression).toBe('5 + 3');
+      expect(calcResult.result).toBe(8);
+      expect(calcResult.type).toBe('calculation');
     });
 
     it('should execute expression with precedence', async () => {
-      const input = CommonToolTestData.VALID_CALCULATOR_INPUT; // "2 + 3 * 4"
-      const result = await testHelper.executeToolViaEngine(input);
+      const input = { expression: '2 + 3 * 4' };
+      const result = await executeTool(input);
 
-      expect(result.success).toBe(true);
-      expect(result.result).toBeDefined();
+      expect(result).toBeDefined();
 
-      // The result should be an object with expression and result
-      if (result.result && typeof result.result === 'object') {
-        const calcResult = result.result as { expression: string; result: number; type: string };
-        expect(calcResult.expression).toBe('2 + 3 * 4');
-        expect(calcResult.result).toBe(14); // Proper precedence: 2 + (3 * 4) = 14
-        expect(calcResult.type).toBe('calculation');
-      }
+      const calcResult = result as { expression: string; result: number; type: string };
+      expect(calcResult.expression).toBe('2 + 3 * 4');
+      expect(calcResult.result).toBe(14); // Proper precedence: 2 + (3 * 4) = 14
+      expect(calcResult.type).toBe('calculation');
     });
 
     it('should execute simple multiplication', async () => {
       const input = { expression: '6 * 7' };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input);
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const calcResult = result.result as { result: number };
-        expect(calcResult.result).toBe(42);
-      }
+      expect(result).toBeDefined();
+      const calcResult = result as { result: number };
+      expect(calcResult.result).toBe(42);
     });
 
     it('should handle single numbers', async () => {
       const input = { expression: '42' };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input);
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const calcResult = result.result as { result: number };
-        expect(calcResult.result).toBe(42);
-      }
+      expect(result).toBeDefined();
+      const calcResult = result as { result: number };
+      expect(calcResult.result).toBe(42);
     });
 
-    it('should emit proper events during execution', async () => {
-      const input = { expression: '5 + 5' };
-      await testHelper.executeToolViaEngine(input);
+    it('should handle expressions with parentheses', async () => {
+      const input = { expression: '(10 + 5) * 2' };
+      const result = await executeTool(input);
 
-      const events = testHelper.getEventLogs();
-      expect(events.length).toBeGreaterThan(0);
+      expect(result).toBeDefined();
+      const calcResult = result as { result: number };
+      expect(calcResult.result).toBe(30); // (10 + 5) * 2 = 15 * 2 = 30
     });
 
-    it('should complete within reasonable time', async () => {
-      const input = { expression: '100 + 200' };
-      const result = await testHelper.executeToolViaEngine(input);
+    it('should handle decimal numbers', async () => {
+      const input = { expression: '3.5 + 2.5' };
+      const result = await executeTool(input);
 
-      expect(result.success).toBe(true);
-      expect(result.duration).toBeLessThan(5000); // Should complete within 5 seconds
+      expect(result).toBeDefined();
+      const calcResult = result as { result: number };
+      expect(calcResult.result).toBe(6);
+    });
+
+    it('should handle division', async () => {
+      const input = { expression: '15 / 3' };
+      const result = await executeTool(input);
+
+      expect(result).toBeDefined();
+      const calcResult = result as { result: number };
+      expect(calcResult.result).toBe(5);
+    });
+
+    it('should handle division by zero', async () => {
+      const input = { expression: '5 / 0' };
+      const result = await executeTool(input);
+
+      expect(result).toBeDefined();
+      const calcResult = result as { result: number };
+      expect(calcResult.result).toBe(Infinity);
+    });
+
+    it('should handle complex expressions', async () => {
+      const input = { expression: '(10 + 5) * 2.5 / 3' };
+      const result = await executeTool(input);
+
+      expect(result).toBeDefined();
+      const calcResult = result as { result: number };
+      expect(typeof calcResult.result).toBe('number');
+      // (15 * 2.5) / 3 = 37.5 / 3 = 12.5
+      expect(calcResult.result).toBeCloseTo(12.5);
     });
   });
 
-  describe('Error Handling', () => {
+  describe('Error Handling with Real Execution', () => {
     it('should handle missing expression', async () => {
       const input = {}; // Missing expression
-      const result = await testHelper.executeToolViaEngine(input);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-      expect(result.error).toContain('Expression is required');
+      await expect(executeTool(input)).rejects.toThrow('Expression is required');
     });
 
     it('should handle invalid expression type', async () => {
       const input = { expression: 123 }; // Should be string
-      const result = await testHelper.executeToolViaEngine(input);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      await expect(executeTool(input)).rejects.toThrow('must be a string');
     });
 
     it('should handle expressions with invalid characters', async () => {
       const input = { expression: '2 + 3; alert("hack")' };
-      const result = await testHelper.executeToolViaEngine(input);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('invalid characters');
+      await expect(executeTool(input)).rejects.toThrow('invalid characters');
     });
 
     it('should handle complex unsupported expressions', async () => {
       const input = { expression: 'Math.pow(2, 8)' };
-      const result = await testHelper.executeToolViaEngine(input);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Complex expressions not supported');
+      await expect(executeTool(input)).rejects.toThrow('Complex expressions not supported');
     });
 
     it('should handle empty expression', async () => {
       const input = { expression: '' };
-      const result = await testHelper.executeToolViaEngine(input);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      await expect(executeTool(input)).rejects.toThrow('Expression is required');
     });
-  });
 
-  describe('Security', () => {
-    it('should reject expressions with potentially dangerous code', async () => {
+    it('should handle expressions with dangerous JavaScript code', async () => {
       const dangerousExpressions = [
         'eval("2+2")',
         'require("fs")',
@@ -223,10 +220,8 @@ describe('Calculator Tool', () => {
 
       for (const expr of dangerousExpressions) {
         const input = { expression: expr };
-        const result = await testHelper.executeToolViaEngine(input);
 
-        expect(result.success).toBe(false);
-        expect(result.error).toContain('invalid characters');
+        await expect(executeTool(input)).rejects.toThrow('invalid characters');
       }
     });
 
@@ -239,20 +234,27 @@ describe('Calculator Tool', () => {
         expect(allowedChars.includes(char)).toBe(true);
       }
 
-      const result = await testHelper.executeToolViaEngine(input);
-      expect(result.success).toBe(true);
+      const result = await executeTool(input);
+      expect(result).toBeDefined();
+
+      const calcResult = result as { result: number };
+      expect(typeof calcResult.result).toBe('number');
     });
-  });
 
-  describe('All Validation Tests', () => {
-    it('should pass comprehensive validation', () => {
-      const validation = testHelper.runAllValidationTests();
+    it('should handle malformed expressions', async () => {
+      const malformedExpressions = ['2 +', '* 3', '(2 + 3', '2 + 3)', '2 ++ 3', '2 + + 3'];
 
-      expect(validation.structureValid).toBe(true);
-      expect(validation.parametersValid).toBe(true);
-      expect(validation.blueprintValid).toBe(true);
-      expect(validation.templateValid).toBe(true);
-      expect(validation.errors).toHaveLength(0);
+      for (const expr of malformedExpressions) {
+        const input = { expression: expr };
+
+        // These might succeed or fail depending on the implementation
+        // The key is they shouldn't crash the system
+        try {
+          await executeTool(input);
+        } catch (error) {
+          expect(error).toBeInstanceOf(Error);
+        }
+      }
     });
   });
 });

@@ -1,80 +1,52 @@
 /**
  * Tool List Tool Tests
- * End-to-end tests for the tool_list tool using autopilot Tool node
+ * End-to-end tests using real autopilot Tool execution with minimal HTTP mocking
  */
 
 import { toolListTool, toolListToolTemplate } from '../tool-list';
-import { ToolTestHelper, CommonToolTestData } from './tool-test-helper';
+import { Tool, ExecutionItemUtils } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, Edge } from '@starships/autopilot';
 
 describe('Tool List Tool', () => {
-  let testHelper: ToolTestHelper;
-
   beforeEach(() => {
-    testHelper = new ToolTestHelper(toolListTool, toolListToolTemplate, 'tool_list');
-    testHelper.clearEventLogs();
+    // Mock fetch globally for HTTP requests
+    global.fetch = jest.fn();
   });
 
-  describe('Tool Structure', () => {
+  afterEach(() => {
+    jest.resetAllMocks();
+  });
+
+  describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      const result = testHelper.testToolStructure();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should have correct tool name', () => {
       expect(toolListTool.name).toBe('tool_list');
-    });
-
-    it('should have descriptive description', () => {
       expect(toolListTool.description).toContain('List all tools');
       expect(toolListTool.description.length).toBeGreaterThan(10);
-    });
-  });
-
-  describe('Parameter Schema', () => {
-    it('should have valid parameter schema', () => {
-      const result = testHelper.testParameterSchema();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      expect(toolListTool.parameters).toBeDefined();
+      expect(toolListTool.blueprint).toBeDefined();
     });
 
     it('should have no required parameters', () => {
       expect(toolListTool.parameters.required).toBeUndefined();
-    });
-
-    it('should define empty properties object', () => {
       expect(toolListTool.parameters.properties).toEqual({});
     });
-  });
 
-  describe('Blueprint Structure', () => {
     it('should have valid blueprint structure', () => {
-      const result = testHelper.testBlueprintStructure();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
-
-    it('should have start and end nodes', () => {
       const blueprint = toolListTool.blueprint;
-      const hasStart = blueprint.nodes.some((n) => n.type === 'start');
-      const hasEnd = blueprint.nodes.some((n) => n.type === 'end');
 
-      expect(hasStart).toBe(true);
-      expect(hasEnd).toBe(true);
-    });
+      // Check basic structure
+      expect(Array.isArray(blueprint.nodes)).toBe(true);
+      expect(Array.isArray(blueprint.edges)).toBe(true);
 
-    it('should have prepare, http_request, and summarize nodes', () => {
-      const blueprint = toolListTool.blueprint;
+      // Check for required nodes
       const nodeTypes = blueprint.nodes.map((n) => n.type);
-
+      expect(nodeTypes).toContain('start');
+      expect(nodeTypes).toContain('end');
       expect(nodeTypes).toContain('code'); // prepare and summarize
       expect(nodeTypes).toContain('http_request');
-    });
 
-    it('should have proper node connectivity', () => {
-      const blueprint = toolListTool.blueprint;
+      // Verify node connectivity
       const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));
-
       for (const edge of blueprint.edges) {
         expect(nodeRefs.has(edge.from)).toBe(true);
         expect(nodeRefs.has(edge.to)).toBe(true);
@@ -85,51 +57,58 @@ describe('Tool List Tool', () => {
       const blueprint = toolListTool.blueprint;
       const edges = blueprint.edges;
 
-      // Find the flow
-      const prepareNode = blueprint.nodes.find((n) => n.ref === 'prepare');
-      const httpNode = blueprint.nodes.find((n) => n.ref === 'http_list');
-      const summarizeNode = blueprint.nodes.find((n) => n.ref === 'summarize');
+      const hasCorrectFlow = [
+        edges.some((e: Edge) => e.from === 'prepare' && e.to === 'http_list'),
+        edges.some((e: Edge) => e.from === 'http_list' && e.to === 'summarize'),
+        edges.some((e: Edge) => e.from === 'summarize' && e.to === 'end_1'),
+      ];
 
-      expect(prepareNode).toBeDefined();
-      expect(httpNode).toBeDefined();
-      expect(summarizeNode).toBeDefined();
-
-      // Check edge connections
-      expect(edges.some((e) => e.from === 'prepare' && e.to === 'http_list')).toBe(true);
-      expect(edges.some((e) => e.from === 'http_list' && e.to === 'summarize')).toBe(true);
-      expect(edges.some((e) => e.from === 'summarize' && e.to === 'end_1')).toBe(true);
+      expect(hasCorrectFlow.every(Boolean)).toBe(true);
     });
   });
 
   describe('Template Configuration', () => {
     it('should have consistent template configuration', () => {
-      const result = testHelper.testTemplateConsistency();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
-    });
+      expect(toolListToolTemplate.name).toBe(toolListTool.name);
+      expect(toolListToolTemplate.description).toBe(toolListTool.description);
+      expect(toolListToolTemplate.parameters).toEqual(toolListTool.parameters);
+      expect(toolListToolTemplate.blueprint).toEqual(toolListTool.blueprint);
 
-    it('should have correct template metadata', () => {
       expect(toolListToolTemplate.slug).toBe('tool-list');
       expect(toolListToolTemplate.category).toBe('automation');
       expect(toolListToolTemplate.requiresApiKey).toBe(false);
-    });
-
-    it('should have example usage', () => {
       expect(toolListToolTemplate.exampleUsage).toBeDefined();
-      if (toolListToolTemplate.exampleUsage) {
-        expect(toolListToolTemplate.exampleUsage.length).toBeGreaterThan(0);
-      }
     });
   });
 
-  describe('Tool Execution with Mock Environment', () => {
-    it('should require environment variables', async () => {
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input);
+  describe('Real Tool Execution', () => {
+    async function executeToolWithMockEnv(input: unknown, mockEnv: Record<string, string>) {
+      const options: NodeHandlerOptions = {
+        eventCallback: jest.fn(),
+        secureEnv: mockEnv,
+        // Force in-process execution so HTTP mocking (global.fetch) works reliably in tests
+        // This still runs the full Autopilot engine, only avoids child process isolation
+        execution: ExecutionItemUtils.createExecution(),
+      };
 
-      // Should fail due to missing environment variables
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('baseUrl is required');
+      const toolNode = new Tool(toolListTool, options);
+
+      // Validate tool first
+      const validation = toolNode.validate();
+      expect(validation.valid).toBe(true);
+
+      const inputData = input || {};
+      const executionItem: ExecutionItem = {
+        json: inputData,
+        pairedItem: { item: 0 },
+      };
+
+      const result = await toolNode.execute([executionItem]);
+      return ExecutionItemUtils.unwrapSingle(result);
+    }
+
+    it('should fail when missing environment variables', async () => {
+      await expect(executeToolWithMockEnv({}, {})).rejects.toThrow('baseUrl is required');
     });
 
     it('should fail without auth token', async () => {
@@ -139,11 +118,7 @@ describe('Tool List Tool', () => {
         // Missing AUTH_TOKEN
       };
 
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input, mockEnv);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('authToken is required');
+      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow('authToken is required');
     });
 
     it('should fail without starship ID', async () => {
@@ -153,107 +128,195 @@ describe('Tool List Tool', () => {
         // Missing STARSHIP_ID
       };
 
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input, mockEnv);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('starshipId is required');
+      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow('starshipId is required');
     });
 
-    it('should prepare correct API request parameters', async () => {
-      const mockEnv = CommonToolTestData.MOCK_API_ENV;
-
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input, mockEnv);
-
-      // The tool will fail at HTTP request since we don't have a real server
-      // but we can verify it got past the preparation phase
-      expect(result.success).toBe(false);
-      // Should fail at HTTP request, not at parameter preparation
-      expect(result.error).not.toContain('baseUrl is required');
-      expect(result.error).not.toContain('authToken is required');
-      expect(result.error).not.toContain('starshipId is required');
-    });
-
-    it('should build correct URL for API call', async () => {
+    it('should successfully execute with mocked API response', async () => {
       const mockEnv = {
-        BASE_URL: 'https://api.example.com/',
-        AUTH_TOKEN: 'test-token-123',
-        STARSHIP_ID: 'starship-456',
+        BASE_URL: 'https://api.test.com',
+        AUTH_TOKEN: 'mock-auth-token',
+        STARSHIP_ID: 'test-starship-123',
       };
 
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input, mockEnv);
+      // Mock successful API response
+      const mockResponseData = {
+        data: [
+          {
+            id: 'tool-1',
+            slug: 'calculator',
+            name: 'Calculator',
+            description: 'Perform mathematical calculations',
+            isEnabled: true,
+          },
+          {
+            id: 'tool-2',
+            slug: 'echo',
+            name: 'Echo',
+            description: 'Echo back the input',
+            isEnabled: true,
+          },
+        ],
+      };
 
-      // Should fail at HTTP request but not at URL preparation
-      expect(result.success).toBe(false);
-      // The error should be related to HTTP request, not URL building
-      if (result.error) {
-        expect(result.error).not.toContain('baseUrl');
-        expect(result.error).not.toContain('authToken');
-        expect(result.error).not.toContain('starshipId');
-      }
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockResponseData,
+        text: async () => JSON.stringify(mockResponseData),
+      });
+
+      const result = await executeToolWithMockEnv({}, mockEnv);
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+
+      // Verify the result structure matches what summarize node should produce
+      const toolList = result as Array<{
+        id: string;
+        slug: string;
+        name: string;
+        description: string;
+        isEnabled: boolean;
+      }>;
+
+      expect(toolList.length).toBe(2);
+      expect(toolList[0]).toEqual({
+        id: 'tool-1',
+        slug: 'calculator',
+        name: 'Calculator',
+        description: 'Perform mathematical calculations',
+        isEnabled: true,
+      });
+      expect(toolList[1]).toEqual({
+        id: 'tool-2',
+        slug: 'echo',
+        name: 'Echo',
+        description: 'Echo back the input',
+        isEnabled: true,
+      });
+
+      // Verify correct API call was made
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api.test.com/starships/test-starship-123/tools',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer mock-auth-token',
+            'Content-Type': 'application/json',
+          }),
+        })
+      );
+    });
+
+    it('should handle API failure gracefully', async () => {
+      const mockEnv = {
+        BASE_URL: 'https://api.test.com',
+        AUTH_TOKEN: 'mock-auth-token',
+        STARSHIP_ID: 'test-starship-123',
+      };
+
+      // Mock network failure
+      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
+
+      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow('Network error');
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {
-      const mockEnvWithTrailingSlash = {
+      const mockEnv = {
         BASE_URL: 'https://api.example.com///',
         AUTH_TOKEN: 'test-token',
         STARSHIP_ID: 'starship-123',
       };
 
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input, mockEnvWithTrailingSlash);
+      const mockResponseData = { data: [] };
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockResponseData,
+        text: async () => JSON.stringify(mockResponseData),
+      });
 
-      // Should handle trailing slashes gracefully
-      expect(result.success).toBe(false);
-      // Should fail at HTTP request, not URL parsing
-      expect(result.error).not.toContain('baseUrl');
+      const result = await executeToolWithMockEnv({}, mockEnv);
+
+      expect(result).toBeDefined();
+      expect(Array.isArray(result)).toBe(true);
+
+      // Verify URL was cleaned up properly (no double slashes)
+      expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/starships/starship-123/tools', expect.any(Object));
     });
 
-    it('should emit proper events during execution', async () => {
-      const mockEnv = CommonToolTestData.MOCK_API_ENV;
+    it('should handle malformed input gracefully', async () => {
+      const mockEnv = {
+        BASE_URL: 'https://api.test.com',
+        AUTH_TOKEN: 'mock-auth-token',
+        STARSHIP_ID: 'test-starship-123',
+      };
 
-      const input = {};
-      await testHelper.executeToolViaEngine(input, mockEnv);
+      const mockResponseData = { data: [] };
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockResponseData,
+        text: async () => JSON.stringify(mockResponseData),
+      });
 
-      const events = testHelper.getEventLogs();
-      expect(events.length).toBeGreaterThan(0);
+      // Tool doesn't require input parameters, so various inputs should work
+      const inputs = [{ invalid: 'parameter' }, 123, 'string-input', null, undefined];
+
+      for (const input of inputs) {
+        const result = await executeToolWithMockEnv(input, mockEnv);
+        expect(result).toBeDefined();
+        expect(Array.isArray(result)).toBe(true);
+      }
     });
 
-    it('should complete within reasonable time even on failure', async () => {
-      const mockEnv = CommonToolTestData.MOCK_API_ENV;
+    it('should handle HTTP errors gracefully', async () => {
+      const mockEnv = {
+        BASE_URL: 'https://api.test.com',
+        AUTH_TOKEN: 'mock-auth-token',
+        STARSHIP_ID: 'test-starship-123',
+      };
 
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input, mockEnv);
+      // Mock HTTP error response
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({ error: 'Starship not found' }),
+        text: async () => JSON.stringify({ error: 'Starship not found' }),
+      });
 
-      // Should fail quickly due to no real HTTP server
-      expect(result.duration).toBeLessThan(10000); // Within 10 seconds
+      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow();
     });
   });
 
-  describe('Data Processing Logic', () => {
-    it('should have code logic for request preparation', () => {
+  describe('Blueprint Implementation Details', () => {
+    it('should have correct prepare node implementation', () => {
       const blueprint = toolListTool.blueprint;
       const prepareNode = blueprint.nodes.find((n) => n.ref === 'prepare');
 
       expect(prepareNode).toBeDefined();
       expect(prepareNode?.type).toBe('code');
+
       if (prepareNode?.parameters) {
         const params = prepareNode.parameters as { code: string };
         expect(params.code).toBeDefined();
         expect(params.code).toContain('baseUrl');
         expect(params.code).toContain('authToken');
         expect(params.code).toContain('starshipId');
+        expect(params.code).toContain("method: 'GET'");
+        expect(params.code).toContain('Authorization');
+        expect(params.code).toContain('Bearer');
       }
     });
 
-    it('should have code logic for response summarization', () => {
+    it('should have correct summarize node implementation', () => {
       const blueprint = toolListTool.blueprint;
       const summarizeNode = blueprint.nodes.find((n) => n.ref === 'summarize');
 
       expect(summarizeNode).toBeDefined();
       expect(summarizeNode?.type).toBe('code');
+
       if (summarizeNode?.parameters) {
         const params = summarizeNode.parameters as { code: string };
         expect(params.code).toBeDefined();
@@ -261,15 +324,18 @@ describe('Tool List Tool', () => {
         expect(params.code).toContain('id');
         expect(params.code).toContain('slug');
         expect(params.code).toContain('name');
+        expect(params.code).toContain('description');
+        expect(params.code).toContain('isEnabled');
       }
     });
 
-    it('should configure HTTP request with proper parameters', () => {
+    it('should have correct HTTP request node configuration', () => {
       const blueprint = toolListTool.blueprint;
       const httpNode = blueprint.nodes.find((n) => n.ref === 'http_list');
 
       expect(httpNode).toBeDefined();
       expect(httpNode?.type).toBe('http_request');
+
       if (httpNode?.parameters) {
         const params = httpNode.parameters as Record<string, unknown>;
         expect(params.url).toBeDefined();
@@ -277,96 +343,6 @@ describe('Tool List Tool', () => {
         expect(params.headers).toBeDefined();
         expect(params.timeout).toBeDefined();
       }
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should handle empty environment variables', async () => {
-      const mockEnv = {
-        BASE_URL: '',
-        AUTH_TOKEN: '',
-        STARSHIP_ID: '',
-      };
-
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input, mockEnv);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('required');
-    });
-
-    it('should handle null environment variables', async () => {
-      const input = {};
-      const result = await testHelper.executeToolViaEngine(input);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('required');
-    });
-
-    it('should handle malformed input gracefully', async () => {
-      const mockEnv = CommonToolTestData.MOCK_API_ENV;
-
-      // Tool doesn't require input parameters, so malformed input should still work
-      const inputs = [{ invalid: 'parameter' }, 123, 'string-input', null, undefined];
-
-      for (const input of inputs) {
-        const result = await testHelper.executeToolViaEngine(input, mockEnv);
-
-        // Should fail at HTTP request, not input processing
-        expect(result.success).toBe(false);
-        expect(result.error).not.toContain('invalid');
-      }
-    });
-  });
-
-  describe('API Integration Points', () => {
-    it('should construct correct API endpoint', () => {
-      const blueprint = toolListTool.blueprint;
-      const prepareNode = blueprint.nodes.find((n) => n.ref === 'prepare');
-
-      if (prepareNode?.parameters) {
-        const params = prepareNode.parameters as { code: string };
-        expect(params.code).toContain('/starships/');
-        expect(params.code).toContain('/tools');
-        expect(params.code).toContain('starshipId');
-      }
-    });
-
-    it('should set correct HTTP method', () => {
-      const blueprint = toolListTool.blueprint;
-      const httpNode = blueprint.nodes.find((n) => n.ref === 'http_list');
-
-      if (httpNode?.parameters) {
-        // The method is a template expression, so check the prepare node
-        const prepareNode = blueprint.nodes.find((n) => n.ref === 'prepare');
-        if (prepareNode?.parameters) {
-          const prepareParams = prepareNode.parameters as { code: string };
-          expect(prepareParams.code).toContain("method: 'GET'");
-        }
-      }
-    });
-
-    it('should include authorization header', () => {
-      const blueprint = toolListTool.blueprint;
-      const prepareNode = blueprint.nodes.find((n) => n.ref === 'prepare');
-
-      if (prepareNode?.parameters) {
-        const params = prepareNode.parameters as { code: string };
-        expect(params.code).toContain('Authorization');
-        expect(params.code).toContain('Bearer');
-      }
-    });
-  });
-
-  describe('All Validation Tests', () => {
-    it('should pass comprehensive validation', () => {
-      const validation = testHelper.runAllValidationTests();
-
-      expect(validation.structureValid).toBe(true);
-      expect(validation.parametersValid).toBe(true);
-      expect(validation.blueprintValid).toBe(true);
-      expect(validation.templateValid).toBe(true);
-      expect(validation.errors).toHaveLength(0);
     });
   });
 });

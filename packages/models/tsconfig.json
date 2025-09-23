@@ -6,6 +6,7 @@
     "rootDir": "./src",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "isolatedModules": true,
     "types": ["node", "jest"],
     "baseUrl": ".",
     "paths": {

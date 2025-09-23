@@ -115,9 +115,13 @@ export class ExecutionItemUtils {
    * This is a common pattern used when nodes need to execute nested blueprints
    */
   static createExecution(input?: ExecutionItem[], parentExecution?: Execution): Execution {
+    // Inherit parent execution state into the new execution (shallow-deep clone) so nested runs
+    // can access contextual data like state.starshipId without leaking mutations back.
+    const parentState = parentExecution && parentExecution.state ? JSON.parse(JSON.stringify(parentExecution.state)) : {};
+
     const execution: Execution = {
       status: 'not_started',
-      state: {},
+      state: parentState,
       results: [],
       depth: parentExecution ? (parentExecution.depth || 0) + 1 : 0, // Auto-calculate depth
     };

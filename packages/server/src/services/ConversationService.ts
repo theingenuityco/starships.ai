@@ -6,6 +6,7 @@ import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import { Operation } from 'fast-json-patch';
+import { getEnvConfig } from '@starships/env';
 
 /**
  * Autopilot child process configuration
@@ -171,7 +172,7 @@ export class ConversationService {
     }
   }
 
-  async addConversationMessage(data: Message & { conversationId: string }): Promise<void> {
+  async addConversationMessage(data: Message & { conversationId: string }, ctx?: { authorization?: string }): Promise<void> {
     // Save user message to database
     const userMessage = await this.messageService.createMessage({
       conversationId: data.conversationId,
@@ -217,17 +218,33 @@ export class ConversationService {
       // console.log('>>>Resolved tools', { resolvedTools });
 
       // Build Agent to materialize blueprint (tools, nodes, etc.)
+      const env = getEnvConfig();
+      const baseUrl = `${env.SERVER_URL}/api/v1`;
+      const rawAuth = ctx?.authorization ?? '';
+      const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
+      const openRouterKey = env.OPENROUTER_API_KEY || '';
+
+      const secureEnv: Record<string, string> = {
+        STARSHIP_ID: starship.id,
+        BASE_URL: baseUrl,
+        ...(authToken ? { AUTH_TOKEN: authToken } : {}),
+        ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
+      };
+
       const agentWithTools: AgentParams = {
         ...agentModel,
         state: {
           ...agentModel.state,
           tools: resolvedTools,
+          // Do not inject secrets into state
+          starshipId: starship.id,
         },
       };
 
-      // Create Agent with ChildProcessRunner for isolation
+      // Create Agent with secureEnv for eval across all nodes
       const agent = new Agent(agentWithTools, {
         eventCallback: (event) => this.eventCallback(data.conversationId, event),
+        secureEnv,
       });
 
       // Convert database messages to LLM format, preserving tool_calls and tool results
@@ -563,8 +580,14 @@ export class ConversationService {
         // Track persistence as an async task so workflow_completed can await before emitting "complete"
         const persistTask = (async () => {
           try {
-            if (event.data?.toolName && event.data?.result) {
-              const toolContent = typeof event.data.result === 'string' ? event.data.result : JSON.stringify(event.data.result);
+            // Persist tool_result for both success (result) and failure (error)
+            if (event.data?.toolName && (event.data?.result !== undefined || event.data?.error)) {
+              const toolContent =
+                event.data?.result !== undefined
+                  ? typeof event.data.result === 'string'
+                    ? event.data.result
+                    : JSON.stringify(event.data.result)
+                  : String(event.data?.error || 'Unknown tool error');
 
               const toolResultMessage = await this.messageService.createMessage({
                 conversationId,

@@ -60,9 +60,12 @@ export class LLM extends BaseNode<LlmParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
-    const apiKey = autopilot.getOpenRouterApiKey();
+    const secureEnv = this.getOptions()?.secureEnv;
+    const apiKey = secureEnv?.OPEN_ROUTER_KEY ?? autopilot.getOpenRouterApiKey();
     if (!apiKey) {
-      throw this.handleExecutionError(new Error('OpenRouter API key is required. Configure it via autopilot.setCredentials().'));
+      throw this.handleExecutionError(
+        new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY") or autopilot.setCredentials().')
+      );
     }
 
     try {

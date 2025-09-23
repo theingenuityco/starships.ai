@@ -33,17 +33,20 @@ export interface EngineConfig {
   eventCallback?: EventCallback;
   failOnNodeError?: boolean;
   runner?: Runner;
+  secureEnv?: Record<string, string>;
 }
 
 export class Engine {
   private eventCallback?: EventCallback;
   private eval: Eval;
   private failOnNodeError: boolean;
+  private secureEnv?: Record<string, string>;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
     this.failOnNodeError = config.failOnNodeError ?? true;
-    this.eval = new Eval();
+    this.secureEnv = config.secureEnv;
+    this.eval = new Eval(this.secureEnv);
   }
 
   async createHandler(node: Node, resolvedParams: NodeParameters, execution: Execution): Promise<NodeHandler> {
@@ -56,6 +59,7 @@ export class Engine {
     const handlerOptions = {
       eventCallback: this.eventCallback,
       execution: execution,
+      secureEnv: this.secureEnv,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);
@@ -99,8 +103,12 @@ export class Engine {
     inputItems?: ExecutionItem[]
   ): Promise<ExecutionItem[]> {
     // Resolve templates at execution time using the current state and the node's output as input
-    const inputData = ExecutionItemUtils.unwrapSingle(inputItems);
-    const resolved = (await this.eval.resolveTemplates({ transforms }, execution, inputData)) as { transforms: TransformOperation[] };
+    const resolved = (await this.eval.resolveTemplates(
+      { transforms },
+      execution,
+      inputItems ? ExecutionItemUtils.unwrapSingle(inputItems) : undefined,
+      { stringEvaluationMode: 'full-only' }
+    )) as { transforms: TransformOperation[] };
 
     const virtualNode = this.createVirtualNode('transform', `inline_transform`, resolved);
     const transformHandler = await this.createHandler(virtualNode, resolved, execution);
@@ -112,7 +120,9 @@ export class Engine {
 
   private async executeInlineMutate(transforms: TransformOperation[], execution: Execution): Promise<ExecutionItem[]> {
     // Resolve templates at execution time using the current state
-    const resolved = (await this.eval.resolveTemplates({ mutations: transforms }, execution)) as { mutations: TransformOperation[] };
+    const resolved = (await this.eval.resolveTemplates({ mutations: transforms }, execution, undefined, {
+      stringEvaluationMode: 'full-only',
+    })) as { mutations: TransformOperation[] };
 
     const params = { mutations: resolved.mutations };
     const virtualNode = this.createVirtualNode('mutate', `inline_mutate`, params);
@@ -125,7 +135,9 @@ export class Engine {
 
   private async executeInlineConditional(conditionExpression: string, execution: Execution): Promise<string> {
     // Resolve the condition expression at execution time
-    const resolved = (await this.eval.resolveTemplates({ condition: conditionExpression }, execution)) as { condition?: string };
+    const resolved = (await this.eval.resolveTemplates({ condition: conditionExpression }, execution, undefined, {
+      stringEvaluationMode: 'full-only',
+    })) as { condition?: string };
     const params = { condition: resolved.condition ?? conditionExpression };
 
     const virtualNode = this.createVirtualNode('conditional', `inline_conditional`, params);
@@ -287,8 +299,11 @@ export class Engine {
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
     execution.results.push({ nodeRef: currentNode.ref, items: ExecutionItemUtils.wrapError(errorMessage) });
-    await this.setExecutionError(execution, errorMessage);
-    await this.emitEvent('workflow_failed', execution);
+    // Only mark the whole workflow as failed and emit workflow_failed when configured to fail on node errors.
+    if (this.failOnNodeError) {
+      await this.setExecutionError(execution, errorMessage);
+      await this.emitEvent('workflow_failed', execution);
+    }
   }
 
   private async handleExecutionError(error: unknown, execution: Execution): Promise<void> {
@@ -346,14 +361,18 @@ export class Engine {
 
       if (currentNode.type === 'transform' || currentNode.type === 'mutate' || currentNode.type === 'conditional') {
         // Dedicated nodes: resolve everything up front
-        resolvedParams = (await this.eval.resolveTemplates(rawParams, execution, inputData)) as NodeParameters;
+        resolvedParams = (await this.eval.resolveTemplates(rawParams, execution, inputData, {
+          stringEvaluationMode: 'full-only',
+        })) as NodeParameters;
       } else {
         // Non-inline nodes: resolve only handler params, defer inline fields to post-execution helpers
         const handlerParams = { ...rawParams } as Record<string, unknown>;
         delete (handlerParams as Record<string, unknown>).transforms;
         delete (handlerParams as Record<string, unknown>).mutations;
         delete (handlerParams as Record<string, unknown>).condition;
-        resolvedParams = (await this.eval.resolveTemplates(handlerParams, execution, inputData)) as NodeParameters;
+        resolvedParams = (await this.eval.resolveTemplates(handlerParams, execution, inputData, {
+          stringEvaluationMode: 'full-only',
+        })) as NodeParameters;
       }
 
       // Create and validate handler
@@ -571,9 +590,32 @@ export class Engine {
         timestamp: new Date().toISOString(),
         data: { execution },
       };
-      await this.eventCallback(event);
+      // Redact any secureEnv values from outgoing events/logs by default
+      const redacted = this.redactSensitive(event);
+      await this.eventCallback(redacted);
     } catch (error) {
       console.error('Error in external streaming emitter:', error);
+    }
+  }
+
+  private redactSensitive<T = unknown>(payload: T): T {
+    try {
+      const secretValues = Object.values(this.secureEnv ?? {}).filter((v) => typeof v === 'string' && v.length > 0) as string[];
+      if (secretValues.length === 0) return payload;
+
+      let json = JSON.stringify(payload);
+      for (const value of secretValues) {
+        // Replace all occurrences; keep it simple for now
+        try {
+          const safe = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          json = json.replace(new RegExp(safe, 'g'), '[REDACTED]');
+        } catch {
+          json = json.split(value).join('[REDACTED]');
+        }
+      }
+      return JSON.parse(json) as T;
+    } catch {
+      return payload;
     }
   }
 }

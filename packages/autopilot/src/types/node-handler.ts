@@ -22,6 +22,7 @@ export interface NodeHandler {
 export interface NodeHandlerOptions {
   eventCallback?: EventCallback;
   execution?: Execution;
+  secureEnv?: Record<string, string>;
 }
 /**
  * Constructor type for handlers that accept the full node object

@@ -104,20 +104,12 @@ export class Tool extends BaseNode<ToolParams> {
 
   /**
    * Extract tool arguments from input data
+   * Only accept plain object as arguments; do not parse JSON strings here.
+   * Parsing (e.g. LLM tool_calls.function.arguments) must be done upstream.
    */
   private extractToolArguments(inputData: unknown): Record<string, unknown> {
-    // Accept plain object as arguments
-    if (typeof inputData === 'object' && inputData !== null) {
+    if (inputData && typeof inputData === 'object') {
       return inputData as Record<string, unknown>;
-    }
-    // Accept JSON string of arguments
-    if (typeof inputData === 'string') {
-      try {
-        const parsed = JSON.parse(inputData);
-        if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
-      } catch {
-        // ignore parse errors
-      }
     }
     return {};
   }

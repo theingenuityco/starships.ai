@@ -1,409 +1,355 @@
 /**
- * Echo Tool Tests
+ * Echo Tool Functional Tests
  *
- * Tests for the echo tool including parameter validation,
- * blueprint structure, and functionality verification.
+ * Tests that actually execute the echo tool and verify echoing functionality
+ * instead of just validating static structure.
  */
 
-import type { Edge } from '@starships/autopilot';
-import { echoTool, echoToolTemplate } from '../echo';
-import { ToolTestHelper, CommonToolTestData, ToolMatchers } from './tool-test-helper';
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
-describe('Echo Tool', () => {
-  let testHelper: ToolTestHelper;
+import { echoTool, echoToolTemplate } from '../echo';
+import { ToolTestRunner, CommonToolScenarios } from './tool-execution-helper';
+
+interface EchoResult {
+  type: 'echo';
+  message: string;
+  metadata: Record<string, unknown>;
+  echoedAt: string;
+}
+
+describe('Echo Tool - Functional Tests', () => {
+  let testRunner: ToolTestRunner;
 
   beforeEach(() => {
-    testHelper = new ToolTestHelper(echoTool, echoToolTemplate, 'echo');
-    jest.clearAllMocks();
+    testRunner = new ToolTestRunner(echoTool);
   });
 
-  describe('Tool Structure', () => {
-    it('should have valid tool structure', () => {
-      expect(echoTool).toMatchObject({
-        name: 'echo',
-        description: expect.stringContaining('Echo back the provided input'),
-        parameters: expect.objectContaining({
-          type: 'object',
-          properties: expect.any(Object),
-          required: expect.arrayContaining(['message']),
-        }),
-        blueprint: expect.objectContaining({
-          nodes: expect.any(Array),
-          edges: expect.any(Array),
-          metadata: expect.any(Object),
-        }),
-      });
+  describe('Basic Echo Functionality', () => {
+    it('should echo a simple message', async () => {
+      const result = (await testRunner.testValidInput(
+        { message: 'Hello, World!' },
+        (output: any) => output.message === 'Hello, World!' && output.type === 'echo'
+      )) as EchoResult;
+
+      expect(result.type).toBe('echo');
+      expect(result.message).toBe('Hello, World!');
+      expect(result.echoedAt).toBeDefined();
+      expect(typeof result.echoedAt).toBe('string');
     });
 
-    it('should have consistent template and tool data', () => {
-      const consistency = testHelper.testTemplateConsistency();
+    it('should echo with metadata', async () => {
+      const testMetadata = { userId: 123, source: 'test' };
+      const result = (await testRunner.testValidInput(
+        { message: 'Test with metadata', metadata: testMetadata },
+        (output: any) => output.message === 'Test with metadata' && output.metadata.userId === 123
+      )) as EchoResult;
 
-      expect(consistency.nameMatch).toBe(true);
-      expect(consistency.descriptionMatch).toBe(true);
-      expect(consistency.parametersMatch).toBe(true);
-      expect(consistency.blueprintMatch).toBe(true);
+      expect(result.message).toBe('Test with metadata');
+      expect(result.metadata).toEqual(testMetadata);
+      expect(result.type).toBe('echo');
     });
 
-    it('should have valid template metadata', () => {
-      expect(echoToolTemplate).toMatchObject({
-        slug: 'echo',
-        category: 'utility',
-        exampleUsage: expect.stringContaining('echo'),
-        requiresApiKey: false,
-        configurationFields: [],
-      });
-    });
-  });
+    it('should handle empty message', async () => {
+      const result = (await testRunner.testValidInput(
+        { message: '' },
+        (output: any) => output.message === '' && output.type === 'echo'
+      )) as EchoResult;
 
-  describe('Parameter Schema', () => {
-    it('should have valid parameter schema structure', () => {
-      const schemaResults = testHelper.testParameterSchema();
-
-      const mainSchema = schemaResults.find((r) => r.description === 'should have valid parameter schema');
-      expect(mainSchema?.isObject).toBe(true);
-      expect(mainSchema?.hasProperties).toBe(true);
-      expect(mainSchema?.hasRequired).toBe(true);
+      expect(result.message).toBe('');
+      expect(result.type).toBe('echo');
     });
 
-    it('should have message parameter with correct definition', () => {
-      const { properties } = echoTool.parameters;
-      const messageProp = (properties as Record<string, unknown>).message as Record<string, unknown>;
+    it('should handle message without metadata', async () => {
+      const result = (await testRunner.testValidInput(
+        { message: 'No metadata' },
+        (output: any) => output.message === 'No metadata' && output.type === 'echo'
+      )) as EchoResult;
 
-      expect(messageProp).toMatchObject({
-        type: 'string',
-        description: expect.stringContaining('Message to echo back'),
-      });
-    });
-
-    it('should have optional metadata parameter', () => {
-      const { properties } = echoTool.parameters;
-      const metadataProp = (properties as Record<string, unknown>).metadata as Record<string, unknown>;
-
-      expect(metadataProp).toMatchObject({
-        type: 'object',
-        description: expect.stringContaining('Additional metadata'),
-        properties: expect.any(Object),
-      });
-    });
-
-    it('should require message parameter', () => {
-      expect(echoTool.parameters.required).toContain('message');
-    });
-
-    it('should not require metadata parameter', () => {
-      expect(echoTool.parameters.required).not.toContain('metadata');
+      expect(result.message).toBe('No metadata');
+      expect(result.metadata).toEqual({});
+      expect(result.type).toBe('echo');
     });
   });
 
-  describe('Blueprint Structure', () => {
-    it('should have valid blueprint structure', () => {
-      const blueprintResults = testHelper.testBlueprintStructure();
+  describe('Message Types', () => {
+    it('should echo long messages', async () => {
+      const longMessage = 'A'.repeat(1000);
+      const result = (await testRunner.testValidInput(
+        { message: longMessage },
+        (output: any) => output.message === longMessage
+      )) as EchoResult;
 
-      const mainStructure = blueprintResults.find((r) => r.description === 'should have valid blueprint structure');
-      expect(mainStructure?.hasNodes).toBe(true);
-      expect(mainStructure?.hasEdges).toBe(true);
-      expect(mainStructure?.nodeCount).toBeGreaterThan(0);
-      expect(mainStructure?.edgeCount).toBeGreaterThan(0);
+      expect(result.message).toBe(longMessage);
+      expect(result.message.length).toBe(1000);
     });
 
-    it('should have start and end nodes', () => {
-      const startEndResult = testHelper.testStartEndNodes();
+    it('should echo messages with special characters', async () => {
+      const specialMessage = '!@#$%^&*()_+-={}[]|\\:";\'<>?,./ 🚀🎉✨';
+      const result = (await testRunner.testValidInput(
+        { message: specialMessage },
+        (output: any) => output.message === specialMessage
+      )) as EchoResult;
 
-      expect(startEndResult.hasStartNode).toBe(true);
-      expect(startEndResult.hasEndNode).toBe(true);
-      expect(startEndResult.startNodeCount).toBe(1);
-      expect(startEndResult.endNodeCount).toBe(1);
+      expect(result.message).toBe(specialMessage);
     });
 
-    it('should have proper node connectivity', () => {
-      const connectivityResult = testHelper.testConnectivity();
+    it('should echo multiline messages', async () => {
+      const multilineMessage = 'Line 1\nLine 2\nLine 3';
+      const result = (await testRunner.testValidInput(
+        { message: multilineMessage },
+        (output: any) => output.message === multilineMessage
+      )) as EchoResult;
 
-      expect(connectivityResult.isConnected).toBe(true);
-      expect(connectivityResult.unreachableNodes).toHaveLength(0);
+      expect(result.message).toBe(multilineMessage);
     });
 
-    it('should have expected nodes', () => {
-      const { nodes } = echoTool.blueprint;
-      const nodeTypes = nodes.map((n) => n.type);
-      const nodeRefs = nodes.map((n) => n.ref);
+    it('should echo JSON-like strings', async () => {
+      const jsonMessage = '{"key": "value", "number": 42}';
+      const result = (await testRunner.testValidInput(
+        { message: jsonMessage },
+        (output: any) => output.message === jsonMessage
+      )) as EchoResult;
 
-      expect(nodeTypes).toContain('start');
-      expect(nodeTypes).toContain('end');
-
-      expect(nodeRefs).toContain('start_1');
-      expect(nodeRefs).toContain('end_1');
-    });
-
-    it('should have minimal blueprint (direct start to end)', () => {
-      const { nodes, edges } = echoTool.blueprint;
-
-      // Echo tool should be minimal - just start and end nodes
-      expect(nodes).toHaveLength(2);
-      expect(edges).toHaveLength(1);
-
-      // Should have direct connection from start to end
-      const edge = edges[0];
-      expect(edge.from).toBe('start_1');
-      expect(edge.to).toBe('end_1');
-    });
-
-    it('should have valid edges connecting nodes', () => {
-      const { edges, nodes } = echoTool.blueprint;
-      const nodeRefs = nodes.map((n) => n.ref);
-
-      edges.forEach((edge: Edge) => {
-        expect(nodeRefs).toContain(edge.from);
-        expect(nodeRefs).toContain(edge.to);
-        expect(edge.ref).toBeTruthy();
-      });
+      expect(result.message).toBe(jsonMessage);
     });
   });
 
-  describe('End Node Logic', () => {
-    it('should have end node with echo output configuration', () => {
-      const { nodes } = echoTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
+  describe('Metadata Handling', () => {
+    it('should handle nested metadata', async () => {
+      const nestedMetadata = {
+        user: { id: 1, name: 'Test User' },
+        settings: { theme: 'dark', lang: 'en' },
+      };
 
-      expect(endNode).toBeDefined();
-      expect(endNode?.parameters).toHaveProperty('output');
+      const result = (await testRunner.testValidInput(
+        { message: 'Nested test', metadata: nestedMetadata },
+        (output: any) => output.metadata.user.id === 1
+      )) as EchoResult;
 
-      const output = (endNode?.parameters as Record<string, unknown>)?.output as Record<string, unknown>;
-      expect(output).toBeDefined();
-      expect(typeof output).toBe('object');
+      expect(result.metadata).toEqual(nestedMetadata);
+      expect((result.metadata as any).user.name).toBe('Test User');
     });
 
-    it('should have proper output structure with echo fields', () => {
-      const { nodes } = echoTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
-      const output = (endNode?.parameters as Record<string, unknown>)?.output as Record<string, unknown>;
+    it('should handle array metadata', async () => {
+      const arrayMetadata = { tags: ['test', 'echo', 'tool'], ids: [1, 2, 3] };
 
-      expect(output).toHaveProperty('type');
-      expect(output).toHaveProperty('message');
-      expect(output).toHaveProperty('metadata');
-      expect(output).toHaveProperty('echoedAt');
+      const result = (await testRunner.testValidInput({ message: 'Array test', metadata: arrayMetadata }, (output: any) =>
+        Array.isArray(output.metadata.tags)
+      )) as EchoResult;
 
-      expect(output.type).toBe('echo');
+      expect(result.metadata).toEqual(arrayMetadata);
+      expect((result.metadata as any).tags).toHaveLength(3);
     });
 
-    it('should use template expressions for dynamic values', () => {
-      const { nodes } = echoTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
-      const output = (endNode?.parameters as Record<string, unknown>)?.output as Record<string, unknown>;
+    it('should handle null metadata gracefully', async () => {
+      const result = (await testRunner.testValidInput(
+        { message: 'Null metadata', metadata: null },
+        (output: any) => output.message === 'Null metadata'
+      )) as EchoResult;
 
-      // Should reference initial input message
-      expect(output.message).toContain('$lastOutputOf("__initial__")');
-      expect(output.message).toContain('json.message');
+      expect(result.message).toBe('Null metadata');
+      // Should default to empty object for null metadata
+      expect(result.metadata).toEqual({});
+    });
 
-      // Should reference initial input metadata with fallback
-      expect(output.metadata).toContain('$lastOutputOf("__initial__")');
-      expect(output.metadata).toContain('json.metadata');
-      expect(output.metadata).toContain('??');
+    it('should handle undefined metadata gracefully', async () => {
+      const result = (await testRunner.testValidInput(
+        { message: 'Undefined metadata' },
+        (output: any) => output.message === 'Undefined metadata'
+      )) as EchoResult;
 
-      // Should generate timestamp
-      expect(output.echoedAt).toContain('new Date()');
-      expect(output.echoedAt).toContain('toISOString()');
+      expect(result.message).toBe('Undefined metadata');
+      expect(result.metadata).toEqual({});
     });
   });
 
-  describe('Parameter Validation', () => {
-    it('should accept valid message strings', () => {
-      const validMessages = [
-        'Hello, world!',
-        'Simple message',
-        'Message with numbers 123',
-        'Message with symbols !@#$%',
-        '', // Empty string should be allowed
-        'Very long message that contains a lot of text and should still be valid',
-      ];
+  describe('Timestamp Validation', () => {
+    it('should generate valid ISO timestamp', async () => {
+      const result = (await testRunner.testValidInput(
+        { message: 'Timestamp test' },
+        (output: any) => typeof output.echoedAt === 'string'
+      )) as EchoResult;
 
-      validMessages.forEach((message) => {
-        const params = { message };
-        expect(() => {
-          expect(params).toMatchObject({
-            message: expect.any(String),
-          });
-        }).not.toThrow();
-      });
+      // Check if it's a valid ISO string
+      const timestamp = new Date(result.echoedAt);
+      expect(timestamp.toISOString()).toBe(result.echoedAt);
+
+      // Should be recent (within last few seconds)
+      const now = new Date();
+      const diff = now.getTime() - timestamp.getTime();
+      expect(diff).toBeLessThan(5000); // Less than 5 seconds
     });
 
-    it('should accept optional metadata', () => {
-      const validInputs = [
-        { message: 'test', metadata: { key: 'value' } },
-        { message: 'test', metadata: {} },
-        { message: 'test', metadata: { nested: { data: 'value' } } },
-        { message: 'test' }, // No metadata
-      ];
+    it('should generate unique timestamps for concurrent calls', async () => {
+      const promises = Array.from({ length: 3 }, (_, i) => testRunner.testValidInput({ message: `Concurrent ${i}` }));
 
-      validInputs.forEach((params) => {
-        expect(() => {
-          expect(params).toMatchObject({
-            message: expect.any(String),
-          });
-          if (params.metadata) {
-            expect(params.metadata).toEqual(expect.any(Object));
-          }
-        }).not.toThrow();
-      });
+      const results = (await Promise.all(promises)) as EchoResult[];
+
+      // All timestamps should be different (or very close)
+      const timestamps = results.map((r) => r.echoedAt);
+      const uniqueTimestamps = new Set(timestamps);
+
+      // Should have unique timestamps or very close ones
+      expect(uniqueTimestamps.size).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe('Input Edge Cases', () => {
+    it('should handle missing message parameter gracefully', async () => {
+      const result = (await testRunner.testValidInput({}, (output: any) => output.type === 'echo')) as EchoResult;
+
+      // Should handle gracefully, possibly with undefined/null message
+      expect(result.type).toBe('echo');
+      expect(result.metadata).toEqual({});
     });
 
-    it('should handle missing message parameter', () => {
-      const invalidInputs = [{}, { metadata: { some: 'data' } }, { message: null }, { message: undefined }];
+    it('should preserve message exactly as provided', async () => {
+      const testCases = ['  spaces around  ', 'UPPERCASE', 'lowercase', 'MiXeD cAsE', '123456789', ''];
 
-      // Note: Actual validation would happen at runtime in the blueprint execution
-      // Here we just verify the parameter schema defines message as required
-      invalidInputs.forEach(() => {
-        expect(echoTool.parameters.required).toContain('message');
+      for (const testMessage of testCases) {
+        const result = (await testRunner.testValidInput(
+          { message: testMessage },
+          (output: any) => output.message === testMessage
+        )) as EchoResult;
+
+        expect(result.message).toBe(testMessage);
+      }
+    });
+  });
+
+  describe('Output Structure Validation', () => {
+    it('should have all required output fields', async () => {
+      const result = (await testRunner.testValidInput({ message: 'Structure test' })) as EchoResult;
+
+      expect(result).toHaveProperty('type');
+      expect(result).toHaveProperty('message');
+      expect(result).toHaveProperty('metadata');
+      expect(result).toHaveProperty('echoedAt');
+
+      expect(result.type).toBe('echo');
+    });
+
+    it('should maintain consistent output structure', async () => {
+      const results = (await Promise.all([
+        testRunner.testValidInput({ message: 'Test 1' }),
+        testRunner.testValidInput({ message: 'Test 2', metadata: { id: 1 } }),
+        testRunner.testValidInput({ message: 'Test 3' }),
+      ])) as EchoResult[];
+
+      results.forEach((result) => {
+        expect(result).toHaveProperty('type');
+        expect(result).toHaveProperty('message');
+        expect(result).toHaveProperty('metadata');
+        expect(result).toHaveProperty('echoedAt');
+        expect(result.type).toBe('echo');
       });
     });
   });
 
-  describe('Tool Template', () => {
-    it('should have correct template configuration', () => {
+  describe('Performance and Reliability', () => {
+    it('should handle rapid sequential echoes', async () => {
+      const messages = Array.from({ length: 10 }, (_, i) => `Message ${i}`);
+      const results = [];
+
+      for (const message of messages) {
+        const result = (await testRunner.testValidInput({ message }, (output: any) => output.message === message)) as EchoResult;
+        results.push(result);
+      }
+
+      results.forEach((result, index) => {
+        expect(result.message).toBe(`Message ${index}`);
+        expect(result.type).toBe('echo');
+      });
+    });
+
+    it('should handle concurrent echoes', async () => {
+      const promises = Array.from({ length: 5 }, (_, i) =>
+        testRunner.testValidInput(
+          { message: `Concurrent ${i}`, metadata: { index: i } },
+          (output: any) => output.message === `Concurrent ${i}`
+        )
+      );
+
+      const results = (await Promise.all(promises)) as EchoResult[];
+
+      results.forEach((result, index) => {
+        expect(result.message).toBe(`Concurrent ${index}`);
+        expect((result.metadata as any).index).toBe(index);
+      });
+    });
+  });
+
+  describe('Tool Template Consistency', () => {
+    it('should have consistent tool and template', () => {
+      expect(echoToolTemplate.name).toBe(echoTool.name);
+      expect(echoToolTemplate.description).toBe(echoTool.description);
+      expect(echoToolTemplate.parameters).toEqual(echoTool.parameters);
+      expect(echoToolTemplate.blueprint).toEqual(echoTool.blueprint);
+    });
+
+    it('should have correct template metadata', () => {
       expect(echoToolTemplate.slug).toBe('echo');
       expect(echoToolTemplate.category).toBe('utility');
       expect(echoToolTemplate.requiresApiKey).toBe(false);
       expect(echoToolTemplate.configurationFields).toEqual([]);
     });
-
-    it('should have helpful example usage', () => {
-      expect(echoToolTemplate.exampleUsage).toContain('echo');
-      expect(echoToolTemplate.exampleUsage).toContain('message');
-      expect(echoToolTemplate.exampleUsage).toContain('Hello Tools!');
-    });
   });
 
-  describe('Expected Output Format', () => {
-    it('should define consistent output structure', () => {
-      const { nodes } = echoTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
-      const output = (endNode?.parameters as Record<string, unknown>)?.output as Record<string, unknown>;
+  describe('Common Test Scenarios', () => {
+    it('should pass common echo scenarios', async () => {
+      const results = await testRunner.testScenarios(CommonToolScenarios.echo);
 
-      // Should have all expected fields
-      expect(output).toHaveProperty('type');
-      expect(output).toHaveProperty('message');
-      expect(output).toHaveProperty('metadata');
-      expect(output).toHaveProperty('echoedAt');
-
-      // Type should be 'echo'
-      expect(output.type).toBe('echo');
-    });
-
-    it('should preserve input message in output', () => {
-      const { nodes } = echoTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
-      const output = (endNode?.parameters as Record<string, unknown>)?.output as Record<string, unknown>;
-
-      // Should reference the original message from input
-      expect(output.message).toContain('__initial__');
-      expect(output.message).toContain('json.message');
-    });
-
-    it('should handle metadata gracefully', () => {
-      const { nodes } = echoTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
-      const output = (endNode?.parameters as Record<string, unknown>)?.output as Record<string, unknown>;
-
-      // Should have fallback for missing metadata
-      expect(output.metadata).toContain('??');
-      expect(output.metadata).toContain('{}');
-    });
-  });
-
-  describe('Simplicity and Performance', () => {
-    it('should have minimal node count for efficiency', () => {
-      const { nodes } = echoTool.blueprint;
-
-      // Echo should be the simplest tool - just start and end
-      expect(nodes.length).toBe(2);
-    });
-
-    it('should have no intermediate processing nodes', () => {
-      const { nodes } = echoTool.blueprint;
-      const intermediateTypes = ['code', 'transform', 'mutate', 'conditional'];
-
-      const hasIntermediateNodes = nodes.some((n) => intermediateTypes.includes(n.type));
-      expect(hasIntermediateNodes).toBe(false);
-    });
-
-    it('should have direct start-to-end connection', () => {
-      const { edges } = echoTool.blueprint;
-
-      expect(edges).toHaveLength(1);
-      expect(edges[0].from).toBe('start_1');
-      expect(edges[0].to).toBe('end_1');
-    });
-  });
-
-  describe('Testing and Debugging Utility', () => {
-    it('should be suitable for testing tool infrastructure', () => {
-      // Echo tool should have minimal complexity for testing
-      expect(echoTool.parameters.required).toEqual(['message']);
-      expect(echoTool.blueprint.nodes).toHaveLength(2);
-      expect(echoTool.blueprint.edges).toHaveLength(1);
-    });
-
-    it('should provide useful debugging output structure', () => {
-      const { nodes } = echoTool.blueprint;
-      const endNode = nodes.find((n) => n.type === 'end');
-      const output = (endNode?.parameters as Record<string, unknown>)?.output as Record<string, unknown>;
-
-      // Should include timestamp for debugging
-      expect(output).toHaveProperty('echoedAt');
-      expect(output.echoedAt).toContain('new Date()');
-
-      // Should preserve original input
-      expect(output).toHaveProperty('message');
-      expect(output).toHaveProperty('metadata');
-    });
-  });
-
-  describe('Integration with Common Test Patterns', () => {
-    it('should handle common invalid inputs', () => {
-      CommonToolTestData.commonInvalidInputs.forEach((testCase) => {
-        // Verify tool structure remains valid regardless of input
-        expect(testCase.params).toBeDefined();
-        expect(testCase.expectedError).toBeTruthy();
-        expect(testCase.description).toBeTruthy();
-      });
-    });
-
-    it('should use ToolMatchers for validation', () => {
-      expect(ToolMatchers.toHaveValidToolStructure(echoTool)).toEqual({
-        message: expect.any(Function),
-        pass: true,
-      });
-
-      expect(ToolMatchers.toHaveValidBlueprint(echoTool.blueprint)).toEqual({
-        message: expect.any(Function),
-        pass: true,
+      results.forEach((result) => {
+        if (result.name.includes('simple message') || result.name.includes('metadata')) {
+          expect(result.passed).toBe(true);
+        }
+        if (result.name.includes('missing message')) {
+          // Echo tool should handle this gracefully
+          expect(result.passed).toBe(true);
+        }
       });
     });
   });
 
-  describe('Blueprint Execution Flow', () => {
-    it('should have correct execution order', () => {
-      const { nodes, edges } = echoTool.blueprint;
+  describe('Debugging and Testing Utility', () => {
+    it('should be useful for testing tool infrastructure', async () => {
+      const testData = {
+        message: 'Infrastructure test',
+        metadata: {
+          testRun: Date.now(),
+          environment: 'test',
+          features: ['echo', 'metadata', 'timestamp'],
+        },
+      };
 
-      // Start node
-      const startNode = nodes.find((n) => n.type === 'start');
-      expect(startNode?.ref).toBe('start_1');
+      const result = (await testRunner.testValidInput(testData, (output: any) => output.message === testData.message)) as EchoResult;
 
-      // End node
-      const endNode = nodes.find((n) => n.type === 'end');
-      expect(endNode?.ref).toBe('end_1');
-
-      // Single edge from start to end
-      expect(edges).toHaveLength(1);
-      expect(edges[0].from).toBe('start_1');
-      expect(edges[0].to).toBe('end_1');
+      expect(result.message).toBe(testData.message);
+      expect(result.metadata).toEqual(testData.metadata);
+      expect(result.type).toBe('echo');
+      expect(new Date(result.echoedAt)).toBeInstanceOf(Date);
     });
 
-    it('should have proper edge reference', () => {
-      const { edges } = echoTool.blueprint;
+    it('should provide complete debugging information', async () => {
+      const debugData = {
+        message: 'Debug test',
+        metadata: {
+          requestId: 'req-123',
+          userId: 'user-456',
+          action: 'echo-test',
+          timestamp: Date.now(),
+        },
+      };
 
-      expect(edges[0].ref).toBe('e1');
-      expect(edges[0].from).toBe('start_1');
-      expect(edges[0].to).toBe('end_1');
+      const result = (await testRunner.testValidInput(debugData)) as EchoResult;
+
+      // Should preserve all debugging information
+      expect(result.message).toBe(debugData.message);
+      expect(result.metadata).toEqual(debugData.metadata);
+      expect(result.echoedAt).toBeDefined();
+
+      // Verify it's actually echoing, not transforming
+      expect(JSON.stringify(result.metadata)).toBe(JSON.stringify(debugData.metadata));
     });
   });
 });

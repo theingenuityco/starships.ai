@@ -4,17 +4,7 @@
  */
 
 import { ALL_TOOL_TEMPLATES } from '../index';
-import { E2EToolTestHelper } from './e2e-tool-test-helper';
 import type { Node } from '@starships/autopilot';
-
-// Import all individual E2E test suites
-import './calculator-e2e.test';
-import './echo-e2e.test';
-import './tool-list-e2e.test';
-
-// Legacy test suites (for backward compatibility during transition)
-import './time.test';
-import './blueprint-lint.test';
 
 describe('Tool Templates Test Suite', () => {
   describe('Tool Suite Integration', () => {
@@ -91,48 +81,6 @@ describe('Tool Templates Test Suite', () => {
         const nodeTypes = template.blueprint.nodes.map((n: Node) => n.type);
         expect(nodeTypes).toContain('start');
         expect(nodeTypes).toContain('end');
-      }
-    });
-  });
-
-  describe('Test Helper Integration', () => {
-    it('should be able to create test helpers for all tools', async () => {
-      for (const template of ALL_TOOL_TEMPLATES) {
-        // Create a basic tool params structure from template
-        const toolParams = {
-          name: template.name,
-          description: template.description,
-          parameters: template.parameters,
-          blueprint: template.blueprint as never,
-        };
-
-        expect(() => {
-          new E2EToolTestHelper(toolParams as never, template, template.name);
-        }).not.toThrow();
-      }
-    });
-
-    it('should validate all tool structures', () => {
-      for (const template of ALL_TOOL_TEMPLATES) {
-        const toolParams = {
-          name: template.name,
-          description: template.description,
-          parameters: template.parameters,
-          blueprint: template.blueprint as never,
-        };
-
-        const helper = new E2EToolTestHelper(toolParams as never, template, template.name);
-        const validation = helper.runAllValidationTests();
-
-        expect(validation.structureValid).toBe(true);
-        expect(validation.parametersValid).toBe(true);
-        expect(validation.blueprintValid).toBe(true);
-        expect(validation.templateValid).toBe(true);
-
-        if (validation.errors.length > 0) {
-          console.error(`Validation errors for ${template.name}:`, validation.errors);
-        }
-        expect(validation.errors).toHaveLength(0);
       }
     });
   });

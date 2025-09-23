@@ -22,6 +22,10 @@ This test suite provides comprehensive testing for all tool templates in the `se
 - [`time.test.ts`](./time.test.ts) - Current time generation with timezone support
 - [`blueprint-lint.test.ts`](./blueprint-lint.test.ts) - Blueprint validation tool
 - [`tool-list.test.ts`](./tool-list.test.ts) - API-based tool listing functionality
+- [`tool-create.test.ts`](./tool-create.test.ts) - Create Tool instance via REST API (E2E with mocked HTTP)
+- [`tool-update.test.ts`](./tool-update.test.ts) - Update Tool instance via REST API (E2E with mocked HTTP)
+- [`tool-smoke-test.test.ts`](./tool-smoke-test.test.ts) - Fetch and execute another tool’s blueprint (E2E with mocked HTTP)
+- [`blueprint-lint-e2e.test.ts`](./blueprint-lint-e2e.test.ts) - E2E runtime validation of blueprint_lint (no HTTP)
 
 ### Test Infrastructure
 

@@ -53,6 +53,10 @@ export const toolUpdateTool: ToolParams = {
               throw new Error('Provide "id" OR "slug" to resolve the tool (starship inferred from state).');
             }
 
+            if (hasSlugResolve && !starshipId) {
+              throw new Error('starshipId is required');
+            }
+
             // Build partial patch body from provided fields (ignore undefined)
             const patch = {};
             const keys = ['name', 'description', 'parameters', 'blueprint', 'configuration', 'isEnabled'];
@@ -83,6 +87,15 @@ export const toolUpdateTool: ToolParams = {
           timeout: 3000,
         },
       },
+      {
+        ref: 'resolve_decision',
+        type: 'conditional',
+        name: 'Resolve by Slug?',
+        description: 'Branch depending on whether slug resolution is needed',
+        parameters: {
+          condition: '{{ $lastOutputOf("validate")[0].json.hasSlugResolve ? "true" : "false" }}',
+        },
+      },
 
       // Optionally resolve ID by slug
       {
@@ -110,7 +123,8 @@ export const toolUpdateTool: ToolParams = {
             let toolId = ctx.id;
 
             if (!ctx.hasId && ctx.hasSlugResolve) {
-              const fetched = $lastOutputOf('maybe_fetch_by_slug')[0].json;
+              const http = $lastOutputOf('maybe_fetch_by_slug')[0]?.json;
+              const fetched = http && typeof http === 'object' ? (http.body ?? http) : http;
               if (!fetched || !fetched.id) {
                 throw new Error('Failed to resolve tool by slug for given starshipId');
               }
@@ -155,7 +169,9 @@ export const toolUpdateTool: ToolParams = {
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'validate' },
-      { ref: 'e2', from: 'validate', to: 'maybe_fetch_by_slug' },
+      { ref: 'e_cond', from: 'validate', to: 'resolve_decision' },
+      { ref: 'e2_true', from: 'resolve_decision', to: 'maybe_fetch_by_slug', condition: 'true' },
+      { ref: 'e2_false', from: 'resolve_decision', to: 'prepare_update', condition: 'false' },
       { ref: 'e3', from: 'maybe_fetch_by_slug', to: 'prepare_update' },
       { ref: 'e4', from: 'prepare_update', to: 'http_update' },
       { ref: 'e5', from: 'http_update', to: 'end_1' },

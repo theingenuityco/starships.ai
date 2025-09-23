@@ -84,9 +84,6 @@ export function ConversationMessageContent({
     }
   }, [completedToolResults, totalToolCalls, messageId])
 
-  // Block id for header-level "copy all tool calls"
-  const combinedHeaderBlockId = `${messageId}-tool-calls-all`
-
   // Build display content from chunks when streaming; after completion fall back to chunks if final content wasn't persisted
   const displayContent = useMemo(() => {
     const hasChunks = Array.isArray(chunks) && chunks.length > 0
@@ -260,77 +257,17 @@ export function ConversationMessageContent({
 
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
-        <div className="mt-2">
+        <div className="mt-2.5">
           <Collapsible defaultOpen={false}>
-            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm inline-flex items-center w-full justify-between text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              <span className="inline-flex items-center gap-2">
-                {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : allToolCallsDone && showCompletionTick ? (
-                  <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
-                ) : (
-                  <Wrench className="w-3 h-3" />
-                )}
-                Tool Calls ({toolCalls.length})
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 ml-2"
-                title="Copy all tool calls"
-                onClick={e => {
-                  e.stopPropagation()
-                  try {
-                    const all = (toolCalls || []).map((tc: any) => {
-                      const rawArgs = (tc as any)?.function?.arguments ?? ''
-                      let argsParsed: any
-                      try {
-                        argsParsed = JSON.parse(rawArgs)
-                      } catch {
-                        argsParsed = rawArgs
-                      }
-                      const funcName = (tc as any)?.function?.name || 'unknown'
-                      const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.tool_call_id ?? (tc as any)?.function?.id ?? null
-                      const toolCallId = rawCallId != null ? String(rawCallId) : ''
-
-                      const matchingResult = (toolResults || []).find((result: any) => {
-                        const rid = (result as any)?.tool_call_id ?? (result as any)?.call_id ?? (result as any)?.id
-                        if (rid == null) return false
-                        return String(rid) === toolCallId
-                      })
-
-                      let resultParsed: any = undefined
-                      if (matchingResult) {
-                        const resultContent = matchingResult.content || ''
-                        try {
-                          const t = (resultContent || '').trim()
-                          if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                            resultParsed = JSON.parse(t)
-                          } else {
-                            resultParsed = resultContent
-                          }
-                        } catch {
-                          resultParsed = resultContent
-                        }
-                      }
-
-                      return {
-                        function: funcName,
-                        id: toolCallId || undefined,
-                        arguments: argsParsed,
-                        ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
-                      }
-                    })
-
-                    const payload = { tool_calls: all }
-                    handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedHeaderBlockId)
-                  } catch {
-                    // no-op; handleCopyCodeBlock already toasts errors
-                  }
-                }}
-              >
-                {copiedStates[combinedHeaderBlockId] ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-              </Button>
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+              {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : allToolCallsDone && showCompletionTick ? (
+                <Check className="w-3 h-3 text-green-600 dark:text-green-400" />
+              ) : (
+                <Wrench className="w-3 h-3" />
+              )}
+              Tool Calls ({toolCalls.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-1.5">

@@ -7,7 +7,34 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolCreateTool: ToolParams = {
   name: 'tool_create',
-  description: 'Create a new Tool instance on the specified starship.',
+  description: `Create a new Tool instance on the current starship.
+
+Required inputs:
+- name: string
+- slug: string (kebab-case, unique per starship)
+- description: string
+- parameters: object (JSON Schema for tool inputs)
+- blueprint: object { nodes: [], edges: [] } (Autopilot blueprint)
+
+Optional inputs:
+- configuration: object (instance-level config; secrets come from Native Tool API Keys)
+- isEnabled: boolean (default true)
+
+Validation and constraints:
+- Blueprint is validated for shape only here; use blueprint_lint for deeper checks
+- No secrets in arguments or blueprint
+- Slug collisions return 409
+
+Implicit environment (do not pass):
+- BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
+
+Output:
+- API response from POST /starships/:starshipId/tools (includes created tool model)
+
+Behavior and limits:
+- Not idempotent (retries may create duplicates unless slug is unchanged)
+- Timeouts: prepare 3s, HTTP 10s
+- Typical failures: missing env, invalid blueprint shape, validation errors`,
   parameters: {
     type: 'object',
     properties: {
@@ -134,7 +161,7 @@ export const toolCreateToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   slug: 'tool-create',
   category: 'automation',
   exampleUsage:
-    'Create a tool: { "name": "...", "slug": "...", "description": "...", "parameters": {...}, "blueprint": {...} } (starshipId/baseUrl/authToken are inferred from state)',
+    '{ "name": "...", "slug": "...", "description": "...", "parameters": {...}, "blueprint": {...} } // env inferred (baseUrl, authToken, starshipId)',
   requiresApiKey: false,
   configurationFields: [],
 };

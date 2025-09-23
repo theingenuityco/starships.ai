@@ -8,7 +8,29 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolUpdateTool: ToolParams = {
   name: 'tool_update',
-  description: 'Update an existing Tool instance. Provide id directly or resolve by slug (uses state.starshipId).',
+  description: `Update an existing Tool instance on the current starship.
+
+Identify target:
+- Provide id directly (preferred), or
+- Provide slug (resolved using STARSHIP_ID)
+
+Patchable fields (at least one required):
+- name, description, parameters, blueprint, configuration, isEnabled
+
+Implicit environment (do not pass):
+- BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
+
+Protocol:
+- If slug provided, GET /starships/:starshipId/tools/:slug to resolve id
+- PUT /tools/:id with a partial body containing only provided fields
+
+Output:
+- API response from PUT /tools/:id (updated tool model)
+
+Behavior and limits:
+- Idempotent for identical patches
+- Timeouts: resolve 6s, update 10s
+- Typical failures: target not found, validation errors, conflicts`,
   parameters: {
     type: 'object',
     properties: {
@@ -192,7 +214,7 @@ export const toolUpdateToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   slug: 'tool-update',
   category: 'automation',
   exampleUsage:
-    'Update by id: { "id": "...", "name": "New Name" } or resolve by slug: { "slug": "...", "isEnabled": false } (starshipId/baseUrl/authToken inferred from state)',
+    'By id: { "id": "...", "isEnabled": false } | By slug: { "slug": "...", "name": "New Name" } // env inferred (baseUrl, authToken, starshipId)',
   requiresApiKey: false,
   configurationFields: [],
 };

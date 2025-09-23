@@ -7,7 +7,26 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolListTool: ToolParams = {
   name: 'tool_list',
-  description: 'List all tools for the specified starship.',
+  description: `List all tools on the current starship via the Starships API.
+
+When to use:
+- Inventory, discovery, or to find a tool id/slug before creation/update/smoke testing.
+
+Inputs:
+- {} (no arguments)
+
+Implicit environment (do not pass as arguments):
+- BASE_URL: derived from agent.state.baseUrl
+- AUTH_TOKEN: derived from agent.state.authToken (sent as Bearer)
+- STARSHIP_ID: derived from agent.state.starshipId
+
+Output:
+- Array of { id, slug, name, description, isEnabled } (deliberately lean; heavy fields like blueprint are omitted)
+
+Behavior and limits:
+- Read-only and idempotent
+- Timeouts: prepare 3s, HTTP 5s
+- Typical failures: missing env, 401/403, network errors, server unavailability`,
   parameters: {
     type: 'object',
     properties: {},
@@ -108,7 +127,7 @@ export const toolListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
 
   slug: 'tool-list',
   category: 'automation',
-  exampleUsage: 'Call with {} to list tools. starshipId/baseUrl/authToken are inferred from state.',
+  exampleUsage: '{} // returns a lean array of tools; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,
   configurationFields: [],
 };

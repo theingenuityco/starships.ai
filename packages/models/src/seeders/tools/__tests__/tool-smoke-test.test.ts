@@ -271,3 +271,56 @@ describe('Tool Smoke Test Tool', () => {
     });
   });
 });
+
+describe('Tool.execute return value - tool_smoke_test', () => {
+  it('should return a single ExecutionItem with final smoke test result and preserve pairedItem', async () => {
+    const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
+
+    // Nested blueprint echoes initial args
+    const nested = {
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+        {
+          ref: 'end_1',
+          type: 'end',
+          name: 'End',
+          description: '',
+          parameters: {
+            output: '{{ $lastOutputOf("__initial__")[0].json }}',
+          },
+        },
+      ],
+      edges: [{ ref: 'e1', from: 'start_1', to: 'end_1' }],
+      metadata: {},
+    };
+
+    // Mock GET /starships/:id/tools/:slug returning tool with blueprint
+    global.fetch = jest.fn() as unknown as jest.Mock;
+    (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ blueprint: nested }));
+
+    const args = { x: 1, y: { deep: true } };
+    const options: NodeHandlerOptions = {
+      eventCallback: jest.fn(),
+      secureEnv: env,
+      execution: ExecutionItemUtils.createExecution(),
+    };
+
+    const toolNode = new Tool(toolSmokeTestTool, options);
+    const raw = await toolNode.execute([{ json: { targetSlug: 'demo', arguments: args }, pairedItem: { item: 7 } } as ExecutionItem]);
+
+    // Raw ExecutionItem[] assertions
+    expect(Array.isArray(raw)).toBe(true);
+    expect(raw).toHaveLength(1);
+
+    const item = raw[0];
+    expect(item.pairedItem).toEqual({ item: 7 });
+
+    // Final payload should be the End node "output" extracted by Engine, not wrapped
+    const payload = item.json as { ok: boolean; durationMs: number; result: Record<string, unknown> };
+    expect(payload).toBeDefined();
+    expect(payload.ok).toBe(true);
+    expect(typeof payload.durationMs).toBe('number');
+    expect(payload.durationMs).toBeGreaterThanOrEqual(0);
+    expect(payload.result).toEqual(args);
+  });
+});

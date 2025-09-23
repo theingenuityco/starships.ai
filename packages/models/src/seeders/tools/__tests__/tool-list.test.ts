@@ -359,3 +359,62 @@ describe('Tool List Tool', () => {
     });
   });
 });
+
+describe('Tool.execute return value - tool_list', () => {
+  it('should return a single ExecutionItem with summarized tool list and preserved pairedItem', async () => {
+    const mockEnv = {
+      BASE_URL: 'https://api.test.com',
+      AUTH_TOKEN: 'mock-auth-token',
+      STARSHIP_ID: 'test-starship-123',
+    };
+
+    const mockResponseData = {
+      data: [
+        {
+          id: 'tool-1',
+          slug: 'calculator',
+          name: 'Calculator',
+          description: 'Perform mathematical calculations',
+          isEnabled: true,
+        },
+        {
+          id: 'tool-2',
+          slug: 'echo',
+          name: 'Echo',
+          description: 'Echo back the input',
+          isEnabled: true,
+        },
+      ],
+    };
+
+    // Local fetch mock for this test
+    global.fetch = jest.fn() as unknown as jest.Mock;
+    (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(mockResponseData));
+
+    const options: NodeHandlerOptions = {
+      eventCallback: jest.fn(),
+      secureEnv: mockEnv,
+      execution: ExecutionItemUtils.createExecution(),
+    };
+
+    const toolNode = new Tool(toolListTool, options);
+    const raw = await toolNode.execute([{ json: {}, pairedItem: { item: 0 } } as ExecutionItem]);
+
+    // Raw ExecutionItem[] assertions
+    expect(Array.isArray(raw)).toBe(true);
+    expect(raw).toHaveLength(1);
+
+    const item = raw[0];
+    expect(item.pairedItem).toEqual({ item: 0 });
+
+    // Final result should be the summarized array produced by the "summarize" code node
+    const expected = mockResponseData.data.map((t) => ({
+      id: t.id,
+      slug: t.slug,
+      name: t.name,
+      description: t.description,
+      isEnabled: t.isEnabled,
+    }));
+    expect(item.json).toEqual(expected);
+  });
+});

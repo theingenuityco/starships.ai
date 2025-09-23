@@ -141,12 +141,23 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
     )
   }
 
+  // Determine which assistant message should display the streaming caret (latest streaming one)
+  const activeStreamingAssistantId = useMemo(() => {
+    let lastId: string | null = null
+    for (const m of displayMessages) {
+      if (m.role === 'assistant' && (m as any).streaming) {
+        lastId = m.id
+      }
+    }
+    return lastId
+  }, [displayMessages])
+
   return (
     <div className="h-full flex flex-col">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
         <div className="max-w-4xl mx-auto space-y-2">
           {displayMessages.map(message => (
-            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} />
+            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeStreamingAssistantId} />
           ))}
           {/* Show responding indicator after the last user message */}
           {isResponding && agentName && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === 'user' && (
@@ -179,11 +190,12 @@ interface StreamChunk {
 interface ConversationMessageBubbleProps {
   message: MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }
   agentName?: string
+  isStreamingActive?: boolean
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({ message, agentName, isStreamingActive }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
 
     if (isUser) {
@@ -218,9 +230,9 @@ const MemoizedMessageBubble = memo(
                 content={message.content}
                 messageId={message.id}
                 enableMarkdown={true}
-                enableCopy={!message.streaming}
+                enableCopy={!isStreamingActive}
                 enableLinkPreview={true}
-                isStreaming={message.streaming}
+                isStreaming={!!isStreamingActive}
                 className="text-foreground"
                 chunks={message.chunks}
                 agentName={agentName}
@@ -238,6 +250,7 @@ const MemoizedMessageBubble = memo(
     // Custom comparison for memo optimization
     if (prevProps.message.id !== nextProps.message.id) return false
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
+    if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
 
     // Re-render when text changes

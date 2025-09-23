@@ -466,7 +466,7 @@ export class ToolTestHelper {
     const blueprint = input?.blueprint as { nodes?: unknown[]; edges?: unknown[] };
 
     if (!blueprint || typeof blueprint !== 'object') {
-      throw new Error('Blueprint parameter is required and must be an object with nodes and edges arrays');
+      throw new Error('blueprint parameter is required and must be an object with nodes and edges arrays');
     }
 
     if (!Array.isArray(blueprint.nodes)) {

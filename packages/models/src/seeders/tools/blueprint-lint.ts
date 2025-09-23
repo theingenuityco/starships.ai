@@ -31,17 +31,29 @@ export const blueprintLintTool: ToolParams = {
           code: `
             function isObject(v) { return v && typeof v === 'object' && !Array.isArray(v); }
 
-            const bp = input.blueprint || input;
+            // Accept either { blueprint } wrapper or direct blueprint
+            const candidate = (input && typeof input === 'object' && 'blueprint' in input) ? input.blueprint : input;
             const issues = [];
 
-            if (!isObject(bp)) {
-              throw new Error('Invalid blueprint: must be an object with nodes[] and edges[]');
+            // If it's not an object, do not throw - return a structured lint result
+            if (!isObject(candidate)) {
+              return {
+                ok: false,
+                issues: ['Invalid blueprint: must be an object with nodes[] and edges[]'],
+                summary: { nodeCount: 0, edgeCount: 0, types: {} }
+              };
             }
+
+            const bp = candidate;
+
+            // Normalize missing arrays to empty while recording issues
             if (!Array.isArray(bp.nodes)) {
-              throw new Error('Invalid blueprint: nodes must be an array');
+              issues.push('Invalid blueprint: nodes must be an array');
+              bp.nodes = [];
             }
             if (!Array.isArray(bp.edges)) {
-              throw new Error('Invalid blueprint: edges must be an array');
+              issues.push('Invalid blueprint: edges must be an array');
+              bp.edges = [];
             }
 
             const nodes = bp.nodes;
@@ -66,15 +78,15 @@ export const blueprintLintTool: ToolParams = {
               }
 
               if (!n.type || typeof n.type !== 'string') {
-                issues.push(\`Node \${n.ref ?? '?'} missing "type"\`);
+                issues.push(\`\${n.ref ?? '?'} missing "type"\`);
               } else if (!allowedTypes.includes(n.type)) {
                 issues.push(\`Unsupported node type "\${n.type}" at \${n.ref}\`);
               }
             }
 
             // Start/End presence
-            const hasStart = nodes.some(n => n && n.type === 'start');
-            const hasEnd = nodes.some(n => n && n.type === 'end');
+            const hasStart = nodes.some((n) => n && n.type === 'start');
+            const hasEnd = nodes.some((n) => n && n.type === 'end');
             if (!hasStart) issues.push('Missing start node');
             if (!hasEnd) issues.push('Missing end node');
 
@@ -85,11 +97,11 @@ export const blueprintLintTool: ToolParams = {
                 continue;
               }
               if (!e.from || !e.to) {
-                issues.push(\`Edge \${e.ref ?? '?'} missing "from" or "to"\`);
+                issues.push(\`\${e.ref ?? '?'} missing "from" or "to"\`);
                 continue;
               }
-              if (!seenRefs.has(e.from)) issues.push(\`Edge \${e.ref ?? '?'} "from" references unknown node: \${e.from}\`);
-              if (!seenRefs.has(e.to)) issues.push(\`Edge \${e.ref ?? '?'} "to" references unknown node: \${e.to}\`);
+              if (!seenRefs.has(e.from)) issues.push(\`\${e.ref ?? '?'} "from" references unknown node: \${e.from}\`);
+              if (!seenRefs.has(e.to)) issues.push(\`\${e.ref ?? '?'} "to" references unknown node: \${e.to}\`);
             }
 
             // Basic summary

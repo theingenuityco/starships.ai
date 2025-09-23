@@ -31,27 +31,53 @@ export class Code extends BaseNode<CodeParams> {
 
       // Create the execution context for the code
       const secureEnv = this.getOptions()?.secureEnv || {};
+
+      // Helper to access last output of a node within current execution
+      const $lastOutputOf = (ref: string): ExecutionItem[] => {
+        try {
+          if (!execution?.results || !ref) return [];
+          for (let i = execution.results.length - 1; i >= 0; i--) {
+            const entry = execution.results[i];
+            if (entry?.nodeRef === ref) {
+              return entry.items ?? [];
+            }
+          }
+          return [];
+        } catch {
+          return [];
+        }
+      };
+
       const context = {
+        // Inputs and state helpers
         input: inputData,
+        $input: () => inputData,
+        $lastOutputOf,
+
         state: execution?.state || {},
         env: (key: string) => (typeof key === 'string' ? secureEnv[key] : undefined),
         envAll: () => ({ ...secureEnv }),
+
+        // Console shims
         console: {
           log: (...args: unknown[]) => console.log('[Code Node]:', ...args),
           error: (...args: unknown[]) => console.error('[Code Node]:', ...args),
           warn: (...args: unknown[]) => console.warn('[Code Node]:', ...args),
         },
-        // Add common utilities
+
+        // Common utilities
         JSON: JSON,
         Math: Math,
         Date: Date,
-        setTimeout: undefined, // Disable for security
-        setInterval: undefined, // Disable for security
-        require: undefined, // Disable for security
-        process: undefined, // Disable for security
-        global: undefined, // Disable for security
-        eval: undefined, // Disable for security
-        Function: undefined, // Disable for security
+
+        // Hard disables for security
+        setTimeout: undefined,
+        setInterval: undefined,
+        require: undefined,
+        process: undefined,
+        global: undefined,
+        eval: undefined,
+        Function: undefined,
       };
 
       // Execute the code with timeout

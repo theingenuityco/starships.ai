@@ -4,11 +4,16 @@ const baseConfig = require('../../jest.preset.js');
 module.exports = {
   ...baseConfig,
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
-  // Map monorepo packages and force '@/...' to point to autopilot/src for cross-package imports
-  // This mirrors how autopilot resolves '@/...' internally and avoids needing a custom resolver
+  // Map monorepo packages:
+  // - Resolve local "@/..." to this package's src
+  // - Resolve @starships/autopilot to its built dist so ChildProcessRunner can find dist/scripts/child-entry.js
+  // - Resolve other @starships/* to their src (ts-jest will transpile them on the fly)
   moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@starships/autopilot$': '<rootDir>/../autopilot/dist',
+    '^@starships/autopilot/src/(.*)$': '<rootDir>/../autopilot/src/$1',
+    '^@starships/autopilot/(.*)$': '<rootDir>/../autopilot/dist/$1',
     '^@starships/(.+)$': '<rootDir>/../$1/src',
-    '^@/(.*)$': '<rootDir>/../autopilot/src/$1',
   },
   // Override transform to handle TypeScript compilation for TS sources
   transform: {
@@ -16,7 +21,6 @@ module.exports = {
       'ts-jest',
       {
         tsconfig: '<rootDir>/tsconfig.json',
-        isolatedModules: true,
         diagnostics: {
           warnOnly: true,
           ignoreCodes: [2307, 7006],

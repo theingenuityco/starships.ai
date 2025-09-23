@@ -127,8 +127,8 @@ export const toolSmokeTestTool: ToolParams = {
         parameters: {
           name: 'Nested Tool Execution',
           description: 'Smoke test runner',
-          // Blueprint reference from fetch step
-          blueprint: '{{ $lastOutputOf("http_get_tool")[0].json.body.blueprint }}',
+          // Blueprint reference from fetch step (server returns ApiResponse<ToolModel> { data: ToolModel })
+          blueprint: '{{ $lastOutputOf("http_get_tool")[0].json.body.data.blueprint }}',
           // If you want to allow timeout override via inputs:
           // timeout: '{{ $lastOutputOf("__initial__")[0].json.timeoutMs ?? 60000 }}'
           timeout: 60000,

@@ -270,7 +270,7 @@ export function ConversationMessageContent({
               Tool Calls ({toolCalls.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {toolCalls.map((tc, idx) => {
                   const rawArgs = (tc as any)?.function?.arguments ?? ''
                   let prettyArgs = ''
@@ -413,7 +413,7 @@ export function ConversationMessageContent({
 
       {/* Streaming indicator - shows after all content including tool calls while streaming */}
       {isStreaming && !hasAnyToolCalls && (
-        <div className="flex items-center gap-2 mt-2 text-muted-foreground">
+        <div className="flex items-center gap-2 mt-1 text-muted-foreground">
           <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
           {chunks.length > 0 && <span className="text-xs">({chunks.length} chunks)</span>}
           <Loader2 className="w-3 h-3 animate-spin" />

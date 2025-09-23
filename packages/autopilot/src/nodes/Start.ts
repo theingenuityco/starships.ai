@@ -7,8 +7,11 @@ export class Start extends BaseNode<StartParams> {
     super(params || {}, options);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async execute(_input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+  // Pass through initial input if provided so downstream nodes receive tool arguments
+  async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    if (input && input.length > 0) {
+      return input;
+    }
     return ExecutionItemUtils.wrapSingle({});
   }
 

@@ -169,7 +169,9 @@ export const wikipediaTool: ToolParams = {
             const metadata = state.wikipedia_metadata || {};
             
             console.log('[COMBINE DATA] Metadata from state:', metadata);
-            console.log('[COMBINE DATA] HTTP Response received:', !!httpResponse);
+            console.log('[COMBINE DATA] HTTP Response type:', typeof httpResponse);
+            console.log('[COMBINE DATA] HTTP Response keys:', Object.keys(httpResponse));
+            console.log('[COMBINE DATA] HTTP Response sample:', JSON.stringify(httpResponse).substring(0, 200));
             
             // Pass both response and metadata to next node
             return {
@@ -196,6 +198,15 @@ export const wikipediaTool: ToolParams = {
             const response = httpResponse?.body;
             const { action, query, language } = metadata || {};
             const timestamp = new Date().toISOString();
+            
+            console.log('[PROCESS RESPONSE] Action:', action);
+            console.log('[PROCESS RESPONSE] Response type:', typeof response);
+            console.log('[PROCESS RESPONSE] Response is array?', Array.isArray(response));
+            if (Array.isArray(response)) {
+              console.log('[PROCESS RESPONSE] Array length:', response.length);
+              console.log('[PROCESS RESPONSE] First element:', response[0]);
+            }
+            console.log('[PROCESS RESPONSE] Response sample:', JSON.stringify(response).substring(0, 300));
             
             try {
               let result;

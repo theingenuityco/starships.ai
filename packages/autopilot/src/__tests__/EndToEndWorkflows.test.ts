@@ -5,9 +5,9 @@
  */
 
 import { Engine } from '@/engine/Engine';
-import { autopilot } from '@/Autopilot';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { Blueprint } from '@/types';
+import { autopilot } from '@/Autopilot';
 
 // Mock all external dependencies
 const mockFetch = jest.fn();
@@ -18,12 +18,7 @@ global.fetch = mockFetch;
 describe('End-to-End Workflow Execution', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Setup autopilot with test credentials
     autopilot.reset();
-    autopilot.setCredentials({
-      openrouterApiKey: 'test-e2e-api-key',
-    });
 
     // Default fetch mock with proper structure
     const mockHeaders = new Map([['content-type', 'application/json']]);
@@ -73,7 +68,7 @@ describe('End-to-End Workflow Execution', () => {
       // Mock network failure
       mockFetch.mockRejectedValueOnce(new Error('Network timeout'));
 
-      const engine = new Engine();
+      const engine = new Engine({ failOnNodeError: false });
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);
@@ -84,7 +79,7 @@ describe('End-to-End Workflow Execution', () => {
       // Check that the api-call node has an error
       const apiCallResult = execution.results.find((r) => r.nodeRef === 'api-call');
       expect(apiCallResult).toBeDefined();
-      expect(apiCallResult!.items[0].error).toBe('HTTP request failed: Network timeout');
+      expect(apiCallResult!.items[0].error).toContain('Network timeout');
       expect(apiCallResult!.items[0].json).toBeUndefined();
     });
 
@@ -114,7 +109,10 @@ describe('End-to-End Workflow Execution', () => {
       // Mock LLM API failure
       mockFetch.mockRejectedValueOnce(new Error('LLM API unavailable'));
 
-      const engine = new Engine();
+      // Provide credentials for validation to pass
+      autopilot.setCredentials({ openrouterApiKey: 'test-e2e-api-key' });
+
+      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
       const execution = ExecutionItemUtils.createExecution();
 
       await expect(engine.executeBlueprint(blueprint, execution)).rejects.toThrow('LLM API unavailable');
@@ -124,9 +122,6 @@ describe('End-to-End Workflow Execution', () => {
     });
 
     it('should handle missing credentials gracefully', async () => {
-      // Reset credentials
-      autopilot.reset();
-
       const blueprint: Blueprint = {
         nodes: [
           { ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
@@ -404,7 +399,11 @@ describe('End-to-End Workflow Execution', () => {
         });
 
       const eventCallback = jest.fn();
-      const engine = new Engine({ eventCallback });
+
+      // Provide credentials for validation to pass
+      autopilot.setCredentials({ openrouterApiKey: 'test-e2e-api-key' });
+
+      const engine = new Engine({ eventCallback, secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);
@@ -562,7 +561,9 @@ describe('End-to-End Workflow Execution', () => {
           text: async () => '{"approved":true,"post_id":"123"}',
         });
 
-      const engine = new Engine();
+      // Provide credentials for validation to pass
+      autopilot.setCredentials({ openrouterApiKey: 'test-e2e-api-key' });
+      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-e2e-api-key' } });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
 

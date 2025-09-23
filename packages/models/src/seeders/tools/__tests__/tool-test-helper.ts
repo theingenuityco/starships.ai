@@ -349,9 +349,6 @@ export class ToolTestHelper {
       case 'blueprint_lint':
         return this.simulateBlueprintLintTool(inputObj);
 
-      case 'tool_list':
-        return this.simulateToolListTool(inputObj, mockEnv);
-
       default:
         return { executed: true, input, mockEnv };
     }
@@ -549,27 +546,6 @@ export class ToolTestHelper {
         types: nodeTypes,
       },
     };
-  }
-
-  private simulateToolListTool(input: Record<string, unknown>, mockEnv?: Record<string, string>): unknown {
-    // Check required environment variables
-    if (!mockEnv) {
-      throw new Error('baseUrl is required');
-    }
-
-    const requiredVars = ['BASE_URL', 'AUTH_TOKEN', 'STARSHIP_ID'];
-    for (const varName of requiredVars) {
-      const value = mockEnv[varName];
-      if (!value || value.trim() === '') {
-        // Keep original casing for expected error messages
-        const friendlyName = varName === 'BASE_URL' ? 'baseUrl' : varName === 'AUTH_TOKEN' ? 'authToken' : 'starshipId';
-        throw new Error(`${friendlyName} is required`);
-      }
-    }
-
-    // Always simulate HTTP failure - this matches test expectations
-    // The malformed input test specifically wants HTTP failure, not success
-    throw new Error('HTTP request failed: Connection refused');
   }
 
   /**

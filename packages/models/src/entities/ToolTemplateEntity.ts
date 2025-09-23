@@ -52,7 +52,7 @@ export class ToolTemplateEntity implements ToolTemplateModel {
 
   @Expose()
   @IsString()
-  @Length(0, 500)
+  @Length(0, 4000) // Increased to allow richly documented tool descriptions used by management tools
   description!: string;
 
   @Expose()

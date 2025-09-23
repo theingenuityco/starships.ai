@@ -21,7 +21,7 @@ const PaginationSchema = z.object({
 
 const CreateToolSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-  description: z.string().min(1, 'Description is required').max(500, 'Description must be less than 500 characters'),
+  description: z.string().min(1, 'Description is required').max(4000, 'Description must be less than 4000 characters'),
   slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters'),
   parameters: z.object({
     type: z.literal('object'),
@@ -38,7 +38,7 @@ const CreateToolSchema = z.object({
 
 const CreateToolTemplateSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-  description: z.string().min(1, 'Description is required').max(500, 'Description must be less than 500 characters'),
+  description: z.string().min(1, 'Description is required').max(4000, 'Description must be less than 4000 characters'),
   parameters: z.object({
     type: z.literal('object'),
     properties: z.record(z.string(), z.unknown()),

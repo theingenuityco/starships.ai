@@ -83,7 +83,28 @@ export class Code extends BaseNode<CodeParams> {
       // Execute the code with timeout
       const result = await this.executeCodeWithTimeout(params.code, context, params.timeout || 5000);
 
-      return ExecutionItemUtils.wrapSingle(result, input?.[0]);
+      // Sanitize non-finite numbers for JSON-safe transport (sentinel strings)
+      const sanitizeNonFinite = (x: unknown): unknown => {
+        if (typeof x === 'number') {
+          if (!Number.isFinite(x)) {
+            if (x === Infinity) return 'Infinity';
+            if (x === -Infinity) return '-Infinity';
+            return 'NaN';
+          }
+          return x;
+        }
+        if (Array.isArray(x)) return x.map(sanitizeNonFinite);
+        if (x && typeof x === 'object') {
+          const out: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(x as Record<string, unknown>)) {
+            out[k] = sanitizeNonFinite(v);
+          }
+          return out;
+        }
+        return x;
+      };
+      const safeResult = sanitizeNonFinite(result);
+      return ExecutionItemUtils.wrapSingle(safeResult, input?.[0]);
     } catch (error) {
       throw this.handleExecutionError(error, `Code execution failed`);
     }

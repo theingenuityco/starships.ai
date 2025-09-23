@@ -144,7 +144,7 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
   return (
     <div className="h-full flex flex-col">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
-        <div className="max-w-4xl mx-auto space-y-4">
+        <div className="max-w-4xl mx-auto space-y-3">
           {displayMessages.map(message => (
             <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} />
           ))}

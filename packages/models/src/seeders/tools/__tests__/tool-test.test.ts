@@ -3,7 +3,7 @@
  * Executes tool_smoke_test using real Autopilot execution with mocked HTTP only
  */
 
-import { toolSmokeTestTool, toolSmokeTestToolTemplate } from '../tool-smoke-test';
+import { toolSmokeTestTool, toolSmokeTestToolTemplate } from '../tool-test';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
@@ -88,7 +88,7 @@ describe('Tool Smoke Test Tool', () => {
       expect(toolSmokeTestToolTemplate.description).toBe(toolSmokeTestTool.description);
       expect(toolSmokeTestToolTemplate.parameters).toEqual(toolSmokeTestTool.parameters);
       expect(toolSmokeTestToolTemplate.blueprint).toEqual(toolSmokeTestTool.blueprint);
-      expect(toolSmokeTestToolTemplate.slug).toBe('tool-smoke-test');
+      expect(toolSmokeTestToolTemplate.slug).toBe('tool-test');
       expect(toolSmokeTestToolTemplate.category).toBe('automation');
       expect(toolSmokeTestToolTemplate.requiresApiKey).toBe(false);
     });
@@ -271,7 +271,7 @@ describe('Tool Smoke Test Tool', () => {
     it('should use http_get_tool response body.blueprint for nested run', () => {
       const bp = toolSmokeTestTool.blueprint;
       const run = bp.nodes.find((n) => n.ref === 'run_tool');
-      expect(run?.type).toBe('workflow');
+      expect(run?.type).toBe('tool');
       const params = (run?.parameters || {}) as Record<string, unknown>;
       // Ensure the template references body.blueprint (HttpRequest wraps JSON under .body)
       expect(JSON.stringify(params)).toContain('http_get_tool');

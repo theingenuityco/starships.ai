@@ -200,7 +200,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   maxTokens: 3200,
 
   // Tool assignment - host tools for managing tools on the starship
-  assignedToolSlugs: ['tool-list', 'tool-get', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'],
+  assignedToolSlugs: ['tool-list', 'tool-get', 'tool-create', 'tool-update', 'tool-test', 'blueprint-lint'],
 
   icon: '🛠️',
   previewPrompts: [

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Wrench, Brain } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -335,12 +335,18 @@ export function ConversationMessageContent({
         <div className="mb-2">
           {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
-            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-xs leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isStreaming && openReasoning ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-              Reasoning
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+              {isStreaming && openReasoning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
+              <span className="ml-1">Reasoning</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="text-xs text-muted-foreground whitespace-pre-wrap">{displayReasoning}</div>
+              <blockquote className="border-l-4 border-primary/20 px-4 py-2 bg-muted/20 rounded-r-lg my-1">
+                <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {displayReasoning}
+                  </ReactMarkdown>
+                </div>
+              </blockquote>
             </CollapsibleContent>
           </Collapsible>
         </div>

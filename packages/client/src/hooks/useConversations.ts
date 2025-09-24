@@ -235,6 +235,30 @@ export function useConversation(conversationId: string | null) {
         }
       }
 
+      // Merge and dedupe: If a temp assistant placeholder is immediately followed by a concrete assistant from server,
+      // merge streamed chunks/reasoning/tool_calls into the concrete message and drop the placeholder.
+      try {
+        const merged: any[] = []
+        for (let i = 0; i < finalMessages.length; i++) {
+          const cur: any = finalMessages[i]
+          const next: any = finalMessages[i + 1]
+          const isTempAssistant = cur && cur.role === 'assistant' && typeof cur.id === 'string' && cur.id.startsWith('temp-assistant-')
+          const isNextRealAssistant = next && next.role === 'assistant' && !(typeof next.id === 'string' && next.id.startsWith('temp-assistant-'))
+          if (isTempAssistant && isNextRealAssistant) {
+            merged.push({
+              ...next,
+              streaming: true,
+              chunks: Array.isArray(cur?.chunks) ? cur.chunks : next?.chunks,
+              reasoningChunks: Array.isArray(cur?.reasoningChunks) ? cur.reasoningChunks : next?.reasoningChunks,
+              tool_calls: next?.tool_calls ?? cur?.tool_calls,
+            })
+            i++ // skip next
+            continue
+          }
+          merged.push(cur)
+        }
+        finalMessages = merged
+      } catch {}
       setConversationSnapshot(conversationId, {
         messages: finalMessages,
         total: finalMessages.length,
@@ -242,6 +266,81 @@ export function useConversation(conversationId: string | null) {
       })
     } catch {}
   }, [conversationId, messagesQuery.dataUpdatedAt])
+
+  // Ensure an assistant placeholder exists when reasoning/tool_calls arrive before content
+  const ensureAssistantShell = (cid: string) => {
+    // Ensure in React Query cache
+    queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
+      const base = old || { messages: [], total: 0, conversationId: cid }
+      const msgs: any[] = Array.isArray(base.messages) ? base.messages : []
+      const last = msgs[msgs.length - 1]
+      if (last && last.role === 'assistant' && last.streaming === true) {
+        return base
+      }
+      const placeholder = {
+        id: `temp-assistant-${Date.now()}`,
+        role: 'assistant',
+        content: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageType: 'agent_response',
+        streaming: true,
+        chunks: [],
+      }
+      return { ...base, messages: [...msgs, placeholder], total: (base.total ?? msgs.length) + 1 }
+    })
+    // Ensure in Zustand UI store
+    try {
+      const s = useStarshipUIStore.getState()
+      const convo = s.conversations[cid]
+      const zMsgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
+      const zLast = zMsgs[zMsgs.length - 1]
+      if (zLast && zLast.role === 'assistant' && zLast.streaming === true) {
+        return
+      }
+      s.appendMessage(cid, {
+        id: `temp-assistant-${Date.now()}`,
+        role: 'assistant',
+        content: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messageType: 'agent_response',
+        streaming: true,
+        chunks: [],
+      } as any)
+    } catch {}
+  }
+
+  // Replace/merge a temp assistant shell with a concrete server message value in the UI store
+  const upsertAssistantWithServerValue = (cid: string, value: any) => {
+    try {
+      const s = useStarshipUIStore.getState()
+      const convo = s.conversations[cid]
+      const zMsgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
+      if (zMsgs.length > 0) {
+        const lastIdx = zMsgs.length - 1
+        const last = zMsgs[lastIdx]
+        const isTemp = last && last.role === 'assistant' && last.streaming === true && typeof last.id === 'string' && last.id.startsWith('temp-assistant-')
+        if (isTemp) {
+          // Preserve any streamed chunks/reasoning/tool_calls accumulated on the shell
+          const merged = {
+            ...(value as any),
+            streaming: true,
+            chunks: Array.isArray((last as any).chunks) ? (last as any).chunks : (value as any).chunks,
+            reasoningChunks: Array.isArray((last as any).reasoningChunks) ? (last as any).reasoningChunks : (value as any).reasoningChunks,
+            tool_calls: (value as any).tool_calls ?? (last as any).tool_calls,
+          }
+          s.updateMessageAt(cid, lastIdx, merged as any)
+          return true
+        }
+      }
+      // Append if not already present by id
+      if (!zMsgs.some((m: any) => m.id === (value as any).id)) {
+        s.appendMessage(cid, { ...(value as any), streaming: true } as any)
+      }
+    } catch {}
+    return false
+  }
 
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
@@ -275,6 +374,7 @@ export function useConversation(conversationId: string | null) {
             .filter(Boolean)
             .join('')
           // Start streaming when any chunks (text or reasoning) arrive
+          ensureAssistantShell(cid)
           startStreaming(cid, version)
           if (text) {
             appendStreamingChunk(cid, text, version)
@@ -573,7 +673,7 @@ export function useConversation(conversationId: string | null) {
                     const zConvo = useStarshipUIStore.getState().conversations[cid]
                     const zMsgs = Array.isArray(zConvo?.messages) ? zConvo.messages : []
                     if (!zMsgs.some((m: any) => m.id === value.id)) {
-                      appendMessage(cid, { ...(value as any) })
+                      upsertAssistantWithServerValue(cid, { ...(value as any) })
                     }
                   } catch {}
                 }
@@ -585,7 +685,14 @@ export function useConversation(conversationId: string | null) {
                 let idx = Number(mTc[1])
                 if (!Number.isInteger(idx)) continue
                 if (idx < 0) {
-                  idx = Math.max(msgs.length - 1, 0)
+                  try {
+                    ensureAssistantShell(cid)
+                    const zState = useStarshipUIStore.getState()
+                    const zMsgs: any[] = Array.isArray(zState.conversations[cid]?.messages) ? (zState.conversations[cid] as any).messages : []
+                    idx = Math.max(zMsgs.length - 1, 0)
+                  } catch {
+                    idx = Math.max(msgs.length - 1, 0)
+                  }
                 }
                 const raw = (op as any).value || []
                 const sanitized = Array.isArray(raw)

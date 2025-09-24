@@ -25,6 +25,13 @@ interface ClientMessage extends MessageModel {
     position: number
     timestamp: number
   }>
+  // Optional reasoning fields streamed and/or persisted
+  reasoning?: string
+  reasoningChunks?: Array<{
+    content: string
+    position: number
+    timestamp: number
+  }>
 }
 
 // Content chunk processing utility
@@ -45,24 +52,33 @@ const processChunks = (data: any) => {
         })
       : undefined
 
-    // If message has chunks, build the streamed content
-    if (message.chunks && Array.isArray(message.chunks)) {
-      // Sort chunks by position to ensure correct order
-      const sortedChunks = [...message.chunks].sort((a, b) => a.position - b.position)
+    const hasTextChunks = Array.isArray((message as any).chunks)
+    const hasReasoningChunks = Array.isArray((message as any).reasoningChunks)
 
+    if (hasTextChunks || hasReasoningChunks) {
       // Build content from chunks
-      let streamedContent = ''
-      for (const chunk of sortedChunks) {
-        streamedContent += chunk.content
+      let streamedContent = message.content || ''
+      if (hasTextChunks) {
+        const sortedChunks = [...(message.chunks || [])].sort((a, b) => a.position - b.position)
+        streamedContent = ''
+        for (const chunk of sortedChunks) streamedContent += chunk.content
       }
 
-      // Return message with both the original content and streamed content
+      // Build reasoning from chunks
+      let streamedReasoning = (message as any).reasoning || ''
+      if (hasReasoningChunks) {
+        const sortedR = [...(((message as any).reasoningChunks || []) as any[])].sort((a, b) => a.position - b.position)
+        streamedReasoning = ''
+        for (const rc of sortedR) streamedReasoning += rc.content
+      }
+
       return {
         ...message,
-        content: message.streaming ? streamedContent : message.content,
-        streamedContent: streamedContent,
+        content: message.streaming && hasTextChunks ? streamedContent : message.content,
+        streamedContent,
+        ...(streamedReasoning ? { reasoning: message.streaming ? streamedReasoning : (message as any).reasoning } : { reasoning: (message as any).reasoning }),
         ...(sanitizedToolCalls ? { tool_calls: sanitizedToolCalls } : {}),
-      }
+      } as ClientMessage
     }
 
     // No chunks case: still ensure tool_calls are sanitized
@@ -249,22 +265,24 @@ export function useConversation(conversationId: string | null) {
 
         // Split chunk-add ops from others to avoid blocking event loop with frequent cache writes
         const chunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/chunks\/-$/.test(op.path))
-        const nonChunkOps = ops.filter(op => !chunkOps.includes(op))
+        const reasoningChunkOps = ops.filter(op => op.op === 'add' && typeof op.path === 'string' && /\/reasoningChunks\/-$/.test(op.path))
+        const nonChunkOps = ops.filter(op => !chunkOps.includes(op) && !reasoningChunkOps.includes(op))
 
         // Fast path: update ephemeral streaming state in zustand for chunk adds
-        if (chunkOps.length > 0) {
+        if (chunkOps.length > 0 || reasoningChunkOps.length > 0) {
           const text = chunkOps
             .map(op => (op as any).value?.content)
             .filter(Boolean)
             .join('')
+          // Start streaming when any chunks (text or reasoning) arrive
+          startStreaming(cid, version)
           if (text) {
-            startStreaming(cid, version)
             appendStreamingChunk(cid, text, version)
-            // Flip responding off once streaming actually starts
-            try {
-              setConversationResponding(cid, false)
-            } catch {}
           }
+          // Flip responding off once streaming actually starts
+          try {
+            setConversationResponding(cid, false)
+          } catch {}
 
           // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
           // We directly mutate the messages cache per op target index rather than applying JSON-Patch (lighter + avoids starvation).
@@ -307,6 +325,43 @@ export function useConversation(conversationId: string | null) {
             // Do not bump lastActivityAt on chunk-only updates to avoid unnecessary re-renders
             return updated
           })
+
+          // Also reflect reasoning chunk additions in TanStack Query cache
+          if (reasoningChunkOps.length > 0) {
+            queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
+              if (!old || !Array.isArray(old.messages)) return old
+              const updated = { ...old, messages: [...old.messages] }
+
+              for (const op of reasoningChunkOps) {
+                const path = String((op as any).path || '')
+                // Expect path like: /messages/{index}/reasoningChunks/- where index can be a concrete number or -1 for last
+                const match = path.match(/^\/messages\/(-?\d+)\/reasoningChunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/reasoningChunks\/-$/)
+                if (!match) continue
+                let msgIndex = Number(match[1])
+                if (!Number.isInteger(msgIndex)) continue
+                if (msgIndex < 0) {
+                  msgIndex = updated.messages.length - 1
+                }
+                if (msgIndex < 0 || msgIndex >= updated.messages.length) continue
+
+                const target = { ...updated.messages[msgIndex] }
+                const chunkVal = (op as any).value
+                const rChunks = Array.isArray((target as any).reasoningChunks) ? [...(target as any).reasoningChunks] : []
+                if (chunkVal && typeof chunkVal.content === 'string') {
+                  rChunks.push({
+                    content: String(chunkVal.content),
+                    position: typeof chunkVal.position === 'number' ? chunkVal.position : rChunks.length > 0 ? rChunks[rChunks.length - 1].position + chunkVal.content.length : 0,
+                    timestamp: typeof chunkVal.timestamp === 'number' ? chunkVal.timestamp : Date.now(),
+                  })
+                }
+                ;(target as any).reasoningChunks = rChunks
+                target.streaming = true
+                updated.messages[msgIndex] = target
+              }
+
+              return updated
+            })
+          }
 
           // Reflect chunks into Zustand immediately for low-latency rendering (without getState)
           try {

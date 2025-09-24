@@ -11,11 +11,15 @@ import { ValidationResult, ValidationError } from '@/types/validation';
 import { ExecutionItem } from '@/types';
 import { autopilot } from '@/Autopilot';
 import { NodeHandlerOptions } from '@/types/node-handler';
-import { LLMMessageRole, LLMResponse, LLMUsage } from '@/types/llm';
+import { LLMMessageRole, LLMResponse, LLMUsage, ReasoningDetail } from '@/types/llm';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 interface StreamChoice {
   content: string;
+  // Optional accumulated reasoning text for reasoning-capable providers
+  reasoning?: string;
+  // Optional accumulated reasoning details (OpenRouter unified)
+  reasoning_details?: ReasoningDetail[];
   finishReason: string | null;
   tool_calls?: {
     id?: string;
@@ -106,6 +110,12 @@ export class LLM extends BaseNode<LlmParams> {
       if (params.tools && Array.isArray(params.tools) && params.tools.length > 0) {
         requestBody.tools = this.convertToOpenRouterTools(params.tools);
         requestBody.tool_choice = 'auto';
+      }
+
+      // Add reasoning config (OpenRouter unified parameter) if provided
+      // Ref: https://openrouter.ai/docs/use-cases/reasoning-tokens
+      if (params.reasoning !== undefined) {
+        (requestBody as { reasoning?: unknown }).reasoning = params.reasoning as unknown;
       }
 
       console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
@@ -238,7 +248,27 @@ export class LLM extends BaseNode<LlmParams> {
         const contentFromMessage = typeof messageNode.content === 'string' ? messageNode.content : '';
         const content = contentFromDelta || contentFromMessage;
 
+        // Extract reasoning text from common provider patterns if present
+        const reasoningFromDelta = this.extractReasoning(delta as unknown);
+        const reasoningFromMessage = this.extractReasoning(messageNode as unknown);
+        const reasoning = reasoningFromDelta || reasoningFromMessage;
+
         const finishReason = choice.finish_reason || null;
+
+        // Extract reasoning_details (unified OpenRouter shape)
+        // They may appear in delta.reasoning_details (streaming) or message.reasoning_details (snapshot)
+        const detailsFromDelta: unknown =
+          (delta && typeof delta === 'object' && (delta as Record<string, unknown>).reasoning_details) || undefined;
+        const detailsFromMessage: unknown =
+          (messageNode && typeof messageNode === 'object' && (messageNode as Record<string, unknown>).reasoning_details) || undefined;
+
+        const normalizeDetails = (val: unknown): ReasoningDetail[] => {
+          if (!Array.isArray(val)) return [];
+          // Keep as-is; API defines objects with type fields (reasoning.text|summary|encrypted)
+          return val as ReasoningDetail[];
+        };
+
+        const mergedDetails: ReasoningDetail[] = [...normalizeDetails(detailsFromDelta), ...normalizeDetails(detailsFromMessage)];
 
         // Prefer true delta updates; otherwise, fall back to message tool_calls snapshot
         const toolCallsDelta =
@@ -253,6 +283,17 @@ export class LLM extends BaseNode<LlmParams> {
         // Accumulate assistant content
         if (content) {
           choices[index].content += content;
+        }
+        // Accumulate reasoning if present
+        if (reasoning) {
+          if (!choices[index].reasoning) choices[index].reasoning = '';
+          choices[index].reasoning += reasoning;
+        }
+
+        // Accumulate reasoning_details if present
+        if (mergedDetails.length > 0) {
+          if (!choices[index].reasoning_details) choices[index].reasoning_details = [];
+          choices[index].reasoning_details.push(...mergedDetails);
         }
 
         // Accumulate tool_calls if present (OpenAI/OpenRouter-style streaming)
@@ -293,6 +334,78 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
+   * Attempt to extract reasoning/thinking text from a provider delta/message node.
+   * Supports a few common shapes:
+   * - node.reasoning: string | { content: string } | { tokens: [{text}] } | Array<{text|content}>
+   * - node.thinking: same as above (alternate field name)
+   */
+  private extractReasoning(node: unknown): string {
+    try {
+      if (!node || typeof node !== 'object') return '';
+      const rec = node as Record<string, unknown>;
+      const parts: string[] = [];
+
+      // Gather from unified 'reasoning' or 'thinking'
+      const raw = (rec.reasoning ?? rec.thinking) as unknown;
+
+      const appendFromRaw = (r: unknown): void => {
+        if (!r) return;
+        if (typeof r === 'string') {
+          parts.push(r);
+          return;
+        }
+        if (typeof r === 'object' && r !== null) {
+          const obj = r as Record<string, unknown>;
+          if (typeof obj.content === 'string') {
+            parts.push(obj.content);
+          }
+          if (Array.isArray(obj.tokens)) {
+            for (const t of obj.tokens as unknown[]) {
+              if (t && typeof t === 'object') {
+                const tok = t as Record<string, unknown>;
+                const text = typeof tok.text === 'string' ? tok.text : '';
+                const content = typeof tok.content === 'string' ? tok.content : '';
+                if (text) parts.push(text);
+                else if (content) parts.push(content);
+              }
+            }
+          }
+        }
+        if (Array.isArray(r)) {
+          for (const p of r as unknown[]) {
+            if (p && typeof p === 'object') {
+              const pr = p as Record<string, unknown>;
+              const text = typeof pr.text === 'string' ? pr.text : '';
+              const content = typeof pr.content === 'string' ? pr.content : '';
+              if (text) parts.push(text);
+              else if (content) parts.push(content);
+            }
+          }
+        }
+      };
+
+      appendFromRaw(raw);
+
+      // Also gather from reasoning_details chunks when provided
+      const details = rec.reasoning_details as unknown;
+      if (Array.isArray(details)) {
+        for (const d of details as unknown[]) {
+          if (d && typeof d === 'object') {
+            const det = d as Record<string, unknown>;
+            if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+              parts.push(det.text);
+            }
+          }
+        }
+      }
+
+      return parts.join('');
+    } catch {
+      return '';
+    }
+  }
+
+  /**
    * Build final response from accumulated streaming data
    */
   private buildFinalResponse(
@@ -321,6 +434,7 @@ export class LLM extends BaseNode<LlmParams> {
         message: {
           role: 'assistant' as LLMMessageRole,
           content: choice.content,
+          ...(choice.reasoning ? { reasoning: choice.reasoning } : {}),
           ...(choice.tool_calls && choice.tool_calls.some(isValidToolCall)
             ? {
                 tool_calls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => ({

@@ -29,6 +29,9 @@ interface MessageContentProps {
   enableLinkPreview?: boolean
   isStreaming?: boolean
   chunks?: StreamChunk[]
+  // Optional reasoning content and chunks
+  reasoning?: string
+  reasoningChunks?: StreamChunk[]
   agentName?: string
   toolCalls?: NonNullable<MessageModel['tool_calls']>
   toolResults?: any[]
@@ -44,6 +47,8 @@ export function ConversationMessageContent({
   enableLinkPreview = true,
   isStreaming = false,
   chunks = [],
+  reasoning,
+  reasoningChunks = [],
   agentName,
   toolCalls,
   toolResults = [],
@@ -122,6 +127,15 @@ export function ConversationMessageContent({
     // After completion, prefer server-finalized content; if missing, fall back to aggregated chunks
     return content && content.trim().length > 0 ? content : aggregated
   }, [content, chunks, isStreaming])
+
+  const displayReasoning = useMemo(() => {
+    const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0
+    if (!hasR) return reasoning || ''
+    const sorted = [...reasoningChunks].sort((a, b) => a.position - b.position)
+    let agg = ''
+    for (const rc of sorted) agg += rc.content
+    return isStreaming ? agg : reasoning && reasoning.trim().length > 0 ? reasoning : agg
+  }, [reasoning, reasoningChunks, isStreaming])
 
   const parsedJson = useMemo(() => {
     try {
@@ -307,6 +321,21 @@ export function ConversationMessageContent({
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
     <div className={cn('relative group', className)}>
+      {/* Reasoning (thinking) collapsible */}
+      {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
+        <div className="mb-2">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-xs leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+              {isStreaming ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              Reasoning
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="text-xs text-muted-foreground whitespace-pre-wrap">{displayReasoning}</div>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
+
       {/* Unified markdown rendering - same for both streaming and completed, but skip for tool_result messages */}
       {messageType !== 'tool_result' && (
         <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>

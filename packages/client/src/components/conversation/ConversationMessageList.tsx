@@ -58,11 +58,39 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       uniqueMessages.push(m)
     }
 
+    // Collapse temp assistant shell followed by concrete assistant from server (UI-level safety if merging missed)
+    const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
+    for (let i = 0; i < uniqueMessages.length; i++) {
+      const cur: any = uniqueMessages[i]
+      if (cur?.role === 'assistant' && typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-')) {
+        const next: any = uniqueMessages[i + 1]
+        if (next && next.role === 'assistant' && !(typeof next.id === 'string' && next.id.startsWith('temp-assistant-'))) {
+          const merged: any = { ...next }
+          if (Array.isArray(cur.chunks) && (!Array.isArray(merged.chunks) || merged.chunks.length === 0)) {
+            merged.chunks = cur.chunks
+          }
+          if (Array.isArray(cur.reasoningChunks) && (!Array.isArray(merged.reasoningChunks) || merged.reasoningChunks.length === 0)) {
+            merged.reasoningChunks = cur.reasoningChunks
+          }
+          if ((merged as any).tool_calls == null || (merged as any).tool_calls.length === 0) {
+            ;(merged as any).tool_calls = cur.tool_calls
+          }
+          merged.streaming = cur.streaming || merged.streaming
+          collapsedMessages.push(merged)
+          i++ // skip concrete assistant already merged
+          continue
+        }
+      }
+      collapsedMessages.push(cur)
+    }
+
+    const baseMessages = collapsedMessages
+
     // First pass: collect all tool result messages by normalized tool call id
     const toolResultsMap = new Map<string, any>()
     const processedResultIds = new Set<string>()
 
-    uniqueMessages.forEach(msg => {
+    baseMessages.forEach(msg => {
       if (msg.messageType === 'tool_result') {
         const rid = (msg as any).tool_call_id ?? (msg as any).call_id ?? (msg as any).id
         if (rid != null) {
@@ -74,7 +102,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     // Second pass: group messages and attach matching tool results
     const groupedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }> = []
 
-    for (const message of uniqueMessages) {
+    for (const message of baseMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
       if (message.role === 'assistant' && (message as any).tool_calls?.length > 0) {
         const toolCallIds = ((message as any).tool_calls || [])
@@ -120,6 +148,11 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       }
     }
     return lastId
+  }, [displayMessages])
+
+  // Hide "responding" indicator if any assistant is already streaming (prevents double assistant rows)
+  const hasAssistantStreaming = useMemo(() => {
+    return displayMessages.some(m => m.role === 'assistant' && (m as any).streaming === true)
   }, [displayMessages])
 
   // Optimized auto-scroll with debouncing
@@ -174,7 +207,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
             <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeStreamingAssistantId} />
           ))}
           {/* Show responding indicator after the last user message */}
-          {isResponding && agentName && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === 'user' && (
+          {isResponding && agentName && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === 'user' && !hasAssistantStreaming && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">

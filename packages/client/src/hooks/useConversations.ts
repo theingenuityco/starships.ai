@@ -306,6 +306,10 @@ export function useConversation(conversationId: string | null) {
       const zMsgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
       const zLast = zMsgs[zMsgs.length - 1]
       if (zLast && zLast.role === 'assistant' && zLast.streaming === true) {
+        // Assistant shell already present – flip responding off just in case
+        try {
+          s.setConversationResponding(cid, false)
+        } catch {}
         return
       }
       s.appendMessage(cid, {
@@ -319,6 +323,9 @@ export function useConversation(conversationId: string | null) {
         chunks: [],
         reasoningChunks: [],
       } as any)
+      try {
+        s.setConversationResponding(cid, false)
+      } catch {}
     } catch {}
   }
 
@@ -342,12 +349,18 @@ export function useConversation(conversationId: string | null) {
             tool_calls: (value as any).tool_calls ?? (last as any).tool_calls,
           }
           s.updateMessageAt(cid, lastIdx, merged as any)
+          try {
+            s.setConversationResponding(cid, false)
+          } catch {}
           return true
         }
       }
       // Append if not already present by id
       if (!zMsgs.some((m: any) => m.id === (value as any).id)) {
         s.appendMessage(cid, { ...(value as any), streaming: true } as any)
+        try {
+          s.setConversationResponding(cid, false)
+        } catch {}
       }
     } catch {}
     return false

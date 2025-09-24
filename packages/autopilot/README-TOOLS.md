@@ -215,6 +215,8 @@ Notes:
 
 ## Error handling and loop prevention
 
-- Tools execute their own blueprint with failOnNodeError enabled. On failure, the Tool node returns an ExecutionItem with the error field set (using ExecutionItemUtils.wrapError), not a thrown exception. This allows inline mutations to execute and publish a tool message.
-- The Agent’s default blueprint falls back to the ExecutionItem.error when json is undefined, serializing a canonical payload like `{ ok: false, error: "<message>" }` into the tool role message content.
-- This prevents infinite loops when a tool fails (for example, tool_smoke_test), because the LLM now receives a tool response (even on failure) and can proceed without repeatedly issuing the same tool call.
+- Tools execute their own blueprint with failOnNodeError enabled. On failure, the Tool node returns an ExecutionItem that sets `error` and also provides `json` with a structured payload:
+  - `{ ok: false, error: "<message>", details: { stack?: string, nodeRef?: string, depth: number, runner: "local" | "child", toolName: string, toolCallId?: string, timestamp: string } }`
+  - This allows inline mutations to execute and publish a detailed tool message for the LLM.
+- The Agent’s default blueprint serializes the `json` payload when present (including `details`). If `json` is missing, it falls back to the `error` string. The tool role message therefore contains all available diagnostics that the LLM can reason about.
+- This prevents infinite loops when a tool fails (for example, tool_smoke_test), because the LLM now receives a concrete tool response (even on failure) and can proceed without repeatedly issuing the same tool call.

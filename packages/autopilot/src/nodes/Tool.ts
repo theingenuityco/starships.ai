@@ -7,7 +7,7 @@
 
 import { BaseNode } from './BaseNode';
 import type { ToolParams } from '@/types/node-parameters';
-import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
+import { ValidationResult, ValidationError, ExecutionItem, Execution } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { EngineConfig } from '@/engine/Engine';
@@ -24,6 +24,9 @@ export class Tool extends BaseNode<ToolParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
+
+    // Will hold nested execution context; populated before running the sub-blueprint
+    let subExec: Execution | undefined;
 
     try {
       // Extract tool arguments from input
@@ -52,7 +55,7 @@ export class Tool extends BaseNode<ToolParams> {
       // Execute the tool's blueprint using depth-aware Runner selection
       // IMPORTANT: propagate parent execution to set correct execution.depth (nested = depth>0)
       const parentExecution = this.getOptions()?.execution;
-      const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
+      subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
       const engineConfig: EngineConfig = {
         eventCallback: this.getEventCallback(),
@@ -84,6 +87,22 @@ export class Tool extends BaseNode<ToolParams> {
       // Emit tool_complete event with error
       const eventCallback = this.getOptions()?.eventCallback;
       const errorMessage = error instanceof Error ? error.message : 'Unknown tool error';
+
+      // Build rich error details so the LLM can consume actionable diagnostics
+      const parentDepth = this.getOptions()?.execution?.depth ?? 0;
+      const depth = subExec?.depth ?? parentDepth + 1;
+      const runnerKind = depth === 0 ? 'child' : 'local';
+      const details = {
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        nodeRef: subExec?.currentNodeRef,
+        depth,
+        runner: runnerKind,
+        toolName: params.name,
+        toolCallId: params.toolCallId,
+        timestamp: new Date().toISOString(),
+      };
+
       if (eventCallback) {
         try {
           await eventCallback({
@@ -99,8 +118,18 @@ export class Tool extends BaseNode<ToolParams> {
           // Ignore callback errors to avoid masking the original error
         }
       }
-      // Do not throw here. Return an ExecutionItem with error populated so Agent mutations can handle natively.
-      return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
+
+      // Return an ExecutionItem that both marks error and carries a structured json payload
+      const inputItem = input?.[0];
+      const errorPayload = { ok: false, error: errorMessage, details };
+      return [
+        {
+          json: errorPayload,
+          error: errorMessage,
+          pairedItem: inputItem?.pairedItem || { item: 0 },
+          binary: inputItem?.binary,
+        },
+      ];
     }
   }
 

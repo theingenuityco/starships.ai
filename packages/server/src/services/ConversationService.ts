@@ -328,9 +328,9 @@ export class ConversationService {
           const hasContent = delta?.content;
           const hasToolCalls = delta?.tool_calls && Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0;
 
-          // Guard: if no active accumulator and we have content, start a new placeholder stream.
+          // Guard: if no active accumulator and we have content OR tool_calls, start a new placeholder stream.
           // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
-          if (hasContent && !this.streamingContent.has(conversationId)) {
+          if ((hasContent || hasToolCalls) && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
               // Acquire lock upfront to avoid race between parallel content_chunk events
               this.streamingContent.set(conversationId, '');

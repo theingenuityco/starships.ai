@@ -143,6 +143,8 @@ export function ConversationMessageContent({
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
   const openReasoning = Boolean(isStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
+  const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Assistant'
+  const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
 
   const parsedJson = useMemo(() => {
     try {
@@ -335,7 +337,7 @@ export function ConversationMessageContent({
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && openReasoning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Brain className="w-3 h-3" />}
-              <span className="ml-1">Reasoning</span>
+              <span className="ml-1">{reasoningHeaderLabel}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <blockquote className="border-l-4 border-primary/20 px-4 py-2 bg-muted/20 rounded-r-lg my-1">

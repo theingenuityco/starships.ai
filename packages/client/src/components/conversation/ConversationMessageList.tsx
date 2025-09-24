@@ -221,21 +221,13 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
       const m: any = displayMessages[i]
       if (m?.role !== 'assistant') continue
-      const isShell = m?.streaming === true // treat shell as progress to avoid double assistant bubbles
       const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
       const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
       const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
-      const hasToolCalls =
-        Array.isArray(m?.tool_calls) &&
-        m.tool_calls.some((tc: any) => {
-          const fn = tc?.function
-          const hasName = typeof fn?.name === 'string' && fn.name.trim().length > 0
-          const hasId = tc?.id != null && String(tc.id).trim().length > 0
-          const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.trim().length > 0
-          return hasName || hasId || hasArgs
-        })
       const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
-      if (isShell || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasContent) {
+      // IMPORTANT: Do NOT treat assistant shell or tool_calls-only as progress; keep the GAP loader
+      // visible until LLM text/reasoning begins.
+      if (hasChunks || hasRChunks || hasReasoning || hasContent) {
         return true
       }
     }

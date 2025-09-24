@@ -105,7 +105,7 @@ export class Agent implements NodeHandler {
           name: 'Check Tool Calls',
           description: 'Check if LLM made any tool calls',
           parameters: {
-            condition: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== undefined && $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== null }}`,
+            condition: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const name = calls?.[0]?.function?.name; return Array.isArray(calls) && calls.length > 0 && typeof name === 'string' && name.length > 0; })() }}`,
           },
         },
         // Prepare tool input from LLM tool_calls arguments
@@ -135,19 +135,19 @@ export class Agent implements NodeHandler {
           description: 'Execute tool and add result to conversation',
           parameters: {
             // Resolve tool definition from state using the tool name from LLM response
-            name: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).name }}`,
-            description: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).description }}`,
-            parameters: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).parameters }}`,
-            blueprint: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).blueprint }}`,
-            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
+            name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.name ?? (toolName ?? ""); })() }}`,
+            description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.description ?? ("Tool '" + (toolName ?? "unknown") + "' not found"); })() }}`,
+            parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
+            blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.blueprint; })() }}`,
+            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
             mutations: [
               {
                 operation: 'add' as const,
                 path: '/state/messages/-',
                 value: {
                   role: 'tool',
-                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
-                  name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
+                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
+                  name: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.name ?? "" }}`,
                   content: `{{ JSON.stringify((() => { const _i = $lastOutputOf("${toolNodeRef}")[0]; const j = _i?.json; if (j !== undefined) { return j; } if (_i && _i.error !== undefined) { return { ok: false, error: _i.error }; } return {}; })()) }}`,
                 },
               },

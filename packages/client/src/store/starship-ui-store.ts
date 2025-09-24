@@ -23,6 +23,11 @@ export interface UIMessage extends MessageModel {
   error?: boolean
   chunks?: UIStreamChunk[]
   streamedContent?: string
+  // Optional reasoning fields streamed and/or persisted during assistant thinking
+  reasoning?: string
+  reasoningChunks?: UIStreamChunk[]
+  // Optional grouped tool results for display convenience (derived in UI)
+  toolResults?: any[]
 }
 
 interface ConversationData {

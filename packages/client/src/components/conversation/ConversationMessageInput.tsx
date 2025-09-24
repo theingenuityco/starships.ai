@@ -45,10 +45,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const createConversation = useCreateConversation()
 
     // Use unified conversation hook (convert undefined to null for the hook)
-    const { sendMessage: sendMessageFn, isSending, isStreaming } = useConversation(conversationId ?? null)
-    // Also consider UI store streaming state to avoid mismatches
-    const uiStreaming = useStarshipUIStore(s => (conversationId ? s.conversationsStreaming[conversationId]?.isStreaming === true : false))
-    const isStreamingEffective = isStreaming || uiStreaming
+    const { sendMessage: sendMessageFn, isSending } = useConversation(conversationId ?? null)
+    // Drive streaming solely from central UI store to avoid event-loop starvation
+    const isStreamingEffective = useStarshipUIStore(s => (conversationId ? s.conversationsStreaming[conversationId]?.isStreaming === true : false))
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 

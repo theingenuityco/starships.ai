@@ -55,8 +55,43 @@ export class Workflow extends BaseNode<WorkflowParams> {
     const errors: ValidationError[] = [];
     const params = this.getParams();
 
+    // Guard: blueprint must exist and be an object
+    if (!params.blueprint || typeof params.blueprint !== 'object') {
+      errors.push({
+        code: 'MISSING_REQUIRED_FIELD',
+        message: 'Workflow blueprint is required',
+      });
+      return {
+        valid: false,
+        errors,
+      };
+    }
+
+    const bp = params.blueprint as unknown as {
+      nodes?: Array<{ ref: string; type: string }>;
+      edges?: Array<{ ref: string; from: string; to: string }>;
+    };
+
+    // Guard: nodes must be an array
+    if (!Array.isArray(bp.nodes)) {
+      errors.push({
+        code: 'INVALID_PARAMETERS',
+        message: 'Workflow blueprint must have a nodes array',
+      });
+      return { valid: false, errors };
+    }
+
+    // Guard: edges must be an array
+    if (!Array.isArray(bp.edges)) {
+      errors.push({
+        code: 'INVALID_PARAMETERS',
+        message: 'Workflow blueprint must have an edges array',
+      });
+      return { valid: false, errors };
+    }
+
     // Check for start node
-    const hasStartNode = params.blueprint.nodes.some((node) => node.type === 'start');
+    const hasStartNode = bp.nodes.some((node) => node.type === 'start');
     if (!hasStartNode) {
       errors.push({
         code: 'MISSING_START_NODE',
@@ -67,8 +102,8 @@ export class Workflow extends BaseNode<WorkflowParams> {
     // Note: Node type validation will be handled by external Engine during execution
 
     // Check edge references
-    const nodeRefs = new Set(params.blueprint.nodes.map((n) => n.ref));
-    const invalidEdges = params.blueprint.edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
+    const nodeRefs = new Set(bp.nodes.map((n) => n.ref));
+    const invalidEdges = bp.edges.filter((edge) => !nodeRefs.has(edge.from) || !nodeRefs.has(edge.to));
     if (invalidEdges.length > 0) {
       invalidEdges.forEach((edge) => {
         errors.push({

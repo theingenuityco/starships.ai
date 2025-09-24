@@ -84,17 +84,22 @@ export class Tool extends BaseNode<ToolParams> {
 
       return ExecutionItemUtils.wrapSingle(result, input?.[0]);
     } catch (error) {
-      // Emit tool_complete event with error
+      // Emit tool_complete event with error and structured result payload for consumers
       const eventCallback = this.getOptions()?.eventCallback;
       const errorMessage = error instanceof Error ? error.message : 'Unknown tool error';
 
-      // Build rich error details so the LLM can consume actionable diagnostics
+      // Build rich error details so the LLM/consumers can use actionable diagnostics
       const parentDepth = this.getOptions()?.execution?.depth ?? 0;
       const depth = subExec?.depth ?? parentDepth + 1;
       const runnerKind = depth === 0 ? 'child' : 'local';
       const details = {
+        name: error instanceof Error ? error.name : 'Error',
         message: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
+        cause:
+          error && typeof error === 'object' && 'cause' in (error as Record<string, unknown>)
+            ? (error as Record<string, unknown>).cause
+            : undefined,
         nodeRef: subExec?.currentNodeRef,
         depth,
         runner: runnerKind,
@@ -103,6 +108,10 @@ export class Tool extends BaseNode<ToolParams> {
         timestamp: new Date().toISOString(),
       };
 
+      // Prepare structured error payload once so both events and return value are consistent
+      const inputItem = input?.[0];
+      const errorPayload = { ok: false, error: errorMessage, details };
+
       if (eventCallback) {
         try {
           await eventCallback({
@@ -110,8 +119,10 @@ export class Tool extends BaseNode<ToolParams> {
             timestamp: new Date().toISOString(),
             data: {
               toolName: params.name,
-              error: errorMessage,
               toolCallId: params.toolCallId,
+              error: errorMessage,
+              // Provide structured details on error as well (same shape as success 'result')
+              result: errorPayload,
             },
           });
         } catch {
@@ -119,9 +130,7 @@ export class Tool extends BaseNode<ToolParams> {
         }
       }
 
-      // Return an ExecutionItem that both marks error and carries a structured json payload
-      const inputItem = input?.[0];
-      const errorPayload = { ok: false, error: errorMessage, details };
+      // Return an ExecutionItem that marks error and carries structured json payload
       return [
         {
           json: errorPayload,

@@ -138,10 +138,11 @@ export function ConversationMessageContent({
   }, [reasoning, reasoningChunks, isStreaming])
 
   // Determine whether reasoning panel should auto-open.
-  // Requirement: Keep it open while only reasoning is streaming; collapse once content starts.
+  // Keep it open only while reasoning-only is streaming; collapse once content OR tool_calls start (and on reload).
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
-  const openReasoning = Boolean(displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow))
+  const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
+  const openReasoning = Boolean(isStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
 
   const parsedJson = useMemo(() => {
     try {

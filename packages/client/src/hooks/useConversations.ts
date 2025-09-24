@@ -808,6 +808,16 @@ export function useConversation(conversationId: string | null) {
                     }
                   } catch {}
                 }
+
+                // Tool result add: keep GAP loader visible until next assistant text/reasoning begins.
+                if (isAppendSentinel || mAdd) {
+                  const isToolResult = value && (value as any).messageType === 'tool_result'
+                  if (isToolResult) {
+                    try {
+                      setConversationResponding(cid, true)
+                    } catch {}
+                  }
+                }
               }
 
               // Update tool_calls on the current assistant placeholder (or concrete index)
@@ -838,11 +848,6 @@ export function useConversation(conversationId: string | null) {
                 try {
                   updateMessageAt(cid, idx, (m: any) => ({ ...m, tool_calls: sanitized }))
                 } catch {}
-                if (Array.isArray(sanitized) && sanitized.length > 0) {
-                  try {
-                    setConversationResponding(cid, false)
-                  } catch {}
-                }
               }
 
               // Mirror reasoning string updates (providers that stream /reasoning via replace/add)
@@ -879,7 +884,8 @@ export function useConversation(conversationId: string | null) {
             }
           } catch {}
 
-          // Identify message indices that completed (either content replaced or streaming=false)
+          // Identify assistant message indices that completed (either assistant streaming=false or assistant content replaced).
+          // IMPORTANT: Do not consider tool_result messages as completion for the assistant turn.
           const completedIdxs = new Set<number>()
           for (const op of nonChunkOps) {
             if (op.op === 'replace' && typeof (op as any).path === 'string') {
@@ -893,19 +899,30 @@ export function useConversation(conversationId: string | null) {
                 const len = Array.isArray(cache?.messages) ? cache.messages.length : 0
                 return Math.max(len - 1, 0)
               }
+
+              const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
+              const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+
               if (mStreaming && (op as any).value === false) {
-                completedIdxs.add(resolveIndex(Number(mStreaming[1])))
+                const idx = resolveIndex(Number(mStreaming[1]))
+                const msg = msgs[idx]
+                if (msg && msg.role === 'assistant' && (msg as any).messageType !== 'tool_result') {
+                  completedIdxs.add(idx)
+                }
               }
+
               if (mContent) {
-                completedIdxs.add(resolveIndex(Number(mContent[1])))
+                const idx = resolveIndex(Number(mContent[1]))
+                const msg = msgs[idx]
+                if (msg && msg.role === 'assistant' && (msg as any).messageType !== 'tool_result') {
+                  completedIdxs.add(idx)
+                }
               }
             }
           }
 
-          // If any op marks streaming complete, end zustand streaming
-          const marksDone =
-            nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/streaming$/.test(op.path) && (op as any).value === false) ||
-            nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
+          // If any assistant op marks streaming complete, end zustand streaming
+          const marksDone = completedIdxs.size > 0
           if (marksDone) {
             endStreaming(cid)
             try {

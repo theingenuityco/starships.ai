@@ -118,22 +118,34 @@ describe('Tool Get Tool', () => {
     }
 
     it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({ slug: 'calc' }, {})).rejects.toThrow('baseUrl is required');
+      await expect(executeToolWithMockEnv({ slug: 'calc' }, {})).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('baseUrl is required'),
+      });
     });
 
     it('should fail without auth token', async () => {
       const env = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 'test-starship' };
-      await expect(executeToolWithMockEnv({ slug: 'calc' }, env as never)).rejects.toThrow('authToken is required');
+      await expect(executeToolWithMockEnv({ slug: 'calc' }, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('authToken is required'),
+      });
     });
 
     it('should fail without starship ID', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({ slug: 'calc' }, env as never)).rejects.toThrow('starshipId is required');
+      await expect(executeToolWithMockEnv({ slug: 'calc' }, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('starshipId is required'),
+      });
     });
 
     it('should fail when slug is missing', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({}, env)).rejects.toThrow('slug is required');
+      await expect(executeToolWithMockEnv({}, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('slug is required'),
+      });
     });
 
     it('should successfully fetch tool by slug with mocked API response', async () => {
@@ -195,7 +207,10 @@ describe('Tool Get Tool', () => {
         text: async () => JSON.stringify({ error: 'Not Found' }),
       });
 
-      await expect(executeToolWithMockEnv({ slug: 'missing' }, env)).rejects.toThrow();
+      await expect(executeToolWithMockEnv({ slug: 'missing' }, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('404 Not Found'),
+      });
     });
   });
 

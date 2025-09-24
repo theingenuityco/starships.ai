@@ -43,13 +43,26 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
+    // Sort ascending by createdAt
     const sortedMessages = [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+    // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
+    const seenIds = new Set<string>()
+    const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
+    for (const m of sortedMessages) {
+      const key = (m as any)?.id != null ? String((m as any).id) : null
+      if (key) {
+        if (seenIds.has(key)) continue
+        seenIds.add(key)
+      }
+      uniqueMessages.push(m)
+    }
 
     // First pass: collect all tool result messages by normalized tool call id
     const toolResultsMap = new Map<string, any>()
     const processedResultIds = new Set<string>()
 
-    sortedMessages.forEach(msg => {
+    uniqueMessages.forEach(msg => {
       if (msg.messageType === 'tool_result') {
         const rid = (msg as any).tool_call_id ?? (msg as any).call_id ?? (msg as any).id
         if (rid != null) {
@@ -61,7 +74,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     // Second pass: group messages and attach matching tool results
     const groupedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }> = []
 
-    for (const message of sortedMessages) {
+    for (const message of uniqueMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
       if (message.role === 'assistant' && (message as any).tool_calls?.length > 0) {
         const toolCallIds = ((message as any).tool_calls || [])
@@ -256,10 +269,20 @@ const MemoizedMessageBubble = memo(
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
 
-    // Re-render when text changes
+    // Re-render when text (assistant content) changes
     if (prevProps.message.content !== nextProps.message.content) return false
 
-    // Re-render when chunks count changes
+    // Re-render when reasoning text changes (server may replace aggregated with finalized)
+    const prevReasoning = (prevProps.message as any).reasoning
+    const nextReasoning = (nextProps.message as any).reasoning
+    if (prevReasoning !== nextReasoning) return false
+
+    // Re-render when reasoningChunks count changes (reasoning-first streaming)
+    const prevRChunks = (prevProps.message as any).reasoningChunks?.length ?? 0
+    const nextRChunks = (nextProps.message as any).reasoningChunks?.length ?? 0
+    if (prevRChunks !== nextRChunks) return false
+
+    // Re-render when content chunks count changes
     const prevChunks = prevProps.message.chunks?.length ?? 0
     const nextChunks = nextProps.message.chunks?.length ?? 0
     if (prevChunks !== nextChunks) return false

@@ -216,24 +216,8 @@ export function useConversation(conversationId: string | null) {
       // Preserve optimistic user messages when syncing from TanStack Query
       let finalMessages = data.messages as any[]
 
-      if (existing && Array.isArray(existing.messages)) {
-        // Find any optimistic messages that should be preserved
-        const optimisticMessages = existing.messages.filter((msg: any) => {
-          if (!msg.sending || !msg.id || !msg.id.startsWith('temp-user-')) {
-            return false
-          }
-
-          // Only preserve if there's no matching server message with same content
-          const hasMatchingServerMessage = data.messages.some((serverMsg: any) => serverMsg.role === 'user' && serverMsg.content === msg.content)
-
-          return !hasMatchingServerMessage
-        })
-
-        if (optimisticMessages.length > 0) {
-          // Add optimistic messages to the end of the synced messages
-          finalMessages = [...data.messages, ...optimisticMessages]
-        }
-      }
+      // Do not preserve optimistic 'temp-user-*' messages during streaming sync to prevent duplicates.
+      // Mirror server-provided messages as the single source of truth.
 
       // Merge and dedupe: If a temp assistant placeholder is immediately followed by a concrete assistant from server,
       // merge streamed chunks/reasoning/tool_calls into the concrete message and drop the placeholder.
@@ -259,6 +243,31 @@ export function useConversation(conversationId: string | null) {
         }
         finalMessages = merged
       } catch {}
+
+      // Dedupe and cleanup before pushing into the UI store:
+      // - Drop any optimistic temp-user-* messages when a server user message with same content exists
+      // - Dedupe by id to avoid duplicates during baseline replays
+      try {
+        const serverUserContents = new Set((finalMessages as any[]).filter((m: any) => m.role === 'user' && typeof m.id === 'string' && !m.id.startsWith('temp-user-')).map((m: any) => m.content))
+
+        const filtered = (finalMessages as any[]).filter((m: any) => {
+          const isTempUser = typeof m.id === 'string' && m.id.startsWith('temp-user-') && m.role === 'user'
+          if (isTempUser && serverUserContents.has(m.content)) return false
+          return true
+        })
+
+        const seen = new Set<string>()
+        const deduped: any[] = []
+        for (const m of filtered as any[]) {
+          const id = (m as any)?.id
+          const key = id != null ? String(id) : null
+          if (key && seen.has(key)) continue
+          if (key) seen.add(key)
+          deduped.push(m)
+        }
+        finalMessages = deduped
+      } catch {}
+
       setConversationSnapshot(conversationId, {
         messages: finalMessages,
         total: finalMessages.length,
@@ -286,6 +295,7 @@ export function useConversation(conversationId: string | null) {
         messageType: 'agent_response',
         streaming: true,
         chunks: [],
+        reasoningChunks: [],
       }
       return { ...base, messages: [...msgs, placeholder], total: (base.total ?? msgs.length) + 1 }
     })
@@ -307,6 +317,7 @@ export function useConversation(conversationId: string | null) {
         messageType: 'agent_response',
         streaming: true,
         chunks: [],
+        reasoningChunks: [],
       } as any)
     } catch {}
   }
@@ -340,6 +351,23 @@ export function useConversation(conversationId: string | null) {
       }
     } catch {}
     return false
+  }
+
+  // Replace optimistic temp user message in the UI store with server user message
+  const reconcileUserAddIntoStore = (cid: string, value: any) => {
+    try {
+      const s = useStarshipUIStore.getState()
+      const convo = s.conversations[cid]
+      const zMsgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
+      // If server message already exists by id, nothing to do
+      if (zMsgs.some((m: any) => m.id === value.id)) return
+      // Remove temp-user optimistic with same content
+      const filtered = zMsgs.filter((m: any) => !(m.role === 'user' && m.sending === true && typeof m.id === 'string' && m.id.startsWith('temp-user-') && m.content === value.content))
+      useStarshipUIStore.getState().setConversationSnapshot(cid, {
+        messages: [...filtered, { ...(value as any), sending: false }],
+        total: filtered.length + 1,
+      })
+    } catch {}
   }
 
   // Process streaming events and update TanStack Query cache
@@ -552,6 +580,18 @@ export function useConversation(conversationId: string | null) {
 
         // Apply only non-chunk ops to React Query cache (e.g., add message shell, replace content, mark streaming=false)
         if (nonChunkOps.length > 0) {
+          // Bootstrap streaming on non-chunk signals (reasoning/tool_calls/shell) so UI renders immediately
+          try {
+            const hasBootstrap = nonChunkOps.some(op => {
+              const p = typeof (op as any).path === 'string' ? String((op as any).path) : ''
+              return /\/reasoning$/.test(p) || /\/tool_calls$/.test(p) || /^\/messages\/(-|\d+)$/.test(p)
+            })
+            if (hasBootstrap) {
+              ensureAssistantShell(cid)
+              startStreaming(cid, version)
+              setConversationResponding(cid, false)
+            }
+          } catch {}
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
             const applyOps = (target: any) => {
               // Helper: check if a JSON Pointer path exists in current state before applying 'remove'
@@ -619,6 +659,28 @@ export function useConversation(conversationId: string | null) {
                   console.warn('[STREAMING] Operation failed, continuing with others:', operation, opErr)
                 }
               }
+
+              // Dedupe messages by id to avoid duplicates when server replays baseline indexes
+              try {
+                const msgs = Array.isArray((result as any)?.messages) ? (result as any).messages : null
+                if (msgs) {
+                  const seen = new Set<string>()
+                  const deduped: any[] = []
+                  for (const m of msgs) {
+                    const id = (m as any)?.id
+                    if (id != null) {
+                      const key = String(id)
+                      if (seen.has(key)) {
+                        continue
+                      }
+                      seen.add(key)
+                    }
+                    deduped.push(m)
+                  }
+                  ;(result as any).messages = deduped
+                }
+              } catch {}
+
               return result
             }
             if (!old) {
@@ -666,14 +728,37 @@ export function useConversation(conversationId: string | null) {
               if ((op as any).op === 'add') {
                 const value = (op as any).value
                 const isAssistant = value && value.role === 'assistant'
+                const isUser = value && value.role === 'user'
                 const isAppendSentinel = path === '/messages/-'
                 const mAdd = path.match(/^\/messages\/(\d+)$/)
+
                 if (isAssistant && (isAppendSentinel || mAdd)) {
                   try {
                     const zConvo = useStarshipUIStore.getState().conversations[cid]
                     const zMsgs = Array.isArray(zConvo?.messages) ? zConvo.messages : []
                     if (!zMsgs.some((m: any) => m.id === value.id)) {
                       upsertAssistantWithServerValue(cid, { ...(value as any) })
+                    }
+                  } catch {}
+                }
+
+                // Dedupe/replace optimistic temp user with server user on add
+                if (isUser && (isAppendSentinel || mAdd)) {
+                  try {
+                    const s = useStarshipUIStore.getState()
+                    const convo = s.conversations[cid]
+                    const zMsgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
+                    // Skip if server message already present by id
+                    if (zMsgs.some((m: any) => m.id === value.id)) {
+                      // nothing to do
+                    } else {
+                      // Filter out optimistic temp user with same content
+                      const filtered = zMsgs.filter((m: any) => !(m.role === 'user' && m.sending === true && typeof m.id === 'string' && m.id.startsWith('temp-user-') && m.content === value.content))
+                      // Replace snapshot to avoid double "user" (index 0 duplication)
+                      setConversationSnapshot(cid, {
+                        messages: [...filtered, { ...(value as any), sending: false }],
+                        total: filtered.length + 1,
+                      })
                     }
                   } catch {}
                 }
@@ -707,6 +792,32 @@ export function useConversation(conversationId: string | null) {
                 try {
                   updateMessageAt(cid, idx, (m: any) => ({ ...m, tool_calls: sanitized }))
                 } catch {}
+              }
+
+              // Mirror reasoning string updates (providers that stream /reasoning via replace/add)
+              const mReason = path.match(/^\/messages\/(-?\d+)\/reasoning$/)
+              if (mReason && ((op as any).op === 'replace' || (op as any).op === 'add')) {
+                let idx = Number(mReason[1])
+                if (!Number.isInteger(idx)) continue
+                if (idx < 0) {
+                  try {
+                    ensureAssistantShell(cid)
+                    const zState = useStarshipUIStore.getState()
+                    const zMsgs: any[] = Array.isArray(zState.conversations[cid]?.messages) ? (zState.conversations[cid] as any).messages : []
+                    idx = Math.max(zMsgs.length - 1, 0)
+                  } catch {
+                    const cache2: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
+                    const msgs2: any[] = Array.isArray(cache2?.messages) ? cache2.messages : []
+                    idx = Math.max(msgs2.length - 1, 0)
+                  }
+                }
+                const reasonVal = (op as any).value
+                if (typeof reasonVal === 'string') {
+                  try {
+                    updateMessageAt(cid, idx, (m: any) => ({ ...m, reasoning: reasonVal, streaming: true }))
+                    markMessageStreaming(cid, idx, true)
+                  } catch {}
+                }
               }
             }
           } catch {}
@@ -921,6 +1032,25 @@ export function useConversation(conversationId: string | null) {
             total: old.total + 1,
           }
         })
+
+        // Mirror and dedupe in Zustand for user messages to avoid duplicate index 0
+        if (message.role === 'user') {
+          try {
+            const s = useStarshipUIStore.getState()
+            const convo = s.conversations[cid]
+            const zMsgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
+            // If server user already present by id in store, skip
+            if (!zMsgs.some((m: any) => m.id === message.id)) {
+              // Remove optimistic temp user with same content
+              const filtered = zMsgs.filter((m: any) => !(m.role === 'user' && m.sending === true && typeof m.id === 'string' && m.id.startsWith('temp-user-') && m.content === message.content))
+              setConversationSnapshot(cid, {
+                messages: [...filtered, { ...(message as any), sending: false }],
+                total: filtered.length + 1,
+              })
+            }
+          } catch {}
+        }
+
         return
       }
 

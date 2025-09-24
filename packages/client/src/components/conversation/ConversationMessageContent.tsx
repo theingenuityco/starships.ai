@@ -324,7 +324,8 @@ export function ConversationMessageContent({
       {/* Reasoning (thinking) collapsible */}
       {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
         <div className="mb-2">
-          <Collapsible defaultOpen={false}>
+          {/* Remount when streaming toggles so defaultOpen is re-applied without local state */}
+          <Collapsible key={`reasoning-${isStreaming ? 'on' : 'off'}`} defaultOpen={isStreaming}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-xs leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
               Reasoning
@@ -348,7 +349,8 @@ export function ConversationMessageContent({
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(normalizedToolCalls) && normalizedToolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="my-2.5">
-          <Collapsible defaultOpen={false}>
+          {/* Remount when streaming/tool-call completion toggles */}
+          <Collapsible key={`tools-${isStreaming ? 'on' : 'off'}-${completedToolResults}-${totalToolCalls}`} defaultOpen={isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Loader2 className="w-3 h-3 animate-spin" />

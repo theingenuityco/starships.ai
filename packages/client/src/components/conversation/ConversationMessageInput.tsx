@@ -138,7 +138,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           sending: true, // Mark as sending so UI can show loading state
         }
 
-        appendMessage(currentConversationId!, optimisticMessage)
+        /* optimistic append skipped (server-SSE will add user message) */
 
         // Now toggle responding so the indicator renders after the user message
         setConversationResponding(currentConversationId!, true)
@@ -232,7 +232,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             sending: true, // Mark as sending so UI can show loading state
           }
 
-          appendMessage(currentConversationId!, optimisticMessage)
+          /* optimistic append skipped (server-SSE will add user message) */
 
           // Now toggle responding so the indicator renders after the user message
           setConversationResponding(currentConversationId!, true)

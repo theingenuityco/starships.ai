@@ -366,7 +366,18 @@ export function useConversation(conversationId: string | null) {
               }
 
               let result = target
-              for (const operation of nonChunkOps) {
+              for (const rawOp of nonChunkOps) {
+                // Translate '/messages/-1/...' to the current last index before applying each op
+                let operation = rawOp as Operation
+                if (typeof (operation as any).path === 'string') {
+                  const p = String((operation as any).path)
+                  if (p.startsWith('/messages/-1')) {
+                    const msgs = Array.isArray((result as any)?.messages) ? (result as any).messages : []
+                    const lastIdx = Math.max(msgs.length - 1, 0)
+                    operation = { ...(operation as any), path: p.replace('/messages/-1', `/messages/${lastIdx}`) } as Operation
+                  }
+                }
+
                 // Skip 'remove' if path no longer exists (can happen if another op replaced the whole node)
                 if ((operation as any).op === 'remove' && typeof (operation as any).path === 'string') {
                   const exists = jsonPointerExists(result, (operation as any).path as string)
@@ -423,13 +434,20 @@ export function useConversation(conversationId: string | null) {
           for (const op of nonChunkOps) {
             if (op.op === 'replace' && typeof (op as any).path === 'string') {
               const p = String((op as any).path)
-              const mStreaming = p.match(/^\/messages\/(\d+)\/streaming$/)
-              const mContent = p.match(/^\/messages\/(\d+)\/content$/)
+              const mStreaming = p.match(/^\/messages\/(-?\d+)\/streaming$/)
+              const mContent = p.match(/^\/messages\/(-?\d+)\/content$/)
+              // Resolve -1 sentinel to last index against current cache
+              const resolveIndex = (idx: number) => {
+                if (idx >= 0) return idx
+                const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
+                const len = Array.isArray(cache?.messages) ? cache.messages.length : 0
+                return Math.max(len - 1, 0)
+              }
               if (mStreaming && (op as any).value === false) {
-                completedIdxs.add(Number(mStreaming[1]))
+                completedIdxs.add(resolveIndex(Number(mStreaming[1])))
               }
               if (mContent) {
-                completedIdxs.add(Number(mContent[1]))
+                completedIdxs.add(resolveIndex(Number(mContent[1])))
               }
             }
           }

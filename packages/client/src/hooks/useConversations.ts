@@ -284,6 +284,25 @@ export function useConversation(conversationId: string | null) {
             setConversationResponding(cid, false)
           } catch {}
 
+          // Ensure assistant shell is present before applying chunk ops (handles providers that batch add and chunk in one event)
+          if (nonChunkOps.length > 0) {
+            const shellAdds = nonChunkOps.filter(op => op.op === 'add' && typeof (op as any).path === 'string' && /^\/messages\/(-|\d+)$/.test(String((op as any).path)))
+            if (shellAdds.length > 0) {
+              queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
+                const base = old || { messages: [], total: 0, conversationId: cid }
+                let result = base
+                for (const raw of shellAdds) {
+                  try {
+                    const op = raw as Operation
+                    const applied = applyOperation(result, op, true)
+                    result = applied.newDocument
+                  } catch {}
+                }
+                return result
+              })
+            }
+          }
+
           // Also reflect chunk additions in TanStack Query cache so UI renders message content during streaming.
           // We directly mutate the messages cache per op target index rather than applying JSON-Patch (lighter + avoids starvation).
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
@@ -382,6 +401,40 @@ export function useConversation(conversationId: string | null) {
                 content: typeof val.content === 'string' ? val.content : '',
                 position: typeof val.position === 'number' ? val.position : 0,
                 timestamp: typeof val.timestamp === 'number' ? val.timestamp : Date.now(),
+              })
+              markMessageStreaming(cid, msgIndex, true)
+            }
+          } catch {}
+
+          // Reflect reasoning chunk additions into Zustand for immediate rendering of "Reasoning"
+          try {
+            for (const op of reasoningChunkOps) {
+              const path = String((op as any).path || '')
+              const match = path.match(/^\/messages\/(-?\d+)\/reasoningChunks\/-\s*$/) || path.match(/^\/messages\/(-?\d+)\/reasoningChunks\/-$/)
+              if (!match) continue
+
+              let msgIndex = Number(match[1])
+              if (!Number.isInteger(msgIndex)) continue
+
+              if (msgIndex < 0) {
+                // Resolve last message index from cache
+                const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
+                const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+                msgIndex = Math.max(msgs.length - 1, 0)
+              }
+
+              const val = (op as any).value || {}
+              const content = typeof val.content === 'string' ? val.content : ''
+              const positionFallback = (prev: any[]) => (prev.length > 0 ? prev[prev.length - 1].position + content.length : 0)
+
+              updateMessageAt(cid, msgIndex, (m: any) => {
+                const rChunks = Array.isArray(m?.reasoningChunks) ? [...m.reasoningChunks] : []
+                rChunks.push({
+                  content,
+                  position: typeof val.position === 'number' ? val.position : positionFallback(rChunks),
+                  timestamp: typeof val.timestamp === 'number' ? val.timestamp : Date.now(),
+                })
+                return { ...m, reasoningChunks: rChunks, streaming: true }
               })
               markMessageStreaming(cid, msgIndex, true)
             }
@@ -509,20 +562,20 @@ export function useConversation(conversationId: string | null) {
               if (typeof (op as any).path !== 'string') continue
               const path = String((op as any).path)
 
-              // Append assistant shell when server adds message at a concrete index
+              // Append assistant shell when server adds message at a concrete index or via append sentinel
               if ((op as any).op === 'add') {
+                const value = (op as any).value
+                const isAssistant = value && value.role === 'assistant'
+                const isAppendSentinel = path === '/messages/-'
                 const mAdd = path.match(/^\/messages\/(\d+)$/)
-                if (mAdd) {
-                  const value = (op as any).value
-                  if (value && value.role === 'assistant') {
-                    try {
-                      const zConvo = useStarshipUIStore.getState().conversations[cid]
-                      const zMsgs = Array.isArray(zConvo?.messages) ? zConvo.messages : []
-                      if (!zMsgs.some((m: any) => m.id === value.id)) {
-                        appendMessage(cid, { ...(value as any) })
-                      }
-                    } catch {}
-                  }
+                if (isAssistant && (isAppendSentinel || mAdd)) {
+                  try {
+                    const zConvo = useStarshipUIStore.getState().conversations[cid]
+                    const zMsgs = Array.isArray(zConvo?.messages) ? zConvo.messages : []
+                    if (!zMsgs.some((m: any) => m.id === value.id)) {
+                      appendMessage(cid, { ...(value as any) })
+                    }
+                  } catch {}
                 }
               }
 

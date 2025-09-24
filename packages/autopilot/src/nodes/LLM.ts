@@ -241,8 +241,23 @@ export class LLM extends BaseNode<LlmParams> {
         const index = choice.index ?? 0;
 
         // Support providers that emit choices[].message.content/tool_calls instead of choices[].delta
-        const delta = choice?.delta || {};
-        const messageNode = choice?.message || {};
+        const delta = (choice?.delta ?? {}) as {
+          content?: string;
+          role?: string;
+          tool_calls?: {
+            index?: number;
+            id?: string;
+            function?: { name?: string; arguments?: string };
+          }[];
+        };
+        const messageNode = (choice?.message ?? {}) as {
+          content?: string;
+          tool_calls?: {
+            index?: number;
+            id?: string;
+            function?: { name?: string; arguments?: string };
+          }[];
+        };
 
         const contentFromDelta = typeof delta.content === 'string' ? delta.content : '';
         const contentFromMessage = typeof messageNode.content === 'string' ? messageNode.content : '';
@@ -271,9 +286,15 @@ export class LLM extends BaseNode<LlmParams> {
         const mergedDetails: ReasoningDetail[] = [...normalizeDetails(detailsFromDelta), ...normalizeDetails(detailsFromMessage)];
 
         // Prefer true delta updates; otherwise, fall back to message tool_calls snapshot
-        const toolCallsDelta =
-          (Array.isArray(delta.tool_calls) ? delta.tool_calls : []) ||
-          (Array.isArray(messageNode.tool_calls) ? messageNode.tool_calls : []);
+        type ToolCallDelta = { index?: number; id?: string; function?: { name?: string; arguments?: string } };
+        const toolCallsFromDeltaRaw = Array.isArray(delta.tool_calls) ? (delta.tool_calls as unknown[]) : [];
+        const toolCallsFromMessageRaw = Array.isArray(messageNode.tool_calls) ? (messageNode.tool_calls as unknown[]) : [];
+        const toToolCallDelta = (arr: unknown[]): ToolCallDelta[] =>
+          arr.filter((t) => typeof t === 'object' && t !== null).map((t) => t as ToolCallDelta);
+        const deltaToolCalls: ToolCallDelta[] = toToolCallDelta(toolCallsFromDeltaRaw);
+        const messageToolCalls: ToolCallDelta[] = toToolCallDelta(toolCallsFromMessageRaw);
+        const hasDeltaToolCalls = deltaToolCalls.length > 0;
+        const hasMessageToolCalls = messageToolCalls.length > 0;
 
         // Ensure choice exists
         while (choices.length <= index) {
@@ -297,20 +318,12 @@ export class LLM extends BaseNode<LlmParams> {
         }
 
         // Accumulate tool_calls if present (OpenAI/OpenRouter-style streaming)
-        if (toolCallsDelta && toolCallsDelta.length > 0) {
+        if (hasDeltaToolCalls) {
           if (!choices[index].tool_calls) {
             choices[index].tool_calls = [];
           }
-          // Narrow tool_call delta typing to avoid 'any'
-          type ToolCallDelta = {
-            index?: number;
-            id?: string;
-            function?: {
-              name?: string;
-              arguments?: string;
-            };
-          };
-          for (const tc of toolCallsDelta as ToolCallDelta[]) {
+          // Use ToolCallDelta type defined above
+          for (const tc of deltaToolCalls) {
             const t = tc || {};
             const tcIndex = typeof t.index === 'number' ? t.index : 0;
             // Ensure tool_call slot
@@ -324,6 +337,23 @@ export class LLM extends BaseNode<LlmParams> {
               target.function.arguments = (target.function.arguments || '') + t.function.arguments;
             }
           }
+        } else if (hasMessageToolCalls) {
+          type NormalizedToolCall = { id?: string; function: { name?: string; arguments: string } };
+          const normalized: NormalizedToolCall[] = messageToolCalls.map((tc) => ({
+            id: tc.id,
+            function: {
+              name: typeof tc.function?.name === 'string' ? tc.function.name : undefined,
+              arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : '',
+            },
+          }));
+          const valid = normalized.filter(
+            (tc): tc is { id?: string; function: { name: string; arguments: string } } =>
+              typeof tc.function.name === 'string' && tc.function.name.length > 0
+          );
+          if (!choices[index].tool_calls) {
+            choices[index].tool_calls = [];
+          }
+          choices[index].tool_calls = valid;
         }
 
         if (finishReason) {

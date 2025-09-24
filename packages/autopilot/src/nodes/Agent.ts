@@ -148,7 +148,7 @@ export class Agent implements NodeHandler {
                   role: 'tool',
                   tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
                   name: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name }}`,
-                  content: `{{ JSON.stringify($lastOutputOf("${toolNodeRef}")[0].json) }}`,
+                  content: `{{ JSON.stringify((() => { const _i = $lastOutputOf("${toolNodeRef}")[0]; return (_i && _i.error !== undefined) ? ({ ok: false, error: _i.error }) : _i?.json; })()) }}`,
                 },
               },
             ],

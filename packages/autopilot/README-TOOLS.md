@@ -212,3 +212,9 @@ Notes:
 - **No External Dependencies**: Uses existing autopilot components
 - **Dynamic Execution**: Creates tool calling loops automatically
 - **Memory Integration**: Works with agent memory system
+
+## Error handling and loop prevention
+
+- Tools execute their own blueprint with failOnNodeError enabled. On failure, the Tool node returns an ExecutionItem with the error field set (using ExecutionItemUtils.wrapError), not a thrown exception. This allows inline mutations to execute and publish a tool message.
+- The Agent’s default blueprint falls back to the ExecutionItem.error when json is undefined, serializing a canonical payload like `{ ok: false, error: "<message>" }` into the tool role message content.
+- This prevents infinite loops when a tool fails (for example, tool_smoke_test), because the LLM now receives a tool response (even on failure) and can proceed without repeatedly issuing the same tool call.

@@ -45,6 +45,17 @@ interface StreamChunk {
         };
       }[];
     };
+    message?: {
+      content?: string;
+      tool_calls?: {
+        index?: number;
+        id?: string;
+        function?: {
+          name?: string;
+          arguments?: string;
+        };
+      }[];
+    };
     finish_reason?: string | null;
   }[];
   usage?: LLMUsage;
@@ -173,6 +184,8 @@ export class LLM extends BaseNode<LlmParams> {
             }
 
             const eventCallback = this.getEventCallback();
+            console.log({ parsed: JSON.stringify(parsed, null, 2) });
+
             if (eventCallback) {
               await eventCallback({
                 type: 'content_chunk',
@@ -214,11 +227,23 @@ export class LLM extends BaseNode<LlmParams> {
 
     // Process choices
     if (parsed.choices && Array.isArray(parsed.choices)) {
-      for (const choice of parsed.choices) {
+      for (const choice of parsed.choices || []) {
         const index = choice.index ?? 0;
-        const content = choice.delta?.content || '';
+
+        // Support providers that emit choices[].message.content/tool_calls instead of choices[].delta
+        const delta = choice?.delta || {};
+        const messageNode = choice?.message || {};
+
+        const contentFromDelta = typeof delta.content === 'string' ? delta.content : '';
+        const contentFromMessage = typeof messageNode.content === 'string' ? messageNode.content : '';
+        const content = contentFromDelta || contentFromMessage;
+
         const finishReason = choice.finish_reason || null;
-        const toolCallsDelta = choice.delta?.tool_calls || [];
+
+        // Prefer true delta updates; otherwise, fall back to message tool_calls snapshot
+        const toolCallsDelta =
+          (Array.isArray(delta.tool_calls) ? delta.tool_calls : []) ||
+          (Array.isArray(messageNode.tool_calls) ? messageNode.tool_calls : []);
 
         // Ensure choice exists
         while (choices.length <= index) {
@@ -231,21 +256,31 @@ export class LLM extends BaseNode<LlmParams> {
         }
 
         // Accumulate tool_calls if present (OpenAI/OpenRouter-style streaming)
-        if (toolCallsDelta.length > 0) {
+        if (toolCallsDelta && toolCallsDelta.length > 0) {
           if (!choices[index].tool_calls) {
             choices[index].tool_calls = [];
           }
-          for (const tc of toolCallsDelta) {
-            const tcIndex = tc.index ?? 0;
+          // Narrow tool_call delta typing to avoid 'any'
+          type ToolCallDelta = {
+            index?: number;
+            id?: string;
+            function?: {
+              name?: string;
+              arguments?: string;
+            };
+          };
+          for (const tc of toolCallsDelta as ToolCallDelta[]) {
+            const t = tc || {};
+            const tcIndex = typeof t.index === 'number' ? t.index : 0;
             // Ensure tool_call slot
             while ((choices[index].tool_calls?.length || 0) <= tcIndex) {
               choices[index].tool_calls?.push({ id: undefined, function: { name: undefined, arguments: '' } });
             }
             const target = choices[index].tool_calls![tcIndex];
-            if (tc.id) target.id = tc.id;
-            if (tc.function?.name) target.function.name = tc.function.name;
-            if (tc.function?.arguments) {
-              target.function.arguments = (target.function.arguments || '') + tc.function.arguments;
+            if (t.id) target.id = t.id;
+            if (t.function?.name) target.function.name = t.function.name;
+            if (t.function?.arguments) {
+              target.function.arguments = (target.function.arguments || '') + t.function.arguments;
             }
           }
         }

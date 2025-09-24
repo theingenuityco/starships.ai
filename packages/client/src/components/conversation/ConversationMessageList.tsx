@@ -62,6 +62,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
     for (let i = 0; i < uniqueMessages.length; i++) {
       const cur: any = uniqueMessages[i]
+
+      // 1) Collapse local temp assistant shell into the next concrete assistant
       if (cur?.role === 'assistant' && typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-')) {
         const next: any = uniqueMessages[i + 1]
         if (next && next.role === 'assistant' && !(typeof next.id === 'string' && next.id.startsWith('temp-assistant-'))) {
@@ -81,6 +83,36 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
           continue
         }
       }
+
+      // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or tool_calls).
+      // If followed by another assistant, skip the blank one. If it's trailing, drop it.
+      if (cur?.role === 'assistant' && !(typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-'))) {
+        const hasContent = typeof cur?.content === 'string' && cur.content.trim().length > 0
+        const hasChunks = Array.isArray(cur?.chunks) && cur.chunks.length > 0
+        const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
+        const hasReasoning = typeof cur?.reasoning === 'string' && cur.reasoning.trim().length > 0
+        const hasToolCalls =
+          Array.isArray(cur?.tool_calls) &&
+          cur.tool_calls.some((tc: any) => {
+            const fn = tc?.function
+            const hasName = typeof fn?.name === 'string' && fn.name.trim().length > 0
+            const hasId = tc?.id != null && String(tc.id).trim().length > 0
+            const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.trim().length > 0
+            return hasName || hasId || hasArgs
+          })
+
+        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls)) {
+          const next: any = uniqueMessages[i + 1]
+          if (next && next.role === 'assistant') {
+            // skip current blank shell; next will be processed/pushed in subsequent iterations
+            continue
+          } else {
+            // trailing blank shell — drop it
+            continue
+          }
+        }
+      }
+
       collapsedMessages.push(cur)
     }
 
@@ -136,7 +168,28 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       }
     }
 
-    return groupedMessages
+    // UI guard: drop blank assistant shells (no content/chunks/reasoning and no tool_calls).
+    // NOTE: Do NOT treat toolResults alone as renderable; without tool_calls the tool panel won't show.
+    const pruned = groupedMessages.filter(msg => {
+      if (msg.role !== 'assistant' || msg.messageType === 'tool_result') return true
+      const a: any = msg as any
+      const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
+      const hasChunks = Array.isArray(a?.chunks) && a.chunks.length > 0
+      const hasRChunks = Array.isArray(a?.reasoningChunks) && a.reasoningChunks.length > 0
+      const hasReasoning = typeof a?.reasoning === 'string' && a.reasoning.trim().length > 0
+      const hasToolCalls =
+        Array.isArray(a?.tool_calls) &&
+        a.tool_calls.some((tc: any) => {
+          const fn = tc?.function
+          const hasName = typeof fn?.name === 'string' && fn.name.trim().length > 0
+          const hasId = tc?.id != null && String(tc.id).trim().length > 0
+          const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.trim().length > 0
+          return hasName || hasId || hasArgs
+        })
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls
+    })
+
+    return pruned
   }, [storeMessages])
 
   // Determine which assistant message should display the streaming caret (latest streaming one)
@@ -150,23 +203,71 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     return lastId
   }, [displayMessages])
 
-  // Determine if assistant has any renderable progress (reasoning/tool_calls/content/chunks)
-  // We keep using streaming flags for other UI, but the GAP loader hides only when real progress exists.
+  // Determine if assistant has started responding for the latest user turn.
+  // Hide the GAP loader as soon as we see either:
+  //  - an assistant shell appended AFTER the latest user message, or
+  //  - any assistant progress (chunks/reasoning/tool_calls/content) after that user.
   const hasAssistantProgress = useMemo(() => {
+    // Find most recent user message index
+    let lastUserIdx = -1
     for (let i = displayMessages.length - 1; i >= 0; i--) {
+      const mm: any = displayMessages[i]
+      if (mm?.role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+    // Scan messages after the last user
+    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
       const m: any = displayMessages[i]
       if (m?.role !== 'assistant') continue
+      const isShell = m?.streaming === true // treat shell as progress to avoid double assistant bubbles
       const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
       const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
       const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
-      const hasToolCalls = Array.isArray(m?.tool_calls) && m.tool_calls.length > 0
+      const hasToolCalls =
+        Array.isArray(m?.tool_calls) &&
+        m.tool_calls.some((tc: any) => {
+          const fn = tc?.function
+          const hasName = typeof fn?.name === 'string' && fn.name.trim().length > 0
+          const hasId = tc?.id != null && String(tc.id).trim().length > 0
+          const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.trim().length > 0
+          return hasName || hasId || hasArgs
+        })
       const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
-      if (hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasContent) return true
-      // If it's just a streaming shell with nothing to render yet, keep scanning (treat as no progress)
-      return false
+      if (isShell || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasContent) {
+        return true
+      }
     }
     return false
   }, [displayMessages])
+
+  // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
+  const renderMessages = useMemo(() => {
+    const canRenderAssistant = (msg: any) => {
+      if (msg.role !== 'assistant') return true
+      if (msg.messageType === 'tool_result') return true
+      const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
+      const hasChunks = Array.isArray(msg.chunks) && msg.chunks.length > 0
+      const hasRChunks = Array.isArray((msg as any)?.reasoningChunks) && (msg as any).reasoningChunks.length > 0
+      const hasReasoning = typeof (msg as any)?.reasoning === 'string' && (msg as any).reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray((msg as any)?.tool_calls) && (msg as any).tool_calls.length > 0
+      const hasToolResults = Array.isArray((msg as any)?.toolResults) && (msg as any).toolResults.length > 0
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults
+    }
+    return displayMessages.filter(canRenderAssistant)
+  }, [displayMessages])
+
+  // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
+  const activeRenderedStreamingAssistantId = useMemo(() => {
+    let lastId: string | null = null
+    for (const m of renderMessages) {
+      if (m.role === 'assistant' && (m as any).streaming) {
+        lastId = m.id
+      }
+    }
+    return lastId
+  }, [renderMessages])
 
   // Optimized auto-scroll with debouncing
   useEffect(() => {
@@ -227,8 +328,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     <div className="h-full flex flex-col">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="max-w-4xl mx-auto space-y-2">
-          {displayMessages.map(message => (
-            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeStreamingAssistantId} />
+          {renderMessages.map(message => (
+            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} />
           ))}
           {/* Gap loader: show between user send and the first real assistant progress (store-driven, no local state) */}
           {isResponding && !hasAssistantProgress && (

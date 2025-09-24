@@ -352,9 +352,9 @@ export function ConversationMessageContent({
         </div>
       )}
 
-      {/* Unified markdown rendering - same for both streaming and completed, but skip for tool_result messages */}
+      {/* Unified markdown rendering - message content at normal size */}
       {messageType !== 'tool_result' && (
-        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>
+        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none break-words message-content', isStreaming && displayContent && 'streaming-caret')}>
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {displayContent}
           </ReactMarkdown>

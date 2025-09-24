@@ -7,7 +7,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
 function createDaedalusBlueprint(): Blueprint {
   const agent = new Agent({
     name: 'Daedalus Toolwright',
-    model: 'anthropic/claude-3.5-sonnet',
+    model: 'openai/gpt-5',
     temperature: 0.3,
     maxTokens: 3200,
   });
@@ -195,7 +195,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',
 
-  model: 'anthropic/claude-3.5-sonnet',
+  model: 'openai/gpt-5',
   temperature: 0.3,
   maxTokens: 3200,
 

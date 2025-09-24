@@ -120,7 +120,7 @@ describe('Tool Update Tool', () => {
     }
 
     it('should fail when missing BASE_URL', async () => {
-      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, {})).resolves.toMatchObject({
+      await expect(executeToolWithMockEnv({ slug: 'calc', name: 'N' }, {})).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('baseUrl is required'),
       });
@@ -128,7 +128,7 @@ describe('Tool Update Tool', () => {
 
     it('should fail without auth token', async () => {
       const env = { BASE_URL: 'https://api.test.com' };
-      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, env as never)).resolves.toMatchObject({
+      await expect(executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env as never)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('authToken is required'),
       });
@@ -142,33 +142,23 @@ describe('Tool Update Tool', () => {
       });
     });
 
-    it('should succeed updating by id without requiring starshipId', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ id: 'tool-123', name: 'Updated' }));
+    it('should succeed updating by slug when server wraps response in ApiResponse', async () => {
+      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
 
-      const input = { id: 'tool-123', name: 'Updated' };
-      const result = await executeToolWithMockEnv(input, env);
+      (global.fetch as jest.Mock)
+        // Resolve slug -> ApiResponse-wrapped tool
+        .mockResolvedValueOnce(
+          createMockResponse({ data: { id: 'resolved-id' } }, { url: 'https://api.test.com/starships/star-1/tools/calc' })
+        )
+        // Update tool
+        .mockResolvedValueOnce(
+          createMockResponse({ id: 'resolved-id', name: 'Updated' }, { url: 'https://api.test.com/tools/resolved-id' })
+        );
+
+      const input = { slug: 'calc', name: 'Updated' };
+      const result = await executeToolWithMockEnv(input, env as never);
 
       expect(result).toBeDefined();
-      const httpResp = result as { body?: unknown; status?: number };
-      expect(httpResp).toHaveProperty('body');
-
-      // Verify API call
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://api.test.com/tools/tool-123',
-        expect.objectContaining({
-          method: 'PUT',
-          headers: expect.objectContaining({
-            Authorization: 'Bearer abc',
-            'Content-Type': 'application/json',
-          }),
-        })
-      );
-
-      const call = (global.fetch as jest.Mock).mock.calls[0];
-      const opts = call[1] as RequestInit;
-      const sent = JSON.parse(String((opts as unknown as Record<string, unknown>).body));
-      expect(sent).toMatchObject({ name: 'Updated' });
     });
 
     it('should resolve id by slug then update', async () => {
@@ -198,45 +188,55 @@ describe('Tool Update Tool', () => {
     });
 
     it('should error when no update fields provided', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
-      await expect(executeToolWithMockEnv({ id: 'tool-1' }, env)).resolves.toMatchObject({
+      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
+      await expect(executeToolWithMockEnv({ slug: 'tool-1' }, env)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('No update fields provided'),
       });
     });
 
     it('should handle HTTP errors gracefully (update request)', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        statusText: 'Not Found',
-        json: async () => ({ error: 'Not found' }),
-        text: async () => JSON.stringify({ error: 'Not found' }),
-      });
+      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
 
-      await expect(executeToolWithMockEnv({ id: 'nope', name: 'N' }, env)).resolves.toMatchObject({
+      (global.fetch as jest.Mock)
+        // slug resolve OK
+        .mockResolvedValueOnce(createMockResponse({ id: 'resolved-id' }, { url: 'https://api.test.com/starships/star-1/tools/nope' }))
+        // update fails
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          statusText: 'Not Found',
+          json: async () => ({ error: 'Not found' }),
+          text: async () => JSON.stringify({ error: 'Not found' }),
+        });
+
+      await expect(executeToolWithMockEnv({ slug: 'nope', name: 'N' }, env)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('HTTP request failed'),
       });
     });
 
     it('should handle network failure', async () => {
-      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
+      const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
 
-      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, env)).resolves.toMatchObject({
+      await expect(executeToolWithMockEnv({ slug: 'x', name: 'N' }, env)).resolves.toMatchObject({
         ok: false,
         error: expect.stringContaining('Network error'),
       });
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {
-      const env = { BASE_URL: 'https://api.example.com///', AUTH_TOKEN: 't' };
-      (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ id: 'tool-123', name: 'N' }));
+      const env = { BASE_URL: 'https://api.example.com///', AUTH_TOKEN: 't', STARSHIP_ID: 'star-1' };
+      (global.fetch as jest.Mock)
+        .mockResolvedValueOnce(createMockResponse({ id: 'tool-123' }))
+        .mockResolvedValueOnce(createMockResponse({ id: 'tool-123', name: 'N' }));
 
-      await executeToolWithMockEnv({ id: 'tool-123', name: 'N' }, env);
-      expect(global.fetch).toHaveBeenCalledWith('https://api.example.com/tools/tool-123', expect.any(Object));
+      await executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env);
+
+      // Verify trimmed baseUrl for both GET and PUT
+      expect((global.fetch as jest.Mock).mock.calls[0][0]).toBe('https://api.example.com/starships/star-1/tools/calc');
+      expect((global.fetch as jest.Mock).mock.calls[1][0]).toBe('https://api.example.com/tools/tool-123');
     });
   });
 
@@ -277,14 +277,14 @@ describe('Tool Update Tool', () => {
 });
 
 describe('Tool.execute return value - tool_update', () => {
-  it('should return a single ExecutionItem with HttpResponse and preserve pairedItem (update by id)', async () => {
-    const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
+  it('should return a single ExecutionItem with HttpResponse and preserve pairedItem (update by slug)', async () => {
+    const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
 
-    // Mock update-by-id response
+    // Mock GET (slug resolve) then PUT (update)
     global.fetch = jest.fn() as unknown as jest.Mock;
-    (global.fetch as jest.Mock).mockImplementation(async () =>
-      createMockResponse({ id: 'tool-123', name: 'Updated' }, { url: 'https://api.test.com/tools/tool-123' })
-    );
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(createMockResponse({ id: 'tool-123' }, { url: 'https://api.test.com/starships/star-1/tools/calc' }))
+      .mockResolvedValueOnce(createMockResponse({ id: 'tool-123', name: 'Updated' }, { url: 'https://api.test.com/tools/tool-123' }));
 
     const options: NodeHandlerOptions = {
       eventCallback: jest.fn(),
@@ -293,7 +293,7 @@ describe('Tool.execute return value - tool_update', () => {
     };
 
     const toolNode = new Tool(toolUpdateTool, options);
-    const raw = await toolNode.execute([{ json: { id: 'tool-123', name: 'Updated' }, pairedItem: { item: 5 } } as ExecutionItem]);
+    const raw = await toolNode.execute([{ json: { slug: 'calc', name: 'Updated' }, pairedItem: { item: 5 } } as ExecutionItem]);
 
     // Raw ExecutionItem[] assertions
     expect(Array.isArray(raw)).toBe(true);

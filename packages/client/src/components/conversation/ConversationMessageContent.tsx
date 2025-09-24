@@ -137,6 +137,12 @@ export function ConversationMessageContent({
     return isStreaming ? agg : reasoning && reasoning.trim().length > 0 ? reasoning : agg
   }, [reasoning, reasoningChunks, isStreaming])
 
+  // Determine whether reasoning panel should auto-open.
+  // Requirement: Keep it open while only reasoning is streaming; collapse once content starts.
+  const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
+  const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
+  const openReasoning = Boolean(displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow))
+
   const parsedJson = useMemo(() => {
     try {
       const t = (displayContent || '').trim()
@@ -324,10 +330,10 @@ export function ConversationMessageContent({
       {/* Reasoning (thinking) collapsible */}
       {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
         <div className="mb-2">
-          {/* Remount when streaming toggles so defaultOpen is re-applied without local state */}
-          <Collapsible key={`reasoning-${isStreaming ? 'on' : 'off'}`} defaultOpen={isStreaming}>
+          {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
+          <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-xs leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isStreaming ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              {isStreaming && openReasoning ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
               Reasoning
             </CollapsibleTrigger>
             <CollapsibleContent>

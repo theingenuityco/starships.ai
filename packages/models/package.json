@@ -18,7 +18,6 @@
     "seed:research": "tsx src/scripts/seed-research-agent.ts",
     "seed:duckduckgo": "tsx src/scripts/seed-duckduckgo.ts",
     "seed:research-full": "tsx src/scripts/seed-research-agent.ts && tsx src/scripts/seed-duckduckgo.ts",
-    "update:duckduckgo-instances": "tsx src/scripts/update-duckduckgo-instances.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",
     "backup:validate": "tsx src/scripts/backup-cli.ts validate",

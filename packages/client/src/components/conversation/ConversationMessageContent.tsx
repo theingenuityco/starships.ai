@@ -143,6 +143,8 @@ export function ConversationMessageContent({
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
   const openReasoning = Boolean(isStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
+  // Inline streaming indicator should show when we are streaming but not in reasoning-only mode and no tool calls yet.
+  const showInlineStreamingIndicator = Boolean(isStreaming && !openReasoning && !hasAnyToolCalls)
 
   const parsedJson = useMemo(() => {
     try {
@@ -541,8 +543,8 @@ export function ConversationMessageContent({
         </Card>
       )}
 
-      {/* Streaming indicator - shows after all content including tool calls while streaming */}
-      {isStreaming && !hasAnyToolCalls && (
+      {/* Inline streaming indicator aligned with the assistant message bubble */}
+      {showInlineStreamingIndicator && (
         <div className="flex items-center gap-2 mt-1 text-muted-foreground">
           <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
           {chunks.length > 0 && <span className="text-xs">({chunks.length} chunks)</span>}

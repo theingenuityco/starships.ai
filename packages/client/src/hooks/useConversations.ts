@@ -383,6 +383,34 @@ export function useConversation(conversationId: string | null) {
     } catch {}
   }
 
+  // Ensure only the target assistant message is flagged streaming in the UI store
+  const setExclusiveAssistantStreaming = (cid: string, targetIndex: number) => {
+    try {
+      const s = useStarshipUIStore.getState()
+      const convo = s.conversations[cid]
+      const msgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
+      for (let i = 0; i < msgs.length; i++) {
+        if (i !== targetIndex && msgs[i]?.role === 'assistant' && msgs[i]?.streaming === true) {
+          s.updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false }))
+        }
+      }
+    } catch {}
+  }
+
+  // Clear streaming flag on all assistant messages for this conversation
+  const clearAllAssistantStreaming = (cid: string) => {
+    try {
+      const s = useStarshipUIStore.getState()
+      const convo = s.conversations[cid]
+      const msgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
+      for (let i = 0; i < msgs.length; i++) {
+        if (msgs[i]?.role === 'assistant' && msgs[i]?.streaming === true) {
+          s.updateMessageAt(cid, i, (m: any) => ({ ...m, streaming: false }))
+        }
+      }
+    } catch {}
+  }
+
   // Process streaming events and update TanStack Query cache
   const handleStreamingEvent = useCallback(
     (data: any) => {
@@ -538,12 +566,15 @@ export function useConversation(conversationId: string | null) {
                 msgIndex = Math.max(msgs.length - 1, 0)
               }
               const val = (op as any).value || {}
+              // Ensure only the new target message is marked as streaming
+              clearAllAssistantStreaming(cid)
               appendMessageChunk(cid, msgIndex, {
                 content: typeof val.content === 'string' ? val.content : '',
                 position: typeof val.position === 'number' ? val.position : 0,
                 timestamp: typeof val.timestamp === 'number' ? val.timestamp : Date.now(),
               })
               markMessageStreaming(cid, msgIndex, true)
+              setExclusiveAssistantStreaming(cid, msgIndex)
             }
           } catch {}
 
@@ -568,6 +599,8 @@ export function useConversation(conversationId: string | null) {
               const content = typeof val.content === 'string' ? val.content : ''
               const positionFallback = (prev: any[]) => (prev.length > 0 ? prev[prev.length - 1].position + content.length : 0)
 
+              // Ensure only the new target message is marked as streaming
+              clearAllAssistantStreaming(cid)
               updateMessageAt(cid, msgIndex, (m: any) => {
                 const rChunks = Array.isArray(m?.reasoningChunks) ? [...m.reasoningChunks] : []
                 rChunks.push({
@@ -578,6 +611,7 @@ export function useConversation(conversationId: string | null) {
                 return { ...m, reasoningChunks: rChunks, streaming: true }
               })
               markMessageStreaming(cid, msgIndex, true)
+              setExclusiveAssistantStreaming(cid, msgIndex)
             }
           } catch {}
         }
@@ -601,6 +635,8 @@ export function useConversation(conversationId: string | null) {
             })
             if (hasBootstrap) {
               ensureAssistantShell(cid)
+              // Exclusive streaming: close any prior assistant streaming flags
+              clearAllAssistantStreaming(cid)
               startStreaming(cid, version)
               setConversationResponding(cid, false)
             }
@@ -827,8 +863,11 @@ export function useConversation(conversationId: string | null) {
                 const reasonVal = (op as any).value
                 if (typeof reasonVal === 'string') {
                   try {
+                    // Ensure only this message is streaming for inline loader correctness
+                    clearAllAssistantStreaming(cid)
                     updateMessageAt(cid, idx, (m: any) => ({ ...m, reasoning: reasonVal, streaming: true }))
                     markMessageStreaming(cid, idx, true)
+                    setExclusiveAssistantStreaming(cid, idx)
                   } catch {}
                 }
               }
@@ -990,6 +1029,12 @@ export function useConversation(conversationId: string | null) {
             startStreaming(cid)
             // Ensure responding indicator is cleared when assistant stream begins
             setConversationResponding(cid, false)
+            // Ensure loader targets the new assistant shell only
+            clearAllAssistantStreaming(cid)
+            // Mirror assistant shell into the UI store so inline loader anchors correctly even before text chunks arrive
+            try {
+              upsertAssistantWithServerValue(cid, { ...(message as any), streaming: true })
+            } catch {}
           } catch {}
 
           // Add streaming message to cache (append; ascending order)

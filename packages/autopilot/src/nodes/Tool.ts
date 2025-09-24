@@ -99,7 +99,8 @@ export class Tool extends BaseNode<ToolParams> {
           // Ignore callback errors to avoid masking the original error
         }
       }
-      throw this.handleExecutionError(error, `Tool '${params.name}' execution failed`);
+      // Do not throw here. Return an ExecutionItem with error populated so Agent mutations can handle natively.
+      return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
     }
   }
 

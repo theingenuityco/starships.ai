@@ -33,14 +33,27 @@ export class MessageEntity implements MessageModel {
 
   @Expose()
   @IsString()
-  @ValidateIf((o) => !(o.role === 'assistant' && Array.isArray(o.tool_calls) && o.tool_calls.length > 0))
-  @Length(1, 50000) // Reasonable content length limit; allow empty when assistant has tool_calls
+  @ValidateIf(
+    (o: MessageEntity) =>
+      !(
+        o.role === 'assistant' &&
+        ((Array.isArray(o.tool_calls) && o.tool_calls.length > 0) || (typeof o.reasoning === 'string' && o.reasoning.length > 0))
+      )
+  )
+  @Length(1, 50000) // Reasonable content length limit; allow empty when assistant has tool_calls or reasoning
   content!: string;
 
   // Message classification
   @Expose()
   @IsEnum(['user_input', 'agent_response', 'system_notification', 'system_instruction', 'workflow_output', 'error', 'tool_result'])
   messageType!: MessageType;
+
+  // Optional model reasoning/thinking text for assistant messages
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 200000)
+  reasoning?: string;
 
   // Optional tool_calls persisted for assistant messages when function calling is used (autopilot types)
   @Expose()

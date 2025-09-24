@@ -29,6 +29,8 @@ export class ConversationService {
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
+  // Track accumulated reasoning during streaming per conversation
+  private streamingReasoning: Map<string, string> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner: ChildProcessRunner;
 
@@ -251,6 +253,7 @@ export class ConversationService {
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
+        ...(msg.reasoning && { reasoning: msg.reasoning }),
         ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
@@ -316,6 +319,7 @@ export class ConversationService {
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
+        this.streamingReasoning.delete(conversationId);
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
@@ -336,9 +340,78 @@ export class ConversationService {
           const toolCallsFromMessage: any[] = Array.isArray(messageNode?.tool_calls) ? messageNode.tool_calls : [];
           const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
-          // Guard: if no active accumulator and we have content OR tool_calls, start a new placeholder stream.
+          // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
+          const extractReasoning = (node: unknown): string => {
+            try {
+              if (!node || typeof node !== 'object') return '';
+              const rec = node as Record<string, unknown>;
+              const parts: string[] = [];
+
+              // Unified fields
+              const raw = (rec.reasoning ?? rec.thinking) as unknown;
+
+              const appendFromRaw = (r: unknown): void => {
+                if (!r) return;
+                if (typeof r === 'string') {
+                  parts.push(r);
+                  return;
+                }
+                if (typeof r === 'object' && r !== null) {
+                  const obj = r as Record<string, unknown>;
+                  if (typeof obj.content === 'string') parts.push(obj.content);
+                  if (Array.isArray(obj.tokens)) {
+                    for (const t of obj.tokens as unknown[]) {
+                      if (t && typeof t === 'object') {
+                        const tr = t as Record<string, unknown>;
+                        const text = typeof tr.text === 'string' ? tr.text : '';
+                        const content = typeof tr.content === 'string' ? tr.content : '';
+                        if (text) parts.push(text);
+                        else if (content) parts.push(content);
+                      }
+                    }
+                  }
+                }
+                if (Array.isArray(r)) {
+                  for (const p of r as unknown[]) {
+                    if (p && typeof p === 'object') {
+                      const pr = p as Record<string, unknown>;
+                      const text = typeof pr.text === 'string' ? pr.text : '';
+                      const content = typeof pr.content === 'string' ? pr.content : '';
+                      if (text) parts.push(text);
+                      else if (content) parts.push(content);
+                    }
+                  }
+                }
+              };
+
+              appendFromRaw(raw);
+
+              // OpenRouter unified 'reasoning_details' chunks
+              const details = rec.reasoning_details as unknown;
+              if (Array.isArray(details)) {
+                for (const d of details as unknown[]) {
+                  if (d && typeof d === 'object') {
+                    const det = d as Record<string, unknown>;
+                    if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                      parts.push(det.text);
+                    }
+                  }
+                }
+              }
+
+              return parts.join('');
+            } catch {
+              return '';
+            }
+          };
+          const reasoningFromDelta = extractReasoning(delta);
+          const reasoningFromMessage = extractReasoning(messageNode);
+          const hasReasoning =
+            (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
+
+          // Guard: if no active accumulator and we have content OR tool_calls OR reasoning, start a new placeholder stream.
           // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
-          if ((hasContent || hasToolCalls) && !this.streamingContent.has(conversationId)) {
+          if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
               // Acquire lock upfront to avoid race between parallel content_chunk events
               this.streamingContent.set(conversationId, '');
@@ -361,6 +434,7 @@ export class ConversationService {
                   ...assistantMessage,
                   streaming: true,
                   chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
+                  reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
                   tool_calls: [], // Initialize empty tool_calls array for replace operations
                 },
               };
@@ -404,6 +478,39 @@ export class ConversationService {
                 },
               };
               await this.streamingService.broadcastDelta(conversationId, chunkDelta);
+            }
+          }
+
+          // Process reasoning if present (stream as delta chunks; persist final reasoning on completion)
+          if (hasReasoning) {
+            const incrementalR = reasoningFromDelta || '';
+            const snapshotR = reasoningFromMessage || '';
+
+            const currentR = this.streamingReasoning.get(conversationId) || '';
+            const currentRLength = currentR.length;
+
+            let appendR = '';
+            if (incrementalR) {
+              appendR = incrementalR;
+            } else if (snapshotR) {
+              appendR = snapshotR.slice(currentRLength);
+            }
+
+            if (appendR) {
+              const newR = currentR + appendR;
+              this.streamingReasoning.set(conversationId, newR);
+
+              // Stream delta chunk for reasoning
+              const rChunkDelta: Operation = {
+                op: 'add',
+                path: '/messages/-1/reasoningChunks/-',
+                value: {
+                  content: appendR,
+                  position: currentRLength,
+                  timestamp: Date.now(),
+                },
+              };
+              await this.streamingService.broadcastDelta(conversationId, rChunkDelta);
             }
           }
 
@@ -484,6 +591,7 @@ export class ConversationService {
         }
 
         const finalContent = this.streamingContent.get(conversationId) || '';
+        const finalReasoning = this.streamingReasoning.get(conversationId) || '';
         const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
         const validToolCalls = finalToolCallsAcc.filter(
           (tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0
@@ -495,13 +603,18 @@ export class ConversationService {
 
           // Persist and patch id/updatedAt while placeholder is still active.
           // Persist if we have content OR at least one valid tool_call (tool-only responses).
-          if ((finalContent && finalContent.trim().length > 0) || validToolCalls.length > 0) {
+          if (
+            (finalContent && finalContent.trim().length > 0) ||
+            validToolCalls.length > 0 ||
+            (finalReasoning && finalReasoning.trim().length > 0)
+          ) {
             try {
               const assistantMessage = await this.messageService.createMessage({
                 conversationId,
                 role: 'assistant',
                 content: finalContent,
                 messageType: 'agent_response',
+                ...(finalReasoning && { reasoning: finalReasoning }),
                 ...(validToolCalls.length > 0 && {
                   tool_calls: validToolCalls.map((tc) => ({
                     id: tc.id,
@@ -532,6 +645,14 @@ export class ConversationService {
                   op: 'replace',
                   path: '/messages/-1/content',
                   value: finalContent,
+                });
+              }
+              // Finalize reasoning text
+              if (finalReasoning && finalReasoning.trim().length > 0) {
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/reasoning',
+                  value: finalReasoning,
                 });
               }
             } catch (persistError) {

@@ -238,12 +238,9 @@
     'onum' 1;
 }
 
-/* Inline streaming caret appended at the end of the last text line (single instance) */
-/* Limit to only the last top-level block in the message content to avoid duplicates in nested structures */
-.message-content.streaming-caret > p:last-child::after,
-.message-content.streaming-caret > ul:last-child > li:last-child::after,
-.message-content.streaming-caret > ol:last-child > li:last-child::after,
-.message-content.streaming-caret > blockquote:last-child p:last-of-type::after {
+/* Inline streaming caret appended at the end of the last text line */
+.message-content.streaming-caret p:last-child::after,
+.message-content.streaming-caret li:last-child::after {
   content: '';
   display: inline-block;
   width: 0.25rem;

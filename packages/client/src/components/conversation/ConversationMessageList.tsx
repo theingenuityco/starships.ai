@@ -3,7 +3,7 @@
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { Bot, User, Loader2 } from 'lucide-react'
+import { Bot, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 
@@ -150,9 +150,22 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     return lastId
   }, [displayMessages])
 
-  // Hide "responding" indicator if any assistant is already streaming (prevents double assistant rows)
-  const hasAssistantStreaming = useMemo(() => {
-    return displayMessages.some(m => m.role === 'assistant' && (m as any).streaming === true)
+  // Determine if assistant has any renderable progress (reasoning/tool_calls/content/chunks)
+  // We keep using streaming flags for other UI, but the GAP loader hides only when real progress exists.
+  const hasAssistantProgress = useMemo(() => {
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      const m: any = displayMessages[i]
+      if (m?.role !== 'assistant') continue
+      const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
+      const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
+      const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray(m?.tool_calls) && m.tool_calls.length > 0
+      const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
+      if (hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasContent) return true
+      // If it's just a streaming shell with nothing to render yet, keep scanning (treat as no progress)
+      return false
+    }
+    return false
   }, [displayMessages])
 
   // Optimized auto-scroll with debouncing
@@ -178,6 +191,17 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
     lastMessageCountRef.current = displayMessages.length
   }, [displayMessages.length])
+
+  // Ensure the GAP loader (store-driven) is visible by auto-scrolling when responding turns on but no assistant progress yet
+  useEffect(() => {
+    if (!scrollContainerRef.current) return
+    if (isResponding && !hasAssistantProgress) {
+      requestAnimationFrame(() => {
+        const container = scrollContainerRef.current!
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+      })
+    }
+  }, [isResponding, hasAssistantProgress])
 
   if (!conversationId) {
     return <EmptyState />
@@ -206,17 +230,21 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
           {displayMessages.map(message => (
             <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeStreamingAssistantId} />
           ))}
-          {/* Show responding indicator after the last user message */}
-          {isResponding && agentName && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === 'user' && !hasAssistantStreaming && (
+          {/* Gap loader: show between user send and the first real assistant progress (store-driven, no local state) */}
+          {isResponding && !hasAssistantProgress && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
                   <Bot className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-2 text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span className="text-xs font-medium">{agentName} is thinking...</span>
+                  <div className="inline-flex items-center px-3 py-2 rounded-2xl rounded-tl-none border bg-muted/30 text-muted-foreground">
+                    <span className="text-xs font-medium">{(agentName || 'Assistant') + ' is responding...'}</span>
+                    <span className="inline-flex items-center gap-1.5 ml-2" aria-hidden="true">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
                   </div>
                 </div>
               </div>

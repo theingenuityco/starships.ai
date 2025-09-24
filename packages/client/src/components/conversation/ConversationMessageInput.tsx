@@ -171,7 +171,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
           .finally(() => {
             setSending(false)
-            setConversationResponding(currentConversationId!, false)
           })
 
         // Exit early to avoid hitting catch/finally paths
@@ -264,7 +263,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             })
             .finally(() => {
               setSending(false)
-              setConversationResponding(currentConversationId!, false)
             })
 
           return

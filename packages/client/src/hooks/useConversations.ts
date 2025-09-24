@@ -306,10 +306,6 @@ export function useConversation(conversationId: string | null) {
       const zMsgs: any[] = Array.isArray(convo?.messages) ? convo.messages : []
       const zLast = zMsgs[zMsgs.length - 1]
       if (zLast && zLast.role === 'assistant' && zLast.streaming === true) {
-        // Assistant shell already present – flip responding off just in case
-        try {
-          s.setConversationResponding(cid, false)
-        } catch {}
         return
       }
       s.appendMessage(cid, {
@@ -323,9 +319,6 @@ export function useConversation(conversationId: string | null) {
         chunks: [],
         reasoningChunks: [],
       } as any)
-      try {
-        s.setConversationResponding(cid, false)
-      } catch {}
     } catch {}
   }
 
@@ -613,6 +606,11 @@ export function useConversation(conversationId: string | null) {
               markMessageStreaming(cid, msgIndex, true)
               setExclusiveAssistantStreaming(cid, msgIndex)
             }
+            if (reasoningChunkOps.length > 0) {
+              try {
+                setConversationResponding(cid, false)
+              } catch {}
+            }
           } catch {}
         }
 
@@ -638,7 +636,6 @@ export function useConversation(conversationId: string | null) {
               // Exclusive streaming: close any prior assistant streaming flags
               clearAllAssistantStreaming(cid)
               startStreaming(cid, version)
-              setConversationResponding(cid, false)
             }
           } catch {}
           queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(cid), (old: any) => {
@@ -841,6 +838,11 @@ export function useConversation(conversationId: string | null) {
                 try {
                   updateMessageAt(cid, idx, (m: any) => ({ ...m, tool_calls: sanitized }))
                 } catch {}
+                if (Array.isArray(sanitized) && sanitized.length > 0) {
+                  try {
+                    setConversationResponding(cid, false)
+                  } catch {}
+                }
               }
 
               // Mirror reasoning string updates (providers that stream /reasoning via replace/add)
@@ -868,6 +870,9 @@ export function useConversation(conversationId: string | null) {
                     updateMessageAt(cid, idx, (m: any) => ({ ...m, reasoning: reasonVal, streaming: true }))
                     markMessageStreaming(cid, idx, true)
                     setExclusiveAssistantStreaming(cid, idx)
+                    try {
+                      if (reasonVal.trim().length > 0) setConversationResponding(cid, false)
+                    } catch {}
                   } catch {}
                 }
               }
@@ -903,6 +908,9 @@ export function useConversation(conversationId: string | null) {
             nonChunkOps.some(op => op.op === 'replace' && typeof op.path === 'string' && /\/content$/.test(op.path))
           if (marksDone) {
             endStreaming(cid)
+            try {
+              setConversationResponding(cid, false)
+            } catch {}
             // Also ensure store cleanup for the event's conversation if provided
             try {
               if ((data as any)?.conversationId) {
@@ -959,6 +967,9 @@ export function useConversation(conversationId: string | null) {
           content: '',
           lastUpdate: Date.now(),
         }))
+        try {
+          setConversationResponding(cid, false)
+        } catch {}
         try {
           endStreaming(cid)
         } catch {}
@@ -1027,8 +1038,6 @@ export function useConversation(conversationId: string | null) {
           }))
           try {
             startStreaming(cid)
-            // Ensure responding indicator is cleared when assistant stream begins
-            setConversationResponding(cid, false)
             // Ensure loader targets the new assistant shell only
             clearAllAssistantStreaming(cid)
             // Mirror assistant shell into the UI store so inline loader anchors correctly even before text chunks arrive
@@ -1343,6 +1352,9 @@ export function useConversation(conversationId: string | null) {
               try {
                 endStreaming(data.conversationId!)
               } catch {}
+              try {
+                setConversationResponding(data.conversationId!, false)
+              } catch {}
 
               // Also mark the last streaming message as complete in the UI store
               try {
@@ -1380,6 +1392,9 @@ export function useConversation(conversationId: string | null) {
             },
             onerror(error) {
               console.error('[STREAMING] Connection error:', error)
+              try {
+                setConversationResponding(data.conversationId!, false)
+              } catch {}
               // If aborted or completed, suppress retries
               if (abortControllerRef.current?.signal.aborted || completedRef.current || !shouldRetryRef.current) {
                 return
@@ -1437,6 +1452,10 @@ export function useConversation(conversationId: string | null) {
 
       // Do NOT optimistically add the user message when streaming; rely on server deltas
       if (variables.stream) {
+        // Drive the GAP loading state via the central store so it renders even while the event loop is busy.
+        try {
+          setConversationResponding(variables.conversationId, true)
+        } catch {}
         return { previousMessages, conversationId: variables.conversationId }
       }
 
@@ -1488,6 +1507,13 @@ export function useConversation(conversationId: string | null) {
 
       // Rollback optimistic update
       queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(variables.conversationId), context.previousMessages)
+
+      // Ensure GAP loader is cleared if streaming failed to start
+      try {
+        if (variables.stream) {
+          setConversationResponding(variables.conversationId, false)
+        }
+      } catch {}
 
       const errorMessage = error?.response?.data?.error || error?.message || 'Failed to send message'
       toast.error('Failed to send message', {

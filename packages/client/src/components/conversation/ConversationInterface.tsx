@@ -23,8 +23,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
 
-  // UI state
-  const [hasMessages, setHasMessages] = useState(false)
+  // UI state (conversation id only; message presence is derived from store)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
 
   // Ref for direct communication with message input
@@ -38,6 +37,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
 
+  // Get agents data from starship and conversation
+  const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
+  const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
+  const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
+
+  // Derive message presence and UI gating from central store to avoid local state being blocked by streaming
+  const uiConvo = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
+  const hasMessages = !!uiConvo && (Array.isArray(uiConvo?.messages) ? uiConvo!.messages.length > 0 : false)
+  const showMessagesArea = Boolean(currentConversationId) && (hasMessages || uiConvo?.isResponding)
+
+  // Measure input container after showMessagesArea is known (prevents TS error and ensures correct layout)
   useEffect(() => {
     const el = inputContainerRef.current
     if (!el) return
@@ -59,12 +69,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       ro.disconnect()
       window.removeEventListener('resize', onResize)
     }
-  }, [hasMessages, currentConversationId])
-
-  // Get agents data from starship and conversation
-  const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
-  const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
-  const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
+  }, [showMessagesArea, currentConversationId])
 
   // Memoized agent change handler to prevent AgentSelector from remounting
   const handleAgentChange = useCallback((agent: Agent | null) => {
@@ -80,10 +85,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     [onConversationChange]
   )
 
-  // Handle first message to trigger layout transition
-  const handleFirstMessage = useCallback(() => {
-    setHasMessages(true)
-  }, [])
+  // Message presence is derived from store; no local handler
 
   // Streaming is now handled internally by useConversation hook
   // No need for external event handler management
@@ -100,7 +102,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   useEffect(() => {
     if (externalConversationId === undefined) return
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
-    setHasMessages(Boolean(externalConversationId))
   }, [externalConversationId])
 
   // Restore selected agent from conversation data (fixes refresh issue)
@@ -183,7 +184,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   return (
     <div className="relative flex flex-col h-screen bg-background">
       {/* Messages Area or Welcome Screen */}
-      {hasMessages && currentConversationId ? (
+      {showMessagesArea ? (
         <div className="flex-1 min-h-0">
           <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
         </div>
@@ -221,7 +222,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         ref={inputContainerRef}
         className="absolute left-0 right-0 p-6 pointer-events-none transition-all duration-300 ease-in-out"
         style={{
-          bottom: hasMessages && currentConversationId ? '0px' : 'calc(50% + 2rem)',
+          bottom: showMessagesArea ? '0px' : 'calc(50% + 2rem)',
         }}
       >
         <div className="max-w-2xl mx-auto pointer-events-auto opacity-100">
@@ -231,9 +232,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             starshipId={starshipId}
             conversationId={currentConversationId}
             onConversationStart={handleConversationStart}
-            onMessageSent={handleFirstMessage}
             disabled={!selectedAgent}
-            minimal={hasMessages && !!currentConversationId}
+            minimal={showMessagesArea}
           >
             {/* Footer Content - Agent Selector */}
             <AgentSelector selectedAgent={selectedAgent} onAgentChange={handleAgentChange} starshipId={starshipId} compact={true} />

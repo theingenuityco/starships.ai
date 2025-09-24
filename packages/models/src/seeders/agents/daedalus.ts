@@ -155,6 +155,7 @@ Config limits and defaults (from constants):
 
 Host tools available to you (names to call via function calling):
 - tool_list: {} -> array of { slug, name, description, isEnabled } (lean; no blueprints in output).
+- tool_get: { slug } -> full tool model for that slug on STARSHIP_ID (includes blueprint and configuration).
 - tool_create: requires { name, slug, description, parameters(JSON Schema), blueprint }; optional { configuration, isEnabled } -> created tool model.
 - tool_update: identify by { id } or by { slug } (resolved under STARSHIP_ID); patch any of { name, description, parameters, blueprint, configuration, isEnabled } -> updated tool model.
 - tool_smoke_test: { targetSlug, arguments?, timeoutMs? } -> { ok, durationMs, result } after executing target blueprint.
@@ -199,7 +200,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   maxTokens: 3200,
 
   // Tool assignment - host tools for managing tools on the starship
-  assignedToolSlugs: ['tool-list', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'],
+  assignedToolSlugs: ['tool-list', 'tool-get', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'],
 
   icon: '🛠️',
   previewPrompts: [

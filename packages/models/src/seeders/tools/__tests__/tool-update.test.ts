@@ -120,17 +120,26 @@ describe('Tool Update Tool', () => {
     }
 
     it('should fail when missing BASE_URL', async () => {
-      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, {})).rejects.toThrow('baseUrl is required');
+      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, {})).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('baseUrl is required'),
+      });
     });
 
     it('should fail without auth token', async () => {
       const env = { BASE_URL: 'https://api.test.com' };
-      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, env as never)).rejects.toThrow('authToken is required');
+      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('authToken is required'),
+      });
     });
 
     it('should fail without starship ID when resolving by slug', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env as never)).rejects.toThrow('starshipId is required');
+      await expect(executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('starshipId is required'),
+      });
     });
 
     it('should succeed updating by id without requiring starshipId', async () => {
@@ -190,7 +199,10 @@ describe('Tool Update Tool', () => {
 
     it('should error when no update fields provided', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
-      await expect(executeToolWithMockEnv({ id: 'tool-1' }, env)).rejects.toThrow('No update fields provided');
+      await expect(executeToolWithMockEnv({ id: 'tool-1' }, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('No update fields provided'),
+      });
     });
 
     it('should handle HTTP errors gracefully (update request)', async () => {
@@ -203,14 +215,20 @@ describe('Tool Update Tool', () => {
         text: async () => JSON.stringify({ error: 'Not found' }),
       });
 
-      await expect(executeToolWithMockEnv({ id: 'nope', name: 'N' }, env)).rejects.toThrow('HTTP request failed');
+      await expect(executeToolWithMockEnv({ id: 'nope', name: 'N' }, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('HTTP request failed'),
+      });
     });
 
     it('should handle network failure', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc' };
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
 
-      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, env)).rejects.toThrow('Network error');
+      await expect(executeToolWithMockEnv({ id: 'x', name: 'N' }, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Network error'),
+      });
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {

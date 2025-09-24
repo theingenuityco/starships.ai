@@ -117,22 +117,34 @@ describe('Tool Create Tool', () => {
     }
 
     it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({}, {})).rejects.toThrow('baseUrl is required');
+      await expect(executeToolWithMockEnv({}, {})).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('baseUrl is required'),
+      });
     });
 
     it('should fail without auth token', async () => {
       const env = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({}, env as never)).rejects.toThrow('authToken is required');
+      await expect(executeToolWithMockEnv({}, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('authToken is required'),
+      });
     });
 
     it('should fail without starship ID', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({}, env as never)).rejects.toThrow('starshipId is required');
+      await expect(executeToolWithMockEnv({}, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('starshipId is required'),
+      });
     });
 
     it('should fail when required input fields are missing', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({ slug: 'x' }, env)).rejects.toThrow('name is required');
+      await expect(executeToolWithMockEnv({ slug: 'x' }, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('name is required'),
+      });
     });
 
     it('should successfully create tool with mocked API response', async () => {
@@ -213,7 +225,10 @@ describe('Tool Create Tool', () => {
           },
           env
         )
-      ).rejects.toThrow('HTTP request failed');
+      ).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('HTTP request failed'),
+      });
     });
 
     it('should handle network failure', async () => {
@@ -230,7 +245,10 @@ describe('Tool Create Tool', () => {
           },
           env
         )
-      ).rejects.toThrow('Network error');
+      ).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Network error'),
+      });
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {

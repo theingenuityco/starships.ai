@@ -34,6 +34,17 @@ const processChunks = (data: any) => {
   }
 
   const processedMessages = data.messages.map((message: ClientMessage) => {
+    // Sanitize tool_calls to keep early tool-first deltas (keep when function.name OR id OR arguments is present)
+    const sanitizedToolCalls = Array.isArray((message as any).tool_calls)
+      ? (message as any).tool_calls.filter((tc: any) => {
+          const fn = (tc as any)?.function
+          const hasName = typeof fn?.name === 'string' && fn.name.length > 0
+          const hasId = (tc as any)?.id != null && String((tc as any).id).length > 0
+          const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.length > 0
+          return hasName || hasId || hasArgs
+        })
+      : undefined
+
     // If message has chunks, build the streamed content
     if (message.chunks && Array.isArray(message.chunks)) {
       // Sort chunks by position to ensure correct order
@@ -50,10 +61,15 @@ const processChunks = (data: any) => {
         ...message,
         content: message.streaming ? streamedContent : message.content,
         streamedContent: streamedContent,
+        ...(sanitizedToolCalls ? { tool_calls: sanitizedToolCalls } : {}),
       }
     }
 
-    return message
+    // No chunks case: still ensure tool_calls are sanitized
+    return {
+      ...message,
+      ...(sanitizedToolCalls ? { tool_calls: sanitizedToolCalls } : {}),
+    } as ClientMessage
   })
 
   return {
@@ -124,6 +140,7 @@ export function useConversation(conversationId: string | null) {
   const endStreaming = useStarshipUIStore(s => s.endStreaming)
   const clearStreaming = useStarshipUIStore(s => s.clearStreaming)
   const setConversationResponding = useStarshipUIStore(s => s.setConversationResponding)
+  const appendMessage = useStarshipUIStore(s => s.appendMessage)
   const existingConversation = useStarshipUIStore(s => (conversationId ? s.conversations[conversationId] : undefined))
   // Get conversation messages
   const messagesQuery = useQuery({
@@ -428,6 +445,56 @@ export function useConversation(conversationId: string | null) {
               return old // Return unchanged data on operation failure
             }
           })
+
+          // Mirror critical non-chunk ops into Zustand for immediate UI updates (tool-first shells, tool_calls)
+          try {
+            const cache: any = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(cid))
+            const msgs: any[] = Array.isArray(cache?.messages) ? cache.messages : []
+            for (const op of nonChunkOps) {
+              if (typeof (op as any).path !== 'string') continue
+              const path = String((op as any).path)
+
+              // Append assistant shell when server adds message at a concrete index
+              if ((op as any).op === 'add') {
+                const mAdd = path.match(/^\/messages\/(\d+)$/)
+                if (mAdd) {
+                  const value = (op as any).value
+                  if (value && value.role === 'assistant') {
+                    try {
+                      const zConvo = useStarshipUIStore.getState().conversations[cid]
+                      const zMsgs = Array.isArray(zConvo?.messages) ? zConvo.messages : []
+                      if (!zMsgs.some((m: any) => m.id === value.id)) {
+                        appendMessage(cid, { ...(value as any) })
+                      }
+                    } catch {}
+                  }
+                }
+              }
+
+              // Update tool_calls on the current assistant placeholder (or concrete index)
+              const mTc = path.match(/^\/messages\/(-?\d+)\/tool_calls$/)
+              if (mTc && (op as any).op === 'replace') {
+                let idx = Number(mTc[1])
+                if (!Number.isInteger(idx)) continue
+                if (idx < 0) {
+                  idx = Math.max(msgs.length - 1, 0)
+                }
+                const raw = (op as any).value || []
+                const sanitized = Array.isArray(raw)
+                  ? raw.filter((tc: any) => {
+                      const fn = tc?.function
+                      const hasName = typeof fn?.name === 'string' && fn.name.length > 0
+                      const hasId = tc?.id != null && String(tc.id).length > 0
+                      const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.length > 0
+                      return hasName || hasId || hasArgs
+                    })
+                  : []
+                try {
+                  updateMessageAt(cid, idx, (m: any) => ({ ...m, tool_calls: sanitized }))
+                } catch {}
+              }
+            }
+          } catch {}
 
           // Identify message indices that completed (either content replaced or streaming=false)
           const completedIdxs = new Set<number>()

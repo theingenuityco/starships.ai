@@ -50,6 +50,7 @@ export class Agent implements NodeHandler {
     const endRef = `end_${this.nodeCounter++}`;
     const llmNodeRef = `llm_${this.nodeCounter++}`;
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
+    const parseArgsNodeRef = `parse_args_${this.nodeCounter++}`;
     const toolNodeRef = `tool_${this.nodeCounter++}`;
 
     // Create complete blueprint with all nodes
@@ -107,6 +108,25 @@ export class Agent implements NodeHandler {
             condition: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== undefined && $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== null }}`,
           },
         },
+        // Prepare tool input from LLM tool_calls arguments
+        {
+          ref: parseArgsNodeRef,
+          type: 'code' as const,
+          name: 'Prepare Tool Input',
+          description: 'Parse function.arguments JSON into input for Tool',
+          parameters: {
+            code: `
+              try {
+                const calls = $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls || [];
+                const argsStr = (calls[0] && calls[0].function && calls[0].function.arguments) ? calls[0].function.arguments : '{}';
+                return JSON.parse(argsStr || '{}');
+              } catch (_e) {
+                return {};
+              }
+            `,
+            timeout: 2000,
+          },
+        },
         // Tool execution node - receives the complete tool definition via template resolution
         {
           ref: toolNodeRef,
@@ -142,8 +162,10 @@ export class Agent implements NodeHandler {
         { ref: 'edge_start_llm', from: startRef, to: llmNodeRef },
         // LLM -> Conditional
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
-        // Conditional -> Tool (if tool_calls exist)
-        { ref: 'edge_conditional_tool', from: conditionalNodeRef, to: toolNodeRef, condition: 'true' },
+        // Conditional -> Prepare Args (if tool_calls exist)
+        { ref: 'edge_conditional_parse', from: conditionalNodeRef, to: parseArgsNodeRef, condition: 'true' },
+        // Prepare Args -> Tool
+        { ref: 'edge_parse_tool', from: parseArgsNodeRef, to: toolNodeRef },
         // Tool -> LLM (loop back)
         { ref: 'edge_tool_llm', from: toolNodeRef, to: llmNodeRef },
         // Conditional -> End (if no tool_calls)
@@ -176,6 +198,10 @@ export class Agent implements NodeHandler {
       // Create execution with ordered messages in state (system -> memory -> conversation)
       const parentExecution = this.options?.execution;
       const execution = ExecutionItemUtils.createExecution(undefined, parentExecution);
+      // Merge agent state fields into execution.state so tools can read context (e.g., starshipId)
+      if (this.state && typeof this.state === 'object') {
+        Object.assign(execution.state, this.state);
+      }
       const orderedMessages: LlmMessage[] = [];
 
       // Add system prompt from params root first
@@ -217,7 +243,8 @@ export class Agent implements NodeHandler {
       // Prepare engine config with event callback
       const engineConfig: EngineConfig = {
         eventCallback: this.options?.eventCallback,
-        failOnNodeError: true,
+        failOnNodeError: false,
+        secureEnv: this.options?.secureEnv,
       };
 
       // Execute using runner chosen by current execution depth

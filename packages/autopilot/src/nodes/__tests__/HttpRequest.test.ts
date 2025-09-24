@@ -418,18 +418,26 @@ describe('HttpRequest Node Handler', () => {
         method: 'GET',
       };
 
+      const mockErrHeaders = new Map([['content-type', 'text/plain']]);
+      mockErrHeaders.forEach = jest.fn((callback) => {
+        callback('text/plain', 'content-type', mockErrHeaders);
+      });
+
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        url: 'https://api.example.com/error',
+        headers: mockErrHeaders,
+        // Non-JSON body for error path
+        text: async () => 'Not Found',
+        json: async () => {
+          throw new Error('No JSON');
+        },
       });
 
       const httpRequest = new HttpRequest(params);
-      const result = await httpRequest.execute();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].error).toBe('HTTP 404: Not Found');
-      expect(result[0].json).toBeUndefined();
+      await expect(httpRequest.execute()).rejects.toThrow(/HTTP request failed: .*404 .*Not Found/);
     });
 
     it('should handle network errors', async () => {
@@ -441,11 +449,7 @@ describe('HttpRequest Node Handler', () => {
       mockFetch.mockRejectedValueOnce(new Error('Network failure'));
 
       const httpRequest = new HttpRequest(params);
-      const result = await httpRequest.execute();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].error).toBe('HTTP request failed: Network failure');
-      expect(result[0].json).toBeUndefined();
+      await expect(httpRequest.execute()).rejects.toThrow('Network failure');
     });
 
     it('should handle timeout errors', async () => {
@@ -470,11 +474,7 @@ describe('HttpRequest Node Handler', () => {
       );
 
       const httpRequest = new HttpRequest(params);
-      const result = await httpRequest.execute();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].error).toBe('HTTP request timeout after 100ms');
-      expect(result[0].json).toBeUndefined();
+      await expect(httpRequest.execute()).rejects.toThrow('timeout after 100ms');
     }, 2000);
 
     it('should handle invalid URLs', async () => {
@@ -486,11 +486,7 @@ describe('HttpRequest Node Handler', () => {
       mockFetch.mockRejectedValueOnce(new TypeError('Invalid URL'));
 
       const httpRequest = new HttpRequest(params);
-      const result = await httpRequest.execute();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].error).toBe('HTTP request failed: Invalid URL');
-      expect(result[0].json).toBeUndefined();
+      await expect(httpRequest.execute()).rejects.toThrow('Invalid URL');
     });
   });
 
@@ -519,11 +515,7 @@ describe('HttpRequest Node Handler', () => {
       );
 
       const httpRequest = new HttpRequest(params);
-      const result = await httpRequest.execute();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].error).toBe('HTTP request timeout after 2000ms');
-      expect(result[0].json).toBeUndefined();
+      await expect(httpRequest.execute()).rejects.toThrow('timeout after 2000ms');
     });
 
     it('should use default timeout when not specified', async () => {
@@ -595,13 +587,10 @@ describe('HttpRequest Node Handler', () => {
         body: { received: true },
         url: 'https://api.example.com/null-body',
       });
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://api.example.com/null-body',
-        expect.objectContaining({
-          method: 'POST',
-          body: null,
-        })
-      );
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toBe('https://api.example.com/null-body');
+      expect(fetchCall[1]).toEqual(expect.objectContaining({ method: 'POST' }));
+      expect(fetchCall[1]).not.toHaveProperty('body');
     });
 
     it('should handle complex nested objects in body', async () => {

@@ -148,12 +148,16 @@ const resilientEngine = new Engine({
 
 When `failOnNodeError` is false:
 
-- Failed nodes still record errors in execution results
-- Full error details are still set in the execution context
-- `workflow_failed` events are still emitted for individual node failures
+- Failed nodes still record errors in `execution.results` (as error items per node)
+- The engine does not set `execution.error` and does not emit `workflow_failed` for individual node failures
 - Execution status is reset to 'running' and continues to the next node
 - Overall workflow completes normally with `workflow_completed` event
 - All error information is preserved in the final execution results
+
+Note:
+
+- Agents execute with `failOnNodeError: false` by default to keep conversations flowing even when tools or steps fail.
+- Tool executions always emit a `tool_complete` event. On success, the result is included; on failure, the error is included. Downstream services should persist both as `tool_result` messages.
 
 ## Node Types
 
@@ -274,6 +278,13 @@ agent
 // Execute the agent
 const execution = await agent.execute();
 ```
+
+### Agent Error Handling
+
+Agents run their internal engine with `failOnNodeError: false`. This means:
+
+- A failing node (e.g., a tool) does not stop the agent; errors are recorded and execution continues.
+- Tool runs emit `tool_complete` with either `result` or `error`, and downstream can persist both as `tool_result` messages.
 
 ### Agent State Management
 

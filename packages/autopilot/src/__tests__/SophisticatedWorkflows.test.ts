@@ -6,8 +6,8 @@
 
 import { Engine } from '@/engine/Engine';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
-import { autopilot } from '@/Autopilot';
 import type { Blueprint, Node } from '@/types';
+import { autopilot } from '@/Autopilot';
 
 // Mock all external dependencies
 const mockFetch = jest.fn();
@@ -16,12 +16,6 @@ global.fetch = mockFetch;
 describe('Sophisticated Workflows', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Setup autopilot with test credentials
-    autopilot.reset();
-    autopilot.setCredentials({
-      openrouterApiKey: 'test-api-key',
-    });
 
     // Default fetch mock with proper structure
     const mockHeaders = new Map([['content-type', 'application/json']]);
@@ -779,13 +773,15 @@ describe('Sophisticated Workflows', () => {
         text: async () => '{"action":"positive","applied":true}',
       });
 
-      const engine = new Engine();
+      // Provide credentials for validation to pass
+      autopilot.setCredentials({ openrouterApiKey: 'test-api-key-123' });
+      const engine = new Engine({ secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });
       const execution = ExecutionItemUtils.createExecution();
       await engine.executeBlueprint(blueprint, execution);
 
       expect(execution.status).toBe('completed');
 
-      // Should execute all nodes in the positive path
+      // Should execute all nodes in the negative path
       expect(execution.results).toHaveLength(7);
       expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
         'start',
@@ -923,7 +919,7 @@ describe('Sophisticated Workflows', () => {
           text: async () => '{"recovered":true,"status":"handled"}',
         });
 
-      const engine = new Engine();
+      const engine = new Engine({ failOnNodeError: false });
       const execution = ExecutionItemUtils.createExecution();
 
       await engine.executeBlueprint(blueprint, execution);

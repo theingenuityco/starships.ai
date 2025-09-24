@@ -14,9 +14,10 @@ const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; chunks
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  bottomPaddingPx?: number
 }
 
-export function ConversationMessageList({ conversationId, starshipId }: ConversationMessageListProps) {
+export function ConversationMessageList({ conversationId, starshipId, bottomPaddingPx }: ConversationMessageListProps) {
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
@@ -44,13 +45,16 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
   const displayMessages = useMemo(() => {
     const sortedMessages = [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
-    // First pass: collect all tool result messages by their tool_call_id
+    // First pass: collect all tool result messages by normalized tool call id
     const toolResultsMap = new Map<string, any>()
     const processedResultIds = new Set<string>()
 
     sortedMessages.forEach(msg => {
-      if (msg.messageType === 'tool_result' && (msg as any).tool_call_id) {
-        toolResultsMap.set((msg as any).tool_call_id, msg)
+      if (msg.messageType === 'tool_result') {
+        const rid = (msg as any).tool_call_id ?? (msg as any).call_id ?? (msg as any).id
+        if (rid != null) {
+          toolResultsMap.set(String(rid), msg)
+        }
       }
     })
 
@@ -60,7 +64,10 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
     for (const message of sortedMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
       if (message.role === 'assistant' && (message as any).tool_calls?.length > 0) {
-        const toolCallIds = ((message as any).tool_calls || []).map((tc: any) => tc.id).filter(Boolean)
+        const toolCallIds = ((message as any).tool_calls || [])
+          .map((tc: any) => (tc as any).id ?? (tc as any).call_id ?? (tc as any).tool_call_id ?? (tc as any).function?.id)
+          .filter(Boolean)
+          .map((id: any) => String(id))
         const toolResults: any[] = []
 
         // Collect all matching tool results
@@ -90,6 +97,17 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
 
     return groupedMessages
   }, [storeMessages])
+
+  // Determine which assistant message should display the streaming caret (latest streaming one)
+  const activeStreamingAssistantId = useMemo(() => {
+    let lastId: string | null = null
+    for (const m of displayMessages) {
+      if (m.role === 'assistant' && (m as any).streaming) {
+        lastId = m.id
+      }
+    }
+    return lastId
+  }, [displayMessages])
 
   // Optimized auto-scroll with debouncing
   useEffect(() => {
@@ -137,10 +155,10 @@ export function ConversationMessageList({ conversationId, starshipId }: Conversa
 
   return (
     <div className="h-full flex flex-col">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 scroll-smooth">
-        <div className="max-w-4xl mx-auto space-y-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
+        <div className="max-w-4xl mx-auto space-y-2">
           {displayMessages.map(message => (
-            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} />
+            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeStreamingAssistantId} />
           ))}
           {/* Show responding indicator after the last user message */}
           {isResponding && agentName && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === 'user' && (
@@ -173,18 +191,19 @@ interface StreamChunk {
 interface ConversationMessageBubbleProps {
   message: MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }
   agentName?: string
+  isStreamingActive?: boolean
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({ message, agentName, isStreamingActive }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
 
     if (isUser) {
       // User message: Blue bubble on the right
       return (
         <div className="flex justify-end">
-          <div className="flex items-end gap-3 max-w-[70%]">
+          <div className="mb-4 mt-4 flex items-end gap-3 max-w-[70%]">
             <div className={`bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
               <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
               {message.sending && (
@@ -212,9 +231,9 @@ const MemoizedMessageBubble = memo(
                 content={message.content}
                 messageId={message.id}
                 enableMarkdown={true}
-                enableCopy={!message.streaming}
+                enableCopy={!isStreamingActive}
                 enableLinkPreview={true}
-                isStreaming={message.streaming}
+                isStreaming={!!isStreamingActive}
                 className="text-foreground"
                 chunks={message.chunks}
                 agentName={agentName}
@@ -232,6 +251,7 @@ const MemoizedMessageBubble = memo(
     // Custom comparison for memo optimization
     if (prevProps.message.id !== nextProps.message.id) return false
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
+    if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
 
     // Re-render when text changes

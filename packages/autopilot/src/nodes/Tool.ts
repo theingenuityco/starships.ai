@@ -60,6 +60,7 @@ export class Tool extends BaseNode<ToolParams> {
       const engineConfig: EngineConfig = {
         eventCallback: this.getEventCallback(),
         failOnNodeError: true,
+        secureEnv: this.getOptions()?.secureEnv,
       };
       const depth = subExec.depth ?? 0;
       const runner = depth === 0 ? new ChildProcessRunner() : new LocalRunner();
@@ -85,6 +86,7 @@ export class Tool extends BaseNode<ToolParams> {
     } catch (error) {
       // Emit tool_complete event with error
       const eventCallback = this.getOptions()?.eventCallback;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown tool error';
       if (eventCallback) {
         try {
           await eventCallback({
@@ -92,7 +94,7 @@ export class Tool extends BaseNode<ToolParams> {
             timestamp: new Date().toISOString(),
             data: {
               toolName: params.name,
-              error: error instanceof Error ? error.message : 'Unknown tool error',
+              error: errorMessage,
               toolCallId: params.toolCallId,
             },
           });
@@ -106,6 +108,8 @@ export class Tool extends BaseNode<ToolParams> {
 
   /**
    * Extract tool arguments from input data
+   * Only accept plain object as arguments; do not parse JSON strings here.
+   * Parsing (e.g. LLM tool_calls.function.arguments) must be done upstream.
    */
   private extractToolArguments(inputData: unknown): Record<string, unknown> {
     // Check if this is coming from a Conditional node (has result and edgeCondition)
@@ -149,6 +153,7 @@ export class Tool extends BaseNode<ToolParams> {
         // ignore parse errors
       }
     }
+    
     return {};
   }
 

@@ -28,6 +28,11 @@ export class Start extends BaseNode<StartParams> {
       return execution.input;
     }
     
+    // Pass through direct input if provided (from main branch update)
+    if (_input && _input.length > 0) {
+      return _input;
+    }
+    
     // Default to empty object for regular workflows
     return ExecutionItemUtils.wrapSingle({});
   }

@@ -73,7 +73,7 @@ export class ChildProcessRunner implements Runner {
       stdio,
       execArgv,
       env: { ...process.env, ...(this.options?.env ?? {}) },
-      serialization: 'json',
+      serialization: 'advanced',
     });
 
     console.log('🚀 [CHILD-PROCESS-RUNNER] Starting execution in child process:', {

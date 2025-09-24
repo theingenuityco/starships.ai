@@ -27,6 +27,7 @@
     "validate-schema": "tsx src/scripts/schema-validator.ts",
     "monitor": "tsx src/scripts/performance-monitor.ts",
     "db-cli": "tsx src/scripts/db-cli.ts",
+    "pretest": "pnpm --filter @starships/autopilot build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"

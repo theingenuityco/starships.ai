@@ -365,6 +365,139 @@ LOG_CONSOLE=true
 LOG_METRICS=true
 ```
 
+## Tool Testing Infrastructure
+
+Comprehensive test coverage for Daedalus's tools with specialized testing utilities and validation patterns.
+
+### Available Tool Tests
+
+| Tool Category       | Tool Name          | Description                                                  |
+| ------------------- | ------------------ | ------------------------------------------------------------ |
+| **Utility Tools**   | `calculator`       | Mathematical expression evaluation with security validation  |
+|                     | `echo`             | Simple input/output testing and debugging utility            |
+|                     | `get_current_time` | Timezone-aware date/time generation with multiple formats    |
+| **Blueprint Tools** | `blueprint_lint`   | Autopilot blueprint structure validation and error reporting |
+| **Tool Management** | `tool_create`      | Create new tool instances via REST API                       |
+|                     | `tool_list`        | List all tools for a starship with lean summaries            |
+|                     | `tool_update`      | Update existing tools by ID or slug resolution               |
+|                     | `tool_smoke_test`  | Execute tools with timing and pass/fail reporting            |
+
+### Running Tool Tests
+
+```bash
+# Run all tool tests
+pnpm test src/seeders/tools/__tests__
+
+# Run specific tool test
+pnpm test src/seeders/tools/__tests__/calculator.test.ts
+
+# Run test suite with coverage
+pnpm test --coverage src/seeders/tools/__tests__
+```
+
+### Test Infrastructure
+
+#### ToolTestHelper
+
+Standardized testing utilities for comprehensive tool validation:
+
+```typescript
+import { ToolTestHelper } from '@starships/models/src/seeders/tools/__tests__/tool-test-helper';
+
+const testHelper = new ToolTestHelper(toolDefinition, toolTemplate, 'tool-name');
+
+// Test tool structure and metadata
+const structureResults = testHelper.testToolStructure();
+
+// Test parameter schema validation
+const schemaResults = testHelper.testParameterSchema();
+
+// Test blueprint structure and connectivity
+const blueprintResults = testHelper.testBlueprintStructure();
+const connectivityResult = testHelper.testConnectivity();
+const startEndResult = testHelper.testStartEndNodes();
+
+// Test template consistency
+const consistency = testHelper.testTemplateConsistency();
+```
+
+#### Common Test Patterns
+
+Every tool test follows standardized test areas for consistency:
+
+- **Tool Structure** - Validates tool definition completeness and format
+- **Parameter Schema** - Tests input parameter definitions and requirements
+- **Blueprint Structure** - Validates workflow nodes, edges, and connectivity
+- **Template Configuration** - Verifies template metadata and example usage
+- **Parameter Validation** - Tests valid/invalid input handling
+- **Integration Patterns** - Common test data and Jest matchers
+
+#### Custom Jest Matchers
+
+Specialized matchers for tool validation:
+
+```typescript
+import { ToolMatchers } from '@starships/models/src/seeders/tools/__tests__/tool-test-helper';
+
+// Validate tool structure completeness
+expect(toolDefinition).toHaveValidToolStructure();
+
+// Validate blueprint has required nodes and edges
+expect(toolBlueprint).toHaveValidBlueprint();
+```
+
+#### Test Categories
+
+**Utility Tools** - Basic functionality tools for common operations
+
+- Input/output processing
+- Data transformation
+- System information
+
+**Automation Tools** - Advanced tools for workflow and system management
+
+- Blueprint validation and linting
+- Tool lifecycle management
+- System testing and monitoring
+
+### Tool Development Testing
+
+When creating new tools, follow the established test patterns:
+
+1. **Create test file** - `src/seeders/tools/__tests__/your-tool.test.ts`
+2. **Import test utilities** - Use `ToolTestHelper` and common test patterns
+3. **Cover all test areas** - Structure, parameters, blueprint, template, validation
+4. **Add to test suite** - Include in `index.test.ts` imports
+5. **Verify coverage** - Ensure comprehensive test coverage
+
+```typescript
+// Example new tool test structure
+import { yourTool, yourToolTemplate } from '../your-tool';
+import { ToolTestHelper, CommonToolTestData, ToolMatchers } from './tool-test-helper';
+
+describe('Your Tool', () => {
+  let testHelper: ToolTestHelper;
+
+  beforeEach(() => {
+    testHelper = new ToolTestHelper(yourTool, yourToolTemplate, 'your_tool');
+  });
+
+  describe('Tool Structure', () => {
+    // Structure validation tests
+  });
+
+  describe('Parameter Schema', () => {
+    // Parameter definition tests
+  });
+
+  describe('Blueprint Structure', () => {
+    // Blueprint validation tests
+  });
+
+  // ... other standard test areas
+});
+```
+
 ## Development Scripts
 
 ```json
@@ -374,7 +507,9 @@ LOG_METRICS=true
   "migrate": "tsx src/scripts/migration-runner.ts",
   "backup:create": "tsx src/scripts/backup-cli.ts create",
   "monitor": "tsx src/scripts/performance-monitor.ts",
-  "db-cli": "tsx src/scripts/db-cli.ts"
+  "db-cli": "tsx src/scripts/db-cli.ts",
+  "test": "jest",
+  "test:tools": "jest src/seeders/tools/__tests__"
 }
 ```
 

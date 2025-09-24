@@ -62,22 +62,26 @@ export class HttpRequest implements NodeHandler {
     try {
       // Use input data as body if available and no explicit body set
       const inputData = ExecutionItemUtils.unwrapSingle(input);
+      const method = (this.params.method || 'GET').toUpperCase();
       const bodyData = this.params.body !== undefined ? this.params.body : inputData;
-      let body: string | null = null;
+      let body: string | undefined = undefined;
 
-      if (bodyData !== undefined) {
-        if (typeof bodyData === 'string') {
-          body = bodyData;
-        } else if (typeof bodyData === 'object' && bodyData !== null) {
-          body = JSON.stringify(bodyData);
+      // Do not send a body for GET/HEAD requests
+      if (method !== 'GET' && method !== 'HEAD') {
+        if (bodyData !== undefined) {
+          if (typeof bodyData === 'string') {
+            body = bodyData;
+          } else if (typeof bodyData === 'object' && bodyData !== null) {
+            body = JSON.stringify(bodyData);
+          }
         }
       }
 
       // Build fetch options using all RequestInit properties from params
-      const fetchOptions = {
-        method: this.params.method,
+      const fetchOptions: RequestInit = {
+        method,
         headers,
-        body,
+        ...(body !== undefined ? { body } : {}),
         signal: controller.signal,
         mode: this.params.mode,
         credentials: this.params.credentials,
@@ -93,12 +97,7 @@ export class HttpRequest implements NodeHandler {
         // Execute request with proper error handling
         const response = await fetch(this.params.url, fetchOptions);
 
-        // Handle HTTP error status codes
-        if (!response.ok) {
-          const errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-          return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
-        }
-        // Parse response body
+        // Parse response body (even when response.ok is false)
         let responseBody: unknown;
         const contentType =
           response.headers && typeof response.headers.get === 'function' ? response.headers.get('content-type') || '' : '';
@@ -129,16 +128,30 @@ export class HttpRequest implements NodeHandler {
           url: response.url,
         };
 
+        // Fail the workflow on non-2xx responses
+        if (!response.ok) {
+          const snippet =
+            typeof responseBody === 'string'
+              ? responseBody.slice(0, 300)
+              : (() => {
+                  try {
+                    return JSON.stringify(responseBody).slice(0, 300);
+                  } catch {
+                    return '';
+                  }
+                })();
+          throw new Error(
+            `HTTP request failed: ${method} ${this.params.url} -> ${response.status} ${response.statusText}${
+              snippet ? ` | body: ${snippet}` : ''
+            }`
+          );
+        }
+
         return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);
       } catch (error) {
-        // Handle fetch errors and timeout - return error ExecutionItem instead of throwing
-        let errorMessage: string;
-        if (controller.signal.aborted) {
-          errorMessage = `HTTP request timeout after ${timeout}ms`;
-        } else {
-          errorMessage = `HTTP request failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        }
-        return ExecutionItemUtils.wrapError(errorMessage, input?.[0]);
+        // Network/timeout errors should fail the workflow
+        const reason = controller.signal.aborted ? `timeout after ${timeout}ms` : error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`HTTP request failed: ${method} ${this.params.url} -> ${reason}`);
       }
     } finally {
       // Always clear timeout to prevent open handles

@@ -52,8 +52,24 @@ export function ConversationMessageContent({
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 
+  // Normalize tool calls to retain early tool-first deltas:
+  // keep entries if function.name exists OR id exists OR arguments exist
+  const normalizedToolCalls = useMemo(
+    () =>
+      Array.isArray(toolCalls)
+        ? toolCalls.filter(tc => {
+            const fn = (tc as any)?.function
+            const hasName = typeof fn?.name === 'string' && fn.name.length > 0
+            const hasId = (tc as any)?.id != null && String((tc as any).id).length > 0
+            const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.length > 0
+            return hasName || hasId || hasArgs
+          })
+        : [],
+    [toolCalls]
+  )
+
   // Tool call header icon state handling
-  const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
+  const totalToolCalls = normalizedToolCalls.length
   const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
   const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
   const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
@@ -117,12 +133,14 @@ export function ConversationMessageContent({
     return null as any
   }, [displayContent])
 
+  // Collapsible should always start closed; users can expand manually
+
   // Natural language header with tense and inline code chips for tool names (no 'tool' word):
   // Ongoing: "<agent> is using `X`[, `Y`] [& some others...]"
   // Completed: "<agent> used `X`[, `Y`] [& some others...]"
   const toolCallHeaderLabel = useMemo(() => {
-    if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null
-    const names = toolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
+    if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return null
+    const names = normalizedToolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
     const unique = Array.from(new Set(names))
     const agent = agentName || 'Assistant'
 
@@ -158,7 +176,7 @@ export function ConversationMessageContent({
         {agent} {verb} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
       </>
     )
-  }, [toolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
+  }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
 
   const handleCopyContent = async () => {
     try {
@@ -299,7 +317,7 @@ export function ConversationMessageContent({
       )}
 
       {/* Tool calls and results rendering for assistant messages */}
-      {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
+      {Array.isArray(normalizedToolCalls) && normalizedToolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="my-2.5">
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
@@ -310,11 +328,11 @@ export function ConversationMessageContent({
               ) : (
                 <Wrench className="w-3 h-3" />
               )}
-              {toolCallHeaderLabel ?? `Tool Calls (${toolCalls.length})`}
+              {toolCallHeaderLabel ?? `Tool Calls (${normalizedToolCalls.length})`}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-1.5">
-                {toolCalls.map((tc, idx) => {
+                {normalizedToolCalls.map((tc, idx) => {
                   const rawArgs = (tc as any)?.function?.arguments ?? ''
                   let prettyArgs = ''
                   try {

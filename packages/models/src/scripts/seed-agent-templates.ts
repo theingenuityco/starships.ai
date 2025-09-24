@@ -3,7 +3,7 @@
  * Creates default agent templates that can be used across starships
  */
 
-import { getConnection } from '@/helpers/database';
+import { createConnection, type Neo4jConfig } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
 import { ALL_AGENT_TEMPLATES } from '@/seeders/agents';
@@ -16,8 +16,20 @@ export async function seedAgentTemplates(): Promise<void> {
   try {
     logger.info('Starting agent template seeding...');
 
-    // Get the existing connection that was initialized by the server
-    const connection = getConnection();
+    // Create database connection - require environment variables
+    if (!process.env.NEO4J_URI || !process.env.NEO4J_USERNAME || !process.env.NEO4J_PASSWORD) {
+      throw new Error('Missing required environment variables: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD');
+    }
+    
+    const config: Neo4jConfig = {
+      uri: process.env.NEO4J_URI,
+      username: process.env.NEO4J_USERNAME,
+      password: process.env.NEO4J_PASSWORD,
+      database: process.env.NEO4J_DATABASE
+    };
+    
+    const connection = createConnection(config);
+    await connection.connect();
 
     // Create the agent template repository
     const templateRepo = new AgentTemplateRepository(connection);
@@ -84,6 +96,11 @@ export async function seedAgentTemplates(): Promise<void> {
     }
 
     logger.info(`✅ Agent template seeding completed: ${addedCount} new, ${existingCount} existing, ${errorCount} errors`);
+    
+    // Close connection when running as script
+    if (require.main === module) {
+      await connection.disconnect();
+    }
   } catch (error) {
     logger.error(`Failed to seed agent templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
     if (error instanceof Error) {
@@ -97,6 +114,9 @@ export async function seedAgentTemplates(): Promise<void> {
 
 // Allow running as standalone script
 if (require.main === module) {
+  // Load environment variables
+  require('dotenv').config({ path: require('path').resolve(__dirname, '../../../../.env') });
+  
   seedAgentTemplates()
     .then(() => {
       console.log('✅ Agent template seeding completed successfully');

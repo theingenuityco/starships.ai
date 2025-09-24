@@ -3,7 +3,7 @@
  * Creates default tool templates available for agents and marketplace
  */
 
-import { getConnection } from '@/helpers/database';
+import { createConnection, type Neo4jConfig } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
 import { generateSlug } from '@/helpers/slugUtils';
@@ -18,8 +18,20 @@ export async function seedToolTemplates(): Promise<void> {
   try {
     logger.info('Starting tool template seeding...');
 
-    // Ensure DB connection exists
-    const connection = getConnection();
+    // Create database connection - require environment variables
+    if (!process.env.NEO4J_URI || !process.env.NEO4J_USERNAME || !process.env.NEO4J_PASSWORD) {
+      throw new Error('Missing required environment variables: NEO4J_URI, NEO4J_USERNAME, NEO4J_PASSWORD');
+    }
+    
+    const config: Neo4jConfig = {
+      uri: process.env.NEO4J_URI,
+      username: process.env.NEO4J_USERNAME,
+      password: process.env.NEO4J_PASSWORD,
+      database: process.env.NEO4J_DATABASE
+    };
+    
+    const connection = createConnection(config);
+    await connection.connect();
 
     // Create repository
     const toolTemplateRepo = new ToolTemplateRepository(connection);
@@ -75,6 +87,11 @@ export async function seedToolTemplates(): Promise<void> {
     }
 
     logger.info(`✅ Tool template seeding completed: ${addedCount} new, ${updatedCount} updated, ${errorCount} errors`);
+    
+    // Close connection when running as script
+    if (require.main === module) {
+      await connection.disconnect();
+    }
   } catch (error) {
     logger.error(`Failed to seed tool templates: ${error instanceof Error ? error.message : 'Unknown error'}`);
     if (error instanceof Error) {
@@ -88,6 +105,9 @@ export async function seedToolTemplates(): Promise<void> {
 
 // Allow running as standalone script
 if (require.main === module) {
+  // Load environment variables
+  require('dotenv').config({ path: require('path').resolve(__dirname, '../../../../.env') });
+  
   seedToolTemplates()
     .then(() => {
       console.log('✅ Tool template seeding completed successfully');

@@ -393,9 +393,12 @@ export class ConversationService {
 
               for (const rawTc of toolCallsDelta as any[]) {
                 const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
-                while (acc.length <= idx) {
-                  acc.push({ id: undefined, type: 'function', function: { name: undefined, arguments: '' } });
+
+                // Ensure slot only for the referenced index; do not pre-fill earlier indices
+                if (!acc[idx]) {
+                  acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
                 }
+
                 const target = acc[idx];
                 if (rawTc?.id) target.id = rawTc.id;
                 if (rawTc?.function?.name) target.function.name = rawTc.function.name;
@@ -406,15 +409,17 @@ export class ConversationService {
 
               this.streamingToolCalls.set(conversationId, acc);
 
-              // Use replace operation to set/update the tool_calls field
-              const toolCallsValue = acc.map((tc) => ({
-                id: tc.id,
-                type: 'function',
-                function: {
-                  name: tc.function?.name || '',
-                  arguments: tc.function?.arguments || '',
-                },
-              }));
+              // Only broadcast valid tool calls (those with a non-empty function name)
+              const toolCallsValue = acc
+                .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
+                .map((tc) => ({
+                  id: tc.id,
+                  type: 'function',
+                  function: {
+                    name: tc.function.name,
+                    arguments: tc.function?.arguments || '',
+                  },
+                }));
 
               const toolCallsOperation: Operation = {
                 op: 'replace',
@@ -439,26 +444,30 @@ export class ConversationService {
         }
 
         const finalContent = this.streamingContent.get(conversationId) || '';
+        const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
+        const validToolCalls = finalToolCallsAcc.filter(
+          (tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0
+        );
 
         // Build finalization task: ensure final patches and persistence complete in order.
         try {
           // Content was already incrementally streamed to /messages/-1/content during chunks
 
-          // Persist and patch id/updatedAt while placeholder is still active
-          if (finalContent && finalContent.trim().length > 0) {
+          // Persist and patch id/updatedAt while placeholder is still active.
+          // Persist if we have content OR at least one valid tool_call (tool-only responses).
+          if ((finalContent && finalContent.trim().length > 0) || validToolCalls.length > 0) {
             try {
-              const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
               const assistantMessage = await this.messageService.createMessage({
                 conversationId,
                 role: 'assistant',
                 content: finalContent,
                 messageType: 'agent_response',
-                ...(finalToolCallsAcc.length > 0 && {
-                  tool_calls: finalToolCallsAcc.map((tc) => ({
+                ...(validToolCalls.length > 0 && {
+                  tool_calls: validToolCalls.map((tc) => ({
                     id: tc.id,
                     type: 'function',
                     function: {
-                      name: tc.function?.name || '',
+                      name: tc.function.name,
                       arguments: tc.function?.arguments || '',
                     },
                   })),
@@ -478,16 +487,18 @@ export class ConversationService {
               });
 
               // Finalize message content with one replace of the full text (clients will stop using chunks)
-              await this.streamingService.broadcastDelta(conversationId, {
-                op: 'replace',
-                path: '/messages/-1/content',
-                value: finalContent,
-              });
+              if (finalContent && finalContent.trim().length > 0) {
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/content',
+                  value: finalContent,
+                });
+              }
             } catch (persistError) {
               console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
             }
           } else {
-            console.log('[STREAMING] Skipping persistence - empty content');
+            console.log('[STREAMING] Skipping persistence - empty content and no valid tool_calls');
           }
 
           // Defer streaming=false and chunks removal to workflow_completed to avoid premature client close

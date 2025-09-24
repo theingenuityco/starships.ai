@@ -9,7 +9,7 @@ import { Transformers } from '@/helpers/serializer';
 import type { MessageModel, MessageType } from '@starships/protocol';
 import type { LlmToolCall } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsEnum, IsISO8601, IsString, Length, validate, ValidationError, IsOptional } from 'class-validator';
+import { IsEnum, IsISO8601, IsString, Length, validate, ValidationError, IsOptional, ValidateIf } from 'class-validator';
 
 export class MessageEntity implements MessageModel {
   @Expose()
@@ -33,7 +33,8 @@ export class MessageEntity implements MessageModel {
 
   @Expose()
   @IsString()
-  @Length(1, 50000) // Reasonable content length limit
+  @ValidateIf((o) => !(o.role === 'assistant' && Array.isArray(o.tool_calls) && o.tool_calls.length > 0))
+  @Length(1, 50000) // Reasonable content length limit; allow empty when assistant has tool_calls
   content!: string;
 
   // Message classification

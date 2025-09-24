@@ -267,6 +267,15 @@ export class LLM extends BaseNode<LlmParams> {
   ): LLMResponse {
     const choices = streamChoices.length > 0 ? streamChoices : [{ content: '', finishReason: 'stop' }];
 
+    // Narrow tool_calls entries to those with a non-empty function name (guards against placeholder chunks)
+    type ToolCallCandidate = { id?: string; function?: { name?: unknown; arguments?: unknown } };
+    type ValidToolCall = { id?: string; function: { name: string; arguments?: string } };
+    const isValidToolCall = (tc: unknown): tc is ValidToolCall => {
+      if (!tc || typeof tc !== 'object') return false;
+      const cand = tc as ToolCallCandidate;
+      return typeof cand.function?.name === 'string' && cand.function.name.length > 0;
+    };
+
     return {
       id: metadata.id,
       object: metadata.object,
@@ -277,13 +286,13 @@ export class LLM extends BaseNode<LlmParams> {
         message: {
           role: 'assistant' as LLMMessageRole,
           content: choice.content,
-          ...(choice.tool_calls && choice.tool_calls.length > 0
+          ...(choice.tool_calls && choice.tool_calls.some(isValidToolCall)
             ? {
-                tool_calls: choice.tool_calls.map((tc, i) => ({
+                tool_calls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => ({
                   id: tc.id || `call_${index}_${i}`,
                   type: 'function',
                   function: {
-                    name: tc.function.name || '',
+                    name: tc.function.name, // guaranteed string by isValidToolCall
                     arguments: tc.function.arguments || '',
                   },
                 })),

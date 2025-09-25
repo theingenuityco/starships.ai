@@ -273,16 +273,16 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   }
   let closed = false
 
-  // Track post-complete trailing patches and then end the stream to allow subsequent turns
+  // Controller to explicitly close SSE on completion or aborts
+  const localController = new AbortController()
+
+  // Track post-complete lifecycle; immediately terminate stream to allow next turn
   let seenComplete = false
-  let postCompleteTimer: any = null
   const schedulePostCompleteEnd = () => {
+    end()
     try {
-      if (postCompleteTimer) clearTimeout(postCompleteTimer as any)
+      localController.abort()
     } catch {}
-    postCompleteTimer = setTimeout(() => {
-      end()
-    }, 400)
   }
 
   type Resolver = (value: IteratorResult<StreamedChunk>) => void
@@ -302,9 +302,6 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   const end = () => {
     if (closed) return
     closed = true
-    try {
-      if (postCompleteTimer) clearTimeout(postCompleteTimer as any)
-    } catch {}
     while (resolvers.length > 0) {
       const resolve = resolvers.shift()!
       resolve({ value: undefined as any, done: true })
@@ -312,11 +309,17 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
   }
 
   if (signal) {
-    // Ensure aborts (e.g., refetch, unmount) close the iterable and connection
-    if (signal.aborted) {
+    // Ensure aborts (e.g., refetch, unmount) close both the iterable and the SSE connection
+    const abortBoth = () => {
       end()
+      try {
+        localController.abort()
+      } catch {}
+    }
+    if (signal.aborted) {
+      abortBoth()
     } else {
-      signal.addEventListener('abort', () => end(), { once: true })
+      signal.addEventListener('abort', abortBoth, { once: true })
     }
   }
 
@@ -325,7 +328,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
     method: 'GET',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     openWhenHidden: true,
-    signal,
+    signal: localController.signal,
     async onopen(response) {
       if (!response.ok) {
         push({ type: 'error', error: { status: response.status, statusText: response.statusText } })

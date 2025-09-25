@@ -188,11 +188,10 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     return lastId
   }, [displayMessages])
 
-  // Determine if assistant has started responding for the latest user turn.
-  // Hide the GAP loader as soon as we see either:
-  //  - an assistant shell appended AFTER the latest user message, or
-  //  - any assistant progress (chunks/reasoning/tool_calls/content) after that user.
-  const hasAssistantProgress = useMemo(() => {
+  // Determine if any assistant textual progress has occurred after the latest user turn.
+  // Progress means: content tokens (chunks), reasoning tokens (reasoningChunks), final reasoning, or finalized content text.
+  // Tool calls alone do NOT count as progress.
+  const hasAssistantTextProgressAfterUser = useMemo(() => {
     // Find most recent user message index
     let lastUserIdx = -1
     for (let i = displayMessages.length - 1; i >= 0; i--) {
@@ -202,7 +201,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
         break
       }
     }
-    // Scan messages after the last user
+    // Scan messages after the last user for any assistant textual progress
     for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
       const m: any = displayMessages[i]
       if (m?.role !== 'assistant') continue
@@ -210,14 +209,66 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
       const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
       const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
-      // IMPORTANT: Do NOT treat assistant shell or tool_calls-only as progress; keep the GAP loader
-      // visible until LLM text/reasoning begins.
       if (hasChunks || hasRChunks || hasReasoning || hasContent) {
         return true
       }
     }
     return false
   }, [displayMessages])
+
+  // When tools are executed mid-turn, show the GAP loader again until LLM resumes streaming text/reasoning.
+  // We detect a "gap" if we see a tool_result after the last user message, but no assistant chunks/reasoning chunks
+  // have arrived AFTER that tool_result.
+  const awaitingResumeAfterTools = useMemo(() => {
+    // Find most recent user message index
+    let lastUserIdx = -1
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      const mm: any = displayMessages[i]
+      if (mm?.role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+
+    // Most recent tool result timestamp after the user
+    let lastToolTs = -1
+    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
+      const m: any = displayMessages[i]
+      // Standalone tool_result messages
+      if (m?.messageType === 'tool_result') {
+        const t = Date.parse(String(m?.createdAt || m?.updatedAt || ''))
+        if (!Number.isNaN(t)) lastToolTs = Math.max(lastToolTs, t)
+      }
+      // Grouped tool results attached to assistant messages
+      if (m?.role === 'assistant' && Array.isArray(m?.toolResults) && m.toolResults.length > 0) {
+        for (const tr of m.toolResults as any[]) {
+          const t = Date.parse(String(tr?.createdAt || tr?.updatedAt || ''))
+          if (!Number.isNaN(t)) lastToolTs = Math.max(lastToolTs, t)
+        }
+      }
+    }
+    if (lastToolTs < 0) return false
+
+    // Most recent assistant token (content/reasoning) timestamp after the user
+    let lastAssistantChunkTs = -1
+    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
+      const m: any = displayMessages[i]
+      if (m?.role !== 'assistant') continue
+      const lastC = Array.isArray(m?.chunks) && m.chunks.length > 0 ? Number(m.chunks[m.chunks.length - 1]?.timestamp) : -1
+      const lastR = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0 ? Number(m.reasoningChunks[m.reasoningChunks.length - 1]?.timestamp) : -1
+      lastAssistantChunkTs = Math.max(lastAssistantChunkTs, lastC, lastR)
+    }
+
+    // Gap exists if no assistant tokens have arrived AFTER the last tool result
+    return lastAssistantChunkTs < 0 || lastAssistantChunkTs <= lastToolTs
+  }, [displayMessages])
+
+  // Final GAP loader decision: show if we're responding AND either:
+  //  - no assistant text progress yet after the user (first response is pending), or
+  //  - we are waiting for the assistant to resume after tool results.
+  const shouldShowGapLoader = useMemo(() => {
+    return isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
+  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {
@@ -270,16 +321,17 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     lastMessageCountRef.current = displayMessages.length
   }, [displayMessages.length])
 
-  // Ensure the GAP loader (store-driven) is visible by auto-scrolling when responding turns on but no assistant progress yet
+  // Ensure the GAP loader remains visible by auto-scrolling when we are waiting for assistant text
+  // either initially or while waiting after tool results.
   useEffect(() => {
     if (!scrollContainerRef.current) return
-    if (isResponding && !hasAssistantProgress) {
+    if (shouldShowGapLoader) {
       requestAnimationFrame(() => {
         const container = scrollContainerRef.current!
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
       })
     }
-  }, [isResponding, hasAssistantProgress])
+  }, [shouldShowGapLoader])
 
   if (!conversationId) {
     return <EmptyState />
@@ -308,8 +360,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
           {renderMessages.map(message => (
             <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} />
           ))}
-          {/* Gap loader: show between user send and the first real assistant progress (store-driven, no local state) */}
-          {isResponding && !hasAssistantProgress && (
+          {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
+          {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">

@@ -483,7 +483,7 @@ export class Engine {
 
     // Find matching edge
     let targetEdge;
-    if (edgeCondition) {
+    if (edgeCondition !== undefined) {
       targetEdge = outgoingEdges.find(
         (edge) =>
           edge.condition === edgeCondition ||
@@ -492,12 +492,21 @@ export class Engine {
       );
     }
 
-    // Fallback to default edge
+    // Improved fallback:
+    // - Prefer explicit 'false' edge when no match
+    // - Then prefer an unconditional edge (no condition)
+    // - Otherwise, stop (return null) rather than selecting an arbitrary first edge
     if (!targetEdge) {
-      targetEdge = outgoingEdges.find((edge) => !edge.condition) || outgoingEdges[0];
+      const falseEdge = outgoingEdges.find((edge) => edge.condition === 'false');
+      const defaultEdge = outgoingEdges.find((edge) => !edge.condition);
+      targetEdge = falseEdge ?? defaultEdge ?? undefined;
     }
 
-    return targetEdge ? blueprint.nodes.find((node) => node.ref === targetEdge.to) || null : null;
+    if (!targetEdge) {
+      return null;
+    }
+
+    return blueprint.nodes.find((node) => node.ref === targetEdge.to) || null;
   }
 
   // Extract final output from End node (if its handler produced a result)

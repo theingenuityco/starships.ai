@@ -26,6 +26,8 @@ interface StreamChoice {
     function: {
       name?: string;
       arguments?: string;
+      // Accumulated parse (best-effort) of arguments into JSON, when possible
+      arguments_json?: unknown;
     };
   }[];
 }
@@ -335,17 +337,78 @@ export class LLM extends BaseNode<LlmParams> {
             if (t.function?.name) target.function.name = t.function.name;
             if (t.function?.arguments) {
               target.function.arguments = (target.function.arguments || '') + t.function.arguments;
+
+              // Attempt to parse accumulated arguments into JSON (best-effort)
+              try {
+                const obj = (() => {
+                  const raw = target.function.arguments;
+                  if (typeof raw !== 'string') return undefined;
+                  let s = raw.replace(/\r/g, '').trim();
+
+                  // Try up to 2 unwrapping passes for quoted JSON strings
+                  for (let i = 0; i < 2; i++) {
+                    const first = s[0];
+                    const last = s[s.length - 1];
+                    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+                      s = s.slice(1, -1);
+                    }
+                    try {
+                      return JSON.parse(s);
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                  try {
+                    return JSON.parse(s);
+                  } catch {
+                    return undefined;
+                  }
+                })();
+                if (obj && typeof obj === 'object') {
+                  target.function.arguments_json = obj as unknown;
+                }
+              } catch {
+                // ignore parse attempt failures during streaming
+              }
             }
           }
         } else if (hasMessageToolCalls) {
-          type NormalizedToolCall = { id?: string; function: { name?: string; arguments: string } };
-          const normalized: NormalizedToolCall[] = messageToolCalls.map((tc) => ({
-            id: tc.id,
-            function: {
-              name: typeof tc.function?.name === 'string' ? tc.function.name : undefined,
-              arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : '',
-            },
-          }));
+          type NormalizedToolCall = { id?: string; function: { name?: string; arguments: string; arguments_json?: unknown } };
+          const normalized: NormalizedToolCall[] = messageToolCalls.map((tc) => {
+            const args = typeof tc.function?.arguments === 'string' ? tc.function.arguments : '';
+            let parsed: unknown;
+            if (typeof args === 'string' && args.length > 0) {
+              let s = args.replace(/\r/g, '').trim();
+              for (let i = 0; i < 2; i++) {
+                const first = s[0],
+                  last = s[s.length - 1];
+                if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+                  s = s.slice(1, -1);
+                }
+                try {
+                  parsed = JSON.parse(s);
+                  break;
+                } catch {
+                  /* ignore */
+                }
+              }
+              if (!parsed) {
+                try {
+                  parsed = JSON.parse(s);
+                } catch {
+                  /* ignore */
+                }
+              }
+            }
+            return {
+              id: tc.id,
+              function: {
+                name: typeof tc.function?.name === 'string' ? tc.function.name : undefined,
+                arguments: args,
+                ...(parsed && typeof parsed === 'object' ? { arguments_json: parsed } : {}),
+              },
+            };
+          });
           const valid = normalized.filter(
             (tc): tc is { id?: string; function: { name: string; arguments: string } } =>
               typeof tc.function.name === 'string' && tc.function.name.length > 0
@@ -447,7 +510,7 @@ export class LLM extends BaseNode<LlmParams> {
 
     // Narrow tool_calls entries to those with a non-empty function name (guards against placeholder chunks)
     type ToolCallCandidate = { id?: string; function?: { name?: unknown; arguments?: unknown } };
-    type ValidToolCall = { id?: string; function: { name: string; arguments?: string } };
+    type ValidToolCall = { id?: string; function: { name: string; arguments?: string; arguments_json?: unknown } };
     const isValidToolCall = (tc: unknown): tc is ValidToolCall => {
       if (!tc || typeof tc !== 'object') return false;
       const cand = tc as ToolCallCandidate;
@@ -473,6 +536,7 @@ export class LLM extends BaseNode<LlmParams> {
                   function: {
                     name: tc.function.name, // guaranteed string by isValidToolCall
                     arguments: tc.function.arguments || '',
+                    ...(tc.function.arguments_json !== undefined ? { arguments_json: tc.function.arguments_json } : {}),
                   },
                 })),
               }

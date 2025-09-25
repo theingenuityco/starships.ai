@@ -8,6 +8,8 @@ export type LLMMessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export interface LlmFunctionCall {
   name: string;
   arguments: string;
+  // Optional pre-parsed JSON form of the arguments when available
+  arguments_json?: unknown;
 }
 
 export interface LlmToolCall {

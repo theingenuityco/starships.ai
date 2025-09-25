@@ -143,15 +143,71 @@ export class Tool extends BaseNode<ToolParams> {
   }
 
   /**
-   * Extract tool arguments from input data
-   * Only accept plain object as arguments; do not parse JSON strings here.
-   * Parsing (e.g. LLM tool_calls.function.arguments) must be done upstream.
+   * Extract tool arguments from upstream input
+   * Accepted inputs:
+   * - Plain object (already parsed args) -> passthrough
+   * - LLMResponse shape (choices[0].message.tool_calls[0]) -> use function.arguments_json only
+   * If input is not an object or LLMResponse, we locate the latest LLM response in the current
+   * execution context and read function.arguments_json. If not found, we fail fast.
+   * Note: Tools do not parse arguments strings; the LLM is responsible for emitting arguments_json.
    */
   private extractToolArguments(inputData: unknown): Record<string, unknown> {
-    if (inputData && typeof inputData === 'object') {
-      return inputData as Record<string, unknown>;
+    // Helpers
+    const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+    const getFirstChoice = (resp: unknown): unknown => {
+      if (!isRecord(resp)) return undefined;
+      const choices = resp['choices'];
+      return Array.isArray(choices) && choices.length > 0 ? choices[0] : undefined;
+    };
+
+    const getToolCall0FromChoice = (choice: unknown): unknown => {
+      if (!isRecord(choice)) return undefined;
+      const message = choice['message'];
+      if (!isRecord(message)) return undefined;
+      const tcs = message['tool_calls'];
+      return Array.isArray(tcs) && tcs.length > 0 && isRecord(tcs[0]) ? (tcs[0] as Record<string, unknown>) : undefined;
+    };
+
+    const getFunctionNode = (tc: unknown): Record<string, unknown> | undefined => {
+      if (!isRecord(tc)) return undefined;
+      const fn = tc['function'];
+      return isRecord(fn) ? fn : undefined;
+    };
+
+    const getArgsFromLlmResponse = (resp: unknown): Record<string, unknown> | undefined => {
+      const choice = getFirstChoice(resp);
+      const tc0 = getToolCall0FromChoice(choice);
+      const fn = getFunctionNode(tc0);
+      if (!fn) return undefined;
+      const pre = (fn as Record<string, unknown>)['arguments_json'];
+      return isRecord(pre) ? pre : undefined;
+    };
+
+    // 1) If upstream already passed a plain object, use it as-is (not an LLM response)
+    if (isRecord(inputData)) {
+      const fromResp = getArgsFromLlmResponse(inputData);
+      return fromResp ?? inputData;
     }
-    return {};
+
+    // 2) Locate pre-parsed arguments_json from the latest LLM response in execution results
+    try {
+      const exec = this.getOptions()?.execution;
+      const results = exec?.results || [];
+      for (let i = results.length - 1; i >= 0; i--) {
+        const items = results[i]?.items || [];
+        for (let j = items.length - 1; j >= 0; j--) {
+          const json = items[j]?.json;
+          const extracted = getArgsFromLlmResponse(json);
+          if (extracted) return extracted;
+        }
+      }
+    } catch {
+      // ignore lookup failures
+    }
+
+    // 3) No pre-parsed args found -> explicit failure (tools do not parse arguments themselves)
+    throw new Error('Tool arguments missing. LLM must provide pre-parsed tool_calls[].function.arguments_json or pass an object as input.');
   }
 
   /**

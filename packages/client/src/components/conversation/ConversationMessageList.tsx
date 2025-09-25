@@ -22,7 +22,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
-  const { messages, isStreaming } = useConversationStreamed(conversationId)
+  const { messages, isResponding: isRespondingHook } = useConversationStreamed(conversationId)
 
   // Use stable selectors to avoid returning new objects each render
   // messages are sourced from useConversationStreamed(conversationId)
@@ -30,7 +30,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     if (!conversationId) return undefined
     return state.conversations[conversationId]?.agentName
   })
-  const isResponding = isStreaming
+  const isResponding = isRespondingHook
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -87,15 +87,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
         const hasChunks = Array.isArray(cur?.chunks) && cur.chunks.length > 0
         const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
         const hasReasoning = typeof cur?.reasoning === 'string' && cur.reasoning.trim().length > 0
-        const hasToolCalls =
-          Array.isArray(cur?.tool_calls) &&
-          cur.tool_calls.some((tc: any) => {
-            const fn = tc?.function
-            const hasName = typeof fn?.name === 'string' && fn.name.trim().length > 0
-            const hasId = tc?.id != null && String(tc.id).trim().length > 0
-            const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.trim().length > 0
-            return hasName || hasId || hasArgs
-          })
+        const hasToolCalls = Array.isArray(cur?.tool_calls) && cur.tool_calls.length > 0
 
         if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls)) {
           // Keep actively streaming assistant shells visible
@@ -178,15 +170,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       const hasChunks = Array.isArray(a?.chunks) && a.chunks.length > 0
       const hasRChunks = Array.isArray(a?.reasoningChunks) && a.reasoningChunks.length > 0
       const hasReasoning = typeof a?.reasoning === 'string' && a.reasoning.trim().length > 0
-      const hasToolCalls =
-        Array.isArray(a?.tool_calls) &&
-        a.tool_calls.some((tc: any) => {
-          const fn = tc?.function
-          const hasName = typeof fn?.name === 'string' && fn.name.trim().length > 0
-          const hasId = tc?.id != null && String(tc.id).trim().length > 0
-          const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.trim().length > 0
-          return hasName || hasId || hasArgs
-        })
+      const hasToolCalls = Array.isArray(a?.tool_calls) && a.tool_calls.length > 0
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls
     })
 

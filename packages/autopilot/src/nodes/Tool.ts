@@ -54,7 +54,7 @@ export class Tool extends BaseNode<ToolParams> {
       // Execute the tool's blueprint using depth-aware Runner selection
       // IMPORTANT: propagate parent execution to set correct execution.depth (nested = depth>0)
       const parentExecution = this.getOptions()?.execution;
-      console.log(`[TOOL NODE ${params.name}] Creating execution with toolArgs:`, JSON.stringify(toolArgs));
+      // console.log(`[TOOL NODE ${params.name}] Creating execution with toolArgs:`, JSON.stringify(toolArgs));
       const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
       const engineConfig: EngineConfig = {

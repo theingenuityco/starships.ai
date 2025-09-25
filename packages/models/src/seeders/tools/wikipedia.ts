@@ -51,13 +51,13 @@ export const wikipediaTool: ToolParams = {
         parameters: {
           code: `
             // Debug logging to understand input structure
-            console.log('[WIKIPEDIA TOOL] Raw input:', JSON.stringify(input, null, 2));
-            console.log('[WIKIPEDIA TOOL] Input type:', typeof input);
-            console.log('[WIKIPEDIA TOOL] Input keys:', input ? Object.keys(input) : 'null/undefined');
-            console.log('[WIKIPEDIA TOOL] Check if input.json exists:', input && input.json ? 'YES' : 'NO');
-            if (input && input.json) {
-              console.log('[WIKIPEDIA TOOL] input.json content:', JSON.stringify(input.json));
-            }
+            // console.log('[WIKIPEDIA TOOL] Raw input:', JSON.stringify(input, null, 2));
+            // console.log('[WIKIPEDIA TOOL] Input type:', typeof input);
+            // console.log('[WIKIPEDIA TOOL] Input keys:', input ? Object.keys(input) : 'null/undefined');
+            // console.log('[WIKIPEDIA TOOL] Check if input.json exists:', input && input.json ? 'YES' : 'NO');
+            // if (input && input.json) {
+            //   console.log('[WIKIPEDIA TOOL] input.json content:', JSON.stringify(input.json));
+            // }
             
             // Extract and validate input parameters
             // The input comes as a single object with all parameters
@@ -69,11 +69,11 @@ export const wikipediaTool: ToolParams = {
               language = 'en' 
             } = params || {};
             
-            console.log('[WIKIPEDIA TOOL] Extracted params:', { query, action, limit, language });
+            // console.log('[WIKIPEDIA TOOL] Extracted params:', { query, action, limit, language });
             
             // Input validation
             if (!query || typeof query !== 'string') {
-              console.error('[WIKIPEDIA TOOL] Validation failed - query:', query, 'type:', typeof query);
+              // console.error('[WIKIPEDIA TOOL] Validation failed - query:', query, 'type:', typeof query);
               throw new Error('Query is required and must be a string. Received input: ' + JSON.stringify(input) + ', params: ' + JSON.stringify(params));
             }
             
@@ -168,10 +168,10 @@ export const wikipediaTool: ToolParams = {
             // Get metadata from state (stored by prepare_request)
             const metadata = state.wikipedia_metadata || {};
             
-            console.log('[COMBINE DATA] Metadata from state:', metadata);
-            console.log('[COMBINE DATA] HTTP Response type:', typeof httpResponse);
-            console.log('[COMBINE DATA] HTTP Response keys:', Object.keys(httpResponse));
-            console.log('[COMBINE DATA] HTTP Response sample:', JSON.stringify(httpResponse).substring(0, 200));
+            // console.log('[COMBINE DATA] Metadata from state:', metadata);
+            // console.log('[COMBINE DATA] HTTP Response type:', typeof httpResponse);
+            // console.log('[COMBINE DATA] HTTP Response keys:', Object.keys(httpResponse));
+            // console.log('[COMBINE DATA] HTTP Response sample:', JSON.stringify(httpResponse).substring(0, 200));
             
             // Pass both response and metadata to next node
             return {
@@ -199,14 +199,14 @@ export const wikipediaTool: ToolParams = {
             const { action, query, language } = metadata || {};
             const timestamp = new Date().toISOString();
             
-            console.log('[PROCESS RESPONSE] Action:', action);
-            console.log('[PROCESS RESPONSE] Response type:', typeof response);
-            console.log('[PROCESS RESPONSE] Response is array?', Array.isArray(response));
-            if (Array.isArray(response)) {
-              console.log('[PROCESS RESPONSE] Array length:', response.length);
-              console.log('[PROCESS RESPONSE] First element:', response[0]);
-            }
-            console.log('[PROCESS RESPONSE] Response sample:', JSON.stringify(response).substring(0, 300));
+            // console.log('[PROCESS RESPONSE] Action:', action);
+            // console.log('[PROCESS RESPONSE] Response type:', typeof response);
+            // console.log('[PROCESS RESPONSE] Response is array?', Array.isArray(response));
+            // if (Array.isArray(response)) {
+            //   console.log('[PROCESS RESPONSE] Array length:', response.length);
+            //   console.log('[PROCESS RESPONSE] First element:', response[0]);
+            // }
+            // console.log('[PROCESS RESPONSE] Response sample:', JSON.stringify(response).substring(0, 300));
             
             try {
               let result;

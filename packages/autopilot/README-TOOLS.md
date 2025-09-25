@@ -64,7 +64,7 @@ const result = await agent.execute('What is 25 * 4 + 17?');
 - Pass any runtime configuration as regular tool arguments; they will be available as initial input (`$json`) to the tool blueprint.
 
 - The Tool node is a lightweight wrapper and is intentionally stateless. It does not parse tool arguments.
-- The Tool node consumes pre-parsed `arguments_json` produced by the LLM. In the built-in Agent loop, it reads `arguments_json` from the latest LLM response in the current execution context. External orchestrators may also pass a plain object as the Tool node's input to make it available as the initial `$json` for the tool blueprint.
+- The Tool node consumes pre-parsed `arguments_json` produced by the LLM. In the built-in Agent loop, a small Code node materializes `arguments_json` into a plain object and passes it as the Tool input. External orchestrators may also pass a plain object directly as the Tool node's input to make it available as the initial `$json` for the tool blueprint.
 
 ## Architecture Details
 

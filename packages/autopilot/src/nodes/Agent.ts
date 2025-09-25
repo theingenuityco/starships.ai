@@ -50,6 +50,7 @@ export class Agent implements NodeHandler {
     const endRef = `end_${this.nodeCounter++}`;
     const llmNodeRef = `llm_${this.nodeCounter++}`;
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
+    const argsNodeRef = `args_${this.nodeCounter++}`;
     const toolNodeRef = `tool_${this.nodeCounter++}`;
 
     // Create complete blueprint with all nodes
@@ -119,6 +120,22 @@ export class Agent implements NodeHandler {
             })() }}`,
           },
         },
+        // Prepare arguments for Tool (materialize arguments_json as plain object)
+        {
+          ref: argsNodeRef,
+          type: 'code' as const,
+          name: 'Prepare Tool Args',
+          description: 'Materialize arguments_json into a plain object for Tool input',
+          parameters: {
+            code: `
+              const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
+              const args = last?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments_json;
+              if (args && typeof args === 'object') { return args; }
+              throw new Error('Missing tool_call function.arguments_json');
+            `,
+            timeout: 3000,
+          },
+        },
         // Tool execution node - receives the complete tool definition via template resolution
         {
           ref: toolNodeRef,
@@ -166,8 +183,10 @@ export class Agent implements NodeHandler {
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
         // Conditional -> LLM (if finish_reason === "length")
         { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'length' },
-        // Conditional -> Tool (if tool_calls exist)
-        { ref: 'edge_conditional_tool', from: conditionalNodeRef, to: toolNodeRef, condition: 'true' },
+        // Conditional -> Prepare Args (if tool_calls exist)
+        { ref: 'edge_conditional_args', from: conditionalNodeRef, to: argsNodeRef, condition: 'true' },
+        // Prepare Args -> Tool
+        { ref: 'edge_args_tool', from: argsNodeRef, to: toolNodeRef },
         // Tool -> LLM (loop back)
         { ref: 'edge_tool_llm', from: toolNodeRef, to: llmNodeRef },
         // Conditional -> End (if no tool_calls)

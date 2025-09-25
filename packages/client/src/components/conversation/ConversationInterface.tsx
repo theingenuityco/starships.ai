@@ -5,7 +5,7 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
@@ -30,7 +30,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
 
   // Track streaming state for current conversation to focus input on completion
-  const uiStreaming = useStarshipUIStore(s => (currentConversationId ? s.conversationsStreaming[currentConversationId]?.isStreaming === true : false))
+  const { isStreaming: uiStreaming, messages: liveMessages = [] } = useConversationStreamed(currentConversationId)
   const prevStreamingRef = useRef(false)
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
@@ -42,10 +42,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const { data: conversationAgents = [] } = useConversationAgents(currentConversationId)
   const conversationData = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
 
-  // Derive message presence and UI gating from central store to avoid local state being blocked by streaming
-  const uiConvo = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
-  const hasMessages = !!uiConvo && (Array.isArray(uiConvo?.messages) ? uiConvo!.messages.length > 0 : false)
-  const showMessagesArea = Boolean(currentConversationId) && (hasMessages || uiConvo?.isResponding)
+  // Derive message presence and UI gating from streamed query (not store)
+  const hasMessages = Array.isArray(liveMessages) && liveMessages.length > 0
+  const showMessagesArea = Boolean(currentConversationId) && (hasMessages || uiStreaming)
 
   // Measure input container after showMessagesArea is known (prevents TS error and ensures correct layout)
   useEffect(() => {

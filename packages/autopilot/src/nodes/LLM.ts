@@ -120,7 +120,7 @@ export class LLM extends BaseNode<LlmParams> {
         (requestBody as { reasoning?: unknown }).reasoning = params.reasoning as unknown;
       }
 
-      // console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
+      console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -530,15 +530,49 @@ export class LLM extends BaseNode<LlmParams> {
           ...(choice.reasoning ? { reasoning: choice.reasoning } : {}),
           ...(choice.tool_calls && choice.tool_calls.some(isValidToolCall)
             ? {
-                tool_calls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => ({
-                  id: tc.id || `call_${index}_${i}`,
-                  type: 'function',
-                  function: {
-                    name: tc.function.name, // guaranteed string by isValidToolCall
-                    arguments: tc.function.arguments || '',
-                    ...(tc.function.arguments_json !== undefined ? { arguments_json: tc.function.arguments_json } : {}),
-                  },
-                })),
+                tool_calls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
+                  // Ensure arguments_json is present at finalization by parsing arguments when needed
+                  const argsStr = typeof tc.function.arguments === 'string' ? tc.function.arguments : '';
+                  let argsJson = tc.function.arguments_json;
+                  if (argsJson === undefined && argsStr) {
+                    try {
+                      let s = argsStr.replace(/\r/g, '').trim();
+                      for (let k = 0; k < 3; k++) {
+                        const first = s[0],
+                          last = s[s.length - 1];
+                        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+                          s = s.slice(1, -1);
+                        }
+                        try {
+                          const parsed = JSON.parse(s);
+                          if (parsed && typeof parsed === 'object') {
+                            argsJson = parsed as unknown;
+                            break;
+                          }
+                        } catch {
+                          /* ignore */
+                        }
+                      }
+                      if (argsJson === undefined) {
+                        const parsed = JSON.parse(s);
+                        if (parsed && typeof parsed === 'object') {
+                          argsJson = parsed as unknown;
+                        }
+                      }
+                    } catch {
+                      /* ignore */
+                    }
+                  }
+                  return {
+                    id: tc.id || `call_${index}_${i}`,
+                    type: 'function',
+                    function: {
+                      name: tc.function.name, // guaranteed string by isValidToolCall
+                      arguments: argsStr,
+                      ...(argsJson !== undefined ? { arguments_json: argsJson } : {}),
+                    },
+                  };
+                }),
               }
             : {}),
         },

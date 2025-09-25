@@ -337,39 +337,7 @@ export class LLM extends BaseNode<LlmParams> {
             if (t.function?.name) target.function.name = t.function.name;
             if (t.function?.arguments) {
               target.function.arguments = (target.function.arguments || '') + t.function.arguments;
-
-              // Attempt to parse accumulated arguments into JSON (best-effort)
-              try {
-                const obj = (() => {
-                  const raw = target.function.arguments;
-                  if (typeof raw !== 'string') return undefined;
-                  let s = raw.replace(/\r/g, '').trim();
-
-                  // Try up to 2 unwrapping passes for quoted JSON strings
-                  for (let i = 0; i < 2; i++) {
-                    const first = s[0];
-                    const last = s[s.length - 1];
-                    if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-                      s = s.slice(1, -1);
-                    }
-                    try {
-                      return JSON.parse(s);
-                    } catch {
-                      /* ignore */
-                    }
-                  }
-                  try {
-                    return JSON.parse(s);
-                  } catch {
-                    return undefined;
-                  }
-                })();
-                if (obj && typeof obj === 'object') {
-                  target.function.arguments_json = obj as unknown;
-                }
-              } catch {
-                // ignore parse attempt failures during streaming
-              }
+              // Note: JSON parsing is deferred to buildFinalResponse to avoid parsing incomplete JSON
             }
           }
         } else if (hasMessageToolCalls) {
@@ -531,10 +499,10 @@ export class LLM extends BaseNode<LlmParams> {
           ...(choice.tool_calls && choice.tool_calls.some(isValidToolCall)
             ? {
                 tool_calls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
-                  // Ensure arguments_json is present at finalization by parsing arguments when needed
+                  // Always parse arguments_json from the final accumulated arguments string
                   const argsStr = typeof tc.function.arguments === 'string' ? tc.function.arguments : '';
-                  let argsJson = tc.function.arguments_json;
-                  if (argsJson === undefined && argsStr) {
+                  let argsJson: unknown = undefined;
+                  if (argsStr) {
                     try {
                       let s = argsStr.replace(/\r/g, '').trim();
                       for (let k = 0; k < 3; k++) {

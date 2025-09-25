@@ -105,7 +105,7 @@ export class Agent implements NodeHandler {
           name: 'Check Tool Calls',
           description: 'Check if LLM made any tool calls',
           parameters: {
-            condition: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== undefined && $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls !== null }}`,
+            condition: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.length > 0 }}`,
           },
         },
         // Prepare tool input from LLM tool_calls arguments
@@ -135,10 +135,11 @@ export class Agent implements NodeHandler {
           description: 'Execute tool and add result to conversation',
           parameters: {
             // Resolve tool definition from state using the tool name from LLM response
-            name: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).name }}`,
-            description: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).description }}`,
-            parameters: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).parameters }}`,
-            blueprint: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name).blueprint }}`,
+            // Conditional ensures tool_calls exist before we reach here
+            name: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name)?.name }}`,
+            description: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name)?.description }}`,
+            parameters: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name)?.parameters }}`,
+            blueprint: `{{ state.tools.find(t => t.name === $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].function.name)?.blueprint }}`,
             toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls[0].id }}`,
             mutations: [
               {

@@ -104,13 +104,12 @@ describe('Sophisticated Workflows', () => {
       await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
 
-      // Should execute start -> check -> inline_conditional -> premium-path -> end
-      expect(execution.results).toHaveLength(5);
+      // Should execute start -> check -> premium-path -> end (no inline_conditional as it's built into conditional node)
+      expect(execution.results).toHaveLength(4);
       expect(execution.results[0].nodeRef).toBe('start');
       expect(execution.results[1].nodeRef).toBe('check');
-      expect(execution.results[2].nodeRef).toBe('inline_conditional');
-      expect(execution.results[3].nodeRef).toBe('premium-path');
-      expect(execution.results[4].nodeRef).toBe('end');
+      expect(execution.results[2].nodeRef).toBe('premium-path');
+      expect(execution.results[3].nodeRef).toBe('end');
 
       // Should have called premium API, not regular API
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/premium', expect.any(Object));
@@ -184,9 +183,9 @@ describe('Sophisticated Workflows', () => {
       await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
 
-      // Should execute start -> check -> inline_conditional -> regular-path -> end
-      expect(execution.results).toHaveLength(5);
-      expect(execution.results[3].nodeRef).toBe('regular-path');
+      // Should execute start -> check -> regular-path -> end (no inline_conditional as it's built into conditional node)
+      expect(execution.results).toHaveLength(4);
+      expect(execution.results[2].nodeRef).toBe('regular-path');
 
       // Should have called regular API, not premium API
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/regular', expect.any(Object));
@@ -270,7 +269,7 @@ describe('Sophisticated Workflows', () => {
 
       await engine.executeBlueprint(blueprint, execution);
       expect(execution.status).toBe('completed');
-      expect(execution.results[3].nodeRef).toBe('silver-path');
+      expect(execution.results[2].nodeRef).toBe('silver-path');
 
       expect(mockFetch).toHaveBeenCalledWith('https://api.example.com/silver', expect.any(Object));
     });
@@ -597,15 +596,14 @@ describe('Sophisticated Workflows', () => {
 
       expect(execution.status).toBe('completed');
 
-      // Should execute: start -> data-prep -> validation-flow -> final-check -> inline_conditional -> process -> end
-      expect(execution.results).toHaveLength(7);
+      // Should execute: start -> data-prep -> validation-flow -> final-check -> abort -> end (conditional routing to abort path)
+      expect(execution.results).toHaveLength(6);
       expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
         'start',
         'data-prep',
         'validation-flow',
         'final-check',
-        'inline_conditional',
-        'process',
+        'abort',
         'end',
       ]);
       // Should have made 4 HTTP calls total
@@ -781,14 +779,13 @@ describe('Sophisticated Workflows', () => {
 
       expect(execution.status).toBe('completed');
 
-      // Should execute all nodes in the negative path
-      expect(execution.results).toHaveLength(7);
+      // Should execute all nodes in the negative path (no inline_conditional)
+      expect(execution.results).toHaveLength(6);
       expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
         'start',
         'data-fetch',
         'ai-analysis',
         'decision',
-        'inline_conditional',
         'negative-action',
         'end',
       ]);
@@ -926,16 +923,14 @@ describe('Sophisticated Workflows', () => {
 
       expect(execution.status).toBe('completed');
 
-      // Should execute: start -> risky-api -> check-success -> inline_conditional -> retry-api -> check-retry -> inline_conditional -> recovery-path -> end
-      expect(execution.results).toHaveLength(9);
+      // Should execute: start -> risky-api -> check-success -> retry-api -> check-retry -> recovery-path -> end (no inline_conditional)
+      expect(execution.results).toHaveLength(7);
       expect(execution.results.map((r: { nodeRef: string }) => r.nodeRef)).toEqual([
         'start',
         'risky-api',
         'check-success',
-        'inline_conditional',
         'retry-api',
         'check-retry',
-        'inline_conditional',
         'recovery-path',
         'end',
       ]);

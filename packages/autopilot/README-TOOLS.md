@@ -63,8 +63,8 @@ const result = await agent.execute('What is 25 * 4 + 17?');
 - The Tool node executes that blueprint using a fresh Engine + Execution (same pattern as the Workflow node).
 - Pass any runtime configuration as regular tool arguments; they will be available as initial input (`$json`) to the tool blueprint.
 
-- The Tool node is a lightweight wrapper and is intentionally stateless. It has no knowledge of LLMs, execution context, or agent state.
-- The Tool node does not inspect prior LLM outputs or tool_calls. Orchestrators must pass tool arguments explicitly via the Tool node's input; these will be available as the initial `$json` for the tool blueprint.
+- The Tool node is a lightweight wrapper and is intentionally stateless. It does not parse tool arguments.
+- The Tool node consumes pre-parsed `arguments_json` produced by the LLM. In the built-in Agent loop, it reads `arguments_json` from the latest LLM response in the current execution context. External orchestrators may also pass a plain object as the Tool node's input to make it available as the initial `$json` for the tool blueprint.
 
 ## Architecture Details
 

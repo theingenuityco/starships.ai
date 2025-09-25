@@ -51,6 +51,42 @@ export class ConversationService {
   }
 
   /**
+   * Best-effort parser for tool_call function.arguments into JSON
+   * - Handles already-object input
+   * - Handles quoted/double-encoded JSON strings
+   * - Returns undefined when parsing fails
+   */
+  private parseToolArguments(raw: unknown): Record<string, unknown> | undefined {
+    try {
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+      if (typeof raw !== 'string') return undefined;
+      let s = raw.replace(/\r/g, '').trim();
+      for (let i = 0; i < 3; i++) {
+        const first = s[0];
+        const last = s[s.length - 1];
+        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+          s = s.slice(1, -1);
+        }
+        try {
+          const parsed = JSON.parse(s);
+          if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+        } catch {
+          /* ignore */
+        }
+      }
+      try {
+        const parsed = JSON.parse(s);
+        if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * Create a new conversation
    */
   async createConversation(data: ConversationModel & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
@@ -404,6 +440,36 @@ export class ConversationService {
               return '';
             }
           };
+          // Best-effort parser for tool_call function.arguments into JSON
+          const tryParseToolArgs = (raw: any): any => {
+            try {
+              if (raw && typeof raw === 'object') return raw;
+              if (typeof raw !== 'string') return undefined;
+              let s = raw.replace(/\r/g, '').trim();
+              for (let i = 0; i < 3; i++) {
+                const first = s[0];
+                const last = s[s.length - 1];
+                if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+                  s = s.slice(1, -1);
+                }
+                try {
+                  const parsed = JSON.parse(s);
+                  if (parsed && typeof parsed === 'object') return parsed;
+                } catch {
+                  /* ignore */
+                }
+              }
+              try {
+                const parsed = JSON.parse(s);
+                if (parsed && typeof parsed === 'object') return parsed;
+              } catch {
+                /* ignore */
+              }
+              return undefined;
+            } catch {
+              return undefined;
+            }
+          };
           const reasoningFromDelta = extractReasoning(delta);
           const reasoningFromMessage = extractReasoning(messageNode);
           const hasReasoning =
@@ -547,6 +613,10 @@ export class ConversationService {
                     function: {
                       name: tc.function.name,
                       arguments: tc.function?.arguments || '',
+                      ...(() => {
+                        const obj = this.parseToolArguments(tc.function?.arguments);
+                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
+                      })(),
                     },
                   }));
 
@@ -557,14 +627,19 @@ export class ConversationService {
                 });
               } else if (toolCallsFromMessage.length > 0) {
                 // Snapshot tool_calls from message node (no incremental indices)
-                const normalized = toolCallsFromMessage.map((tc: any) => ({
-                  id: tc?.id,
-                  type: 'function',
-                  function: {
-                    name: tc?.function?.name,
-                    arguments: typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '',
-                  },
-                }));
+                const normalized = toolCallsFromMessage.map((tc: any) => {
+                  const args = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
+                  const obj = this.parseToolArguments(args);
+                  return {
+                    id: tc?.id,
+                    type: 'function',
+                    function: {
+                      name: tc?.function?.name,
+                      arguments: args,
+                      ...(obj && typeof obj === 'object' ? { arguments_json: obj } : {}),
+                    },
+                  };
+                });
 
                 this.streamingToolCalls.set(conversationId, normalized);
 
@@ -622,6 +697,10 @@ export class ConversationService {
                     function: {
                       name: tc.function.name,
                       arguments: tc.function?.arguments || '',
+                      ...(() => {
+                        const obj = this.parseToolArguments(tc.function?.arguments);
+                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
+                      })(),
                     },
                   })),
                 }),
@@ -741,7 +820,18 @@ export class ConversationService {
       }
 
       case 'tool_started': {
-        console.log('[STREAMING] Tool started:', event.data?.toolName);
+        // Log argument preview to verify parsing/shape reaching the Tool node
+        try {
+          const args = (event as any)?.data?.arguments;
+          const preview = args !== undefined ? JSON.stringify(args).slice(0, 1000) : undefined;
+          console.log('[STREAMING] Tool started:', (event as any)?.data?.toolName, {
+            toolCallId: (event as any)?.data?.toolCallId,
+            argsType: typeof args,
+            argsPreview: preview,
+          });
+        } catch {
+          console.log('[STREAMING] Tool started:', event.data?.toolName);
+        }
         // Tool started - we can optionally broadcast this or track it
         break;
       }

@@ -50,7 +50,6 @@ export class Agent implements NodeHandler {
     const endRef = `end_${this.nodeCounter++}`;
     const llmNodeRef = `llm_${this.nodeCounter++}`;
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
-    const parseArgsNodeRef = `parse_args_${this.nodeCounter++}`;
     const toolNodeRef = `tool_${this.nodeCounter++}`;
 
     // Create complete blueprint with all nodes
@@ -106,29 +105,18 @@ export class Agent implements NodeHandler {
           description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
           parameters: {
             // Returns:
-            //  - "length" when choices[0].finish_reason === "length" (loop back to LLM)
-            //  - true when tool_calls exist (parse -> tool)
+            //  - "length" when choices[0].finish_reason === "length" (continue generation)
+            //  - true when finish_reason === "tool_calls" AND the tool_call.id has NOT been executed yet
             //  - false otherwise (end)
-            condition: `{{ (() => { const last = $lastOutputOf("${llmNodeRef}")[0]?.json; const fr = last?.choices?.[0]?.finish_reason; if (fr === "length") return "length"; const calls = last?.choices?.[0]?.message?.tool_calls; const name = calls?.[0]?.function?.name; return Array.isArray(calls) && calls.length > 0 && typeof name === 'string' && name.length > 0; })() }}`,
-          },
-        },
-        // Prepare tool input from LLM tool_calls arguments
-        {
-          ref: parseArgsNodeRef,
-          type: 'code' as const,
-          name: 'Prepare Tool Input',
-          description: 'Parse function.arguments JSON into input for Tool',
-          parameters: {
-            code: `
-              try {
-                const calls = $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls || [];
-                const argsStr = (calls[0] && calls[0].function && calls[0].function.arguments) ? calls[0].function.arguments : '{}';
-                return JSON.parse(argsStr || '{}');
-              } catch (_e) {
-                return {};
-              }
-            `,
-            timeout: 2000,
+            condition: `{{ (() => {
+              const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
+              const fr = last?.choices?.[0]?.finish_reason;
+              if (fr === "length") return "length";
+              if (fr !== "tool_calls") return "false";
+              const id = last?.choices?.[0]?.message?.tool_calls?.[0]?.id;
+              const processed = Array.isArray(state?.processedToolCalls) ? state.processedToolCalls : [];
+              return id && !processed.includes(id) ? "true" : "false";
+            })() }}`,
           },
         },
         // Tool execution node - receives the complete tool definition via template resolution
@@ -138,11 +126,11 @@ export class Agent implements NodeHandler {
           name: 'Execute Tool',
           description: 'Execute tool and add result to conversation',
           parameters: {
-            // Resolve tool definition from state using the tool name from LLM response
-            name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.name ?? (toolName ?? ""); })() }}`,
-            description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.description ?? ("Tool '" + (toolName ?? "unknown") + "' not found"); })() }}`,
-            parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
-            blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const toolName = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && t.name === toolName); return tool?.blueprint; })() }}`,
+            // Resolve tool definition from state using the tool name from LLM response (normalized)
+            name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
+            description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
+            parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
+            blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
             toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
             mutations: [
               {
@@ -155,6 +143,18 @@ export class Agent implements NodeHandler {
                   content: `{{ JSON.stringify((() => { const _i = $lastOutputOf("${toolNodeRef}")[0]; const j = _i?.json; if (j !== undefined) { return j; } if (_i && _i.error !== undefined) { return { ok: false, error: _i.error }; } return {}; })()) }}`,
                 },
               },
+              // Ensure processedToolCalls array exists (idempotent)
+              {
+                operation: 'add' as const,
+                path: '/state/processedToolCalls',
+                value: `{{ Array.isArray(state?.processedToolCalls) ? state.processedToolCalls : [] }}`,
+              },
+              // Track executed tool_call id to prevent re-executing the same call
+              {
+                operation: 'add' as const,
+                path: '/state/processedToolCalls/-',
+                value: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
+              },
             ],
           },
         },
@@ -166,10 +166,8 @@ export class Agent implements NodeHandler {
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
         // Conditional -> LLM (if finish_reason === "length")
         { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'length' },
-        // Conditional -> Prepare Args (if tool_calls exist)
-        { ref: 'edge_conditional_parse', from: conditionalNodeRef, to: parseArgsNodeRef, condition: 'true' },
-        // Prepare Args -> Tool
-        { ref: 'edge_parse_tool', from: parseArgsNodeRef, to: toolNodeRef },
+        // Conditional -> Tool (if tool_calls exist)
+        { ref: 'edge_conditional_tool', from: conditionalNodeRef, to: toolNodeRef, condition: 'true' },
         // Tool -> LLM (loop back)
         { ref: 'edge_tool_llm', from: toolNodeRef, to: llmNodeRef },
         // Conditional -> End (if no tool_calls)

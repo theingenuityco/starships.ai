@@ -266,9 +266,24 @@ type StreamedChunk =
   | { type: 'error'; error: any }
 
 // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events
-function makeSSEAsyncIterable(conversationId: string, token: string | null): AsyncIterable<StreamedChunk> {
-  const url = `/api/v1/conversations/${conversationId}/messages?stream=true`
+function makeSSEAsyncIterable(conversationId: string, token: string | null, signal?: AbortSignal, baselineLength?: number): AsyncIterable<StreamedChunk> {
+  let url = `/api/v1/conversations/${conversationId}/messages?stream=true`
+  if (typeof baselineLength === 'number' && baselineLength >= 0) {
+    url += `&baselineLength=${baselineLength}`
+  }
   let closed = false
+
+  // Track post-complete trailing patches and then end the stream to allow subsequent turns
+  let seenComplete = false
+  let postCompleteTimer: any = null
+  const schedulePostCompleteEnd = () => {
+    try {
+      if (postCompleteTimer) clearTimeout(postCompleteTimer as any)
+    } catch {}
+    postCompleteTimer = setTimeout(() => {
+      end()
+    }, 400)
+  }
 
   type Resolver = (value: IteratorResult<StreamedChunk>) => void
   const queue: StreamedChunk[] = []
@@ -287,9 +302,21 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null): Asy
   const end = () => {
     if (closed) return
     closed = true
+    try {
+      if (postCompleteTimer) clearTimeout(postCompleteTimer as any)
+    } catch {}
     while (resolvers.length > 0) {
       const resolve = resolvers.shift()!
       resolve({ value: undefined as any, done: true })
+    }
+  }
+
+  if (signal) {
+    // Ensure aborts (e.g., refetch, unmount) close the iterable and connection
+    if (signal.aborted) {
+      end()
+    } else {
+      signal.addEventListener('abort', () => end(), { once: true })
     }
   }
 
@@ -298,6 +325,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null): Asy
     method: 'GET',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     openWhenHidden: true,
+    signal,
     async onopen(response) {
       if (!response.ok) {
         push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
@@ -366,32 +394,38 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null): Asy
             if (op === 'replace' && replaceToolCallsRe.test(path)) {
               const value = Array.isArray(raw.value) ? raw.value : []
               push({ type: 'replace_tool_calls', value })
+              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Replace content / reasoning
             if (op === 'replace' && replaceContentRe.test(path)) {
               push({ type: 'replace_content', value: typeof raw.value === 'string' ? raw.value : '' })
+              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             if (op === 'replace' && replaceReasoningRe.test(path)) {
               push({ type: 'replace_reasoning', value: typeof raw.value === 'string' ? raw.value : '' })
+              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Update id / updatedAt on the last assistant
             if (op === 'replace' && replaceIdRe.test(path)) {
               push({ type: 'update_last_assistant', fields: { id: String(raw.value) } as Partial<ClientMessage> })
+              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             if (op === 'replace' && replaceUpdatedAtRe.test(path)) {
               push({ type: 'update_last_assistant', fields: { updatedAt: String(raw.value) } as Partial<ClientMessage> })
+              if (seenComplete) schedulePostCompleteEnd()
               break
             }
 
             // Mark streaming flag
             if (op === 'replace' && replaceStreamingRe.test(path) && raw.value === false) {
               push({ type: 'mark_last_assistant_streaming', streaming: false })
+              if (seenComplete) schedulePostCompleteEnd()
               break
             }
             break
@@ -400,7 +434,9 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null): Asy
             // Ensure we flip streaming=false before completion (UI caret off)
             push({ type: 'mark_last_assistant_streaming', streaming: false })
             push({ type: 'complete' })
-            // Do NOT end the stream here. Server may emit follow-up patches (id/content/reasoning).
+            // Allow trailing finalize patches (id/content/reasoning), then end shortly
+            seenComplete = true
+            schedulePostCompleteEnd()
             break
           }
           case 'error': {
@@ -601,12 +637,16 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
 export function useConversationStreamed(conversationId: string | null) {
   const queryClient = useQueryClient()
 
+  // Compute baselineLength from cached chunks to let the server replay any missed messages on reconnect
+  const cachedChunks = conversationId ? (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) : undefined
+  const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
+
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
     queryFn: streamedQuery({
       queryFn: async (_ctx: any) => {
         const token = await getCurrentToken()
-        return makeSSEAsyncIterable(conversationId!, token)
+        return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal, baselineLength)
       },
       refetchMode: 'append',
     }),

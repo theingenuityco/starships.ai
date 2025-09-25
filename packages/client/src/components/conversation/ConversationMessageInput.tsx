@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation, useConversation } from '@/hooks/useConversations'
+import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
@@ -44,10 +44,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const createConversation = useCreateConversation()
 
-    // Use unified conversation hook (convert undefined to null for the hook)
-    const { sendMessage: sendMessageFn, isSending } = useConversation(conversationId ?? null)
-    // Drive streaming solely from central UI store to avoid event-loop starvation
-    const isStreamingEffective = useStarshipUIStore(s => (conversationId ? s.conversationsStreaming[conversationId]?.isStreaming === true : false))
+    // Use streamedQuery-based conversation hook
+    const { sendMessage: sendMessageFn, isSending, isStreaming: isStreamingEffective } = useConversationStreamed(conversationId ?? null)
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
@@ -118,7 +116,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Set agent information in store
-        const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
+        const { setConversationAgent } = useStarshipUIStore.getState()
         setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
 
         // Clear input and reset UI immediately for better UX
@@ -127,21 +125,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           textareaRef.current.style.height = 'auto'
         }
 
-        // Add optimistic user message to UI store immediately
-        const optimisticMessage = {
-          id: `temp-user-${Date.now()}`,
-          content: messageToSend,
-          role: 'user' as const,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          messageType: 'user_input' as const,
-          sending: true, // Mark as sending so UI can show loading state
-        }
-
         /* optimistic append skipped (server-SSE will add user message) */
 
-        // Now toggle responding so the indicator renders after the user message
-        setConversationResponding(currentConversationId!, true)
+        // Streaming UI is driven by TanStack Query status
 
         // Notify parent about message activity immediately (for UI state updates)
         onMessageSent?.()
@@ -154,20 +140,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           role: 'user',
           starshipId: starshipId!,
           messageType: 'user_input',
-          stream: true,
         })
           .catch(error => {
             console.error('Failed to send message:', error)
-            // Restore message on error and remove optimistic message
+            // Restore message on error
             setMessage(messageToSend)
-            const { conversations } = useStarshipUIStore.getState()
-            const currentMessages = conversations[currentConversationId!]?.messages || []
-            const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
-            setConversationSnapshot(currentConversationId!, {
-              messages: filteredMessages,
-              total: filteredMessages.length,
-            })
-            setConversationResponding(currentConversationId!, false)
           })
           .finally(() => {
             setSending(false)
@@ -180,9 +157,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
-        if (conversationId) {
-          useStarshipUIStore.getState().setConversationResponding(conversationId, false)
-        }
       }
     }, [message, sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId])
 
@@ -217,24 +191,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           }
 
           // Set agent information in store
-          const { setConversationAgent, setConversationResponding, appendMessage, setConversationSnapshot } = useStarshipUIStore.getState()
+          const { setConversationAgent } = useStarshipUIStore.getState()
           setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
-
-          // Add optimistic user message to UI store immediately
-          const optimisticMessage = {
-            id: `temp-user-${Date.now()}`,
-            content: suggestionText,
-            role: 'user' as const,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            messageType: 'user_input' as const,
-            sending: true, // Mark as sending so UI can show loading state
-          }
 
           /* optimistic append skipped (server-SSE will add user message) */
 
-          // Now toggle responding so the indicator renders after the user message
-          setConversationResponding(currentConversationId!, true)
+          // Streaming UI is driven by TanStack Query status
 
           // Notify parent about message activity immediately (for UI state updates)
           onMessageSent?.()
@@ -247,19 +209,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             role: 'user',
             starshipId: starshipId!,
             messageType: 'user_input',
-            stream: true,
           })
             .catch(error => {
               console.error('Failed to send suggestion:', error)
-              // Remove optimistic message on error
-              const { conversations } = useStarshipUIStore.getState()
-              const currentMessages = conversations[currentConversationId!]?.messages || []
-              const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage.id)
-              setConversationSnapshot(currentConversationId!, {
-                messages: filteredMessages,
-                total: filteredMessages.length,
-              })
-              setConversationResponding(currentConversationId!, false)
             })
             .finally(() => {
               setSending(false)
@@ -269,9 +221,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch (error) {
           console.error('Failed to send suggestion:', error)
           setSending(false)
-          if (conversationId) {
-            useStarshipUIStore.getState().setConversationResponding(conversationId, false)
-          }
         }
       },
       [sending, disabled, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]

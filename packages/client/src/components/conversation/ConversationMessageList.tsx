@@ -6,6 +6,7 @@ import type { MessageModel } from '@starships/protocol'
 import { Bot, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
+import { useConversationStreamed } from '@/hooks/useConversations'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
@@ -21,21 +22,15 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
+  const { messages, isStreaming } = useConversationStreamed(conversationId)
 
   // Use stable selectors to avoid returning new objects each render
-  const storeMessages = useStarshipUIStore(state => {
-    if (!conversationId) return EMPTY_MESSAGES as any
-    const convo = state.conversations[conversationId]
-    return (convo?.messages as any) || EMPTY_MESSAGES
-  })
+  // messages are sourced from useConversationStreamed(conversationId)
   const agentName = useStarshipUIStore(state => {
     if (!conversationId) return undefined
     return state.conversations[conversationId]?.agentName
   })
-  const isResponding = useStarshipUIStore(state => {
-    if (!conversationId) return false
-    return state.conversations[conversationId]?.isResponding === true
-  })
+  const isResponding = isStreaming
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -44,7 +39,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
     // Sort ascending by createdAt
-    const sortedMessages = [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
     // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
     const seenIds = new Set<string>()
@@ -85,8 +80,9 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       }
 
       // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or tool_calls).
-      // If followed by another assistant, skip the blank one. If it's trailing, drop it.
+      // Preserve if it's actively streaming (so caret can show) and only drop if non-streaming.
       if (cur?.role === 'assistant' && !(typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-'))) {
+        const streaming = Boolean((cur as any)?.streaming)
         const hasContent = typeof cur?.content === 'string' && cur.content.trim().length > 0
         const hasChunks = Array.isArray(cur?.chunks) && cur.chunks.length > 0
         const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
@@ -102,6 +98,11 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
           })
 
         if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls)) {
+          // Keep actively streaming assistant shells visible
+          if (streaming) {
+            collapsedMessages.push(cur)
+            continue
+          }
           const next: any = uniqueMessages[i + 1]
           if (next && next.role === 'assistant') {
             // skip current blank shell; next will be processed/pushed in subsequent iterations
@@ -190,7 +191,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     })
 
     return pruned
-  }, [storeMessages])
+  }, [messages])
 
   // Determine which assistant message should display the streaming caret (latest streaming one)
   const activeStreamingAssistantId = useMemo(() => {

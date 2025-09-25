@@ -23,8 +23,83 @@ When to use:
     properties: {
       blueprint: {
         type: 'object',
-        description: 'Blueprint object with nodes and edges',
-        properties: {},
+        description: 'Blueprint object with nodes and edges arrays',
+        properties: {
+          nodes: {
+            type: 'array',
+            description: 'Array of workflow nodes',
+            items: {
+              type: 'object',
+              description: 'Workflow node definition',
+              properties: {
+                ref: {
+                  type: 'string',
+                  description: 'Unique node reference identifier',
+                },
+                type: {
+                  type: 'string',
+                  description: 'Node type (start, end, llm, code, etc.)',
+                  enum: [
+                    'start',
+                    'end',
+                    'agent',
+                    'workflow',
+                    'http_request',
+                    'llm',
+                    'user_prompt',
+                    'conditional',
+                    'transform',
+                    'mutate',
+                    'tool',
+                    'code',
+                  ],
+                },
+                name: {
+                  type: 'string',
+                  description: 'Display name for the node',
+                },
+                description: {
+                  type: 'string',
+                  description: 'Node description',
+                },
+                parameters: {
+                  type: 'object',
+                  description: 'Node-specific configuration parameters',
+                },
+              },
+            },
+          },
+          edges: {
+            type: 'array',
+            description: 'Array of workflow edges connecting nodes',
+            items: {
+              type: 'object',
+              description: 'Workflow edge definition',
+              properties: {
+                ref: {
+                  type: 'string',
+                  description: 'Unique edge reference identifier',
+                },
+                from: {
+                  type: 'string',
+                  description: 'Source node reference',
+                },
+                to: {
+                  type: 'string',
+                  description: 'Target node reference',
+                },
+                condition: {
+                  type: 'string',
+                  description: 'Optional condition for edge traversal',
+                },
+              },
+            },
+          },
+          metadata: {
+            type: 'object',
+            description: 'Optional blueprint metadata',
+          },
+        },
       },
     },
     required: ['blueprint'],

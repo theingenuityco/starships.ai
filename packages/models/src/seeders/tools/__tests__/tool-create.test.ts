@@ -56,7 +56,7 @@ describe('Tool Create Tool', () => {
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
       expect(toolCreateTool.name).toBe('tool_create');
-      expect(toolCreateTool.description).toContain('Create a new Tool');
+      expect(toolCreateTool.description).toContain('Creates a new Tool');
       expect(toolCreateTool.parameters).toBeDefined();
       expect(toolCreateTool.blueprint).toBeDefined();
     });

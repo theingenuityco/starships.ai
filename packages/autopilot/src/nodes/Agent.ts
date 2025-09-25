@@ -110,14 +110,9 @@ export class Agent implements NodeHandler {
             //  - "call_tool" when finish_reason === "tool_calls" OR tool_calls[] exist (route to tool execution)
             //  - "complete" otherwise (end)
             // Use $input() (the LLM node output passed into this Conditional) to avoid cross-scope lookup issues.
-            condition: `{{ (() => {
-              const last = $input();
-              const fr = last?.choices?.[0]?.finish_reason;
-              if (fr === "length") return "continue";
-              if (fr === "tool_calls") return "call_tool";
-              const calls = last?.choices?.[0]?.message?.tool_calls;
-              return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete";
-            })() }}`,
+            // Trimmed single-template string for full-only evaluation
+            condition:
+              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.tool_calls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
           },
         },
         // Prepare arguments for Tool (materialize arguments_json as plain object)

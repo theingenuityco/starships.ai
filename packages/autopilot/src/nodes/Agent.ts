@@ -98,14 +98,18 @@ export class Agent implements NodeHandler {
             ],
           },
         },
-        // Conditional node for tool call detection
+        // Conditional node for tool call detection + streaming length handling
         {
           ref: conditionalNodeRef,
           type: 'conditional' as const,
           name: 'Check Tool Calls',
-          description: 'Check if LLM made any tool calls',
+          description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
           parameters: {
-            condition: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const name = calls?.[0]?.function?.name; return Array.isArray(calls) && calls.length > 0 && typeof name === 'string' && name.length > 0; })() }}`,
+            // Returns:
+            //  - "length" when choices[0].finish_reason === "length" (loop back to LLM)
+            //  - true when tool_calls exist (parse -> tool)
+            //  - false otherwise (end)
+            condition: `{{ (() => { const last = $lastOutputOf("${llmNodeRef}")[0]?.json; const fr = last?.choices?.[0]?.finish_reason; if (fr === "length") return "length"; const calls = last?.choices?.[0]?.message?.tool_calls; const name = calls?.[0]?.function?.name; return Array.isArray(calls) && calls.length > 0 && typeof name === 'string' && name.length > 0; })() }}`,
           },
         },
         // Prepare tool input from LLM tool_calls arguments
@@ -160,6 +164,8 @@ export class Agent implements NodeHandler {
         { ref: 'edge_start_llm', from: startRef, to: llmNodeRef },
         // LLM -> Conditional
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
+        // Conditional -> LLM (if finish_reason === "length")
+        { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'length' },
         // Conditional -> Prepare Args (if tool_calls exist)
         { ref: 'edge_conditional_parse', from: conditionalNodeRef, to: parseArgsNodeRef, condition: 'true' },
         // Prepare Args -> Tool

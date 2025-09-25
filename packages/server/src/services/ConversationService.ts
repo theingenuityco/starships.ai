@@ -29,6 +29,8 @@ export class ConversationService {
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
+  // Track accumulated reasoning during streaming per conversation
+  private streamingReasoning: Map<string, string> = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner: ChildProcessRunner;
 
@@ -46,6 +48,42 @@ export class ConversationService {
     this.streamingService = new StreamingService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
+  }
+
+  /**
+   * Best-effort parser for tool_call function.arguments into JSON
+   * - Handles already-object input
+   * - Handles quoted/double-encoded JSON strings
+   * - Returns undefined when parsing fails
+   */
+  private parseToolArguments(raw: unknown): Record<string, unknown> | undefined {
+    try {
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
+      if (typeof raw !== 'string') return undefined;
+      let s = raw.replace(/\r/g, '').trim();
+      for (let i = 0; i < 3; i++) {
+        const first = s[0];
+        const last = s[s.length - 1];
+        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+          s = s.slice(1, -1);
+        }
+        try {
+          const parsed = JSON.parse(s);
+          if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+        } catch {
+          /* ignore */
+        }
+      }
+      try {
+        const parsed = JSON.parse(s);
+        if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
+      } catch {
+        /* ignore */
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -251,6 +289,7 @@ export class ConversationService {
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
+        ...(msg.reasoning && { reasoning: msg.reasoning }),
         ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
@@ -316,21 +355,129 @@ export class ConversationService {
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
+        this.streamingReasoning.delete(conversationId);
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
 
       case 'content_chunk': {
-        // Stream content chunks in real-time
+        // Stream content chunks in real-time (supports both delta.* and message.* providers)
         const chunkContent = event.data?.chunk;
         if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
-          const delta = chunkContent.choices[0]?.delta;
-          const hasContent = delta?.content;
-          const hasToolCalls = delta?.tool_calls && Array.isArray(delta.tool_calls) && delta.tool_calls.length > 0;
+          const choice0: any = chunkContent.choices[0] || {};
+          const delta: any = choice0?.delta || {};
+          const messageNode: any = choice0?.message || {};
 
-          // Guard: if no active accumulator and we have content, start a new placeholder stream.
+          const contentFromDelta = typeof delta?.content === 'string' ? delta.content : '';
+          const contentFromMessage = typeof messageNode?.content === 'string' ? messageNode.content : '';
+          const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
+
+          const toolCallsFromDelta: any[] = Array.isArray(delta?.tool_calls) ? delta.tool_calls : [];
+          const toolCallsFromMessage: any[] = Array.isArray(messageNode?.tool_calls) ? messageNode.tool_calls : [];
+          const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
+
+          // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
+          const extractReasoning = (node: unknown): string => {
+            try {
+              if (!node || typeof node !== 'object') return '';
+              const rec = node as Record<string, unknown>;
+              const parts: string[] = [];
+
+              // Unified fields
+              const raw = (rec.reasoning ?? rec.thinking) as unknown;
+
+              const appendFromRaw = (r: unknown): void => {
+                if (!r) return;
+                if (typeof r === 'string') {
+                  parts.push(r);
+                  return;
+                }
+                if (typeof r === 'object' && r !== null) {
+                  const obj = r as Record<string, unknown>;
+                  if (typeof obj.content === 'string') parts.push(obj.content);
+                  if (Array.isArray(obj.tokens)) {
+                    for (const t of obj.tokens as unknown[]) {
+                      if (t && typeof t === 'object') {
+                        const tr = t as Record<string, unknown>;
+                        const text = typeof tr.text === 'string' ? tr.text : '';
+                        const content = typeof tr.content === 'string' ? tr.content : '';
+                        if (text) parts.push(text);
+                        else if (content) parts.push(content);
+                      }
+                    }
+                  }
+                }
+                if (Array.isArray(r)) {
+                  for (const p of r as unknown[]) {
+                    if (p && typeof p === 'object') {
+                      const pr = p as Record<string, unknown>;
+                      const text = typeof pr.text === 'string' ? pr.text : '';
+                      const content = typeof pr.content === 'string' ? pr.content : '';
+                      if (text) parts.push(text);
+                      else if (content) parts.push(content);
+                    }
+                  }
+                }
+              };
+
+              appendFromRaw(raw);
+
+              // OpenRouter unified 'reasoning_details' chunks
+              const details = rec.reasoning_details as unknown;
+              if (Array.isArray(details)) {
+                for (const d of details as unknown[]) {
+                  if (d && typeof d === 'object') {
+                    const det = d as Record<string, unknown>;
+                    if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                      parts.push(det.text);
+                    }
+                  }
+                }
+              }
+
+              return parts.join('');
+            } catch {
+              return '';
+            }
+          };
+          // Best-effort parser for tool_call function.arguments into JSON
+          const tryParseToolArgs = (raw: any): any => {
+            try {
+              if (raw && typeof raw === 'object') return raw;
+              if (typeof raw !== 'string') return undefined;
+              let s = raw.replace(/\r/g, '').trim();
+              for (let i = 0; i < 3; i++) {
+                const first = s[0];
+                const last = s[s.length - 1];
+                if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+                  s = s.slice(1, -1);
+                }
+                try {
+                  const parsed = JSON.parse(s);
+                  if (parsed && typeof parsed === 'object') return parsed;
+                } catch {
+                  /* ignore */
+                }
+              }
+              try {
+                const parsed = JSON.parse(s);
+                if (parsed && typeof parsed === 'object') return parsed;
+              } catch {
+                /* ignore */
+              }
+              return undefined;
+            } catch {
+              return undefined;
+            }
+          };
+          const reasoningFromDelta = extractReasoning(delta);
+          const reasoningFromMessage = extractReasoning(messageNode);
+          const hasReasoning =
+            (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
+
+          // Guard: if no active accumulator and we have content OR tool_calls OR reasoning, start a new placeholder stream.
           // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
-          if (hasContent && !this.streamingContent.has(conversationId)) {
+          if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
               // Acquire lock upfront to avoid race between parallel content_chunk events
               this.streamingContent.set(conversationId, '');
@@ -353,6 +500,7 @@ export class ConversationService {
                   ...assistantMessage,
                   streaming: true,
                   chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
+                  reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
                   tool_calls: [], // Initialize empty tool_calls array for replace operations
                 },
               };
@@ -362,67 +510,146 @@ export class ConversationService {
             }
           }
 
-          // Process content if present
+          // Process content if present (prefer delta token chunks; fall back to full message content snapshot with diffing)
           if (hasContent) {
-            const content = String(delta.content);
+            const incremental = contentFromDelta || '';
+            const snapshot = contentFromMessage || '';
 
             // Track accumulated content server-side for completion event
             const currentContent = this.streamingContent.get(conversationId) || '';
             const currentLength = currentContent.length;
-            const newContent = currentContent + content;
-            this.streamingContent.set(conversationId, newContent);
 
-            // Stream delta chunk as JSON Patch add into chunks array (no cumulative replace)
-            const chunkDelta: Operation = {
-              op: 'add',
-              path: '/messages/-1/chunks/-',
-              value: {
-                content,
-                position: currentLength,
-                timestamp: Date.now(),
-              },
-            };
-            await this.streamingService.broadcastDelta(conversationId, chunkDelta);
+            // Compute the append text:
+            // - If incremental tokens exist, append them directly.
+            // - Else if we only have snapshot, append the new suffix beyond what we've already accumulated.
+            let append = '';
+            if (incremental) {
+              append = incremental;
+            } else if (snapshot) {
+              append = snapshot.slice(currentLength);
+            }
+
+            if (append) {
+              const newContent = currentContent + append;
+              this.streamingContent.set(conversationId, newContent);
+
+              // Stream delta chunk as JSON Patch add into chunks array
+              const chunkDelta: Operation = {
+                op: 'add',
+                path: '/messages/-1/chunks/-',
+                value: {
+                  content: append,
+                  position: currentLength,
+                  timestamp: Date.now(),
+                },
+              };
+              await this.streamingService.broadcastDelta(conversationId, chunkDelta);
+            }
           }
 
-          // Process tool_calls if present (separate from content processing)
+          // Process reasoning if present (stream as delta chunks; persist final reasoning on completion)
+          if (hasReasoning) {
+            const incrementalR = reasoningFromDelta || '';
+            const snapshotR = reasoningFromMessage || '';
+
+            const currentR = this.streamingReasoning.get(conversationId) || '';
+            const currentRLength = currentR.length;
+
+            let appendR = '';
+            if (incrementalR) {
+              appendR = incrementalR;
+            } else if (snapshotR) {
+              appendR = snapshotR.slice(currentRLength);
+            }
+
+            if (appendR) {
+              const newR = currentR + appendR;
+              this.streamingReasoning.set(conversationId, newR);
+
+              // Stream delta chunk for reasoning
+              const rChunkDelta: Operation = {
+                op: 'add',
+                path: '/messages/-1/reasoningChunks/-',
+                value: {
+                  content: appendR,
+                  position: currentRLength,
+                  timestamp: Date.now(),
+                },
+              };
+              await this.streamingService.broadcastDelta(conversationId, rChunkDelta);
+            }
+          }
+
+          // Process tool_calls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
           if (hasToolCalls) {
             try {
-              const toolCallsDelta = delta.tool_calls || [];
-              const acc = this.streamingToolCalls.get(conversationId) || [];
+              if (toolCallsFromDelta.length > 0) {
+                const acc = this.streamingToolCalls.get(conversationId) || [];
 
-              for (const rawTc of toolCallsDelta as any[]) {
-                const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
-                while (acc.length <= idx) {
-                  acc.push({ id: undefined, type: 'function', function: { name: undefined, arguments: '' } });
+                for (const rawTc of toolCallsFromDelta as any[]) {
+                  const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
+
+                  // Ensure slot only for the referenced index; do not pre-fill earlier indices
+                  if (!acc[idx]) {
+                    acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
+                  }
+
+                  const target = acc[idx];
+                  if (rawTc?.id) target.id = rawTc.id;
+                  if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+                  if (typeof rawTc?.function?.arguments === 'string') {
+                    target.function.arguments = (target.function.arguments || '') + rawTc.function.arguments;
+                  }
                 }
-                const target = acc[idx];
-                if (rawTc?.id) target.id = rawTc.id;
-                if (rawTc?.function?.name) target.function.name = rawTc.function.name;
-                if (typeof rawTc?.function?.arguments === 'string') {
-                  target.function.arguments = (target.function.arguments || '') + rawTc.function.arguments;
-                }
+
+                this.streamingToolCalls.set(conversationId, acc);
+
+                // Only broadcast valid tool calls (those with a non-empty function name)
+                const toolCallsValue = acc
+                  .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
+                  .map((tc) => ({
+                    id: tc.id,
+                    type: 'function',
+                    function: {
+                      name: tc.function.name,
+                      arguments: tc.function?.arguments || '',
+                      ...(() => {
+                        const obj = this.parseToolArguments(tc.function?.arguments);
+                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
+                      })(),
+                    },
+                  }));
+
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/tool_calls',
+                  value: toolCallsValue,
+                });
+              } else if (toolCallsFromMessage.length > 0) {
+                // Snapshot tool_calls from message node (no incremental indices)
+                const normalized = toolCallsFromMessage.map((tc: any) => {
+                  const args = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
+                  const obj = this.parseToolArguments(args);
+                  return {
+                    id: tc?.id,
+                    type: 'function',
+                    function: {
+                      name: tc?.function?.name,
+                      arguments: args,
+                      ...(obj && typeof obj === 'object' ? { arguments_json: obj } : {}),
+                    },
+                  };
+                });
+
+                this.streamingToolCalls.set(conversationId, normalized);
+
+                // Broadcast only valid entries (non-empty function name)
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/tool_calls',
+                  value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
+                });
               }
-
-              this.streamingToolCalls.set(conversationId, acc);
-
-              // Use replace operation to set/update the tool_calls field
-              const toolCallsValue = acc.map((tc) => ({
-                id: tc.id,
-                type: 'function',
-                function: {
-                  name: tc.function?.name || '',
-                  arguments: tc.function?.arguments || '',
-                },
-              }));
-
-              const toolCallsOperation: Operation = {
-                op: 'replace',
-                path: '/messages/-1/tool_calls',
-                value: toolCallsValue,
-              };
-
-              await this.streamingService.broadcastDelta(conversationId, toolCallsOperation);
             } catch (e) {
               // ignore tool_call parse errors to avoid breaking streaming
               console.warn('[STREAMING] Tool call processing error:', e);
@@ -439,27 +666,41 @@ export class ConversationService {
         }
 
         const finalContent = this.streamingContent.get(conversationId) || '';
+        const finalReasoning = this.streamingReasoning.get(conversationId) || '';
+        const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
+        const validToolCalls = finalToolCallsAcc.filter(
+          (tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0
+        );
 
         // Build finalization task: ensure final patches and persistence complete in order.
         try {
           // Content was already incrementally streamed to /messages/-1/content during chunks
 
-          // Persist and patch id/updatedAt while placeholder is still active
-          if (finalContent && finalContent.trim().length > 0) {
+          // Persist and patch id/updatedAt while placeholder is still active.
+          // Persist if we have content OR at least one valid tool_call (tool-only responses).
+          if (
+            (finalContent && finalContent.trim().length > 0) ||
+            validToolCalls.length > 0 ||
+            (finalReasoning && finalReasoning.trim().length > 0)
+          ) {
             try {
-              const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
               const assistantMessage = await this.messageService.createMessage({
                 conversationId,
                 role: 'assistant',
                 content: finalContent,
                 messageType: 'agent_response',
-                ...(finalToolCallsAcc.length > 0 && {
-                  tool_calls: finalToolCallsAcc.map((tc) => ({
+                ...(finalReasoning && { reasoning: finalReasoning }),
+                ...(validToolCalls.length > 0 && {
+                  tool_calls: validToolCalls.map((tc) => ({
                     id: tc.id,
                     type: 'function',
                     function: {
-                      name: tc.function?.name || '',
+                      name: tc.function.name,
                       arguments: tc.function?.arguments || '',
+                      ...(() => {
+                        const obj = this.parseToolArguments(tc.function?.arguments);
+                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
+                      })(),
                     },
                   })),
                 }),
@@ -478,16 +719,26 @@ export class ConversationService {
               });
 
               // Finalize message content with one replace of the full text (clients will stop using chunks)
-              await this.streamingService.broadcastDelta(conversationId, {
-                op: 'replace',
-                path: '/messages/-1/content',
-                value: finalContent,
-              });
+              if (finalContent && finalContent.trim().length > 0) {
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/content',
+                  value: finalContent,
+                });
+              }
+              // Finalize reasoning text
+              if (finalReasoning && finalReasoning.trim().length > 0) {
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'replace',
+                  path: '/messages/-1/reasoning',
+                  value: finalReasoning,
+                });
+              }
             } catch (persistError) {
               console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
             }
           } else {
-            console.log('[STREAMING] Skipping persistence - empty content');
+            console.log('[STREAMING] Skipping persistence - empty content and no valid tool_calls');
           }
 
           // Defer streaming=false and chunks removal to workflow_completed to avoid premature client close
@@ -513,6 +764,7 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // console.log('Execution >>>', JSON.stringify(event.data?.execution, null, 2));
         // Just before emitting "complete", finalize the assistant placeholder so UIs see the finished state
         // (but not earlier to avoid client prematurely closing the SSE on streaming=false).
         if (this.streamingService && this.streamingService.isActive(conversationId)) {
@@ -569,7 +821,18 @@ export class ConversationService {
       }
 
       case 'tool_started': {
-        console.log('[STREAMING] Tool started:', event.data?.toolName);
+        // Log argument preview to verify parsing/shape reaching the Tool node
+        try {
+          const args = (event as any)?.data?.arguments;
+          const preview = args !== undefined ? JSON.stringify(args).slice(0, 1000) : undefined;
+          console.log('[STREAMING] Tool started:', (event as any)?.data?.toolName, {
+            toolCallId: (event as any)?.data?.toolCallId,
+            argsType: typeof args,
+            argsPreview: preview,
+          });
+        } catch {
+          console.log('[STREAMING] Tool started:', event.data?.toolName);
+        }
         // Tool started - we can optionally broadcast this or track it
         break;
       }

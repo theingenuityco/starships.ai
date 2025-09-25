@@ -63,8 +63,8 @@ const result = await agent.execute('What is 25 * 4 + 17?');
 - The Tool node executes that blueprint using a fresh Engine + Execution (same pattern as the Workflow node).
 - Pass any runtime configuration as regular tool arguments; they will be available as initial input (`$json`) to the tool blueprint.
 
-- The Tool node is a lightweight wrapper and is intentionally stateless. It has no knowledge of LLMs, execution context, or agent state.
-- The Tool node does not inspect prior LLM outputs or tool_calls. Orchestrators must pass tool arguments explicitly via the Tool node's input; these will be available as the initial `$json` for the tool blueprint.
+- The Tool node is a lightweight wrapper and is intentionally stateless. It does not parse tool arguments.
+- The Tool node consumes pre-parsed `arguments_json` produced by the LLM. In the built-in Agent loop, a small Code node materializes `arguments_json` into a plain object and passes it as the Tool input. External orchestrators may also pass a plain object directly as the Tool node's input to make it available as the initial `$json` for the tool blueprint.
 
 ## Architecture Details
 
@@ -212,3 +212,11 @@ Notes:
 - **No External Dependencies**: Uses existing autopilot components
 - **Dynamic Execution**: Creates tool calling loops automatically
 - **Memory Integration**: Works with agent memory system
+
+## Error handling and loop prevention
+
+- Tools execute their own blueprint with failOnNodeError enabled. On failure, the Tool node returns an ExecutionItem that sets `error` and also provides `json` with a structured payload:
+  - `{ ok: false, error: "<message>", details: { stack?: string, nodeRef?: string, depth: number, runner: "local" | "child", toolName: string, toolCallId?: string, timestamp: string } }`
+  - This allows inline mutations to execute and publish a detailed tool message for the LLM.
+- The Agent’s default blueprint serializes the `json` payload when present (including `details`). If `json` is missing, it falls back to the `error` string. The tool role message therefore contains all available diagnostics that the LLM can reason about.
+- This prevents infinite loops when a tool fails (for example, tool_smoke_test), because the LLM now receives a concrete tool response (even on failure) and can proceed without repeatedly issuing the same tool call.

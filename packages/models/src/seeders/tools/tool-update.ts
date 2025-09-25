@@ -4,14 +4,13 @@ import type { ToolTemplateModel } from '@starships/protocol';
 /**
  * Tool: tool_update
  * Update an existing Tool instance on a starship via server REST API
- * Accepts either direct "id" or "slug" (uses state.starshipId) to resolve the tool ID first.
+ * Accepts "slug" (uses state.starshipId) to resolve the tool ID first.
  */
 export const toolUpdateTool: ToolParams = {
   name: 'tool_update',
   description: `Update an existing Tool instance on the current starship.
 
 Identify target:
-- Provide id directly (preferred), or
 - Provide slug (resolved using STARSHIP_ID)
 
 Patchable fields (at least one required):
@@ -34,9 +33,8 @@ Behavior and limits:
   parameters: {
     type: 'object',
     properties: {
-      // Identifier options
-      id: { type: 'string', description: 'Tool ID to update (preferred when known)' },
-      slug: { type: 'string', description: 'Tool slug (required if resolving by slug)' },
+      // Identifier
+      slug: { type: 'string', description: 'Tool slug on current starship' },
 
       // Patchable fields (all optional)
       name: { type: 'string', description: 'New tool name' },
@@ -57,7 +55,7 @@ Behavior and limits:
         ref: 'validate',
         type: 'code',
         name: 'Validate Inputs',
-        description: 'Ensure we have either id or slug',
+        description: 'Ensure slug and required env are present',
         parameters: {
           code: `
             const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
@@ -65,17 +63,14 @@ Behavior and limits:
             const authToken = env('AUTH_TOKEN');
             if (!authToken) throw new Error('authToken is required');
 
-            // Determine if we have id or need to resolve via slug (starship is inferred from state)
-            const hasId = typeof input.id === 'string' && input.id.length > 0;
+            // Resolve via slug only (starship is inferred from state)
             const slug = input.slug;
             const starshipId = env('STARSHIP_ID') || (state && typeof state === 'object' ? state.starshipId : undefined);
-            const hasSlugResolve = !!slug;
 
-            if (!hasId && !hasSlugResolve) {
-              throw new Error('Provide "id" OR "slug" to resolve the tool (starship inferred from state).');
+            if (!slug) {
+              throw new Error('slug is required');
             }
-
-            if (hasSlugResolve && !starshipId) {
+            if (!starshipId) {
               throw new Error('starshipId is required');
             }
 
@@ -94,11 +89,9 @@ Behavior and limits:
 
             return {
               baseUrl,
-              hasId,
-              hasSlugResolve,
+              hasSlugResolve: true,
               starshipId,
               slug,
-              id: input.id,
               patch,
               headers: {
                 'Authorization': \`Bearer \${authToken}\`,
@@ -142,16 +135,23 @@ Behavior and limits:
         parameters: {
           code: `
             const ctx = $lastOutputOf('validate')[0].json;
-            let toolId = ctx.id;
 
-            if (!ctx.hasId && ctx.hasSlugResolve) {
-              const http = $lastOutputOf('maybe_fetch_by_slug')[0]?.json;
-              const fetched = http && typeof http === 'object' ? (http.body ?? http) : http;
-              if (!fetched || !fetched.id) {
-                throw new Error('Failed to resolve tool by slug for given starshipId');
-              }
-              toolId = fetched.id;
+            const http = $lastOutputOf('maybe_fetch_by_slug')[0]?.json;
+
+            // Normalize HTTP response: unwrap .body and prefer .data when present
+            let fetched;
+            if (http && typeof http === 'object') {
+              const hasBody = 'body' in http;
+              const body = hasBody ? http['body'] : http;
+              fetched = body && typeof body === 'object' && 'data' in body ? body['data'] : body;
+            } else {
+              fetched = http;
             }
+
+            if (!fetched || !fetched.id) {
+              throw new Error('Failed to resolve tool by slug for given starshipId');
+            }
+            const toolId = fetched.id;
 
             return {
               url: \`\${ctx.baseUrl}/tools/\${toolId}\`,
@@ -213,8 +213,7 @@ export const toolUpdateToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
 
   slug: 'tool-update',
   category: 'automation',
-  exampleUsage:
-    'By id: { "id": "...", "isEnabled": false } | By slug: { "slug": "...", "name": "New Name" } // env inferred (baseUrl, authToken, starshipId)',
+  exampleUsage: 'By slug: { "slug": "...", "name": "New Name" } // env inferred (baseUrl, authToken, starshipId)',
   requiresApiKey: false,
   configurationFields: [],
 };

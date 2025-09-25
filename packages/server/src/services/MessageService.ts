@@ -32,6 +32,7 @@ export class MessageService {
       content: request.content,
       messageType: request.messageType,
       conversationId: request.conversationId,
+      ...(request.reasoning && { reasoning: request.reasoning }),
       ...(request.tool_calls && { tool_calls: request.tool_calls }),
       ...(request.tool_call_id && { tool_call_id: request.tool_call_id }),
     });

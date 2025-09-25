@@ -457,6 +457,12 @@ const toolNode = {
 };
 ```
 
+Note on arguments parsing:
+
+- The LLM layer is authoritative for tool_call argument parsing.
+- Tools assume pre-parsed function.arguments_json and will not attempt to parse string arguments.
+- If arguments_json is missing, Tool execution fails with an explicit error so the conversation can proceed with diagnostics.
+
 ### Tool Usage Examples
 
 ```typescript
@@ -503,6 +509,7 @@ pnpm run test         # Run tests
 ## Additional Documentation
 
 - **[Tool Calling Guide](./README-TOOLS.md)** - Complete guide to implementing and using function calling with LLMs
+- **[Template Expressions & Eval Engine](./README-EVAL.md)** - Comprehensive guide to `{{ jsExpression }}` syntax, context variables, helper functions, and evaluation patterns
 
 ---
 

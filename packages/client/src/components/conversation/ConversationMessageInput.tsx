@@ -45,7 +45,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const createConversation = useCreateConversation()
 
     // Use streamedQuery-based conversation hook
-    const { sendMessage: sendMessageFn, isSending, isStreaming: isStreamingEffective } = useConversationStreamed(conversationId ?? null)
+    const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null)
+    const isStreamingEffective = isResponding
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 

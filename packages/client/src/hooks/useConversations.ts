@@ -539,7 +539,9 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       const messages = clone(acc)
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'assistant') {
-          messages[i] = { ...(messages[i] as any), content: chunk.value, streaming: true } as ClientMessage
+          // Preserve existing streaming flag; server may finalize after streaming=false
+          const prev: any = messages[i]
+          messages[i] = { ...prev, content: chunk.value } as ClientMessage
           break
         }
       }
@@ -549,7 +551,9 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       const messages = clone(acc)
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'assistant') {
-          messages[i] = { ...(messages[i] as any), reasoning: chunk.value, streaming: true } as ClientMessage
+          // Preserve existing streaming flag
+          const prev: any = messages[i]
+          messages[i] = { ...prev, reasoning: chunk.value } as ClientMessage
           break
         }
       }
@@ -616,8 +620,45 @@ export function useConversationStreamed(conversationId: string | null) {
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
 
-  // Derive UI streaming state from messages rather than query fetchStatus
-  const uiStreaming = useMemo(() => computedMessages.some(m => (m as any)?.streaming === true), [computedMessages])
+  // Derived streaming flags
+  const isAssistantStreaming = useMemo(() => computedMessages.some(m => (m as any)?.streaming === true), [computedMessages])
+
+  // Awaiting assistant = after the last user message, no assistant progress yet and the stream is open
+  const isAwaitingAssistant = useMemo(() => {
+    if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
+
+    let lastUserIdx = -1
+    for (let i = computedMessages.length - 1; i >= 0; i--) {
+      if (computedMessages[i].role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+    if (lastUserIdx === -1) return false
+
+    let hasAssistantAfter = false
+    let hasAssistantProgress = false
+    for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
+      const m: any = computedMessages[i]
+      if (m?.role !== 'assistant') continue
+      hasAssistantAfter = true
+      const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
+      const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
+      const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
+      const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
+      if (hasChunks || hasRChunks || hasReasoning || hasContent) {
+        hasAssistantProgress = true
+        break
+      }
+    }
+
+    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
+    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
+    return false
+  }, [computedMessages, messagesQuery.fetchStatus])
+
+  // Unified responder state for UI (input gating and gap loader)
+  const isResponding = isAssistantStreaming || isAwaitingAssistant
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {
@@ -642,7 +683,13 @@ export function useConversationStreamed(conversationId: string | null) {
     messages: computedMessages,
     isLoading: messagesQuery.isLoading,
     error: messagesQuery.error,
-    isStreaming: uiStreaming,
+    // Backwards-compatible: expose responding state as isStreaming
+    isStreaming: isResponding,
+    // Also expose granular flags
+    isResponding,
+    isAssistantStreaming,
+    isAwaitingAssistant,
+    isFetching: messagesQuery.fetchStatus === 'fetching',
     sendMessage: (data: CreateMessageRequest & { conversationId: string }) => sendMessageMutation.mutateAsync(data),
     isSending: sendMessageMutation.isPending,
     refetch: messagesQuery.refetch,

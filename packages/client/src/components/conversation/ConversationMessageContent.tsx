@@ -59,19 +59,7 @@ export function ConversationMessageContent({
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
-  const normalizedToolCalls = useMemo(
-    () =>
-      Array.isArray(toolCalls)
-        ? toolCalls.filter(tc => {
-            const fn = (tc as any)?.function
-            const hasName = typeof fn?.name === 'string' && fn.name.length > 0
-            const hasId = (tc as any)?.id != null && String((tc as any).id).length > 0
-            const hasArgs = typeof fn?.arguments === 'string' && fn.arguments.length > 0
-            return hasName || hasId || hasArgs
-          })
-        : [],
-    [toolCalls]
-  )
+  const normalizedToolCalls = useMemo(() => (Array.isArray(toolCalls) ? toolCalls.filter(tc => typeof tc === 'object' && tc !== null) : []), [toolCalls])
 
   // Tool call header icon state handling
   const totalToolCalls = normalizedToolCalls.length

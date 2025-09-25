@@ -129,28 +129,9 @@ export class Agent implements NodeHandler {
           parameters: {
             code: `
               const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const call = last?.choices?.[0]?.message?.tool_calls?.[0];
-              const j = call?.function?.arguments_json;
+              const j = last?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments_json;
               if (j && typeof j === 'object') { return j; }
-              const raw = call?.function?.arguments;
-              const tryParse = (input) => {
-                if (input == null) return undefined;
-                if (typeof input === 'object') return input;
-                if (typeof input !== 'string') return undefined;
-                let s = input.replace(/\\r/g, '').trim();
-                for (let i = 0; i < 3; i++) {
-                  const first = s[0], last = s[s.length - 1];
-                  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-                    s = s.slice(1, -1);
-                  }
-                  try { const parsed = JSON.parse(s); if (parsed && typeof parsed === 'object') return parsed; } catch { /* ignore */ }
-                }
-                try { const parsed = JSON.parse(s); if (parsed && typeof parsed === 'object') return parsed; } catch { /* ignore */ }
-                return undefined;
-              };
-              const parsed = tryParse(raw);
-              if (parsed && typeof parsed === 'object') { return parsed; }
-              throw new Error('Missing tool_call arguments');
+              throw new Error('Missing tool_call function.arguments_json');
             `,
             timeout: 3000,
           },
@@ -201,15 +182,15 @@ export class Agent implements NodeHandler {
         // LLM -> Conditional
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
         // Conditional -> LLM (if finish_reason === "length")
-        { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'length' },
+        { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'continue' },
         // Conditional -> Prepare Args (if tool_calls exist)
-        { ref: 'edge_conditional_args', from: conditionalNodeRef, to: argsNodeRef, condition: 'true' },
+        { ref: 'edge_conditional_args', from: conditionalNodeRef, to: argsNodeRef, condition: 'call_tool' },
         // Prepare Args -> Tool
         { ref: 'edge_args_tool', from: argsNodeRef, to: toolNodeRef },
         // Tool -> LLM (loop back)
         { ref: 'edge_tool_llm', from: toolNodeRef, to: llmNodeRef },
         // Conditional -> End (if no tool_calls)
-        { ref: 'edge_conditional_end', from: conditionalNodeRef, to: endRef, condition: 'false' },
+        { ref: 'edge_conditional_end', from: conditionalNodeRef, to: endRef, condition: 'complete' },
       ],
       metadata: {
         generatedBy: 'Agent constructor',

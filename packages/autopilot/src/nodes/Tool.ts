@@ -7,7 +7,7 @@
 
 import { BaseNode } from './BaseNode';
 import type { ToolParams } from '@/types/node-parameters';
-import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
+import { ValidationResult, ValidationError, ExecutionItem, Execution } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { EngineConfig } from '@/engine/Engine';
@@ -24,6 +24,9 @@ export class Tool extends BaseNode<ToolParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
+
+    // Will hold nested execution context; populated before running the sub-blueprint
+    let subExec: Execution | undefined;
 
     try {
       // Extract tool arguments from input
@@ -52,7 +55,7 @@ export class Tool extends BaseNode<ToolParams> {
       // Execute the tool's blueprint using depth-aware Runner selection
       // IMPORTANT: propagate parent execution to set correct execution.depth (nested = depth>0)
       const parentExecution = this.getOptions()?.execution;
-      const subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
+      subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
       const engineConfig: EngineConfig = {
         eventCallback: this.getEventCallback(),
@@ -81,9 +84,34 @@ export class Tool extends BaseNode<ToolParams> {
 
       return ExecutionItemUtils.wrapSingle(result, input?.[0]);
     } catch (error) {
-      // Emit tool_complete event with error
+      // Emit tool_complete event with error and structured result payload for consumers
       const eventCallback = this.getOptions()?.eventCallback;
       const errorMessage = error instanceof Error ? error.message : 'Unknown tool error';
+
+      // Build rich error details so the LLM/consumers can use actionable diagnostics
+      const parentDepth = this.getOptions()?.execution?.depth ?? 0;
+      const depth = subExec?.depth ?? parentDepth + 1;
+      const runnerKind = depth === 0 ? 'child' : 'local';
+      const details = {
+        name: error instanceof Error ? error.name : 'Error',
+        message: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined,
+        cause:
+          error && typeof error === 'object' && 'cause' in (error as Record<string, unknown>)
+            ? (error as Record<string, unknown>).cause
+            : undefined,
+        nodeRef: subExec?.currentNodeRef,
+        depth,
+        runner: runnerKind,
+        toolName: params.name,
+        toolCallId: params.toolCallId,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Prepare structured error payload once so both events and return value are consistent
+      const inputItem = input?.[0];
+      const errorPayload = { ok: false, error: errorMessage, details };
+
       if (eventCallback) {
         try {
           await eventCallback({
@@ -91,28 +119,40 @@ export class Tool extends BaseNode<ToolParams> {
             timestamp: new Date().toISOString(),
             data: {
               toolName: params.name,
-              error: errorMessage,
               toolCallId: params.toolCallId,
+              error: errorMessage,
+              // Provide structured details on error as well (same shape as success 'result')
+              result: errorPayload,
             },
           });
         } catch {
           // Ignore callback errors to avoid masking the original error
         }
       }
-      throw this.handleExecutionError(error, `Tool '${params.name}' execution failed`);
+
+      // Return an ExecutionItem that marks error and carries structured json payload
+      return [
+        {
+          json: errorPayload,
+          error: errorMessage,
+          pairedItem: inputItem?.pairedItem || { item: 0 },
+          binary: inputItem?.binary,
+        },
+      ];
     }
   }
 
   /**
-   * Extract tool arguments from input data
-   * Only accept plain object as arguments; do not parse JSON strings here.
-   * Parsing (e.g. LLM tool_calls.function.arguments) must be done upstream.
+   * Extract tool arguments from upstream input
+   * Accepted inputs:
+   * - Plain object (already parsed args) -> passthrough
+   * Any other input results in an error. Tools do not parse or derive arguments.
    */
   private extractToolArguments(inputData: unknown): Record<string, unknown> {
-    if (inputData && typeof inputData === 'object') {
+    if (inputData && typeof inputData === 'object' && !Array.isArray(inputData)) {
       return inputData as Record<string, unknown>;
     }
-    return {};
+    throw new Error('Tool arguments must be provided as a plain object input.');
   }
 
   /**

@@ -7,7 +7,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
 function createGaiaBlueprint(): Blueprint {
   const agent = new Agent({
     name: 'Gaia Agent Builder',
-    model: 'anthropic/claude-3.5-sonnet',
+    model: 'openai/gpt-5',
     temperature: 0.4,
     maxTokens: 3000,
   });
@@ -70,7 +70,7 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
   description: 'Expert AI agent builder that helps you design, create, and optimize other AI agents with advanced workflow capabilities.',
   category: 'general',
 
-  model: 'anthropic/claude-3.5-sonnet',
+  model: 'openai/gpt-5',
   temperature: 0.4,
   maxTokens: 3000,
 

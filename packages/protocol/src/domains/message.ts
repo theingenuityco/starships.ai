@@ -23,6 +23,8 @@ export type MessageType =
 
 export interface Message extends LlmMessage {
   messageType: MessageType;
+  // Optional model-provided reasoning/thinking text
+  reasoning?: string;
 }
 
 /**

@@ -135,20 +135,23 @@ export const toolSmokeTestTool: ToolParams = {
         },
       },
 
-      // Run the fetched tool's blueprint as a nested workflow with the provided args
+      // Run the fetched tool using the Tool node (instead of Workflow) with the provided args
       {
         ref: 'run_tool',
-        type: 'workflow',
+        type: 'tool',
         name: 'Run Target Tool',
         description: 'Execute target tool blueprint with provided arguments',
         parameters: {
-          name: 'Nested Tool Execution',
+          // Prefer server-provided name; fallback to a generic label
+          name: '{{ ($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.name) ? $lastOutputOf("http_get_tool")[0].json.body.name : "Nested Tool Execution" }}',
           description: 'Smoke test runner',
-          // Blueprint reference from fetch step (server returns ApiResponse<ToolModel> { data: ToolModel })
-          blueprint: '{{ $lastOutputOf("http_get_tool")[0].json.body.blueprint }}',
-          // If you want to allow timeout override via inputs:
-          // timeout: '{{ $lastOutputOf("__initial__")[0].json.timeoutMs ?? 60000 }}'
-          timeout: 60000,
+          // Use server-provided parameters schema when available; fallback to minimal object schema
+          parameters:
+            '{{ ($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.parameters) ? $lastOutputOf("http_get_tool")[0].json.body.parameters : ({ "type": "object", "properties": {} }) }}',
+          // Blueprint reference from fetch step.
+          // Prefer body.blueprint; fall back to body.data.blueprint when server wraps payloads.
+          blueprint:
+            '{{ ($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.blueprint) ? $lastOutputOf("http_get_tool")[0].json.body.blueprint : (($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.data) ? $lastOutputOf("http_get_tool")[0].json.body.data.blueprint : undefined) }}',
         },
       },
 
@@ -189,7 +192,7 @@ export const toolSmokeTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdA
   parameters: toolSmokeTestTool.parameters,
   blueprint: toolSmokeTestTool.blueprint,
 
-  slug: 'tool-smoke-test',
+  slug: 'tool-test',
   category: 'automation',
   exampleUsage: '{ "targetSlug": "my-tool", "arguments": { ... } } // returns { ok, durationMs, result } (env inferred)',
   requiresApiKey: false,

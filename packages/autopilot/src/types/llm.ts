@@ -8,6 +8,8 @@ export type LLMMessageRole = 'user' | 'assistant' | 'system' | 'tool';
 export interface LlmFunctionCall {
   name: string;
   arguments: string;
+  // Optional pre-parsed JSON form of the arguments when available
+  arguments_json?: unknown;
 }
 
 export interface LlmToolCall {
@@ -16,9 +18,38 @@ export interface LlmToolCall {
   function: LlmFunctionCall;
 }
 
+// Unified OpenRouter reasoning details
+export type ReasoningDetail =
+  | {
+      type: 'reasoning.summary';
+      summary: string;
+      id?: string | null;
+      format?: 'unknown' | 'openai-responses-v1' | 'anthropic-claude-v1';
+      index?: number;
+    }
+  | {
+      type: 'reasoning.encrypted';
+      data: string;
+      id?: string | null;
+      format?: 'unknown' | 'openai-responses-v1' | 'anthropic-claude-v1';
+      index?: number;
+    }
+  | {
+      type: 'reasoning.text';
+      text: string;
+      signature?: string | null;
+      id?: string | null;
+      format?: 'unknown' | 'openai-responses-v1' | 'anthropic-claude-v1';
+      index?: number;
+    };
+
 export interface LlmMessage {
   role: LLMMessageRole;
   content: string;
+  // Optional model-provided reasoning/thinking text (for reasoning-capable models)
+  reasoning?: string;
+  // Optional unified reasoning details (OpenRouter normalized)
+  reasoning_details?: ReasoningDetail[];
   /**
    * The ID of the tool call this message is a result of.
    * For tool role messages emitted after executing a function/tool, providers use this to link

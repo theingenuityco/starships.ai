@@ -109,6 +109,13 @@ export interface LlmParams extends BaseParams {
   frequencyPenalty?: number | string; // Supports template expressions
   presencePenalty?: number | string; // Supports template expressions
   tools?: ToolParams[] | string; // Optional tools for function calling schema, supports template expressions
+  // OpenRouter unified reasoning configuration (optional)
+  reasoning?: {
+    effort?: 'low' | 'medium' | 'high';
+    max_tokens?: number;
+    exclude?: boolean;
+    enabled?: boolean;
+  };
 }
 
 /**

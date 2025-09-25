@@ -7,7 +7,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
 function createDaedalusBlueprint(): Blueprint {
   const agent = new Agent({
     name: 'Daedalus Toolwright',
-    model: 'anthropic/claude-3.5-sonnet',
+    model: 'openai/gpt-5',
     temperature: 0.3,
     maxTokens: 3200,
   });
@@ -150,13 +150,14 @@ JSON Patch semantics (used by transform/mutate):
 
 Config limits and defaults (from constants):
 - APPROVAL_TIMEOUT=1800000ms, EXECUTION_TIMEOUT=3600000ms, USER_PROMPT_TIMEOUT=3600000ms, AGENT_EXECUTION_TIMEOUT=600000ms.
-- MAX_NODES=50, MAX_EDGES=100, MAX_CONDITIONAL_DEPTH=10, MAX_NODE_VISITS=3.
+- MAX_NODES=50, MAX_EDGES=100, MAX_CONDITIONAL_DEPTH=10, MAX_NODE_VISITS=100.
 - DEFAULT_RETRIES=3, RETRY_BACKOFF_MS=1000, EXPRESSION_TIMEOUT_MS=5000.
 
 Host tools available to you (names to call via function calling):
 - tool_list: {} -> array of { slug, name, description, isEnabled } (lean; no blueprints in output).
+- tool_get: { slug } -> full tool model for that slug on STARSHIP_ID (includes blueprint and configuration).
 - tool_create: requires { name, slug, description, parameters(JSON Schema), blueprint }; optional { configuration, isEnabled } -> created tool model.
-- tool_update: identify by { id } or by { slug } (resolved under STARSHIP_ID); patch any of { name, description, parameters, blueprint, configuration, isEnabled } -> updated tool model.
+- tool_update: identify by { slug } (resolved under STARSHIP_ID); patch any of { name, description, parameters, blueprint, configuration, isEnabled } -> updated tool model.
 - tool_smoke_test: { targetSlug, arguments?, timeoutMs? } -> { ok, durationMs, result } after executing target blueprint.
 - blueprint_lint: { blueprint } -> { ok, issues[], summary }.
 
@@ -194,12 +195,12 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',
 
-  model: 'anthropic/claude-3.5-sonnet',
+  model: 'openai/gpt-5',
   temperature: 0.3,
   maxTokens: 3200,
 
   // Tool assignment - host tools for managing tools on the starship
-  assignedToolSlugs: ['tool-list', 'tool-create', 'tool-update', 'tool-smoke-test', 'blueprint-lint'],
+  assignedToolSlugs: ['tool-list', 'tool-get', 'tool-create', 'tool-update', 'tool-test', 'blueprint-lint'],
 
   icon: '🛠️',
   previewPrompts: [

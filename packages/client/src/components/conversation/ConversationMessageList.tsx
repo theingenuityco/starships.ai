@@ -3,9 +3,10 @@
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { Bot, User, Loader2 } from 'lucide-react'
+import { Bot, User } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
+import { useConversationStreamed } from '@/hooks/useConversations'
 
 // Stable empty array to prevent re-render storms when no conversationId is present.
 // Returning a new array literal from the selector causes a new reference on every store change.
@@ -21,21 +22,15 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
   const isLoading = false
   const error: any = null
+  const { messages, isResponding: isRespondingHook } = useConversationStreamed(conversationId)
 
   // Use stable selectors to avoid returning new objects each render
-  const storeMessages = useStarshipUIStore(state => {
-    if (!conversationId) return EMPTY_MESSAGES as any
-    const convo = state.conversations[conversationId]
-    return (convo?.messages as any) || EMPTY_MESSAGES
-  })
+  // messages are sourced from useConversationStreamed(conversationId)
   const agentName = useStarshipUIStore(state => {
     if (!conversationId) return undefined
     return state.conversations[conversationId]?.agentName
   })
-  const isResponding = useStarshipUIStore(state => {
-    if (!conversationId) return false
-    return state.conversations[conversationId]?.isResponding === true
-  })
+  const isResponding = isRespondingHook
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -43,13 +38,84 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
-    const sortedMessages = [...storeMessages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    // Sort ascending by createdAt
+    const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+    // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
+    const seenIds = new Set<string>()
+    const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
+    for (const m of sortedMessages) {
+      const key = (m as any)?.id != null ? String((m as any).id) : null
+      if (key) {
+        if (seenIds.has(key)) continue
+        seenIds.add(key)
+      }
+      uniqueMessages.push(m)
+    }
+
+    // Collapse temp assistant shell followed by concrete assistant from server (UI-level safety if merging missed)
+    const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
+    for (let i = 0; i < uniqueMessages.length; i++) {
+      const cur: any = uniqueMessages[i]
+
+      // 1) Collapse local temp assistant shell into the next concrete assistant
+      if (cur?.role === 'assistant' && typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-')) {
+        const next: any = uniqueMessages[i + 1]
+        if (next && next.role === 'assistant' && !(typeof next.id === 'string' && next.id.startsWith('temp-assistant-'))) {
+          const merged: any = { ...next }
+          if (Array.isArray(cur.chunks) && (!Array.isArray(merged.chunks) || merged.chunks.length === 0)) {
+            merged.chunks = cur.chunks
+          }
+          if (Array.isArray(cur.reasoningChunks) && (!Array.isArray(merged.reasoningChunks) || merged.reasoningChunks.length === 0)) {
+            merged.reasoningChunks = cur.reasoningChunks
+          }
+          if ((merged as any).tool_calls == null || (merged as any).tool_calls.length === 0) {
+            ;(merged as any).tool_calls = cur.tool_calls
+          }
+          merged.streaming = cur.streaming || merged.streaming
+          collapsedMessages.push(merged)
+          i++ // skip concrete assistant already merged
+          continue
+        }
+      }
+
+      // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or tool_calls).
+      // Preserve if it's actively streaming (so caret can show) and only drop if non-streaming.
+      if (cur?.role === 'assistant' && !(typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-'))) {
+        const streaming = Boolean((cur as any)?.streaming)
+        const hasContent = typeof cur?.content === 'string' && cur.content.trim().length > 0
+        const hasChunks = Array.isArray(cur?.chunks) && cur.chunks.length > 0
+        const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
+        const hasReasoning = typeof cur?.reasoning === 'string' && cur.reasoning.trim().length > 0
+        const hasToolCalls = Array.isArray(cur?.tool_calls) && cur.tool_calls.length > 0
+
+        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls)) {
+          // Keep actively streaming assistant shells visible
+          if (streaming) {
+            collapsedMessages.push(cur)
+            continue
+          }
+          const next: any = uniqueMessages[i + 1]
+          if (next && next.role === 'assistant') {
+            // skip current blank shell; next will be processed/pushed in subsequent iterations
+            continue
+          } else {
+            // trailing blank shell — drop it
+            continue
+          }
+        }
+      }
+
+      collapsedMessages.push(cur)
+    }
+
+    const baseMessages = collapsedMessages
 
     // First pass: collect all tool result messages by normalized tool call id
     const toolResultsMap = new Map<string, any>()
     const processedResultIds = new Set<string>()
 
-    sortedMessages.forEach(msg => {
+    baseMessages.forEach(msg => {
       if (msg.messageType === 'tool_result') {
         const rid = (msg as any).tool_call_id ?? (msg as any).call_id ?? (msg as any).id
         if (rid != null) {
@@ -61,7 +127,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     // Second pass: group messages and attach matching tool results
     const groupedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }> = []
 
-    for (const message of sortedMessages) {
+    for (const message of baseMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
       if (message.role === 'assistant' && (message as any).tool_calls?.length > 0) {
         const toolCallIds = ((message as any).tool_calls || [])
@@ -95,8 +161,21 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       }
     }
 
-    return groupedMessages
-  }, [storeMessages])
+    // UI guard: drop blank assistant shells (no content/chunks/reasoning and no tool_calls).
+    // NOTE: Do NOT treat toolResults alone as renderable; without tool_calls the tool panel won't show.
+    const pruned = groupedMessages.filter(msg => {
+      if (msg.role !== 'assistant' || msg.messageType === 'tool_result') return true
+      const a: any = msg as any
+      const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
+      const hasChunks = Array.isArray(a?.chunks) && a.chunks.length > 0
+      const hasRChunks = Array.isArray(a?.reasoningChunks) && a.reasoningChunks.length > 0
+      const hasReasoning = typeof a?.reasoning === 'string' && a.reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray(a?.tool_calls) && a.tool_calls.length > 0
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls
+    })
+
+    return pruned
+  }, [messages])
 
   // Determine which assistant message should display the streaming caret (latest streaming one)
   const activeStreamingAssistantId = useMemo(() => {
@@ -108,6 +187,115 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     }
     return lastId
   }, [displayMessages])
+
+  // Determine if any assistant textual progress has occurred after the latest user turn.
+  // Progress means: content tokens (chunks), reasoning tokens (reasoningChunks), final reasoning, or finalized content text.
+  // Tool calls alone do NOT count as progress.
+  const hasAssistantTextProgressAfterUser = useMemo(() => {
+    // Find most recent user message index
+    let lastUserIdx = -1
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      const mm: any = displayMessages[i]
+      if (mm?.role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+    // Scan messages after the last user for any assistant textual progress
+    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
+      const m: any = displayMessages[i]
+      if (m?.role !== 'assistant') continue
+      const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
+      const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
+      const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
+      const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
+      if (hasChunks || hasRChunks || hasReasoning || hasContent) {
+        return true
+      }
+    }
+    return false
+  }, [displayMessages])
+
+  // When tools are executed mid-turn, show the GAP loader again until LLM resumes streaming text/reasoning.
+  // We detect a "gap" if we see a tool_result after the last user message, but no assistant chunks/reasoning chunks
+  // have arrived AFTER that tool_result.
+  const awaitingResumeAfterTools = useMemo(() => {
+    // Find most recent user message index
+    let lastUserIdx = -1
+    for (let i = displayMessages.length - 1; i >= 0; i--) {
+      const mm: any = displayMessages[i]
+      if (mm?.role === 'user') {
+        lastUserIdx = i
+        break
+      }
+    }
+
+    // Most recent tool result timestamp after the user
+    let lastToolTs = -1
+    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
+      const m: any = displayMessages[i]
+      // Standalone tool_result messages
+      if (m?.messageType === 'tool_result') {
+        const t = Date.parse(String(m?.createdAt || m?.updatedAt || ''))
+        if (!Number.isNaN(t)) lastToolTs = Math.max(lastToolTs, t)
+      }
+      // Grouped tool results attached to assistant messages
+      if (m?.role === 'assistant' && Array.isArray(m?.toolResults) && m.toolResults.length > 0) {
+        for (const tr of m.toolResults as any[]) {
+          const t = Date.parse(String(tr?.createdAt || tr?.updatedAt || ''))
+          if (!Number.isNaN(t)) lastToolTs = Math.max(lastToolTs, t)
+        }
+      }
+    }
+    if (lastToolTs < 0) return false
+
+    // Most recent assistant token (content/reasoning) timestamp after the user
+    let lastAssistantChunkTs = -1
+    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
+      const m: any = displayMessages[i]
+      if (m?.role !== 'assistant') continue
+      const lastC = Array.isArray(m?.chunks) && m.chunks.length > 0 ? Number(m.chunks[m.chunks.length - 1]?.timestamp) : -1
+      const lastR = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0 ? Number(m.reasoningChunks[m.reasoningChunks.length - 1]?.timestamp) : -1
+      lastAssistantChunkTs = Math.max(lastAssistantChunkTs, lastC, lastR)
+    }
+
+    // Gap exists if no assistant tokens have arrived AFTER the last tool result
+    return lastAssistantChunkTs < 0 || lastAssistantChunkTs <= lastToolTs
+  }, [displayMessages])
+
+  // Final GAP loader decision: show if we're responding AND either:
+  //  - no assistant text progress yet after the user (first response is pending), or
+  //  - we are waiting for the assistant to resume after tool results.
+  const shouldShowGapLoader = useMemo(() => {
+    return isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
+  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
+
+  // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
+  const renderMessages = useMemo(() => {
+    const canRenderAssistant = (msg: any) => {
+      if (msg.role !== 'assistant') return true
+      if (msg.messageType === 'tool_result') return true
+      const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
+      const hasChunks = Array.isArray(msg.chunks) && msg.chunks.length > 0
+      const hasRChunks = Array.isArray((msg as any)?.reasoningChunks) && (msg as any).reasoningChunks.length > 0
+      const hasReasoning = typeof (msg as any)?.reasoning === 'string' && (msg as any).reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray((msg as any)?.tool_calls) && (msg as any).tool_calls.length > 0
+      const hasToolResults = Array.isArray((msg as any)?.toolResults) && (msg as any).toolResults.length > 0
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults
+    }
+    return displayMessages.filter(canRenderAssistant)
+  }, [displayMessages])
+
+  // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
+  const activeRenderedStreamingAssistantId = useMemo(() => {
+    let lastId: string | null = null
+    for (const m of renderMessages) {
+      if (m.role === 'assistant' && (m as any).streaming) {
+        lastId = m.id
+      }
+    }
+    return lastId
+  }, [renderMessages])
 
   // Optimized auto-scroll with debouncing
   useEffect(() => {
@@ -133,6 +321,18 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     lastMessageCountRef.current = displayMessages.length
   }, [displayMessages.length])
 
+  // Ensure the GAP loader remains visible by auto-scrolling when we are waiting for assistant text
+  // either initially or while waiting after tool results.
+  useEffect(() => {
+    if (!scrollContainerRef.current) return
+    if (shouldShowGapLoader) {
+      requestAnimationFrame(() => {
+        const container = scrollContainerRef.current!
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+      })
+    }
+  }, [shouldShowGapLoader])
+
   if (!conversationId) {
     return <EmptyState />
   }
@@ -157,20 +357,24 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     <div className="h-full flex flex-col">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="max-w-4xl mx-auto space-y-2">
-          {displayMessages.map(message => (
-            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeStreamingAssistantId} />
+          {renderMessages.map(message => (
+            <MemoizedMessageBubble key={message.id} message={message} agentName={agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} />
           ))}
-          {/* Show responding indicator after the last user message */}
-          {isResponding && agentName && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === 'user' && (
+          {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
+          {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 max-w-[85%]">
                 <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1">
                   <Bot className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-2 text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    <span className="text-xs font-medium">{agentName} is thinking...</span>
+                  <div className="inline-flex items-center px-3 py-2 rounded-2xl rounded-tl-none border bg-muted/30 text-muted-foreground">
+                    <span className="text-xs font-medium">{(agentName || 'Assistant') + ' is responding...'}</span>
+                    <span className="inline-flex items-center gap-1.5 ml-2" aria-hidden="true">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
                   </div>
                 </div>
               </div>
@@ -203,7 +407,7 @@ const MemoizedMessageBubble = memo(
       // User message: Blue bubble on the right
       return (
         <div className="flex justify-end">
-          <div className="mb-4 mt-4 flex items-end gap-3 max-w-[70%]">
+          <div className="mb-4 mt-6 flex items-end gap-3 max-w-[70%]">
             <div className={`bg-primary text-primary-foreground rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
               <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
               {message.sending && (
@@ -236,6 +440,8 @@ const MemoizedMessageBubble = memo(
                 isStreaming={!!isStreamingActive}
                 className="text-foreground"
                 chunks={message.chunks}
+                reasoning={(message as any).reasoning}
+                reasoningChunks={(message as any).reasoningChunks}
                 agentName={agentName}
                 toolCalls={(message as any).tool_calls}
                 toolResults={(message as any).toolResults}
@@ -254,10 +460,20 @@ const MemoizedMessageBubble = memo(
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
 
-    // Re-render when text changes
+    // Re-render when text (assistant content) changes
     if (prevProps.message.content !== nextProps.message.content) return false
 
-    // Re-render when chunks count changes
+    // Re-render when reasoning text changes (server may replace aggregated with finalized)
+    const prevReasoning = (prevProps.message as any).reasoning
+    const nextReasoning = (nextProps.message as any).reasoning
+    if (prevReasoning !== nextReasoning) return false
+
+    // Re-render when reasoningChunks count changes (reasoning-first streaming)
+    const prevRChunks = (prevProps.message as any).reasoningChunks?.length ?? 0
+    const nextRChunks = (nextProps.message as any).reasoningChunks?.length ?? 0
+    if (prevRChunks !== nextRChunks) return false
+
+    // Re-render when content chunks count changes
     const prevChunks = prevProps.message.chunks?.length ?? 0
     const nextChunks = nextProps.message.chunks?.length ?? 0
     if (prevChunks !== nextChunks) return false

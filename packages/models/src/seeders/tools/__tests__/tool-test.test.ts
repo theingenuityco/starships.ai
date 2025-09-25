@@ -3,7 +3,7 @@
  * Executes tool_smoke_test using real Autopilot execution with mocked HTTP only
  */
 
-import { toolSmokeTestTool, toolSmokeTestToolTemplate } from '../tool-smoke-test';
+import { toolSmokeTestTool, toolSmokeTestToolTemplate } from '../tool-test';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
@@ -88,7 +88,7 @@ describe('Tool Smoke Test Tool', () => {
       expect(toolSmokeTestToolTemplate.description).toBe(toolSmokeTestTool.description);
       expect(toolSmokeTestToolTemplate.parameters).toEqual(toolSmokeTestTool.parameters);
       expect(toolSmokeTestToolTemplate.blueprint).toEqual(toolSmokeTestTool.blueprint);
-      expect(toolSmokeTestToolTemplate.slug).toBe('tool-smoke-test');
+      expect(toolSmokeTestToolTemplate.slug).toBe('tool-test');
       expect(toolSmokeTestToolTemplate.category).toBe('automation');
       expect(toolSmokeTestToolTemplate.requiresApiKey).toBe(false);
     });
@@ -139,22 +139,34 @@ describe('Tool Smoke Test Tool', () => {
     }
 
     it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, {})).rejects.toThrow('baseUrl is required');
+      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, {})).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('baseUrl is required'),
+      });
     });
 
     it('should fail without auth token', async () => {
       const env = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).rejects.toThrow('authToken is required');
+      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('authToken is required'),
+      });
     });
 
     it('should fail without starship ID', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).rejects.toThrow('starshipId is required');
+      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('starshipId is required'),
+      });
     });
 
     it('should fail when targetSlug is missing', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({}, env)).rejects.toThrow('targetSlug is required');
+      await expect(executeToolWithMockEnv({}, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('targetSlug is required'),
+      });
     });
 
     it('should execute nested tool blueprint and return result with duration', async () => {
@@ -203,13 +215,19 @@ describe('Tool Smoke Test Tool', () => {
         text: async () => JSON.stringify({ error: 'Tool not found' }),
       });
 
-      await expect(executeToolWithMockEnv({ targetSlug: 'missing' }, env)).rejects.toThrow('HTTP request failed');
+      await expect(executeToolWithMockEnv({ targetSlug: 'missing' }, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('HTTP request failed'),
+      });
     });
 
     it('should handle network failure', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env)).rejects.toThrow('Network error');
+      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Network error'),
+      });
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {
@@ -253,7 +271,7 @@ describe('Tool Smoke Test Tool', () => {
     it('should use http_get_tool response body.blueprint for nested run', () => {
       const bp = toolSmokeTestTool.blueprint;
       const run = bp.nodes.find((n) => n.ref === 'run_tool');
-      expect(run?.type).toBe('workflow');
+      expect(run?.type).toBe('tool');
       const params = (run?.parameters || {}) as Record<string, unknown>;
       // Ensure the template references body.blueprint (HttpRequest wraps JSON under .body)
       expect(JSON.stringify(params)).toContain('http_get_tool');

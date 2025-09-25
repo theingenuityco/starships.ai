@@ -7,56 +7,85 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const toolCreateTool: ToolParams = {
   name: 'tool_create',
-  description: `Create a new Tool instance on the current starship.
+  description: `Creates a new Tool instance on the current starship with full blueprint validation and configuration.
 
-Required inputs:
-- name: string
-- slug: string (kebab-case, unique per starship)
-- description: string
-- parameters: object (JSON Schema for tool inputs)
-- blueprint: object { nodes: [], edges: [] } (Autopilot blueprint)
+## Purpose
+Creates executable tools that can be invoked by agents, with complete Autopilot workflow blueprints that define their behavior.
 
-Optional inputs:
-- configuration: object (instance-level config; secrets come from Native Tool API Keys)
-- isEnabled: boolean (default true)
+## Required Parameters
+- **name**: Human-readable tool name (e.g., "Weather Lookup", "Send Email")
+- **slug**: Unique kebab-case identifier (e.g., "weather-lookup", "send-email") 
+- **description**: Clear description of tool functionality and usage
+- **parameters**: JSON Schema defining tool input structure with validation rules
+- **blueprint**: Complete Autopilot workflow blueprint with nodes, edges, and execution logic
 
-Validation and constraints:
-- Blueprint is validated for shape only here; use blueprint_lint for deeper checks
-- No secrets in arguments or blueprint
-- Slug collisions return 409
+## Optional Parameters
+- **configuration**: Instance-specific settings (endpoints, flags, timeouts)
+- **isEnabled**: Tool availability status (default: true)
 
-Implicit environment (do not pass):
-- BASE_URL, AUTH_TOKEN, STARSHIP_ID from agent.state
+## Blueprint Requirements
+Blueprints must follow Autopilot structure:
+- **nodes[]**: Array of workflow nodes (start, end, llm, code, http_request, etc.)
+- **edges[]**: Array of connections defining execution flow
+- **metadata**: Optional blueprint metadata and configuration
 
-Output:
-- API response from POST /starships/:starshipId/tools (includes created tool model)
+## Template Expression Support
+Blueprints support \`{{ jsExpression }}\` syntax for dynamic evaluation:
+- **Context Variables**: \`state\`, \`input\`, \`outputs\`, \`status\`
+- **Helper Functions**: \`$lastOutputOf(nodeRef)\`, \`$input(path)\`, \`env(key)\`
+- **Examples**: \`{{ $json.apiKey }}\`, \`{{ $lastOutputOf("http_1")[0].json }}\`
 
-Behavior and limits:
-- Not idempotent (retries may create duplicates unless slug is unchanged)
-- Timeouts: prepare 3s, HTTP 10s
-- Typical failures: missing env, invalid blueprint shape, validation errors`,
+## Environment Dependencies
+Automatically inferred from agent state (do not pass manually):
+- **BASE_URL**: API server endpoint
+- **AUTH_TOKEN**: Authentication token  
+- **STARSHIP_ID**: Current starship identifier
+
+## Validation & Constraints
+- Blueprint structure validated for basic shape (use blueprint_lint for comprehensive validation)
+- No secrets allowed in parameters or blueprint (use Native Tool API Keys)
+- Slug must be unique per starship (409 error on collision)
+
+## Response & Behavior
+- **Output**: Complete tool model from POST /starships/:starshipId/tools
+- **Timeouts**: Preparation (3s), HTTP request (10s)
+- **Not idempotent**: Retries may create duplicates unless slug unchanged
+- **Common failures**: Missing environment, invalid blueprint, validation errors`,
   parameters: {
     type: 'object',
     properties: {
-      name: { type: 'string', description: 'Tool name' },
-      slug: { type: 'string', description: 'Kebab-case slug for the tool instance' },
-      description: { type: 'string', description: 'Short description of the tool' },
+      name: {
+        type: 'string',
+        description: 'Human-readable tool name (e.g., "Weather Lookup", "Send Email", "Calculate Math")',
+      },
+      slug: {
+        type: 'string',
+        description:
+          'Unique kebab-case identifier for the tool (e.g., "weather-lookup", "send-email", "calculate-math"). Must match pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$',
+      },
+      description: {
+        type: 'string',
+        description: 'Clear description of tool functionality and usage (minimum 10 characters, maximum 500 characters)',
+      },
       parameters: {
         type: 'object',
-        description: 'JSON Schema defining the tool input',
-        properties: {},
+        description:
+          'JSON Schema defining the tool input structure and validation rules. Must have "type": "object" and "properties" defining input parameters. Each property supports type (string|number|boolean|object|array), description, enum for validation. Arrays use "items", objects use "properties". Example: { "type": "object", "properties": { "location": { "type": "string", "description": "City name" }, "units": { "type": "string", "enum": ["metric", "imperial"], "description": "Temperature units" } }, "required": ["location"] }',
       },
       blueprint: {
         type: 'object',
-        description: 'Autopilot blueprint { nodes, edges }',
-        properties: {},
+        description:
+          'Complete Autopilot workflow blueprint defining tool execution logic. Must contain "nodes" array and "edges" array. Nodes have required fields: ref (unique ID), type (start|end|llm|code|http_request|conditional|transform|mutate|tool|agent|workflow|user_prompt), name, description, parameters. Edges have required fields: ref, from (source node ref), to (target node ref), optional condition. Supports template expressions {{ jsExpression }} in parameters for dynamic evaluation using context variables (state, input, outputs, status) and helper functions ($lastOutputOf, $input, env). Common node types: start/end (flow control), llm (AI models with model/messages/temperature), http_request (API calls with url/method/headers/body), code (JavaScript execution), conditional (branching logic), transform/mutate (data operations), tool (nested tools), agent (AI agents), workflow (sub-workflows). Metadata is optional for versioning and documentation.',
       },
       configuration: {
         type: 'object',
-        description: 'Optional instance configuration (e.g., endpoints, flags)',
-        properties: {},
+        description:
+          'Optional instance-specific configuration settings including endpoints (object with string values), timeouts (object with default/http/llm integer values), retries (object with maxAttempts/backoffMs), and feature flags (object with boolean values)',
       },
-      isEnabled: { type: 'boolean', description: 'Enable tool after creation (default: true)' },
+      isEnabled: {
+        type: 'boolean',
+        description: 'Whether the tool is available for use after creation (default: true)',
+      },
     },
     required: ['name', 'slug', 'description', 'parameters', 'blueprint'],
   },

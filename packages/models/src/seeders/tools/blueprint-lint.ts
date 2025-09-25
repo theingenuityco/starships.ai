@@ -7,99 +7,66 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const blueprintLintTool: ToolParams = {
   name: 'blueprint_lint',
-  description: `Validate an Autopilot blueprint’s basic structure and connectivity.
+  description: `Validates Autopilot blueprint structure and connectivity with comprehensive error reporting.
 
-Inputs:
-- blueprint: object with nodes[] and edges[] (or wrapper { blueprint })
+## Purpose
+Performs structural validation of Autopilot workflow blueprints to catch issues before deployment or execution.
 
-Output:
-- { ok: boolean, issues: string[], summary: { nodeCount: number, edgeCount: number, types: Record<string, number> } }
+## Input Requirements
+- **blueprint**: Complete blueprint object OR wrapper object containing blueprint
+  - Accepts direct blueprint: \`{ nodes: [...], edges: [...], metadata?: {...} }\`
+  - Accepts wrapped blueprint: \`{ blueprint: { nodes: [...], edges: [...] } }\`
 
-When to use:
-- Before tool_create or tool_update
-- During review to catch structural issues early`,
+## Validation Coverage
+- **Structure**: Validates nodes[] and edges[] arrays exist and contain valid objects
+- **Node Validation**: Checks ref uniqueness, required fields (ref, type, name, parameters), supported types
+- **Edge Validation**: Ensures from/to references point to existing nodes, validates edge structure
+- **Flow Validation**: Verifies start and end nodes exist for proper workflow execution
+- **Type Coverage**: Supports all Autopilot node types (start, end, llm, code, http_request, conditional, transform, mutate, tool, agent, workflow, user_prompt)
+
+## Output Format
+Returns structured validation result:
+\`\`\`json
+{
+  "ok": boolean,              // true if no issues found
+  "issues": string[],         // array of validation error messages
+  "summary": {
+    "nodeCount": number,      // total number of nodes
+    "edgeCount": number,      // total number of edges
+    "types": {                // count by node type
+      "start": 1,
+      "llm": 2,
+      "end": 1
+    }
+  }
+}
+\`\`\`
+
+## Usage Scenarios
+- **Pre-deployment**: Validate blueprints before tool_create or tool_update operations
+- **Development**: Catch structural issues during blueprint authoring
+- **Quality Assurance**: Verify blueprint integrity before production deployment
+- **Debugging**: Identify connectivity and reference issues in complex workflows
+
+## Validation Rules
+- **Required Structure**: Blueprint must have nodes[] and edges[] arrays
+- **Node Requirements**: Each node needs ref (unique), type (supported), name, parameters object
+- **Edge Requirements**: Each edge needs from/to references to existing nodes
+- **Flow Requirements**: Must contain at least one start node and one end node
+- **Reference Integrity**: All edge references must point to existing node refs
+
+## Error Categories
+- **Structural Errors**: Missing or invalid nodes/edges arrays
+- **Reference Errors**: Duplicate node refs, missing edge targets
+- **Type Errors**: Unsupported node types, invalid object structures
+- **Flow Errors**: Missing start/end nodes, broken connectivity`,
   parameters: {
     type: 'object',
     properties: {
       blueprint: {
         type: 'object',
-        description: 'Blueprint object with nodes and edges arrays',
-        properties: {
-          nodes: {
-            type: 'array',
-            description: 'Array of workflow nodes',
-            items: {
-              type: 'object',
-              description: 'Workflow node definition',
-              properties: {
-                ref: {
-                  type: 'string',
-                  description: 'Unique node reference identifier',
-                },
-                type: {
-                  type: 'string',
-                  description: 'Node type (start, end, llm, code, etc.)',
-                  enum: [
-                    'start',
-                    'end',
-                    'agent',
-                    'workflow',
-                    'http_request',
-                    'llm',
-                    'user_prompt',
-                    'conditional',
-                    'transform',
-                    'mutate',
-                    'tool',
-                    'code',
-                  ],
-                },
-                name: {
-                  type: 'string',
-                  description: 'Display name for the node',
-                },
-                description: {
-                  type: 'string',
-                  description: 'Node description',
-                },
-                parameters: {
-                  type: 'object',
-                  description: 'Node-specific configuration parameters',
-                },
-              },
-            },
-          },
-          edges: {
-            type: 'array',
-            description: 'Array of workflow edges connecting nodes',
-            items: {
-              type: 'object',
-              description: 'Workflow edge definition',
-              properties: {
-                ref: {
-                  type: 'string',
-                  description: 'Unique edge reference identifier',
-                },
-                from: {
-                  type: 'string',
-                  description: 'Source node reference',
-                },
-                to: {
-                  type: 'string',
-                  description: 'Target node reference',
-                },
-                condition: {
-                  type: 'string',
-                  description: 'Optional condition for edge traversal',
-                },
-              },
-            },
-          },
-          metadata: {
-            type: 'object',
-            description: 'Optional blueprint metadata',
-          },
-        },
+        description:
+          'Complete Autopilot workflow blueprint for validation OR wrapper object containing blueprint. Accepts direct blueprint { nodes: [...], edges: [...], metadata?: {...} } or wrapped blueprint { blueprint: { nodes: [...], edges: [...] } }. Validates structure, node types, edge connectivity, reference integrity, and flow requirements (start/end nodes). Supported node types: start, end, llm, code, http_request, conditional, transform, mutate, tool, agent, workflow, user_prompt. Each node requires ref (unique identifier), type, name, description, parameters. Each edge requires ref, from (source node), to (target node), optional condition. Returns { ok: boolean, issues: string[], summary: { nodeCount, edgeCount, types: {...} } }',
       },
     },
     required: ['blueprint'],

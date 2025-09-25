@@ -509,6 +509,7 @@ pnpm run test         # Run tests
 ## Additional Documentation
 
 - **[Tool Calling Guide](./README-TOOLS.md)** - Complete guide to implementing and using function calling with LLMs
+- **[Template Expressions & Eval Engine](./README-EVAL.md)** - Comprehensive guide to `{{ jsExpression }}` syntax, context variables, helper functions, and evaluation patterns
 
 ---
 

@@ -6,8 +6,8 @@
 export { calculatorToolTemplate } from './calculator';
 export { timeToolTemplate } from './time';
 export { echoToolTemplate } from './echo';
-export { wikipediaToolTemplate, wikipediaTool } from './wikipedia';
-export { duckduckgoToolTemplate, duckduckgoTool } from './duckduckgo';
+export { wikipediaToolTemplate } from './wikipedia';
+export { duckduckgoToolTemplate } from './duckduckgo';
 export { toolListToolTemplate } from './tool-list';
 export { toolCreateToolTemplate } from './tool-create';
 export { toolUpdateToolTemplate } from './tool-update';

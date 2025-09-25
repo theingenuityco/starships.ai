@@ -176,7 +176,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Check State',
             description: 'Verify state',
             parameters: {
-              condition: 'state.initialized = true',
+              condition: '{{ state.initialized === true }}',
             },
           },
           {
@@ -244,7 +244,7 @@ describe('End-to-End Workflow Execution', () => {
 
       expect(execution.status).toBe('completed');
       expect(execution.state).toEqual({ initialized: true });
-      expect(execution.results).toHaveLength(3); // start -> set-state -> check-state (stops here due to condition evaluation)
+      expect(execution.results).toHaveLength(5); // start -> set-state -> check-state -> update-state -> end
     });
   });
 
@@ -455,7 +455,8 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Content Decision',
             description: 'Route based on analysis',
             parameters: {
-              condition: 'results[-1].items[0].json.choices[0].message.content ~> /positive/i ? "approve" : "review"',
+              condition:
+                '{{ outputs.find(r => r.nodeRef === "ai-analysis")?.items?.[0]?.json?.choices?.[0]?.message?.content?.includes("positive") ? "approve" : "review" }}',
             },
           },
 
@@ -497,9 +498,15 @@ describe('End-to-End Workflow Execution', () => {
         metadata: { type: 'content-analysis-workflow' },
       };
 
-      // Mock positive analysis scenario using native Headers
-      const mockHeaders1 = new Headers({ 'content-type': 'application/json' });
-      const mockHeaders2 = new Headers({ 'content-type': 'application/json' });
+      // Mock positive analysis scenario
+      const mockHeaders1 = new Map([['content-type', 'application/json']]);
+      mockHeaders1.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders1);
+      });
+      const mockHeaders2 = new Map([['content-type', 'application/json']]);
+      mockHeaders2.forEach = jest.fn((callback) => {
+        callback('application/json', 'content-type', mockHeaders2);
+      });
 
       mockFetch
         .mockResolvedValueOnce({
@@ -509,14 +516,12 @@ describe('End-to-End Workflow Execution', () => {
           statusText: 'OK',
           url: 'https://api.content.example.com/posts/123',
           headers: mockHeaders1,
-          json: jest.fn().mockResolvedValue({
+          json: async () => ({
             post_id: '123',
             content: 'This is a great product! I love using it.',
             author: 'user@example.com',
           }),
-          text: jest
-            .fn()
-            .mockResolvedValue('{"post_id":"123","content":"This is a great product! I love using it.","author":"user@example.com"}'),
+          text: async () => '{"post_id":"123","content":"This is a great product! I love using it.","author":"user@example.com"}',
         })
         .mockResolvedValueOnce({
           // ai-analysis
@@ -553,9 +558,9 @@ describe('End-to-End Workflow Execution', () => {
           statusText: 'OK',
           url: 'https://api.content.example.com/approve',
           headers: mockHeaders2,
-          json: jest.fn().mockResolvedValue({ approved: true, post_id: '123' }),
-          text: jest.fn().mockResolvedValue('{"approved":true,"post_id":"123"}'),
-        } as unknown as Response);
+          json: async () => ({ approved: true, post_id: '123' }),
+          text: async () => '{"approved":true,"post_id":"123"}',
+        });
 
       // Provide credentials for validation to pass
       autopilot.setCredentials({ openrouterApiKey: 'test-e2e-api-key' });
@@ -596,7 +601,7 @@ describe('End-to-End Workflow Execution', () => {
             name: 'Validate Data',
             description: 'Check data quality',
             parameters: {
-              condition: 'results.find(r => r.nodeRef === "extract-data")?.items?.[0]?.json ? "true" : "false"',
+              condition: '{{ outputs.find(r => r.nodeRef === "extract-data")?.items?.[0]?.json ? "true" : "false" }}',
             },
           },
 
@@ -726,8 +731,8 @@ describe('End-to-End Workflow Execution', () => {
       }
 
       expect(execution.status).toBe('completed');
-      expect(execution.results).toHaveLength(3); // start -> extract-data -> validate-data (stops here due to condition evaluation)
-      expect(mockFetch).toHaveBeenCalledTimes(1); // Only extract-data call made
+      expect(execution.results).toHaveLength(7); // start -> extract-data -> validate-data -> transform-data -> load-data -> send-notification -> end
+      expect(mockFetch).toHaveBeenCalledTimes(4); // extract-data, transform-data, load-data, send-notification
     });
   });
 });

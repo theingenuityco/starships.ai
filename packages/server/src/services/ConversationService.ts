@@ -764,6 +764,7 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // console.log('Execution >>>', JSON.stringify(event.data?.execution, null, 2));
         // Just before emitting "complete", finalize the assistant placeholder so UIs see the finished state
         // (but not earlier to avoid client prematurely closing the SSE on streaming=false).
         if (this.streamingService && this.streamingService.isActive(conversationId)) {

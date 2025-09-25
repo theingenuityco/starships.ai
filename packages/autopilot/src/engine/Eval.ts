@@ -56,7 +56,7 @@ export interface EvalOptions {
  * Centralized expression evaluation engine
  */
 export class Eval {
-  private static readonly TEMPLATE_REGEX = /\{\{\s*(.*?)\s*\}\}/g;
+  private static readonly TEMPLATE_REGEX = /\{\{\s*([\s\S]*?)\s*\}\}/g;
 
   constructor(private readonly secureEnv?: Record<string, string>) {}
 
@@ -193,8 +193,8 @@ export class Eval {
    */
   hasTemplateExpressions(value: unknown): boolean {
     if (typeof value === 'string') {
-      // Create fresh regex to avoid global flag state issues
-      const regex = /\{\{\s*(.*?)\s*\}\}/;
+      // Create fresh regex to avoid global flag state issues (supports multiline)
+      const regex = /\{\{\s*([\s\S]*?)\s*\}\}/;
       return regex.test(value);
     } else if (Array.isArray(value)) {
       return value.some((item) => this.hasTemplateExpressions(item));
@@ -301,8 +301,8 @@ export class Eval {
    * Resolve template expressions in a string
    */
   private async resolveStringTemplates(str: string, context: EvalContext, options?: EvalOptions): Promise<unknown> {
-    // Create fresh regex to avoid global flag state issues
-    const regex = /\{\{\s*(.*?)\s*\}\}/g;
+    // Create fresh regex to avoid global flag state issues (supports multiline)
+    const regex = /\{\{\s*([\s\S]*?)\s*\}\}/g;
     const matches = Array.from(str.matchAll(regex));
 
     if (matches.length === 0) return str;
@@ -420,8 +420,8 @@ export class Eval {
    * Validate template expressions in a string
    */
   private validateStringTemplates(str: string, errors: ValidationError[], options?: EvalOptions, path = ''): void {
-    // Create fresh regex to avoid global flag state issues
-    const regex = /\{\{\s*(.*?)\s*\}\}/g;
+    // Create fresh regex to avoid global flag state issues (supports multiline)
+    const regex = /\{\{\s*([\s\S]*?)\s*\}\}/g;
     const matches = Array.from(str.matchAll(regex));
 
     for (const match of matches) {

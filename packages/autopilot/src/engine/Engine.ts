@@ -404,20 +404,23 @@ export class Engine {
       // Record primary node output immediately (as a normal node result)
       execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
 
-      // Execute inline transforms AFTER handler if present, transforming the node output
-      if (inlineParams?.transforms?.length) {
+      // Execute inline transforms AFTER handler if present, transforming the node output.
+      // IMPORTANT: Skip when the current node IS the dedicated transform node to avoid double-processing.
+      if (inlineParams?.transforms?.length && currentNode.type !== 'transform') {
         outputItems = await this.executeInlineTransform(inlineParams.transforms, execution, outputItems);
       }
 
-      // Execute inline mutations if present (mutations can use lastOutputOf/current state)
-      if (inlineParams?.mutations?.length) {
+      // Execute inline mutations if present (mutations can use lastOutputOf/current state).
+      // IMPORTANT: Skip when the current node IS the dedicated mutate node to avoid double-processing.
+      if (inlineParams?.mutations?.length && currentNode.type !== 'mutate') {
         await this.executeInlineMutate(inlineParams.mutations, execution);
         // Mutations modify state; keep primary output as-is unless you intend otherwise
         // Optionally, could attach mutate result to primary result if desired
       }
 
-      // Execute inline conditional if present
-      if (inlineParams?.condition) {
+      // Execute inline conditional if present.
+      // IMPORTANT: Skip when the current node IS the dedicated conditional node to avoid conflicting edgeCondition.
+      if (inlineParams?.condition && currentNode.type !== 'conditional') {
         const conditionResult = await this.executeInlineConditional(inlineParams.condition, execution);
         const firstItem = outputItems[0];
         if (!firstItem?.json || typeof firstItem.json !== 'object' || !('edgeCondition' in firstItem.json)) {

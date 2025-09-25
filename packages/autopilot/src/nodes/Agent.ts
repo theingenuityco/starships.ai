@@ -106,17 +106,17 @@ export class Agent implements NodeHandler {
           description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
           parameters: {
             // Returns:
-            //  - "length" when choices[0].finish_reason === "length" (continue generation)
-            //  - true when finish_reason === "tool_calls" AND the tool_call.id has NOT been executed yet
-            //  - false otherwise (end)
+            //  - "continue" when choices[0].finish_reason === "length" (continue generation)
+            //  - "call_tool" when finish_reason === "tool_calls" OR tool_calls[] exist (route to tool execution)
+            //  - "complete" otherwise (end)
+            // Use $input() (the LLM node output passed into this Conditional) to avoid cross-scope lookup issues.
             condition: `{{ (() => {
-              const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
+              const last = $input();
               const fr = last?.choices?.[0]?.finish_reason;
-              if (fr === "length") return "length";
-              if (fr !== "tool_calls") return "false";
-              const id = last?.choices?.[0]?.message?.tool_calls?.[0]?.id;
-              const processed = Array.isArray(state?.processedToolCalls) ? state.processedToolCalls : [];
-              return id && !processed.includes(id) ? "true" : "false";
+              if (fr === "length") return "continue";
+              if (fr === "tool_calls") return "call_tool";
+              const calls = last?.choices?.[0]?.message?.tool_calls;
+              return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete";
             })() }}`,
           },
         },
@@ -129,9 +129,28 @@ export class Agent implements NodeHandler {
           parameters: {
             code: `
               const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const args = last?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments_json;
-              if (args && typeof args === 'object') { return args; }
-              throw new Error('Missing tool_call function.arguments_json');
+              const call = last?.choices?.[0]?.message?.tool_calls?.[0];
+              const j = call?.function?.arguments_json;
+              if (j && typeof j === 'object') { return j; }
+              const raw = call?.function?.arguments;
+              const tryParse = (input) => {
+                if (input == null) return undefined;
+                if (typeof input === 'object') return input;
+                if (typeof input !== 'string') return undefined;
+                let s = input.replace(/\\r/g, '').trim();
+                for (let i = 0; i < 3; i++) {
+                  const first = s[0], last = s[s.length - 1];
+                  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+                    s = s.slice(1, -1);
+                  }
+                  try { const parsed = JSON.parse(s); if (parsed && typeof parsed === 'object') return parsed; } catch { /* ignore */ }
+                }
+                try { const parsed = JSON.parse(s); if (parsed && typeof parsed === 'object') return parsed; } catch { /* ignore */ }
+                return undefined;
+              };
+              const parsed = tryParse(raw);
+              if (parsed && typeof parsed === 'object') { return parsed; }
+              throw new Error('Missing tool_call arguments');
             `,
             timeout: 3000,
           },

@@ -190,7 +190,7 @@ Implicit environment for host tools (never ask the user; never echo secrets):
 - blueprint_lint requires a “blueprint” input. Do not skip it due to signature confusion.
 - tool_create requires a complete definition at creation. Do not attempt “minimal create then patch”.
 - When unsure about a tool schema, prefer calling tool_get(slug) or re-checking the tools list, rather than skipping steps.
-- Exit only after the smoke test (or a hard error).
+- Exit only after the test (or a hard error).
 
 ## Tool Authoring Protocol (Best Practice Loop)
 1) **Understand**: Clarify capability/constraints succinctly. Use node_schema for parameter details.

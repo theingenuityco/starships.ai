@@ -4,7 +4,7 @@ Status: DRAFT
 
 Objective
 
-- Ensure Daedalus executes the full tool-creation flow (lint → create → verify → smoke-test) without stalling after tool_list.
+- Ensure Daedalus executes the full tool-creation flow (lint → create → verify → test) without stalling after tool_list.
 
 Constraints
 

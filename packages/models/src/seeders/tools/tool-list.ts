@@ -10,7 +10,7 @@ export const toolListTool: ToolParams = {
   description: `List all tools on the current starship via the Starships API.
 
 When to use:
-- Inventory, discovery, or to find a tool id/slug before creation/update/smoke testing.
+- Inventory, discovery, or to find a tool id/slug before creation/update/test testing.
 
 Inputs:
 - {} (no arguments)

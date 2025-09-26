@@ -71,7 +71,7 @@ describe('Tool Test Tool', () => {
       const nodeRefs = new Set(bp.nodes.map((n) => n.ref));
 
       // Required nodes present
-      const requiredRefs = ['start_1', 'prepare', 'http_get_tool', 'capture_args', 'mark_time', 'emit_args', 'run_tool', 'end_1'];
+      const requiredRefs = ['start_1', 'prepare', 'http_get_tool', 'prepare_test', 'emit_args', 'run_tool', 'end_1'];
       for (const r of requiredRefs) expect(nodeRefs.has(r)).toBe(true);
 
       // Edges reference valid nodes
@@ -273,9 +273,9 @@ describe('Tool Test Tool', () => {
       const run = bp.nodes.find((n) => n.ref === 'run_tool');
       expect(run?.type).toBe('tool');
       const params = (run?.parameters || {}) as Record<string, unknown>;
-      // Ensure the template references body.blueprint (HttpRequest wraps JSON under .body)
-      expect(JSON.stringify(params)).toContain('http_get_tool');
-      expect(JSON.stringify(params)).toContain('body');
+      // Template references the resolved tool definition from prepare_test
+      expect(JSON.stringify(params)).toContain('prepare_test');
+      expect(JSON.stringify(params)).toContain('toolDef');
       expect(JSON.stringify(params)).toContain('blueprint');
     });
 
@@ -285,7 +285,7 @@ describe('Tool Test Tool', () => {
       expect(end?.type).toBe('end');
       const params = (end?.parameters || {}) as Record<string, unknown>;
       expect(JSON.stringify(params)).toContain('durationMs');
-      expect(JSON.stringify(params)).toContain('mark_time');
+      expect(JSON.stringify(params)).toContain('prepare_test');
     });
   });
 });

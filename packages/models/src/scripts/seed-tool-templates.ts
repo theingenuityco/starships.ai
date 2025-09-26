@@ -18,7 +18,7 @@ export async function seedToolTemplates(): Promise<void> {
   try {
     logger.info('Starting tool template seeding...');
 
-    // Ensure DB connection exists
+    // Get the existing connection that was initialized by the server
     const connection = getConnection();
 
     // Create repository
@@ -86,15 +86,3 @@ export async function seedToolTemplates(): Promise<void> {
   }
 }
 
-// Allow running as standalone script
-if (require.main === module) {
-  seedToolTemplates()
-    .then(() => {
-      console.log('✅ Tool template seeding completed successfully');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('❌ Failed to seed tool templates:', error);
-      process.exit(1);
-    });
-}

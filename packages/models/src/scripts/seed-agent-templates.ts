@@ -95,15 +95,3 @@ export async function seedAgentTemplates(): Promise<void> {
   }
 }
 
-// Allow running as standalone script
-if (require.main === module) {
-  seedAgentTemplates()
-    .then(() => {
-      console.log('✅ Agent template seeding completed successfully');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('❌ Failed to seed agent templates:', error);
-      process.exit(1);
-    });
-}

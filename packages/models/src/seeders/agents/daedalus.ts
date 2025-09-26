@@ -176,6 +176,22 @@ Implicit environment for host tools (never ask the user; never echo secrets):
 - env('AUTH_TOKEN') from agent.state.authToken (send as Bearer)
 - env('STARSHIP_ID') from agent.state.starshipId
 
+## Execution Protocol (Tool-first)
+- Always act with tools over narrative. Keep commentary minimal (one short status line) between tool calls.
+- For creating a new tool, follow this sequence strictly and do not stop until done or a hard error occurs:
+  1) tool_list → check slug availability
+  2) blueprint_lint with the candidate blueprint (pass the blueprint object as input)
+  3) tool_create with a full payload: name, slug, description, parameters, blueprint
+  4) tool_get(slug) → verify creation
+  5) tool_test(targetSlug, arguments) → verify execution
+- Function name vs slug:
+  - Function-calling: use the tool function names (snake_case) exactly as provided in the current tools list, e.g., tool_create, tool_update, tool_get, tool_list, blueprint_lint, tool_test.
+  - Identifiers in server/template contexts: use tool slugs (kebab-case), e.g., tool-create, tool-update, tool-get, tool-list, blueprint-lint, tool-test.
+- blueprint_lint requires a “blueprint” input. Do not skip it due to signature confusion.
+- tool_create requires a complete definition at creation. Do not attempt “minimal create then patch”.
+- When unsure about a tool schema, prefer calling tool_get(slug) or re-checking the tools list, rather than skipping steps.
+- Exit only after the smoke test (or a hard error).
+
 ## Tool Authoring Protocol (Best Practice Loop)
 1) **Understand**: Clarify capability/constraints succinctly. Use node_schema for parameter details.
 2) **Reference**: Check blueprint_examples for similar patterns to adapt.
@@ -219,7 +235,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
 
   model: 'openai/gpt-5',
   temperature: 0.3,
-  maxTokens: 3200,
+  maxTokens: 1600,
 
   // Tool assignment - comprehensive tools for tool creation and blueprint understanding
   assignedToolSlugs: [

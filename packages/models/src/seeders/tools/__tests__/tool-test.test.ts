@@ -1,6 +1,6 @@
 /**
  * Tool Smoke Test - E2E
- * Executes tool_smoke_test using real Autopilot execution with mocked HTTP only
+ * Executes tool_test using real Autopilot execution with mocked HTTP only
  */
 
 import { toolSmokeTestTool, toolSmokeTestToolTemplate } from '../tool-test';
@@ -55,7 +55,7 @@ describe('Tool Smoke Test Tool', () => {
 
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      expect(toolSmokeTestTool.name).toBe('tool_smoke_test');
+      expect(toolSmokeTestTool.name).toBe('tool_test');
       expect(toolSmokeTestTool.description).toContain('Execute another tool');
       expect(toolSmokeTestTool.parameters).toBeDefined();
       expect(toolSmokeTestTool.blueprint).toBeDefined();
@@ -290,7 +290,7 @@ describe('Tool Smoke Test Tool', () => {
   });
 });
 
-describe('Tool.execute return value - tool_smoke_test', () => {
+describe('Tool.execute return value - tool_test', () => {
   it('should return a single ExecutionItem with final smoke test result and preserve pairedItem', async () => {
     const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
 

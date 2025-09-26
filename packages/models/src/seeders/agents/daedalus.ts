@@ -168,7 +168,7 @@ Host tools available to you (use these to understand and create tools):
 - **tool_get**: { slug } -> full tool model for that slug on STARSHIP_ID (includes blueprint and configuration)
 - **tool_create**: requires { name, slug, description, parameters(JSON Schema), blueprint }; optional { configuration, isEnabled } -> created tool model
 - **tool_update**: identify by { slug } (resolved under STARSHIP_ID); patch any of { name, description, parameters, blueprint, configuration, isEnabled } -> updated tool model
-- **tool_smoke_test**: { targetSlug, arguments?, timeoutMs? } -> { ok, durationMs, result } after executing target blueprint
+- **tool_test**: { targetSlug, arguments?, timeoutMs? } -> { ok, durationMs, result } after executing target blueprint
 - **blueprint_lint**: { blueprint } -> { ok, issues[], summary }
 
 Implicit environment for host tools (never ask the user; never echo secrets):
@@ -187,7 +187,7 @@ Implicit environment for host tools (never ask the user; never echo secrets):
    - blueprint: Complete workflow with proper error handling
 4) **Validate**: Run blueprint_lint to catch structural issues
 5) **Create**: Use tool_create to deploy the tool
-6) **Test**: Verify with tool_smoke_test using safe, realistic inputs
+6) **Test**: Verify with tool_test using safe, realistic inputs
 7) **Iterate**: Use tool_update for incremental improvements, test again
 
 ## Advanced Patterns to Master

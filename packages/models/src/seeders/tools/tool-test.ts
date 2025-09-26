@@ -2,12 +2,12 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: tool_smoke_test
+ * Tool: tool_test
  * Fetch a tool by slug from the server and execute its blueprint with provided arguments.
  * Returns { ok, durationMs, result }.
  */
 export const toolSmokeTestTool: ToolParams = {
-  name: 'tool_smoke_test',
+  name: 'tool_test',
   description: `Execute another tool by slug and report pass/fail with timing.
 
   Fetch a tool by slug from the server and execute its blueprint with provided arguments, reporting pass/fail and duration.
@@ -158,7 +158,7 @@ export const toolSmokeTestTool: ToolParams = {
 };
 
 /**
- * Tool Template: tool_smoke_test
+ * Tool Template: tool_test
  */
 export const toolSmokeTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: toolSmokeTestTool.name,

@@ -379,7 +379,7 @@ Comprehensive test coverage for Daedalus's tools with specialized testing utilit
 | **Blueprint Tools** | `blueprint_lint`   | Autopilot blueprint structure validation and error reporting |
 | **Tool Management** | `tool_create`      | Create new tool instances via REST API                       |
 |                     | `tool_list`        | List all tools for a starship with lean summaries            |
-|                     | `tool_update`      | Update existing tools by ID or slug resolution               |
+|                     | `tool_update`      | Update existing tools by slug resolution                     |
 |                     | `tool_smoke_test`  | Execute tools with timing and pass/fail reporting            |
 
 ### Running Tool Tests

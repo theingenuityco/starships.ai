@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2, Wrench } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Wrench, MessageCircleMore } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -29,6 +29,9 @@ interface MessageContentProps {
   enableLinkPreview?: boolean
   isStreaming?: boolean
   chunks?: StreamChunk[]
+  // Optional reasoning content and chunks
+  reasoning?: string
+  reasoningChunks?: StreamChunk[]
   agentName?: string
   toolCalls?: NonNullable<MessageModel['tool_calls']>
   toolResults?: any[]
@@ -44,6 +47,8 @@ export function ConversationMessageContent({
   enableLinkPreview = true,
   isStreaming = false,
   chunks = [],
+  reasoning,
+  reasoningChunks = [],
   agentName,
   toolCalls,
   toolResults = [],
@@ -52,8 +57,12 @@ export function ConversationMessageContent({
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 
+  // Normalize tool calls to retain early tool-first deltas:
+  // keep entries if function.name exists OR id exists OR arguments exist
+  const normalizedToolCalls = useMemo(() => (Array.isArray(toolCalls) ? toolCalls.filter(tc => typeof tc === 'object' && tc !== null) : []), [toolCalls])
+
   // Tool call header icon state handling
-  const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
+  const totalToolCalls = normalizedToolCalls.length
   const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
   const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
   const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
@@ -107,6 +116,24 @@ export function ConversationMessageContent({
     return content && content.trim().length > 0 ? content : aggregated
   }, [content, chunks, isStreaming])
 
+  const displayReasoning = useMemo(() => {
+    const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0
+    if (!hasR) return reasoning || ''
+    const sorted = [...reasoningChunks].sort((a, b) => a.position - b.position)
+    let agg = ''
+    for (const rc of sorted) agg += rc.content
+    return isStreaming ? agg : reasoning && reasoning.trim().length > 0 ? reasoning : agg
+  }, [reasoning, reasoningChunks, isStreaming])
+
+  // Determine whether reasoning panel should auto-open.
+  // Keep it open only while reasoning-only is streaming; collapse once content OR tool_calls start (and on reload).
+  const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
+  const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
+  const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
+  const openReasoning = Boolean(isStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
+  const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Assistant'
+  const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
+
   const parsedJson = useMemo(() => {
     try {
       const t = (displayContent || '').trim()
@@ -117,12 +144,14 @@ export function ConversationMessageContent({
     return null as any
   }, [displayContent])
 
+  // Collapsible should always start closed; users can expand manually
+
   // Natural language header with tense and inline code chips for tool names (no 'tool' word):
   // Ongoing: "<agent> is using `X`[, `Y`] [& some others...]"
   // Completed: "<agent> used `X`[, `Y`] [& some others...]"
   const toolCallHeaderLabel = useMemo(() => {
-    if (!Array.isArray(toolCalls) || toolCalls.length === 0) return null
-    const names = toolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
+    if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return null
+    const names = normalizedToolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
     const unique = Array.from(new Set(names))
     const agent = agentName || 'Assistant'
 
@@ -158,7 +187,7 @@ export function ConversationMessageContent({
         {agent} {verb} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
       </>
     )
-  }, [toolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
+  }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
 
   const handleCopyContent = async () => {
     try {
@@ -289,9 +318,31 @@ export function ConversationMessageContent({
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
     <div className={cn('relative group', className)}>
-      {/* Unified markdown rendering - same for both streaming and completed, but skip for tool_result messages */}
+      {/* Reasoning (thinking) collapsible */}
+      {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
+        <div className="mb-2">
+          {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
+          <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
+            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+              {isStreaming && openReasoning ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircleMore className="w-3 h-3" />}
+              <span>{reasoningHeaderLabel}</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <blockquote className="border-l-4 border-primary/20 px-4 py-2 bg-muted/20 rounded-r-lg my-1">
+                <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                    {displayReasoning}
+                  </ReactMarkdown>
+                </div>
+              </blockquote>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      )}
+
+      {/* Unified markdown rendering - message content at normal size */}
       {messageType !== 'tool_result' && (
-        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none message-content', isStreaming && displayContent && 'streaming-caret')}>
+        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none break-words message-content')}>
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {displayContent}
           </ReactMarkdown>
@@ -299,9 +350,10 @@ export function ConversationMessageContent({
       )}
 
       {/* Tool calls and results rendering for assistant messages */}
-      {Array.isArray(toolCalls) && toolCalls.length > 0 && messageType !== 'tool_result' && (
+      {Array.isArray(normalizedToolCalls) && normalizedToolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="my-2.5">
-          <Collapsible defaultOpen={false}>
+          {/* Remount when streaming/tool-call completion toggles */}
+          <Collapsible key={`tools-${isStreaming ? 'on' : 'off'}-${completedToolResults}-${totalToolCalls}`} defaultOpen={isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -310,11 +362,11 @@ export function ConversationMessageContent({
               ) : (
                 <Wrench className="w-3 h-3" />
               )}
-              {toolCallHeaderLabel ?? `Tool Calls (${toolCalls.length})`}
+              {toolCallHeaderLabel ?? `Tool Calls (${normalizedToolCalls.length})`}
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-1.5">
-                {toolCalls.map((tc, idx) => {
+                {normalizedToolCalls.map((tc, idx) => {
                   const rawArgs = (tc as any)?.function?.arguments ?? ''
                   let prettyArgs = ''
                   try {
@@ -483,15 +535,6 @@ export function ConversationMessageContent({
             <code>{JSON.stringify(parsedJson, null, 2)}</code>
           </pre>
         </Card>
-      )}
-
-      {/* Streaming indicator - shows after all content including tool calls while streaming */}
-      {isStreaming && !hasAnyToolCalls && (
-        <div className="flex items-center gap-2 mt-1 text-muted-foreground">
-          <span className="text-xs font-medium">{agentName || 'Assistant'} is responding...</span>
-          {chunks.length > 0 && <span className="text-xs">({chunks.length} chunks)</span>}
-          <Loader2 className="w-3 h-3 animate-spin" />
-        </div>
       )}
 
       {/* Copy button for entire message */}

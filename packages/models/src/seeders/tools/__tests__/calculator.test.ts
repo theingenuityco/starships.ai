@@ -182,31 +182,46 @@ describe('Calculator Tool', () => {
     it('should handle missing expression', async () => {
       const input = {}; // Missing expression
 
-      await expect(executeTool(input)).rejects.toThrow('Expression is required');
+      await expect(executeTool(input)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Expression is required'),
+      });
     });
 
     it('should handle invalid expression type', async () => {
       const input = { expression: 123 }; // Should be string
 
-      await expect(executeTool(input)).rejects.toThrow('must be a string');
+      await expect(executeTool(input)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('must be a string'),
+      });
     });
 
     it('should handle expressions with invalid characters', async () => {
       const input = { expression: '2 + 3; alert("hack")' };
 
-      await expect(executeTool(input)).rejects.toThrow('invalid characters');
+      await expect(executeTool(input)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('invalid characters'),
+      });
     });
 
     it('should handle complex unsupported expressions', async () => {
       const input = { expression: 'Math.pow(2, 8)' };
 
-      await expect(executeTool(input)).rejects.toThrow('Complex expressions not supported');
+      await expect(executeTool(input)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Complex expressions not supported'),
+      });
     });
 
     it('should handle empty expression', async () => {
       const input = { expression: '' };
 
-      await expect(executeTool(input)).rejects.toThrow('Expression is required');
+      await expect(executeTool(input)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Expression is required'),
+      });
     });
 
     it('should handle expressions with dangerous JavaScript code', async () => {
@@ -221,7 +236,10 @@ describe('Calculator Tool', () => {
       for (const expr of dangerousExpressions) {
         const input = { expression: expr };
 
-        await expect(executeTool(input)).rejects.toThrow('invalid characters');
+        await expect(executeTool(input)).resolves.toMatchObject({
+          ok: false,
+          error: expect.stringContaining('invalid characters'),
+        });
       }
     });
 

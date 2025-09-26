@@ -144,7 +144,10 @@ describe('Tool List Tool', () => {
     }
 
     it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({}, {})).rejects.toThrow('baseUrl is required');
+      await expect(executeToolWithMockEnv({}, {})).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('baseUrl is required'),
+      });
     });
 
     it('should fail without auth token', async () => {
@@ -154,7 +157,10 @@ describe('Tool List Tool', () => {
         // Missing AUTH_TOKEN
       };
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow('authToken is required');
+      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('authToken is required'),
+      });
     });
 
     it('should fail without starship ID', async () => {
@@ -164,7 +170,10 @@ describe('Tool List Tool', () => {
         // Missing STARSHIP_ID
       };
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow('starshipId is required');
+      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('starshipId is required'),
+      });
     });
 
     it('should successfully execute with mocked API response', async () => {
@@ -240,7 +249,10 @@ describe('Tool List Tool', () => {
       // Mock network failure
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow('Network error');
+      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('Network error'),
+      });
     });
 
     it('should handle trailing slashes in BASE_URL', async () => {
@@ -297,7 +309,10 @@ describe('Tool List Tool', () => {
         text: async () => JSON.stringify({ error: 'Starship not found' }),
       });
 
-      await expect(executeToolWithMockEnv({}, mockEnv)).rejects.toThrow();
+      await expect(executeToolWithMockEnv({}, mockEnv)).resolves.toMatchObject({
+        ok: false,
+        error: expect.stringContaining('404 Not Found'),
+      });
     });
   });
 

@@ -3,14 +3,6 @@ import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { MessageModel } from '@starships/protocol'
 
-interface ConversationStreaming {
-  content: string
-  chunks: number
-  isStreaming: boolean
-  version?: number
-  updatedAt: number
-}
-
 // UI conversation message shape (extends protocol with UI flags)
 interface UIStreamChunk {
   content: string
@@ -23,6 +15,11 @@ export interface UIMessage extends MessageModel {
   error?: boolean
   chunks?: UIStreamChunk[]
   streamedContent?: string
+  // Optional reasoning fields streamed and/or persisted during assistant thinking
+  reasoning?: string
+  reasoningChunks?: UIStreamChunk[]
+  // Optional grouped tool results for display convenience (derived in UI)
+  toolResults?: any[]
 }
 
 interface ConversationData {
@@ -31,7 +28,6 @@ interface ConversationData {
   lastActivityAt?: string
   agentId?: string
   agentName?: string
-  isResponding?: boolean // Gap between message send and streaming start
 }
 
 interface StarshipUIState {
@@ -41,9 +37,6 @@ interface StarshipUIState {
 
   // Conversations data (authoritative UI source)
   conversations: Record<string, ConversationData>
-
-  // Streaming (ephemeral, not persisted)
-  conversationsStreaming: Record<string, ConversationStreaming>
 
   // UI actions
   setActiveStarship: (id: string | null) => void
@@ -57,13 +50,6 @@ interface StarshipUIState {
   markMessageStreaming: (conversationId: string, index: number, isStreaming: boolean) => void
   clearConversation: (conversationId: string) => void
   setConversationAgent: (conversationId: string, agentId: string, agentName: string) => void
-  setConversationResponding: (conversationId: string, isResponding: boolean) => void
-
-  // Streaming actions (ephemeral)
-  startStreaming: (conversationId: string, version?: number) => void
-  appendStreamingChunk: (conversationId: string, text: string, version?: number) => void
-  endStreaming: (conversationId: string) => void
-  clearStreaming: (conversationId: string) => void
 }
 
 export const useStarshipUIStore = create<StarshipUIState>()(
@@ -74,7 +60,6 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         activeStarshipId: null,
         currentRoute: '/',
         conversations: {},
-        conversationsStreaming: {},
 
         // UI actions
         setActiveStarship: (id: string | null) => {
@@ -101,8 +86,9 @@ export const useStarshipUIStore = create<StarshipUIState>()(
                 conversations: {
                   ...state.conversations,
                   [conversationId]: {
-                    // Preserve existing per-conversation UI metadata (agentId, agentName, isResponding, etc.)
-                    ...(prev || {}),
+                    // Preserve only allowed metadata
+                    agentId: prev?.agentId,
+                    agentName: prev?.agentName,
                     // Override with the latest snapshot fields
                     messages: Array.isArray(data.messages) ? data.messages : [],
                     total: typeof data.total === 'number' ? data.total : Array.isArray(data.messages) ? data.messages.length : 0,
@@ -214,96 +200,6 @@ export const useStarshipUIStore = create<StarshipUIState>()(
             },
             false,
             'convo/setAgent'
-          ),
-
-        setConversationResponding: (conversationId: string, isResponding: boolean) =>
-          set(
-            state => {
-              const current = state.conversations[conversationId] || { messages: [], total: 0 }
-              return {
-                conversations: {
-                  ...state.conversations,
-                  [conversationId]: { ...current, isResponding },
-                },
-              }
-            },
-            false,
-            'convo/setResponding'
-          ),
-
-        // Streaming actions (ephemeral)
-        startStreaming: (conversationId: string, version?: number) =>
-          set(
-            state => {
-              const current = state.conversationsStreaming[conversationId]
-              return {
-                conversationsStreaming: {
-                  ...state.conversationsStreaming,
-                  [conversationId]: {
-                    content: current?.content ?? '',
-                    chunks: current?.chunks ?? 0,
-                    isStreaming: true,
-                    version: version ?? current?.version,
-                    updatedAt: Date.now(),
-                  },
-                },
-              }
-            },
-            false,
-            'stream/start'
-          ),
-
-        appendStreamingChunk: (conversationId: string, text: string, version?: number) =>
-          set(
-            state => {
-              const current = state.conversationsStreaming[conversationId] || {
-                content: '',
-                chunks: 0,
-                isStreaming: true,
-                version,
-                updatedAt: 0,
-              }
-              return {
-                conversationsStreaming: {
-                  ...state.conversationsStreaming,
-                  [conversationId]: {
-                    content: current.content + text,
-                    chunks: current.chunks + 1,
-                    isStreaming: true,
-                    version: version ?? current.version,
-                    updatedAt: Date.now(),
-                  },
-                },
-              }
-            },
-            false,
-            'stream/append'
-          ),
-
-        endStreaming: (conversationId: string) =>
-          set(
-            state => {
-              const current = state.conversationsStreaming[conversationId]
-              if (!current) return { conversationsStreaming: state.conversationsStreaming }
-              return {
-                conversationsStreaming: {
-                  ...state.conversationsStreaming,
-                  [conversationId]: { ...current, isStreaming: false, updatedAt: Date.now() },
-                },
-              }
-            },
-            false,
-            'stream/end'
-          ),
-
-        clearStreaming: (conversationId: string) =>
-          set(
-            state => {
-              const { [conversationId]: _, ...rest } = state.conversationsStreaming
-              return { conversationsStreaming: rest }
-            },
-            false,
-            'stream/clear'
           ),
       }),
       {

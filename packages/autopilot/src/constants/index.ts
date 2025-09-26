@@ -34,7 +34,7 @@ export const config = {
   MAX_CONDITIONAL_DEPTH: 10,
 
   // Maximum visits per node to prevent infinite cycles
-  MAX_NODE_VISITS: 3,
+  MAX_NODE_VISITS: 100,
 } as const;
 
 export type ConfigKey = keyof typeof config;

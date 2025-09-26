@@ -155,9 +155,13 @@ export class Engine {
   }
 
   private async validateInlineOperations(node: Node, validationErrors: string[]): Promise<void> {
-    const nodeParams = node.parameters as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string };
+    const raw = node?.parameters;
+    const nodeParams =
+      raw && typeof raw === 'object'
+        ? (raw as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string })
+        : ({} as { transforms?: TransformOperation[]; mutations?: TransformOperation[]; condition?: string });
 
-    if (nodeParams.transforms) {
+    if (Array.isArray(nodeParams.transforms) && nodeParams.transforms.length) {
       const transformHandler = await this.createVirtualHandler('transform', { transforms: nodeParams.transforms });
       const transformValidation = transformHandler.validate();
       if (!transformValidation.valid) {
@@ -166,7 +170,7 @@ export class Engine {
       }
     }
 
-    if (nodeParams.mutations) {
+    if (Array.isArray(nodeParams.mutations) && nodeParams.mutations.length) {
       const mutateHandler = await this.createVirtualHandler('mutate', { mutations: nodeParams.mutations });
       const mutateValidation = mutateHandler.validate();
       if (!mutateValidation.valid) {
@@ -175,7 +179,7 @@ export class Engine {
       }
     }
 
-    if (nodeParams.condition) {
+    if (typeof nodeParams.condition === 'string' && nodeParams.condition.length > 0) {
       const conditionalHandler = await this.createVirtualHandler('conditional', { condition: nodeParams.condition });
       const conditionValidation = conditionalHandler.validate();
       if (!conditionValidation.valid) {
@@ -384,11 +388,14 @@ export class Engine {
       }
 
       // Process inline operations (use RAW inline params from the node definition to ensure templates are resolved at execution time)
-      const inlineParams = currentNode.parameters as {
-        transforms?: TransformOperation[];
-        mutations?: TransformOperation[];
-        condition?: string;
-      };
+      const inlineParams =
+        currentNode.parameters && typeof currentNode.parameters === 'object'
+          ? (currentNode.parameters as {
+              transforms?: TransformOperation[];
+              mutations?: TransformOperation[];
+              condition?: string;
+            })
+          : undefined;
       let processedInputItems = nodeInputItems;
 
       // Execute the handler first (inline transforms will run after on the output)
@@ -397,20 +404,23 @@ export class Engine {
       // Record primary node output immediately (as a normal node result)
       execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
 
-      // Execute inline transforms AFTER handler if present, transforming the node output
-      if (inlineParams.transforms?.length) {
+      // Execute inline transforms AFTER handler if present, transforming the node output.
+      // IMPORTANT: Skip when the current node IS the dedicated transform node to avoid double-processing.
+      if (inlineParams?.transforms?.length && currentNode.type !== 'transform') {
         outputItems = await this.executeInlineTransform(inlineParams.transforms, execution, outputItems);
       }
 
-      // Execute inline mutations if present (mutations can use lastOutputOf/current state)
-      if (inlineParams.mutations?.length) {
+      // Execute inline mutations if present (mutations can use lastOutputOf/current state).
+      // IMPORTANT: Skip when the current node IS the dedicated mutate node to avoid double-processing.
+      if (inlineParams?.mutations?.length && currentNode.type !== 'mutate') {
         await this.executeInlineMutate(inlineParams.mutations, execution);
         // Mutations modify state; keep primary output as-is unless you intend otherwise
         // Optionally, could attach mutate result to primary result if desired
       }
 
-      // Execute inline conditional if present
-      if (inlineParams.condition) {
+      // Execute inline conditional if present.
+      // IMPORTANT: Skip when the current node IS the dedicated conditional node to avoid conflicting edgeCondition.
+      if (inlineParams?.condition && currentNode.type !== 'conditional') {
         const conditionResult = await this.executeInlineConditional(inlineParams.condition, execution);
         const firstItem = outputItems[0];
         if (!firstItem?.json || typeof firstItem.json !== 'object' || !('edgeCondition' in firstItem.json)) {
@@ -476,7 +486,7 @@ export class Engine {
 
     // Find matching edge
     let targetEdge;
-    if (edgeCondition) {
+    if (edgeCondition !== undefined) {
       targetEdge = outgoingEdges.find(
         (edge) =>
           edge.condition === edgeCondition ||
@@ -485,12 +495,21 @@ export class Engine {
       );
     }
 
-    // Fallback to default edge
+    // Improved fallback:
+    // - Prefer explicit 'false' edge when no match
+    // - Then prefer an unconditional edge (no condition)
+    // - Otherwise, stop (return null) rather than selecting an arbitrary first edge
     if (!targetEdge) {
-      targetEdge = outgoingEdges.find((edge) => !edge.condition) || outgoingEdges[0];
+      const falseEdge = outgoingEdges.find((edge) => edge.condition === 'false');
+      const defaultEdge = outgoingEdges.find((edge) => !edge.condition);
+      targetEdge = falseEdge ?? defaultEdge ?? undefined;
     }
 
-    return targetEdge ? blueprint.nodes.find((node) => node.ref === targetEdge.to) || null : null;
+    if (!targetEdge) {
+      return null;
+    }
+
+    return blueprint.nodes.find((node) => node.ref === targetEdge.to) || null;
   }
 
   // Extract final output from End node (if its handler produced a result)

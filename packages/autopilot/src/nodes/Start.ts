@@ -7,11 +7,12 @@ export class Start extends BaseNode<StartParams> {
     super(params || {}, options);
   }
 
-  // Pass through initial input if provided so downstream nodes receive tool arguments
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    // Pass through input if provided (Engine handles __initial__ for tool blueprints)
     if (input && input.length > 0) {
       return input;
     }
+    // Default to empty object for regular workflows
     return ExecutionItemUtils.wrapSingle({});
   }
 

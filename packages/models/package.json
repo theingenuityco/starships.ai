@@ -13,8 +13,6 @@
     "lint": "eslint src --ext .ts",
     "migrate": "tsx src/scripts/migration-runner.ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
-    "seed:tool-templates": "tsx src/scripts/seed-tool-templates.ts",
-    "seed:agent-templates": "tsx src/scripts/seed-agent-templates.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",
     "backup:validate": "tsx src/scripts/backup-cli.ts validate",

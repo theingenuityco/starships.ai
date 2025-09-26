@@ -15,7 +15,7 @@ const PaginationSchema = z.object({
 });
 
 const CreateAgentFromTemplateSchema = z.object({
-  starshipId: z.string().regex(/^([a-z0-9]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug'),
+  starshipId: z.string().regex(/^([a-z0-9_-]{10,30}|[a-z0-9-]{1,100})$/i, 'Invalid starship ID or slug'),
 });
 
 // Helper function for Zod validation

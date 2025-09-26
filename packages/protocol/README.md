@@ -35,7 +35,6 @@ import {
   Conversation,
   Message,
   Memory,
-  NativeToolApiKey,
   Waitlist,
 } from '@starships/protocol';
 ```
@@ -54,7 +53,6 @@ import {
 - [`Conversation`](src/domains/conversation.ts) - Chat and communication logs
 - [`Message`](src/domains/message.ts) - Individual message storage and retrieval
 - [`Memory`](src/domains/memory.ts) - Agent memory and conversation context
-- [`NativeToolApiKey`](src/domains/native-tool.ts) - Encrypted API key storage for native tools
 - [`Waitlist`](src/domains/waitlist.ts) - Early access user management
 
 ### API Contracts
@@ -114,8 +112,7 @@ src/
 │   ├── agent-template.ts   # Agent templates
 │   ├── user.ts             # User management
 │   ├── workflow.ts         # Workflow execution
-│   ├── waitlist.ts         # Waitlist management
-│   └── native-tool.ts      # Native tool API key storage
+│   └── waitlist.ts         # Waitlist management
 ```
 
 ## Used By

@@ -43,7 +43,7 @@ Automatically inferred from agent state (do not pass manually):
 
 ## Validation & Constraints
 - Blueprint structure validated for basic shape (use blueprint_lint for comprehensive validation)
-- No secrets allowed in parameters or blueprint (use Native Tool API Keys)
+- No secrets allowed in parameters or blueprint
 - Slug must be unique per starship (409 error on collision)
 
 ## Response & Behavior

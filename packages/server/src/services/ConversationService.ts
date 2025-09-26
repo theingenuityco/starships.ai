@@ -329,7 +329,7 @@ export class ConversationService {
       return;
     }
 
-    // Skip workflow control events from nested executions (e.g., tool blueprints) to avoid duplicates
+    // Skip workflow/node control events from nested executions (depth>0) to avoid duplicates
     if (
       event.type === 'workflow_started' ||
       event.type === 'workflow_completed' ||
@@ -340,10 +340,8 @@ export class ConversationService {
       event.type === 'node_completed' ||
       event.type === 'node_failed'
     ) {
-      const executionEvent = event as ExecutionEvent;
-      const executionDepth = executionEvent.data?.execution.depth || 0;
-
-      if (executionDepth > 0) {
+      const depthRoot = (event as any)?.executionDepth ?? (event as any)?.data?.execution?.depth ?? 0;
+      if (depthRoot > 0) {
         // Skip these events from nested workflows (depth > 0) to prevent duplication
         return;
       }
@@ -361,6 +359,10 @@ export class ConversationService {
       }
 
       case 'content_chunk': {
+        // Drop nested LLM content streams (depth>0) from conversation timeline
+        if (((event as any)?.executionDepth ?? 0) > 0) {
+          break;
+        }
         // Stream content chunks in real-time (supports both delta.* and message.* providers)
         const chunkContent = event.data?.chunk;
         if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
@@ -660,6 +662,10 @@ export class ConversationService {
       }
 
       case 'content_complete': {
+        // Drop nested LLM completion events (depth>0)
+        if (((event as any)?.executionDepth ?? 0) > 0) {
+          break;
+        }
         // Guard: if there's no active stream (no accumulator), ignore completion to avoid corrupting state
         if (!this.streamingContent.has(conversationId)) {
           break;
@@ -840,6 +846,19 @@ export class ConversationService {
       case 'tool_complete': {
         console.log('[STREAMING] Tool completed:', event.data?.toolName);
 
+        // Depth-based guard: persist ONLY top-level tool executions (executionDepth === 1).
+        // Fallback: if depth is unavailable (older autopilot), require toolCallId to reduce duplicates.
+        const depth = (event as any)?.executionDepth;
+        if (typeof depth === 'number') {
+          if (depth !== 1) {
+            break;
+          }
+        } else {
+          if (!event.data?.toolCallId) {
+            break;
+          }
+        }
+
         // Track persistence as an async task so workflow_completed can await before emitting "complete"
         const persistTask = (async () => {
           try {
@@ -857,7 +876,7 @@ export class ConversationService {
                 role: 'tool',
                 content: toolContent,
                 messageType: 'tool_result',
-                ...(event.data.toolCallId && { tool_call_id: event.data.toolCallId }),
+                ...(event.data?.toolCallId ? { tool_call_id: event.data.toolCallId } : {}),
               });
 
               console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);

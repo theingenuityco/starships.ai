@@ -170,6 +170,8 @@ export class LLM extends BaseNode<LlmParams> {
     };
     let usage: LLMUsage | undefined;
     const choices: StreamChoice[] = [];
+    // Root-level execution depth for this LLM stream (0=top-level, >0=nested)
+    const executionDepth = this.getOptions()?.execution?.depth ?? 0;
 
     try {
       while (true) {
@@ -202,6 +204,7 @@ export class LLM extends BaseNode<LlmParams> {
               await eventCallback({
                 type: 'content_chunk',
                 timestamp: new Date().toISOString(),
+                executionDepth,
                 data: { chunk: parsed },
               });
             }
@@ -213,7 +216,7 @@ export class LLM extends BaseNode<LlmParams> {
 
       const eventCallback = this.getEventCallback();
       if (eventCallback) {
-        await eventCallback({ type: 'content_complete', timestamp: new Date().toISOString() });
+        await eventCallback({ type: 'content_complete', timestamp: new Date().toISOString(), executionDepth });
       }
 
       return this.buildFinalResponse(responseMetadata, choices, usage);

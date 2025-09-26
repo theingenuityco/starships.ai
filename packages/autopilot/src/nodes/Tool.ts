@@ -27,6 +27,9 @@ export class Tool extends BaseNode<ToolParams> {
 
     // Will hold nested execution context; populated before running the sub-blueprint
     let subExec: Execution | undefined;
+    // Compute execution depth for this tool call: parent depth + 1 (top-level calls are depth===1)
+    const parentDepth = this.getOptions()?.execution?.depth ?? 0;
+    const executionDepth = parentDepth + 1;
 
     try {
       // Extract tool arguments from input
@@ -39,6 +42,7 @@ export class Tool extends BaseNode<ToolParams> {
         await eventCallback({
           type: 'tool_started',
           timestamp: new Date().toISOString(),
+          executionDepth,
           data: {
             toolName: params.name,
             arguments: toolArgs,
@@ -73,6 +77,7 @@ export class Tool extends BaseNode<ToolParams> {
         await eventCallback({
           type: 'tool_complete',
           timestamp: new Date().toISOString(),
+          executionDepth: subExec?.depth ?? executionDepth,
           data: {
             toolName: params.name,
             arguments: toolArgs,
@@ -117,6 +122,7 @@ export class Tool extends BaseNode<ToolParams> {
           await eventCallback({
             type: 'tool_complete',
             timestamp: new Date().toISOString(),
+            executionDepth: details.depth,
             data: {
               toolName: params.name,
               toolCallId: params.toolCallId,

@@ -8,17 +8,20 @@
 
 import { Execution } from './execution';
 
-export interface LLMEvent {
-  type: 'content_chunk' | 'content_complete';
+export interface BaseEvent {
   timestamp: string;
+  executionDepth: number;
+}
+
+export interface LLMEvent extends BaseEvent {
+  type: 'content_chunk' | 'content_complete';
   data?: {
     chunk?: Record<string, unknown>;
   };
 }
 
-export interface ToolEvent {
+export interface ToolEvent extends BaseEvent {
   type: 'tool_started' | 'tool_complete';
-  timestamp: string;
   data?: {
     toolName?: string;
     toolCallId?: string;
@@ -41,9 +44,8 @@ export type ExecutionEventType =
 /**
  * Events that can be emitted during workflow execution
  */
-export interface ExecutionEvent {
+export interface ExecutionEvent extends BaseEvent {
   type: ExecutionEventType;
-  timestamp: string;
   data?: {
     execution: Execution;
   };

@@ -87,75 +87,48 @@ export const toolSmokeTestTool: ToolParams = {
         },
       },
 
-      // Capture original "arguments" (from __initial__) into current stream as "dummy"
+      // Simplified: Prepare test execution with timing
       {
-        ref: 'capture_args',
-        type: 'transform',
-        name: 'Capture Arguments',
-        description: 'Attach initial arguments under dummy for later extraction',
-        parameters: {
-          transforms: [
-            {
-              operation: 'add',
-              path: '/dummy',
-              value: '{{ $lastOutputOf("__initial__")[0].json.arguments ?? {} }}',
-            },
-          ],
-        },
-      },
-
-      // Mark t0 and expose args in a clean envelope
-      {
-        ref: 'mark_time',
+        ref: 'prepare_test',
         type: 'code',
-        name: 'Mark Start Time',
-        description: 'Record t0 and carry args forward',
+        name: 'Prepare Test Execution',
+        description: 'Extract tool definition and prepare arguments',
         parameters: {
           code: `
+            const httpResult = $lastOutputOf("http_get_tool")[0].json;
+            const toolDef = httpResult.body?.data || httpResult.body;
+            
+            if (!toolDef || !toolDef.blueprint) {
+              throw new Error('Tool definition missing or invalid blueprint');
+            }
+            
+            const testArgs = $lastOutputOf("__initial__")[0].json.arguments || {};
+            
             return {
-              t0: Date.now(),
-              args: (input && typeof input === 'object' && input !== null) ? (input.dummy ?? {}) : {}
+              toolDef,
+              testArgs,
+              startTime: Date.now()
             };
           `,
           timeout: 2000,
         },
       },
 
-      // Emit only the args object so the nested Workflow receives them as initial input
-      {
-        ref: 'emit_args',
-        type: 'code',
-        name: 'Emit Arguments',
-        description: 'Return plain args for nested workflow input',
-        parameters: {
-          code: `
-            return (input && typeof input === 'object' && input !== null) ? (input.args ?? {}) : {};
-          `,
-          timeout: 2000,
-        },
-      },
-
-      // Run the fetched tool using the Tool node (instead of Workflow) with the provided args
+      // Execute the tool using workflow node with test arguments
       {
         ref: 'run_tool',
-        type: 'tool',
-        name: 'Run Target Tool',
-        description: 'Execute target tool blueprint with provided arguments',
+        type: 'workflow',
+        name: 'Execute Tool Blueprint',
+        description: 'Run the tool blueprint with test arguments',
         parameters: {
-          // Prefer server-provided name; fallback to a generic label
-          name: '{{ ($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.name) ? $lastOutputOf("http_get_tool")[0].json.body.name : "Nested Tool Execution" }}',
-          description: 'Smoke test runner',
-          // Use server-provided parameters schema when available; fallback to minimal object schema
-          parameters:
-            '{{ ($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.parameters) ? $lastOutputOf("http_get_tool")[0].json.body.parameters : ({ "type": "object", "properties": {} }) }}',
-          // Blueprint reference from fetch step.
-          // Prefer body.blueprint; fall back to body.data.blueprint when server wraps payloads.
-          blueprint:
-            '{{ ($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.blueprint) ? $lastOutputOf("http_get_tool")[0].json.body.blueprint : (($lastOutputOf("http_get_tool")[0].json.body && $lastOutputOf("http_get_tool")[0].json.body.data) ? $lastOutputOf("http_get_tool")[0].json.body.data.blueprint : undefined) }}',
+          name: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.name || "Test Tool" }}',
+          description: 'Tool smoke test execution',
+          blueprint: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.blueprint }}',
+          timeout: '{{ $lastOutputOf("__initial__")[0].json.timeoutMs || 60000 }}',
         },
       },
 
-      // Return summary
+      // Return test results with timing
       {
         ref: 'end_1',
         type: 'end',
@@ -163,9 +136,12 @@ export const toolSmokeTestTool: ToolParams = {
         description: '',
         parameters: {
           output: {
-            ok: true,
-            durationMs: '{{ Date.now() - $lastOutputOf("mark_time")[0].json.t0 }}',
+            ok: '{{ !$exists($lastOutputOf("run_tool")[0].error) }}',
+            durationMs: '{{ Date.now() - $lastOutputOf("prepare_test")[0].json.startTime }}',
             result: '{{ $lastOutputOf("run_tool")[0].json }}',
+            error: '{{ $lastOutputOf("run_tool")[0].error || null }}',
+            toolName: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.name }}',
+            arguments: '{{ $lastOutputOf("prepare_test")[0].json.testArgs }}',
           },
         },
       },
@@ -173,11 +149,9 @@ export const toolSmokeTestTool: ToolParams = {
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'http_get_tool' },
-      { ref: 'e3', from: 'http_get_tool', to: 'capture_args' },
-      { ref: 'e4', from: 'capture_args', to: 'mark_time' },
-      { ref: 'e5', from: 'mark_time', to: 'emit_args' },
-      { ref: 'e6', from: 'emit_args', to: 'run_tool' },
-      { ref: 'e7', from: 'run_tool', to: 'end_1' },
+      { ref: 'e3', from: 'http_get_tool', to: 'prepare_test' },
+      { ref: 'e4', from: 'prepare_test', to: 'run_tool' },
+      { ref: 'e5', from: 'run_tool', to: 'end_1' },
     ],
     metadata: {},
   },

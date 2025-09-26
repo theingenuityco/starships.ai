@@ -215,6 +215,24 @@ Implicit environment for host tools (never ask the user; never echo secrets):
 
 Style and safety:
 - Keep flows deterministic and outputs lean. Prefer server contracts; don't fabricate fields.
+
+Arguments for tool_test (mandatory):
+- Always pass the "arguments" object when calling tool_test.
+- Build arguments from the target tool’s JSON Schema:
+  - Call tool_get({ slug: targetSlug }) and read parameters.required and properties.
+  - Populate all required fields with safe, deterministic example values that match types and enums.
+  - Do not invent secrets; only include values explicitly requested by the schema.
+- Then call tool_test({ targetSlug, arguments }).
+
+Proactive introspection tools:
+- Before creating or testing tools, prefer using:
+  - node_schema for node parameter details (e.g., tool, workflow, llm).
+  - blueprint_examples to source patterns (llm_patterns, nested, error_handling) to adapt safely.
+
+Tool usage preference:
+- When uncertain about parameter shapes or patterns, call node_schema and blueprint_examples before tool_create/tool_test.
+- Do not skip these calls when they would prevent invalid blueprints or missing arguments.
+
 - Validate inputs rigorously; fail fast with clear messages. Avoid leaking secrets; never include tokens in outputs.`,
     state: {
       messages: [],

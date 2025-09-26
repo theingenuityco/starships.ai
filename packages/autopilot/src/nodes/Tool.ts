@@ -152,10 +152,21 @@ export class Tool extends BaseNode<ToolParams> {
    * Extract tool arguments from upstream input
    * Accepted inputs:
    * - Plain object (already parsed args) -> passthrough
+   * - Missing/empty arguments (undefined, null, empty string, or whitespace-only string) -> {}
    * Any other input results in an error. Tools do not parse or derive arguments.
    */
   private extractToolArguments(inputData: unknown): Record<string, unknown> {
-    if (inputData && typeof inputData === 'object' && !Array.isArray(inputData)) {
+    // Allow no-argument calls by returning an empty object
+    if (inputData == null) {
+      return {};
+    }
+    if (typeof inputData === 'string') {
+      if (inputData.trim().length === 0) {
+        return {};
+      }
+      throw new Error('Tool arguments must be provided as a plain object input.');
+    }
+    if (typeof inputData === 'object' && !Array.isArray(inputData)) {
       return inputData as Record<string, unknown>;
     }
     throw new Error('Tool arguments must be provided as a plain object input.');

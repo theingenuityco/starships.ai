@@ -114,17 +114,32 @@ export const toolTestTool: ToolParams = {
         },
       },
 
-      // Execute the tool using workflow node with test arguments
+      // Emit only test arguments to feed the Tool node
+      {
+        ref: 'emit_args',
+        type: 'code',
+        name: 'Emit Test Arguments',
+        description: 'Extract only the test arguments to pass into the Tool node',
+        parameters: {
+          code: `
+            const testArgs = $lastOutputOf("prepare_test")[0].json.testArgs || {};
+            return testArgs;
+          `,
+          timeout: 1000,
+        },
+      },
+
+      // Execute the tool using Tool node with test arguments
       {
         ref: 'run_tool',
-        type: 'workflow',
-        name: 'Execute Tool Blueprint',
+        type: 'tool',
+        name: 'Execute Tool',
         description: 'Run the tool blueprint with test arguments',
         parameters: {
           name: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.name || "Test Tool" }}',
-          description: 'Tool test execution',
+          description: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.description || "Tool test execution" }}',
+          parameters: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.parameters || ({ type: "object", properties: {} }) }}',
           blueprint: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.blueprint }}',
-          timeout: '{{ $lastOutputOf("__initial__")[0].json.timeoutMs || 60000 }}',
         },
       },
 
@@ -141,7 +156,7 @@ export const toolTestTool: ToolParams = {
             result: '{{ $lastOutputOf("run_tool")[0].json }}',
             error: '{{ $lastOutputOf("run_tool")[0].error || null }}',
             toolName: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.name }}',
-            arguments: '{{ $lastOutputOf("prepare_test")[0].json.testArgs }}',
+            arguments: '{{ $lastOutputOf("emit_args")[0].json }}',
           },
         },
       },
@@ -150,8 +165,9 @@ export const toolTestTool: ToolParams = {
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'http_get_tool' },
       { ref: 'e3', from: 'http_get_tool', to: 'prepare_test' },
-      { ref: 'e4', from: 'prepare_test', to: 'run_tool' },
-      { ref: 'e5', from: 'run_tool', to: 'end_1' },
+      { ref: 'e4', from: 'prepare_test', to: 'emit_args' },
+      { ref: 'e5', from: 'emit_args', to: 'run_tool' },
+      { ref: 'e6', from: 'run_tool', to: 'end_1' },
     ],
     metadata: {},
   },

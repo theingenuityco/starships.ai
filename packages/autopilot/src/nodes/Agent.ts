@@ -92,6 +92,7 @@ export class Agent implements NodeHandler {
                 value: {
                   role: 'assistant',
                   content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
+                  reasoning: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.reasoning }}`,
                   tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
                 },
               },

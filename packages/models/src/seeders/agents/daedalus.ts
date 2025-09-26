@@ -8,8 +8,7 @@ function createDaedalusBlueprint(): Blueprint {
   const agent = new Agent({
     name: 'Daedalus Toolwright',
     model: 'openai/gpt-5',
-    temperature: 0.3,
-    maxTokens: 3200,
+    // Using system defaults for temperature and maxTokens
   });
 
   // Use the single default LLM chain created by Agent constructor
@@ -252,8 +251,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   category: 'coding',
 
   model: 'openai/gpt-5',
-  temperature: 0.3,
-  maxTokens: 1600,
+  // Using system defaults for temperature and maxTokens
 
   // Tool assignment - comprehensive tools for tool creation and blueprint understanding
   assignedToolSlugs: [

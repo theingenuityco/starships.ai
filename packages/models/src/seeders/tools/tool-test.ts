@@ -6,7 +6,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * Fetch a tool by slug from the server and execute its blueprint with provided arguments.
  * Returns { ok, durationMs, result }.
  */
-export const toolSmokeTestTool: ToolParams = {
+export const toolTestTool: ToolParams = {
   name: 'tool_test',
   description: `Execute another tool by slug and report pass/fail with timing.
 
@@ -122,7 +122,7 @@ export const toolSmokeTestTool: ToolParams = {
         description: 'Run the tool blueprint with test arguments',
         parameters: {
           name: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.name || "Test Tool" }}',
-          description: 'Tool smoke test execution',
+          description: 'Tool test execution',
           blueprint: '{{ $lastOutputOf("prepare_test")[0].json.toolDef.blueprint }}',
           timeout: '{{ $lastOutputOf("__initial__")[0].json.timeoutMs || 60000 }}',
         },
@@ -160,11 +160,11 @@ export const toolSmokeTestTool: ToolParams = {
 /**
  * Tool Template: tool_test
  */
-export const toolSmokeTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
-  name: toolSmokeTestTool.name,
-  description: toolSmokeTestTool.description,
-  parameters: toolSmokeTestTool.parameters,
-  blueprint: toolSmokeTestTool.blueprint,
+export const toolTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
+  name: toolTestTool.name,
+  description: toolTestTool.description,
+  parameters: toolTestTool.parameters,
+  blueprint: toolTestTool.blueprint,
 
   slug: 'tool-test',
   category: 'automation',

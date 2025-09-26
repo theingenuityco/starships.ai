@@ -1,9 +1,9 @@
 /**
- * Tool Smoke Test - E2E
+ * Tool Test - E2E
  * Executes tool_test using real Autopilot execution with mocked HTTP only
  */
 
-import { toolSmokeTestTool, toolSmokeTestToolTemplate } from '../tool-test';
+import { toolTestTool, toolTestToolTemplate } from '../tool-test';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
 
@@ -43,7 +43,7 @@ function createMockResponse(
   };
 }
 
-describe('Tool Smoke Test Tool', () => {
+describe('Tool Test Tool', () => {
   beforeEach(() => {
     // Mock fetch globally for HTTP requests
     global.fetch = jest.fn() as unknown as jest.Mock;
@@ -55,19 +55,19 @@ describe('Tool Smoke Test Tool', () => {
 
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      expect(toolSmokeTestTool.name).toBe('tool_test');
-      expect(toolSmokeTestTool.description).toContain('Execute another tool');
-      expect(toolSmokeTestTool.parameters).toBeDefined();
-      expect(toolSmokeTestTool.blueprint).toBeDefined();
+      expect(toolTestTool.name).toBe('tool_test');
+      expect(toolTestTool.description).toContain('Execute another tool');
+      expect(toolTestTool.parameters).toBeDefined();
+      expect(toolTestTool.blueprint).toBeDefined();
     });
 
     it('should require targetSlug parameter', () => {
-      const req = toolSmokeTestTool.parameters.required || [];
+      const req = toolTestTool.parameters.required || [];
       expect(req).toEqual(expect.arrayContaining(['targetSlug']));
     });
 
     it('should have the expected nodes and connectivity', () => {
-      const bp = toolSmokeTestTool.blueprint;
+      const bp = toolTestTool.blueprint;
       const nodeRefs = new Set(bp.nodes.map((n) => n.ref));
 
       // Required nodes present
@@ -84,13 +84,13 @@ describe('Tool Smoke Test Tool', () => {
 
   describe('Template Configuration', () => {
     it('should have consistent template configuration', () => {
-      expect(toolSmokeTestToolTemplate.name).toBe(toolSmokeTestTool.name);
-      expect(toolSmokeTestToolTemplate.description).toBe(toolSmokeTestTool.description);
-      expect(toolSmokeTestToolTemplate.parameters).toEqual(toolSmokeTestTool.parameters);
-      expect(toolSmokeTestToolTemplate.blueprint).toEqual(toolSmokeTestTool.blueprint);
-      expect(toolSmokeTestToolTemplate.slug).toBe('tool-test');
-      expect(toolSmokeTestToolTemplate.category).toBe('automation');
-      expect(toolSmokeTestToolTemplate.requiresApiKey).toBe(false);
+      expect(toolTestToolTemplate.name).toBe(toolTestTool.name);
+      expect(toolTestToolTemplate.description).toBe(toolTestTool.description);
+      expect(toolTestToolTemplate.parameters).toEqual(toolTestTool.parameters);
+      expect(toolTestToolTemplate.blueprint).toEqual(toolTestTool.blueprint);
+      expect(toolTestToolTemplate.slug).toBe('tool-test');
+      expect(toolTestToolTemplate.category).toBe('automation');
+      expect(toolTestToolTemplate.requiresApiKey).toBe(false);
     });
   });
 
@@ -103,7 +103,7 @@ describe('Tool Smoke Test Tool', () => {
         execution: ExecutionItemUtils.createExecution(),
       };
 
-      const toolNode = new Tool(toolSmokeTestTool, options);
+      const toolNode = new Tool(toolTestTool, options);
 
       const validation = toolNode.validate();
       expect(validation.valid).toBe(true);
@@ -256,7 +256,7 @@ describe('Tool Smoke Test Tool', () => {
 
   describe('Blueprint Implementation Details', () => {
     it('should have correct prepare node implementation', () => {
-      const bp = toolSmokeTestTool.blueprint;
+      const bp = toolTestTool.blueprint;
       const node = bp.nodes.find((n) => n.ref === 'prepare');
       expect(node).toBeDefined();
       expect(node?.type).toBe('code');
@@ -269,7 +269,7 @@ describe('Tool Smoke Test Tool', () => {
     });
 
     it('should use http_get_tool response body.blueprint for nested run', () => {
-      const bp = toolSmokeTestTool.blueprint;
+      const bp = toolTestTool.blueprint;
       const run = bp.nodes.find((n) => n.ref === 'run_tool');
       expect(run?.type).toBe('tool');
       const params = (run?.parameters || {}) as Record<string, unknown>;
@@ -280,7 +280,7 @@ describe('Tool Smoke Test Tool', () => {
     });
 
     it('should compute duration in end node', () => {
-      const bp = toolSmokeTestTool.blueprint;
+      const bp = toolTestTool.blueprint;
       const end = bp.nodes.find((n) => n.ref === 'end_1');
       expect(end?.type).toBe('end');
       const params = (end?.parameters || {}) as Record<string, unknown>;
@@ -291,7 +291,7 @@ describe('Tool Smoke Test Tool', () => {
 });
 
 describe('Tool.execute return value - tool_test', () => {
-  it('should return a single ExecutionItem with final smoke test result and preserve pairedItem', async () => {
+  it('should return a single ExecutionItem with final test result and preserve pairedItem', async () => {
     const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
 
     // Nested blueprint echoes initial args
@@ -323,7 +323,7 @@ describe('Tool.execute return value - tool_test', () => {
       execution: ExecutionItemUtils.createExecution(),
     };
 
-    const toolNode = new Tool(toolSmokeTestTool, options);
+    const toolNode = new Tool(toolTestTool, options);
     const raw = await toolNode.execute([{ json: { targetSlug: 'demo', arguments: args }, pairedItem: { item: 7 } } as ExecutionItem]);
 
     // Raw ExecutionItem[] assertions

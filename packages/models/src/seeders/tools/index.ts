@@ -11,7 +11,7 @@ export { toolGetToolTemplate } from './tool-get';
 export { toolCreateToolTemplate } from './tool-create';
 export { toolUpdateToolTemplate } from './tool-update';
 export { blueprintLintToolTemplate } from './blueprint-lint';
-export { toolSmokeTestToolTemplate } from './tool-test';
+export { toolTestToolTemplate } from './tool-test';
 export { nodeSchemaIntrospectionToolTemplate } from './node-schema';
 export { blueprintExamplesToolTemplate } from './blueprint-examples';
 
@@ -24,7 +24,7 @@ import { toolGetToolTemplate } from './tool-get';
 import { toolCreateToolTemplate } from './tool-create';
 import { toolUpdateToolTemplate } from './tool-update';
 import { blueprintLintToolTemplate } from './blueprint-lint';
-import { toolSmokeTestToolTemplate } from './tool-test';
+import { toolTestToolTemplate } from './tool-test';
 import { nodeSchemaIntrospectionToolTemplate } from './node-schema';
 import { blueprintExamplesToolTemplate } from './blueprint-examples';
 
@@ -37,7 +37,7 @@ export const ALL_TOOL_TEMPLATES = [
   toolCreateToolTemplate,
   toolUpdateToolTemplate,
   blueprintLintToolTemplate,
-  toolSmokeTestToolTemplate,
+  toolTestToolTemplate,
   nodeSchemaIntrospectionToolTemplate,
   blueprintExamplesToolTemplate,
 ];

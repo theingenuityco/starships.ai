@@ -352,8 +352,8 @@ export function ConversationMessageContent({
       {/* Tool calls and results rendering for assistant messages */}
       {Array.isArray(normalizedToolCalls) && normalizedToolCalls.length > 0 && messageType !== 'tool_result' && (
         <div className="my-2.5">
-          {/* Remount when streaming/tool-call completion toggles */}
-          <Collapsible key={`tools-${isStreaming ? 'on' : 'off'}-${completedToolResults}-${totalToolCalls}`} defaultOpen={isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls}>
+          {/* Tools panel: keep collapsed by default and preserve user toggle state */}
+          <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
               {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Loader2 className="w-3 h-3 animate-spin" />

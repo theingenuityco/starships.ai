@@ -58,7 +58,11 @@ Loops are allowed; the engine prevents infinite cycles.
 </blueprint-basics>
 
 <templates>
-Use full‑string {{ ... }} templates only. Context includes: state, outputs, status, currentNodeRef, input, $lastOutputOf(ref), $input(path), env(key).
+Partial evaluation is forbidden. Only evaluate when the entire string equals a single {{ ... }} template.
+- Incorrect: 'Hello {{ name }}'
+- Correct: '{{ "Hello " + $input("name") }}'
+- For URLs, headers, JSON bodies, and any strings, compute the entire value inside one full template or pre-shape data with transform/mutate/code.
+- Available context: state, outputs, status, currentNodeRef, input, $lastOutputOf(ref), $input(path), env(key).
 </templates>
 
 <ops-notes>
@@ -66,6 +70,13 @@ Use full‑string {{ ... }} templates only. Context includes: state, outputs, st
 - mutate: apply JSON Patch ops to execution.state only (paths start with /state).
 - code: sandboxed JS; no require/process/import/eval; timeout enforced. Prefer transform/mutate for data shaping.
 </ops-notes>
+
+<environment>
+- Use env('KEY') for all configuration and secrets, including any new variables you introduce.
+- Do not attempt to read from process.env, code nodes, or fetch secrets yourself; the runtime provides env('KEY') at execution time.
+- If a new variable is needed, reference it directly as env('NEW_KEY') and proceed; do not prompt for it, and do not hardcode defaults.
+- Never log or echo the raw value of env(...); redact in outputs and logs.
+</environment>
 
 <testing>
 Always pass tool_test.arguments.

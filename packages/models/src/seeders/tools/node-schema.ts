@@ -96,7 +96,7 @@ Returns comprehensive schema with:
                   output: {
                     type: 'any',
                     required: false,
-                    description: 'Optional output value. Supports {{ }} template expressions. When set, Engine returns this as final workflow result wrapped in ExecutionItem[]'
+                    description: 'Optional output value. Supports {{ expression }} template expressions. When set, Engine returns this as final workflow result wrapped in ExecutionItem[]'
                   }
                 },
                 behavior: {

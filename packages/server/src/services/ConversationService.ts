@@ -1,7 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
-import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent } from '@starships/autopilot';
+import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent, LLMEvent, ToolEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { ConversationRepository, AgentRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
@@ -329,7 +329,7 @@ export class ConversationService {
       return;
     }
 
-    // Skip workflow control events from nested executions (e.g., tool blueprints) to avoid duplicates
+    // Skip workflow/node control events from nested executions (depth>0) to avoid duplicates
     if (
       event.type === 'workflow_started' ||
       event.type === 'workflow_completed' ||
@@ -340,10 +340,8 @@ export class ConversationService {
       event.type === 'node_completed' ||
       event.type === 'node_failed'
     ) {
-      const executionEvent = event as ExecutionEvent;
-      const executionDepth = executionEvent.data?.execution.depth || 0;
-
-      if (executionDepth > 0) {
+      const depthRoot = event.executionDepth ?? 0;
+      if (depthRoot > 0) {
         // Skip these events from nested workflows (depth > 0) to prevent duplication
         return;
       }
@@ -361,8 +359,12 @@ export class ConversationService {
       }
 
       case 'content_chunk': {
+        // Drop nested LLM content streams (depth>0) from conversation timeline
+        if ((event.executionDepth ?? 0) > 0) {
+          break;
+        }
         // Stream content chunks in real-time (supports both delta.* and message.* providers)
-        const chunkContent = event.data?.chunk;
+        const chunkContent = (event as LLMEvent).data?.chunk;
         if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
           const choice0: any = chunkContent.choices[0] || {};
           const delta: any = choice0?.delta || {};
@@ -660,6 +662,10 @@ export class ConversationService {
       }
 
       case 'content_complete': {
+        // Drop nested LLM completion events (depth>0)
+        if ((event.executionDepth ?? 0) > 0) {
+          break;
+        }
         // Guard: if there's no active stream (no accumulator), ignore completion to avoid corrupting state
         if (!this.streamingContent.has(conversationId)) {
           break;
@@ -800,13 +806,14 @@ export class ConversationService {
       }
 
       case 'workflow_failed': {
-        console.error('[STREAMING] Workflow failed:', event.data?.execution?.error);
+        const execEvent = event as ExecutionEvent;
+        console.error('[STREAMING] Workflow failed:', execEvent.data?.execution?.error);
 
         // Create error message
         const errorMessage = await this.messageService.createMessage({
           conversationId,
           role: 'system',
-          content: `❌ Workflow failed: ${event.data?.execution?.error || 'Unknown error'}`,
+          content: `❌ Workflow failed: ${execEvent.data?.execution?.error || 'Unknown error'}`,
           messageType: 'error',
         });
 
@@ -823,41 +830,49 @@ export class ConversationService {
       case 'tool_started': {
         // Log argument preview to verify parsing/shape reaching the Tool node
         try {
-          const args = (event as any)?.data?.arguments;
+          const tEvent = event as ToolEvent;
+          const args = tEvent.data?.arguments;
           const preview = args !== undefined ? JSON.stringify(args).slice(0, 1000) : undefined;
-          console.log('[STREAMING] Tool started:', (event as any)?.data?.toolName, {
-            toolCallId: (event as any)?.data?.toolCallId,
+          console.log('[STREAMING] Tool started:', tEvent.data?.toolName, {
+            toolCallId: tEvent.data?.toolCallId,
             argsType: typeof args,
             argsPreview: preview,
           });
         } catch {
-          console.log('[STREAMING] Tool started:', event.data?.toolName);
+          const tEvent = event as ToolEvent;
+          console.log('[STREAMING] Tool started:', tEvent.data?.toolName);
         }
         // Tool started - we can optionally broadcast this or track it
         break;
       }
 
       case 'tool_complete': {
-        console.log('[STREAMING] Tool completed:', event.data?.toolName);
+        const toolEvt = event as ToolEvent;
+        console.log('[STREAMING] Tool completed:', toolEvt.data?.toolName);
+
+        // Depth-based guard: drop nested tool executions (keep only top-level where executionDepth === 0)
+        if ((event.executionDepth ?? 0) > 0) {
+          break;
+        }
 
         // Track persistence as an async task so workflow_completed can await before emitting "complete"
         const persistTask = (async () => {
           try {
             // Persist tool_result for both success (result) and failure (error)
-            if (event.data?.toolName && (event.data?.result !== undefined || event.data?.error)) {
+            if (toolEvt.data?.toolName && (toolEvt.data?.result !== undefined || toolEvt.data?.error)) {
               const toolContent =
-                event.data?.result !== undefined
-                  ? typeof event.data.result === 'string'
-                    ? event.data.result
-                    : JSON.stringify(event.data.result)
-                  : String(event.data?.error || 'Unknown tool error');
+                toolEvt.data?.result !== undefined
+                  ? typeof toolEvt.data.result === 'string'
+                    ? toolEvt.data.result
+                    : JSON.stringify(toolEvt.data.result)
+                  : String(toolEvt.data?.error || 'Unknown tool error');
 
               const toolResultMessage = await this.messageService.createMessage({
                 conversationId,
                 role: 'tool',
                 content: toolContent,
                 messageType: 'tool_result',
-                ...(event.data.toolCallId && { tool_call_id: event.data.toolCallId }),
+                ...(toolEvt.data?.toolCallId ? { tool_call_id: toolEvt.data.toolCallId } : {}),
               });
 
               console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);

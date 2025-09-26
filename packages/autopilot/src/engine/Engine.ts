@@ -607,6 +607,7 @@ export class Engine {
       const event: ExecutionEvent = {
         type,
         timestamp: new Date().toISOString(),
+        executionDepth: execution.depth ?? 0,
         data: { execution },
       };
       // Redact any secureEnv values from outgoing events/logs by default

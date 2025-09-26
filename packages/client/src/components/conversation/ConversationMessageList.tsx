@@ -3,7 +3,7 @@
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
-import { Bot, User } from 'lucide-react'
+import { Bot, User, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationStreamed } from '@/hooks/useConversations'
@@ -368,13 +368,9 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
                   <Bot className="w-4 h-4 text-muted-foreground" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="inline-flex items-center px-3 py-2 rounded-2xl rounded-tl-none border bg-muted/30 text-muted-foreground">
-                    <span className="text-xs font-medium">{(agentName || 'Assistant') + ' is responding...'}</span>
-                    <span className="inline-flex items-center gap-1.5 ml-2" aria-hidden="true">
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </span>
+                  <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                    <span>{(agentName || 'Assistant') + ' is typing...'}</span>
                   </div>
                 </div>
               </div>

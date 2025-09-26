@@ -29,6 +29,9 @@ export interface EvalContext {
   $lastOutputOf: (nodeRef: string) => unknown;
   $input: (path?: string) => unknown;
 
+  // General-purpose helpers
+  $exists: (value: unknown) => boolean;
+
   // Unified env/secret system (uniform naming across eval and code)
   env: (key: string) => unknown;
   envAll: () => Record<string, unknown>;
@@ -109,6 +112,9 @@ export class Eval {
         return items;
       },
       $input: (path?: string) => this.extractPath(inputData, path),
+
+      // General-purpose helpers
+      $exists: (value: unknown) => value !== undefined && value !== null,
 
       // Unified env/secret system (uniform naming across eval and code)
       env: (key: string) => {

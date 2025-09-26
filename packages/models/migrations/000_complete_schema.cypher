@@ -146,12 +146,6 @@ CREATE CONSTRAINT execution_id_unique IF NOT EXISTS FOR (ex:Execution) REQUIRE e
 // Execution indexes
 CREATE INDEX execution_status IF NOT EXISTS FOR (ex:Execution) ON (ex.status);
 
-// ============================================================================
-// NATIVE TOOL API KEY COLLECTION
-// ============================================================================
-
-// Native Tool API Key constraints
-CREATE CONSTRAINT native_tool_api_key_unique IF NOT EXISTS FOR (k:NativeToolApiKey) REQUIRE (k.starshipId, k.toolName) IS UNIQUE;
 
 // ============================================================================
 // WORKFLOW RUNTIME STATE COLLECTION

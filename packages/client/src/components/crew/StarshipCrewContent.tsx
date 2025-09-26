@@ -3,11 +3,9 @@
 import { useEffect, useState } from 'react'
 // import { motion, AnimatePresence } from 'motion/react'
 import { AgentSelector } from '@/components/agents/AgentSelector'
-import { NativeToolApiKeys } from '@/components/crew/NativeToolApiKeys'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useConfiguredToolsCount } from '@/hooks/useNativeApiKeys'
 import { useStarshipBySlug, useStarships } from '@/hooks/useStarships'
 import { useToast } from '@/hooks/useToast'
 import { MCPServerConnector, mcpServerAPI } from '@/lib/api'
@@ -50,8 +48,8 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
   // State for info button animation
   const [animateInfoButton, setAnimateInfoButton] = useState(false)
 
-  // Get configured tools count from TanStack Query hook
-  const configuredToolsCount = useConfiguredToolsCount(starship?.id || '')
+  // Native tool functionality removed - keeping for future extensibility
+  const configuredToolsCount = 0
 
   // Handle dismissing the floating message
   const handleDismissMessage = () => {
@@ -193,10 +191,10 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                 <Card className="bg-card/60 backdrop-blur-sm border-border/40 shadow-sm">
                   <CardContent className="p-2">
                     <div className="flex items-center gap-2">
-                      <Zap className="h-3.5 w-3.5 text-yellow-500" />
+                      <Settings className="h-3.5 w-3.5 text-yellow-500" />
                       <div>
-                        <p className="text-[10px] text-muted-foreground">Tools</p>
-                        <p className="text-sm font-bold">{configuredToolsCount}</p>
+                        <p className="text-[10px] text-muted-foreground">Config</p>
+                        <p className="text-sm font-bold">Ready</p>
                       </div>
                     </div>
                   </CardContent>
@@ -241,25 +239,18 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
         <div className="border-r border-border/40 bg-gradient-to-br from-card/60 to-card/40 backdrop-blur-sm shadow-lg flex flex-col min-h-0">
           <div className="p-6 pb-0 flex flex-col h-full min-h-0">
             <Tabs value={currentTab} onValueChange={handleTabChange} className="flex flex-col h-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
+              <TabsList className="grid w-full grid-cols-1 mb-6 flex-shrink-0 bg-muted/50 p-1 rounded-lg">
                 <TabsTrigger value="agents" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all">
                   <Bot className="h-4 w-4" />
                   Agents
                 </TabsTrigger>
-                {/* <TabsTrigger 
-                  value="connectors" 
+                {/* <TabsTrigger
+                  value="connectors"
                   className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
                 >
                   <Plug className="h-4 w-4" />
                   Connectors
                 </TabsTrigger> */}
-                <TabsTrigger
-                  value="api-keys"
-                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm transition-all"
-                >
-                  <Zap className="h-4 w-4" />
-                  Tools
-                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="agents" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
@@ -355,21 +346,6 @@ export function StarshipCrewContent({ slug }: StarshipCrewContentProps) {
                   </div>
                 </AnimatePresence>
               </TabsContent> */}
-
-              <TabsContent value="api-keys" className="flex-1 mt-0 data-[state=active]:flex data-[state=active]:flex-col min-h-0">
-                <div key="api-keys-content" className="flex-1 overflow-y-auto px-6 pb-6 -mx-6 min-h-0 custom-scrollbar">
-                  {starship?.id ? (
-                    <NativeToolApiKeys starshipId={starship.id} />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center">
-                        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
-                        <p className="text-sm text-muted-foreground">Loading starship data...</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
             </Tabs>
           </div>
         </div>

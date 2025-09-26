@@ -5,7 +5,6 @@ export { ConversationRepository } from './ConversationRepository';
 export { EdgeRepository } from './EdgeRepository';
 export { ExecutionRepository } from './ExecutionRepository';
 export { MessageRepository } from './MessageRepository';
-export { NativeToolApiKeyRepository } from './NativeToolApiKeyRepository';
 export { NodeRepository } from './NodeRepository';
 export { StarshipRepository } from './StarshipRepository';
 export { ToolRepository } from './ToolRepository';

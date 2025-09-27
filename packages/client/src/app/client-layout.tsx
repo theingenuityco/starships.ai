@@ -59,8 +59,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return <div className="h-full w-full">{children}</div>
   }
 
-  // Hide navigation on all routes except starship routes and marketplace
-  const shouldHideNavigation = !pathname.startsWith('/ship/') && pathname !== '/marketplace'
+  // Only show navigation for authenticated users (JwtAuthGate will handle this)
+  // Hide navigation only on landing page
+  const shouldHideNavigation = isDashboard
 
   // Regular pages with conditional navigation sidebar
   return (

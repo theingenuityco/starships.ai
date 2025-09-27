@@ -8,6 +8,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useAuth } from '@/hooks/useAuth'
 import { History, MessageSquare, Plus, Users, X, Settings, Key, Store } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
@@ -18,25 +19,34 @@ interface NavigationProps {
   isMobile?: boolean
 }
 
-// Starship-internal navigation structure - function to generate paths based on current starship
-const getStarshipNavigationSections = (starshipSlug: string) => [
-  {
-    title: 'Starship Systems',
-    items: [{ href: `/ship/${starshipSlug}/crew`, label: 'Crew', icon: Users, status: 'optimal' }],
-  },
+// Global navigation structure that works for all authenticated users
+const getGlobalNavigationSections = (starshipSlug: string | null) => [
+  ...(starshipSlug
+    ? [
+        {
+          title: 'Starship Systems',
+          items: [{ href: `/ship/${starshipSlug}/crew`, label: 'Crew', icon: Users, status: 'optimal' }],
+        },
+      ]
+    : []),
   {
     title: 'Resources',
     items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],
   },
-  {
-    title: 'Settings',
-    items: [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: Key, status: 'optimal' }],
-  },
+  ...(starshipSlug
+    ? [
+        {
+          title: 'Settings',
+          items: [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: Key, status: 'optimal' }],
+        },
+      ]
+    : []),
 ]
 
 export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { isAuthenticated } = useAuth()
 
   // State for conversation list toggle
   const [showConversationList, setShowConversationList] = useState(false)
@@ -98,38 +108,24 @@ export function Navigation(props: NavigationProps) {
     setShowConversationList(false)
   }
 
-  // Determine which navigation sections to show based on current route
+  // Show comprehensive navigation for all authenticated users
   const getNavigationSections = () => {
-    // Show starship navigation when inside starship context
-    if (starshipSlug) {
-      return getStarshipNavigationSections(starshipSlug)
-    }
-
-    // Show global navigation for marketplace and other authenticated routes
-    if (pathname === '/marketplace') {
-      return [
-        {
-          title: 'Resources',
-          items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],
-        },
-      ]
-    }
-
-    // No navigation for other routes
-    return []
+    if (!isAuthenticated) return []
+    return getGlobalNavigationSections(starshipSlug)
   }
 
   const navigationSections = getNavigationSections()
 
-  // Handle logo click - navigate to conversations and trigger animation
+  // Handle logo click - smart navigation based on context
   const handleLogoClick = () => {
     // Trigger animation
     setAnimationTrigger(prev => prev + 1)
 
     if (starshipSlug) {
+      // Go to conversations if we have a starship
       router.push(`/ship/${starshipSlug}/conversations`)
-    } else if (pathname === '/marketplace') {
-      // Stay on marketplace when clicking logo from marketplace
+    } else {
+      // Go to marketplace as default for authenticated users without starships
       router.push('/marketplace')
     }
   }
@@ -153,7 +149,7 @@ export function Navigation(props: NavigationProps) {
         {/* Navigation Content */}
         <div className="flex-1 flex flex-col justify-center min-h-0">
           <div className="p-2 space-y-2">
-            {/* Conversations Section - Only show when in starship context */}
+            {/* Conversations Section - Only show when user has a starship */}
             {starshipSlug && (
               <div>
                 {/* Main Conversations Icon - Standalone */}

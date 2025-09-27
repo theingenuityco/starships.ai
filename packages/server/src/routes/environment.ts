@@ -139,10 +139,10 @@ router.post('/starships/:id/environment', jwtAuthMiddleware, async (req: Request
   }
 });
 
-// PUT /starships/:id/environment/:key - Update environment variable
-router.put('/starships/:id/environment/:key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// PUT /starships/:id/environment/:envId - Update environment variable
+router.put('/starships/:id/environment/:envId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id: starshipId, key } = req.params;
+    const { id: starshipId, envId } = req.params;
     const userId = (req as any).user?.id;
 
     if (!userId) {
@@ -152,10 +152,10 @@ router.put('/starships/:id/environment/:key', jwtAuthMiddleware, async (req: Req
 
     // Validate parameters
     const paramValidation = validateData(
-      z.object({ id: IdSchema, key: EnvironmentKeySchema }),
+      z.object({ id: IdSchema, envId: IdSchema }),
       req.params,
       res,
-      'starship and key parameters'
+      'starship and environment variable parameters'
     );
     if (!paramValidation) return;
 
@@ -167,7 +167,7 @@ router.put('/starships/:id/environment/:key', jwtAuthMiddleware, async (req: Req
     if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
 
     const environmentService = new EnvironmentService();
-    const environment = await environmentService.updateEnvironmentVariable(starshipId, key, bodyValidation, userId);
+    const environment = await environmentService.updateEnvironmentVariableById(starshipId, envId, bodyValidation, userId);
 
     sendSuccess(res, { environment });
   } catch (error) {
@@ -175,10 +175,10 @@ router.put('/starships/:id/environment/:key', jwtAuthMiddleware, async (req: Req
   }
 });
 
-// DELETE /starships/:id/environment/:key - Delete environment variable
-router.delete('/starships/:id/environment/:key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// DELETE /starships/:id/environment/:envId - Delete environment variable
+router.delete('/starships/:id/environment/:envId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { id: starshipId, key } = req.params;
+    const { id: starshipId, envId } = req.params;
     const userId = (req as any).user?.id;
 
     if (!userId) {
@@ -188,10 +188,10 @@ router.delete('/starships/:id/environment/:key', jwtAuthMiddleware, async (req: 
 
     // Validate parameters
     const paramValidation = validateData(
-      z.object({ id: IdSchema, key: EnvironmentKeySchema }),
+      z.object({ id: IdSchema, envId: IdSchema }),
       req.params,
       res,
-      'starship and key parameters'
+      'starship and environment variable parameters'
     );
     if (!paramValidation) return;
 
@@ -199,11 +199,11 @@ router.delete('/starships/:id/environment/:key', jwtAuthMiddleware, async (req: 
     if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
 
     const environmentService = new EnvironmentService();
-    const deleted = await environmentService.deleteEnvironmentVariable(starshipId, key);
+    const deleted = await environmentService.deleteEnvironmentVariableById(starshipId, envId);
 
     if (!deleted) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Environment variable not found', 404, {
-        key,
+        envId,
         starshipId,
       });
       return;

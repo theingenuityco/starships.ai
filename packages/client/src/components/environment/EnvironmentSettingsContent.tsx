@@ -53,7 +53,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
     if (selectedVariable) {
       // Update existing variable
       await updateMutation.mutateAsync({
-        variable: selectedVariable,
+        variableId: selectedVariable.id,
         updates: {
           value: data.value,
           description: data.description,
@@ -74,7 +74,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
 
   const handleDeleteConfirm = async () => {
     if (selectedVariable) {
-      await deleteMutation.mutateAsync(selectedVariable)
+      await deleteMutation.mutateAsync(selectedVariable.id)
       setShowDeleteModal(false)
       setSelectedVariable(undefined)
     }

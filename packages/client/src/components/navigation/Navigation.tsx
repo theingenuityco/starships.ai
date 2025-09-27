@@ -8,7 +8,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { History, MessageSquare, Plus, Users, X } from 'lucide-react'
+import { History, MessageSquare, Plus, Users, X, Settings, Key } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -24,6 +24,10 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
     title: 'Starship Systems',
     items: [{ href: `/ship/${starshipSlug}/crew`, label: 'Crew', icon: Users, status: 'optimal' }],
   },
+  {
+    title: 'Settings',
+    items: [{ href: `/ship/${starshipSlug}/settings/environment`, label: 'Environment', icon: Key, status: 'optimal' }],
+  },
 ]
 
 export function Navigation(props: NavigationProps) {
@@ -32,6 +36,8 @@ export function Navigation(props: NavigationProps) {
 
   // State for conversation list toggle
   const [showConversationList, setShowConversationList] = useState(false)
+  // State for logo animation trigger
+  const [animationTrigger, setAnimationTrigger] = useState(0)
 
   // Extract starship slug from path
   const getStarshipSlug = () => {
@@ -101,8 +107,11 @@ export function Navigation(props: NavigationProps) {
 
   const navigationSections = getNavigationSections()
 
-  // Handle logo click - navigate to conversations
+  // Handle logo click - navigate to conversations and trigger animation
   const handleLogoClick = () => {
+    // Trigger animation
+    setAnimationTrigger(prev => prev + 1)
+
     if (starshipSlug) {
       router.push(`/ship/${starshipSlug}/conversations`)
     }
@@ -118,15 +127,9 @@ export function Navigation(props: NavigationProps) {
         }}
       >
         {/* Compact Header with Theme Toggle */}
-        <div className="p-3 border-b border-border/20 flex-shrink-0">
-          <div className="flex flex-col items-center justify-center gap-2">
-            <div
-              className="p-2 bg-primary/15 rounded-xl cursor-pointer hover:bg-primary/25 transition-colors duration-200 hover:scale-105 transform transition-transform flex items-center justify-center"
-              onClick={handleLogoClick}
-              title="Navigate to Conversations"
-            >
-              <StarshipsLogo width={20} height={20} gradientId="nav-gradient" animationDelay={1} repeatDelay={8} />
-            </div>
+        <div className="px-2 py-4 border-b border-border/20 flex-shrink-0 flex items-center justify-center">
+          <div className="cursor-pointer hover:scale-105 transform transition-transform" onClick={handleLogoClick} title="Navigate to Conversations">
+            <StarshipsLogo width={40} height={40} className="text-foreground" gradientId="nav-gradient" animationDelay={1} repeatDelay={20} triggerAnimation={animationTrigger} />
           </div>
         </div>
 

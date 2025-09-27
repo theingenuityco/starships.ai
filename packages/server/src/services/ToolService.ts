@@ -1,6 +1,6 @@
 import { Engine, ExecutionItemUtils } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
-import { AgentRepository, ToolRepository, NativeToolApiKeyRepository } from '@starships/models';
+import { AgentRepository, ToolRepository } from '@starships/models';
 import type { ToolModel } from '@starships/protocol';
 
 // Note: LLMToolDefinition type needs to be defined based on the actual interface needed
@@ -50,7 +50,6 @@ export class ToolService {
   private toolUsageStats: Map<string, number> = new Map();
   private agentRepository: AgentRepository;
   private toolRepository: ToolRepository;
-  private apiKeyRepository: NativeToolApiKeyRepository;
 
   constructor(config: { starshipId: string; agentId: string; enableLogging?: boolean }) {
     this.starshipId = config.starshipId;
@@ -58,7 +57,6 @@ export class ToolService {
     this.enableLogging = config.enableLogging || false;
     this.agentRepository = new AgentRepository();
     this.toolRepository = new ToolRepository();
-    this.apiKeyRepository = new NativeToolApiKeyRepository();
   }
 
   /**
@@ -76,9 +74,6 @@ export class ToolService {
         return [];
       }
 
-      // Get API keys for tools that need them
-      const apiKeys = await this.apiKeyRepository.getAllApiKeys(this.starshipId);
-
       // Convert database tools to executable AgentTools
       const tools: AgentTool[] = [];
 
@@ -87,7 +82,7 @@ export class ToolService {
           continue; // Skip disabled tools
         }
 
-        const agentTool = await this.createAgentToolFromDatabase(dbTool, apiKeys);
+        const agentTool = await this.createAgentToolFromDatabase(dbTool, {});
         if (agentTool) {
           tools.push(agentTool);
         }
@@ -151,11 +146,9 @@ export class ToolService {
    */
   private async createAgentToolFromDatabase(dbTool: ToolModel, apiKeys: Record<string, string>): Promise<AgentTool | null> {
     try {
-      // Merge tool configuration with available API keys
+      // Use tool configuration as-is (API keys functionality removed)
       const toolConfig = {
         ...dbTool.configuration,
-        // Provide API keys that might be needed by the tool
-        apiKeys: apiKeys,
       };
 
       return {

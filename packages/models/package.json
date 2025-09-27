@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "@starships/autopilot": "workspace:*",
+    "@starships/env": "workspace:*",
     "@starships/errors": "workspace:*",
     "@starships/protocol": "workspace:*",
     "class-transformer": "^0.5.1",

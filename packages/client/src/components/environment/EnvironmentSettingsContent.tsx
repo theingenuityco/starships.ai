@@ -93,10 +93,12 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
   if (starshipLoading) {
     return (
       <PageLayout>
-        <div className="container mx-auto py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-3 text-muted-foreground">Loading starship...</span>
+        <div className="flex flex-col h-screen items-center justify-center">
+          <div className="text-center space-y-4 opacity-100">
+            <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center">
+              <Key className="w-8 h-8 text-primary animate-pulse" />
+            </div>
+            <p className="text-muted-foreground">Loading environment settings...</p>
           </div>
         </div>
       </PageLayout>
@@ -106,11 +108,13 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
   if (!starship) {
     return (
       <PageLayout>
-        <div className="container mx-auto py-8">
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>Starship not found. Please check the URL and try again.</AlertDescription>
-          </Alert>
+        <div className="flex flex-col h-screen items-center justify-center">
+          <div className="w-full max-w-6xl mx-auto px-6">
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>Starship not found. Please check the URL and try again.</AlertDescription>
+            </Alert>
+          </div>
         </div>
       </PageLayout>
     )
@@ -118,34 +122,38 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
 
   return (
     <PageLayout>
-      <div className="container mx-auto py-8 space-y-8">
-        {/* Header */}
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Key className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Environment Variables</h1>
-          </div>
-          <p className="text-muted-foreground">
-            Manage environment variables for <strong>{starship.name}</strong>. These variables will be securely encrypted and available to your agents.
-          </p>
-        </div>
+      <div className="bg-background">
+        <div className="flex flex-col items-center px-6 py-8">
+          <div className="w-full max-w-6xl mx-auto space-y-8">
+            {/* Header */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Key className="h-6 w-6 text-primary" />
+                <h1 className="text-2xl font-bold">Environment Variables</h1>
+              </div>
+              <p className="text-muted-foreground">
+                Manage environment variables for <strong>{starship.name}</strong>. These variables will be securely encrypted and available to your agents.
+              </p>
+            </div>
 
-        {/* Security Notice */}
-        <Alert>
-          <Shield className="h-4 w-4" />
-          <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
-        </Alert>
-
-        {/* Variables List */}
-        <div>
-          {variablesError ? (
+            {/* Security Notice */}
             <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>Failed to load environment variables. Please try refreshing the page.</AlertDescription>
+              <Shield className="h-4 w-4" />
+              <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
             </Alert>
-          ) : (
-            <EnvironmentVariableList variables={variables} loading={variablesLoading} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
-          )}
+
+            {/* Variables List */}
+            <div>
+              {variablesError ? (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>Failed to load environment variables. Please try refreshing the page.</AlertDescription>
+                </Alert>
+              ) : (
+                <EnvironmentVariableList variables={variables} loading={variablesLoading} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Form Modal */}

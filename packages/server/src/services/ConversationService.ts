@@ -1,5 +1,6 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
+import { EnvironmentService } from '@/services/EnvironmentService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
 import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent, LLMEvent, ToolEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
@@ -25,6 +26,7 @@ export class ConversationService {
   private agentRepository: AgentRepository;
   private messageService: MessageService;
   private streamingService: StreamingService;
+  private environmentService: EnvironmentService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
@@ -46,6 +48,7 @@ export class ConversationService {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
+    this.environmentService = new EnvironmentService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
   }
@@ -262,11 +265,17 @@ export class ConversationService {
       const authToken = rawAuth.startsWith('Bearer ') ? rawAuth.slice(7) : rawAuth;
       const openRouterKey = env.OPENROUTER_API_KEY || '';
 
+      // Get user-defined encrypted environment variables for this starship
+      const starshipEnv = await this.environmentService.getDecryptedEnvironment(starship.id);
+
       const secureEnv: Record<string, string> = {
+        // System variables (read-only)
         STARSHIP_ID: starship.id,
         BASE_URL: baseUrl,
         ...(authToken ? { AUTH_TOKEN: authToken } : {}),
         ...(openRouterKey ? { OPEN_ROUTER_KEY: String(openRouterKey) } : {}),
+        // User-defined variables (from encrypted storage)
+        ...starshipEnv,
       };
 
       const agentWithTools: AgentParams = {

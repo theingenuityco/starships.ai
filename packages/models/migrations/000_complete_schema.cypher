@@ -25,6 +25,18 @@ CREATE INDEX starship_status IF NOT EXISTS FOR (s:Starship) ON (s.status);
 CREATE RANGE INDEX starship_created_at IF NOT EXISTS FOR (s:Starship) ON (s.createdAt);
 
 // ============================================================================
+// ENVIRONMENT COLLECTION
+// ============================================================================
+
+// Environment constraints
+CREATE CONSTRAINT environment_id_unique IF NOT EXISTS FOR (e:Environment) REQUIRE e.id IS UNIQUE;
+CREATE CONSTRAINT environment_starship_key_unique IF NOT EXISTS FOR (e:Environment) REQUIRE (e.starshipId, e.key) IS UNIQUE;
+
+// Environment indexes
+CREATE INDEX environment_starship_id IF NOT EXISTS FOR (e:Environment) ON (e.starshipId);
+CREATE INDEX environment_key IF NOT EXISTS FOR (e:Environment) ON (e.key);
+
+// ============================================================================
 // AGENT COLLECTION
 // ============================================================================
 

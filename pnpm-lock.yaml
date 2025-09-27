@@ -320,6 +320,9 @@ importers:
       '@starships/autopilot':
         specifier: workspace:*
         version: link:../autopilot
+      '@starships/env':
+        specifier: workspace:*
+        version: link:../env
       '@starships/errors':
         specifier: workspace:*
         version: link:../errors

@@ -48,7 +48,7 @@ const CreateToolTemplateSchema = z.object({
     nodes: z.array(z.unknown()),
     edges: z.array(z.unknown()),
   }),
-  category: z.enum(['general', 'api', 'utility', 'data', 'communication', 'automation']),
+  category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']),
   exampleUsage: z.string().optional(),
   requiresApiKey: z.boolean().optional(),
   configurationFields: z
@@ -97,7 +97,9 @@ router.get('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Respo
   try {
     const queryValidation = validateData(
       PaginationSchema.extend({
-        category: z.enum(['general', 'api', 'utility', 'data', 'communication', 'automation']).optional(),
+        category: z
+          .enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
+          .optional(),
         query: z.string().optional(),
         requiresApiKey: z.boolean().optional(),
       }),

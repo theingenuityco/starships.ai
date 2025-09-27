@@ -4,6 +4,8 @@
  * Clean starship type definitions for protocol contract.
  */
 
+import type { TemplateCategory } from '../index';
+
 // ============================================================================
 // STARSHIP TYPES
 // ============================================================================
@@ -100,7 +102,7 @@ export interface StarshipAgentsResponse {
     createdAt: string;
     updatedAt: string;
     version: string;
-    category: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+    category: TemplateCategory;
     usageCount: number;
     templateId?: string;
     starshipId: string;

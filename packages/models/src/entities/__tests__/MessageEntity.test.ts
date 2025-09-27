@@ -284,16 +284,7 @@ describe('MessageEntity', () => {
         })
       ).rejects.toThrow();
 
-      // Too long content (over 50000 characters)
-      await expect(
-        MessageEntity.validate({
-          role: 'user',
-          content: 'a'.repeat(50001),
-          messageType: 'user_input',
-        })
-      ).rejects.toThrow();
-
-      // Valid content lengths should pass
+      // Valid content lengths should pass - no maximum limit
       await expect(
         MessageEntity.validate({
           role: 'user',
@@ -305,7 +296,15 @@ describe('MessageEntity', () => {
       await expect(
         MessageEntity.validate({
           role: 'user',
-          content: 'a'.repeat(50000), // Maximum length
+          content: 'a'.repeat(50000), // Large content should be allowed
+          messageType: 'user_input',
+        })
+      ).resolves.not.toThrow();
+
+      await expect(
+        MessageEntity.validate({
+          role: 'user',
+          content: 'a'.repeat(100000), // Very large content should be allowed
           messageType: 'user_input',
         })
       ).resolves.not.toThrow();

@@ -938,7 +938,6 @@ Standardized patterns across layers make the codebase predictable and easier for
 - **Messages**: Complete implementation following all 6 layers
 - **Agents**: Complete implementation following all 6 layers
 - **Agent Templates**: Complete implementation following all 6 layers ✨ **NEWLY COMPLETED**
-- **Native API Keys**: Complete implementation following all 6 layers ✨ **NEWLY COMPLETED**
 - **Blueprints**: Complete implementation following all 6 layers
 - **Workflows**: Complete implementation following all 6 layers
 - **Executions**: Complete implementation following all 6 layers
@@ -961,14 +960,12 @@ Any new features should be implemented following this established 6-layer patter
 **January 2025**: Successfully completed the final missing components to achieve 100% layered architecture compliance:
 
 - **Agent Template Entity**: Created [`packages/models/src/entities/AgentTemplateEntity.ts`](packages/models/src/entities/AgentTemplateEntity.ts) with comprehensive validation, transformation, and business helper methods following established patterns.
-- **Native Tool API Key Entity**: Created [`packages/models/src/entities/NativeToolApiKeyEntity.ts`](packages/models/src/entities/NativeToolApiKeyEntity.ts) with encryption-aware validation and security-focused helper methods.
 - **Repository Pattern Compliance**: Updated [`AgentTemplateRepository`](packages/models/src/repositories/AgentTemplateRepository.ts) to use entity classes instead of manual serialization, eliminating the last architecture violations.
 
 **November 2024**: Successfully completed migration of the remaining features to eliminate all layer jumping violations:
 
 - **Agents**: Fixed critical violations where [`packages/server/src/routes/agents.ts`](packages/server/src/routes/agents.ts) was directly calling `AgentRepository`. Now properly uses [`AgentService`](packages/server/src/services/AgentService.ts) with new business logic methods.
 - **Agent Templates**: Fixed violations in [`packages/server/src/routes/agent-templates.ts`](packages/server/src/routes/agent-templates.ts) by adding business logic methods to [`AgentTemplateService`](packages/server/src/services/AgentTemplateService.ts) for starship validation and agent template creation.
-- **Native API Keys**: Created new [`NativeApiKeyService`](packages/server/src/services/NativeApiKeyService.ts) and updated [`packages/server/src/routes/native-api-keys.ts`](packages/server/src/routes/native-api-keys.ts) to eliminate direct repository access.
 
 ## 🎉 **100% Migration Complete - January 2025**
 
@@ -985,7 +982,6 @@ The layered architecture migration is now **fully complete** with all entities p
 7. [`WorkflowEntity`](packages/models/src/entities/WorkflowEntity.ts) ✅
 8. [`ExecutionEntity`](packages/models/src/entities/ExecutionEntity.ts) ✅
 9. [`AgentTemplateEntity`](packages/models/src/entities/AgentTemplateEntity.ts) ✅ **NEW**
-10. [`NativeToolApiKeyEntity`](packages/models/src/entities/NativeToolApiKeyEntity.ts) ✅ **NEW**
 
 ### **Architecture Compliance: 100/100** 🎯
 

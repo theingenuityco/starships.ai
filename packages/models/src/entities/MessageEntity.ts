@@ -9,7 +9,7 @@ import { Transformers } from '@/helpers/serializer';
 import type { MessageModel, MessageType } from '@starships/protocol';
 import type { LlmToolCall } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsEnum, IsISO8601, IsString, Length, validate, ValidationError, IsOptional, ValidateIf } from 'class-validator';
+import { IsEnum, IsISO8601, IsString, Length, MinLength, validate, ValidationError, IsOptional, ValidateIf } from 'class-validator';
 
 export class MessageEntity implements MessageModel {
   @Expose()
@@ -40,7 +40,7 @@ export class MessageEntity implements MessageModel {
         ((Array.isArray(o.tool_calls) && o.tool_calls.length > 0) || (typeof o.reasoning === 'string' && o.reasoning.length > 0))
       )
   )
-  @Length(1, 50000) // Reasonable content length limit; allow empty when assistant has tool_calls or reasoning
+  @MinLength(1) // Ensure non-empty when required; no max length cap
   content!: string;
 
   // Message classification

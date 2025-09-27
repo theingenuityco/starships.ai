@@ -66,6 +66,7 @@ module.exports = {
         'frosted-card': 'linear-gradient(135deg, hsl(var(--card) / 0.30) 0%, hsl(var(--card) / 0.20) 100%)',
       },
       boxShadow: {
+        'frosted-lg': 'var(--shadow-frosted-lg)',
         'frosted-xl': 'var(--shadow-frosted-xl)',
       },
     },

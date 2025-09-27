@@ -142,15 +142,6 @@ erDiagram
         string updatedAt
     }
 
-    %% Security and API Management
-    NativeToolApiKey {
-        string id PK
-        string starshipId FK
-        string toolName
-        string encryptedApiKey "AES-256-GCM encrypted"
-        string createdAt
-        string updatedAt
-    }
 
     %% Stripe Integration
     StripeEvent {
@@ -167,7 +158,6 @@ erDiagram
     %% Starship Relationships
     Starship ||--|| Vision : "HAS_VISION"
     Starship ||--o{ Agent : "DEPLOYED_ON"
-    Starship ||--o{ NativeToolApiKey : "HAS_API_KEYS"
 
     %% Agent System Relationships
     LLM ||--o{ AgentTemplate : "REFERENCES"
@@ -188,7 +178,6 @@ graph TD
     U[User] --> S[Starship]
     S --> V[Vision]
     S --> A[Agent]
-    S --> NK[NativeToolApiKey]
 
     %% Agent System
     U --> AT[AgentTemplate]
@@ -213,7 +202,6 @@ graph TD
     class U,S primary
     class A,V secondary
     class L,AT system
-    class NK security
     class SE integration
 ```
 
@@ -233,7 +221,6 @@ graph TD
 
 ### Security & Integration
 
-- **API Key Management**: `NativeToolApiKey` stores encrypted tool credentials per starship
 - **Stripe Integration**: `StripeEvent` ensures webhook idempotency; `User.stripeCustomerId` and `Starship.stripeCustomerId` link to Stripe
 
 ### Technical Implementation Notes
@@ -241,5 +228,4 @@ graph TD
 - **Neo4j Relationships**: Repository code maintains both FK references and Neo4j relationship patterns
 - **JSON Storage**: Complex objects (workflow parameters, execution results, metadata) stored as JSON
 - **Soft References**: Agent IDs in missions stored as string arrays for flexibility
-- **Encryption**: Native tool API keys use AES-256-GCM encryption
 - **Slug Generation**: Starship slugs are auto-generated with collision handling

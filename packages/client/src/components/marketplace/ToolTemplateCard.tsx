@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2 } from 'lucide-react'
+import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2, Download } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { ToolTemplateModel } from '@starships/protocol'
@@ -75,7 +75,7 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl hover:border-primary/50 group flex flex-col">
+      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl group flex flex-col hover:bg-primary/5">
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
@@ -102,7 +102,7 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
         <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <Users className="w-4 h-4" />
+              <Download className="w-4 h-4" />
               <span>{template.usageCount}</span>
             </div>
             {template.requiresApiKey && (
@@ -148,13 +148,7 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
 
         {/* Action Button */}
         <div className="mt-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-            onClick={handleInstall}
-            disabled={isInstalling || !primaryStarship}
-          >
+          <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleInstall} disabled={isInstalling || !primaryStarship}>
             <Sparkles className="w-4 h-4 mr-2" />
             {isInstalling ? 'Installing...' : 'Install'}
           </Button>

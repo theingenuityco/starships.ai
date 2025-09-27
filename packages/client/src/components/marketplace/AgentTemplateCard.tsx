@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Users, Sparkles } from 'lucide-react'
+import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Users, Sparkles, Download } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
@@ -74,7 +74,7 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl hover:border-primary/50 group flex flex-col">
+      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl group flex flex-col hover:bg-primary/5">
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
@@ -104,8 +104,8 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
             <span className="font-mono text-xs truncate">{template.model}</span>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
-            <Users className="w-4 h-4" />
-            <span>{template.usageCount} uses</span>
+            <Download className="w-4 h-4" />
+            <span>{template.usageCount}</span>
           </div>
         </div>
 
@@ -125,13 +125,7 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
 
         {/* Action Button */}
         <div className="mt-auto">
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-            onClick={handleDeploy}
-            disabled={isDeploying || !primaryStarship}
-          >
+          <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeploy} disabled={isDeploying || !primaryStarship}>
             <Sparkles className="w-4 h-4 mr-2" />
             {isDeploying ? 'Deploying...' : 'Deploy'}
           </Button>

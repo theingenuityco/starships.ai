@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card'
 import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
+import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2, Download, CheckCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
@@ -22,6 +23,7 @@ interface ToolTemplateCardProps {
 
 export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps) {
   const [isInstalling, setIsInstalling] = useState(false)
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
   // Get current user and their starships for installation
   const { userId } = useAuth()
@@ -77,7 +79,14 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
     return colors[category as keyof typeof colors] || colors.general
   }
 
-  const handleInstall = async () => {
+  const handleInstallClick = () => {
+    if (!primaryStarship) {
+      return // No starship to install to
+    }
+    setShowConfirmationModal(true)
+  }
+
+  const handleConfirmInstall = async () => {
     if (!primaryStarship) {
       return // No starship to install to
     }
@@ -90,7 +99,7 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
         configuration: {},
       })
       onInstall?.(template)
-    } catch (error) {
+    } catch {
       // Error handling is done in the mutation hook
     } finally {
       setIsInstalling(false)
@@ -178,12 +187,23 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
               <span className="truncate">Already installed on {primaryStarship?.name || 'starship'}</span>
             </Button>
           ) : (
-            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleInstall} disabled={isInstalling || !primaryStarship}>
+            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleInstallClick} disabled={isInstalling || !primaryStarship}>
               <Sparkles className="w-4 h-4 mr-2" />
               {isInstalling ? 'Installing...' : 'Install'}
             </Button>
           )}
         </div>
+
+        {/* Confirmation Modal */}
+        <DeploymentConfirmationModal
+          isOpen={showConfirmationModal}
+          onOpenChange={setShowConfirmationModal}
+          onConfirm={handleConfirmInstall}
+          isProcessing={isInstalling}
+          type="tool"
+          template={template}
+          starshipName={primaryStarship?.name || 'Unknown Starship'}
+        />
       </Card>
     </motion.div>
   )

@@ -7,7 +7,8 @@ import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
-import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Users, Sparkles, Download, CheckCircle } from 'lucide-react'
+import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
+import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Sparkles, Download, CheckCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
@@ -19,6 +20,7 @@ interface AgentTemplateCardProps {
 
 export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps) {
   const [isDeploying, setIsDeploying] = useState(false)
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
   // Get current user and their starships for deployment
   const { userId } = useAuth()
@@ -59,7 +61,14 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
     return colors[category as keyof typeof colors] || colors.general
   }
 
-  const handleDeploy = async () => {
+  const handleDeployClick = () => {
+    if (!primaryStarship) {
+      return // No starship to deploy to
+    }
+    setShowConfirmationModal(true)
+  }
+
+  const handleConfirmDeploy = async () => {
     if (!primaryStarship) {
       return // No starship to deploy to
     }
@@ -71,7 +80,7 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
         starshipId: primaryStarship.id,
       })
       onDeploy?.(template)
-    } catch (error) {
+    } catch {
       // Error handling is done in the mutation hook
     } finally {
       setIsDeploying(false)
@@ -122,7 +131,7 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
             <div className="space-y-1">
               {template.previewPrompts.slice(0, 2).map((prompt, idx) => (
                 <div key={idx} className="text-xs bg-muted/30 px-2 py-1 rounded border border-muted-foreground/20 truncate">
-                  "{prompt.length > 40 ? `${prompt.slice(0, 40)}...` : prompt}"
+                  &quot;{prompt.length > 40 ? `${prompt.slice(0, 40)}...` : prompt}&quot;
                 </div>
               ))}
             </div>
@@ -137,12 +146,23 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
               <span className="truncate">Already deployed on {primaryStarship?.name || 'starship'}</span>
             </Button>
           ) : (
-            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeploy} disabled={isDeploying || !primaryStarship}>
+            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying || !primaryStarship}>
               <Sparkles className="w-4 h-4 mr-2" />
               {isDeploying ? 'Deploying...' : 'Deploy'}
             </Button>
           )}
         </div>
+
+        {/* Confirmation Modal */}
+        <DeploymentConfirmationModal
+          isOpen={showConfirmationModal}
+          onOpenChange={setShowConfirmationModal}
+          onConfirm={handleConfirmDeploy}
+          isProcessing={isDeploying}
+          type="agent"
+          template={template}
+          starshipName={primaryStarship?.name || 'Unknown Starship'}
+        />
       </Card>
     </motion.div>
   )

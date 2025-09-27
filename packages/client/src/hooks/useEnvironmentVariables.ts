@@ -97,18 +97,18 @@ export function useUpdateEnvironmentVariable(starshipId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ variable, updates }: { variable: EnvironmentSummary; updates: UpdateEnvironmentVariableRequest }): Promise<EnvironmentSummary> => {
-      const response: FetchResponse<ApiResponse<EnvironmentVariableResponse>> = await api.put(`/api/v1/starships/${starshipId}/environment/${variable.key}`, updates)
+    mutationFn: async ({ variableId, updates }: { variableId: string; updates: UpdateEnvironmentVariableRequest }): Promise<EnvironmentSummary> => {
+      const response: FetchResponse<ApiResponse<EnvironmentVariableResponse>> = await api.put(`/api/v1/starships/${starshipId}/environment/${variableId}`, updates)
       return response.data.data.environment
     },
-    onSuccess: (updatedVariable, { variable }) => {
+    onSuccess: (updatedVariable, { variableId }) => {
       // Update the specific environment variable in cache
-      queryClient.setQueryData(ENVIRONMENT_QUERY_KEYS.detail(starshipId, variable.id), updatedVariable)
+      queryClient.setQueryData(ENVIRONMENT_QUERY_KEYS.detail(starshipId, variableId), updatedVariable)
 
       // Update variable in the starship's list
       queryClient.setQueryData(ENVIRONMENT_QUERY_KEYS.byStarship(starshipId), (old: EnvironmentSummary[] | undefined) => {
         if (!old) return [updatedVariable]
-        return old.map(v => (v.id === variable.id ? updatedVariable : v))
+        return old.map(variable => (variable.id === variableId ? updatedVariable : variable))
       })
 
       toast.success('Environment variable updated successfully!', {
@@ -131,32 +131,41 @@ export function useDeleteEnvironmentVariable(starshipId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (variable: EnvironmentSummary) => {
-      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/starships/${starshipId}/environment/${variable.key}`)
+    mutationFn: async (variableId: string) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/starships/${starshipId}/environment/${variableId}`)
       return response.data.data
     },
-    onMutate: async variable => {
-      await queryClient.cancelQueries({
-        queryKey: ENVIRONMENT_QUERY_KEYS.byStarship(starshipId),
-      })
+    onMutate: async variableId => {
+      // Get variable details to know which caches to update
+      const variable = queryClient.getQueryData(ENVIRONMENT_QUERY_KEYS.detail(starshipId, variableId)) as EnvironmentSummary | undefined
 
-      // Optimistically remove the variable
-      queryClient.setQueryData(ENVIRONMENT_QUERY_KEYS.byStarship(starshipId), (old: EnvironmentSummary[] | undefined) => {
-        if (!old) return old
-        return old.filter(v => v.id !== variable.id)
-      })
+      if (variable) {
+        await queryClient.cancelQueries({
+          queryKey: ENVIRONMENT_QUERY_KEYS.byStarship(starshipId),
+        })
+
+        // Optimistically remove the variable
+        queryClient.setQueryData(ENVIRONMENT_QUERY_KEYS.byStarship(starshipId), (old: EnvironmentSummary[] | undefined) => {
+          if (!old) return old
+          return old.filter(v => v.id !== variableId)
+        })
+      }
 
       return { variable }
     },
-    onSuccess: (data, variable, context) => {
+    onSuccess: (data, variableId, context) => {
       // Remove from detail cache
-      queryClient.removeQueries({ queryKey: ENVIRONMENT_QUERY_KEYS.detail(starshipId, variable.id) })
+      queryClient.removeQueries({ queryKey: ENVIRONMENT_QUERY_KEYS.detail(starshipId, variableId) })
 
-      toast.success('Environment variable deleted successfully!', {
-        description: `${variable.key} has been removed from your starship.`,
-      })
+      if (context?.variable) {
+        toast.success('Environment variable deleted successfully!', {
+          description: `${context.variable.key} has been removed from your starship.`,
+        })
+      } else {
+        toast.success('Environment variable deleted successfully!')
+      }
     },
-    onError: (error: any, variable, context) => {
+    onError: (error: any, variableId, context) => {
       // Rollback optimistic deletion
       if (context?.variable) {
         queryClient.invalidateQueries({

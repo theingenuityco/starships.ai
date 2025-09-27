@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useAuth } from '@/hooks/useAuth'
-import { useStarships } from '@/hooks/useStarships'
+import { useUserStarships } from '@/hooks/useStarships'
 import { Book, Brain, ChevronDown, Compass, Lightbulb, Minus, Rocket, Sparkles, Star, User, Users } from 'lucide-react'
 import { motion } from 'motion/react'
 import { lazy, memo, Suspense, useEffect, useState } from 'react'
@@ -89,14 +89,11 @@ StarshipClass.displayName = 'StarshipClass'
 export default function HomePage() {
   const [mounted, setMounted] = useState(false)
   const [launching, setLaunching] = useState(false)
-  const { isAuthenticated, isLoading, userName } = useAuth()
+  const { isAuthenticated, isLoading, userName, userId } = useAuth()
 
   // Use TanStack Query to fetch starships - only when authenticated
-  const { data: starshipsData, isLoading: starshipsLoading } = useStarships({
-    enabled: isAuthenticated
-  })
+  const { data: starships = [], isLoading: starshipsLoading } = useUserStarships(userId || '', !!userId && isAuthenticated)
 
-  const starships = starshipsData?.starships || []
   const hasExistingStarships = starships.length > 0
 
   useEffect(() => {

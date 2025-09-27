@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
+import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
-import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Users, Sparkles, Download } from 'lucide-react'
+import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Users, Sparkles, Download, CheckCircle } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
@@ -23,6 +24,11 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
   const { userId } = useAuth()
   const { data: starships = [] } = useUserStarships(userId || '', !!userId)
   const primaryStarship = starships[0] // Use first starship by default
+
+  // Get deployed agents to check if this template is already deployed
+  const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship)
+  // Note: We use name matching since agents don't store templateId
+  const isAlreadyDeployed = deployedAgents.some(agent => agent.name === template.name)
 
   // Deployment mutation
   const createAgentMutation = useCreateAgentFromTemplate()
@@ -125,10 +131,17 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
 
         {/* Action Button */}
         <div className="mt-auto">
-          <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeploy} disabled={isDeploying || !primaryStarship}>
-            <Sparkles className="w-4 h-4 mr-2" />
-            {isDeploying ? 'Deploying...' : 'Deploy'}
-          </Button>
+          {isAlreadyDeployed ? (
+            <Button size="sm" variant="outline" className="w-full transition-colors" disabled>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              <span className="truncate">Already deployed on {primaryStarship?.name || 'starship'}</span>
+            </Button>
+          ) : (
+            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeploy} disabled={isDeploying || !primaryStarship}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isDeploying ? 'Deploying...' : 'Deploy'}
+            </Button>
+          )}
         </div>
       </Card>
     </motion.div>

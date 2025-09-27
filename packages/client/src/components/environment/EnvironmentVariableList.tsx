@@ -90,7 +90,7 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
         ) : (
           <div className="divide-y">
             {filteredVariables.map(variable => (
-              <div key={variable.id} className="group p-4 hover:bg-muted/50 transition-colors">
+              <div key={variable.id} className="group px-6 py-4 hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">

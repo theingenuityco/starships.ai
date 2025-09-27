@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
+import { useUserStarships } from '@/hooks/useStarships'
+import { useAuth } from '@/hooks/useAuth'
 import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2 } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
@@ -17,7 +19,12 @@ interface ToolTemplateCardProps {
 export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps) {
   const [isInstalling, setIsInstalling] = useState(false)
 
-  // Installation mutation (placeholder for now since tool creation isn't implemented yet)
+  // Get current user and their starships for installation
+  const { userId } = useAuth()
+  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
+  const primaryStarship = starships[0] // Use first starship by default
+
+  // Installation mutation
   const createToolMutation = useCreateToolFromTemplate()
 
   const getCategoryIcon = (category: string) => {
@@ -47,13 +54,17 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
   }
 
   const handleInstall = async () => {
+    if (!primaryStarship) {
+      return // No starship to install to
+    }
+
     setIsInstalling(true)
     try {
-      // TODO: Implement tool installation when backend is ready
-      // await createToolMutation.mutateAsync({
-      //   templateId: template.id,
-      //   starshipId: primaryStarship.id,
-      // })
+      await createToolMutation.mutateAsync({
+        templateSlug: template.slug,
+        starshipId: primaryStarship.id,
+        configuration: {},
+      })
       onInstall?.(template)
     } catch (error) {
       // Error handling is done in the mutation hook
@@ -95,7 +106,13 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
                 )}
               </div>
 
-              <Button size="sm" variant="outline" className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors" onClick={handleInstall} disabled={isInstalling}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+                onClick={handleInstall}
+                disabled={isInstalling || !primaryStarship}
+              >
                 <Sparkles className="w-4 h-4 mr-2" />
                 {isInstalling ? 'Installing...' : 'Install'}
               </Button>

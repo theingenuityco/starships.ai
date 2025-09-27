@@ -56,15 +56,16 @@ export function useAgentTemplate(id: string, enabled: boolean = true) {
 }
 
 /**
- * Get all tool templates (placeholder - needs backend implementation)
+ * Get all tool templates
  */
 export function useToolTemplates(filters?: TemplateFilters, enabled: boolean = true) {
   return useQuery({
     queryKey: TEMPLATE_QUERY_KEYS.toolTemplatesList(filters),
     queryFn: async (): Promise<ToolTemplateModel[]> => {
-      // TODO: Implement tool templates endpoint in backend
-      // For now, return empty array to prevent errors
-      return []
+      const response: FetchResponse<ApiResponse<ToolTemplateModel[]>> = await api.get('/api/v1/tool-templates', {
+        params: filters,
+      })
+      return response.data.data
     },
     enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -73,14 +74,14 @@ export function useToolTemplates(filters?: TemplateFilters, enabled: boolean = t
 }
 
 /**
- * Get tool template by ID (placeholder - needs backend implementation)
+ * Get tool template by ID
  */
 export function useToolTemplate(id: string, enabled: boolean = true) {
   return useQuery({
     queryKey: TEMPLATE_QUERY_KEYS.toolTemplate(id),
     queryFn: async (): Promise<ToolTemplateModel> => {
-      // TODO: Implement tool template endpoint in backend
-      throw new Error('Tool templates not yet implemented')
+      const response: FetchResponse<ApiResponse<ToolTemplateModel>> = await api.get(`/api/v1/tool-templates/${id}`)
+      return response.data.data
     },
     enabled: !!id && enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
@@ -126,15 +127,18 @@ export function useCreateAgentFromTemplate() {
 }
 
 /**
- * Create tool from template (placeholder - needs backend implementation)
+ * Create tool from template
  */
 export function useCreateToolFromTemplate() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ templateId, starshipId }: { templateId: string; starshipId: string }) => {
-      // TODO: Implement tool creation endpoint in backend
-      throw new Error('Tool creation from template not yet implemented')
+    mutationFn: async ({ templateSlug, starshipId, configuration }: { templateSlug: string; starshipId: string; configuration?: Record<string, unknown> }) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/starships/${starshipId}/tools/from-template`, {
+        templateSlug,
+        configuration,
+      })
+      return response.data.data
     },
     onSuccess: (tool, variables) => {
       // Invalidate tool queries to refresh lists
@@ -142,8 +146,13 @@ export function useCreateToolFromTemplate() {
         queryKey: ['tools'],
       })
 
+      // Update template usage count
+      queryClient.invalidateQueries({
+        queryKey: TEMPLATE_QUERY_KEYS.toolTemplate(variables.templateSlug),
+      })
+
       toast.success('Tool installed successfully!', {
-        description: `Tool has been installed to your starship.`,
+        description: `${tool.name} has been installed to your starship.`,
       })
     },
     onError: (error: any) => {

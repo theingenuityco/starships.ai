@@ -55,26 +55,15 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
   return (
     <Card>
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Key className="h-5 w-5 text-primary" />
-            <CardTitle>Environment Variables</CardTitle>
-            <Badge variant="secondary" className="ml-2">
-              {variables.length}
-            </Badge>
+        <div className="flex items-center justify-between gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search variables..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
           </div>
           <Button onClick={onAdd} size="sm" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Add Variable
           </Button>
-        </div>
-
-        {/* Search */}
-        <div className="flex items-center gap-2 mt-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search variables..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
-          </div>
         </div>
       </CardHeader>
 
@@ -86,7 +75,7 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
               <>
                 <h3 className="text-lg font-medium mb-2">No environment variables</h3>
                 <p className="text-muted-foreground mb-4">Get started by adding your first environment variable. These will be securely encrypted and available to your agents.</p>
-                <Button onClick={onAdd} className="flex items-center gap-2">
+                <Button onClick={onAdd} className="flex items-center gap-2 mx-auto">
                   <Plus className="h-4 w-4" />
                   Add Your First Variable
                 </Button>

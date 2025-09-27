@@ -122,8 +122,8 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
         {/* Header */}
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Settings className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Environment Settings</h1>
+            <Key className="h-6 w-6 text-primary" />
+            <h1 className="text-2xl font-bold">Environment Variables</h1>
           </div>
           <p className="text-muted-foreground">
             Manage environment variables for <strong>{starship.name}</strong>. These variables will be securely encrypted and available to your agents.
@@ -132,7 +132,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
 
         {/* Security Notice */}
         <Alert>
-          <Shield className="h-4 w-4" />
+          <Shield className="h-4 w-4 !top-[14px]" />
           <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
         </Alert>
 

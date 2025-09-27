@@ -57,19 +57,19 @@ export default function MarketplacePage() {
         <div className="flex flex-col items-center px-6 py-8">
           <div className="w-full max-w-6xl mx-auto space-y-8">
             {/* Header */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
                 <Store className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Template Marketplace</h1>
+                <h1 className="text-2xl font-bold">Agent Marketplace</h1>
               </div>
               <p className="text-muted-foreground">Discover and deploy powerful agent templates and tools to enhance your starship's capabilities.</p>
             </div>
 
             {/* Search and Filters */}
             <div className="mb-8">
-              <div className="relative max-w-md mb-6">
+              <div className="relative max-w-md mb-6 mx-auto">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-                <Input type="text" placeholder="Search templates..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
+                <Input type="text" placeholder="Search Agent & Tools..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
               </div>
             </div>
 
@@ -82,11 +82,11 @@ export default function MarketplacePage() {
               ))}
             </div>
 
-            {/* Agent Templates Section */}
+            {/* Agents Section */}
             <div className="space-y-6">
               <div className="flex items-center gap-3">
                 <Bot className="w-6 h-6 text-primary" />
-                <h2 className="text-xl font-semibold">Agent Templates</h2>
+                <h2 className="text-xl font-semibold">Agents</h2>
                 <Badge variant="outline" className="ml-2">
                   {filteredAgentTemplates.length}
                 </Badge>
@@ -115,11 +115,11 @@ export default function MarketplacePage() {
               )}
             </div>
 
-            {/* Tool Templates Section */}
+            {/* Tools Section */}
             <div className="space-y-6 mt-12">
               <div className="flex items-center gap-3">
                 <Wrench className="w-6 h-6 text-primary" />
-                <h2 className="text-xl font-semibold">Tool Templates</h2>
+                <h2 className="text-xl font-semibold">Tools</h2>
                 <Badge variant="outline" className="ml-2">
                   {filteredToolTemplates.length}
                 </Badge>

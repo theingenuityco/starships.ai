@@ -51,8 +51,8 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
 
     if (!formData.key.trim()) {
       newErrors.key = 'Key is required'
-    } else if (!/^[A-Z][A-Z0-9_]*$/.test(formData.key)) {
-      newErrors.key = 'Key must start with a letter and contain only uppercase letters, numbers, and underscores'
+    } else if (!/^[A-Z][A-Z0-9_]*$/.test(formData.key.trim())) {
+      newErrors.key = 'Environment key must be uppercase letters, numbers, and underscores only'
     }
 
     if (!isEdit && !formData.value.trim()) {

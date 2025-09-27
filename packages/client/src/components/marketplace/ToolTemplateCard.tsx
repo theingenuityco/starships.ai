@@ -75,74 +75,89 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card className="p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-primary/50 group">
-        <div className="flex items-start gap-4">
-          <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-primary/50 group flex flex-col">
+        {/* Header */}
+        <div className="flex items-start gap-4 mb-4">
+          <div className="flex-shrink-0 p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
             <Wrench className="w-6 h-6 text-primary" />
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">{template.name}</h3>
-              <Badge className={`text-xs ${getCategoryColor(template.category)} flex items-center gap-1 border font-medium`}>
-                {getCategoryIcon(template.category)}
-                {template.category}
-              </Badge>
+            <div className="flex items-start gap-2 mb-2">
+              <h3 className="font-semibold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2">{template.name}</h3>
             </div>
+            <Badge className={`text-xs ${getCategoryColor(template.category)} flex items-center gap-1 border font-medium w-fit`}>
+              {getCategoryIcon(template.category)}
+              {template.category}
+            </Badge>
+          </div>
+        </div>
 
-            <p className="text-sm text-muted-foreground mb-3 line-clamp-2 leading-relaxed">{template.description}</p>
+        {/* Description */}
+        <div className="flex-1">
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-3 leading-relaxed">{template.description}</p>
+        </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  <span>{template.usageCount} uses</span>
-                </div>
-                {template.requiresApiKey && (
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 text-yellow-500" />
-                    <span className="text-xs">API Key Required</span>
-                  </div>
-                )}
+        {/* Stats and Requirements */}
+        <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Users className="w-4 h-4" />
+              <span>{template.usageCount}</span>
+            </div>
+            {template.requiresApiKey && (
+              <div className="flex items-center gap-1">
+                <Star className="w-4 h-4 text-yellow-500" />
+                <span className="text-xs">API Key</span>
               </div>
+            )}
+          </div>
+        </div>
 
-              <Button
-                size="sm"
-                variant="outline"
-                className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-                onClick={handleInstall}
-                disabled={isInstalling || !primaryStarship}
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                {isInstalling ? 'Installing...' : 'Install'}
-              </Button>
-            </div>
-
+        {/* Example Usage or Configuration */}
+        {(template.exampleUsage || (template.configurationFields && template.configurationFields.length > 0)) && (
+          <div className="mb-4">
             {template.exampleUsage && (
-              <div className="mt-3 pt-3 border-t border-border/50">
-                <p className="text-xs text-muted-foreground mb-1">Example usage:</p>
-                <code className="text-xs bg-muted/30 px-2 py-1 rounded font-mono">{template.exampleUsage.length > 50 ? `${template.exampleUsage.slice(0, 50)}...` : template.exampleUsage}</code>
+              <div className="mb-2">
+                <p className="text-xs text-muted-foreground mb-1">Example:</p>
+                <code className="text-xs bg-muted/30 px-2 py-1 rounded font-mono block truncate">
+                  {template.exampleUsage.length > 45 ? `${template.exampleUsage.slice(0, 45)}...` : template.exampleUsage}
+                </code>
               </div>
             )}
 
             {template.configurationFields && template.configurationFields.length > 0 && (
-              <div className="mt-2">
-                <p className="text-xs text-muted-foreground mb-1">Configuration required:</p>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Config fields:</p>
                 <div className="flex flex-wrap gap-1">
-                  {template.configurationFields.slice(0, 3).map((field, idx) => (
+                  {template.configurationFields.slice(0, 2).map((field, idx) => (
                     <Badge key={idx} variant="outline" className="text-xs">
                       {field.name}
                     </Badge>
                   ))}
-                  {template.configurationFields.length > 3 && (
+                  {template.configurationFields.length > 2 && (
                     <Badge variant="outline" className="text-xs">
-                      +{template.configurationFields.length - 3} more
+                      +{template.configurationFields.length - 2}
                     </Badge>
                   )}
                 </div>
               </div>
             )}
           </div>
+        )}
+
+        {/* Action Button */}
+        <div className="mt-auto">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+            onClick={handleInstall}
+            disabled={isInstalling || !primaryStarship}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {isInstalling ? 'Installing...' : 'Install'}
+          </Button>
         </div>
       </Card>
     </motion.div>

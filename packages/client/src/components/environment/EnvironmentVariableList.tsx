@@ -48,7 +48,8 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
   return (
     <Card className="frosted-glass-card shadow-frosted-lg">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-end gap-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Variables</h3>
           <Button onClick={onAdd} size="sm" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Add Variable

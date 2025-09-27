@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
-import { Bot, Search, Wrench } from 'lucide-react'
+import { PageLayout } from '@/components/layout/PageLayout'
+import { Bot, Search, Wrench, Store } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
@@ -14,6 +15,7 @@ import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState<string>('agents')
 
   // Fetch templates data
   const { data: agentTemplates = [], isLoading: agentTemplatesLoading } = useAgentTemplates()
@@ -49,106 +51,109 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">Template Marketplace</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Discover and deploy powerful agent templates and tools to enhance your starship's capabilities.</p>
-        </motion.div>
+    <PageLayout>
+      <div className="bg-background">
+        <div className="flex flex-col items-center px-6 py-8">
+          <div className="w-full max-w-6xl mx-auto space-y-8">
+            {/* Header */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Store className="h-6 w-6 text-primary" />
+                <h1 className="text-2xl font-bold">Template Marketplace</h1>
+              </div>
+              <p className="text-muted-foreground">Discover and deploy powerful agent templates and tools to enhance your starship's capabilities.</p>
+            </div>
 
-        {/* Search and Filters */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-8">
-          <div className="relative max-w-md mx-auto mb-6">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-            <Input type="text" placeholder="Search templates..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
+            {/* Search and Filters */}
+            <div className="mb-8">
+              <div className="relative max-w-md mb-6">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                <Input type="text" placeholder="Search templates..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
+              </div>
+            </div>
+
+            {/* Tabs and Category Filter Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-shrink-0">
+                <TabsList className="grid w-full max-w-md grid-cols-2">
+                  <TabsTrigger value="agents" className="flex items-center gap-2">
+                    <Bot className="w-4 h-4" />
+                    Agent Templates
+                  </TabsTrigger>
+                  <TabsTrigger value="tools" className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4" />
+                    Tool Templates
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {/* Category Filter */}
+              <div className="flex flex-wrap gap-2">
+                {(activeTab === 'agents' ? agentCategories : toolCategories).map(category => (
+                  <Button key={category} variant={selectedCategory === category ? 'default' : 'outline'} size="sm" onClick={() => setSelectedCategory(category)} className="capitalize">
+                    {category === 'all' ? 'All Categories' : category}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Content */}
+            <div>
+              {activeTab === 'agents' ? (
+                <div className="space-y-6">
+                  {/* Agent Templates Grid */}
+                  {agentTemplatesLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[...Array(6)].map((_, i) => (
+                        <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  ) : filteredAgentTemplates.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredAgentTemplates.map((template: AgentTemplateModel, idx: number) => (
+                        <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
+                          <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Bot className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No agent templates found</h3>
+                      <p className="text-muted-foreground">Try adjusting your search or category filter.</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Tool Templates Grid */}
+                  {toolTemplatesLoading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {[...Array(6)].map((_, i) => (
+                        <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
+                      ))}
+                    </div>
+                  ) : filteredToolTemplates.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {filteredToolTemplates.map((template: ToolTemplateModel, idx: number) => (
+                        <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
+                          <ToolTemplateCard template={template} onInstall={handleToolInstall} />
+                        </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Wrench className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">No tool templates found</h3>
+                      <p className="text-muted-foreground">Try adjusting your search or category filter.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </motion.div>
-
-        {/* Tabs */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Tabs defaultValue="agents" className="w-full">
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
-              <TabsTrigger value="agents" className="flex items-center gap-2">
-                <Bot className="w-4 h-4" />
-                Agent Templates
-              </TabsTrigger>
-              <TabsTrigger value="tools" className="flex items-center gap-2">
-                <Wrench className="w-4 h-4" />
-                Tool Templates
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="agents" className="space-y-6">
-              {/* Category Filter */}
-              <div className="flex flex-wrap gap-2 justify-center mb-6">
-                {agentCategories.map(category => (
-                  <Button key={category} variant={selectedCategory === category ? 'default' : 'outline'} size="sm" onClick={() => setSelectedCategory(category)} className="capitalize">
-                    {category === 'all' ? 'All Categories' : category}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Agent Templates Grid */}
-              {agentTemplatesLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
-                  ))}
-                </div>
-              ) : filteredAgentTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredAgentTemplates.map((template: AgentTemplateModel, idx: number) => (
-                    <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
-                      <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} />
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Bot className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No agent templates found</h3>
-                  <p className="text-muted-foreground">Try adjusting your search or category filter.</p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="tools" className="space-y-6">
-              {/* Category Filter */}
-              <div className="flex flex-wrap gap-2 justify-center mb-6">
-                {toolCategories.map(category => (
-                  <Button key={category} variant={selectedCategory === category ? 'default' : 'outline'} size="sm" onClick={() => setSelectedCategory(category)} className="capitalize">
-                    {category === 'all' ? 'All Categories' : category}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Tool Templates Grid */}
-              {toolTemplatesLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
-                  ))}
-                </div>
-              ) : filteredToolTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredToolTemplates.map((template: ToolTemplateModel, idx: number) => (
-                    <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
-                      <ToolTemplateCard template={template} onInstall={handleToolInstall} />
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Wrench className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No tool templates found</h3>
-                  <p className="text-muted-foreground">Try adjusting your search or category filter.</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </motion.div>
+        </div>
       </div>
-    </div>
+    </PageLayout>
   )
 }

@@ -41,7 +41,7 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
 
   if (loading) {
     return (
-      <Card>
+      <Card className="frosted-glass-card shadow-frosted-lg">
         <CardContent className="p-8">
           <div className="flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -53,7 +53,7 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
   }
 
   return (
-    <Card>
+    <Card className="frosted-glass-card shadow-frosted-lg">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between gap-4">
           <div className="relative flex-1 max-w-sm">

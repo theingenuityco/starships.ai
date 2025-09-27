@@ -76,12 +76,7 @@ export class ChildProcessRunner implements Runner {
       serialization: 'advanced',
     });
 
-    console.log('🚀 [CHILD-PROCESS-RUNNER] Starting execution in child process:', {
-      pid: child.pid,
-      memoryLimitMB: this.options?.memoryLimitMB || 'unlimited',
-      timeoutMs: this.options?.timeoutMs || 'no timeout',
-      execArgv: execArgv.length ? execArgv : 'none',
-    });
+    // Child process started with pid: ${child.pid}
 
     return await new Promise<ExecutionItem[]>((resolvePromise, rejectPromise) => {
       let settled = false;
@@ -99,10 +94,14 @@ export class ChildProcessRunner implements Runner {
         if (!this.options?.stdioInherit && child.stderr) child.stderr.removeAllListeners('data');
       };
 
-      // Forward logs when piping
+      // Forward logs when piping - forward ALL logs for debugging
       if (!this.options?.stdioInherit) {
         child.stdout?.on('data', (chunk: Buffer) => {
-          process.stdout.write(`[autopilot:child ${child.pid}] ${chunk.toString()}`);
+          const message = chunk.toString().trim();
+          // Forward ALL logs to debug the issue
+          if (message) {
+            console.log(`[autopilot:child ${child.pid}]`, message);
+          }
         });
         child.stderr?.on('data', (chunk: Buffer) => {
           process.stderr.write(`[autopilot:child ${child.pid}] ${chunk.toString()}`);

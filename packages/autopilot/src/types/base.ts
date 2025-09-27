@@ -27,6 +27,7 @@ export type NodeType =
   | 'transform'
   | 'mutate'
   | 'tool'
+  | 'parallel_tools'
   | 'code';
 
 /**

@@ -6,7 +6,7 @@ Complete rewrite of the Autopilot engine with parallel execution as the default 
 
 **Project Status**: 🟢 Approved for Development  
 **Target Completion**: 2-3 weeks  
-**Overall Progress**: ░░░░░░░░░░ 0%  
+**Overall Progress**: ████████░░ 80%  
 **Approach**: Option B - Parallel-First Architecture
 
 ## Strategic Decision
@@ -50,61 +50,103 @@ async execute() {
 ## Implementation Plan
 
 ### Phase 1: Core Engine Rewrite (Week 1)
-**Status**: ⏱️ Not Started  
-**Progress**: ░░░░░░░░░░ 0%  
+**Status**: ✅ Complete  
+**Progress**: ██████████ 100%  
 **Target**: Jan 6-10, 2025
 
-#### 1.1 New Parallel Engine (Detailed Implementation)
-**Status**: ⏱️ | **Priority**: P0 | **Effort**: 3 days
+#### 1.1 New Parallel Engine with Dynamic Stage Routing
+**Status**: ✅ Completed | **Priority**: P0 | **Effort**: 3 days
 
 ```typescript
 // packages/autopilot/src/engine/ParallelEngine.ts
 import { EventEmitter } from 'events';
 import { Blueprint, Execution, ExecutionItem, BaseNode } from '@/types';
-import { GraphAnalyzer } from './GraphAnalyzer';
+import { DynamicStageRouter } from './DynamicStageRouter';
 import { ParallelStateManager } from './ParallelStateManager';
 import { StageContext } from './StageContext';
 
 export class ParallelEngine extends EventEmitter {
-  private analyzer: GraphAnalyzer;
+  private router: DynamicStageRouter;
   private stateManager: ParallelStateManager;
   private nodeRegistry: Map<string, NodeHandler>;
+  private visitCounts: Map<string, number>;
+  private readonly MAX_VISITS = 10;
   
   constructor(config?: EngineConfig) {
     super();
-    this.analyzer = new GraphAnalyzer();
+    this.router = new DynamicStageRouter();
     this.stateManager = new ParallelStateManager();
     this.nodeRegistry = new Map();
+    this.visitCounts = new Map();
   }
   
   async execute(blueprint: Blueprint, execution: Execution): Promise<ExecutionItem[]> {
-    // Initialize execution with parallel-aware structure
     const parallelExecution = this.initializeExecution(execution);
     
-    // Analyze blueprint for parallel stages
-    const stages = this.analyzer.analyze(blueprint);
+    // Start with entry nodes (no incoming edges or from 'start')
+    let currentNodeRefs = this.router.getStartNodes(blueprint);
+    let stageIndex = 0;
     
-    // Execute stages in sequence, nodes in parallel
-    for (const stage of stages) {
+    // Dynamic execution loop - stages determined at runtime
+    while (currentNodeRefs.length > 0) {
+      // Check for cycles
+      for (const nodeRef of currentNodeRefs) {
+        const visits = (this.visitCounts.get(nodeRef) || 0) + 1;
+        if (visits > this.MAX_VISITS) {
+          throw new Error(`Maximum visits (${this.MAX_VISITS}) exceeded for node: ${nodeRef}`);
+        }
+        this.visitCounts.set(nodeRef, visits);
+      }
+      
+      // Create stage from current nodes
+      const stageNodes = currentNodeRefs.map(ref => 
+        blueprint.nodes.find(n => n.ref === ref)!
+      );
+      
+      const stage = {
+        nodes: stageNodes,
+        stageIndex,
+        parallelCount: stageNodes.length
+      };
+      
       const stageContext = new StageContext(stage, parallelExecution);
       
       // Execute all nodes in this stage in parallel
-      const nodePromises = stage.nodes.map(node => 
+      const nodePromises = stageNodes.map(node => 
         this.executeNodeWithContext(node, stageContext)
       );
       
       // Wait for all parallel executions
       const results = await Promise.allSettled(nodePromises);
       
-      // Process results and update execution state
-      await this.processStageResults(results, stage, parallelExecution);
+      // Process results and collect routing information
+      const stageResults = await this.processStageResults(
+        results, 
+        stage, 
+        parallelExecution
+      );
+      
+      // Apply state mutations atomically for this stage
+      parallelExecution.state = await this.stateManager.commitStageMutations(
+        parallelExecution.state,
+        stageIndex
+      );
       
       // Emit stage completion event
       this.emit('stage:complete', { 
-        stageIndex: stage.stageIndex,
+        stageIndex,
         nodesExecuted: stage.nodes.length,
         results 
       });
+      
+      // CRITICAL: Dynamically determine next nodes based on results
+      currentNodeRefs = this.router.determineNextNodes(
+        stageResults,
+        blueprint,
+        parallelExecution
+      );
+      
+      stageIndex++;
     }
     
     return this.extractFinalResults(parallelExecution);
@@ -113,73 +155,280 @@ export class ParallelEngine extends EventEmitter {
   private async executeNodeWithContext(
     node: BaseNode,
     context: StageContext
-  ): Promise<ExecutionItem[]> {
+  ): Promise<NodeExecutionResult> {
     try {
-      // Create node handler with parallel-aware context
       const handler = await this.createNodeHandler(node, context);
-      
-      // Get inputs from previous stages
       const inputs = context.getNodeInputs(node.ref);
       
-      // Execute node with timeout and error handling
       const result = await this.executeWithTimeout(
         handler.execute(inputs),
         node.parameters.timeout || 30000
       );
       
-      // Store result in stage context
-      context.setNodeResult(node.ref, result);
+      // Include routing information for conditional nodes
+      let routingInfo = undefined;
+      if (node.type === 'conditional' && result[0]?.json) {
+        routingInfo = {
+          edgeCondition: result[0].json.edgeCondition || result[0].json.result
+        };
+      }
       
-      return result;
+      return {
+        nodeRef: node.ref,
+        nodeType: node.type,
+        items: result,
+        routingInfo
+      };
     } catch (error) {
-      // Handle node execution error
       return this.handleNodeError(node, error, context);
     }
-  }
-  
-  private initializeExecution(execution: Execution): ParallelExecution {
-    return {
-      ...execution,
-      stages: [],
-      nodeResults: new Map(), // ref -> ExecutionItem[]
-      stageResults: new Map(), // stageIndex -> StageResult
-      parallelContext: {
-        maxConcurrency: 10,
-        resourcePool: new Map()
-      }
-    };
   }
 }
 ```
 
 **Tasks**:
-- [ ] ⏱️ Implement graph analyzer with topological sort
-- [ ] ⏱️ Create stage-based executor
-- [ ] ⏱️ Add automatic dependency detection
-- [ ] ⏱️ Implement parallel-safe state management
-- [ ] ⏱️ Add comprehensive error handling
+- [x] ✅ Implement DynamicStageRouter for runtime stage determination
+- [x] ✅ Create stage-based executor with parallel node execution  
+- [x] ✅ Add cycle detection to prevent infinite loops
+- [x] ✅ Implement parallel-safe state management
+- [x] ✅ Add comprehensive error handling
+
+#### 1.1b Dynamic Stage Router (Critical Component)
+**Status**: ✅ Completed | **Priority**: P0 | **Effort**: 1 day
+
+```typescript
+// packages/autopilot/src/engine/DynamicStageRouter.ts
+export class DynamicStageRouter {
+  /**
+   * Get starting nodes (no incoming edges or from 'start' node)
+   */
+  getStartNodes(blueprint: Blueprint): string[] {
+    const incomingEdges = new Map<string, number>();
+    
+    // Count incoming edges for each node
+    blueprint.nodes.forEach(n => incomingEdges.set(n.ref, 0));
+    blueprint.edges.forEach(e => {
+      if (e.to !== 'start') {
+        incomingEdges.set(e.to, (incomingEdges.get(e.to) || 0) + 1);
+      }
+    });
+    
+    // Find nodes with no incoming edges or connected from 'start'
+    const startNodes: string[] = [];
+    const startEdges = blueprint.edges.filter(e => e.from === 'start');
+    
+    if (startEdges.length > 0) {
+      // Use explicit start edges
+      startNodes.push(...startEdges.map(e => e.to));
+    } else {
+      // Use nodes with no incoming edges
+      incomingEdges.forEach((count, ref) => {
+        if (count === 0 && ref !== 'end') {
+          startNodes.push(ref);
+        }
+      });
+    }
+    
+    return startNodes;
+  }
+  
+  /**
+   * Dynamically determine next nodes based on stage results
+   * Handles conditional routing and parallel node selection
+   */
+  determineNextNodes(
+    stageResults: NodeExecutionResult[],
+    blueprint: Blueprint,
+    execution: ParallelExecution
+  ): string[] {
+    const nextNodes = new Set<string>();
+    const completedNodes = new Set(stageResults.map(r => r.nodeRef));
+    
+    for (const result of stageResults) {
+      // Handle conditional nodes with edge routing
+      if (result.nodeType === 'conditional' && result.routingInfo) {
+        const condition = result.routingInfo.edgeCondition;
+        
+        // Find edges matching the condition
+        const matchingEdges = blueprint.edges.filter(edge => 
+          edge.from === result.nodeRef && 
+          (edge.condition === condition || (!edge.condition && condition === 'true'))
+        );
+        
+        matchingEdges.forEach(edge => {
+          if (!this.isNodeCompleted(edge.to, execution)) {
+            nextNodes.add(edge.to);
+          }
+        });
+      } else {
+        // Regular node - follow all non-conditional edges
+        const outgoingEdges = blueprint.edges.filter(edge => 
+          edge.from === result.nodeRef && !edge.condition
+        );
+        
+        outgoingEdges.forEach(edge => {
+          if (!this.isNodeCompleted(edge.to, execution)) {
+            nextNodes.add(edge.to);
+          }
+        });
+      }
+    }
+    
+    // Check if nodes are ready (all dependencies satisfied)
+    const readyNodes: string[] = [];
+    nextNodes.forEach(nodeRef => {
+      if (this.areAllDependenciesSatisfied(nodeRef, blueprint, execution)) {
+        readyNodes.push(nodeRef);
+      }
+    });
+    
+    return readyNodes;
+  }
+  
+  /**
+   * Check if all dependencies for a node are satisfied
+   */
+  private areAllDependenciesSatisfied(
+    nodeRef: string,
+    blueprint: Blueprint,
+    execution: ParallelExecution
+  ): boolean {
+    // Find all incoming edges
+    const incomingEdges = blueprint.edges.filter(e => e.to === nodeRef);
+    
+    // Check if all source nodes have completed
+    return incomingEdges.every(edge => {
+      const sourceCompleted = execution.nodeResults.has(edge.from);
+      
+      // If edge has condition, check if it was satisfied
+      if (edge.condition && sourceCompleted) {
+        const sourceResult = execution.nodeResults.get(edge.from);
+        if (sourceResult?.routingInfo) {
+          return sourceResult.routingInfo.edgeCondition === edge.condition;
+        }
+      }
+      
+      return sourceCompleted;
+    });
+  }
+  
+  private isNodeCompleted(nodeRef: string, execution: ParallelExecution): boolean {
+    return execution.nodeResults.has(nodeRef);
+  }
+}
+
+#### 1.1c Stage Context for Parallel Execution
+**Status**: ✅ Completed | **Priority**: P0 | **Effort**: 1 day
+
+```typescript
+// packages/autopilot/src/engine/StageContext.ts
+export class StageContext {
+  private stage: ExecutionStage;
+  private execution: ParallelExecution;
+  private stageOutputs: Map<string, ExecutionItem[]>;
+  
+  constructor(stage: ExecutionStage, execution: ParallelExecution) {
+    this.stage = stage;
+    this.execution = execution;
+    this.stageOutputs = new Map();
+  }
+  
+  /**
+   * Get inputs for a node from previous stages
+   * Handles parallel-aware template resolution
+   */
+  getNodeInputs(nodeRef: string): ExecutionItem[] | undefined {
+    const node = this.stage.nodes.find(n => n.ref === nodeRef);
+    if (!node) return undefined;
+    
+    // Check if node has explicit input dependencies
+    const incomingEdges = this.getIncomingEdges(nodeRef);
+    
+    if (incomingEdges.length === 0) {
+      // No dependencies - this is a start node
+      return this.execution.initialInputs;
+    }
+    
+    // Aggregate inputs from all dependencies
+    const inputs: ExecutionItem[] = [];
+    for (const edge of incomingEdges) {
+      const sourceOutput = this.execution.nodeResults.get(edge.from);
+      if (sourceOutput) {
+        inputs.push(...sourceOutput.items);
+      }
+    }
+    
+    return inputs.length > 0 ? inputs : undefined;
+  }
+  
+  /**
+   * Get output from a specific node (for template resolution)
+   * Replaces $lastOutputOf() for parallel execution
+   */
+  getNodeOutput(nodeRef: string): ExecutionItem[] | undefined {
+    // First check current stage outputs
+    if (this.stageOutputs.has(nodeRef)) {
+      return this.stageOutputs.get(nodeRef);
+    }
+    
+    // Then check completed nodes from previous stages
+    const result = this.execution.nodeResults.get(nodeRef);
+    return result?.items;
+  }
+  
+  /**
+   * Store node result in context
+   */
+  setNodeResult(nodeRef: string, items: ExecutionItem[]): void {
+    this.stageOutputs.set(nodeRef, items);
+  }
+  
+  /**
+   * Get previous stage results for synthesis
+   */
+  getPreviousStageResults(): ExecutionItem[] {
+    if (this.stage.stageIndex === 0) return [];
+    
+    const previousStage = this.execution.stages[this.stage.stageIndex - 1];
+    const results: ExecutionItem[] = [];
+    
+    for (const nodeRef of previousStage.nodeRefs) {
+      const nodeResult = this.execution.nodeResults.get(nodeRef);
+      if (nodeResult) {
+        results.push(...nodeResult.items);
+      }
+    }
+    
+    return results;
+  }
+  
+  private getIncomingEdges(nodeRef: string): Edge[] {
+    return this.execution.blueprint.edges.filter(e => e.to === nodeRef);
+  }
+}
+```
 
 #### 1.2 Simplified Node Interface
-**Status**: ⏱️ | **Priority**: P0 | **Effort**: 1 day
+**Status**: ✅ Completed | **Priority**: P0 | **Effort**: 1 day
 
 ```typescript
 // Unified node interface - no special cases
 interface Node {
-  id: string;
+  ref: string;
   type: NodeType;
   execute(inputs: NodeInputs): Promise<NodeOutput>;
-  dependencies?: string[]; // Explicit dependencies
+  parameters: Record<string, unknown>;
 }
 ```
 
 **Tasks**:
-- [ ] ⏱️ Simplify BaseNode class
-- [ ] ⏱️ Remove sequential assumptions
-- [ ] ⏱️ Add parallel-safe validation
-- [ ] ⏱️ Update all node implementations
+- [x] ✅ Simplify BaseNode class for parallel execution
+- [x] ✅ Remove sequential execution assumptions
+- [x] ✅ Add parallel-safe validation
+- [x] ✅ Update all node implementations
 
 #### 1.3 State Management Overhaul (Thread-Safe Implementation)
-**Status**: ⏱️ | **Priority**: P0 | **Effort**: 1 day
+**Status**: ✅ Completed | **Priority**: P0 | **Effort**: 1 day
 
 ```typescript
 // packages/autopilot/src/engine/ParallelStateManager.ts
@@ -284,18 +533,18 @@ export class ParallelStateManager {
 ```
 
 **Tasks**:
-- [ ] ⏱️ Implement immutable state manager
-- [ ] ⏱️ Convert all mutations to use immer
-- [ ] ⏱️ Add state versioning for debugging
-- [ ] ⏱️ Remove mutable state patterns
+- [x] ✅ Implement immutable state manager
+- [x] ✅ Convert all mutations to use immer
+- [x] ✅ Add state versioning for debugging
+- [x] ✅ Remove mutable state patterns
 
 ### Phase 2: Agent & Blueprint Simplification (Week 2)
-**Status**: ⏱️ Not Started  
-**Progress**: ░░░░░░░░░░ 0%  
+**Status**: ✅ Complete  
+**Progress**: ██████████ 100%  
 **Target**: Jan 13-17, 2025
 
 #### 2.1 Simplified Agent Blueprint
-**Status**: ⏱️ | **Priority**: P0 | **Effort**: 2 days
+**Status**: ✅ Completed | **Priority**: P0 | **Effort**: 2 days
 
 ```typescript
 // No more special cases for single vs multiple tools
@@ -313,13 +562,13 @@ class Agent {
 ```
 
 **Tasks**:
-- [ ] ⏱️ Remove tool_calls[0] limitation
-- [ ] ⏱️ Implement unified tool handler
-- [ ] ⏱️ Simplify conditional routing
-- [ ] ⏱️ Update agent tests
+- [x] ✅ Remove tool_calls[0] limitation
+- [x] ✅ Implement unified tool handler
+- [x] ✅ Simplify conditional routing
+- [x] ✅ Update agent tests
 
 #### 2.2 Native Multi-Tool Support (Complete Implementation)
-**Status**: ⏱️ | **Priority**: P0 | **Effort**: 1 day
+**Status**: ✅ Completed | **Priority**: P0 | **Effort**: 1 day
 
 ```typescript
 // packages/autopilot/src/nodes/ParallelTools.ts
@@ -402,10 +651,10 @@ class ParallelToolsNode extends BaseNode {
 ```
 
 **Tasks**:
-- [ ] ⏱️ Create unified ToolsNode
-- [ ] ⏱️ Add automatic parallelization
-- [ ] ⏱️ Implement smart retry logic
-- [ ] ⏱️ Add result aggregation
+- [x] ✅ Create unified ParallelToolsNode
+- [x] ✅ Add automatic parallelization
+- [x] ✅ Implement smart retry logic
+- [x] ✅ Add result aggregation
 
 #### 2.3 Template System Enhancement
 **Status**: ⏱️ | **Priority**: P1 | **Effort**: 1 day
@@ -424,12 +673,12 @@ class ParallelToolsNode extends BaseNode {
 - [ ] ⏱️ Update documentation
 
 ### Phase 3: Testing & Migration (Week 3)
-**Status**: ⏱️ Not Started  
-**Progress**: ░░░░░░░░░░ 0%  
+**Status**: 🔄 In Progress  
+**Progress**: ████░░░░░░ 40%  
 **Target**: Jan 20-24, 2025
 
 #### 3.1 Comprehensive Testing
-**Status**: ⏱️ | **Priority**: P0 | **Effort**: 2 days
+**Status**: 🔄 In Progress | **Priority**: P0 | **Effort**: 2 days
 
 **Test Matrix**:
 | Scenario | Expected Behavior | Status |
@@ -441,9 +690,9 @@ class ParallelToolsNode extends BaseNode {
 | Error recovery | Graceful handling | ⏱️ |
 
 **Tasks**:
-- [ ] ⏱️ Unit tests for new engine
-- [ ] ⏱️ Integration tests for agents
-- [ ] ⏱️ Performance benchmarks
+- [x] ✅ Unit tests for new engine
+- [x] ✅ Integration tests for agents
+- [x] ✅ Performance benchmarks
 - [ ] ⏱️ Stress testing
 - [ ] ⏱️ Memory leak detection
 
@@ -839,6 +1088,130 @@ class ParallelEngine {
 - ✅ Full test coverage
 - ✅ Documentation complete
 - ✅ Ready for team adoption
+
+## Complete Node Type Handling
+
+### How Each Node Type Works in ParallelEngine
+
+#### 1. LLM Nodes
+```typescript
+// Executes independently, decides on tool parallelism
+{
+  type: 'llm',
+  execute: async (inputs) => {
+    // Analyze query and decide:
+    // - 0 tool_calls: No tools needed
+    // - 1 tool_call: Sequential flow
+    // - N tool_calls: Parallel execution
+    return { choices: [{ message: { tool_calls: [...] }}]};
+  }
+}
+```
+
+#### 2. Conditional Nodes (With Dynamic Routing)
+```typescript
+// Evaluates condition and routes to appropriate edge
+{
+  type: 'conditional',
+  execute: async (inputs) => {
+    const result = evaluateCondition(inputs);
+    return {
+      result,
+      edgeCondition: result // Used by router for edge selection
+    };
+  }
+}
+
+// Router uses this for dynamic stage determination:
+if (result.nodeType === 'conditional') {
+  const nextEdge = blueprint.edges.find(e => 
+    e.from === nodeRef && e.condition === result.edgeCondition
+  );
+}
+```
+
+#### 3. Parallel Tools Node
+```typescript
+// Handles 1-N tools automatically in parallel
+{
+  type: 'parallel_tools',
+  execute: async (inputs) => {
+    const toolCalls = inputs.tool_calls || [];
+    
+    // Execute ALL tools in parallel
+    const results = await Promise.allSettled(
+      toolCalls.map(call => executeToolWithTimeout(call))
+    );
+    
+    return aggregateToolResults(results);
+  }
+}
+```
+
+#### 4. Mutate Nodes (With Stage Batching)
+```typescript
+// Safe mutations with stage-level atomic commits
+{
+  type: 'mutate',
+  execute: async (inputs, context) => {
+    // Queue mutations for stage commit
+    context.queueMutations([
+      { operation: 'add', path: '/messages/-', value: newMessage }
+    ]);
+    
+    // Mutations applied atomically after stage completes
+    return { mutationsQueued: true };
+  }
+}
+```
+
+#### 5. Synthesis/Transform Nodes
+```typescript
+// Aggregates results from previous parallel operations
+{
+  type: 'synthesis',
+  execute: async (inputs, context) => {
+    // Get all results from previous stage
+    const previousResults = context.getPreviousStageResults();
+    
+    // Synthesize into final output
+    return synthesizeResults(previousResults);
+  }
+}
+```
+
+### Example Complete Flow
+
+```typescript
+// Research Agent asking about mangoes and apples
+User: "How to grow mangoes, and where to find apples?"
+
+Stage 0: [start]
+Stage 1: [llm_main]
+  → Recognizes two independent questions
+  → Returns tool_calls: [wikipedia_mango, duckduckgo_apples]
+  
+Stage 2: [conditional_check]
+  → Evaluates: tool_calls.length > 0
+  → Returns edgeCondition: "has_tools"
+  
+Stage 3: [parallel_tools]  // BOTH EXECUTE IN PARALLEL!
+  ├── wikipedia_search("mango cultivation")  [3s]
+  └── duckduckgo_instant("apple orchards")   [1s]
+  → Total time: max(3s, 1s) = 3s
+  
+Stage 4: [synthesis_llm]
+  → Receives both tool results
+  → Synthesizes comprehensive answer
+  
+Stage 5: [conditional_final]
+  → Evaluates: "complete"
+  → Routes to end
+  
+Stage 6: [end]
+
+Total execution: ~6s (vs 10s sequential)
+```
 
 ## Critical Implementation Gaps Found
 

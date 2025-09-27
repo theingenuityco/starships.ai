@@ -34,7 +34,8 @@ export class Tool extends BaseNode<ToolParams> {
     try {
       // Extract tool arguments from input
       const inputData = ExecutionItemUtils.unwrapSingle(input);
-      // console.log(`[TOOL NODE ${params.name}] Input data:`, JSON.stringify(inputData));
+      console.log(`[Tool.ts - SINGLE] Executing tool: ${params.name} at ${new Date().toISOString()}`);
+      console.log(`[Tool.ts - SINGLE] This is SEQUENTIAL execution - NOT parallel!`);
       const toolArgs = this.extractToolArguments(inputData);
       // console.log(`[TOOL NODE ${params.name}] Extracted tool args:`, JSON.stringify(toolArgs));
 

@@ -26,6 +26,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   transform: () => import('@/nodes/Transform').then((m) => m.Transform as NodeHandlerConstructor),
   mutate: () => import('@/nodes/Mutate').then((m) => m.Mutate as NodeHandlerConstructor),
   tool: () => import('@/nodes/Tool').then((m) => m.Tool as NodeHandlerConstructor),
+  parallel_tools: () => import('@/nodes/ParallelToolsNode').then((m) => m.ParallelToolsNode as NodeHandlerConstructor),
   code: () => import('@/nodes/Code').then((m) => m.Code as NodeHandlerConstructor),
 };
 
@@ -302,6 +303,10 @@ export class Engine {
 
   private async handleNodeError(error: unknown, currentNode: Node, execution: Execution): Promise<void> {
     const errorMessage = error instanceof Error ? error.message : 'Node execution failed';
+    console.error(`[Engine] Node ${currentNode.ref} (${currentNode.type}) failed:`, errorMessage);
+    if (error instanceof Error && error.stack) {
+      console.error(`[Engine] Stack trace:`, error.stack);
+    }
     execution.results.push({ nodeRef: currentNode.ref, items: ExecutionItemUtils.wrapError(errorMessage) });
     // Only mark the whole workflow as failed and emit workflow_failed when configured to fail on node errors.
     if (this.failOnNodeError) {
@@ -399,7 +404,26 @@ export class Engine {
       let processedInputItems = nodeInputItems;
 
       // Execute the handler first (inline transforms will run after on the output)
+      console.log(`[Engine] Executing node: ${currentNode.ref} (${currentNode.type})`);
       let outputItems = await handler.execute(processedInputItems);
+      console.log(`[Engine] Node ${currentNode.ref} returned ${outputItems?.length || 0} items`);
+      
+      // Log first item for debugging
+      if (outputItems && outputItems.length > 0 && outputItems[0].json) {
+        const json = outputItems[0].json as any;
+        if (json.choices) {
+          console.log(`[Engine] Node ${currentNode.ref} result has choices:`, json.choices?.length || 0);
+          if (json.choices?.[0]?.message) {
+            const msg = json.choices[0].message;
+            console.log(`[Engine] First choice message:`, {
+              hasContent: !!msg.content,
+              contentLength: msg.content?.length || 0,
+              toolCallsCount: msg.tool_calls?.length || 0,
+              finishReason: json.choices[0].finish_reason
+            });
+          }
+        }
+      }
 
       // Record primary node output immediately (as a normal node result)
       execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
@@ -485,14 +509,27 @@ export class Engine {
     }
 
     // Find matching edge
-    let targetEdge;
+    let targetEdge: typeof outgoingEdges[0] | undefined;
     if (edgeCondition !== undefined) {
+      // Debug: log edge routing for tool execution
+      if (edgeCondition === 'call_tools' || edgeCondition === 'call_tool') {
+        console.log(`[Engine] Looking for edge with condition: "${edgeCondition}"`);
+        console.log(`[Engine] Available edges:`, outgoingEdges.map(e => ({
+          to: blueprint.nodes.find(n => n.ref === e.to)?.name,
+          condition: e.condition
+        })));
+      }
+      
       targetEdge = outgoingEdges.find(
         (edge) =>
           edge.condition === edgeCondition ||
           (edge.condition === 'true' && edgeCondition === 'true') ||
           (edge.condition === 'false' && edgeCondition === 'false')
       );
+      
+      if (edgeCondition === 'call_tools' || edgeCondition === 'call_tool') {
+        console.log(`[Engine] Found edge:`, targetEdge ? `to ${blueprint.nodes.find(n => n.ref === targetEdge!.to)?.name}` : 'NONE');
+      }
     }
 
     // Improved fallback:

@@ -76,11 +76,21 @@ export class Mutate implements NodeHandler {
       throw new Error('Mutate node requires execution context');
     }
 
+    console.log('[Mutate] Applying mutations:', this.params.mutations.length, 'operations');
+    console.log('[Mutate] Mutation details:', this.params.mutations.map(m => ({
+      operation: m.operation,
+      path: m.path,
+      valueType: Array.isArray(m.value) ? `array(${m.value.length})` : typeof m.value
+    })));
+
     // Apply mutations to execution state
     await this.applyTransforms(this.params.mutations, this.options.execution);
 
     // Return summary of what was mutated
     const operations = this.params.mutations.map((t) => `${t.operation} ${t.path}`);
+    
+    console.log('[Mutate] Mutations completed:', operations);
+    
     return ExecutionItemUtils.wrapSingle({
       mutationsApplied: this.params.mutations.length,
       operations,
@@ -99,6 +109,12 @@ export class Mutate implements NodeHandler {
     try {
       // Apply transforms one at a time so each can see the updated state
       for (const transform of transforms) {
+        console.log('[Mutate] Processing transform:', {
+          operation: transform.operation,
+          path: transform.path,
+          valueType: Array.isArray(transform.value) ? `array(${transform.value.length})` : typeof transform.value
+        });
+        
         // For 'add' operations, ensure intermediate paths exist
         if (transform.operation === 'add') {
           this.ensureIntermediatePaths(execution.state, transform.path);
@@ -108,6 +124,8 @@ export class Mutate implements NodeHandler {
         // Force fresh evaluation by creating a new Eval instance each time
         const freshEval = new Eval();
         const patchOperations = await this.convertSingleTransformToJsonPatch(transform, execution, freshEval);
+        
+        console.log('[Mutate] Patch operations:', JSON.stringify(patchOperations, null, 2));
 
         // Apply patch to a wrapper object to handle the root state correctly
         const stateWrapper = { state: execution.state };
@@ -115,6 +133,9 @@ export class Mutate implements NodeHandler {
 
         // Update execution state immediately so next transform can see the changes
         execution.state = patchedWrapper.state;
+        
+        console.log('[Mutate] State after transform - messages count:', 
+          Array.isArray(execution.state.messages) ? execution.state.messages.length : 'not an array');
       }
 
       // Validate final state changes

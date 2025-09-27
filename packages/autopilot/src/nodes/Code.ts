@@ -21,6 +21,11 @@ export class Code extends BaseNode<CodeParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
+    
+    // Log if this is the parallel tools code node
+    if (params.code?.includes('PARALLEL execution')) {
+      console.log('[Code.ts] Parallel tools node executing!');
+    }
 
     try {
       // Get input data for the function

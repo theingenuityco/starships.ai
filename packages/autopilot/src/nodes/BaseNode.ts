@@ -107,6 +107,10 @@ export abstract class BaseNode<TParams extends NodeParameters = NodeParameters> 
   protected handleExecutionError(error: unknown, context = ''): never {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const fullMessage = context ? `${context}: ${errorMessage}` : errorMessage;
+    console.error(`[${this.constructor.name}] ERROR:`, fullMessage);
+    if (error instanceof Error && error.stack) {
+      console.error(`[${this.constructor.name}] Stack:`, error.stack);
+    }
     throw new Error(fullMessage);
   }
 

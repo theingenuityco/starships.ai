@@ -14,6 +14,25 @@
  *   { type: 'error', error: { message, stack } }
  */
 
+// Ensure fetch is available and network issues are handled
+// This helps with SSL/TLS issues in child processes
+if (typeof globalThis.fetch === 'undefined') {
+  console.log('[child-entry] fetch not available, something is wrong with Node.js version');
+}
+
+// Test network connectivity on startup
+const dns = require('dns');
+const https = require('https');
+
+// Quick DNS test
+dns.lookup('openrouter.ai', (err, address) => {
+  if (err) {
+    console.error('[child-entry] DNS lookup failed for openrouter.ai:', err.message);
+  } else {
+    console.log('[child-entry] DNS resolved openrouter.ai to:', address);
+  }
+});
+
 // Event buffering to prevent race conditions with early events
 let isParentReady = false;
 let eventBuffer = [];

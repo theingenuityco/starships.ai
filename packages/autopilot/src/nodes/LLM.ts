@@ -77,9 +77,18 @@ export class LLM extends BaseNode<LlmParams> {
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
+    console.log('[LLM] Starting execution with params:', {
+      model: params.model,
+      hasMessages: !!params.messages,
+      messageCount: Array.isArray(params.messages) ? params.messages.length : 0,
+      hasTools: !!params.tools,
+      toolCount: Array.isArray(params.tools) ? params.tools.length : 0
+    });
+    
     const secureEnv = this.getOptions()?.secureEnv;
     const apiKey = secureEnv?.OPEN_ROUTER_KEY ?? autopilot.getOpenRouterApiKey();
     if (!apiKey) {
+      console.error('[LLM] No API key found!');
       throw this.handleExecutionError(
         new Error('OpenRouter API key is required. Provide it via starship $env("OPEN_ROUTER_KEY") or autopilot.setCredentials().')
       );
@@ -92,6 +101,14 @@ export class LLM extends BaseNode<LlmParams> {
         const inputData = ExecutionItemUtils.unwrapSingle(input);
         const inputContent = typeof inputData === 'string' ? inputData : JSON.stringify(inputData);
         messages = [{ role: 'user', content: inputContent }];
+      }
+      
+      console.log('[LLM] Final message count:', Array.isArray(messages) ? messages.length : 0);
+      if (Array.isArray(messages) && messages.length > 0) {
+        console.log('[LLM] Last message:', {
+          role: messages[messages.length - 1].role,
+          contentLength: messages[messages.length - 1].content?.length || 0
+        });
       }
 
       // Always stream; downstream receiver will handle tool_calls assembly from streaming deltas
@@ -120,19 +137,45 @@ export class LLM extends BaseNode<LlmParams> {
         (requestBody as { reasoning?: unknown }).reasoning = params.reasoning as unknown;
       }
 
-      console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
+      // Removed verbose LLM request log
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
+      console.log('[LLM] Making API call to OpenRouter...');
+      console.log('[LLM] Request body size:', JSON.stringify(requestBody).length, 'bytes');
+      
+      let response;
+      try {
+        response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+            'User-Agent': 'Starships-Autopilot/1.0',
+          },
+          body: JSON.stringify(requestBody),
+        });
+      } catch (fetchError) {
+        console.error('[LLM] Fetch error details:', fetchError);
+        console.error('[LLM] Fetch error name:', fetchError instanceof Error ? fetchError.name : 'Unknown');
+        console.error('[LLM] Fetch error cause:', (fetchError as any).cause);
+        
+        // Try to provide more context about the network error
+        if (fetchError instanceof Error && fetchError.message.includes('fetch failed')) {
+          const cause = (fetchError as any).cause;
+          if (cause) {
+            console.error('[LLM] Network error cause:', cause.message || cause);
+            if (cause.code) console.error('[LLM] Error code:', cause.code);
+            if (cause.syscall) console.error('[LLM] Syscall:', cause.syscall);
+          }
+        }
+        throw fetchError;
+      }
 
+      console.log('[LLM] Response status:', response.status, response.statusText);
+      
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('[LLM] API Error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       // If streaming is disabled (tools present), return the full JSON (includes tool_calls)
@@ -148,10 +191,15 @@ export class LLM extends BaseNode<LlmParams> {
         return ExecutionItemUtils.wrapSingle(result, input?.[0]);
       }
 
+      console.log('[LLM] Processing streaming response...');
       const llmResponse = await this.processStreamingResponse(reader);
-      console.log('<<RESPONSE<< ', JSON.stringify(llmResponse, null, 2));
-      return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
+      console.log('[LLM] Streaming complete, wrapping response');
+      const result = ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
+      console.log('[LLM] Returning result with', result.length, 'items');
+      return result;
     } catch (error) {
+      console.error('[LLM] ERROR in execute:', error instanceof Error ? error.message : error);
+      console.error('[LLM] Error stack:', error instanceof Error ? error.stack : 'No stack');
       throw this.handleExecutionError(error, 'LLM execution failed');
     }
   }
@@ -160,6 +208,7 @@ export class LLM extends BaseNode<LlmParams> {
    * Process streaming response from OpenRouter
    */
   private async processStreamingResponse(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<LLMResponse> {
+    console.log('[LLM] Starting to process streaming response');
     const decoder = new TextDecoder();
     let buffer = '';
     let responseMetadata = {
@@ -172,11 +221,15 @@ export class LLM extends BaseNode<LlmParams> {
     const choices: StreamChoice[] = [];
     // Root-level execution depth for this LLM stream (0=top-level, >0=nested)
     const executionDepth = this.getOptions()?.execution?.depth ?? 0;
+    let chunkCount = 0;
 
     try {
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[LLM] Stream reading complete, received', chunkCount, 'chunks');
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -191,6 +244,7 @@ export class LLM extends BaseNode<LlmParams> {
 
           try {
             const parsed = JSON.parse(data);
+            chunkCount++;
             this.processStreamChunk(parsed, responseMetadata, choices);
 
             if (parsed.usage) {
@@ -219,8 +273,12 @@ export class LLM extends BaseNode<LlmParams> {
         await eventCallback({ type: 'content_complete', timestamp: new Date().toISOString(), executionDepth });
       }
 
-      return this.buildFinalResponse(responseMetadata, choices, usage);
+      console.log('[LLM] Building final response from', choices.length, 'choices');
+      const finalResponse = this.buildFinalResponse(responseMetadata, choices, usage);
+      console.log('[LLM] Final response built successfully');
+      return finalResponse;
     } catch (error) {
+      console.error('[LLM] ERROR in processStreamingResponse:', error);
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
       throw new Error(`LLM streaming execution failed: ${errorMessage}`);
     }
@@ -478,6 +536,16 @@ export class LLM extends BaseNode<LlmParams> {
     usage?: LLMUsage
   ): LLMResponse {
     const choices = streamChoices.length > 0 ? streamChoices : [{ content: '', finishReason: 'stop' }];
+    
+    console.log('[LLM] Building final response:', {
+      choiceCount: choices.length,
+      firstChoice: choices[0] ? {
+        hasContent: !!choices[0].content,
+        contentLength: choices[0].content?.length || 0,
+        finishReason: choices[0].finishReason,
+        toolCallCount: choices[0].tool_calls?.length || 0
+      } : null
+    });
 
     // Narrow tool_calls entries to those with a non-empty function name (guards against placeholder chunks)
     type ToolCallCandidate = { id?: string; function?: { name?: unknown; arguments?: unknown } };

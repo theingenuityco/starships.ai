@@ -35,23 +35,30 @@ export class Agent implements NodeHandler {
 
     // Runner selection deferred to execute() based on execution.depth to avoid nested runners
 
-    // Create complete tool-enabled blueprint if none was provided
-    if (!this.params.blueprint) {
+    // Check if blueprint has the parallel tools node
+    const hasParallelTools = this.params.blueprint?.nodes?.some((n: any) => 
+      n.name === 'Execute Tools in Parallel' || n.type === 'parallel_tools'
+    );
+    
+    if (!hasParallelTools) {
+      console.log('[Agent] OLD blueprint detected - upgrading to PARALLEL execution');
       this.createDefaultBlueprint();
+    } else {
+      console.log('[Agent] Blueprint already has parallel tools support');
     }
   }
 
   /**
-   * Create complete blueprint from scratch - includes scaffolding and tool execution infrastructure
+   * Create complete blueprint from scratch - includes scaffolding and PARALLEL tool execution
    * Since tools are driven entirely by state, all blueprints are tool-ready
    */
   private createDefaultBlueprint(): void {
+    console.log('[Agent] Creating blueprint with PARALLEL tool execution support');
     const startRef = `start_${this.nodeCounter++}`;
     const endRef = `end_${this.nodeCounter++}`;
     const llmNodeRef = `llm_${this.nodeCounter++}`;
     const conditionalNodeRef = `conditional_${this.nodeCounter++}`;
-    const argsNodeRef = `args_${this.nodeCounter++}`;
-    const toolNodeRef = `tool_${this.nodeCounter++}`;
+    const parallelToolsRef = `parallel_tools_${this.nodeCounter++}`;
 
     // Create complete blueprint with all nodes
     this.params.blueprint = {
@@ -108,65 +115,34 @@ export class Agent implements NodeHandler {
           parameters: {
             // Returns:
             //  - "continue" when choices[0].finish_reason === "length" (continue generation)
-            //  - "call_tool" when finish_reason === "tool_calls" OR tool_calls[] exist (route to tool execution)
+            //  - "call_tools" when finish_reason === "tool_calls" OR tool_calls[] exist (route to PARALLEL tool execution)
             //  - "complete" otherwise (end)
-            // Use $input() (the LLM node output passed into this Conditional) to avoid cross-scope lookup issues.
-            // Trimmed single-template string for full-only evaluation
             condition:
-              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.tool_calls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
+              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; const calls = last?.choices?.[0]?.message?.tool_calls; const hasTools = Array.isArray(calls) && calls.length > 0; console.log("[Agent] Conditional check - finish_reason:", fr, "tool_calls count:", calls?.length || 0, "routing to:", hasTools || fr==="tool_calls" ? "call_tools" : fr==="length" ? "continue" : "complete"); if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tools"; return hasTools ? "call_tools" : "complete"; })()}}',
           },
         },
-        // Prepare arguments for Tool (materialize arguments_json as plain object)
+        // PARALLEL Tools Execution Node - executes ALL tool_calls simultaneously
         {
-          ref: argsNodeRef,
-          type: 'code' as const,
-          name: 'Prepare Tool Args',
-          description: 'Materialize arguments_json into a plain object for Tool input',
+          ref: parallelToolsRef,
+          type: 'parallel_tools' as const,  // Use the actual parallel_tools type
+          name: 'Execute Tools in Parallel',
+          description: 'Execute ALL tool calls from LLM in parallel for maximum efficiency',
           parameters: {
-            code: `
-              const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const j = last?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments_json;
-              if (j && typeof j === 'object') { return j; }
-              throw new Error('Missing tool_call function.arguments_json');
-            `,
-            timeout: 3000,
-          },
-        },
-        // Tool execution node - receives the complete tool definition via template resolution
-        {
-          ref: toolNodeRef,
-          type: 'tool' as const,
-          name: 'Execute Tool',
-          description: 'Execute tool and add result to conversation',
-          parameters: {
-            // Resolve tool definition from state using the tool name from LLM response (normalized)
-            name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
-            description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
-            parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
-            blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
-            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
+            // Provide the LLM node reference so ParallelToolsNode can fetch its output
+            llmNodeRef: llmNodeRef,
+            timeout: 60000, // 60 seconds for all tools
             mutations: [
+              // Append tool results to messages by merging arrays
+              // Since JSON Patch doesn't support spreading arrays when adding to path/-,
+              // we need to replace the entire messages array with the combined array
               {
-                operation: 'add' as const,
-                path: '/state/messages/-',
-                value: {
-                  role: 'tool',
-                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
-                  name: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.name ?? "" }}`,
-                  content: `{{ JSON.stringify((() => { const _i = $lastOutputOf("${toolNodeRef}")[0]; const j = _i?.json; if (j !== undefined) { return j; } if (_i && _i.error !== undefined) { return { ok: false, error: _i.error }; } return {}; })()) }}`,
-                },
-              },
-              // Ensure processedToolCalls array exists (idempotent)
-              {
-                operation: 'add' as const,
-                path: '/state/processedToolCalls',
-                value: `{{ Array.isArray(state?.processedToolCalls) ? state.processedToolCalls : [] }}`,
-              },
-              // Track executed tool_call id to prevent re-executing the same call
-              {
-                operation: 'add' as const,
-                path: '/state/processedToolCalls/-',
-                value: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
+                operation: 'replace' as const,
+                path: '/state/messages',
+                value: `{{ (() => { 
+                  const currentMessages = state.messages || [];
+                  const toolResults = $lastOutputOf("${parallelToolsRef}").map(item => item.json);
+                  return [...currentMessages, ...toolResults];
+                })() }}`,
               },
             ],
           },
@@ -179,12 +155,10 @@ export class Agent implements NodeHandler {
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
         // Conditional -> LLM (if finish_reason === "length")
         { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'continue' },
-        // Conditional -> Prepare Args (if tool_calls exist)
-        { ref: 'edge_conditional_args', from: conditionalNodeRef, to: argsNodeRef, condition: 'call_tool' },
-        // Prepare Args -> Tool
-        { ref: 'edge_args_tool', from: argsNodeRef, to: toolNodeRef },
-        // Tool -> LLM (loop back)
-        { ref: 'edge_tool_llm', from: toolNodeRef, to: llmNodeRef },
+        // Conditional -> Parallel Tools (if tool_calls exist) - NOW PARALLEL!
+        { ref: 'edge_conditional_parallel_tools', from: conditionalNodeRef, to: parallelToolsRef, condition: 'call_tools' },
+        // Parallel Tools -> LLM (loop back after ALL tools complete)
+        { ref: 'edge_parallel_tools_llm', from: parallelToolsRef, to: llmNodeRef },
         // Conditional -> End (if no tool_calls)
         { ref: 'edge_conditional_end', from: conditionalNodeRef, to: endRef, condition: 'complete' },
       ],

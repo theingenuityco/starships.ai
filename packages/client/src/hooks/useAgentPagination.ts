@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Agent, agentAPI } from '@/lib/api'
+import type { TemplateCategory } from '@starships/protocol'
 
 interface UseAgentPaginationOptions {
   pageSize?: number
-  category?: 'general' | 'coding' | 'creative' | 'analysis' | 'support'
+  category?: TemplateCategory
   authorId?: string
   searchQuery?: string
   isPublic?: boolean

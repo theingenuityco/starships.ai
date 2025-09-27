@@ -174,14 +174,22 @@ export function useTemplateCategories() {
     { value: 'creative', label: 'Creative', description: 'Content creation and artistic tasks' },
     { value: 'analysis', label: 'Analysis', description: 'Data analysis and insights' },
     { value: 'support', label: 'Support', description: 'Customer service and help' },
+    { value: 'utility', label: 'Utility', description: 'Utility and helper tools' },
+    { value: 'data', label: 'Data', description: 'Data processing and analysis' },
+    { value: 'communication', label: 'Communication', description: 'Communication and messaging' },
+    { value: 'automation', label: 'Automation', description: 'Workflow automation tools' },
   ] as const
 
   const toolCategories = [
     { value: 'general', label: 'General', description: 'General-purpose tools' },
-    { value: 'integration', label: 'Integration', description: 'Third-party service integrations' },
-    { value: 'automation', label: 'Automation', description: 'Workflow automation tools' },
+    { value: 'coding', label: 'Coding', description: 'Programming and development tools' },
+    { value: 'creative', label: 'Creative', description: 'Content creation and artistic tools' },
+    { value: 'analysis', label: 'Analysis', description: 'Data analysis and insights tools' },
+    { value: 'support', label: 'Support', description: 'Customer service and help tools' },
+    { value: 'utility', label: 'Utility', description: 'Utility and helper tools' },
     { value: 'data', label: 'Data', description: 'Data processing and analysis' },
     { value: 'communication', label: 'Communication', description: 'Communication and messaging' },
+    { value: 'automation', label: 'Automation', description: 'Workflow automation tools' },
   ] as const
 
   const getAgentCategoryInfo = (category: string) => {

@@ -74,10 +74,10 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-primary/50 group flex flex-col">
+      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl hover:border-primary/50 group flex flex-col">
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
-          <div className="flex-shrink-0 p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+          <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
             <div className="text-2xl">{template.icon || '🤖'}</div>
           </div>
 

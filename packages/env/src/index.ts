@@ -52,6 +52,9 @@ export function getEnvConfig(): EnvironmentConfig {
     // JWT Authentication Configuration
     JWT_SECRET: process.env.JWT_SECRET || '',
 
+    // Environment Variables Encryption Key
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+
     // Stripe Configuration
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',

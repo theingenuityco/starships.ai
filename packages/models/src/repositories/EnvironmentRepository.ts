@@ -3,6 +3,7 @@ import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { EnvironmentModel, EnvironmentSummary } from '@starships/protocol';
+import { getEnvConfig } from '@starships/env';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 
 export class EnvironmentRepository extends BaseRepository {
@@ -49,7 +50,8 @@ export class EnvironmentRepository extends BaseRepository {
    * Get starship-specific encryption key derived from master key
    */
   private getEncryptionKey(starshipId: string): Buffer {
-    const masterKey = process.env.ENCRYPTION_KEY;
+    const envConfig = getEnvConfig();
+    const masterKey = envConfig.ENCRYPTION_KEY;
     if (!masterKey) {
       throw new Error('ENCRYPTION_KEY environment variable is required');
     }

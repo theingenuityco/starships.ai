@@ -8,7 +8,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { History, MessageSquare, Plus, Users, X, Settings, Key } from 'lucide-react'
+import { History, MessageSquare, Plus, Users, X, Settings, Key, Store } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -23,6 +23,10 @@ const getStarshipNavigationSections = (starshipSlug: string) => [
   {
     title: 'Starship Systems',
     items: [{ href: `/ship/${starshipSlug}/crew`, label: 'Crew', icon: Users, status: 'optimal' }],
+  },
+  {
+    title: 'Resources',
+    items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],
   },
   {
     title: 'Settings',

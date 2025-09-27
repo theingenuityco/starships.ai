@@ -108,6 +108,11 @@ export function useCreateAgentFromTemplate() {
         queryKey: ['agents'],
       })
 
+      // Invalidate starship-specific agent queries used by AgentTemplateCard
+      queryClient.invalidateQueries({
+        queryKey: ['agents', 'starship', variables.starshipId],
+      })
+
       // Update template usage count
       queryClient.invalidateQueries({
         queryKey: TEMPLATE_QUERY_KEYS.agentTemplate(variables.templateId),
@@ -144,6 +149,11 @@ export function useCreateToolFromTemplate() {
       // Invalidate tool queries to refresh lists
       queryClient.invalidateQueries({
         queryKey: ['tools'],
+      })
+
+      // Invalidate starship-specific tool queries used by ToolTemplateCard
+      queryClient.invalidateQueries({
+        queryKey: ['starship-tools', variables.starshipId],
       })
 
       // Update template usage count

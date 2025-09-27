@@ -1,7 +1,8 @@
 'use client'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useStarships } from '@/hooks/useStarships'
+import { useUserStarships } from '@/hooks/useStarships'
+import { useAuth } from '@/hooks/useAuth'
 import type { StarshipModel } from '@starships/protocol'
 import { AlertCircle, Loader2, Rocket } from 'lucide-react'
 
@@ -15,8 +16,8 @@ interface StarshipSelectorProps {
 }
 
 export function StarshipSelector({ value, onValueChange, placeholder = 'Select a starship', disabled = false, className }: StarshipSelectorProps) {
-  const { data: starshipsData, isLoading: loading, error } = useStarships()
-  const starships = starshipsData?.starships || []
+  const { userId } = useAuth()
+  const { data: starships = [], isLoading: loading, error } = useUserStarships(userId || '', !!userId)
 
   const getStarshipIcon = (starshipClass: 'scout' | 'cruiser' | 'draught') => {
     switch (starshipClass) {

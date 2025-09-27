@@ -85,33 +85,6 @@ const checkAuth = (req: Request, res: Response): boolean => {
   return true;
 };
 
-// GET /starships - Get user's starships (OpenAPI pattern)
-router.get('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Authentication check
-    if (!checkAuth(req, res)) return;
-
-    // Validate pagination query parameters
-    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
-    if (!paginationValidation) return;
-
-    const userId = (req as any).user!.id;
-    const { page, limit } = paginationValidation;
-
-    const starshipService = new StarshipService();
-    const starships = await starshipService.getStarshipsByOwner(userId);
-
-    // Apply pagination
-    const total = starships.length;
-    const offset = (page - 1) * limit;
-    const paginatedStarships = starships.slice(offset, offset + limit);
-
-    sendSuccess(res, paginatedStarships, 200, createPaginationMeta(page, limit, total));
-  } catch (error) {
-    handleError(error, res, 'fetching starships');
-  }
-});
-
 // POST /starships/create-paid - Create paid starship with pending payment status (OpenAPI pattern)
 router.post('/starships/create-paid', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {

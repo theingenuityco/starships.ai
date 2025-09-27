@@ -46,25 +46,25 @@ export function StarshipsLogo({ width = 20, height = 20, className = '', gradien
             delay: animationDelay,
           }}
         >
-          <stop offset="0%" stopColor="rgba(255,255,255,0.9)" />
-          <stop offset="12%" stopColor="rgba(255,255,255,0.95)" />
-          <stop offset="15%" stopColor="white" />
-          <stop offset="18%" stopColor="rgba(255,255,255,0.8)" />
-          <stop offset="20%" stopColor="rgba(255,255,255,0.5)" />
-          <stop offset="22%" stopColor="rgba(255,255,255,0.2)" />
-          <stop offset="25%" stopColor="rgba(0,0,0,0.01)" />
-          <stop offset="30%" stopColor="rgba(0,0,0,0.05)" />
-          <stop offset="35%" stopColor="rgba(0,0,0,0.08)" />
-          <stop offset="50%" stopColor="rgba(0,0,0,0.1)" />
-          <stop offset="65%" stopColor="rgba(0,0,0,0.08)" />
-          <stop offset="70%" stopColor="rgba(0,0,0,0.05)" />
-          <stop offset="75%" stopColor="rgba(0,0,0,0.01)" />
-          <stop offset="78%" stopColor="rgba(255,255,255,0.2)" />
-          <stop offset="80%" stopColor="rgba(255,255,255,0.5)" />
-          <stop offset="82%" stopColor="rgba(255,255,255,0.8)" />
-          <stop offset="85%" stopColor="white" />
-          <stop offset="88%" stopColor="rgba(255,255,255,0.95)" />
-          <stop offset="100%" stopColor="rgba(255,255,255,0.9)" />
+          <stop offset="0%" stopColor="hsl(var(--foreground) / 0.9)" />
+          <stop offset="12%" stopColor="hsl(var(--foreground) / 0.95)" />
+          <stop offset="15%" stopColor="hsl(var(--foreground))" />
+          <stop offset="18%" stopColor="hsl(var(--foreground) / 0.8)" />
+          <stop offset="20%" stopColor="hsl(var(--foreground) / 0.5)" />
+          <stop offset="22%" stopColor="hsl(var(--foreground) / 0.2)" />
+          <stop offset="25%" stopColor="hsl(var(--background) / 0.01)" />
+          <stop offset="30%" stopColor="hsl(var(--background) / 0.05)" />
+          <stop offset="35%" stopColor="hsl(var(--background) / 0.08)" />
+          <stop offset="50%" stopColor="hsl(var(--background) / 0.1)" />
+          <stop offset="65%" stopColor="hsl(var(--background) / 0.08)" />
+          <stop offset="70%" stopColor="hsl(var(--background) / 0.05)" />
+          <stop offset="75%" stopColor="hsl(var(--background) / 0.01)" />
+          <stop offset="78%" stopColor="hsl(var(--foreground) / 0.2)" />
+          <stop offset="80%" stopColor="hsl(var(--foreground) / 0.5)" />
+          <stop offset="82%" stopColor="hsl(var(--foreground) / 0.8)" />
+          <stop offset="85%" stopColor="hsl(var(--foreground))" />
+          <stop offset="88%" stopColor="hsl(var(--foreground) / 0.95)" />
+          <stop offset="100%" stopColor="hsl(var(--foreground) / 0.9)" />
         </motion.linearGradient>
       </defs>
       <motion.path

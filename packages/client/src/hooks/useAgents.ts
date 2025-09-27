@@ -460,6 +460,10 @@ export function useAgentCategories() {
     { value: 'creative', label: 'Creative Assistant', description: 'Content creation and artistic tasks' },
     { value: 'analysis', label: 'Analysis Assistant', description: 'Data analysis and insights' },
     { value: 'support', label: 'Support Assistant', description: 'Customer service and help desk' },
+    { value: 'utility', label: 'Utility Assistant', description: 'Utility and helper tools' },
+    { value: 'data', label: 'Data Assistant', description: 'Data processing and analysis' },
+    { value: 'communication', label: 'Communication Assistant', description: 'Communication and messaging' },
+    { value: 'automation', label: 'Automation Assistant', description: 'Workflow automation' },
   ] as const
 
   const getCategoryInfo = (category: string) => {

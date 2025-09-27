@@ -1,4 +1,4 @@
-import type { ApiResponse } from '@starships/protocol'
+import type { ApiResponse, TemplateCategory } from '@starships/protocol'
 
 import { ConnectorInstanceConfig } from '@/components/crew/ConnectorInstanceConfig'
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
@@ -475,7 +475,7 @@ export const agentAPI = {
   },
 
   // Enhanced query methods with caching
-  getByCategory: async (category: 'general' | 'coding' | 'creative' | 'analysis' | 'support'): Promise<Agent[]> => {
+  getByCategory: async (category: TemplateCategory): Promise<Agent[]> => {
     const cacheKey = CACHE_KEYS.AGENTS_BY_CATEGORY(category)
     const cached = apiCache.get<Agent[]>(cacheKey)
     if (cached) {

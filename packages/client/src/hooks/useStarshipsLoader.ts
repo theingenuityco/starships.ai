@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { useStarships } from '@/hooks/useStarships'
+import { useUserStarships } from '@/hooks/useStarships'
+import { useAuth } from '@/hooks/useAuth'
 
 interface UseStarshipsLoaderOptions {
   enabled?: boolean
@@ -14,9 +15,9 @@ interface UseStarshipsLoaderOptions {
  */
 export function useStarshipsLoader(options: UseStarshipsLoaderOptions = {}) {
   const { enabled = true, refetchOnWindowFocus = false, refetchOnVisibilityChange = false, refetchInterval = 0 } = options
+  const { userId } = useAuth()
 
-  const { data: starshipsResponse, isLoading: loadingStarships, refetch } = useStarships({ enabled })
-  const starships = starshipsResponse?.starships || []
+  const { data: starships = [], isLoading: loadingStarships, refetch } = useUserStarships(userId || '', !!userId && enabled)
 
   const isLoadingRef = useRef(false)
   const lastFetchRef = useRef<number>(0)

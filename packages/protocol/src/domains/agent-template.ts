@@ -10,10 +10,12 @@ import { AgentParamsWithoutMetadata } from './agent';
 // AGENT TEMPLATE TYPES
 // ============================================================================
 
+import type { TemplateCategory } from '../index';
+
 /**
- * Agent template category options
+ * Agent template category options (using shared TemplateCategory)
  */
-export type AgentTemplateCategory = 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+export type AgentTemplateCategory = TemplateCategory;
 
 /**
  * Core agent template entity

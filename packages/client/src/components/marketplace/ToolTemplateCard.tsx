@@ -1,0 +1,210 @@
+'use client'
+
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
+import { useUserStarships } from '@/hooks/useStarships'
+import { useAuth } from '@/hooks/useAuth'
+import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
+import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2, Download, CheckCircle } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/lib/api'
+import type { FetchResponse } from '@/lib/types'
+import type { ApiResponse } from '@starships/protocol'
+import { motion } from 'motion/react'
+import { useState } from 'react'
+import type { ToolTemplateModel } from '@starships/protocol'
+
+interface ToolTemplateCardProps {
+  template: ToolTemplateModel
+  onInstall?: (template: ToolTemplateModel) => void
+}
+
+export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps) {
+  const [isInstalling, setIsInstalling] = useState(false)
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+
+  // Get current user and their starships for installation
+  const { userId } = useAuth()
+  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
+  const primaryStarship = starships[0] // Use first starship by default
+
+  // Get deployed tools to check if this template is already installed
+  const { data: deployedTools = [] } = useQuery({
+    queryKey: ['starship-tools', primaryStarship?.id],
+    queryFn: async () => {
+      if (!primaryStarship?.id) return []
+      try {
+        const response: FetchResponse<ApiResponse<any[]>> = await api.get(`/api/v1/starships/${primaryStarship.id}/tools`)
+        return response.data.data || []
+      } catch (error) {
+        console.warn('Failed to fetch starship tools:', error)
+        return []
+      }
+    },
+    enabled: !!primaryStarship?.id,
+    staleTime: 30 * 1000,
+  })
+
+  // Note: We use slug/name matching since tools might not store templateSlug
+  const isAlreadyInstalled = deployedTools.some((tool: any) => tool.slug === template.slug || tool.name === template.name)
+
+  // Installation mutation
+  const createToolMutation = useCreateToolFromTemplate()
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'integration':
+        return <Package className="w-4 h-4" />
+      case 'automation':
+        return <Bot className="w-4 h-4" />
+      case 'data':
+        return <BarChart2 className="w-4 h-4" />
+      case 'communication':
+        return <Users className="w-4 h-4" />
+      default:
+        return <Wrench className="w-4 h-4" />
+    }
+  }
+
+  const getCategoryColor = (category: string) => {
+    const colors = {
+      general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
+      integration: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
+      automation: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
+      data: 'bg-gradient-to-r from-purple-500/10 to-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30',
+      communication: 'bg-gradient-to-r from-orange-500/10 to-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30',
+    }
+    return colors[category as keyof typeof colors] || colors.general
+  }
+
+  const handleInstallClick = () => {
+    if (!primaryStarship) {
+      return // No starship to install to
+    }
+    setShowConfirmationModal(true)
+  }
+
+  const handleConfirmInstall = async () => {
+    if (!primaryStarship) {
+      return // No starship to install to
+    }
+
+    setIsInstalling(true)
+    try {
+      await createToolMutation.mutateAsync({
+        templateSlug: template.slug,
+        starshipId: primaryStarship.id,
+        configuration: {},
+      })
+      onInstall?.(template)
+    } catch {
+      // Error handling is done in the mutation hook
+    } finally {
+      setIsInstalling(false)
+    }
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
+      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl group flex flex-col hover:bg-primary/5">
+        {/* Header */}
+        <div className="flex items-start gap-4 mb-4">
+          <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
+            <Wrench className="w-6 h-6 text-primary" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2 mb-2">
+              <h3 className="font-semibold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2">{template.name}</h3>
+            </div>
+            <Badge className={`text-xs ${getCategoryColor(template.category)} flex items-center gap-1 border font-medium w-fit`}>
+              {getCategoryIcon(template.category)}
+              {template.category}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="flex-1">
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-3 leading-relaxed">{template.description}</p>
+        </div>
+
+        {/* Stats and Requirements */}
+        <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Download className="w-4 h-4" />
+              <span>{template.usageCount}</span>
+            </div>
+            {template.requiresApiKey && (
+              <div className="flex items-center gap-1">
+                <Star className="w-4 h-4 text-yellow-500" />
+                <span className="text-xs">API Key</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Example Usage or Configuration */}
+        {(template.exampleUsage || (template.configurationFields && template.configurationFields.length > 0)) && (
+          <div className="mb-4">
+            {template.exampleUsage && (
+              <div className="mb-2">
+                <p className="text-xs text-muted-foreground mb-1">Example:</p>
+                <code className="text-xs bg-muted/30 px-2 py-1 rounded font-mono block truncate">
+                  {template.exampleUsage.length > 45 ? `${template.exampleUsage.slice(0, 45)}...` : template.exampleUsage}
+                </code>
+              </div>
+            )}
+
+            {template.configurationFields && template.configurationFields.length > 0 && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Config fields:</p>
+                <div className="flex flex-wrap gap-1">
+                  {template.configurationFields.slice(0, 2).map((field, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs">
+                      {field.name}
+                    </Badge>
+                  ))}
+                  {template.configurationFields.length > 2 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{template.configurationFields.length - 2}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Button */}
+        <div className="mt-auto">
+          {isAlreadyInstalled ? (
+            <Button size="sm" variant="outline" className="w-full transition-colors" disabled>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              <span className="truncate">Already installed on {primaryStarship?.name || 'starship'}</span>
+            </Button>
+          ) : (
+            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleInstallClick} disabled={isInstalling || !primaryStarship}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isInstalling ? 'Installing...' : 'Install'}
+            </Button>
+          )}
+        </div>
+
+        {/* Confirmation Modal */}
+        <DeploymentConfirmationModal
+          isOpen={showConfirmationModal}
+          onOpenChange={setShowConfirmationModal}
+          onConfirm={handleConfirmInstall}
+          isProcessing={isInstalling}
+          type="tool"
+          template={template}
+          starshipName={primaryStarship?.name || 'Unknown Starship'}
+        />
+      </Card>
+    </motion.div>
+  )
+}

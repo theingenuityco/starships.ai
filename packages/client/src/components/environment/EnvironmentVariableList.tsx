@@ -6,9 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Key, MoreHorizontal, Edit, Trash2, Calendar, User, FileText, Plus, Search } from 'lucide-react'
+import { Key, MoreHorizontal, Edit, Trash2, Calendar, User, FileText, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Input } from '@/components/ui/input'
 
 interface EnvironmentVariableListProps {
   variables: EnvironmentSummary[]
@@ -19,12 +18,6 @@ interface EnvironmentVariableListProps {
 }
 
 export function EnvironmentVariableList({ variables, loading = false, onAdd, onEdit, onDelete }: EnvironmentVariableListProps) {
-  const [searchQuery, setSearchQuery] = useState('')
-
-  const filteredVariables = variables.filter(
-    variable => variable.key.toLowerCase().includes(searchQuery.toLowerCase()) || (variable.description && variable.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  )
-
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString('en-US', {
@@ -55,11 +48,8 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
   return (
     <Card className="frosted-glass-card shadow-frosted-lg">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search variables..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
-          </div>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Variables</h3>
           <Button onClick={onAdd} size="sm" className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Add Variable
@@ -68,7 +58,7 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
       </CardHeader>
 
       <CardContent className="p-0">
-        {filteredVariables.length === 0 ? (
+        {variables.length === 0 ? (
           <div className="p-8 text-center">
             <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             {variables.length === 0 ? (
@@ -89,7 +79,7 @@ export function EnvironmentVariableList({ variables, loading = false, onAdd, onE
           </div>
         ) : (
           <div className="divide-y">
-            {filteredVariables.map(variable => (
+            {variables.map(variable => (
               <div key={variable.id} className="group px-6 py-4 hover:bg-muted/50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">

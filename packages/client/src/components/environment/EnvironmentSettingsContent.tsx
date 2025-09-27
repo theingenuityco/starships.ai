@@ -7,10 +7,12 @@ import { useEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnviron
 import { EnvironmentVariableList } from './EnvironmentVariableList'
 import { EnvironmentVariableForm } from './EnvironmentVariableForm'
 import { EnvironmentVariableDeleteModal } from './EnvironmentVariableDeleteModal'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Settings, Key, Shield, Info } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Settings, Key, Shield, Info, Search, Plus } from 'lucide-react'
 
 interface EnvironmentSettingsContentProps {
   slug: string
@@ -21,12 +23,18 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
   const [showForm, setShowForm] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [selectedVariable, setSelectedVariable] = useState<EnvironmentSummary | undefined>()
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Fetch starship data
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug)
 
   // Fetch environment variables
   const { data: variables = [], isLoading: variablesLoading, error: variablesError } = useEnvironmentVariables(starship?.id || '', !!starship?.id)
+
+  // Filter variables based on search query
+  const filteredVariables = variables.filter(
+    variable => variable.key.toLowerCase().includes(searchQuery.toLowerCase()) || (variable.description && variable.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  )
 
   // Mutations
   const createMutation = useCreateEnvironmentVariable(starship?.id || '')
@@ -126,14 +134,22 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
         <div className="flex flex-col items-center px-6 py-8">
           <div className="w-full max-w-6xl mx-auto space-y-8">
             {/* Header */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
                 <Key className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Environment Variables</h1>
               </div>
               <p className="text-muted-foreground">
                 Manage environment variables for <strong>{starship.name}</strong>. These variables will be securely encrypted and available to your agents.
               </p>
+            </div>
+
+            {/* Search */}
+            <div className="mb-8">
+              <div className="relative max-w-md mb-6 mx-auto">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
+                <Input type="text" placeholder="Search environment variables..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2 w-full" />
+              </div>
             </div>
 
             {/* Security Notice */}
@@ -150,7 +166,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
                   <AlertDescription>Failed to load environment variables. Please try refreshing the page.</AlertDescription>
                 </Alert>
               ) : (
-                <EnvironmentVariableList variables={variables} loading={variablesLoading} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
+                <EnvironmentVariableList variables={filteredVariables} loading={variablesLoading} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} />
               )}
             </div>
           </div>

@@ -2,6 +2,24 @@
 // MAIN PROTOCOL EXPORTS
 // ============================================================================
 
+// ============================================================================
+// SHARED TEMPLATE TYPES
+// ============================================================================
+
+/**
+ * Unified template category options (shared between agent and tool templates)
+ */
+export type TemplateCategory =
+  | 'general'
+  | 'coding'
+  | 'creative'
+  | 'analysis'
+  | 'support'
+  | 'utility'
+  | 'data'
+  | 'communication'
+  | 'automation';
+
 // Export domain types (database domains)
 export * from './domains/agent';
 export * from './domains/agent-template';

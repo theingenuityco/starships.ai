@@ -99,15 +99,13 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
 
         {/* Stats */}
         <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <Users className="w-4 h-4" />
-              <span>{template.usageCount}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Bot className="w-4 h-4" />
-              <span className="font-mono text-xs truncate max-w-[80px]">{template.model}</span>
-            </div>
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            <Bot className="w-4 h-4 flex-shrink-0" />
+            <span className="font-mono text-xs truncate">{template.model}</span>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Users className="w-4 h-4" />
+            <span>{template.usageCount} uses</span>
           </div>
         </div>
 

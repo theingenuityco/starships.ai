@@ -6,7 +6,7 @@
  */
 
 import { Transformers } from '@/helpers/serializer';
-import type { ToolTemplateModel, ToolTemplateCategory } from '@starships/protocol';
+import type { ToolTemplateModel, TemplateCategory } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
 import {
@@ -90,7 +90,7 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   // Template metadata
   @Expose()
   @IsString()
-  category!: ToolTemplateCategory;
+  category!: TemplateCategory;
 
   @Expose()
   @IsNumber()

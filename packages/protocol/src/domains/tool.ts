@@ -16,10 +16,12 @@ import type { ToolParams } from '@starships/autopilot';
 // TOOL TEMPLATE TYPES (Marketplace)
 // ============================================================================
 
+import type { TemplateCategory } from '../index';
+
 /**
- * Tool template category options
+ * Tool template category options (using shared TemplateCategory)
  */
-export type ToolTemplateCategory = 'general' | 'api' | 'utility' | 'data' | 'communication' | 'automation';
+export type ToolTemplateCategory = TemplateCategory;
 
 /**
  * Core tool template entity - marketplace/gallery items

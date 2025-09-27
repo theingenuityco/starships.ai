@@ -7,7 +7,7 @@
 
 import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import type { AgentState, Blueprint } from '@starships/autopilot';
-import type { AgentTemplateModel } from '@starships/protocol';
+import type { AgentTemplateModel, TemplateCategory } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
 import {
   IsArray,
@@ -136,8 +136,8 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   // Template metadata
   @Expose()
-  @IsEnum(['general', 'coding', 'creative', 'analysis', 'support'])
-  category!: 'general' | 'coding' | 'creative' | 'analysis' | 'support';
+  @IsEnum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
+  category!: TemplateCategory;
 
   @Expose()
   @IsNumber()

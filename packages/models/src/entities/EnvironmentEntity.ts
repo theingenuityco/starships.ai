@@ -7,7 +7,7 @@
 import { Transformers } from '@/helpers/serializer';
 import type { EnvironmentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsString, Length, IsISO8601, validate, ValidationError } from 'class-validator';
+import { IsString, Length, IsISO8601, IsOptional, validate, ValidationError } from 'class-validator';
 
 export class EnvironmentEntity implements EnvironmentModel {
   @Expose()
@@ -30,6 +30,7 @@ export class EnvironmentEntity implements EnvironmentModel {
   encryptedValue!: string;
 
   @Expose()
+  @IsOptional()
   @IsString()
   @Length(0, 500)
   description?: string;

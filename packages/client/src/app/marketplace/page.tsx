@@ -62,7 +62,7 @@ export default function MarketplacePage() {
                 <Store className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Agent Marketplace</h1>
               </div>
-              <p className="text-muted-foreground">Discover and deploy powerful agent and tools to enhance your starship's capabilities.</p>
+              <p className="text-muted-foreground">Discover and deploy powerful agent and tools to enhance your starship&apos;s capabilities.</p>
             </div>
 
             {/* Search and Filters */}

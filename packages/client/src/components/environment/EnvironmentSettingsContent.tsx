@@ -132,7 +132,7 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
 
         {/* Security Notice */}
         <Alert>
-          <Shield className="h-4 w-4 !top-[14px]" />
+          <Shield className="h-4 w-4" />
           <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
         </Alert>
 

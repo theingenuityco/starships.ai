@@ -56,15 +56,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
   if (isDashboard) {
     // Landing page - no authentication required
-    return (
-      <div className="h-full w-full">
-        {children}
-      </div>
-    )
+    return <div className="h-full w-full">{children}</div>
   }
 
-  // Hide navigation on all routes except starship routes (only show inside starship context)
-  const shouldHideNavigation = !pathname.startsWith('/ship/')
+  // Hide navigation on all routes except starship routes and marketplace
+  const shouldHideNavigation = !pathname.startsWith('/ship/') && pathname !== '/marketplace'
 
   // Regular pages with conditional navigation sidebar
   return (
@@ -94,9 +90,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         )}
 
         {/* Main Content Area - Dynamic positioning based on navigation visibility */}
-        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto">
-          {children}
-        </main>
+        <main className="relative flex-1 min-h-full w-full transition-all duration-300 overflow-auto">{children}</main>
       </div>
     </JwtAuthGate>
   )

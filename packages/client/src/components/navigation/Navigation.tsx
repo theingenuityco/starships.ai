@@ -100,12 +100,22 @@ export function Navigation(props: NavigationProps) {
 
   // Determine which navigation sections to show based on current route
   const getNavigationSections = () => {
-    // Only show navigation inside starship context (/ship/<slug>/*)
+    // Show starship navigation when inside starship context
     if (starshipSlug) {
       return getStarshipNavigationSections(starshipSlug)
     }
 
-    // No navigation for non-starship routes
+    // Show global navigation for marketplace and other authenticated routes
+    if (pathname === '/marketplace') {
+      return [
+        {
+          title: 'Resources',
+          items: [{ href: `/marketplace`, label: 'Marketplace', icon: Store, status: 'optimal' }],
+        },
+      ]
+    }
+
+    // No navigation for other routes
     return []
   }
 
@@ -118,6 +128,9 @@ export function Navigation(props: NavigationProps) {
 
     if (starshipSlug) {
       router.push(`/ship/${starshipSlug}/conversations`)
+    } else if (pathname === '/marketplace') {
+      // Stay on marketplace when clicking logo from marketplace
+      router.push('/marketplace')
     }
   }
 
@@ -140,87 +153,89 @@ export function Navigation(props: NavigationProps) {
         {/* Navigation Content */}
         <div className="flex-1 flex flex-col justify-center min-h-0">
           <div className="p-2 space-y-2">
-            {/* Conversations Section - Expandable when on conversation routes */}
-            <div>
-              {/* Main Conversations Icon - Standalone */}
-              <Tooltip delayDuration={300}>
-                <TooltipTrigger asChild>
-                  <Link href={`/ship/${starshipSlug}/conversations`}>
+            {/* Conversations Section - Only show when in starship context */}
+            {starshipSlug && (
+              <div>
+                {/* Main Conversations Icon - Standalone */}
+                <Tooltip delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <Link href={`/ship/${starshipSlug}/conversations`}>
+                      <motion.div
+                        className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
+                          isConversationRoute
+                            ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
+                            : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
+                        }`}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <MessageSquare className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                      </motion.div>
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                    Conversations
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Expanded Sub-icons Container - Visually joined from bottom */}
+                <AnimatePresence>
+                  {isConversationRoute && (
                     <motion.div
-                      className={`group relative transition-all duration-300 mx-1 p-2 rounded-xl z-10 flex items-center justify-center ${
-                        isConversationRoute
-                          ? 'bg-gradient-to-r from-primary/25 to-primary/20 shadow-md border border-primary/15'
-                          : 'hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md'
-                      }`}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="border-l border-r border-b border-primary/15 rounded-bl-xl rounded-br-xl mx-1 space-y-1 overflow-hidden -mt-2 pt-4 pb-2 flex flex-col items-center three-way-border"
                     >
-                      <MessageSquare className={`w-5 h-5 ${isConversationRoute ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'} transition-colors`} />
+                      {/* New Conversation Icon */}
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <motion.button
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.1 }}
+                            onClick={handleNewConversation}
+                            className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                          </motion.button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                          New Conversation
+                        </TooltipContent>
+                      </Tooltip>
+
+                      {/* Conversation History Toggle Icon */}
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <motion.button
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.2 }}
+                            onClick={handleToggleConversationHistory}
+                            className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            {showConversationList ? (
+                              <X className="w-4 h-4 text-primary transition-colors" />
+                            ) : (
+                              <History className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                            )}
+                          </motion.button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
+                          {showConversationList ? 'Hide' : 'Show'} History
+                        </TooltipContent>
+                      </Tooltip>
                     </motion.div>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                  Conversations
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Expanded Sub-icons Container - Visually joined from bottom */}
-              <AnimatePresence>
-                {isConversationRoute && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                    className="border-l border-r border-b border-primary/15 rounded-bl-xl rounded-br-xl mx-1 space-y-1 overflow-hidden -mt-2 pt-4 pb-2 flex flex-col items-center three-way-border"
-                  >
-                    {/* New Conversation Icon */}
-                    <Tooltip delayDuration={300}>
-                      <TooltipTrigger asChild>
-                        <motion.button
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.1 }}
-                          onClick={handleNewConversation}
-                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                        </motion.button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                        New Conversation
-                      </TooltipContent>
-                    </Tooltip>
-
-                    {/* Conversation History Toggle Icon */}
-                    <Tooltip delayDuration={300}>
-                      <TooltipTrigger asChild>
-                        <motion.button
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.2 }}
-                          onClick={handleToggleConversationHistory}
-                          className="group relative transition-all duration-300 p-1.5 rounded-lg hover:bg-gradient-to-r hover:from-muted/40 hover:to-muted/30 hover:shadow-md flex items-center justify-center"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          {showConversationList ? (
-                            <X className="w-4 h-4 text-primary transition-colors" />
-                          ) : (
-                            <History className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                          )}
-                        </motion.button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="bg-popover border border-border shadow-xl rounded-lg text-popover-foreground font-medium z-[1001]" sideOffset={12}>
-                        {showConversationList ? 'Hide' : 'Show'} History
-                      </TooltipContent>
-                    </Tooltip>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {/* Other Navigation Items */}
             {navigationSections.map(section => (

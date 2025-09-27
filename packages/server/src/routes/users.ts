@@ -7,6 +7,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
+import { StarshipService } from '@/services/StarshipService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { CreateUserRequest } from '@starships/protocol';
 import type { Request, Response } from 'express';
@@ -293,6 +294,49 @@ router.delete('/users/:id', jwtAuthMiddleware, async (req: Request, res: Respons
     sendSuccess(res, { message: 'User deleted successfully' }, 200);
   } catch (error) {
     handleError(error, res, 'deleting user');
+  }
+});
+
+// ============================================================================
+// USER STARSHIPS ENDPOINTS
+// ============================================================================
+
+// GET /users/:id/starships - Get user's starships (OpenAPI pattern)
+router.get('/users/:id/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
+
+    const requestedUserId = req.params.id;
+    const currentUserId = req.user?.id;
+
+    // Authorization: Users can only access their own starships
+    if (requestedUserId !== currentUserId) {
+      sendError(res, 'ACCESS_DENIED', 'You can only access your own starships', 403);
+      return;
+    }
+
+    // Validate pagination query parameters
+    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!queryValidation) return;
+
+    const { page, limit } = queryValidation;
+
+    const starshipService = new StarshipService();
+    const starships = await starshipService.getStarshipsByOwner(requestedUserId);
+
+    // Apply pagination
+    const total = starships.length;
+    const offset = (page - 1) * limit;
+    const paginatedStarships = starships.slice(offset, offset + limit);
+
+    const paginationMeta = createPaginationMeta(page, limit, total);
+
+    sendSuccess(res, paginatedStarships, 200, paginationMeta);
+  } catch (error) {
+    handleError(error, res, 'fetching user starships');
   }
 });
 

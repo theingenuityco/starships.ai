@@ -6,7 +6,11 @@ import { Card } from '@/components/ui/card'
 import { useCreateToolFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2, Download } from 'lucide-react'
+import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2, Download, CheckCircle } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import api from '@/lib/api'
+import type { FetchResponse } from '@/lib/types'
+import type { ApiResponse } from '@starships/protocol'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { ToolTemplateModel } from '@starships/protocol'
@@ -23,6 +27,26 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
   const { userId } = useAuth()
   const { data: starships = [] } = useUserStarships(userId || '', !!userId)
   const primaryStarship = starships[0] // Use first starship by default
+
+  // Get deployed tools to check if this template is already installed
+  const { data: deployedTools = [] } = useQuery({
+    queryKey: ['starship-tools', primaryStarship?.id],
+    queryFn: async () => {
+      if (!primaryStarship?.id) return []
+      try {
+        const response: FetchResponse<ApiResponse<any[]>> = await api.get(`/api/v1/starships/${primaryStarship.id}/tools`)
+        return response.data.data || []
+      } catch (error) {
+        console.warn('Failed to fetch starship tools:', error)
+        return []
+      }
+    },
+    enabled: !!primaryStarship?.id,
+    staleTime: 30 * 1000,
+  })
+
+  // Note: We use slug/name matching since tools might not store templateSlug
+  const isAlreadyInstalled = deployedTools.some((tool: any) => tool.slug === template.slug || tool.name === template.name)
 
   // Installation mutation
   const createToolMutation = useCreateToolFromTemplate()
@@ -148,10 +172,17 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
 
         {/* Action Button */}
         <div className="mt-auto">
-          <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleInstall} disabled={isInstalling || !primaryStarship}>
-            <Sparkles className="w-4 h-4 mr-2" />
-            {isInstalling ? 'Installing...' : 'Install'}
-          </Button>
+          {isAlreadyInstalled ? (
+            <Button size="sm" variant="outline" className="w-full transition-colors" disabled>
+              <CheckCircle className="w-4 h-4 mr-2" />
+              <span className="truncate">Already installed on {primaryStarship?.name || 'starship'}</span>
+            </Button>
+          ) : (
+            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleInstall} disabled={isInstalling || !primaryStarship}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              {isInstalling ? 'Installing...' : 'Install'}
+            </Button>
+          )}
         </div>
       </Card>
     </motion.div>

@@ -74,60 +74,69 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card className="p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-primary/50 group">
-        <div className="flex items-start gap-4">
-          <div className="p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:border-primary/50 group flex flex-col">
+        {/* Header */}
+        <div className="flex items-start gap-4 mb-4">
+          <div className="flex-shrink-0 p-3 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
             <div className="text-2xl">{template.icon || '🤖'}</div>
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold text-lg truncate group-hover:text-primary transition-colors">{template.name}</h3>
-              <Badge className={`text-xs ${getCategoryColor(template.category)} flex items-center gap-1 border font-medium`}>
-                {getCategoryIcon(template.category)}
-                {template.category}
-              </Badge>
+            <div className="flex items-start gap-2 mb-2">
+              <h3 className="font-semibold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2">{template.name}</h3>
             </div>
-
-            <p className="text-sm text-muted-foreground mb-3 line-clamp-2 leading-relaxed">{template.description}</p>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Users className="w-4 h-4" />
-                  <span>{template.usageCount} uses</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Bot className="w-4 h-4" />
-                  <span className="font-mono text-xs">{template.model}</span>
-                </div>
-              </div>
-
-              <Button
-                size="sm"
-                variant="outline"
-                className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-                onClick={handleDeploy}
-                disabled={isDeploying || !primaryStarship}
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                {isDeploying ? 'Deploying...' : 'Deploy'}
-              </Button>
-            </div>
-
-            {template.previewPrompts && template.previewPrompts.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-border/50">
-                <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
-                <div className="flex flex-wrap gap-1">
-                  {template.previewPrompts.slice(0, 2).map((prompt, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs bg-muted/30 border-muted-foreground/20 hover:bg-muted/50 transition-colors cursor-pointer">
-                      "{prompt.length > 30 ? `${prompt.slice(0, 30)}...` : prompt}"
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
+            <Badge className={`text-xs ${getCategoryColor(template.category)} flex items-center gap-1 border font-medium w-fit`}>
+              {getCategoryIcon(template.category)}
+              {template.category}
+            </Badge>
           </div>
+        </div>
+
+        {/* Description */}
+        <div className="flex-1">
+          <p className="text-sm text-muted-foreground mb-4 line-clamp-3 leading-relaxed">{template.description}</p>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <Users className="w-4 h-4" />
+              <span>{template.usageCount}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Bot className="w-4 h-4" />
+              <span className="font-mono text-xs truncate max-w-[80px]">{template.model}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Preview Prompts */}
+        {template.previewPrompts && template.previewPrompts.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
+            <div className="space-y-1">
+              {template.previewPrompts.slice(0, 2).map((prompt, idx) => (
+                <div key={idx} className="text-xs bg-muted/30 px-2 py-1 rounded border border-muted-foreground/20 truncate">
+                  "{prompt.length > 40 ? `${prompt.slice(0, 40)}...` : prompt}"
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Action Button */}
+        <div className="mt-auto">
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+            onClick={handleDeploy}
+            disabled={isDeploying || !primaryStarship}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            {isDeploying ? 'Deploying...' : 'Deploy'}
+          </Button>
         </div>
       </Card>
     </motion.div>

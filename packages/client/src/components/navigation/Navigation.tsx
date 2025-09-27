@@ -7,13 +7,13 @@ import { ThemeToggle } from '@/components/theme-toggle'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation, useUpdateConversationStatus } from '@/hooks/useConversations'
-import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { History, MessageSquare, Plus, Users, X, Settings, Key, Store } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface NavigationProps {
   isMobile?: boolean
@@ -46,12 +46,18 @@ const getGlobalNavigationSections = (starshipSlug: string | null) => [
 export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const { getSelectedStarshipId } = useSelectedStarship()
 
   // State for conversation list toggle
   const [showConversationList, setShowConversationList] = useState(false)
   // State for logo animation trigger
   const [animationTrigger, setAnimationTrigger] = useState(0)
+  // State for navigation starship slug
+  const [navigationStarshipSlug, setNavigationStarshipSlug] = useState<string | null>(null)
+
+  // Get user starships to find a default starship
+  const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
 
   // Extract starship slug from path
   const getStarshipSlug = () => {
@@ -62,7 +68,34 @@ export function Navigation(props: NavigationProps) {
     return null
   }
 
-  const starshipSlug = getStarshipSlug()
+  const pathStarshipSlug = getStarshipSlug()
+
+  // Update navigation starship slug based on context
+  useEffect(() => {
+    if (pathStarshipSlug) {
+      // If we're on a starship route, use that starship
+      setNavigationStarshipSlug(pathStarshipSlug)
+    } else {
+      // If we're not on a starship route, try to get a default starship
+      const selectedStarshipId = getSelectedStarshipId()
+      if (selectedStarshipId && userStarships) {
+        const selectedStarship = userStarships.find(ship => ship.id === selectedStarshipId)
+        if (selectedStarship) {
+          setNavigationStarshipSlug(selectedStarship.slug)
+          return
+        }
+      }
+
+      // Fall back to the first available starship
+      if (userStarships && userStarships.length > 0) {
+        setNavigationStarshipSlug(userStarships[0].slug)
+      } else {
+        setNavigationStarshipSlug(null)
+      }
+    }
+  }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
+
+  const starshipSlug = navigationStarshipSlug
 
   // Check if we're on a conversation route
   const isConversationRoute = pathname.includes('/conversations')

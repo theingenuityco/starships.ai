@@ -7,11 +7,12 @@ import { useEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnviron
 import { EnvironmentVariableList } from './EnvironmentVariableList'
 import { EnvironmentVariableForm } from './EnvironmentVariableForm'
 import { EnvironmentVariableDeleteModal } from './EnvironmentVariableDeleteModal'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Input } from '@/components/ui/input'
-import { Settings, Key, Shield, Info, Search } from 'lucide-react'
+import { Settings, Key, Shield, Info, Search, Plus } from 'lucide-react'
 
 interface EnvironmentSettingsContentProps {
   slug: string

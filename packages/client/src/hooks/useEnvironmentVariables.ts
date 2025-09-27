@@ -180,28 +180,3 @@ export function useDeleteEnvironmentVariable(starshipId: string) {
     },
   })
 }
-
-/**
- * Utility hooks for environment variable management
- */
-export function useEnvironmentVariableStats(starshipId: string) {
-  const { data: variables = [] } = useEnvironmentVariables(starshipId)
-
-  const stats = {
-    total: variables.length,
-    recentlyCreated: variables.filter(variable => {
-      const createdDate = new Date(variable.createdAt)
-      const weekAgo = new Date()
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      return createdDate > weekAgo
-    }).length,
-    recentlyUpdated: variables.filter(variable => {
-      const updatedDate = new Date(variable.updatedAt)
-      const dayAgo = new Date()
-      dayAgo.setDate(dayAgo.getDate() - 1)
-      return updatedDate > dayAgo && variable.updatedAt !== variable.createdAt
-    }).length,
-  }
-
-  return stats
-}

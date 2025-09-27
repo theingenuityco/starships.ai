@@ -3,16 +3,14 @@
 import { useState } from 'react'
 import { EnvironmentSummary } from '@starships/protocol'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnvironmentVariable, useDeleteEnvironmentVariable, useEnvironmentVariableStats } from '@/hooks/useEnvironmentVariables'
+import { useEnvironmentVariables, useCreateEnvironmentVariable, useUpdateEnvironmentVariable, useDeleteEnvironmentVariable } from '@/hooks/useEnvironmentVariables'
 import { EnvironmentVariableList } from './EnvironmentVariableList'
 import { EnvironmentVariableForm } from './EnvironmentVariableForm'
 import { EnvironmentVariableDeleteModal } from './EnvironmentVariableDeleteModal'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Settings, Key, Shield, Info, TrendingUp, Clock, Plus } from 'lucide-react'
+import { Settings, Key, Shield, Info } from 'lucide-react'
 
 interface EnvironmentSettingsContentProps {
   slug: string
@@ -29,9 +27,6 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
 
   // Fetch environment variables
   const { data: variables = [], isLoading: variablesLoading, error: variablesError } = useEnvironmentVariables(starship?.id || '', !!starship?.id)
-
-  // Get environment variable statistics
-  const stats = useEnvironmentVariableStats(starship?.id || '')
 
   // Mutations
   const createMutation = useCreateEnvironmentVariable(starship?.id || '')
@@ -140,44 +135,6 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
           <Shield className="h-4 w-4" />
           <AlertDescription>All environment variables are encrypted at rest and in transit. Variable values are never displayed in the interface for security.</AlertDescription>
         </Alert>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Variables</CardTitle>
-              <Key className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <p className="text-xs text-muted-foreground">Environment variables configured</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recently Added</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.recentlyCreated}</div>
-              <p className="text-xs text-muted-foreground">Added in the last 7 days</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recently Updated</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.recentlyUpdated}</div>
-              <p className="text-xs text-muted-foreground">Updated in the last 24 hours</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Separator />
 
         {/* Variables List */}
         <div>

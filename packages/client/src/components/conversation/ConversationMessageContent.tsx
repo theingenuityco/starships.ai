@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2, Wrench, MessageCircleMore } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Wrench, MessageCircleMore, Coins } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -553,20 +553,12 @@ export function ConversationMessageContent({
         </Card>
       )}
 
-      {/* Inline usage/cost metadata for assistant messages */}
+      {/* Minimal per-message cost with subtle pill background */}
       {messageType !== 'tool_result' && usage && (
-        <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span>
-            Cost: <span className="text-foreground">{formatUSD(Number(usage.cost))}</span>
-          </span>
-          <span>
-            In: <span className="text-foreground">{Number(usage.promptTokens ?? 0).toLocaleString()}</span>
-          </span>
-          <span>
-            Out: <span className="text-foreground">{Number(usage.completionTokens ?? 0).toLocaleString()}</span>
-          </span>
-          <span>
-            Total: <span className="text-foreground">{Number(usage.totalTokens ?? (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)).toLocaleString()}</span>
+        <div className="mt-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-[2px] text-[10px] border border-border/50 text-muted-foreground" aria-label="Message cost">
+            <Coins className="w-3 h-3 text-amber-500" aria-hidden="true" />
+            <span className="font-medium text-foreground">{formatUSD(Number(usage.cost))}</span>
           </span>
         </div>
       )}

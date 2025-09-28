@@ -202,7 +202,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                         >
                           <div className="flex items-start gap-2">
                             <Zap className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                            <p className="text-sm leading-relaxed group-hover:text-foreground transition-colors">"{prompt}"</p>
+                            <p className="text-sm leading-relaxed group-hover:text-foreground transition-colors">&quot;{prompt}&quot;</p>
                           </div>
                         </motion.div>
                       ))}

@@ -3,12 +3,13 @@
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { AgentDetailsDrawer } from '@/components/marketplace/AgentDetailsDrawer'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
+import { ToolDetailsDrawer } from '@/components/marketplace/ToolDetailsDrawer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Bot, Search, Wrench, Store, Filter, Package } from 'lucide-react'
+import { Bot, Search, Wrench, Store } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
@@ -17,7 +18,9 @@ export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [isAgentDrawerOpen, setIsAgentDrawerOpen] = useState(false)
+  const [selectedTool, setSelectedTool] = useState<ToolTemplateModel | null>(null)
+  const [isToolDrawerOpen, setIsToolDrawerOpen] = useState(false)
 
   // Fetch templates data
   const { data: agentTemplates = [], isLoading: agentTemplatesLoading } = useAgentTemplates()
@@ -46,25 +49,39 @@ export default function MarketplacePage() {
   })
 
   // Handle template deployment/installation
-  const handleAgentDeploy = (template: AgentTemplateModel) => {
+  const handleAgentDeploy = (_template: AgentTemplateModel) => {
     // Handle successful deployment - could show a success message or redirect
   }
 
-  const handleToolInstall = (template: ToolTemplateModel) => {
+  const handleToolInstall = (_template: ToolTemplateModel) => {
     // Handle successful installation - could show a success message
   }
 
   // Handle agent template click to show details
   const handleAgentClick = (template: AgentTemplateModel) => {
     setSelectedAgent(template)
-    setIsDrawerOpen(true)
+    setIsAgentDrawerOpen(true)
   }
 
-  // Handle drawer close
-  const handleDrawerClose = (open: boolean) => {
-    setIsDrawerOpen(open)
+  // Handle agent drawer close
+  const handleAgentDrawerClose = (open: boolean) => {
+    setIsAgentDrawerOpen(open)
     if (!open) {
       setSelectedAgent(null)
+    }
+  }
+
+  // Handle tool template click to show details
+  const handleToolClick = (template: ToolTemplateModel) => {
+    setSelectedTool(template)
+    setIsToolDrawerOpen(true)
+  }
+
+  // Handle tool drawer close
+  const handleToolDrawerClose = (open: boolean) => {
+    setIsToolDrawerOpen(open)
+    if (!open) {
+      setSelectedTool(null)
     }
   }
 
@@ -152,7 +169,7 @@ export default function MarketplacePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredToolTemplates.map((template: ToolTemplateModel, idx: number) => (
                     <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
-                      <ToolTemplateCard template={template} onInstall={handleToolInstall} />
+                      <ToolTemplateCard template={template} onInstall={handleToolInstall} onClick={handleToolClick} />
                     </motion.div>
                   ))}
                 </div>
@@ -169,7 +186,10 @@ export default function MarketplacePage() {
       </div>
 
       {/* Agent Details Drawer */}
-      <AgentDetailsDrawer template={selectedAgent} open={isDrawerOpen} onOpenChange={handleDrawerClose} onDeploy={handleAgentDeploy} />
+      <AgentDetailsDrawer template={selectedAgent} open={isAgentDrawerOpen} onOpenChange={handleAgentDrawerClose} onDeploy={handleAgentDeploy} />
+
+      {/* Tool Details Drawer */}
+      <ToolDetailsDrawer template={selectedTool} open={isToolDrawerOpen} onOpenChange={handleToolDrawerClose} onInstall={handleToolInstall} />
     </PageLayout>
   )
 }

@@ -407,14 +407,14 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     const indexAtLevel = sortedNodes.findIndex(n => n.ref === node.id)
     const totalAtLevel = sortedNodes.length
 
-    // Vertical positioning with more spacing
-    const y = level * 180 + 60
+    // Vertical positioning with much more spacing to avoid edge overlap
+    const y = level * 250 + 80
 
-    // Horizontal distribution for nodes at same level
-    let x = 400 // Increased center position
+    // Horizontal distribution for nodes at same level with wider spacing
+    let x = 500 // Increased center position
     if (totalAtLevel > 1) {
-      const spacing = Math.min(300, 800 / totalAtLevel) // Increased spacing
-      x = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 400
+      const spacing = Math.max(400, 1000 / totalAtLevel) // Much wider spacing
+      x = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 500
     }
 
     return {
@@ -464,12 +464,17 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
     const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
 
+    // Determine if this edge needs special routing (cycle edges)
+    const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
+    const targetNode = blueprint.nodes.find(n => n.ref === edge.to)
+    const isCycleEdge = sourceNode && targetNode && (targetNode.type === 'llm' || targetNode.type === 'agent') && (sourceNode.type === 'tool' || sourceNode.type === 'code')
+
     return {
       id: edge.ref,
       source: edge.from,
       target: edge.to,
-      sourceHandle: isConditionalEdge ? edge.ref : undefined, // Use edge ref as handle ID for conditional branches
-      type: 'default', // Default curved edges
+      sourceHandle: isConditionalEdge ? edge.ref : undefined,
+      type: 'step', // Step edges naturally route around obstacles
       animated: false,
       style: {
         stroke: '#64748b',
@@ -497,6 +502,15 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
         rx: 4,
         ry: 4,
       },
+      // For cycle edges, add special routing to go around nodes
+      pathOptions: isCycleEdge
+        ? {
+            borderRadius: 15,
+            offset: 50, // Large offset to route around other nodes
+          }
+        : {
+            borderRadius: 10,
+          },
     }
   })
 

@@ -70,7 +70,7 @@
       "outputs": []
     },
     "@starships/client#lint": {
-      "dependsOn": ["@starships/protocol#build"],
+      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -105,7 +105,7 @@
       "outputs": []
     },
     "@starships/client#type-check": {
-      "dependsOn": ["@starships/protocol#build"],
+      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },

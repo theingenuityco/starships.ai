@@ -26,7 +26,7 @@ export class MessageService {
    * Create a new message with streaming support
    */
   async createMessage(request: Message & { conversationId: string }): Promise<MessageModel> {
-    // Create message with all available properties including tool_calls and tool_call_id
+    // Create message with all available properties including tool_calls, tool_call_id, and usage
     const message = await this.messageRepository.create({
       role: request.role,
       content: request.content,
@@ -35,6 +35,7 @@ export class MessageService {
       ...(request.reasoning && { reasoning: request.reasoning }),
       ...(request.tool_calls && { tool_calls: request.tool_calls }),
       ...(request.tool_call_id && { tool_call_id: request.tool_call_id }),
+      ...(request.usage && { usage: request.usage }),
     });
 
     return message;

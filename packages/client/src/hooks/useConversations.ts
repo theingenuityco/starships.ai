@@ -260,6 +260,7 @@ type StreamedChunk =
   | { type: 'replace_tool_calls'; value: any[] }
   | { type: 'replace_content'; value: string }
   | { type: 'replace_reasoning'; value: string }
+  | { type: 'replace_usage'; value: any }
   | { type: 'update_last_assistant'; fields: Partial<ClientMessage> }
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
   | { type: 'complete' }
@@ -357,6 +358,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             const replaceToolCallsRe = /^\/messages\/(?:-1|\d+)\/tool_calls$/i
             const replaceContentRe = /^\/messages\/(?:-1|\d+)\/content$/i
             const replaceReasoningRe = /^\/messages\/(?:-1|\d+)\/reasoning$/i
+            const replaceUsageRe = /^\/messages\/(?:-1|\d+)\/usage$/i
             const replaceIdRe = /^\/messages\/(?:-1|\d+)\/id$/i
             const replaceUpdatedAtRe = /^\/messages\/(?:-1|\d+)\/updatedAt$/i
             const replaceStreamingRe = /^\/messages\/(?:-1|\d+)\/streaming$/i
@@ -409,6 +411,13 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             }
             if (op === 'replace' && replaceReasoningRe.test(path)) {
               push({ type: 'replace_reasoning', value: typeof raw.value === 'string' ? raw.value : '' })
+              if (seenComplete) schedulePostCompleteEnd()
+              break
+            }
+            // Replace usage (provider-reported tokens/cost/model)
+            if (op === 'replace' && replaceUsageRe.test(path)) {
+              const value = raw.value
+              push({ type: 'replace_usage', value })
               if (seenComplete) schedulePostCompleteEnd()
               break
             }
@@ -603,6 +612,16 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'assistant') {
           messages[i] = { ...(messages[i] as any), ...(chunk.fields as any) }
+          break
+        }
+      }
+      return messages
+    }
+    case 'replace_usage': {
+      const messages = clone(acc)
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i].role === 'assistant') {
+          ;(messages[i] as any).usage = chunk.value
           break
         }
       }

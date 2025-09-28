@@ -442,6 +442,7 @@ const MemoizedMessageBubble = memo(
                 toolCalls={(message as any).tool_calls}
                 toolResults={(message as any).toolResults}
                 messageType={message.messageType}
+                usage={(message as any).usage}
               />
             </div>
           </div>

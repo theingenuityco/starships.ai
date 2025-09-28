@@ -67,6 +67,18 @@ export class MessageEntity implements MessageModel {
   @IsString()
   tool_call_id?: string;
 
+  // Optional per-request usage/cost metadata (provider-reported); persisted as JSON
+  @Expose()
+  @IsOptional()
+  @Transformers.JsonTransform()
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    costUSD?: number;
+    model?: string;
+  };
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution

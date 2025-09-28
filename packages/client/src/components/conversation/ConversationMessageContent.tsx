@@ -36,6 +36,8 @@ interface MessageContentProps {
   toolCalls?: NonNullable<MessageModel['tool_calls']>
   toolResults?: any[]
   messageType?: MessageModel['messageType']
+  // Optional usage/cost metadata for assistant messages
+  usage?: MessageModel['usage']
 }
 
 export function ConversationMessageContent({
@@ -53,6 +55,7 @@ export function ConversationMessageContent({
   toolCalls,
   toolResults = [],
   messageType,
+  usage,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
@@ -535,6 +538,33 @@ export function ConversationMessageContent({
             <code>{JSON.stringify(parsedJson, null, 2)}</code>
           </pre>
         </Card>
+      )}
+
+      {/* Inline usage/cost metadata for assistant messages */}
+      {messageType !== 'tool_result' && usage && (
+        <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
+          {typeof usage.model === 'string' && usage.model && <span className="font-mono">Model: {usage.model}</span>}
+          <span>
+            In: <span className="text-foreground">{Number(usage.promptTokens ?? 0).toLocaleString()}</span>
+          </span>
+          <span>
+            Out: <span className="text-foreground">{Number(usage.completionTokens ?? 0).toLocaleString()}</span>
+          </span>
+          <span>
+            Total: <span className="text-foreground">{Number(usage.totalTokens ?? (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)).toLocaleString()}</span>
+          </span>
+          {typeof usage.costUSD === 'number' && (
+            <span>
+              Cost:{' '}
+              <span className="text-foreground">
+                {`$${Number(usage.costUSD).toLocaleString(undefined, {
+                  minimumFractionDigits: 6,
+                  maximumFractionDigits: 6,
+                })}`}
+              </span>
+            </span>
+          )}
+        </div>
       )}
 
       {/* Copy button for entire message */}

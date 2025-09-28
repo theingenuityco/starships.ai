@@ -680,6 +680,34 @@ export class ConversationService {
           break;
         }
 
+        // Extract provider-reported usage (from LLMEvent.data.usage)
+        const llmUsage = (event as LLMEvent).data?.usage;
+
+        // Build a strongly-typed usage payload with required numeric fields
+        // Defaults ensure compatibility with MessageUsage (promptTokens/completionTokens/totalTokens are required)
+        const usagePayload = llmUsage
+          ? {
+              promptTokens: typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0,
+              completionTokens: typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0,
+              totalTokens:
+                typeof llmUsage.total_tokens === 'number'
+                  ? llmUsage.total_tokens
+                  : (typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0) +
+                    (typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0),
+              ...(typeof llmUsage.costUSD === 'number' ? { costUSD: llmUsage.costUSD } : {}),
+              ...(typeof llmUsage.model === 'string' ? { model: llmUsage.model } : {}),
+            }
+          : undefined;
+
+        // Stream usage as a replace on the current assistant placeholder before final persistence
+        if (usagePayload && this.streamingService && this.streamingService.isActive(conversationId)) {
+          await this.streamingService.broadcastDelta(conversationId, {
+            op: 'replace',
+            path: '/messages/-1/usage',
+            value: usagePayload,
+          });
+        }
+
         const finalContent = this.streamingContent.get(conversationId) || '';
         const finalReasoning = this.streamingReasoning.get(conversationId) || '';
         const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
@@ -719,6 +747,7 @@ export class ConversationService {
                     },
                   })),
                 }),
+                ...(usagePayload ? { usage: usagePayload } : {}),
               });
 
               await this.streamingService.broadcastDelta(conversationId, {

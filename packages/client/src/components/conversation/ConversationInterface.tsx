@@ -10,6 +10,7 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 
 interface ConversationInterfaceProps {
   starshipId?: string
@@ -184,9 +185,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     <div className="relative flex flex-col h-screen bg-background">
       {/* Messages Area or Welcome Screen */}
       {showMessagesArea ? (
-        <div className="flex-1 min-h-0">
-          <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
-        </div>
+        <>
+          <ConversationContextBar messages={liveMessages} />
+          <div className="flex-1 min-h-0">
+            <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
+          </div>
+        </>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-32">
           {/* Welcome Section */}

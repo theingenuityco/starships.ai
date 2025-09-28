@@ -245,25 +245,25 @@ function BlueprintFlow({ blueprint }: { blueprint: Blueprint }) {
   const { nodes, edges } = useMemo(() => convertBlueprintToFlow(blueprint), [blueprint])
 
   return (
-    <div className="h-[300px] w-full border border-muted-foreground/20 rounded-lg overflow-hidden bg-background">
+    <div className="h-full w-full border border-muted-foreground/20 rounded-lg overflow-hidden bg-background">
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
         fitViewOptions={{
-          padding: 0.2,
-          minZoom: 0.5,
-          maxZoom: 1.5,
+          padding: 0.1,
+          minZoom: 0.3,
+          maxZoom: 2.0,
         }}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
-        zoomOnScroll={false}
-        zoomOnPinch={false}
-        panOnScroll={false}
-        panOnDrag={false}
-        zoomOnDoubleClick={false}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        panOnScroll={true}
+        panOnDrag={true}
+        zoomOnDoubleClick={true}
         preventScrolling={false}
         proOptions={{ hideAttribution: true }}
       >

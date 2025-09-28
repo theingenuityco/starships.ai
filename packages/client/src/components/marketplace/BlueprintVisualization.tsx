@@ -178,61 +178,82 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] }> = ({ data }
   )
 }
 
-// Convert blueprint to React Flow format with hierarchical layout
+// Convert blueprint to React Flow format with improved hierarchical layout
 const convertBlueprintToFlow = (blueprint: Blueprint) => {
   const nodes: ReactFlowNode[] = []
   const edges: Edge[] = []
 
-  // Build adjacency map for layout calculation
-  const adjacencyMap = new Map<string, string[]>()
+  if (!blueprint.nodes || blueprint.nodes.length === 0) {
+    return { nodes, edges }
+  }
+
+  // Build adjacency maps
+  const outgoingEdges = new Map<string, string[]>()
   const incomingEdges = new Map<string, string[]>()
+  const incomingCount = new Map<string, number>()
 
-  blueprint.edges.forEach((edge: BlueprintEdge) => {
-    if (!adjacencyMap.has(edge.from)) {
-      adjacencyMap.set(edge.from, [])
-    }
-    adjacencyMap.get(edge.from)!.push(edge.to)
-
-    if (!incomingEdges.has(edge.to)) {
-      incomingEdges.set(edge.to, [])
-    }
-    incomingEdges.get(edge.to)!.push(edge.from)
+  // Initialize all nodes
+  blueprint.nodes.forEach(node => {
+    outgoingEdges.set(node.ref, [])
+    incomingEdges.set(node.ref, [])
+    incomingCount.set(node.ref, 0)
   })
 
-  // Find start nodes (nodes with no incoming edges)
-  const startNodes = blueprint.nodes.filter(node => !incomingEdges.has(node.ref))
+  // Build edge maps
+  blueprint.edges.forEach((edge: BlueprintEdge) => {
+    if (outgoingEdges.has(edge.from) && incomingEdges.has(edge.to)) {
+      outgoingEdges.get(edge.from)!.push(edge.to)
+      incomingEdges.get(edge.to)!.push(edge.from)
+      incomingCount.set(edge.to, (incomingCount.get(edge.to) || 0) + 1)
+    }
+  })
 
-  // Calculate node levels using BFS-like approach
+  // Calculate node levels using corrected topological sort
   const nodeLevels = new Map<string, number>()
-  const visited = new Set<string>()
+  const processedCount = new Map<string, number>()
 
-  const calculateLevels = (nodeRefs: string[], level: number) => {
-    const nextLevel: string[] = []
+  // Initialize processed count for all nodes
+  blueprint.nodes.forEach(node => {
+    processedCount.set(node.ref, 0)
+  })
 
-    nodeRefs.forEach(nodeRef => {
-      if (!visited.has(nodeRef)) {
-        visited.add(nodeRef)
-        nodeLevels.set(nodeRef, level)
+  // Find and process start nodes (no incoming edges)
+  const queue: string[] = []
+  blueprint.nodes.forEach(node => {
+    if ((incomingCount.get(node.ref) || 0) === 0) {
+      queue.push(node.ref)
+      nodeLevels.set(node.ref, 0)
+    }
+  })
 
-        const children = adjacencyMap.get(nodeRef) || []
-        nextLevel.push(...children)
+  // Process nodes in proper topological order
+  while (queue.length > 0) {
+    const currentNodeRef = queue.shift()!
+    const currentLevel = nodeLevels.get(currentNodeRef) || 0
+
+    // Process all children of current node
+    const children = outgoingEdges.get(currentNodeRef) || []
+    children.forEach(childRef => {
+      // Increment processed count for this child
+      const currentProcessedCount = processedCount.get(childRef) || 0
+      processedCount.set(childRef, currentProcessedCount + 1)
+
+      // Update child's level to be at least currentLevel + 1
+      const childCurrentLevel = nodeLevels.get(childRef) || 0
+      const newChildLevel = Math.max(childCurrentLevel, currentLevel + 1)
+      nodeLevels.set(childRef, newChildLevel)
+
+      // If all dependencies of this child have been processed, add to queue
+      const childIncomingCount = incomingCount.get(childRef) || 0
+      const childProcessedCount = processedCount.get(childRef) || 0
+
+      if (childProcessedCount === childIncomingCount) {
+        queue.push(childRef)
       }
     })
-
-    if (nextLevel.length > 0) {
-      calculateLevels(nextLevel, level + 1)
-    }
   }
 
-  // Start level calculation from start nodes
-  if (startNodes.length > 0) {
-    calculateLevels(
-      startNodes.map(n => n.ref),
-      0
-    )
-  }
-
-  // Handle any remaining unvisited nodes (isolated nodes)
+  // Handle any remaining unprocessed nodes (isolated or circular)
   blueprint.nodes.forEach(node => {
     if (!nodeLevels.has(node.ref)) {
       nodeLevels.set(node.ref, 0)
@@ -249,24 +270,28 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     nodesByLevel.get(level)!.push(node)
   })
 
-  // Create nodes with horizontal positioning (n8n style)
+  // Create nodes with improved horizontal positioning
   blueprint.nodes.forEach((node: BlueprintNode) => {
     const level = nodeLevels.get(node.ref) || 0
     const nodesAtLevel = nodesByLevel.get(level) || []
     const indexAtLevel = nodesAtLevel.indexOf(node)
     const totalAtLevel = nodesAtLevel.length
 
-    // Calculate horizontal position (left to right flow)
-    const levelHeight = Math.max(totalAtLevel * 180, 200) // Minimum height per level
-    const nodeSpacing = levelHeight / Math.max(totalAtLevel, 1)
-    const startY = -levelHeight / 2 + nodeSpacing / 2
+    // Better vertical distribution
+    let yPosition = 0
+    if (totalAtLevel === 1) {
+      yPosition = 0 // Center single nodes
+    } else {
+      const spacing = Math.min(120, 400 / totalAtLevel) // Adaptive spacing
+      yPosition = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing
+    }
 
     nodes.push({
       id: node.ref,
       type: 'custom',
       position: {
-        x: level * 300 + 50, // Horizontal spacing between levels
-        y: startY + indexAtLevel * nodeSpacing,
+        x: level * 280 + 50, // Slightly tighter horizontal spacing
+        y: yPosition,
       },
       data: {
         label: node.name,

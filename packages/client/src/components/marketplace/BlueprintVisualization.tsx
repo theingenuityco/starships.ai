@@ -143,58 +143,130 @@ const getNodeColors = (nodeType: string) => {
   return colorSchemes[nodeType as keyof typeof colorSchemes] || colorSchemes.default
 }
 
-// Custom node component
+// Custom node component with n8n-style design
 const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] }> = ({ data }) => {
   const colors = getNodeColors(data.type)
 
   return (
     <>
       {/* Input handle - all nodes except start */}
-      {data.type !== 'start' && <Handle type="target" position={Position.Top} className="!w-3 !h-3 !border-2 !border-background" style={{ background: colors.handle }} />}
+      {data.type !== 'start' && <Handle type="target" position={Position.Left} className="!w-2 !h-2 !border-0 !bg-gray-400 hover:!bg-gray-600 !rounded-full" />}
 
       <div
         className={`
-        ${colors.bg} ${colors.border} ${colors.text}
-        border-2 rounded-lg p-3 min-w-[200px] shadow-sm
-        transition-all duration-200 hover:shadow-md
+        relative flex items-center gap-3 px-4 py-2 min-w-[160px] max-w-[200px]
+        bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700
+        rounded-lg shadow-sm hover:shadow-md transition-all duration-200
+        text-gray-900 dark:text-gray-100
       `}
       >
-        {/* Header with icon and title */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="flex-shrink-0">{data.icon}</div>
-          <div className="font-medium text-sm leading-tight">{data.label}</div>
+        {/* Circular icon container */}
+        <div className="flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: colors.handle + '20', color: colors.handle }}>
+          <div className="w-4 h-4">{data.icon}</div>
         </div>
 
-        {/* Description if present */}
-        {data.description && <div className="text-xs opacity-75 leading-relaxed">{data.description}</div>}
-
-        {/* Node type badge */}
-        <div className="mt-2">
-          <span className="px-2 py-1 bg-current/10 rounded text-xs font-medium capitalize">{data.type.replace('_', ' ')}</span>
+        {/* Node content */}
+        <div className="flex-1 min-w-0">
+          <div className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{data.label}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{data.type.replace('_', ' ')}</div>
         </div>
       </div>
 
       {/* Output handle - all nodes except end */}
-      {data.type !== 'end' && <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !border-2 !border-background" style={{ background: colors.handle }} />}
+      {data.type !== 'end' && <Handle type="source" position={Position.Right} className="!w-2 !h-2 !border-0 !bg-gray-400 hover:!bg-gray-600 !rounded-full" />}
     </>
   )
 }
 
-// Convert blueprint to React Flow format
+// Convert blueprint to React Flow format with hierarchical layout
 const convertBlueprintToFlow = (blueprint: Blueprint) => {
   const nodes: ReactFlowNode[] = []
   const edges: Edge[] = []
 
-  // Create nodes in a simple vertical layout
-  blueprint.nodes.forEach((node: BlueprintNode, index: number) => {
-    const colors = getNodeColors(node.type)
+  // Build adjacency map for layout calculation
+  const adjacencyMap = new Map<string, string[]>()
+  const incomingEdges = new Map<string, string[]>()
+
+  blueprint.edges.forEach((edge: BlueprintEdge) => {
+    if (!adjacencyMap.has(edge.from)) {
+      adjacencyMap.set(edge.from, [])
+    }
+    adjacencyMap.get(edge.from)!.push(edge.to)
+
+    if (!incomingEdges.has(edge.to)) {
+      incomingEdges.set(edge.to, [])
+    }
+    incomingEdges.get(edge.to)!.push(edge.from)
+  })
+
+  // Find start nodes (nodes with no incoming edges)
+  const startNodes = blueprint.nodes.filter(node => !incomingEdges.has(node.ref))
+
+  // Calculate node levels using BFS-like approach
+  const nodeLevels = new Map<string, number>()
+  const visited = new Set<string>()
+
+  const calculateLevels = (nodeRefs: string[], level: number) => {
+    const nextLevel: string[] = []
+
+    nodeRefs.forEach(nodeRef => {
+      if (!visited.has(nodeRef)) {
+        visited.add(nodeRef)
+        nodeLevels.set(nodeRef, level)
+
+        const children = adjacencyMap.get(nodeRef) || []
+        nextLevel.push(...children)
+      }
+    })
+
+    if (nextLevel.length > 0) {
+      calculateLevels(nextLevel, level + 1)
+    }
+  }
+
+  // Start level calculation from start nodes
+  if (startNodes.length > 0) {
+    calculateLevels(
+      startNodes.map(n => n.ref),
+      0
+    )
+  }
+
+  // Handle any remaining unvisited nodes (isolated nodes)
+  blueprint.nodes.forEach(node => {
+    if (!nodeLevels.has(node.ref)) {
+      nodeLevels.set(node.ref, 0)
+    }
+  })
+
+  // Group nodes by level for positioning
+  const nodesByLevel = new Map<number, BlueprintNode[]>()
+  blueprint.nodes.forEach(node => {
+    const level = nodeLevels.get(node.ref) || 0
+    if (!nodesByLevel.has(level)) {
+      nodesByLevel.set(level, [])
+    }
+    nodesByLevel.get(level)!.push(node)
+  })
+
+  // Create nodes with horizontal positioning (n8n style)
+  blueprint.nodes.forEach((node: BlueprintNode) => {
+    const level = nodeLevels.get(node.ref) || 0
+    const nodesAtLevel = nodesByLevel.get(level) || []
+    const indexAtLevel = nodesAtLevel.indexOf(node)
+    const totalAtLevel = nodesAtLevel.length
+
+    // Calculate horizontal position (left to right flow)
+    const levelHeight = Math.max(totalAtLevel * 180, 200) // Minimum height per level
+    const nodeSpacing = levelHeight / Math.max(totalAtLevel, 1)
+    const startY = -levelHeight / 2 + nodeSpacing / 2
 
     nodes.push({
       id: node.ref,
       type: 'custom',
       position: {
-        x: 50 + (index % 2) * 250, // Simple 2-column layout
-        y: 50 + Math.floor(index / 2) * 150,
+        x: level * 300 + 50, // Horizontal spacing between levels
+        y: startY + indexAtLevel * nodeSpacing,
       },
       data: {
         label: node.name,
@@ -209,27 +281,34 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     })
   })
 
-  // Create edges
+  // Create edges with n8n-style appearance
   blueprint.edges.forEach((edge: BlueprintEdge) => {
-    const sourceColors = getNodeColors(blueprint.nodes.find((n: BlueprintNode) => n.ref === edge.from)?.type || 'default')
-
     edges.push({
       id: edge.ref,
       source: edge.from,
       target: edge.to,
       type: 'smoothstep',
-      animated: true,
+      animated: false,
       style: {
-        stroke: sourceColors.handle,
-        strokeWidth: 2,
+        stroke: '#9ca3af', // Gray-400 for subtle connections
+        strokeWidth: 1.5,
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: sourceColors.handle,
-        width: 16,
-        height: 16,
+        color: '#9ca3af',
+        width: 12,
+        height: 12,
       },
       label: edge.label,
+      labelStyle: {
+        fontSize: '11px',
+        fontWeight: 500,
+        fill: '#6b7280',
+        background: 'transparent',
+      },
+      labelBgStyle: {
+        fill: 'transparent',
+      },
     })
   })
 

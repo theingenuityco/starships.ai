@@ -16,6 +16,7 @@ interface ReactFlowNode extends Node {
     type: string
     description?: string
     icon: React.ReactNode
+    outgoingEdges?: BlueprintEdge[]
   }
 }
 
@@ -143,9 +144,90 @@ const getNodeColors = (nodeType: string) => {
   return colorSchemes[nodeType as keyof typeof colorSchemes] || colorSchemes.default
 }
 
-// Custom node component with professional design
-const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] }> = ({ data }) => {
+// Custom conditional node component with horizontal sections for each output
+const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[] } }> = ({ data }) => {
   const colors = getNodeColors(data.type)
+  const edges = data.outgoingEdges || []
+
+  return (
+    <>
+      {/* Input handle */}
+      <Handle type="target" position={Position.Top} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ top: -6 }} />
+
+      <div className="relative">
+        {/* Main node body */}
+        <div
+          className={`
+            relative flex items-center gap-3 px-4 py-3 min-w-[180px] max-w-[220px]
+            bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600
+            rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
+            text-gray-900 dark:text-gray-100 cursor-pointer hover:border-gray-300
+          `}
+        >
+          {/* Circular icon container */}
+          <div
+            className="flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 shadow-sm"
+            style={{
+              backgroundColor: colors.handle + '15',
+              color: colors.handle,
+              border: `2px solid ${colors.handle}30`,
+            }}
+          >
+            <div className="w-5 h-5">{data.icon}</div>
+          </div>
+
+          {/* Node content */}
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate leading-tight">{data.label}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>
+          </div>
+        </div>
+
+        {/* Horizontal conditional sections at the bottom */}
+        {edges.length > 1 && (
+          <div className="flex mt-1">
+            {edges.map((edge, index) => (
+              <div
+                key={edge.ref}
+                className="relative bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-b-md px-2 py-1 text-xs font-medium text-gray-600 dark:text-gray-300 mr-1 last:mr-0"
+                style={{ minWidth: '60px' }}
+              >
+                <div className="truncate text-center">{edge.label || `Branch ${index + 1}`}</div>
+                {/* Individual output handle for this branch */}
+                <Handle
+                  type="source"
+                  position={Position.Bottom}
+                  id={edge.ref}
+                  className="!w-2.5 !h-2.5 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm"
+                  style={{
+                    bottom: -5,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    position: 'absolute',
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Single output handle for nodes with only one output */}
+        {edges.length <= 1 && (
+          <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !border-2 !border-white !bg-gray-500 hover:!bg-gray-700 !rounded-full !shadow-sm" style={{ bottom: -6 }} />
+        )}
+      </div>
+    </>
+  )
+}
+
+// Custom node component with professional design
+const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEdges?: BlueprintEdge[] } }> = ({ data }) => {
+  const colors = getNodeColors(data.type)
+
+  // Use conditional node for nodes with multiple outputs
+  if (data.type === 'conditional' && data.outgoingEdges && data.outgoingEdges.length > 1) {
+    return <CustomConditionalNode data={data} />
+  }
 
   return (
     <>
@@ -191,42 +273,91 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] }> = ({ data }
 
 // Create execution-order based layout (vertical workflow)
 const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprint: Blueprint) => {
-  // Find start node
+  // Find start and end nodes
   const startNode = blueprint.nodes.find(node => node.type === 'start')
+  const endNodes = blueprint.nodes.filter(node => node.type === 'end')
+
   if (!startNode) {
     throw new Error('No start node found')
   }
 
   // Build edge maps for navigation
   const edgeMap = new Map<string, BlueprintEdge[]>()
+  const incomingEdgeMap = new Map<string, BlueprintEdge[]>()
+
   blueprint.edges.forEach(edge => {
+    // Outgoing edges
     if (!edgeMap.has(edge.from)) {
       edgeMap.set(edge.from, [])
     }
     edgeMap.get(edge.from)!.push(edge)
+
+    // Incoming edges
+    if (!incomingEdgeMap.has(edge.to)) {
+      incomingEdgeMap.set(edge.to, [])
+    }
+    incomingEdgeMap.get(edge.to)!.push(edge)
   })
 
-  // Calculate execution levels following the actual execution flow
+  // Calculate execution levels with proper cycle and end node handling
   const executionLevels = new Map<string, number>()
-  const visited = new Set<string>()
+  const processing = new Set<string>()
+  const processed = new Set<string>()
 
-  // Traverse execution path starting from start node
-  const calculateExecutionLevel = (nodeRef: string, level: number = 0) => {
-    if (visited.has(nodeRef)) {
-      // Handle cycles - don't increase level for revisited nodes
-      return
+  // Modified DFS that handles cycles and ensures end nodes are positioned last
+  const calculateExecutionLevel = (nodeRef: string, currentLevel: number = 0): number => {
+    // If already processed, return the stored level
+    if (processed.has(nodeRef)) {
+      return executionLevels.get(nodeRef) ?? currentLevel
     }
 
-    visited.add(nodeRef)
-    executionLevels.set(nodeRef, level)
+    // If currently processing (cycle detected), don't recurse further
+    if (processing.has(nodeRef)) {
+      return currentLevel
+    }
 
+    processing.add(nodeRef)
+
+    // Set initial level
+    let maxLevel = currentLevel
+    executionLevels.set(nodeRef, maxLevel)
+
+    // Process all outgoing edges
     const outgoingEdges = edgeMap.get(nodeRef) || []
-    outgoingEdges.forEach(edge => {
-      calculateExecutionLevel(edge.to, level + 1)
-    })
+    for (const edge of outgoingEdges) {
+      const childLevel = calculateExecutionLevel(edge.to, maxLevel + 1)
+      // Update our level if child requires higher level
+      if (childLevel > maxLevel) {
+        maxLevel = Math.max(maxLevel, childLevel - 1)
+      }
+    }
+
+    // Update the level if it changed
+    if (maxLevel > currentLevel) {
+      executionLevels.set(nodeRef, maxLevel)
+    }
+
+    processing.delete(nodeRef)
+    processed.add(nodeRef)
+
+    return executionLevels.get(nodeRef) ?? currentLevel
   }
 
-  calculateExecutionLevel(startNode.ref)
+  // Start traversal from start node
+  calculateExecutionLevel(startNode.ref, 0)
+
+  // Ensure all nodes are processed (handle disconnected components)
+  blueprint.nodes.forEach(node => {
+    if (!processed.has(node.ref)) {
+      calculateExecutionLevel(node.ref, 0)
+    }
+  })
+
+  // Special handling for end nodes - ensure they're at the bottom
+  const maxLevel = Math.max(...Array.from(executionLevels.values()))
+  endNodes.forEach(endNode => {
+    executionLevels.set(endNode.ref, maxLevel + 1)
+  })
 
   // Group nodes by execution level
   const nodesByLevel = new Map<number, BlueprintNode[]>()
@@ -238,21 +369,52 @@ const getExecutionOrderLayout = (nodes: ReactFlowNode[], edges: Edge[], blueprin
     nodesByLevel.get(level)!.push(node)
   })
 
-  // Position nodes based on execution levels (vertical layout)
+  // Position nodes to minimize edge crossings
   const layoutedNodes = nodes.map(node => {
     const level = executionLevels.get(node.id) ?? 0
     const nodesAtLevel = nodesByLevel.get(level) || []
-    const indexAtLevel = nodesAtLevel.findIndex(n => n.ref === node.id)
-    const totalAtLevel = nodesAtLevel.length
 
-    // Vertical positioning
-    const y = level * 150 + 50 // Vertical spacing between execution levels
+    // Sort nodes at same level to minimize crossings
+    const sortedNodes = [...nodesAtLevel].sort((a, b) => {
+      // Prioritize nodes with incoming edges from left side
+      const aIncoming = incomingEdgeMap.get(a.ref) || []
+      const bIncoming = incomingEdgeMap.get(b.ref) || []
+
+      if (aIncoming.length !== bIncoming.length) {
+        return aIncoming.length - bIncoming.length
+      }
+
+      // Secondary sort by node type priority
+      const typePriority = {
+        start: 0,
+        llm: 1,
+        agent: 1,
+        conditional: 2,
+        code: 3,
+        tool: 3,
+        http_request: 3,
+        transform: 4,
+        mutate: 4,
+        end: 5,
+      }
+
+      const aPriority = typePriority[a.type as keyof typeof typePriority] ?? 6
+      const bPriority = typePriority[b.type as keyof typeof typePriority] ?? 6
+
+      return aPriority - bPriority
+    })
+
+    const indexAtLevel = sortedNodes.findIndex(n => n.ref === node.id)
+    const totalAtLevel = sortedNodes.length
+
+    // Vertical positioning with more spacing
+    const y = level * 180 + 60
 
     // Horizontal distribution for nodes at same level
-    let x = 250 // Default center position
+    let x = 400 // Increased center position
     if (totalAtLevel > 1) {
-      const spacing = Math.min(200, 600 / totalAtLevel)
-      x = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 250
+      const spacing = Math.min(300, 800 / totalAtLevel) // Increased spacing
+      x = (indexAtLevel - (totalAtLevel - 1) / 2) * spacing + 400
     }
 
     return {
@@ -270,6 +432,15 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     return { nodes: [], edges: [] }
   }
 
+  // Build outgoing edges map for conditional nodes
+  const outgoingEdgesMap = new Map<string, BlueprintEdge[]>()
+  blueprint.edges.forEach(edge => {
+    if (!outgoingEdgesMap.has(edge.from)) {
+      outgoingEdgesMap.set(edge.from, [])
+    }
+    outgoingEdgesMap.get(edge.from)!.push(edge)
+  })
+
   // Create initial nodes without positioning
   const initialNodes: ReactFlowNode[] = blueprint.nodes.map((node: BlueprintNode) => ({
     id: node.ref,
@@ -280,6 +451,7 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
       type: node.type,
       description: node.description,
       icon: getNodeIcon(node.type),
+      outgoingEdges: outgoingEdgesMap.get(node.ref) || [],
     },
     style: {
       background: 'transparent',
@@ -287,40 +459,46 @@ const convertBlueprintToFlow = (blueprint: Blueprint) => {
     },
   }))
 
-  // Create edges with improved styling for vertical layout
-  const initialEdges: Edge[] = blueprint.edges.map((edge: BlueprintEdge) => ({
-    id: edge.ref,
-    source: edge.from,
-    target: edge.to,
-    type: 'smoothstep',
-    animated: false,
-    style: {
-      stroke: '#9ca3af',
-      strokeWidth: 2,
-    },
-    markerEnd: {
-      type: MarkerType.ArrowClosed,
-      color: '#9ca3af',
-      width: 16,
-      height: 16,
-    },
-    label: edge.label,
-    labelStyle: {
-      fontSize: '12px',
-      fontWeight: 500,
-      fill: '#6b7280',
-      background: 'rgba(255, 255, 255, 0.9)',
-      padding: '4px 8px',
-      borderRadius: '4px',
-      border: '1px solid #e5e7eb',
-    },
-    labelBgStyle: {
-      fill: 'rgba(255, 255, 255, 0.9)',
-      fillOpacity: 0.95,
-      rx: 4,
-      ry: 4,
-    },
-  }))
+  // Create edges with curved styling for clean appearance
+  const initialEdges: Edge[] = blueprint.edges.map((edge: BlueprintEdge) => {
+    const sourceNode = blueprint.nodes.find(n => n.ref === edge.from)
+    const isConditionalEdge = sourceNode?.type === 'conditional' && (outgoingEdgesMap.get(edge.from)?.length || 0) > 1
+
+    return {
+      id: edge.ref,
+      source: edge.from,
+      target: edge.to,
+      sourceHandle: isConditionalEdge ? edge.ref : undefined, // Use edge ref as handle ID for conditional branches
+      type: 'default', // Default curved edges
+      animated: false,
+      style: {
+        stroke: '#64748b',
+        strokeWidth: 2,
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color: '#64748b',
+        width: 16,
+        height: 16,
+      },
+      label: edge.label,
+      labelStyle: {
+        fontSize: '11px',
+        fontWeight: 500,
+        fill: '#475569',
+        background: 'rgba(255, 255, 255, 0.95)',
+        padding: '3px 6px',
+        borderRadius: '4px',
+        border: '1px solid #cbd5e1',
+      },
+      labelBgStyle: {
+        fill: 'rgba(255, 255, 255, 0.95)',
+        fillOpacity: 0.98,
+        rx: 4,
+        ry: 4,
+      },
+    }
+  })
 
   // Apply execution-order layout
   return getExecutionOrderLayout(initialNodes, initialEdges, blueprint)

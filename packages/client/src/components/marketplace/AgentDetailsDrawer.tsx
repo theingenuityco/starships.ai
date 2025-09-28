@@ -180,41 +180,7 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                       <GitBranch className="w-5 h-5 text-primary" />
                       Blueprint Workflow
                     </h3>
-                    <div className="space-y-4">
-                      {/* Stats Summary */}
-                      <div className="grid grid-cols-3 gap-4 p-3 bg-muted/20 rounded-lg border border-muted-foreground/20">
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground">Nodes</p>
-                          <p className="text-lg font-bold text-primary">{template.blueprint.nodes?.length || 0}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground">Connections</p>
-                          <p className="text-lg font-bold text-primary">{template.blueprint.edges?.length || 0}</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-sm text-muted-foreground">Types</p>
-                          <p className="text-lg font-bold text-primary">{Array.from(new Set(template.blueprint.nodes.map(node => node.type))).length}</p>
-                        </div>
-                      </div>
-
-                      {/* Node Types */}
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Node Types</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {Array.from(new Set(template.blueprint.nodes.map(node => node.type))).map(nodeType => (
-                            <Badge key={nodeType} variant="outline" className="text-xs px-2 py-1 capitalize bg-muted/20 border-muted-foreground/30">
-                              {nodeType.replace('_', ' ')}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Workflow Visualization */}
-                      <div>
-                        <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Workflow Structure</h4>
-                        <BlueprintVisualization blueprint={template.blueprint} className="h-[400px]" />
-                      </div>
-                    </div>
+                    <BlueprintVisualization blueprint={template.blueprint} className="h-[500px]" />
                   </Card>
                 )}
 

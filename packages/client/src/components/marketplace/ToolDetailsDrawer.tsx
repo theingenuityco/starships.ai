@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { ToolTemplateModel, ToolModel } from '@starships/protocol'
+import type { ToolTemplateModel } from '@starships/protocol'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -268,7 +268,7 @@ export function ToolDetailsDrawer({ template, open, onOpenChange, onInstall }: T
                             <Key className="w-4 h-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
                             <div className="text-sm">
                               <p className="text-yellow-700 dark:text-yellow-300 font-medium">API Key Required</p>
-                              <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">You'll need to configure API credentials after installation.</p>
+                              <p className="text-yellow-600 dark:text-yellow-400 text-xs mt-1">You&apos;ll need to configure API credentials after installation.</p>
                             </div>
                           </div>
                         </div>

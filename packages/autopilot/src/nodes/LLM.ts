@@ -106,6 +106,9 @@ export class LLM extends BaseNode<LlmParams> {
         frequency_penalty: params.frequencyPenalty || 0,
         presence_penalty: params.presencePenalty || 0,
         stream: useStream,
+        // Enable OpenRouter usage accounting in the streamed payload per docs
+        // https://openrouter.ai/docs/use-cases/usage-accounting
+        usage: { include: true },
       };
 
       // Add function calling support if tools are provided
@@ -135,8 +138,7 @@ export class LLM extends BaseNode<LlmParams> {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Extract usage/cost/model metadata from OpenRouter headers (works for streaming and non-streaming)
-      const headerUsage = this.parseOpenRouterUsageHeaders(response.headers);
+      // Usage accounting enabled; rely on SSE usage payload only
 
       // If streaming is disabled (tools present), return the full JSON (includes tool_calls)
       if (!useStream) {
@@ -151,7 +153,7 @@ export class LLM extends BaseNode<LlmParams> {
         return ExecutionItemUtils.wrapSingle(result, input?.[0]);
       }
 
-      const llmResponse = await this.processStreamingResponse(reader, headerUsage);
+      const llmResponse = await this.processStreamingResponse(reader);
       console.log('<<RESPONSE<< ', JSON.stringify(llmResponse, null, 2));
       return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
@@ -162,17 +164,7 @@ export class LLM extends BaseNode<LlmParams> {
   /**
    * Process streaming response from OpenRouter
    */
-  private async processStreamingResponse(
-    reader: ReadableStreamDefaultReader<Uint8Array>,
-    headerUsage?: {
-      tokensIn?: number;
-      tokensOut?: number;
-      totalTokens?: number;
-      costUSD?: number;
-      model?: string;
-      raw?: Record<string, string>;
-    }
-  ): Promise<LLMResponse> {
+  private async processStreamingResponse(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<LLMResponse> {
     const decoder = new TextDecoder();
     let buffer = '';
     let responseMetadata = {
@@ -229,24 +221,21 @@ export class LLM extends BaseNode<LlmParams> {
 
       const eventCallback = this.getEventCallback();
       if (eventCallback) {
-        // Normalize usage from stream payload (usage) and/or OpenRouter headers (headerUsage)
-        const promptTokens =
-          (usage && typeof usage.prompt_tokens === 'number' ? usage.prompt_tokens : undefined) ??
-          (headerUsage && typeof headerUsage.tokensIn === 'number' ? headerUsage.tokensIn : undefined);
-
-        const completionTokens =
-          (usage && typeof usage.completion_tokens === 'number' ? usage.completion_tokens : undefined) ??
-          (headerUsage && typeof headerUsage.tokensOut === 'number' ? headerUsage.tokensOut : undefined);
-
+        // Normalize usage from stream payload only (usage.include=true)
+        const promptTokens = typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : undefined;
+        const completionTokens = typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : undefined;
         const totalTokens =
-          (usage && typeof usage.total_tokens === 'number' ? usage.total_tokens : undefined) ??
-          (headerUsage && typeof headerUsage.totalTokens === 'number' ? headerUsage.totalTokens : undefined) ??
-          (typeof promptTokens === 'number' && typeof completionTokens === 'number' ? promptTokens + completionTokens : undefined);
+          typeof usage?.total_tokens === 'number'
+            ? usage.total_tokens
+            : typeof promptTokens === 'number' && typeof completionTokens === 'number'
+              ? promptTokens + completionTokens
+              : undefined;
 
-        const costUSD = headerUsage && typeof headerUsage.costUSD === 'number' ? headerUsage.costUSD : undefined;
-        const usageModel =
-          (responseMetadata.model && responseMetadata.model.length > 0 ? responseMetadata.model : undefined) ??
-          (headerUsage?.model || undefined);
+        // Cost provided by OpenRouter usage payload (USD)
+        const cost = typeof (usage as any)?.cost === 'number' ? (usage as any).cost : undefined;
+
+        // Prefer model from response metadata; no header dependency
+        const usageModel = responseMetadata.model && responseMetadata.model.length > 0 ? responseMetadata.model : undefined;
 
         await eventCallback({
           type: 'content_complete',
@@ -257,7 +246,7 @@ export class LLM extends BaseNode<LlmParams> {
               ...(typeof promptTokens === 'number' ? { prompt_tokens: promptTokens } : {}),
               ...(typeof completionTokens === 'number' ? { completion_tokens: completionTokens } : {}),
               ...(typeof totalTokens === 'number' ? { total_tokens: totalTokens } : {}),
-              ...(typeof costUSD === 'number' ? { costUSD } : {}),
+              ...(typeof cost === 'number' ? { cost } : {}),
               ...(usageModel ? { model: usageModel } : {}),
             },
           },
@@ -612,47 +601,7 @@ export class LLM extends BaseNode<LlmParams> {
     }));
   }
 
-  /**
-   * Parse usage/cost/model info from OpenRouter headers.
-   * Works for streaming and non-streaming responses.
-   */
-  private parseOpenRouterUsageHeaders(headers: Headers | Record<string, string> | undefined): {
-    tokensIn?: number;
-    tokensOut?: number;
-    totalTokens?: number;
-    costUSD?: number;
-    model?: string;
-    raw?: Record<string, string>;
-  } {
-    try {
-      if (!headers) return {};
-      // Normalize headers to a case-insensitive plain object
-      const raw: Record<string, string> = {};
-      if (typeof (headers as any).forEach === 'function') {
-        (headers as Headers).forEach((value, key) => {
-          raw[key.toLowerCase()] = value;
-        });
-      } else {
-        const rec = headers as Record<string, string>;
-        for (const [k, v] of Object.entries(rec)) raw[k.toLowerCase()] = String(v);
-      }
-      const toFloat = (v?: string): number | undefined => {
-        if (typeof v !== 'string') return undefined;
-        const n = parseFloat(v);
-        return Number.isFinite(n) ? n : undefined;
-      };
-      const tokensIn = toFloat(raw['x-usage-prompt-tokens']);
-      const tokensOut = toFloat(raw['x-usage-output-tokens']);
-      const totalTokens =
-        toFloat(raw['x-usage-total-tokens']) ??
-        (typeof tokensIn === 'number' && typeof tokensOut === 'number' ? tokensIn + tokensOut : undefined);
-      const costUSD = toFloat(raw['x-request-cost']);
-      const model = raw['openrouter-model'] || undefined;
-      return { tokensIn, tokensOut, totalTokens, costUSD, model, raw };
-    } catch {
-      return {};
-    }
-  }
+  // Header parsing removed; relying solely on SSE usage payload (usage.include = true)
 
   /**
    * Validate LLM configuration

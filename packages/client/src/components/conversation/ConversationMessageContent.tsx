@@ -37,7 +37,13 @@ interface MessageContentProps {
   toolResults?: any[]
   messageType?: MessageModel['messageType']
   // Optional usage/cost metadata for assistant messages
-  usage?: MessageModel['usage']
+  usage?: {
+    promptTokens: number
+    completionTokens: number
+    totalTokens: number
+    cost: number
+    model?: string
+  }
 }
 
 export function ConversationMessageContent({
@@ -59,6 +65,13 @@ export function ConversationMessageContent({
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
+
+  // Dynamic USD formatting: show 6 decimals by default, increase precision for tiny non-zero costs
+  const formatUSD = (v: number) => {
+    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.000000'
+    if (v > 0 && v < 1e-6) return `$${v.toFixed(9)}`
+    return `$${v.toFixed(6)}`
+  }
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
@@ -543,7 +556,9 @@ export function ConversationMessageContent({
       {/* Inline usage/cost metadata for assistant messages */}
       {messageType !== 'tool_result' && usage && (
         <div className="mt-2 text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1">
-          {typeof usage.model === 'string' && usage.model && <span className="font-mono">Model: {usage.model}</span>}
+          <span>
+            Cost: <span className="text-foreground">{formatUSD(Number(usage.cost))}</span>
+          </span>
           <span>
             In: <span className="text-foreground">{Number(usage.promptTokens ?? 0).toLocaleString()}</span>
           </span>
@@ -553,17 +568,6 @@ export function ConversationMessageContent({
           <span>
             Total: <span className="text-foreground">{Number(usage.totalTokens ?? (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0)).toLocaleString()}</span>
           </span>
-          {typeof usage.costUSD === 'number' && (
-            <span>
-              Cost:{' '}
-              <span className="text-foreground">
-                {`$${Number(usage.costUSD).toLocaleString(undefined, {
-                  minimumFractionDigits: 6,
-                  maximumFractionDigits: 6,
-                })}`}
-              </span>
-            </span>
-          )}
         </div>
       )}
 

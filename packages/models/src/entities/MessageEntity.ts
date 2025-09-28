@@ -75,7 +75,8 @@ export class MessageEntity implements MessageModel {
     promptTokens: number;
     completionTokens: number;
     totalTokens: number;
-    costUSD?: number;
+    /** Provider-reported cost for this request in USD (mandatory) */
+    cost: number;
     model?: string;
   };
 

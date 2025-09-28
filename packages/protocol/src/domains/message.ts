@@ -28,8 +28,8 @@ export interface MessageUsage {
   completionTokens: number;
   /** Total tokens for the request (prompt + completion) */
   totalTokens: number;
-  /** Provider-reported cost in USD for this request (if available) */
-  costUSD?: number;
+  /** Provider-reported cost for this request in USD (mandatory) */
+  cost: number;
   /** Provider/model identifier for the request (if available) */
   model?: string;
 }

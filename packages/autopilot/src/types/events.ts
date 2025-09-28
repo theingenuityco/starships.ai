@@ -26,7 +26,7 @@ export interface LLMEvent extends BaseEvent {
       completion_tokens?: number;
       total_tokens?: number;
       /** Provider-reported request cost in USD (if available) */
-      costUSD?: number;
+      cost: number;
       /** Model identifier (if available from headers) */
       model?: string;
     };

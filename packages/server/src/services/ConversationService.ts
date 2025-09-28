@@ -694,11 +694,11 @@ export class ConversationService {
                   ? llmUsage.total_tokens
                   : (typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0) +
                     (typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0),
-              ...(typeof llmUsage.costUSD === 'number' ? { costUSD: llmUsage.costUSD } : {}),
-              ...(typeof llmUsage.model === 'string' ? { model: llmUsage.model } : {}),
+              // Cost in USD (OpenRouter usage.cost). Mandatory; default to 0 if missing.
+              cost: Number((llmUsage as any).cost) || 0,
+              ...(typeof (llmUsage as any).model === 'string' ? { model: (llmUsage as any).model } : {}),
             }
           : undefined;
-
         // Stream usage as a replace on the current assistant placeholder before final persistence
         if (usagePayload && this.streamingService && this.streamingService.isActive(conversationId)) {
           await this.streamingService.broadcastDelta(conversationId, {

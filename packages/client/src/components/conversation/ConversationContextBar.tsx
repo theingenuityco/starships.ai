@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { useMemo } from 'react'
 
 interface ConversationContextBarProps {
-  messages: ReadonlyArray<MessageModel & { usage?: { promptTokens: number; completionTokens: number; totalTokens: number; costUSD?: number; model?: string } }>
+  messages: ReadonlyArray<MessageModel>
   className?: string
   /** Default combined token budget (In+Out) to visualize progress against */
   budgetTokens?: number
@@ -23,16 +23,17 @@ export function ConversationContextBar({ messages, className, budgetTokens = 400
       const u = (m as any)?.usage
       if (!u) continue
 
-      // Required numeric fields (by protocol)
-      const p = Number(u.promptTokens) || 0
-      const c = Number(u.completionTokens) || 0
-      const t = Number(u.totalTokens) || p + c
-      const usd = Number(u.costUSD) || 0
+      const p = Number(u.promptTokens ?? 0)
+      const c = Number(u.completionTokens ?? 0)
+      const t = Number(u.totalTokens ?? p + c)
+
+      // Cost in USD (mandatory, provided by server as usage.cost)
+      const costVal = Number((u as any).cost) || 0
 
       prompt += p
       completion += c
       total += t
-      cost += usd
+      cost += Number(costVal) || 0
     }
 
     return { prompt, completion, total, cost }
@@ -42,8 +43,9 @@ export function ConversationContextBar({ messages, className, budgetTokens = 400
 
   const formatTokens = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 })
   const formatUSD6 = (v: number) => {
-    const s = v.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 })
-    return `$${s}`
+    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.000000'
+    if (v > 0 && v < 1e-6) return `$${v.toFixed(9)}`
+    return `$${v.toFixed(6)}`
   }
 
   return (

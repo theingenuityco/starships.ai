@@ -13,7 +13,8 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
-import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Sparkles, Download, CheckCircle, Brain, MessageSquare, Star, Users, Calendar, Zap, X } from 'lucide-react'
+import { BlueprintVisualization } from './BlueprintVisualization'
+import { Bot, Code, Lightbulb, BarChart2, HeartPulse, Sparkles, Download, CheckCircle, Brain, MessageSquare, Star, Users, Calendar, Zap, X, FileText, Settings, GitBranch, Copy } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { format } from 'date-fns'
@@ -151,6 +152,71 @@ export function AgentDetailsDrawer({ template, open, onOpenChange, onDeploy }: A
                     </div>
                   </div>
                 </Card>
+
+                {/* System Prompt */}
+                {template.systemPrompt && (
+                  <Card className="p-4 frosted-glass-card">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-primary" />
+                      System Prompt
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <div className="p-4 rounded-lg bg-muted/20 border border-muted-foreground/20 font-mono text-sm leading-relaxed max-h-64 overflow-y-auto custom-scrollbar">
+                          <pre className="whitespace-pre-wrap text-foreground/90">{template.systemPrompt}</pre>
+                        </div>
+                        <Button size="sm" variant="ghost" className="absolute top-2 right-2 h-8 w-8 p-0" onClick={() => navigator.clipboard?.writeText(template.systemPrompt || '')}>
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+
+                {/* Blueprint Visualization */}
+                {template.blueprint && template.blueprint.nodes && template.blueprint.nodes.length > 0 && (
+                  <Card className="p-4 frosted-glass-card">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <GitBranch className="w-5 h-5 text-primary" />
+                      Blueprint Workflow
+                    </h3>
+                    <div className="space-y-4">
+                      {/* Stats Summary */}
+                      <div className="grid grid-cols-3 gap-4 p-3 bg-muted/20 rounded-lg border border-muted-foreground/20">
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Nodes</p>
+                          <p className="text-lg font-bold text-primary">{template.blueprint.nodes?.length || 0}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Connections</p>
+                          <p className="text-lg font-bold text-primary">{template.blueprint.edges?.length || 0}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm text-muted-foreground">Types</p>
+                          <p className="text-lg font-bold text-primary">{Array.from(new Set(template.blueprint.nodes.map(node => node.type))).length}</p>
+                        </div>
+                      </div>
+
+                      {/* Node Types */}
+                      <div>
+                        <h4 className="text-sm font-semibold mb-2 text-muted-foreground">Node Types</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from(new Set(template.blueprint.nodes.map(node => node.type))).map(nodeType => (
+                            <Badge key={nodeType} variant="outline" className="text-xs px-2 py-1 capitalize bg-muted/20 border-muted-foreground/30">
+                              {nodeType.replace('_', ' ')}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Workflow Visualization */}
+                      <div>
+                        <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Workflow Structure</h4>
+                        <BlueprintVisualization blueprint={template.blueprint} className="h-[400px]" />
+                      </div>
+                    </div>
+                  </Card>
+                )}
 
                 {/* Preview Prompts */}
                 {template.previewPrompts && template.previewPrompts.length > 0 && (

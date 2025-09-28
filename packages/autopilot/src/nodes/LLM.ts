@@ -243,10 +243,11 @@ export class LLM extends BaseNode<LlmParams> {
           executionDepth,
           data: {
             usage: {
+              // 'cost' is required by LLMEvent usage type; default to 0 when not provided
+              cost: typeof cost === 'number' ? cost : 0,
               ...(typeof promptTokens === 'number' ? { prompt_tokens: promptTokens } : {}),
               ...(typeof completionTokens === 'number' ? { completion_tokens: completionTokens } : {}),
               ...(typeof totalTokens === 'number' ? { total_tokens: totalTokens } : {}),
-              ...(typeof cost === 'number' ? { cost } : {}),
               ...(usageModel ? { model: usageModel } : {}),
             },
           },

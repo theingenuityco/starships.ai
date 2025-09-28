@@ -11,7 +11,7 @@ import { Wrench, Users, Star, Sparkles, Package, Bot, BarChart2, Download, Check
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import type { FetchResponse } from '@/lib/types'
-import type { ApiResponse } from '@starships/protocol'
+import type { ApiResponse, ToolModel } from '@starships/protocol'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import type { ToolTemplateModel } from '@starships/protocol'
@@ -19,9 +19,10 @@ import type { ToolTemplateModel } from '@starships/protocol'
 interface ToolTemplateCardProps {
   template: ToolTemplateModel
   onInstall?: (template: ToolTemplateModel) => void
+  onClick?: (template: ToolTemplateModel) => void
 }
 
-export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps) {
+export function ToolTemplateCard({ template, onInstall, onClick }: ToolTemplateCardProps) {
   const [isInstalling, setIsInstalling] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
@@ -36,7 +37,7 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
     queryFn: async () => {
       if (!primaryStarship?.id) return []
       try {
-        const response: FetchResponse<ApiResponse<any[]>> = await api.get(`/api/v1/starships/${primaryStarship.id}/tools`)
+        const response: FetchResponse<ApiResponse<unknown[]>> = await api.get(`/api/v1/starships/${primaryStarship.id}/tools`)
         return response.data.data || []
       } catch (error) {
         console.warn('Failed to fetch starship tools:', error)
@@ -48,7 +49,9 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
   })
 
   // Note: We use slug/name matching since tools might not store templateSlug
-  const isAlreadyInstalled = deployedTools.some((tool: any) => tool.slug === template.slug || tool.name === template.name)
+  const isAlreadyInstalled = deployedTools.some(
+    (tool: unknown) => (tool as { slug?: string; name?: string }).slug === template.slug || (tool as { slug?: string; name?: string }).name === template.name
+  )
 
   // Installation mutation
   const createToolMutation = useCreateToolFromTemplate()
@@ -79,11 +82,16 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
     return colors[category as keyof typeof colors] || colors.general
   }
 
-  const handleInstallClick = () => {
+  const handleInstallClick = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click from triggering
     if (!primaryStarship) {
       return // No starship to install to
     }
     setShowConfirmationModal(true)
+  }
+
+  const handleCardClick = () => {
+    onClick?.(template)
   }
 
   const handleConfirmInstall = async () => {
@@ -108,7 +116,10 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl group flex flex-col hover:bg-primary/5">
+      <Card
+        className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl group flex flex-col hover:bg-primary/5"
+        onClick={handleCardClick}
+      >
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
@@ -182,7 +193,7 @@ export function ToolTemplateCard({ template, onInstall }: ToolTemplateCardProps)
         {/* Action Button */}
         <div className="mt-auto">
           {isAlreadyInstalled ? (
-            <Button size="sm" variant="outline" className="w-full transition-colors" disabled>
+            <Button size="sm" variant="outline" className="w-full transition-colors" disabled onClick={e => e.stopPropagation()}>
               <CheckCircle className="w-4 h-4 mr-2" />
               <span className="truncate">Already installed on {primaryStarship?.name || 'starship'}</span>
             </Button>

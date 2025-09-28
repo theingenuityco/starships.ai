@@ -1,6 +1,7 @@
 'use client'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
+import { AgentDetailsDrawer } from '@/components/marketplace/AgentDetailsDrawer'
 import { ToolTemplateCard } from '@/components/marketplace/ToolTemplateCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,8 @@ import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   // Fetch templates data
   const { data: agentTemplates = [], isLoading: agentTemplatesLoading } = useAgentTemplates()
@@ -49,6 +52,20 @@ export default function MarketplacePage() {
 
   const handleToolInstall = (template: ToolTemplateModel) => {
     // Handle successful installation - could show a success message
+  }
+
+  // Handle agent template click to show details
+  const handleAgentClick = (template: AgentTemplateModel) => {
+    setSelectedAgent(template)
+    setIsDrawerOpen(true)
+  }
+
+  // Handle drawer close
+  const handleDrawerClose = (open: boolean) => {
+    setIsDrawerOpen(open)
+    if (!open) {
+      setSelectedAgent(null)
+    }
   }
 
   return (
@@ -102,7 +119,7 @@ export default function MarketplacePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredAgentTemplates.map((template: AgentTemplateModel, idx: number) => (
                     <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
-                      <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} />
+                      <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                     </motion.div>
                   ))}
                 </div>
@@ -150,6 +167,9 @@ export default function MarketplacePage() {
           </div>
         </div>
       </div>
+
+      {/* Agent Details Drawer */}
+      <AgentDetailsDrawer template={selectedAgent} open={isDrawerOpen} onOpenChange={handleDrawerClose} onDeploy={handleAgentDeploy} />
     </PageLayout>
   )
 }

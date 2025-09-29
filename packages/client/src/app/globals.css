@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ReactFlow styles - Required for proper functionality */
+@import '@xyflow/react/dist/style.css';
+
 /*
  * STARSHIPS.AI THEME SYSTEM - EXPANDABLE ARCHITECTURE
  * ===================================================

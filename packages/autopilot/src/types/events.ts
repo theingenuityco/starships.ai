@@ -7,6 +7,7 @@
  */
 
 import { Execution } from './execution';
+import type { LLMUsage } from './llm';
 
 export interface BaseEvent {
   timestamp: string;
@@ -17,6 +18,13 @@ export interface LLMEvent extends BaseEvent {
   type: 'content_chunk' | 'content_complete';
   data?: {
     chunk?: Record<string, unknown>;
+    /** Model identifier (if available from headers) */
+    model?: string;
+    /**
+     * Provider-reported usage/cost metadata, emitted on content_complete.
+     * Uses OpenRouter/OpenAI-style snake_case for token fields to match upstream payloads.
+     */
+    usage?: Partial<LLMUsage>;
   };
 }
 

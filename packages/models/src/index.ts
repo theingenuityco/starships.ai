@@ -4,7 +4,7 @@ export type { Neo4jConfig } from './helpers/database';
 
 export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
 
-// Entity exports
+/* Entity exports */
 export { AgentEntity } from './entities/AgentEntity';
 export { AgentTemplateEntity } from './entities/AgentTemplateEntity';
 export { BlueprintEntity } from './entities/BlueprintEntity';
@@ -17,8 +17,9 @@ export { ToolEntity } from './entities/ToolEntity';
 export { ToolTemplateEntity } from './entities/ToolTemplateEntity';
 export { UserEntity } from './entities/UserEntity';
 export { WorkflowEntity } from './entities/WorkflowEntity';
+export { UsageEntity } from './entities/UsageEntity';
 
-// Repository exports
+/* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
 export { AgentTemplateRepository } from './repositories/AgentTemplateRepository';
 export { BlueprintRepository } from './repositories/BlueprintRepository';
@@ -34,6 +35,7 @@ export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
 export { WorkflowRepository } from './repositories/WorkflowRepository';
+export { UsageRepository } from './repositories/UsageRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

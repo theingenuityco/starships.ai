@@ -1,6 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
+import { UsageService } from '@/services/UsageService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
 import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent, LLMEvent, ToolEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
@@ -27,6 +28,7 @@ export class ConversationService {
   private messageService: MessageService;
   private streamingService: StreamingService;
   private environmentService: EnvironmentService;
+  private usageService: UsageService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
@@ -49,6 +51,7 @@ export class ConversationService {
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
     this.environmentService = new EnvironmentService();
+    this.usageService = new UsageService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
   }
@@ -678,6 +681,50 @@ export class ConversationService {
         // Guard: if there's no active stream (no accumulator), ignore completion to avoid corrupting state
         if (!this.streamingContent.has(conversationId)) {
           break;
+        }
+
+        // Extract provider-reported usage (from LLMEvent.data.usage)
+        const llmEvent = event as LLMEvent;
+        const llmUsage = llmEvent.data?.usage;
+        const model = llmEvent.data?.model;
+
+        // Build a strongly-typed usage payload with required numeric fields
+        // Defaults ensure compatibility with MessageUsage (prompt_tokens/completion_tokens/total_tokens are required)
+        const usagePayload = llmUsage
+          ? {
+              prompt_tokens: typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0,
+              completion_tokens: typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0,
+              total_tokens:
+                typeof llmUsage.total_tokens === 'number'
+                  ? llmUsage.total_tokens
+                  : (typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0) +
+                    (typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0),
+              // Cost in USD (OpenRouter usage.cost). Mandatory; default to 0 if missing.
+              cost: Number(llmUsage.cost) || 0,
+              ...(typeof model === 'string' ? { model } : {}),
+            }
+          : undefined;
+        /**
+         * Persist usage at end-of-turn (no per-token streaming). This records usage in the Usage model
+         * and links it to both Starship and Conversation.
+         */
+        if (usagePayload) {
+          try {
+            const starship = await this.getConversationStarship(conversationId);
+            if (starship) {
+              await this.usageService.createUsageForTurn({
+                starshipId: starship.id,
+                conversationId,
+                prompt_tokens: usagePayload.prompt_tokens,
+                completion_tokens: usagePayload.completion_tokens,
+                total_tokens: usagePayload.total_tokens,
+                cost: usagePayload.cost,
+                model: usagePayload.model,
+              });
+            }
+          } catch (e) {
+            console.error('[STREAMING] Failed to persist usage record:', e);
+          }
         }
 
         const finalContent = this.streamingContent.get(conversationId) || '';

@@ -106,6 +106,9 @@ export class LLM extends BaseNode<LlmParams> {
         frequency_penalty: params.frequencyPenalty || 0,
         presence_penalty: params.presencePenalty || 0,
         stream: useStream,
+        // Enable OpenRouter usage accounting in the streamed payload per docs
+        // https://openrouter.ai/docs/use-cases/usage-accounting
+        usage: { include: true },
       };
 
       // Add function calling support if tools are provided
@@ -134,6 +137,8 @@ export class LLM extends BaseNode<LlmParams> {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      // Usage accounting (if present) is handled via SSE usage payload from the provider
 
       // If streaming is disabled (tools present), return the full JSON (includes tool_calls)
       if (!useStream) {
@@ -216,7 +221,37 @@ export class LLM extends BaseNode<LlmParams> {
 
       const eventCallback = this.getEventCallback();
       if (eventCallback) {
-        await eventCallback({ type: 'content_complete', timestamp: new Date().toISOString(), executionDepth });
+        // Normalize usage from stream payload only (usage.include=true)
+        const promptTokens = typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : undefined;
+        const completionTokens = typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : undefined;
+        const totalTokens =
+          typeof usage?.total_tokens === 'number'
+            ? usage.total_tokens
+            : typeof promptTokens === 'number' && typeof completionTokens === 'number'
+              ? promptTokens + completionTokens
+              : undefined;
+
+        // Cost provided by OpenRouter usage payload (USD)
+        const cost = typeof usage?.cost === 'number' ? usage.cost : undefined;
+
+        // Prefer model from response metadata; no header dependency
+        const usageModel = responseMetadata.model && responseMetadata.model.length > 0 ? responseMetadata.model : undefined;
+
+        await eventCallback({
+          type: 'content_complete',
+          timestamp: new Date().toISOString(),
+          executionDepth,
+          data: {
+            model: usageModel,
+            usage: {
+              // 'cost' is required by LLMEvent usage type; default to 0 when not provided
+              cost: typeof cost === 'number' ? cost : 0,
+              ...(typeof promptTokens === 'number' ? { prompt_tokens: promptTokens } : {}),
+              ...(typeof completionTokens === 'number' ? { completion_tokens: completionTokens } : {}),
+              ...(typeof totalTokens === 'number' ? { total_tokens: totalTokens } : {}),
+            },
+          },
+        });
       }
 
       return this.buildFinalResponse(responseMetadata, choices, usage);
@@ -566,6 +601,8 @@ export class LLM extends BaseNode<LlmParams> {
       },
     }));
   }
+
+  // Header parsing removed; relying solely on SSE usage payload (usage.include = true)
 
   /**
    * Validate LLM configuration

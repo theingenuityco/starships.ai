@@ -1,0 +1,115 @@
+/**
+ * Usage Entity - Layer 2
+ *
+ * Persists provider-reported usage per assistant turn and links it to both
+ * Starship and Conversation. This replaces message-level usage storage.
+ */
+
+import { Transformers } from '@/helpers/serializer';
+import type { UsageModel } from '@starships/protocol';
+import { Expose } from 'class-transformer';
+import { IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
+
+export class UsageEntity implements UsageModel {
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  id!: string;
+
+  // Foreign keys (string IDs)
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  starshipId!: string;
+
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  conversationId!: string;
+
+  // Provider-reported usage
+  @Expose()
+  @Transformers.NumberTransform()
+  @IsNumber()
+  @Min(0)
+  prompt_tokens!: number;
+
+  @Expose()
+  @Transformers.NumberTransform()
+  @IsNumber()
+  @Min(0)
+  completion_tokens!: number;
+
+  @Expose()
+  @Transformers.NumberTransform()
+  @IsNumber()
+  @Min(0)
+  total_tokens!: number;
+
+  @Expose()
+  @Transformers.NumberTransform()
+  @IsNumber()
+  @Min(0)
+  cost!: number;
+
+  // Optional provider/model identifier
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  model?: string;
+
+  // Timestamps
+  @Expose()
+  @Transformers.DateTransform()
+  @IsISO8601()
+  createdAt!: string;
+
+  @Expose()
+  @Transformers.DateTransform()
+  @IsISO8601()
+  updatedAt!: string;
+
+  /**
+   * Validation method leveraging class-validator
+   */
+  static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data must be an object');
+    }
+
+    const dataRecord = data as Record<string, unknown>;
+    const entity = new UsageEntity();
+
+    if (operation === 'create') {
+      Object.assign(entity, {
+        id: dataRecord.id || 'temp-id', // replaced by repository auto-id
+        starshipId: dataRecord.starshipId,
+        conversationId: dataRecord.conversationId,
+        prompt_tokens: dataRecord.prompt_tokens,
+        completion_tokens: dataRecord.completion_tokens,
+        total_tokens: dataRecord.total_tokens,
+        cost: dataRecord.cost,
+        model: dataRecord.model,
+        createdAt: dataRecord.createdAt || new Date().toISOString(),
+        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        ...dataRecord,
+      });
+    } else {
+      Object.assign(entity, dataRecord);
+    }
+
+    const errors = await validate(entity, {
+      skipMissingProperties: operation === 'update',
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+
+    if (errors.length > 0) {
+      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
+      throw new Error(`Validation failed: ${errorMessages}`);
+    }
+  }
+}
+
+export default UsageEntity;

@@ -1,23 +1,18 @@
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { WorkflowModel } from '@starships/protocol';
 import { WorkflowEntity } from '../entities/WorkflowEntity';
 
 export class WorkflowRepository extends BaseRepository {
-  constructor(connection?: Neo4jConnection) {
-    super('WorkflowRepository', connection);
+  constructor() {
+    super('WorkflowRepository');
   }
 
   async findAll(): Promise<WorkflowModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) RETURN w ORDER BY w.createdAt DESC');
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        const result = await super.findAllEntities<Record<string, unknown>>('workflows', 'created_at DESC');
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'findAll',
       'Workflow'
@@ -27,9 +22,8 @@ export class WorkflowRepository extends BaseRepository {
   async findById(id: string): Promise<WorkflowModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>('MATCH (w:Workflow) WHERE w.id = $id RETURN w', { id });
-        return result.length > 0 ? fromDatabase(WorkflowEntity, result[0].w) : null;
+        const result = await super.findEntityById<Record<string, unknown>>('workflows', id);
+        return result ? fromDatabase(WorkflowEntity, result) : null;
       },
       'findById',
       'Workflow',

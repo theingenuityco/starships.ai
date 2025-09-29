@@ -1,26 +1,21 @@
 import { MessageEntity } from '@/entities/MessageEntity';
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { Message, MessageModel } from '@starships/protocol';
 
 /**
- * Neo4j-based message repository following layered architecture
+ * PostgreSQL-based message repository following layered architecture
  */
 export class MessageRepository extends BaseRepository {
-  constructor(connection?: Neo4jConnection) {
-    super('MessageRepository', connection);
+  constructor() {
+    super('MessageRepository');
   }
 
   async findAll(): Promise<MessageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) RETURN m ORDER BY m.timestamp DESC');
-        return fromDatabaseArray(
-          MessageEntity,
-          result.map((record) => record.m)
-        );
+        const result = await super.findAllEntities<Record<string, unknown>>('messages', 'created_at DESC');
+        return fromDatabaseArray(MessageEntity, result);
       },
       'findAll',
       'Message'
@@ -30,10 +25,8 @@ export class MessageRepository extends BaseRepository {
   async findById(id: string): Promise<MessageModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id RETURN m', { id });
-        const message = result[0]?.m || null;
-        return message ? fromDatabase(MessageEntity, message) : null;
+        const result = await super.findEntityById<Record<string, unknown>>('messages', id);
+        return result ? fromDatabase(MessageEntity, result) : null;
       },
       'findById',
       'Message',
@@ -45,34 +38,31 @@ export class MessageRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        let cypher = 'MATCH (m:Message) WHERE m.role = $role';
-        const params: Record<string, unknown> = { role };
+        let query = 'SELECT * FROM messages WHERE role = $1';
+        const params: unknown[] = [role];
 
         if (starshipId) {
-          cypher += ' AND m.starshipId = $starshipId';
-          params.starshipId = starshipId;
+          query += ' AND starship_id = $2';
+          params.push(starshipId);
         }
 
-        cypher += ' RETURN m ORDER BY m.timestamp DESC';
+        query += ' ORDER BY created_at DESC';
 
-        const result = await connection.executeQuery<{ m: MessageModel }>(cypher, params);
-        return fromDatabaseArray(
-          MessageEntity,
-          result.map((record) => record.m)
-        );
+        const result = await connection.query<Record<string, unknown>>(query, params);
+        return fromDatabaseArray(MessageEntity, result);
       },
       'findByRole',
       'Message'
     );
   }
 
-  async create(entity: Message & { conversationId: string }): Promise<MessageModel> {
+  async create(entity: Message & { conversationId: string; starshipId?: string }): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Extract conversationId before validation since it's not part of MessageEntity
-        const { conversationId, ...messageInput } = entity;
+        // Extract relationship IDs before validation since they're not part of MessageEntity
+        const { conversationId, starshipId, ...messageInput } = entity;
 
-        // Validate using Entity (without conversationId)
+        // Validate using Entity (without relationship IDs)
         await MessageEntity.validate(messageInput, 'create');
 
         const now = new Date().toISOString();
@@ -81,6 +71,9 @@ export class MessageRepository extends BaseRepository {
           // Additional database fields
           createdAt: now,
           updatedAt: now,
+          // PostgreSQL foreign keys
+          conversationId,
+          starshipId,
           // From base Message interface
           role: entity.role,
           content: entity.content,
@@ -94,10 +87,7 @@ export class MessageRepository extends BaseRepository {
 
         // Create entity instance from plain object, then serialize
         const messageEntity = toEntityInstance(MessageEntity, messageData);
-        const result = await this.createEntityWithAutoId<MessageModel>('Message', toDatabase(messageEntity));
-
-        // Create explicit Neo4j relationship with conversation if conversationId is provided
-        await this.linkToConversation(result.id, conversationId);
+        const result = await this.createEntity<Record<string, unknown>>('messages', toDatabase(messageEntity));
 
         return fromDatabase(MessageEntity, result);
       },
@@ -111,21 +101,34 @@ export class MessageRepository extends BaseRepository {
       async () => {
         await MessageEntity.validate(updates, 'update');
 
-        const connection = this.getConnection();
         const updateProps = {
           ...updates,
           updatedAt: new Date().toISOString(),
         };
 
-        // Create entity instance from plain object, then serialize
-        const updateEntity = toEntityInstance(MessageEntity, updateProps);
-        const result = await connection.executeWrite<{ m: MessageModel }>('MATCH (m:Message) WHERE m.id = $id SET m += $updates RETURN m', {
-          id,
-          updates: toDatabase(updateEntity),
-        });
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(MessageEntity, updateProps));
 
-        const message = result[0]?.m || null;
-        return message ? fromDatabase(MessageEntity, message) : null;
+        // Filter out protected fields (id, createdAt, conversation_id, starship_id)
+        const {
+          id: _id,
+          created_at: _createdAt,
+          conversation_id: _conversationId,
+          starship_id: _starshipId,
+          ...filteredUpdateData
+        } = updateData;
+        // Suppress ESLint warnings for unused destructured variables used for filtering
+        void _id;
+        void _createdAt;
+        void _conversationId;
+        void _starshipId;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return await this.findById(id);
+        }
+
+        const result = await this.updateEntity<Record<string, unknown>>('messages', id, filteredUpdateData);
+        return result ? fromDatabase(MessageEntity, result) : null;
       },
       'update',
       'Message',
@@ -136,13 +139,8 @@ export class MessageRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (m:Message) WHERE m.id = $id DETACH DELETE m RETURN count(m) as deletedCount',
-          { id }
-        );
-
-        return result[0]?.deletedCount > 0;
+        // PostgreSQL CASCADE rules will handle relationships automatically
+        return await this.deleteEntity('messages', id);
       },
       'delete',
       'Message',
@@ -151,21 +149,13 @@ export class MessageRepository extends BaseRepository {
   }
 
   /**
-   * Create explicit Neo4j relationship between message and conversation
+   * Link message to conversation using foreign key (conversation_id is set during creation)
    */
   async linkToConversation(messageId: string, conversationId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.executeWrite(
-          `MATCH (c:Conversation {id: $conversationId}), (m:Message {id: $messageId})
-           CREATE (c)-[:HAS_MESSAGE {key: $key}]->(m)`,
-          {
-            conversationId,
-            messageId,
-            key: `${conversationId}_${messageId}`,
-          }
-        );
+        await connection.query('UPDATE messages SET conversation_id = $1, updated_at = NOW() WHERE id = $2', [conversationId, messageId]);
       },
       'linkToConversation',
       'Message'
@@ -173,17 +163,13 @@ export class MessageRepository extends BaseRepository {
   }
 
   /**
-   * Remove explicit Neo4j relationship between message and conversation
+   * Remove conversation association from message
    */
   async unlinkFromConversation(messageId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.executeWrite(
-          `MATCH (c:Conversation)-[r:HAS_MESSAGE]->(m:Message {id: $messageId})
-           DELETE r`,
-          { messageId }
-        );
+        await connection.query('UPDATE messages SET conversation_id = NULL, updated_at = NOW() WHERE id = $1', [messageId]);
       },
       'unlinkFromConversation',
       'Message'
@@ -191,24 +177,20 @@ export class MessageRepository extends BaseRepository {
   }
 
   /**
-   * Get conversation associated with a message using Neo4j relationship
+   * Get conversation associated with a message using JOIN
    */
   async getMessageConversation(messageId: string): Promise<{ id: string; title: string; status: string } | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ c: { id: string; title: string; status: string } }>(
-          `MATCH (c:Conversation)-[:HAS_MESSAGE]->(m:Message {id: $messageId})
-           RETURN c`,
-          { messageId }
+        const result = await connection.queryOne<{ id: string; title: string; status: string }>(
+          `SELECT c.id, c.title, c.status
+           FROM conversations c
+           INNER JOIN messages m ON c.id = m.conversation_id
+           WHERE m.id = $1`,
+          [messageId]
         );
-        return result.length > 0
-          ? {
-              id: result[0].c.id,
-              title: result[0].c.title,
-              status: result[0].c.status,
-            }
-          : null;
+        return result || null;
       },
       'getMessageConversation',
       'Message'

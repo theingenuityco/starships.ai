@@ -6,7 +6,7 @@
 
 **Rationale**: The current Neo4j implementation can be simplified to PostgreSQL since the application doesn't heavily leverage graph-specific features like complex traversals or graph algorithms. PostgreSQL offers better ecosystem support, simpler deployment, and more familiar SQL operations.
 
-**Status**: 🟡 **In Progress** (85% Complete)
+**Status**: 🟡 **In Progress** (88% Complete)
 
 ---
 
@@ -48,13 +48,13 @@
 
 ### 🟡 **IN PROGRESS TASKS**
 
-- [ ] **Repository Conversion Phase** (15% Complete - CURRENT FOCUS)
+- [ ] **Repository Conversion Phase** (31% Complete - CURRENT FOCUS)
   - [x] [`UserRepository`](packages/models/src/repositories/UserRepository.ts) ✅ Completed
   - [x] [`StarshipRepository`](packages/models/src/repositories/StarshipRepository.ts) ✅ Completed
-  - [ ] `AgentRepository` (14 repos remaining)
-  - [ ] `ConversationRepository`
-  - [ ] `MessageRepository`
-  - [ ] `WorkflowRepository`
+  - [x] [`AgentRepository`](packages/models/src/repositories/AgentRepository.ts) ✅ Completed
+  - [x] [`ConversationRepository`](packages/models/src/repositories/ConversationRepository.ts) ✅ Completed
+  - [x] [`MessageRepository`](packages/models/src/repositories/MessageRepository.ts) ✅ Completed
+  - [ ] `WorkflowRepository` (Started - Basic CRUD converted)
   - [ ] `ExecutionRepository`
   - [ ] `BlueprintRepository`
   - [ ] `NodeRepository`

@@ -1,26 +1,21 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { ConversationEntity } from '@/entities/ConversationEntity';
 import { StarshipEntity } from '@/entities/StarshipEntity';
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { AgentModel } from '@starships/protocol';
 import { StarshipModel } from '@starships/protocol';
 
 export class StarshipRepository extends BaseRepository {
-  constructor(connection?: Neo4jConnection) {
-    super('StarshipRepository', connection);
+  constructor() {
+    super('StarshipRepository');
   }
 
   async findAll(): Promise<StarshipModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
-        return fromDatabaseArray(
-          StarshipEntity,
-          result.map((record) => record.s)
-        );
+        const result = await super.findAll<Record<string, unknown>>('starships', 'created_at DESC');
+        return fromDatabaseArray(StarshipEntity, result);
       },
       'findAll',
       'Starship'
@@ -30,10 +25,8 @@ export class StarshipRepository extends BaseRepository {
   async findById(id: string): Promise<StarshipModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ s: StarshipModel }>('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id });
-        const starship = result[0]?.s || null;
-        return starship ? fromDatabase(StarshipEntity, starship) : null;
+        const result = await super.findById<Record<string, unknown>>('starships', id);
+        return result ? fromDatabase(StarshipEntity, result) : null;
       },
       'findById',
       'Starship',
@@ -45,12 +38,11 @@ export class StarshipRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ s: StarshipModel }>(
-          'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId RETURN s',
-          { slug, ownerId }
-        );
-        const starship = result[0]?.s || null;
-        return starship ? fromDatabase(StarshipEntity, starship) : null;
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM starships WHERE slug = $1 AND owner_id = $2', [
+          slug,
+          ownerId,
+        ]);
+        return result ? fromDatabase(StarshipEntity, result) : null;
       },
       'findBySlug',
       'Starship',
@@ -62,14 +54,11 @@ export class StarshipRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ s: StarshipModel }>(
-          'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
-          { ownerId }
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM starships WHERE owner_id = $1 ORDER BY created_at DESC',
+          [ownerId]
         );
-        return fromDatabaseArray(
-          StarshipEntity,
-          result.map((record) => record.s)
-        );
+        return fromDatabaseArray(StarshipEntity, result);
       },
       'findByOwner',
       'Starship'
@@ -81,7 +70,6 @@ export class StarshipRepository extends BaseRepository {
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
         const now = new Date().toISOString();
 
         // Set maxAgents based on class (Scout: 3, Cruiser: 5, Draught: 10)
@@ -102,24 +90,11 @@ export class StarshipRepository extends BaseRepository {
         // Validate using Entity after all fields are populated
         await StarshipEntity.validate(starshipData, 'create');
 
-        // Use base repository for database operation
-        const starship = await this.createEntityWithAutoId<StarshipModel>(
-          'Starship',
-          toDatabase(toEntityInstance(StarshipEntity, starshipData))
-        );
+        // Convert entity to database format and create
+        const databaseFormat = toDatabase(toEntityInstance(StarshipEntity, starshipData));
+        const result = await this.createEntity<Record<string, unknown>>('starships', databaseFormat);
 
-        // Create relationship with owner
-        await connection.executeWrite(
-          `MATCH (u:User {id: $ownerId}), (s:Starship {id: $starshipId})
-         CREATE (u)-[:OWNS {ownedSince: $timestamp}]->(s)`,
-          {
-            ownerId: starship.ownerId,
-            starshipId: starship.id,
-            timestamp: starship.createdAt,
-          }
-        );
-
-        return fromDatabase(StarshipEntity, starship);
+        return fromDatabase(StarshipEntity, result);
       },
       'create',
       'Starship'
@@ -131,8 +106,6 @@ export class StarshipRepository extends BaseRepository {
       async () => {
         // Use lean validation from StarshipEntity for updates
         await StarshipEntity.validate(updates, 'update');
-
-        const connection = this.getConnection();
 
         // Handle slug updates
         if (updates.name && !updates.slug) {
@@ -147,13 +120,19 @@ export class StarshipRepository extends BaseRepository {
           updatedAt: new Date().toISOString(),
         };
 
-        const result = await connection.executeWrite<{ s: StarshipModel }>(
-          'MATCH (s:Starship) WHERE s.id = $id SET s += $updates RETURN s',
-          { id, updates: updateProps }
-        );
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(StarshipEntity, updateProps));
 
-        const starship = result[0]?.s || null;
-        return starship ? fromDatabase(StarshipEntity, starship) : null;
+        // Filter out protected fields (id, createdAt)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return await this.findById(id);
+        }
+
+        const result = await this.updateEntity<Record<string, unknown>>('starships', id, filteredUpdateData);
+        return result ? fromDatabase(StarshipEntity, result) : null;
       },
       'update',
       'Starship',
@@ -164,13 +143,7 @@ export class StarshipRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (s:Starship) WHERE s.id = $id DETACH DELETE s RETURN count(s) as deletedCount',
-          { id }
-        );
-
-        return result[0]?.deletedCount > 0;
+        return await this.deleteEntity('starships', id);
       },
       'delete',
       'Starship',
@@ -183,15 +156,19 @@ export class StarshipRepository extends BaseRepository {
       throw new Error('Starship ID is required');
     }
 
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ a: AgentModel }>(
-      `MATCH (s:Starship {id: $starshipId})<-[:DEPLOYED_ON]-(a:Agent)
-       RETURN a ORDER BY a.name`,
-      { starshipId }
-    );
-    return fromDatabaseArray(
-      AgentEntity,
-      result.map((record) => record.a)
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT a.* FROM agents a 
+         WHERE a.starship_id = $1 AND a.deployed_at IS NOT NULL 
+         ORDER BY a.name`,
+          [starshipId]
+        );
+        return fromDatabaseArray(AgentEntity, result);
+      },
+      'getDeployedAgents',
+      'Agent'
     );
   }
 
@@ -203,40 +180,41 @@ export class StarshipRepository extends BaseRepository {
       throw new Error('Agent ID is required');
     }
 
-    const connection = this.getConnection();
+    return this.executeWithErrorHandling(
+      async () => {
+        // Check if starship has available slots
+        const availableSlots = await this.getAvailableSlots(starshipId);
+        if (availableSlots <= 0) {
+          throw new Error('No available slots on this starship');
+        }
 
-    // Check if starship has available slots
-    const availableSlots = await this.getAvailableSlots(starshipId);
-    if (availableSlots <= 0) {
-      throw new Error('No available slots on this starship');
-    }
+        // Check if agent is already deployed
+        const connection = this.getConnection();
+        const existingDeployment = await connection.queryOne(
+          `SELECT id FROM agents WHERE id = $1 AND starship_id = $2 AND deployed_at IS NOT NULL`,
+          [agentId, starshipId]
+        );
 
-    // Check if agent is already deployed
-    const existingDeployment = await connection.executeQuery(
-      `MATCH (s:Starship {id: $starshipId})<-[r:DEPLOYED_ON]-(a:Agent {id: $agentId})
-       RETURN r`,
-      { starshipId, agentId }
+        if (existingDeployment) {
+          throw new Error('Agent is already deployed on this starship');
+        }
+
+        // Deploy agent by updating the agents table
+        await connection.query(
+          `UPDATE agents SET 
+         starship_id = $1, 
+         deployed_at = $2, 
+         updated_at = NOW() 
+         WHERE id = $3`,
+          [starshipId, new Date().toISOString(), agentId]
+        );
+
+        return true;
+      },
+      'deployAgent',
+      'Agent',
+      agentId
     );
-
-    if (existingDeployment.length > 0) {
-      throw new Error('Agent is already deployed on this starship');
-    }
-
-    // Deploy agent
-    await connection.executeWrite(
-      `MATCH (s:Starship {id: $starshipId}), (a:Agent {id: $agentId})
-       CREATE (a)-[:DEPLOYED_ON {
-         deployedAt: $timestamp,
-         isActive: true
-       }]->(s)`,
-      {
-        starshipId,
-        agentId,
-        timestamp: new Date().toISOString(),
-      }
-    );
-
-    return true;
   }
 
   async removeAgent(starshipId: string, agentId: string): Promise<boolean> {
@@ -247,15 +225,24 @@ export class StarshipRepository extends BaseRepository {
       throw new Error('Agent ID is required');
     }
 
-    const connection = this.getConnection();
-    const result = await connection.executeWrite<{ deletedCount: number }>(
-      `MATCH (s:Starship {id: $starshipId})<-[r:DEPLOYED_ON]-(a:Agent {id: $agentId})
-       DELETE r
-       RETURN count(r) as deletedCount`,
-      { starshipId, agentId }
-    );
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query(
+          `UPDATE agents SET 
+         starship_id = NULL, 
+         deployed_at = NULL, 
+         updated_at = NOW() 
+         WHERE id = $1 AND starship_id = $2`,
+          [agentId, starshipId]
+        );
 
-    return result[0]?.deletedCount > 0;
+        return (result as unknown as { rowCount: number }).rowCount > 0;
+      },
+      'removeAgent',
+      'Agent',
+      agentId
+    );
   }
 
   async getAvailableSlots(starshipId: string): Promise<number> {
@@ -263,36 +250,50 @@ export class StarshipRepository extends BaseRepository {
       throw new Error('Starship ID is required');
     }
 
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{
-      maxAgents: number;
-      deployedCount: number;
-    }>(
-      `MATCH (s:Starship {id: $starshipId})
-       OPTIONAL MATCH (s)<-[:DEPLOYED_ON]-(a:AgentModel)
-       RETURN s.maxAgents as maxAgents, count(a) as deployedCount`,
-      { starshipId }
-    );
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{
+          max_agents: string;
+          deployed_count: string;
+        }>(
+          `SELECT 
+         s.max_agents,
+         COUNT(a.id) as deployed_count
+         FROM starships s
+         LEFT JOIN agents a ON s.id = a.starship_id AND a.deployed_at IS NOT NULL
+         WHERE s.id = $1
+         GROUP BY s.id, s.max_agents`,
+          [starshipId]
+        );
 
-    const { maxAgents, deployedCount } = result[0] || { maxAgents: 0, deployedCount: 0 };
-    return Number(maxAgents) - Number(deployedCount);
+        const { max_agents, deployed_count } = result || { max_agents: '0', deployed_count: '0' };
+        return Number(max_agents) - Number(deployed_count);
+      },
+      'getAvailableSlots',
+      'Starship',
+      starshipId
+    );
   }
 
   async updateStatus(starshipId: string, status: StarshipModel['status']): Promise<boolean> {
-    const connection = this.getConnection();
-    // Database constraints will validate the status values
-    const result = await connection.executeWrite<{ count: number }>(
-      `MATCH (s:Starship) WHERE s.id = $starshipId
-       SET s.status = $status, s.updatedAt = $timestamp
-       RETURN count(s) as count`,
-      {
-        starshipId,
-        status,
-        timestamp: new Date().toISOString(),
-      }
-    );
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query(
+          `UPDATE starships SET 
+         status = $1, 
+         updated_at = NOW() 
+         WHERE id = $2`,
+          [status, starshipId]
+        );
 
-    return result[0]?.count > 0;
+        return (result as unknown as { rowCount: number }).rowCount > 0;
+      },
+      'updateStatus',
+      'Starship',
+      starshipId
+    );
   }
 
   async generateUniqueSlug(name: string, ownerId: string): Promise<string> {
@@ -345,20 +346,24 @@ export class StarshipRepository extends BaseRepository {
       throw new Error('Owner ID parameter is required');
     }
 
-    const connection = this.getConnection();
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
 
-    let query = 'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId';
-    const params: Record<string, unknown> = { slug, ownerId };
+        let query = 'SELECT COUNT(*) as count FROM starships WHERE slug = $1 AND owner_id = $2';
+        const params: unknown[] = [slug, ownerId];
 
-    if (excludeId) {
-      query += ' AND s.id <> $excludeId';
-      params.excludeId = excludeId;
-    }
+        if (excludeId) {
+          query += ' AND id != $3';
+          params.push(excludeId);
+        }
 
-    query += ' RETURN count(s) as count';
-
-    const result = await connection.executeQuery<{ count: number }>(query, params);
-    return result[0]?.count === 0;
+        const result = await connection.queryOne<{ count: string }>(query, params);
+        return result?.count === '0' ?? false;
+      },
+      'isSlugAvailable',
+      'Starship'
+    );
   }
 
   createSlugFromName(name: string): string {
@@ -371,16 +376,19 @@ export class StarshipRepository extends BaseRepository {
       .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
   }
 
+  // Stripe integration methods
   async findBySubscriptionId(subscriptionId: string): Promise<StarshipModel | null> {
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ starship: StarshipModel }>(
-      `MATCH (starship:Starship {subscriptionId: $subscriptionId})
-       RETURN starship`,
-      { subscriptionId }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>(`SELECT * FROM starships WHERE subscription_id = $1`, [
+          subscriptionId,
+        ]);
+        return result ? fromDatabase(StarshipEntity, result) : null;
+      },
+      'findBySubscriptionId',
+      'Starship'
     );
-
-    if (!result[0]?.starship) return null;
-    return fromDatabase(StarshipEntity, result[0].starship);
   }
 
   async updateSubscription(
@@ -392,245 +400,231 @@ export class StarshipRepository extends BaseRepository {
       billingPeriod?: 'monthly' | 'yearly';
     }
   ): Promise<void> {
-    const connection = this.getConnection();
-    const setClause = Object.entries(updates)
-      .map(([key]) => `starship.${key} = $${key}`)
-      .join(', ');
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
 
-    await connection.executeWrite(
-      `MATCH (starship:Starship {id: $starshipId})
-       SET ${setClause}, starship.updatedAt = $timestamp`,
-      { starshipId, ...updates, timestamp: new Date().toISOString() }
+        const setParts: string[] = [];
+        const values: unknown[] = [];
+        let paramIndex = 1;
+
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value !== undefined) {
+            const dbKey = key === 'subscriptionId' ? 'subscription_id' : key === 'billingPeriod' ? 'billing_period' : key;
+            setParts.push(`${dbKey} = $${paramIndex++}`);
+            values.push(value);
+          }
+        });
+
+        if (setParts.length === 0) return;
+
+        setParts.push(`updated_at = NOW()`);
+        values.push(starshipId);
+
+        const query = `UPDATE starships SET ${setParts.join(', ')} WHERE id = $${paramIndex}`;
+        await connection.query(query, values);
+      },
+      'updateSubscription',
+      'Starship',
+      starshipId
     );
   }
 
   async countFreeStarships(userId: string): Promise<number> {
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ count: number }>(
-      `MATCH (user:User {id: $userId})-[:OWNS]->(starship:Starship {plan: 'scout'})
-       RETURN count(starship) as count`,
-      { userId }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{ count: string }>(
+          `SELECT COUNT(*) as count FROM starships WHERE owner_id = $1 AND plan = 'scout'`,
+          [userId]
+        );
+        return parseInt(result?.count || '0', 10);
+      },
+      'countFreeStarships',
+      'Starship'
     );
-
-    return result[0]?.count || 0;
   }
 
-  /** Check if a Stripe webhook event has already been processed */
+  // Stripe events for webhook processing
   async isEventProcessed(eventId: string): Promise<boolean> {
-    const connection = this.getConnection();
-    const result = await connection.executeQuery('MATCH (e:StripeEvent {eventId: $eventId}) RETURN e LIMIT 1', { eventId });
-    return result.length > 0;
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{ count: string }>('SELECT COUNT(*) as count FROM stripe_events WHERE event_id = $1', [
+          eventId,
+        ]);
+        return parseInt(result?.count || '0', 10) > 0;
+      },
+      'isEventProcessed',
+      'StripeEvent'
+    );
   }
 
-  /** Mark a Stripe webhook event as processed */
   async markEventProcessed(eventId: string, eventType?: string): Promise<void> {
-    const connection = this.getConnection();
-    await connection.executeWrite(
-      `CREATE (e:StripeEvent {
-        eventId: $eventId, 
-        eventType: $eventType,
-        processedAt: datetime()
-      })`,
-      { eventId, eventType: eventType || 'unknown' }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.query(
+          `INSERT INTO stripe_events (event_id, event_type, processed_at, data) 
+         VALUES ($1, $2, NOW(), '{}')`,
+          [eventId, eventType || 'unknown']
+        );
+      },
+      'markEventProcessed',
+      'StripeEvent'
     );
   }
 
-  /** Update Starship with Stripe Customer ID */
   async updateStripeCustomer(starshipId: string, stripeCustomerId: string): Promise<void> {
-    const connection = this.getConnection();
-    await connection.executeWrite(
-      `MATCH (s:Starship {id: $id}) 
-       SET s.stripeCustomerId = $customerId,
-           s.updatedAt = datetime()`,
-      { id: starshipId, customerId: stripeCustomerId }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.query(
+          `UPDATE starships SET 
+         stripe_customer_id = $1,
+         updated_at = NOW() 
+         WHERE id = $2`,
+          [stripeCustomerId, starshipId]
+        );
+      },
+      'updateStripeCustomer',
+      'Starship',
+      starshipId
     );
   }
 
-  /** Find Starship by Stripe Customer ID */
   async findByStripeCustomerId(customerId: string): Promise<StarshipModel | null> {
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ s: StarshipModel }>(
-      'MATCH (s:Starship {stripeCustomerId: $customerId}) RETURN s LIMIT 1',
-      { customerId }
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM starships WHERE stripe_customer_id = $1 LIMIT 1', [
+          customerId,
+        ]);
+        return result ? fromDatabase(StarshipEntity, result) : null;
+      },
+      'findByStripeCustomerId',
+      'Starship'
     );
-    if (!result[0]?.s) return null;
-    return fromDatabase(StarshipEntity, result[0].s);
   }
 
-  /** Find all pending payment starships older than specified hours */
+  // Cleanup and maintenance methods
   async findAbandonedPendingStarships(hours: number = 24): Promise<StarshipModel[]> {
-    const connection = this.getConnection();
-    const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 
-    const result = await connection.executeQuery<{ s: StarshipModel }>(
-      `MATCH (s:Starship)
-       WHERE s.status = 'pending_payment'
-       AND s.createdAt < $cutoffTime
-       RETURN s
-       ORDER BY s.createdAt DESC`,
-      { cutoffTime }
-    );
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT * FROM starships
+         WHERE status = 'pending_payment'
+         AND created_at < $1
+         ORDER BY created_at DESC`,
+          [cutoffTime]
+        );
 
-    return fromDatabaseArray(
-      StarshipEntity,
-      result.map((record) => record.s)
+        return fromDatabaseArray(StarshipEntity, result);
+      },
+      'findAbandonedPendingStarships',
+      'Starship'
     );
   }
 
-  /** Clean up abandoned pending starships */
   async cleanupAbandonedStarship(starshipId: string): Promise<void> {
-    const connection = this.getConnection();
-    // Delete the starship
-    await connection.executeWrite(
-      `MATCH (s:Starship {id: $starshipId})
-       DELETE s`,
-      { starshipId }
+    return this.executeWithErrorHandling(
+      async () => {
+        await this.deleteEntity('starships', starshipId);
+      },
+      'cleanupAbandonedStarship',
+      'Starship',
+      starshipId
     );
   }
 
-  /** Update starship payment status */
   async updatePaymentStatus(
     starshipId: string,
     status: 'active' | 'restricted' | 'disabled' | 'pending_payment',
     additionalFields?: Partial<StarshipModel>
   ): Promise<void> {
-    const connection = this.getConnection();
-    const updates = {
-      status,
-      ...additionalFields,
-      updatedAt: new Date().toISOString(),
-    };
+    return this.executeWithErrorHandling(
+      async () => {
+        const updates = {
+          status,
+          ...additionalFields,
+          updatedAt: new Date().toISOString(),
+        };
 
-    await connection.executeWrite(
-      `MATCH (s:Starship {id: $id})
-       SET s += $updates`,
-      { id: starshipId, updates }
+        const updateData = toDatabase(toEntityInstance(StarshipEntity, updates));
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        await this.updateEntity('starships', starshipId, filteredUpdateData);
+      },
+      'updatePaymentStatus',
+      'Starship',
+      starshipId
     );
   }
 
-  /** Get all memories for a starship using Neo4j relationships */
-  async getMemories(starshipId: string): Promise<Record<string, unknown>[]> {
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ m: Record<string, unknown> }>(
-      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)
-       RETURN m ORDER BY m.createdAt DESC`,
-      { starshipId }
-    );
-    return result.map((record) => record.m);
-  }
-
-  /**
-   * Get memory count for a starship
-   * @param starshipId - The starship ID
-   * @returns Number of memories
-   */
-  async getMemoryCount(starshipId: string): Promise<number> {
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ count: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)
-       RETURN count(m) as count`,
-      { starshipId }
-    );
-
-    return Number(result[0]?.count || 0);
-  }
-
-  /**
-   * Remove a specific memory from a starship (deletes the memory and relationship)
-   * @param starshipId - The starship ID
-   * @param memoryId - The memory ID
-   * @returns True if memory was removed
-   */
-  async removeMemory(starshipId: string, memoryId: string): Promise<boolean> {
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-    if (!memoryId) {
-      throw new Error('Memory ID is required');
-    }
-
-    const connection = this.getConnection();
-    const result = await connection.executeWrite<{ deletedCount: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory {id: $memoryId})
-       DETACH DELETE m
-       RETURN count(m) as deletedCount`,
-      { starshipId, memoryId }
-    );
-
-    return result[0]?.deletedCount > 0;
-  }
-
-  /** Get all conversations for a starship using Neo4j relationships */
+  // Conversation methods (relationships converted to foreign keys)
   async getConversations(starshipId: string): Promise<Record<string, unknown>[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ c: Record<string, unknown> }>(
-      `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
-       RETURN c ORDER BY c.createdAt DESC`,
-      { starshipId }
-    );
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT * FROM conversations WHERE starship_id = $1 ORDER BY created_at DESC`,
+          [starshipId]
+        );
 
-    return result.map((record) => toDatabase(fromDatabase(ConversationEntity, record.c as Record<string, unknown>)));
+        return result.map((record) => toDatabase(fromDatabase(ConversationEntity, record)));
+      },
+      'getConversations',
+      'Conversation'
+    );
   }
 
-  /**
-   * Get conversation count for a starship
-   * @param starshipId - The starship ID
-   * @returns Number of conversations
-   */
   async getConversationCount(starshipId: string): Promise<number> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ count: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(conversation:Conversation)
-       RETURN count(conversation) as count`,
-      { starshipId }
-    );
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{ count: string }>(`SELECT COUNT(*) as count FROM conversations WHERE starship_id = $1`, [
+          starshipId,
+        ]);
 
-    return Number(result[0]?.count || 0);
+        return parseInt(result?.count || '0', 10);
+      },
+      'getConversationCount',
+      'Conversation'
+    );
   }
 
-  /**
-   * Get active conversations for a starship
-   * @param starshipId - The starship ID
-   * @returns Array of active conversations
-   */
   async getActiveConversations(starshipId: string): Promise<Record<string, unknown>[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
 
-    const connection = this.getConnection();
-    const result = await connection.executeQuery<{ c: Record<string, unknown> }>(
-      `MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)
-       WHERE c.status = 'active'
-       RETURN c ORDER BY c.createdAt DESC`,
-      { starshipId }
-    );
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT * FROM conversations WHERE starship_id = $1 AND status = 'active' ORDER BY created_at DESC`,
+          [starshipId]
+        );
 
-    return result.map((record) => toDatabase(fromDatabase(ConversationEntity, record.c as Record<string, unknown>)));
+        return result.map((record) => toDatabase(fromDatabase(ConversationEntity, record)));
+      },
+      'getActiveConversations',
+      'Conversation'
+    );
   }
 
-  /**
-   * Remove a specific conversation from a starship (deletes the relationship)
-   * @param starshipId - The starship ID
-   * @param conversationId - The conversation ID
-   * @returns Success boolean
-   */
   async removeConversation(starshipId: string, conversationId: string): Promise<boolean> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
@@ -639,14 +633,19 @@ export class StarshipRepository extends BaseRepository {
       throw new Error('Conversation ID is required');
     }
 
-    const connection = this.getConnection();
-    const result = await connection.executeWrite<{ deletedCount: number }>(
-      `MATCH (s:Starship {id: $starshipId})-[r:HAS_CONVERSATION]->(conversation:Conversation {id: $conversationId})
-       DELETE r
-       RETURN count(r) as deletedCount`,
-      { starshipId, conversationId }
-    );
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query(
+          `UPDATE conversations SET starship_id = NULL, updated_at = NOW() WHERE id = $1 AND starship_id = $2`,
+          [conversationId, starshipId]
+        );
 
-    return result[0]?.deletedCount > 0;
+        return (result as unknown as { rowCount: number }).rowCount > 0;
+      },
+      'removeConversation',
+      'Conversation',
+      conversationId
+    );
   }
 }

@@ -65,8 +65,6 @@ export class UserTransformers {
 }
 
 export class UserEntity implements UserModel {
-  [key: string]: unknown;
-
   // Core database fields
   @Expose()
   @IsString()
@@ -78,8 +76,13 @@ export class UserEntity implements UserModel {
   @IsISO8601()
   createdAt!: string;
 
-  // User profile fields
+  @Expose()
+  @Transformers.DateTransform()
+  @IsISO8601()
+  @IsOptional()
+  updatedAt?: string;
 
+  // User profile fields
   @Expose()
   @IsOptional()
   @UserTransformers.EmailTransform()

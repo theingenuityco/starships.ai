@@ -33,13 +33,13 @@ export class Agent implements NodeHandler {
       tools: params.state?.tools || [],
     };
 
-    // Runner selection deferred to execute() based on execution.depth to avoid nested runners
+    // Runner selection deferred to execute() based on execution.depth to avoid any nested runners
 
     // Check if blueprint has the parallel tools node
-    const hasParallelTools = this.params.blueprint?.nodes?.some((n: any) => 
-      n.name === 'Execute Tools in Parallel' || n.type === 'parallel_tools'
+    const hasParallelTools = this.params.blueprint?.nodes?.some(
+      (n: any) => n.name === 'Execute Tools in Parallel' || n.type === 'parallel_tools'
     );
-    
+
     if (!hasParallelTools) {
       console.log('[Agent] OLD blueprint detected - upgrading to PARALLEL execution');
       this.createDefaultBlueprint();
@@ -124,7 +124,7 @@ export class Agent implements NodeHandler {
         // PARALLEL Tools Execution Node - executes ALL tool_calls simultaneously
         {
           ref: parallelToolsRef,
-          type: 'parallel_tools' as const,  // Use the actual parallel_tools type
+          type: 'parallel_tools' as const, // Use the actual parallel_tools type
           name: 'Execute Tools in Parallel',
           description: 'Execute ALL tool calls from LLM in parallel for maximum efficiency',
           parameters: {

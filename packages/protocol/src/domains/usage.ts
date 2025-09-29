@@ -6,21 +6,15 @@
  * Starship and Conversation.
  */
 
-export interface UsageModel {
+import type { LLMUsage } from '@starships/autopilot';
+
+export interface UsageModel extends LLMUsage {
   // Database identity
   id: string;
 
   // Foreign keys
   starshipId: string;
   conversationId: string;
-
-  // Provider-reported usage for this assistant turn
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-
-  // Cost in USD for this assistant turn (provider-reported or normalized)
-  cost: number;
 
   // Optional provider/model identifier associated with this turn
   model?: string;

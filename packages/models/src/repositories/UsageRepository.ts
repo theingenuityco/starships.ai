@@ -20,9 +20,9 @@ export class UsageRepository extends BaseRepository {
   async createAndLink(data: {
     starshipId: string;
     conversationId: string;
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
     cost: number;
     model?: string;
     createdAt?: string;
@@ -35,9 +35,9 @@ export class UsageRepository extends BaseRepository {
           {
             starshipId: data.starshipId,
             conversationId: data.conversationId,
-            promptTokens: data.promptTokens,
-            completionTokens: data.completionTokens,
-            totalTokens: data.totalTokens,
+            prompt_tokens: data.prompt_tokens,
+            completion_tokens: data.completion_tokens,
+            total_tokens: data.total_tokens,
             cost: data.cost,
             model: data.model,
             createdAt: data.createdAt || new Date().toISOString(),
@@ -96,9 +96,9 @@ export class UsageRepository extends BaseRepository {
           `
         MATCH (:Conversation {id: $conversationId})-[:HAS_USAGE]->(u:Usage)
         RETURN
-          coalesce(sum(u.promptTokens), 0) AS promptTokens,
-          coalesce(sum(u.completionTokens), 0) AS completionTokens,
-          coalesce(sum(u.totalTokens), 0) AS totalTokens,
+          coalesce(sum(u.prompt_tokens), 0) AS promptTokens,
+          coalesce(sum(u.completion_tokens), 0) AS completionTokens,
+          coalesce(sum(u.total_tokens), 0) AS totalTokens,
           coalesce(sum(u.cost), 0) AS cost
         `,
           { conversationId }
@@ -135,9 +135,9 @@ export class UsageRepository extends BaseRepository {
           `
         MATCH (:Starship {id: $starshipId})-[:HAS_USAGE]->(u:Usage)
         RETURN
-          coalesce(sum(u.promptTokens), 0) AS promptTokens,
-          coalesce(sum(u.completionTokens), 0) AS completionTokens,
-          coalesce(sum(u.totalTokens), 0) AS totalTokens,
+          coalesce(sum(u.prompt_tokens), 0) AS promptTokens,
+          coalesce(sum(u.completion_tokens), 0) AS completionTokens,
+          coalesce(sum(u.total_tokens), 0) AS totalTokens,
           coalesce(sum(u.cost), 0) AS cost
         `,
           { starshipId }

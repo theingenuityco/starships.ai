@@ -232,7 +232,7 @@ export class LLM extends BaseNode<LlmParams> {
               : undefined;
 
         // Cost provided by OpenRouter usage payload (USD)
-        const cost = typeof (usage as any)?.cost === 'number' ? (usage as any).cost : undefined;
+        const cost = typeof usage?.cost === 'number' ? usage.cost : undefined;
 
         // Prefer model from response metadata; no header dependency
         const usageModel = responseMetadata.model && responseMetadata.model.length > 0 ? responseMetadata.model : undefined;

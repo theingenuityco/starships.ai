@@ -684,22 +684,24 @@ export class ConversationService {
         }
 
         // Extract provider-reported usage (from LLMEvent.data.usage)
-        const llmUsage = (event as LLMEvent).data?.usage;
+        const llmEvent = event as LLMEvent;
+        const llmUsage = llmEvent.data?.usage;
+        const model = llmEvent.data?.model;
 
         // Build a strongly-typed usage payload with required numeric fields
-        // Defaults ensure compatibility with MessageUsage (promptTokens/completionTokens/totalTokens are required)
+        // Defaults ensure compatibility with MessageUsage (prompt_tokens/completion_tokens/total_tokens are required)
         const usagePayload = llmUsage
           ? {
-              promptTokens: typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0,
-              completionTokens: typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0,
-              totalTokens:
+              prompt_tokens: typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0,
+              completion_tokens: typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0,
+              total_tokens:
                 typeof llmUsage.total_tokens === 'number'
                   ? llmUsage.total_tokens
                   : (typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0) +
                     (typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0),
               // Cost in USD (OpenRouter usage.cost). Mandatory; default to 0 if missing.
-              cost: Number((llmUsage as any).cost) || 0,
-              ...(typeof (llmUsage as any).model === 'string' ? { model: (llmUsage as any).model } : {}),
+              cost: Number(llmUsage.cost) || 0,
+              ...(typeof model === 'string' ? { model } : {}),
             }
           : undefined;
         /**
@@ -713,11 +715,11 @@ export class ConversationService {
               await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,
-                promptTokens: usagePayload.promptTokens,
-                completionTokens: usagePayload.completionTokens,
-                totalTokens: usagePayload.totalTokens,
+                prompt_tokens: usagePayload.prompt_tokens,
+                completion_tokens: usagePayload.completion_tokens,
+                total_tokens: usagePayload.total_tokens,
                 cost: usagePayload.cost,
-                model: (usagePayload as any).model,
+                model: usagePayload.model,
               });
             }
           } catch (e) {

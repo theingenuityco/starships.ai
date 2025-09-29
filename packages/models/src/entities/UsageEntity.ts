@@ -32,19 +32,19 @@ export class UsageEntity implements UsageModel {
   @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
-  promptTokens!: number;
+  prompt_tokens!: number;
 
   @Expose()
   @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
-  completionTokens!: number;
+  completion_tokens!: number;
 
   @Expose()
   @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
-  totalTokens!: number;
+  total_tokens!: number;
 
   @Expose()
   @Transformers.NumberTransform()
@@ -86,9 +86,9 @@ export class UsageEntity implements UsageModel {
         id: dataRecord.id || 'temp-id', // replaced by repository auto-id
         starshipId: dataRecord.starshipId,
         conversationId: dataRecord.conversationId,
-        promptTokens: dataRecord.promptTokens,
-        completionTokens: dataRecord.completionTokens,
-        totalTokens: dataRecord.totalTokens,
+        prompt_tokens: dataRecord.prompt_tokens,
+        completion_tokens: dataRecord.completion_tokens,
+        total_tokens: dataRecord.total_tokens,
         cost: dataRecord.cost,
         model: dataRecord.model,
         createdAt: dataRecord.createdAt || new Date().toISOString(),

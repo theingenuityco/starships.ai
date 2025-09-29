@@ -668,7 +668,7 @@ export function useConversationStreamed(conversationId: string | null) {
   useEffect(() => {
     if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
     const last = chunks[chunks.length - 1]
-    if ((last as any)?.type === 'complete') {
+    if (last.type === 'complete') {
       queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
     }
   }, [chunks, conversationId, queryClient])

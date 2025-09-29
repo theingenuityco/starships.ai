@@ -2,6 +2,7 @@ import { UsageEntity } from '@/entities/UsageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
 import type { UsageModel, LLMUsage } from '@starships/protocol';
+import type { Neo4jConnection } from '@/helpers/database';
 
 /**
  * UsageRepository
@@ -10,7 +11,7 @@ import type { UsageModel, LLMUsage } from '@starships/protocol';
  *   (Starship)-[:HAS_USAGE]->(Usage)<-[:HAS_USAGE]-(Conversation)
  */
 export class UsageRepository extends BaseRepository {
-  constructor(connection?: any) {
+  constructor(connection?: Neo4jConnection) {
     super('UsageRepository', connection);
   }
 
@@ -87,12 +88,7 @@ export class UsageRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
-        const result = await conn.executeQuery<{
-          prompt_tokens: number;
-          completion_tokens: number;
-          total_tokens: number;
-          cost: number;
-        }>(
+        const result = await conn.executeQuery<LLMUsage>(
           `
         MATCH (:Conversation {id: $conversationId})-[:HAS_USAGE]->(u:Usage)
         RETURN
@@ -104,7 +100,12 @@ export class UsageRepository extends BaseRepository {
           { conversationId }
         );
 
-        const row = result?.[0] || ({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 } as any);
+        const row: LLMUsage = result?.[0] || {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+          cost: 0,
+        };
 
         return {
           prompt_tokens: Number(row.prompt_tokens) || 0,
@@ -126,12 +127,7 @@ export class UsageRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
-        const result = await conn.executeQuery<{
-          prompt_tokens: number;
-          completion_tokens: number;
-          total_tokens: number;
-          cost: number;
-        }>(
+        const result = await conn.executeQuery<LLMUsage>(
           `
         MATCH (:Starship {id: $starshipId})-[:HAS_USAGE]->(u:Usage)
         RETURN
@@ -143,7 +139,12 @@ export class UsageRepository extends BaseRepository {
           { starshipId }
         );
 
-        const row = result?.[0] || ({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 } as any);
+        const row: LLMUsage = result?.[0] || {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+          cost: 0,
+        };
 
         return {
           prompt_tokens: Number(row.prompt_tokens) || 0,

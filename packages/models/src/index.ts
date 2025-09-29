@@ -1,8 +1,6 @@
 // Database connections and utilities
-export { createConnection, getConnection, Neo4jConnection } from './helpers/database';
-export type { Neo4jConfig } from './helpers/database';
-
-export { convertNeo4jInt, convertNeo4jIntsInObject } from './helpers/database';
+export { createConnection, getConnection, PostgresConnection } from './helpers/database';
+export type { PostgresConfig } from './helpers/database';
 
 /* Entity exports */
 export { AgentEntity } from './entities/AgentEntity';

@@ -83,17 +83,6 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
             <div className="absolute inset-0 opacity-[0.08] pointer-events-none bg-[linear-gradient(to_right,currentColor_1px,transparent_1px)] [background-size:16px_100%]" />
           </div>
         </div>
-
-        {/* Optional: cost per 1k tokens display */}
-        <div className="mt-2 text-[11px] text-muted-foreground">
-          {total > 0 ? (
-            <span>
-              Avg cost: <span className="text-foreground font-medium">{formatPerK(costPerK)}</span>
-            </span>
-          ) : (
-            <span>Awaiting usage...</span>
-          )}
-        </div>
       </div>
     </div>
   )

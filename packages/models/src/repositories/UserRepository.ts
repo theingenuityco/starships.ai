@@ -8,18 +8,18 @@ export class UserRepository extends BaseRepository {
     super('UserRepository');
   }
 
-  async findAllUsers(): Promise<UserModel[]> {
+  async findAll(): Promise<UserModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const result = await super.findAll<Record<string, unknown>>('users');
+      const result = await super.findAllEntities<Record<string, unknown>>('users');
       return fromDatabaseArray(UserEntity, result);
-    }, 'findAllUsers');
+    }, 'findAll');
   }
 
-  async findUserById(id: string): Promise<UserModel | null> {
+  async findById(id: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
-      const result = await super.findById<Record<string, unknown>>('users', id);
+      const result = await super.findEntityById<Record<string, unknown>>('users', id);
       return result ? fromDatabase(UserEntity, result) : null;
-    }, 'findUserById');
+    }, 'findById');
   }
 
   async findByEmail(email: string): Promise<UserModel | null> {
@@ -68,7 +68,7 @@ export class UserRepository extends BaseRepository {
       const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
 
       if (Object.keys(filteredUpdateData).length === 0) {
-        return await this.findUserById(id);
+        return await this.findById(id);
       }
 
       // Update entity in database (camelCase → snake_case handled automatically)

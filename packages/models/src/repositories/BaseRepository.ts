@@ -1,19 +1,19 @@
 /**
- * Base repository class with standardized error handling and validation utilities
+ * Base repository class with standardized error handling and validation utilities for PostgreSQL
  */
 
-import { getConnection, Neo4jConnection } from '@/helpers/database';
+import { getConnection, PostgresConnection } from '@/helpers/database';
 import { AppError, ConflictError, DatabaseError, NotFoundError, ValidationError } from '@starships/errors';
 import { nanoid } from 'nanoid';
 
 /**
- * Base repository with standardized error handling and validation
+ * Base repository with standardized error handling and validation for PostgreSQL
  */
 export abstract class BaseRepository {
   protected serviceName: string;
-  private connection: Neo4jConnection | null = null;
+  private connection: PostgresConnection | null = null;
 
-  constructor(serviceName: string, connection?: Neo4jConnection) {
+  constructor(serviceName: string, connection?: PostgresConnection) {
     this.serviceName = serviceName;
     this.connection = connection || null;
   }
@@ -21,7 +21,7 @@ export abstract class BaseRepository {
   /**
    * Get database connection with lazy initialization and caching
    */
-  protected getConnection(): Neo4jConnection {
+  protected getConnection(): PostgresConnection {
     if (!this.connection) {
       this.connection = getConnection();
     }
@@ -50,18 +50,6 @@ export abstract class BaseRepository {
 
   /**
    * Handle database errors and convert to standardized error types
-   *
-   * This method analyzes various database error types and converts them into
-   * standardized application errors with proper context and error codes.
-   *
-   * @param error - The original database error
-   * @param operation - The operation that caused the error
-   * @param resource - The resource type being operated on (optional)
-   * @param resourceId - The specific resource ID (optional)
-   * @throws {ConflictError} For constraint violations
-   * @throws {DatabaseError} For connection, timeout, or query errors
-   *
-   * @protected
    */
   protected handleDatabaseError(error: unknown, operation: string, resource?: string, resourceId?: string): never {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -69,7 +57,7 @@ export abstract class BaseRepository {
       originalError: errorMessage,
     });
 
-    // Handle specific database error types
+    // Handle specific PostgreSQL error types
     if (this.isConstraintViolationError(error)) {
       throw new ConflictError('Database constraint violation', error instanceof Error ? error : undefined);
     }
@@ -92,13 +80,6 @@ export abstract class BaseRepository {
 
   /**
    * Handle not found scenarios with standardized error response
-   *
-   * @param resource - Type of resource that was not found
-   * @param resourceId - ID of the resource that was not found (optional)
-   * @param operation - Operation that was being performed (optional)
-   * @throws {NotFoundError} Always throws a standardized not found error
-   *
-   * @protected
    */
   protected handleNotFound(resource: string, resourceId?: string): never {
     throw new NotFoundError(resource, resourceId || 'unknown');
@@ -106,12 +87,6 @@ export abstract class BaseRepository {
 
   /**
    * Handle validation errors with detailed field-level error information
-   *
-   * @param fieldErrors - Array of field validation errors
-   * @param operation - Operation that triggered validation (optional)
-   * @throws {ValidationError} Always throws a standardized validation error
-   *
-   * @protected
    */
   protected handleValidationError(fieldErrors: Array<{ field: string; message: string; value?: unknown }>): never {
     const message = fieldErrors.map((e) => `${e.field}: ${e.message}`).join(', ');
@@ -120,14 +95,6 @@ export abstract class BaseRepository {
 
   /**
    * Handle conflict errors such as duplicate resources or constraint violations
-   *
-   * @param resource - Type of resource causing the conflict
-   * @param conflictReason - Human-readable reason for the conflict
-   * @param operation - Operation that caused the conflict (optional)
-   * @param resourceId - ID of the conflicting resource (optional)
-   * @throws {ConflictError} Always throws a standardized conflict error
-   *
-   * @protected
    */
   protected handleConflict(resource: string, conflictReason: string): never {
     throw new ConflictError(conflictReason);
@@ -135,20 +102,6 @@ export abstract class BaseRepository {
 
   /**
    * Wrap asynchronous repository operations with standardized error handling
-   *
-   * This method provides a consistent way to handle errors across all repository
-   * operations, ensuring that database errors are properly converted to application
-   * errors with appropriate context and error codes.
-   *
-   * @template T - Return type of the operation
-   * @param operation - The async operation to execute
-   * @param operationName - Name of the operation for error context
-   * @param resource - Resource type being operated on (optional)
-   * @param resourceId - Specific resource ID (optional)
-   * @returns Promise resolving to the operation result
-   * @throws {BaseError} Standardized application errors based on the underlying error
-   *
-   * @protected
    */
   protected async executeWithErrorHandling<T>(
     operation: () => Promise<T>,
@@ -171,16 +124,6 @@ export abstract class BaseRepository {
 
   /**
    * Wrap synchronous repository operations with standardized error handling
-   *
-   * @template T - Return type of the operation
-   * @param operation - The synchronous operation to execute
-   * @param operationName - Name of the operation for error context
-   * @param resource - Resource type being operated on (optional)
-   * @param resourceId - Specific resource ID (optional)
-   * @returns The operation result
-   * @throws {BaseError} Standardized application errors based on the underlying error
-   *
-   * @protected
    */
   protected executeWithErrorHandlingSync<T>(operation: () => T, operationName: string, resource?: string, resourceId?: string): T {
     try {
@@ -201,27 +144,25 @@ export abstract class BaseRepository {
   // ============================================================================
 
   /**
-   * Check if error is a constraint violation
+   * Check if error is a constraint violation (PostgreSQL specific)
    */
   private isConstraintViolationError(error: unknown): boolean {
     if (!error) return false;
 
-    const constraintPatterns = [
-      'constraint',
-      'unique',
-      'duplicate',
-      'foreign key',
-      'check constraint',
-      'not null',
-      'primary key',
-      'constraintvalidationfailed',
-      'neo.clienterror.schema.constraintvalidationfailed',
+    const pgError = error as { code?: string; constraint?: string };
+
+    // PostgreSQL constraint violation error codes
+    const constraintErrorCodes = [
+      '23000', // integrity_constraint_violation
+      '23001', // restrict_violation
+      '23502', // not_null_violation
+      '23503', // foreign_key_violation
+      '23505', // unique_violation
+      '23514', // check_violation
+      '23P01', // exclusion_violation
     ];
 
-    const errorMessage = (error as { message?: string }).message || '';
-    const errorCode = (error as { code?: string }).code || '';
-
-    return constraintPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern) || errorCode.toLowerCase().includes(pattern));
+    return constraintErrorCodes.includes(pgError.code || '');
   }
 
   /**
@@ -230,12 +171,17 @@ export abstract class BaseRepository {
   private isConnectionError(error: unknown): boolean {
     if (!error) return false;
 
-    const connectionPatterns = ['connection', 'connect', 'econnrefused', 'enotfound', 'network', 'timeout'];
+    const pgError = error as { code?: string; message?: string };
+    const connectionErrorCodes = ['08000', '08003', '08006', '08001', '08004'];
+    const errorMessage = pgError.message?.toLowerCase() || '';
 
-    const errorMessage = (error as { message?: string }).message || '';
-    const errorCode = (error as { code?: string }).code || '';
-
-    return connectionPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern) || errorCode.toLowerCase().includes(pattern));
+    return (
+      connectionErrorCodes.includes(pgError.code || '') ||
+      errorMessage.includes('connection') ||
+      errorMessage.includes('connect') ||
+      errorMessage.includes('econnrefused') ||
+      errorMessage.includes('enotfound')
+    );
   }
 
   /**
@@ -244,12 +190,16 @@ export abstract class BaseRepository {
   private isTimeoutError(error: unknown): boolean {
     if (!error) return false;
 
-    const timeoutPatterns = ['timeout', 'etimedout', 'time out', 'timed out'];
+    const pgError = error as { code?: string; message?: string };
+    const errorMessage = pgError.message?.toLowerCase() || '';
 
-    const errorMessage = (error as { message?: string }).message || '';
-    const errorCode = (error as { code?: string }).code || '';
-
-    return timeoutPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern) || errorCode.toLowerCase().includes(pattern));
+    return (
+      pgError.code === '57014' || // query_canceled
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('etimedout') ||
+      errorMessage.includes('time out') ||
+      errorMessage.includes('timed out')
+    );
   }
 
   /**
@@ -258,19 +208,18 @@ export abstract class BaseRepository {
   private isQueryError(error: unknown): boolean {
     if (!error) return false;
 
-    const queryPatterns = ['syntax error', 'invalid query', 'query failed', 'sql error', 'cypher error'];
+    const pgError = error as { code?: string; message?: string };
+    const queryErrorCodes = ['42000', '42601', '42501', '42602', '42622', '42723'];
+    const errorMessage = pgError.message?.toLowerCase() || '';
 
-    const errorMessage = (error as { message?: string }).message || '';
-
-    return queryPatterns.some((pattern) => errorMessage.toLowerCase().includes(pattern));
+    return (
+      queryErrorCodes.includes(pgError.code || '') ||
+      errorMessage.includes('syntax error') ||
+      errorMessage.includes('invalid query') ||
+      errorMessage.includes('query failed') ||
+      errorMessage.includes('sql error')
+    );
   }
-
-  // ============================================================================
-  // VALIDATION HELPERS
-  // ============================================================================
-  // Note: Entity-specific validation is now handled by individual entities
-  // using class-validator decorators. These methods are kept for backward compatibility
-  // with repositories that haven't migrated to the entity validation pattern.
 
   // ============================================================================
   // SIMPLIFIED ENTITY CREATION HELPERS
@@ -278,18 +227,8 @@ export abstract class BaseRepository {
 
   /**
    * Create a new entity with automatic ID generation
-   * This method automatically generates a nanoid for the entity using application logic
-   *
-   * @param nodeLabel - Neo4j node label (e.g., 'User', 'Starship')
-   * @param properties - Object properties to set on the node (excluding id)
-   * @returns The created entity with generated ID
    */
-  protected async createEntityWithAutoId<T>(
-    nodeLabel: string,
-    properties: Record<string, unknown>,
-    connection?: Neo4jConnection
-  ): Promise<T> {
-    // Use provided connection or get from centralized getConnection method
+  protected async createEntity<T>(tableName: string, properties: Record<string, unknown>, connection?: PostgresConnection): Promise<T> {
     const conn = connection || this.getConnection();
 
     // Generate nanoid in application layer for consistent, compact IDs
@@ -297,81 +236,110 @@ export abstract class BaseRepository {
 
     // Remove any existing 'id' from properties and add the generated one
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _existingId, ...propsWithoutId } = properties;
+    const { id: _id, ...propsWithoutId } = properties;
     const propsWithGeneratedId = { ...propsWithoutId, id: generatedId };
 
-    const result = await conn.executeWrite(
-      `CREATE (n:${nodeLabel})
-       SET n += $props
-       RETURN n`,
-      { props: propsWithGeneratedId }
-    );
+    // Build column names and placeholders
+    const columns = Object.keys(propsWithGeneratedId);
+    const placeholders = columns.map((_, index) => `$${index + 1}`);
+    const values = Object.values(propsWithGeneratedId);
+
+    const query = `
+      INSERT INTO ${tableName} (${columns.join(', ')})
+      VALUES (${placeholders.join(', ')})
+      RETURNING *
+    `;
+
+    const result = await conn.query<T>(query, values);
 
     if (!result || result.length === 0) {
-      throw new Error(`Failed to create ${nodeLabel}`);
+      throw new Error(`Failed to create ${tableName}`);
     }
 
-    return result[0].n as T;
+    return result[0];
   }
 
   /**
-   * MERGE (upsert) operation with automatic ID generation on CREATE
-   * Uses MERGE for upsert operations while ensuring ID is only set on CREATE
-   *
-   * @param nodeLabel - Neo4j node label
-   * @param matchProperties - Properties used for MERGE matching
-   * @param createProperties - Properties set only on CREATE
-   * @param updateProperties - Properties set only on MATCH
-   * @param connection - Optional database connection (for testing)
-   * @returns The merged entity
+   * Update an entity by ID
    */
-  protected async mergeEntityWithAutoId<T>(
-    nodeLabel: string,
-    matchProperties: Record<string, unknown>,
-    createProperties: Record<string, unknown> = {},
-    updateProperties: Record<string, unknown> = {},
-    connection?: Neo4jConnection
-  ): Promise<T> {
-    // Use provided connection or get from centralized getConnection method
+  protected async updateEntity<T>(
+    tableName: string,
+    id: string,
+    updates: Record<string, unknown>,
+    connection?: PostgresConnection
+  ): Promise<T | null> {
     const conn = connection || this.getConnection();
 
-    // Generate nanoid in application layer
-    const generatedId = nanoid();
-
-    // Remove ID from all property sets and add generated ID to create properties
+    // Remove id from updates and add updated_at timestamp
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _matchId, ...matchProps } = matchProperties;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _createId, ...createProps } = createProperties;
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _updateId, ...updateProps } = updateProperties;
+    const { id: _updateId, ...updateProps } = updates;
+    const propsWithTimestamp = { ...updateProps, updated_at: new Date().toISOString() };
 
-    // Add generated ID to create properties
-    const createPropsWithId = { ...createProps, id: generatedId };
+    // Build SET clause
+    const setClause = Object.keys(propsWithTimestamp)
+      .map((key, index) => `${key} = $${index + 2}`)
+      .join(', ');
 
-    let cypher = `MERGE (n:${nodeLabel} {${Object.keys(matchProps)
-      .map((key) => `${key}: $match.${key}`)
-      .join(', ')}})`;
+    const values = [id, ...Object.values(propsWithTimestamp)];
 
-    cypher += `\nON CREATE SET n += $create`;
+    const query = `
+      UPDATE ${tableName}
+      SET ${setClause}
+      WHERE id = $1
+      RETURNING *
+    `;
 
-    if (Object.keys(updateProps).length > 0) {
-      cypher += `\nON MATCH SET n += $update`;
+    const result = await conn.query<T>(query, values);
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * Delete an entity by ID
+   */
+  protected async deleteEntity(tableName: string, id: string, connection?: PostgresConnection): Promise<boolean> {
+    const conn = connection || this.getConnection();
+
+    const query = `DELETE FROM ${tableName} WHERE id = $1`;
+    const result = await conn.query(query, [id]);
+
+    return (result as unknown as { rowCount: number }).rowCount > 0;
+  }
+
+  /**
+   * Find entity by ID
+   */
+  protected async findById<T>(tableName: string, id: string, connection?: PostgresConnection): Promise<T | null> {
+    const conn = connection || this.getConnection();
+
+    const query = `SELECT * FROM ${tableName} WHERE id = $1`;
+    const result = await conn.query<T>(query, [id]);
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * Find all entities in a table
+   */
+  protected async findAll<T>(tableName: string, orderBy: string = 'created_at DESC', connection?: PostgresConnection): Promise<T[]> {
+    const conn = connection || this.getConnection();
+
+    const query = `SELECT * FROM ${tableName} ORDER BY ${orderBy}`;
+    return await conn.query<T>(query);
+  }
+
+  /**
+   * Count entities in a table
+   */
+  protected async count(tableName: string, whereClause?: string, params?: unknown[], connection?: PostgresConnection): Promise<number> {
+    const conn = connection || this.getConnection();
+
+    let query = `SELECT COUNT(*) as count FROM ${tableName}`;
+    if (whereClause) {
+      query += ` WHERE ${whereClause}`;
     }
 
-    cypher += `\nRETURN n`;
-
-    const parameters: Record<string, unknown> = {
-      match: matchProps,
-      create: createPropsWithId,
-    };
-
-    if (Object.keys(updateProps).length > 0) {
-      parameters.update = updateProps;
-    }
-
-    const result = await conn.executeWrite(cypher, parameters);
-    return result[0].n as T;
+    const result = await conn.queryOne<{ count: string }>(query, params || []);
+    return result ? parseInt(result.count, 10) : 0;
   }
 
   // ============================================================================
@@ -379,7 +347,7 @@ export abstract class BaseRepository {
   // ============================================================================
 
   /**
-   * Log repository operations (can be overridden by subclasses)
+   * Log repository operations
    */
   protected log(level: 'debug' | 'info' | 'warn' | 'error', message: string, context?: unknown): void {
     const logMessage = `[${this.serviceName.toUpperCase()}] ${message}`;

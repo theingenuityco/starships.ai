@@ -308,7 +308,7 @@ export abstract class BaseRepository {
   /**
    * Find entity by ID
    */
-  protected async findById<T>(tableName: string, id: string, connection?: PostgresConnection): Promise<T | null> {
+  protected async findEntityById<T>(tableName: string, id: string, connection?: PostgresConnection): Promise<T | null> {
     const conn = connection || this.getConnection();
 
     const query = `SELECT * FROM ${tableName} WHERE id = $1`;
@@ -320,7 +320,11 @@ export abstract class BaseRepository {
   /**
    * Find all entities in a table
    */
-  protected async findAll<T>(tableName: string, orderBy: string = 'created_at DESC', connection?: PostgresConnection): Promise<T[]> {
+  protected async findAllEntities<T>(
+    tableName: string,
+    orderBy: string = 'created_at DESC',
+    connection?: PostgresConnection
+  ): Promise<T[]> {
     const conn = connection || this.getConnection();
 
     const query = `SELECT * FROM ${tableName} ORDER BY ${orderBy}`;
@@ -330,7 +334,12 @@ export abstract class BaseRepository {
   /**
    * Count entities in a table
    */
-  protected async count(tableName: string, whereClause?: string, params?: unknown[], connection?: PostgresConnection): Promise<number> {
+  protected async countEntities(
+    tableName: string,
+    whereClause?: string,
+    params?: unknown[],
+    connection?: PostgresConnection
+  ): Promise<number> {
     const conn = connection || this.getConnection();
 
     let query = `SELECT COUNT(*) as count FROM ${tableName}`;

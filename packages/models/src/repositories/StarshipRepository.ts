@@ -14,7 +14,7 @@ export class StarshipRepository extends BaseRepository {
   async findAll(): Promise<StarshipModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const result = await super.findAll<Record<string, unknown>>('starships', 'created_at DESC');
+        const result = await super.findAllEntities<Record<string, unknown>>('starships', 'created_at DESC');
         return fromDatabaseArray(StarshipEntity, result);
       },
       'findAll',
@@ -25,7 +25,7 @@ export class StarshipRepository extends BaseRepository {
   async findById(id: string): Promise<StarshipModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const result = await super.findById<Record<string, unknown>>('starships', id);
+        const result = await super.findEntityById<Record<string, unknown>>('starships', id);
         return result ? fromDatabase(StarshipEntity, result) : null;
       },
       'findById',
@@ -359,7 +359,7 @@ export class StarshipRepository extends BaseRepository {
         }
 
         const result = await connection.queryOne<{ count: string }>(query, params);
-        return result?.count === '0' ?? false;
+        return result?.count === '0';
       },
       'isSlugAvailable',
       'Starship'

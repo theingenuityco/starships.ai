@@ -1,9 +1,10 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -260,7 +261,6 @@ type StreamedChunk =
   | { type: 'replace_tool_calls'; value: any[] }
   | { type: 'replace_content'; value: string }
   | { type: 'replace_reasoning'; value: string }
-  | { type: 'replace_usage'; value: any }
   | { type: 'update_last_assistant'; fields: Partial<ClientMessage> }
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
   | { type: 'complete' }
@@ -358,7 +358,6 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             const replaceToolCallsRe = /^\/messages\/(?:-1|\d+)\/tool_calls$/i
             const replaceContentRe = /^\/messages\/(?:-1|\d+)\/content$/i
             const replaceReasoningRe = /^\/messages\/(?:-1|\d+)\/reasoning$/i
-            const replaceUsageRe = /^\/messages\/(?:-1|\d+)\/usage$/i
             const replaceIdRe = /^\/messages\/(?:-1|\d+)\/id$/i
             const replaceUpdatedAtRe = /^\/messages\/(?:-1|\d+)\/updatedAt$/i
             const replaceStreamingRe = /^\/messages\/(?:-1|\d+)\/streaming$/i
@@ -411,13 +410,6 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             }
             if (op === 'replace' && replaceReasoningRe.test(path)) {
               push({ type: 'replace_reasoning', value: typeof raw.value === 'string' ? raw.value : '' })
-              if (seenComplete) schedulePostCompleteEnd()
-              break
-            }
-            // Replace usage (provider-reported tokens/cost/model)
-            if (op === 'replace' && replaceUsageRe.test(path)) {
-              const value = raw.value
-              push({ type: 'replace_usage', value })
               if (seenComplete) schedulePostCompleteEnd()
               break
             }
@@ -617,16 +609,6 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       }
       return messages
     }
-    case 'replace_usage': {
-      const messages = clone(acc)
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === 'assistant') {
-          ;(messages[i] as any).usage = chunk.value
-          break
-        }
-      }
-      return messages
-    }
     case 'mark_last_assistant_streaming': {
       const messages = clone(acc)
       for (let i = messages.length - 1; i >= 0; i--) {
@@ -681,6 +663,15 @@ export function useConversationStreamed(conversationId: string | null) {
   // Fold streamed chunks into final message array in-memory
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
+
+  // Invalidate usage totals on end-of-turn (SSE 'complete') to update context bar post-turn
+  useEffect(() => {
+    if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
+    const last = chunks[chunks.length - 1]
+    if ((last as any)?.type === 'complete') {
+      queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
+    }
+  }, [chunks, conversationId, queryClient])
 
   // Derived streaming flags
   const isAssistantStreaming = useMemo(() => computedMessages.some(m => (m as any)?.streaming === true), [computedMessages])

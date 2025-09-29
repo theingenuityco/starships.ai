@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
-import { Check, Copy, ExternalLink, Loader2, Wrench, MessageCircleMore, Coins } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, Wrench, MessageCircleMore } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useState, useMemo, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -36,14 +36,6 @@ interface MessageContentProps {
   toolCalls?: NonNullable<MessageModel['tool_calls']>
   toolResults?: any[]
   messageType?: MessageModel['messageType']
-  // Optional usage/cost metadata for assistant messages
-  usage?: {
-    promptTokens: number
-    completionTokens: number
-    totalTokens: number
-    cost: number
-    model?: string
-  }
 }
 
 export function ConversationMessageContent({
@@ -61,17 +53,9 @@ export function ConversationMessageContent({
   toolCalls,
   toolResults = [],
   messageType,
-  usage,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
-
-  // Dynamic USD formatting: show 6 decimals by default, increase precision for tiny non-zero costs
-  const formatUSD = (v: number) => {
-    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.000000'
-    if (v > 0 && v < 1e-6) return `$${v.toFixed(9)}`
-    return `$${v.toFixed(6)}`
-  }
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
@@ -551,16 +535,6 @@ export function ConversationMessageContent({
             <code>{JSON.stringify(parsedJson, null, 2)}</code>
           </pre>
         </Card>
-      )}
-
-      {/* Minimal per-message cost with subtle pill background */}
-      {messageType !== 'tool_result' && usage && (
-        <div className="mt-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/60 px-2 py-[2px] text-[10px] border border-border/50 text-muted-foreground" aria-label="Message cost">
-            <Coins className="w-3 h-3 text-amber-500" aria-hidden="true" />
-            <span className="font-medium text-foreground">{formatUSD(Number(usage.cost))}</span>
-          </span>
-        </div>
       )}
 
       {/* Copy button for entire message */}

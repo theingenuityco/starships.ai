@@ -186,7 +186,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area or Welcome Screen */}
       {showMessagesArea ? (
         <>
-          <ConversationContextBar messages={liveMessages} />
+          <ConversationContextBar conversationId={currentConversationId} />
           <div className="flex-1 min-h-0">
             <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
           </div>

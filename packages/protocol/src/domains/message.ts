@@ -21,25 +21,10 @@ export type MessageType =
   | 'error'
   | 'tool_result';
 
-export interface MessageUsage {
-  /** Prompt (input) tokens counted by provider */
-  promptTokens: number;
-  /** Completion (output) tokens counted by provider */
-  completionTokens: number;
-  /** Total tokens for the request (prompt + completion) */
-  totalTokens: number;
-  /** Provider-reported cost for this request in USD (mandatory) */
-  cost: number;
-  /** Provider/model identifier for the request (if available) */
-  model?: string;
-}
-
 export interface Message extends LlmMessage {
   messageType: MessageType;
   // Optional model-provided reasoning/thinking text
   reasoning?: string;
-  // Optional per-request usage and cost metadata
-  usage?: MessageUsage;
 }
 
 /**

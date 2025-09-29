@@ -138,7 +138,7 @@ export class LLM extends BaseNode<LlmParams> {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Usage accounting enabled; rely on SSE usage payload only
+      // Usage accounting (if present) is handled via SSE usage payload from the provider
 
       // If streaming is disabled (tools present), return the full JSON (includes tool_calls)
       if (!useStream) {

@@ -90,8 +90,6 @@ export class MessageRepository extends BaseRepository {
           ...(entity.tool_calls ? { tool_calls: entity.tool_calls } : {}),
           // Persist tool_call_id when provided (tool_result linking)
           ...(entity.tool_call_id ? { tool_call_id: entity.tool_call_id } : {}),
-          // Persist provider-reported usage/cost metadata when provided
-          ...(entity.usage ? { usage: entity.usage } : {}),
         };
 
         // Create entity instance from plain object, then serialize

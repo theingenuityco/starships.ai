@@ -105,6 +105,7 @@ describe('LLM Node Handler', () => {
             frequency_penalty: 0,
             presence_penalty: 0,
             stream: true,
+            usage: { include: true },
           }),
         })
       );
@@ -171,6 +172,7 @@ describe('LLM Node Handler', () => {
             frequency_penalty: 0.5,
             presence_penalty: -0.2,
             stream: true,
+            usage: { include: true },
           }),
         })
       );

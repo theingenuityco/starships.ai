@@ -1,6 +1,7 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
 import { EnvironmentService } from '@/services/EnvironmentService';
+import { UsageService } from '@/services/UsageService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner } from '@starships/autopilot';
 import type { ToolParams, ExecutionItem, AgentParams, ExecutionEvent, LLMEvent, ToolEvent } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
@@ -27,6 +28,7 @@ export class ConversationService {
   private messageService: MessageService;
   private streamingService: StreamingService;
   private environmentService: EnvironmentService;
+  private usageService: UsageService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Track accumulated tool_calls during streaming per conversation
@@ -49,6 +51,7 @@ export class ConversationService {
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
     this.environmentService = new EnvironmentService();
+    this.usageService = new UsageService();
     // Choose default runner (child process) with proper limits
     this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
   }
@@ -699,13 +702,27 @@ export class ConversationService {
               ...(typeof (llmUsage as any).model === 'string' ? { model: (llmUsage as any).model } : {}),
             }
           : undefined;
-        // Stream usage as a replace on the current assistant placeholder before final persistence
-        if (usagePayload && this.streamingService && this.streamingService.isActive(conversationId)) {
-          await this.streamingService.broadcastDelta(conversationId, {
-            op: 'replace',
-            path: '/messages/-1/usage',
-            value: usagePayload,
-          });
+        /**
+         * Persist usage at end-of-turn (no per-token streaming). This records usage in the Usage model
+         * and links it to both Starship and Conversation.
+         */
+        if (usagePayload) {
+          try {
+            const starship = await this.getConversationStarship(conversationId);
+            if (starship) {
+              await this.usageService.createUsageForTurn({
+                starshipId: starship.id,
+                conversationId,
+                promptTokens: usagePayload.promptTokens,
+                completionTokens: usagePayload.completionTokens,
+                totalTokens: usagePayload.totalTokens,
+                cost: usagePayload.cost,
+                model: (usagePayload as any).model,
+              });
+            }
+          } catch (e) {
+            console.error('[STREAMING] Failed to persist usage record:', e);
+          }
         }
 
         const finalContent = this.streamingContent.get(conversationId) || '';
@@ -747,7 +764,6 @@ export class ConversationService {
                     },
                   })),
                 }),
-                ...(usagePayload ? { usage: usagePayload } : {}),
               });
 
               await this.streamingService.broadcastDelta(conversationId, {

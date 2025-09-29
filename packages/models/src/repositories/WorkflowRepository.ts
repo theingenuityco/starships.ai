@@ -34,9 +34,6 @@ export class WorkflowRepository extends BaseRepository {
   async create(entity: Omit<WorkflowModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>): Promise<WorkflowModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Use WorkflowEntity validation
-        await WorkflowEntity.validate(entity, 'create');
-
         const now = new Date().toISOString();
 
         // Prepare workflow data with defaults and validation
@@ -59,16 +56,13 @@ export class WorkflowRepository extends BaseRepository {
           },
         };
 
-        // Create entity instance from plain object, then serialize
-        const workflowEntity = toEntityInstance(WorkflowEntity, workflowData);
-        const result = await this.createEntityWithAutoId<WorkflowModel>('Workflow', toDatabase(workflowEntity));
+        // Validate using WorkflowEntity
+        await WorkflowEntity.validate(workflowData, 'create');
 
-        // Create relationship with starship if starshipId is provided
-        if (result.starshipId) {
-          await this.linkToStarship(result.id, result.starshipId);
-        }
+        // Convert entity to database format and create
+        const databaseFormat = toDatabase(toEntityInstance(WorkflowEntity, workflowData));
+        const result = await this.createEntity<Record<string, unknown>>('workflows', databaseFormat);
 
-        // Use WorkflowEntity for consistent mapping
         return fromDatabase(WorkflowEntity, result);
       },
       'create',
@@ -82,84 +76,24 @@ export class WorkflowRepository extends BaseRepository {
         // Use WorkflowEntity validation for updates
         await WorkflowEntity.validate(updates, 'update');
 
-        const connection = this.getConnection();
-        const setFields = [];
-        const params: Record<string, unknown> = { id };
+        const updateProps = {
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
 
-        // Handle updatable fields with proper serialization
-        if (updates.name !== undefined) {
-          setFields.push('w.name = $name');
-          params.name = updates.name;
-        }
-        if (updates.description !== undefined) {
-          setFields.push('w.description = $description');
-          params.description = updates.description;
-        }
-        if (updates.category !== undefined) {
-          setFields.push('w.category = $category');
-          params.category = updates.category;
-        }
-        if (updates.version !== undefined) {
-          setFields.push('w.version = $version');
-          params.version = updates.version;
-        }
-        if (updates.isPublic !== undefined) {
-          setFields.push('w.isPublic = $isPublic');
-          params.isPublic = updates.isPublic;
-        }
-        if (updates.tags !== undefined) {
-          setFields.push('w.tags = $tags');
-          params.tags = updates.tags;
-        }
-        if (updates.rating !== undefined) {
-          setFields.push('w.rating = $rating');
-          params.rating = updates.rating;
-        }
-        if (updates.executionMode !== undefined) {
-          setFields.push('w.executionMode = $executionMode');
-          params.executionMode = updates.executionMode;
-        }
-        if (updates.allowedStarshipClasses !== undefined) {
-          setFields.push('w.allowedStarshipClasses = $allowedStarshipClasses');
-          params.allowedStarshipClasses = updates.allowedStarshipClasses;
-        }
-        if (updates.timeout !== undefined) {
-          setFields.push('w.timeout = $timeout');
-          params.timeout = updates.timeout;
-        }
-        if (updates.blueprint !== undefined) {
-          setFields.push('w.blueprint = $blueprint');
-          // Create entity instance to handle blueprint serialization
-          const blueprintEntity = toEntityInstance(WorkflowEntity, { blueprint: updates.blueprint });
-          const serialized = toDatabase(blueprintEntity);
-          params.blueprint = serialized.blueprint;
-        }
-        if (updates.starshipId !== undefined) {
-          setFields.push('w.starshipId = $starshipId');
-          params.starshipId = updates.starshipId;
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(WorkflowEntity, updateProps));
+
+        // Filter out protected fields (id, createdAt)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return await this.findById(id);
         }
 
-        if (setFields.length === 0) {
-          return this.findById(id);
-        }
-
-        // Always update the updatedAt field
-        setFields.push('w.updatedAt = $updatedAt');
-        params.updatedAt = new Date().toISOString();
-
-        const result = await connection.executeWrite<{ w: WorkflowModel }>(
-          `MATCH (w:Workflow) WHERE w.id = $id
-           SET ${setFields.join(', ')}
-           RETURN w`,
-          params
-        );
-
-        if (result.length === 0) {
-          this.handleNotFound('Workflow', id);
-        }
-
-        // Use WorkflowEntity for consistent mapping
-        return fromDatabase(WorkflowEntity, result[0].w);
+        const result = await this.updateEntity<Record<string, unknown>>('workflows', id, filteredUpdateData);
+        return result ? fromDatabase(WorkflowEntity, result) : null;
       },
       'update',
       'Workflow',
@@ -170,13 +104,7 @@ export class WorkflowRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (w:Workflow) WHERE w.id = $id DETACH DELETE w RETURN count(w) as deletedCount',
-          { id }
-        );
-
-        return result[0]?.deletedCount > 0;
+        return await this.deleteEntity('workflows', id);
       },
       'delete',
       'Workflow',
@@ -188,14 +116,11 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) WHERE w.authorId = $authorId RETURN w ORDER BY w.updatedAt DESC',
-          { authorId }
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM workflows WHERE author_id = $1 ORDER BY updated_at DESC',
+          [authorId]
         );
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'findByAuthor',
       'Workflow'
@@ -206,14 +131,10 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) WHERE w.category = $category RETURN w ORDER BY w.name',
-          { category }
-        );
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM workflows WHERE category = $1 ORDER BY name', [
+          category,
+        ]);
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'findByCategory',
       'Workflow'
@@ -224,14 +145,10 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) WHERE w.starshipId = $starshipId RETURN w ORDER BY w.name',
-          { starshipId }
-        );
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM workflows WHERE starship_id = $1 ORDER BY name', [
+          starshipId,
+        ]);
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'findByStarshipId',
       'Workflow'
@@ -242,14 +159,8 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) WHERE ANY(tag IN $tags WHERE tag IN w.tags) RETURN w ORDER BY w.name',
-          { tags }
-        );
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM workflows WHERE tags && $1 ORDER BY name', [tags]);
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'findByTags',
       'Workflow'
@@ -260,14 +171,11 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          'MATCH (w:Workflow) WHERE w.isPublic = true RETURN w ORDER BY w.usageCount DESC, w.rating DESC SKIP $offset LIMIT $limit',
-          { limit, offset }
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM workflows WHERE is_public = true ORDER BY usage_count DESC, rating DESC LIMIT $1 OFFSET $2',
+          [limit, offset]
         );
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'findPublic',
       'Workflow'
@@ -278,18 +186,15 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        // Simple text search if full-text index is not available
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(
-          `MATCH (w:Workflow) 
-           WHERE toLower(w.name) CONTAINS toLower($query) 
-              OR toLower(w.description) CONTAINS toLower($query)
-           RETURN w ORDER BY w.usageCount DESC LIMIT 20`,
-          { query }
+        // Using PostgreSQL full-text search
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT * FROM workflows
+           WHERE LOWER(name) LIKE LOWER($1)
+              OR LOWER(description) LIKE LOWER($1)
+           ORDER BY usage_count DESC LIMIT 20`,
+          [`%${query}%`]
         );
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'searchWorkflows',
       'Workflow'
@@ -306,41 +211,39 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        let query = 'MATCH (w:Workflow) WHERE 1=1';
-        const params: Record<string, unknown> = {};
+        let query = 'SELECT * FROM workflows WHERE 1=1';
+        const params: unknown[] = [];
+        let paramIndex = 1;
 
         if (filters.category) {
-          query += ' AND w.category = $category';
-          params.category = filters.category;
+          query += ` AND category = $${paramIndex++}`;
+          params.push(filters.category);
         }
 
         if (filters.authorId) {
-          query += ' AND w.authorId = $authorId';
-          params.authorId = filters.authorId;
+          query += ` AND author_id = $${paramIndex++}`;
+          params.push(filters.authorId);
         }
 
         if (filters.isPublic !== undefined) {
-          query += ' AND w.isPublic = $isPublic';
-          params.isPublic = filters.isPublic;
+          query += ` AND is_public = $${paramIndex++}`;
+          params.push(filters.isPublic);
         }
 
         if (filters.tags && filters.tags.length > 0) {
-          query += ' AND ANY(tag IN $tags WHERE tag IN w.tags)';
-          params.tags = filters.tags;
+          query += ` AND tags && $${paramIndex++}`;
+          params.push(filters.tags);
         }
 
         if (filters.starshipClass) {
-          query += ' AND $starshipClass IN w.allowedStarshipClasses';
-          params.starshipClass = filters.starshipClass;
+          query += ` AND $${paramIndex++} = ANY(allowed_starship_classes)`;
+          params.push(filters.starshipClass);
         }
 
-        query += ' RETURN w ORDER BY w.usageCount DESC, w.rating DESC';
+        query += ' ORDER BY usage_count DESC, rating DESC';
 
-        const result = await connection.executeQuery<{ w: WorkflowModel }>(query, params);
-        return fromDatabaseArray(
-          WorkflowEntity,
-          result.map((record) => record.w)
-        );
+        const result = await connection.query<Record<string, unknown>>(query, params);
+        return fromDatabaseArray(WorkflowEntity, result);
       },
       'findWithFilters',
       'Workflow'
@@ -351,14 +254,12 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.executeWrite(
-          `MATCH (w:Workflow) WHERE w.id = $id 
-           SET w.usageCount = COALESCE(w.usageCount, 0) + 1,
-               w.updatedAt = $updatedAt`,
-          {
-            id,
-            updatedAt: new Date().toISOString(),
-          }
+        await connection.query(
+          `UPDATE workflows
+           SET usage_count = COALESCE(usage_count, 0) + 1,
+               updated_at = $2
+           WHERE id = $1`,
+          [id, new Date().toISOString()]
         );
       },
       'incrementUsageCount',
@@ -371,11 +272,7 @@ export class WorkflowRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.executeWrite('MATCH (w:Workflow) WHERE w.id = $id SET w.rating = $rating, w.updatedAt = $timestamp', {
-          id,
-          rating,
-          timestamp: new Date().toISOString(),
-        });
+        await connection.query('UPDATE workflows SET rating = $2, updated_at = $3 WHERE id = $1', [id, rating, new Date().toISOString()]);
       },
       'updateRating',
       'Workflow',
@@ -385,22 +282,17 @@ export class WorkflowRepository extends BaseRepository {
 
   /**
    * Create relationship between existing workflow and starship
+   * In PostgreSQL, this is handled by the starship_id foreign key
    */
   async linkToStarship(workflowId: string, starshipId: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.executeWrite(
-          `MATCH (s:Starship {id: $starshipId}), (w:Workflow {id: $workflowId})
-           CREATE (w)-[:DEPLOYED_ON {
-             deployedAt: $timestamp,
-             deployedBy: 'system'
-           }]->(s)`,
-          {
-            starshipId,
-            workflowId,
-            timestamp: new Date().toISOString(),
-          }
+        await connection.query(
+          `UPDATE workflows
+           SET starship_id = $2, updated_at = $3
+           WHERE id = $1`,
+          [workflowId, starshipId, new Date().toISOString()]
         );
       },
       'linkToStarship',
@@ -418,26 +310,15 @@ export class WorkflowRepository extends BaseRepository {
         const timestamp = new Date().toISOString();
 
         // Update workflow's starshipId
-        const result = await connection.executeWrite<{ count: number }>(
-          `MATCH (w:Workflow) WHERE w.id = $workflowId
-           SET w.starshipId = $starshipId, w.updatedAt = $timestamp
-           RETURN count(w) as count`,
-          { workflowId, starshipId, timestamp }
+        const result = await connection.query(
+          `UPDATE workflows
+           SET starship_id = $2, updated_at = $3
+           WHERE id = $1`,
+          [workflowId, starshipId, timestamp]
         );
 
-        if (!result[0] || result[0].count === 0) {
+        if ((result as unknown as { rowCount: number }).rowCount === 0) {
           this.handleNotFound('Workflow', workflowId);
-        }
-
-        // Update Neo4j relationship for backward compatibility
-        try {
-          // Remove existing DEPLOYED_ON relationships
-          await connection.executeWrite('MATCH (w:Workflow {id: $workflowId})-[r:DEPLOYED_ON]->() DELETE r', { workflowId });
-
-          // Create new DEPLOYED_ON relationship
-          await this.linkToStarship(workflowId, starshipId);
-        } catch (error) {
-          console.warn('Failed to update Neo4j relationship for workflow deployment:', error);
         }
       },
       'updateStarshipId',

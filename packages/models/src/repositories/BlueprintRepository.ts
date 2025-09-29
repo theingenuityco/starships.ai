@@ -1,54 +1,23 @@
 /**
  * BlueprintRepository - Repository for autopilot blueprints
  *
- * Handles CRUD operations for Blueprint, Node, and Edge entities
- * following BaseRepository patterns and Neo4j relationship patterns.
+ * Handles CRUD operations for Blueprint entities with JSONB storage for nodes and edges
+ * following BaseRepository patterns and PostgreSQL JSONB patterns.
  */
 
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import { EdgeRepository } from '@/repositories/EdgeRepository';
-import { NodeRepository } from '@/repositories/NodeRepository';
 import type { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 import { BlueprintEntity } from '../entities/BlueprintEntity';
 
 export class BlueprintRepository extends BaseRepository {
-  private nodeRepo: NodeRepository;
-  private edgeRepo: EdgeRepository;
-
-  constructor(connection?: Neo4jConnection) {
-    super('BlueprintRepository', connection);
-    this.nodeRepo = new NodeRepository(connection);
-    this.edgeRepo = new EdgeRepository(connection);
+  constructor() {
+    super('BlueprintRepository');
   }
 
   async createBlueprint(request: CreateBlueprintRequest): Promise<BlueprintModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Use BlueprintEntity validation instead of validateRequired
-        await BlueprintEntity.validate(request, 'create');
-
-        if (!Array.isArray(request.nodes) || request.nodes.length === 0) {
-          this.handleValidationError([
-            {
-              field: 'nodes',
-              message: 'At least one node is required',
-              value: request.nodes,
-            },
-          ]);
-        }
-
-        if (!Array.isArray(request.edges)) {
-          this.handleValidationError([
-            {
-              field: 'edges',
-              message: 'Edges array is required',
-              value: request.edges,
-            },
-          ]);
-        }
-
         const now = new Date().toISOString();
 
         // Prepare blueprint data with proper transformation
@@ -57,27 +26,39 @@ export class BlueprintRepository extends BaseRepository {
           createdAt: now,
           updatedAt: now,
           usageCount: 0,
-          nodes: request.nodes,
-          edges: request.edges,
+          nodes: request.nodes || [],
+          edges: request.edges || [],
           metadata: request.metadata || {},
         };
 
-        // Create entity instance from plain object, then serialize
-        const blueprintEntity = toEntityInstance(BlueprintEntity, blueprintData);
-        const blueprint = await this.createEntityWithAutoId<BlueprintModel>('Blueprint', toDatabase(blueprintEntity));
+        // Use BlueprintEntity validation
+        await BlueprintEntity.validate(blueprintData, 'create');
 
-        // Create nodes using NodeRepository
-        const { nodes, idMapping } = await this.nodeRepo.createNodes(blueprint.id, request.nodes);
+        if (!Array.isArray(blueprintData.nodes) || blueprintData.nodes.length === 0) {
+          this.handleValidationError([
+            {
+              field: 'nodes',
+              message: 'At least one node is required',
+              value: blueprintData.nodes,
+            },
+          ]);
+        }
 
-        // Create edges using EdgeRepository with ID mapping
-        const edges = await this.edgeRepo.createEdges(blueprint.id, request.edges, idMapping);
+        if (!Array.isArray(blueprintData.edges)) {
+          this.handleValidationError([
+            {
+              field: 'edges',
+              message: 'Edges array is required',
+              value: blueprintData.edges,
+            },
+          ]);
+        }
 
-        return fromDatabase(BlueprintEntity, {
-          ...blueprint,
-          nodes,
-          edges,
-          metadata: request.metadata || {},
-        });
+        // Convert entity to database format and create
+        const databaseFormat = toDatabase(toEntityInstance(BlueprintEntity, blueprintData));
+        const result = await this.createEntity<Record<string, unknown>>('blueprints', databaseFormat);
+
+        return fromDatabase(BlueprintEntity, result);
       },
       'createBlueprint',
       'Blueprint'
@@ -91,29 +72,8 @@ export class BlueprintRepository extends BaseRepository {
           throw new Error('Blueprint ID is required');
         }
 
-        const connection = this.getConnection();
-
-        // Get blueprint metadata
-        const blueprintResult = await connection.executeQuery<{ b: BlueprintModel }>(
-          'MATCH (b:Blueprint {id: $blueprintId})\n        RETURN b',
-          {
-            blueprintId,
-          }
-        );
-
-        if (!blueprintResult || blueprintResult.length === 0) return null;
-
-        const blueprint = blueprintResult[0].b;
-
-        // Get nodes and edges using separate repositories
-        const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
-        const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
-
-        return fromDatabase(BlueprintEntity, {
-          ...blueprint,
-          nodes,
-          edges,
-        });
+        const result = await super.findEntityById<Record<string, unknown>>('blueprints', blueprintId);
+        return result ? fromDatabase(BlueprintEntity, result) : null;
       },
       'getBlueprintById',
       'Blueprint',
@@ -125,34 +85,9 @@ export class BlueprintRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM blueprints ORDER BY created_at DESC');
 
-        // Get all blueprints
-        const blueprintResults = await connection.executeQuery<{ b: BlueprintModel }>(
-          'MATCH (b:Blueprint)\n        RETURN b\n        ORDER BY b.createdAt DESC'
-        );
-
-        if (!blueprintResults || blueprintResults.length === 0) return [];
-
-        const blueprints: BlueprintModel[] = [];
-
-        for (const result of blueprintResults) {
-          const blueprint = result.b;
-          const blueprintId = blueprint.id;
-
-          // Get nodes and edges for each blueprint
-          const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
-          const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
-
-          blueprints.push(
-            fromDatabase(BlueprintEntity, {
-              ...blueprint,
-              nodes,
-              edges,
-            })
-          );
-        }
-
-        return blueprints;
+        return result.map((record) => fromDatabase(BlueprintEntity, record));
       },
       'getAllBlueprints',
       'Blueprint'
@@ -178,52 +113,24 @@ export class BlueprintRepository extends BaseRepository {
           ]);
         }
 
-        const connection = this.getConnection();
-        const now = new Date().toISOString();
+        const updateProps = {
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        };
 
-        // Build SET clause dynamically
-        const setClause: string[] = ['b.updatedAt = $updatedAt'];
-        const params: Record<string, unknown> = { blueprintId, updatedAt: now };
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(BlueprintEntity, updateProps));
 
-        if (updates.name !== undefined) {
-          setClause.push('b.name = $name');
-          params.name = updates.name;
+        // Filter out protected fields (id, createdAt)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return await this.getBlueprintById(blueprintId);
         }
 
-        if (updates.description !== undefined) {
-          setClause.push('b.description = $description');
-          params.description = updates.description;
-        }
-
-        if (updates.category !== undefined) {
-          setClause.push('b.category = $category');
-          params.category = updates.category;
-        }
-
-        if (updates.usageCount !== undefined) {
-          setClause.push('b.usageCount = $usageCount');
-          params.usageCount = updates.usageCount;
-        }
-
-        // Always include metadata in the SET clause, even when undefined
-        // This is to match the test expectation
-        setClause.push('b.metadata = $metadata');
-        params.metadata = JSON.stringify(updates.metadata ?? null);
-
-        const query = `
-        MATCH (b:Blueprint {id: $blueprintId})
-        SET ${setClause.join(', ')}
-        RETURN b
-      `;
-
-        const result = await connection.executeWrite(query, params);
-
-        if (!result || result.length === 0) {
-          this.handleNotFound('Blueprint', blueprintId);
-        }
-
-        // Return full updated blueprint
-        return this.getBlueprintById(blueprintId);
+        const result = await this.updateEntity<Record<string, unknown>>('blueprints', blueprintId, filteredUpdateData);
+        return result ? fromDatabase(BlueprintEntity, result) : null;
       },
       'updateBlueprint',
       'Blueprint',
@@ -239,17 +146,12 @@ export class BlueprintRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-
-        await connection.executeWrite(
-          `
-        MATCH (b:Blueprint {id: $blueprintId})
-        SET b.usageCount = COALESCE(b.usageCount, 0) + 1,
-            b.updatedAt = $updatedAt
-      `,
-          {
-            blueprintId,
-            updatedAt: new Date().toISOString(),
-          }
+        await connection.query(
+          `UPDATE blueprints
+           SET usage_count = COALESCE(usage_count, 0) + 1,
+               updated_at = $2
+           WHERE id = $1`,
+          [blueprintId, new Date().toISOString()]
         );
       },
       'incrementUsageCount',
@@ -265,15 +167,7 @@ export class BlueprintRepository extends BaseRepository {
           throw new Error('Blueprint ID is required');
         }
 
-        // Delete nodes and edges using separate repositories
-        await this.nodeRepo.deleteNodesByBlueprintId(blueprintId);
-        await this.edgeRepo.deleteEdgesByBlueprintId(blueprintId);
-
-        // Delete the blueprint itself
-        const connection = this.getConnection();
-        await connection.executeWrite('MATCH (b:Blueprint {id: $blueprintId})\n        DELETE b', {
-          blueprintId,
-        });
+        await this.deleteEntity('blueprints', blueprintId);
       },
       'deleteBlueprint',
       'Blueprint',
@@ -289,35 +183,12 @@ export class BlueprintRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-
-        // Get blueprints by category
-        const blueprintResults = await connection.executeQuery<{ b: BlueprintModel }>(
-          'MATCH (b:Blueprint {category: $category})\n        RETURN b\n        ORDER BY b.usageCount DESC, b.createdAt DESC',
-          { category }
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM blueprints WHERE category = $1 ORDER BY usage_count DESC, created_at DESC',
+          [category]
         );
 
-        if (!blueprintResults || blueprintResults.length === 0) return [];
-
-        const blueprints: BlueprintModel[] = [];
-
-        for (const result of blueprintResults) {
-          const blueprint = result.b;
-          const blueprintId = blueprint.id;
-
-          // Get nodes and edges for each blueprint
-          const nodes = await this.nodeRepo.getNodesByBlueprintId(blueprintId);
-          const edges = await this.edgeRepo.getEdgesByBlueprintId(blueprintId);
-
-          blueprints.push(
-            fromDatabase(BlueprintEntity, {
-              ...blueprint,
-              nodes,
-              edges,
-            })
-          );
-        }
-
-        return blueprints;
+        return result.map((record) => fromDatabase(BlueprintEntity, record));
       },
       'getBlueprintsByCategory',
       'Blueprint'

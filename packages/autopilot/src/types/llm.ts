@@ -63,6 +63,8 @@ export interface LLMUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  // OpenRouter usage accounting: total amount charged (credits/USD)
+  cost: number;
 }
 
 export interface LLMResponse {

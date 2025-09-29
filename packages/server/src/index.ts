@@ -30,6 +30,7 @@ import messageRoutes from '@/routes/messages';
 import starshipRoutes from '@/routes/starships';
 import toolsRoutes from '@/routes/tools';
 import userRoutes from '@/routes/users';
+import usageRoutes from '@/routes/usage';
 // import expeditionRoutes from '@/routes/expeditions';
 import webhookRoutes, { initializeWebhookRoutes } from '@/routes/webhooks';
 
@@ -107,6 +108,7 @@ app.use('/api/v1', messageRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', toolsRoutes);
+app.use('/api/v1', usageRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

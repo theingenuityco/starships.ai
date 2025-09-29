@@ -19,8 +19,7 @@ export type TemplateCategory =
   | 'data'
   | 'communication'
   | 'automation';
-
-// Export domain types (database domains)
+/* Export domain types (database domains) */
 export * from './domains/agent';
 export * from './domains/agent-template';
 export * from './domains/auth';
@@ -36,6 +35,7 @@ export * from './domains/tool';
 export * from './domains/user';
 export * from './domains/waitlist';
 export * from './domains/workflow';
+export * from './domains/usage';
 
 // Export API contracts
 export * from './contracts/api-response';

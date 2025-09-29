@@ -1,9 +1,10 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -662,6 +663,15 @@ export function useConversationStreamed(conversationId: string | null) {
   // Fold streamed chunks into final message array in-memory
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
+
+  // Invalidate usage totals on end-of-turn (SSE 'complete') to update context bar post-turn
+  useEffect(() => {
+    if (!conversationId || !Array.isArray(chunks) || chunks.length === 0) return
+    const last = chunks[chunks.length - 1]
+    if (last.type === 'complete') {
+      queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
+    }
+  }, [chunks, conversationId, queryClient])
 
   // Derived streaming flags
   const isAssistantStreaming = useMemo(() => computedMessages.some(m => (m as any)?.streaming === true), [computedMessages])

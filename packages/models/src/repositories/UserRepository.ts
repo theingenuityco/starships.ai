@@ -7,226 +7,116 @@ export class UserRepository extends BaseRepository {
   constructor() {
     super('UserRepository');
   }
+
   async findAll(): Promise<UserModel[]> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
-        return fromDatabaseArray(
-          UserEntity,
-          result.map((record) => record.u)
-        );
-      },
-      'findAll',
-      'User'
-    );
+    return this.executeWithErrorHandling(async () => {
+      const result = await super.findAll<UserModel>('users');
+      return fromDatabaseArray(UserEntity, result);
+    }, 'findAll');
   }
 
   async findById(id: string): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.id = $id RETURN u', { id: id });
-        const user = result[0]?.u || null;
-        return user ? fromDatabase(UserEntity, user) : null;
-      },
-      'findById',
-      'User',
-      id
-    );
+    return this.executeWithErrorHandling(async () => {
+      const result = await super.findById<UserModel>('users', id);
+      return result ? fromDatabase(UserEntity, result) : null;
+    }, 'findById');
   }
 
   async findByEmail(email: string): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
-        const user = result[0]?.u || null;
-        return user ? fromDatabase(UserEntity, user) : null;
-      },
-      'findByEmail',
-      'User',
-      email
-    );
+    return this.executeWithErrorHandling(async () => {
+      const connection = this.getConnection();
+      const result = await connection.queryOne<UserModel>('SELECT * FROM users WHERE email = $1', [email]);
+      return result ? fromDatabase(UserEntity, result) : null;
+    }, 'findByEmail');
   }
 
   async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        // Validate using Entity
-        await UserEntity.validate(entity, 'create');
+    return this.executeWithErrorHandling(async () => {
+      // Validate using Entity
+      await UserEntity.validate(entity, 'create');
 
-        const now = new Date().toISOString();
+      // Prepare entity data
+      const entityData = {
+        ...entity,
+        createdAt: new Date().toISOString(),
+      };
 
-        // Prepare entity data
-        const entityData = {
-          ...entity,
-          createdAt: now,
-        };
+      const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
+      const result = await this.createEntity<UserModel>('users', databaseFormat);
 
-        const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
-        // Use email as unique identifier for merge operation
-        const user = await this.mergeEntityWithAutoId<UserModel>('User', { email: entity.email }, databaseFormat, databaseFormat);
-
-        return fromDatabase(UserEntity, user);
-      },
-      'create',
-      'User'
-    );
+      return fromDatabase(UserEntity, result);
+    }, 'create');
   }
 
   async update(id: string, updates: Partial<UserModel>): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        // Validate using Entity
-        if (Object.keys(updates).length > 0) {
-          await UserEntity.validate(updates, 'update');
-        }
+    return this.executeWithErrorHandling(async () => {
+      // Validate using Entity
+      if (Object.keys(updates).length > 0) {
+        await UserEntity.validate(updates, 'update');
+      }
 
-        const connection = this.getConnection();
-        const now = new Date().toISOString();
+      // Prepare update data
+      const updateData = toDatabase(toEntityInstance(UserEntity, updates));
 
-        // Prepare update data
-        const updateData = toDatabase(
-          toEntityInstance(UserEntity, {
-            ...updates,
-            updatedAt: now, // Add updatedAt timestamp
-          })
-        );
-        const setClause = Object.keys(updateData)
-          .filter((key) => key !== 'id' && key !== 'createdAt' && updateData[key] !== undefined)
-          .map((key) => `u.${key} = $${key}`)
-          .join(', ');
+      // Filter out protected fields (id, createdAt)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { id: _id, createdAt: _createdAt, ...filteredUpdateData } = updateData;
 
-        if (!setClause) {
-          return this.findById(id);
-        }
+      if (Object.keys(filteredUpdateData).length === 0) {
+        return await this.findById(id);
+      }
 
-        // Filter out protected fields from params
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _, createdAt: __, ...filteredUpdateData } = updateData;
-        const params = {
-          id: id, // Use the actual user ID parameter
-          ...filteredUpdateData,
-        };
-
-        const result = await connection.executeWrite<{ u: UserModel }>(
-          `MATCH (u:User) WHERE u.id = $id
-         SET ${setClause}
-         RETURN u`,
-          params
-        );
-
-        if (result.length === 0) {
-          this.handleNotFound('User', id);
-        }
-
-        return fromDatabase(UserEntity, result[0].u);
-      },
-      'update',
-      'User',
-      id
-    );
+      const result = await this.updateEntity<UserModel>('users', id, filteredUpdateData);
+      return result ? fromDatabase(UserEntity, result) : null;
+    }, 'update');
   }
 
   async delete(id: string): Promise<boolean> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (u:User) WHERE u.id = $id DETACH DELETE u RETURN count(u) as deletedCount',
-          { id: id }
-        );
-
-        return result[0]?.deletedCount > 0;
-      },
-      'delete',
-      'User',
-      id
-    );
+    return this.executeWithErrorHandling(async () => {
+      return await this.deleteEntity('users', id);
+    }, 'delete');
   }
 
   // Stripe integration methods
   async findByStripeCustomerId(stripeCustomerId: string): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ user: UserModel }>(
-          `MATCH (user:User {stripeCustomerId: $stripeCustomerId})
-         RETURN user`,
-          { stripeCustomerId }
-        );
-
-        const user = result[0]?.user || null;
-        return user ? fromDatabase(UserEntity, user) : null;
-      },
-      'findByStripeCustomerId',
-      'User',
-      stripeCustomerId
-    );
+    return this.executeWithErrorHandling(async () => {
+      const connection = this.getConnection();
+      const result = await connection.queryOne<UserModel>('SELECT * FROM users WHERE stripe_customer_id = $1', [stripeCustomerId]);
+      return result ? fromDatabase(UserEntity, result) : null;
+    }, 'findByStripeCustomerId');
   }
 
   async updateStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
-    return this.executeWithErrorHandling(
-      async () => {
-        // Validate required parameters
-        if (!userId) {
-          throw new Error('userId is required for updateStripeCustomerId');
-        }
-        if (!stripeCustomerId) {
-          throw new Error('stripeCustomerId is required for updateStripeCustomerId');
-        }
+    return this.executeWithErrorHandling(async () => {
+      // Validate required parameters
+      if (!userId) {
+        throw new Error('userId is required for updateStripeCustomerId');
+      }
+      if (!stripeCustomerId) {
+        throw new Error('stripeCustomerId is required for updateStripeCustomerId');
+      }
 
-        const connection = this.getConnection();
-        await connection.executeWrite(
-          `MATCH (user:User {id: $userId})
-         SET user.stripeCustomerId = $stripeCustomerId`,
-          { userId, stripeCustomerId }
-        );
-      },
-      'updateStripeCustomerId',
-      'User',
-      userId
-    );
+      const connection = this.getConnection();
+      await connection.query('UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2', [stripeCustomerId, userId]);
+    }, 'updateStripeCustomerId');
   }
 
   // Auth-specific methods
   async findByEmailWithPassword(email: string): Promise<UserModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ u: UserModel }>('MATCH (u:User) WHERE u.email = $email RETURN u', { email: email });
-        const user = result[0]?.u || null;
-        return user ? fromDatabase(UserEntity, user) : null;
-      },
-      'findByEmailWithPassword',
-      'User',
-      email
-    );
+    return this.executeWithErrorHandling(async () => {
+      return await this.findByEmail(email);
+    }, 'findByEmailWithPassword');
   }
 
   async createWithPassword(userData: { email: string; password: string; name?: string; displayName?: string }): Promise<UserModel> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const now = new Date().toISOString();
+    return this.executeWithErrorHandling(async () => {
+      const entityData = {
+        email: userData.email,
+        displayName: userData.displayName || userData.name,
+        password: userData.password,
+      };
 
-        const entityData = {
-          email: userData.email,
-          displayName: userData.displayName || userData.name,
-          password: userData.password,
-          createdAt: now,
-        };
-
-        // Validate using Entity
-        await UserEntity.validate(entityData, 'create');
-
-        const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
-        const user = await this.mergeEntityWithAutoId<UserModel>('User', { email: userData.email }, databaseFormat, databaseFormat);
-
-        return fromDatabase(UserEntity, user);
-      },
-      'createWithPassword',
-      'User'
-    );
+      return await this.create(entityData);
+    }, 'createWithPassword');
   }
 }

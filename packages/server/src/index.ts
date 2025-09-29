@@ -59,12 +59,14 @@ const PORT = config.SERVER_PORT || 3001;
 validateUrlFormat(config.CLIENT_URL, 'CLIENT_URL');
 // Note: NEXT_PUBLIC_API_URL validation is handled by client config
 
-// Initialize Neo4j database connection
+// Initialize PostgreSQL database connection
 const dbConnection = createConnection({
-  uri: config.NEO4J_URI,
-  username: config.NEO4J_USERNAME,
-  password: config.NEO4J_PASSWORD,
-  database: config.NEO4J_DATABASE,
+  host: config.POSTGRES_HOST,
+  port: config.POSTGRES_PORT,
+  user: config.POSTGRES_USER,
+  password: config.POSTGRES_PASSWORD,
+  database: config.POSTGRES_DATABASE,
+  ssl: config.POSTGRES_SSL,
 });
 // Aether Core repositories
 const starshipRepository = new StarshipRepository();
@@ -138,7 +140,7 @@ httpServer.listen(PORT, async () => {
 
     // Initialize database connection FIRST
     await dbConnection.connect();
-    console.log('✅ Neo4j database connected');
+    console.log('✅ PostgreSQL database connected');
 
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();

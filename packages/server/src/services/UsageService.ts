@@ -1,5 +1,5 @@
 import { UsageRepository } from '@starships/models';
-import type { UsageModel, UsageTotals } from '@starships/protocol';
+import type { UsageModel, LLMUsage } from '@starships/protocol';
 
 export interface CreateUsageForTurnParams {
   starshipId: string;
@@ -37,11 +37,11 @@ export class UsageService {
     });
   }
 
-  async getTotalsByConversation(conversationId: string): Promise<UsageTotals> {
+  async getTotalsByConversation(conversationId: string): Promise<LLMUsage> {
     return this.repo.getTotalsByConversation(conversationId);
   }
 
-  async getTotalsByStarship(starshipId: string): Promise<UsageTotals> {
+  async getTotalsByStarship(starshipId: string): Promise<LLMUsage> {
     return this.repo.getTotalsByStarship(starshipId);
   }
 

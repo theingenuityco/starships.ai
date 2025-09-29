@@ -24,12 +24,5 @@ export interface UsageModel extends LLMUsage {
   updatedAt: string;
 }
 
-/**
- * Aggregate totals for a scope (e.g., a conversation or a starship)
- */
-export interface UsageTotals {
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  cost: number;
-}
+// Re-export LLMUsage directly for usage totals
+export type { LLMUsage };

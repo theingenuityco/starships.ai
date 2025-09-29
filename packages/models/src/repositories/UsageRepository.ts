@@ -1,7 +1,7 @@
 import { UsageEntity } from '@/entities/UsageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
-import type { UsageModel, UsageTotals } from '@starships/protocol';
+import type { UsageModel, LLMUsage } from '@starships/protocol';
 
 /**
  * UsageRepository
@@ -83,33 +83,33 @@ export class UsageRepository extends BaseRepository {
   /**
    * Aggregate totals for a conversation
    */
-  async getTotalsByConversation(conversationId: string): Promise<UsageTotals> {
+  async getTotalsByConversation(conversationId: string): Promise<LLMUsage> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
         const result = await conn.executeQuery<{
-          promptTokens: number;
-          completionTokens: number;
-          totalTokens: number;
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
           cost: number;
         }>(
           `
         MATCH (:Conversation {id: $conversationId})-[:HAS_USAGE]->(u:Usage)
         RETURN
-          coalesce(sum(u.prompt_tokens), 0) AS promptTokens,
-          coalesce(sum(u.completion_tokens), 0) AS completionTokens,
-          coalesce(sum(u.total_tokens), 0) AS totalTokens,
+          coalesce(sum(u.prompt_tokens), 0) AS prompt_tokens,
+          coalesce(sum(u.completion_tokens), 0) AS completion_tokens,
+          coalesce(sum(u.total_tokens), 0) AS total_tokens,
           coalesce(sum(u.cost), 0) AS cost
         `,
           { conversationId }
         );
 
-        const row = result?.[0] || ({ promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 } as any);
+        const row = result?.[0] || ({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 } as any);
 
         return {
-          promptTokens: Number(row.promptTokens) || 0,
-          completionTokens: Number(row.completionTokens) || 0,
-          totalTokens: Number(row.totalTokens) || 0,
+          prompt_tokens: Number(row.prompt_tokens) || 0,
+          completion_tokens: Number(row.completion_tokens) || 0,
+          total_tokens: Number(row.total_tokens) || 0,
           cost: Number(row.cost) || 0,
         };
       },
@@ -122,33 +122,33 @@ export class UsageRepository extends BaseRepository {
   /**
    * Aggregate totals for a starship
    */
-  async getTotalsByStarship(starshipId: string): Promise<UsageTotals> {
+  async getTotalsByStarship(starshipId: string): Promise<LLMUsage> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
         const result = await conn.executeQuery<{
-          promptTokens: number;
-          completionTokens: number;
-          totalTokens: number;
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
           cost: number;
         }>(
           `
         MATCH (:Starship {id: $starshipId})-[:HAS_USAGE]->(u:Usage)
         RETURN
-          coalesce(sum(u.prompt_tokens), 0) AS promptTokens,
-          coalesce(sum(u.completion_tokens), 0) AS completionTokens,
-          coalesce(sum(u.total_tokens), 0) AS totalTokens,
+          coalesce(sum(u.prompt_tokens), 0) AS prompt_tokens,
+          coalesce(sum(u.completion_tokens), 0) AS completion_tokens,
+          coalesce(sum(u.total_tokens), 0) AS total_tokens,
           coalesce(sum(u.cost), 0) AS cost
         `,
           { starshipId }
         );
 
-        const row = result?.[0] || ({ promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 } as any);
+        const row = result?.[0] || ({ prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: 0 } as any);
 
         return {
-          promptTokens: Number(row.promptTokens) || 0,
-          completionTokens: Number(row.completionTokens) || 0,
-          totalTokens: Number(row.totalTokens) || 0,
+          prompt_tokens: Number(row.prompt_tokens) || 0,
+          completion_tokens: Number(row.completion_tokens) || 0,
+          total_tokens: Number(row.total_tokens) || 0,
           cost: Number(row.cost) || 0,
         };
       },

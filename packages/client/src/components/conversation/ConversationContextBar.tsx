@@ -14,9 +14,9 @@ interface ConversationContextBarProps {
 export function ConversationContextBar({ conversationId, className, budgetTokens = 400_000 }: ConversationContextBarProps) {
   const { data: totalsData } = useConversationUsageTotals(conversationId)
 
-  const prompt = Number(totalsData?.promptTokens ?? 0)
-  const completion = Number(totalsData?.completionTokens ?? 0)
-  const total = Number(totalsData?.totalTokens ?? 0)
+  const prompt = Number(totalsData?.prompt_tokens ?? 0)
+  const completion = Number(totalsData?.completion_tokens ?? 0)
+  const total = Number(totalsData?.total_tokens ?? 0)
   const cost = Number(totalsData?.cost ?? 0)
 
   // Derived metrics

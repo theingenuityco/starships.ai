@@ -1,14 +1,6 @@
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
-import type { ApiResponse } from '@starships/protocol'
-
-type UsageTotals = {
-  promptTokens: number
-  completionTokens: number
-  totalTokens: number
-  cost: number
-}
-
+import type { ApiResponse, LLMUsage } from '@starships/protocol'
 export const USAGE_QUERY_KEYS = {
   conversationTotals: (conversationId: string) => ['usage', 'conversation', conversationId, 'totals'] as const,
   starshipTotals: (starshipId: string) => ['usage', 'starship', starshipId, 'totals'] as const,
@@ -17,8 +9,8 @@ export const USAGE_QUERY_KEYS = {
 export function useConversationUsageTotals(conversationId: string | null) {
   return useQuery({
     queryKey: conversationId ? USAGE_QUERY_KEYS.conversationTotals(conversationId) : ['__noop__'],
-    queryFn: async (): Promise<UsageTotals> => {
-      const res = await api.get<ApiResponse<UsageTotals>>(`/api/v1/conversations/${conversationId}/usage/totals`)
+    queryFn: async (): Promise<LLMUsage> => {
+      const res = await api.get<ApiResponse<LLMUsage>>(`/api/v1/conversations/${conversationId}/usage/totals`)
       return res.data.data
     },
     enabled: !!conversationId,
@@ -30,8 +22,8 @@ export function useConversationUsageTotals(conversationId: string | null) {
 export function useStarshipUsageTotals(starshipId: string | null) {
   return useQuery({
     queryKey: starshipId ? USAGE_QUERY_KEYS.starshipTotals(starshipId) : ['__noop__'],
-    queryFn: async (): Promise<UsageTotals> => {
-      const res = await api.get<ApiResponse<UsageTotals>>(`/api/v1/starships/${starshipId}/usage/totals`)
+    queryFn: async (): Promise<LLMUsage> => {
+      const res = await api.get<ApiResponse<LLMUsage>>(`/api/v1/starships/${starshipId}/usage/totals`)
       return res.data.data
     },
     enabled: !!starshipId,

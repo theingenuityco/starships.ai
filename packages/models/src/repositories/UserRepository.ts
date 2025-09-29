@@ -8,42 +8,47 @@ export class UserRepository extends BaseRepository {
     super('UserRepository');
   }
 
-  async findAll(): Promise<UserModel[]> {
+  async findAllUsers(): Promise<UserModel[]> {
     return this.executeWithErrorHandling(async () => {
-      const result = await super.findAll<UserModel>('users');
+      const result = await super.findAll<Record<string, unknown>>('users');
       return fromDatabaseArray(UserEntity, result);
-    }, 'findAll');
+    }, 'findAllUsers');
   }
 
-  async findById(id: string): Promise<UserModel | null> {
+  async findUserById(id: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
-      const result = await super.findById<UserModel>('users', id);
+      const result = await super.findById<Record<string, unknown>>('users', id);
       return result ? fromDatabase(UserEntity, result) : null;
-    }, 'findById');
+    }, 'findUserById');
   }
 
   async findByEmail(email: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
-      const result = await connection.queryOne<UserModel>('SELECT * FROM users WHERE email = $1', [email]);
+      const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM users WHERE email = $1', [email]);
       return result ? fromDatabase(UserEntity, result) : null;
     }, 'findByEmail');
   }
 
-  async create(entity: Omit<UserModel, 'id' | 'createdAt'>): Promise<UserModel> {
+  async create(entity: Omit<UserModel, 'id' | 'createdAt' | 'updatedAt'>): Promise<UserModel> {
     return this.executeWithErrorHandling(async () => {
       // Validate using Entity
       await UserEntity.validate(entity, 'create');
 
-      // Prepare entity data
+      // Prepare entity data with timestamps
       const entityData = {
         ...entity,
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
+      // Convert entity to database format (camelCase → snake_case automatically)
       const databaseFormat = toDatabase(toEntityInstance(UserEntity, entityData));
-      const result = await this.createEntity<UserModel>('users', databaseFormat);
 
+      // Create entity in database
+      const result = await this.createEntity<Record<string, unknown>>('users', databaseFormat);
+
+      // Convert back to entity format (snake_case → camelCase automatically)
       return fromDatabase(UserEntity, result);
     }, 'create');
   }
@@ -60,13 +65,16 @@ export class UserRepository extends BaseRepository {
 
       // Filter out protected fields (id, createdAt)
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id: _id, createdAt: _createdAt, ...filteredUpdateData } = updateData;
+      const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
 
       if (Object.keys(filteredUpdateData).length === 0) {
-        return await this.findById(id);
+        return await this.findUserById(id);
       }
 
-      const result = await this.updateEntity<UserModel>('users', id, filteredUpdateData);
+      // Update entity in database (camelCase → snake_case handled automatically)
+      const result = await this.updateEntity<Record<string, unknown>>('users', id, filteredUpdateData);
+
+      // Convert back to entity format (snake_case → camelCase automatically)
       return result ? fromDatabase(UserEntity, result) : null;
     }, 'update');
   }
@@ -81,7 +89,9 @@ export class UserRepository extends BaseRepository {
   async findByStripeCustomerId(stripeCustomerId: string): Promise<UserModel | null> {
     return this.executeWithErrorHandling(async () => {
       const connection = this.getConnection();
-      const result = await connection.queryOne<UserModel>('SELECT * FROM users WHERE stripe_customer_id = $1', [stripeCustomerId]);
+      const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM users WHERE stripe_customer_id = $1', [
+        stripeCustomerId,
+      ]);
       return result ? fromDatabase(UserEntity, result) : null;
     }, 'findByStripeCustomerId');
   }

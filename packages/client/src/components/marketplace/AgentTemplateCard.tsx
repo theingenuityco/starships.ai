@@ -16,9 +16,10 @@ import type { AgentTemplateModel } from '@starships/protocol'
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
   onDeploy?: (template: AgentTemplateModel) => void
+  onClick?: (template: AgentTemplateModel) => void
 }
 
-export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps) {
+export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplateCardProps) {
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
@@ -61,11 +62,16 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
     return colors[category as keyof typeof colors] || colors.general
   }
 
-  const handleDeployClick = () => {
+  const handleDeployClick = (e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent card click from triggering
     if (!primaryStarship) {
       return // No starship to deploy to
     }
     setShowConfirmationModal(true)
+  }
+
+  const handleCardClick = () => {
+    onClick?.(template)
   }
 
   const handleConfirmDeploy = async () => {
@@ -89,7 +95,10 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl group flex flex-col hover:bg-primary/5">
+      <Card
+        className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-xl group flex flex-col hover:bg-primary/5"
+        onClick={handleCardClick}
+      >
         {/* Header */}
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0 p-3 rounded-lg bg-primary/20 group-hover:bg-primary/30 transition-colors">
@@ -141,7 +150,7 @@ export function AgentTemplateCard({ template, onDeploy }: AgentTemplateCardProps
         {/* Action Button */}
         <div className="mt-auto">
           {isAlreadyDeployed ? (
-            <Button size="sm" variant="outline" className="w-full transition-colors" disabled>
+            <Button size="sm" variant="outline" className="w-full transition-colors" disabled onClick={e => e.stopPropagation()}>
               <CheckCircle className="w-4 h-4 mr-2" />
               <span className="truncate">Already deployed on {primaryStarship?.name || 'starship'}</span>
             </Button>

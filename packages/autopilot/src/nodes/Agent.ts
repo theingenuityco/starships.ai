@@ -33,7 +33,7 @@ export class Agent implements NodeHandler {
       tools: params.state?.tools || [],
     };
 
-    // Runner selection deferred to execute() based on execution.depth to avoid any nested runners
+    // Runner selection deferred to execute() based on execution.depth to avoid any of nested runners
 
     // Check if blueprint has the parallel tools node
     const hasParallelTools = this.params.blueprint?.nodes?.some(

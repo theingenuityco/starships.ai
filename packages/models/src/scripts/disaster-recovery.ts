@@ -611,7 +611,7 @@ export class DisasterRecoveryManager {
           warnings: userCount === 0 ? ['No users found in database'] : [],
           statistics: [{ type: 'users', count: userCount }],
         };
-      } catch (fallbackError) {
+      } catch {
         return {
           valid: false,
           errors: [`Recovery validation failed: ${error instanceof Error ? error.message : String(error)}`],

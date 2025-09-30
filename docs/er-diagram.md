@@ -1,5 +1,11 @@
 # Starships.ai Entity Relationship Diagram
 
+## Overview
+
+This ER diagram reflects the **actual implemented database schema** with repository support. Tables shown here have corresponding repository implementations in `packages/models/src/repositories/`.
+
+**Note:** Workflows, blueprints, and executions tables have been removed as no repository implementations exist for them. If workflow functionality is needed in the future, repositories must be created first.
+
 ## Comprehensive Data Model
 
 ```mermaid
@@ -99,56 +105,6 @@ erDiagram
         timestamp updated_at
     }
 
-    %% Workflow and Blueprint System
-    workflows {
-        string id PK
-        string name
-        string author_id FK
-        text description
-        string category
-        string version
-        int usage_count
-        boolean is_public
-        jsonb tags
-        decimal rating
-        string execution_mode "simple|workflow"
-        jsonb allowed_starship_classes
-        int timeout
-        jsonb blueprint "Workflow definition with nodes and edges"
-        string starship_id FK
-        timestamp deployed_at
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    blueprints {
-        string id PK
-        string name
-        text description
-        string category
-        string version
-        int usage_count
-        boolean is_public
-        jsonb tags
-        jsonb metadata
-        timestamp created_at
-        timestamp updated_at
-    }
-
-    %% Execution System
-    executions {
-        string id PK
-        string workflow_id FK
-        string status "pending|running|completed|failed|cancelled|paused"
-        jsonb result
-        text error_message
-        jsonb metadata
-        timestamp started_at
-        timestamp completed_at
-        timestamp created_at
-        timestamp updated_at
-    }
-
     %% Conversation and Message System
     conversations {
         string id PK
@@ -236,12 +192,10 @@ erDiagram
 
     %% Primary Relationships
     users ||--o{ starships : "owns"
-    users ||--o{ workflows : "authors"
 
     %% Starship Relationships
     starships ||--o{ agents : "hosts"
     starships ||--o{ tools : "hosts"
-    starships ||--o{ workflows : "deployed_to"
     starships ||--o{ conversations : "contains"
     starships ||--o{ messages : "belongs_to"
     starships ||--o{ environments : "has_vars"
@@ -256,9 +210,6 @@ erDiagram
 
     %% Tool System Relationships
     tool_templates ||--o{ tools : "instantiated_from"
-
-    %% Workflow and Execution
-    workflows ||--o{ executions : "executed_as"
 
     %% Conversation System
     conversations ||--o{ messages : "contains"
@@ -276,23 +227,17 @@ graph TD
     U[User] --> S[Starship]
     S --> A[Agent]
     S --> T[Tool]
-    S --> W[Workflow]
     S --> C[Conversation]
     S --> E[Environment]
 
     %% Template System
-    U --> AT[AgentTemplate]
-    AT --> A
+    AT[AgentTemplate] --> A
     TT[ToolTemplate] --> T
 
     %% Conversation System
     C --> M[Message]
     C --> CA[ConversationAgent]
     A --> CA
-
-    %% Workflow System
-    W --> EX[Execution]
-    W --> B[Blueprint]
 
     %% Usage Tracking
     S --> US[Usage]
@@ -316,8 +261,8 @@ graph TD
     classDef integration fill:#fff3e0
 
     class U,S primary
-    class A,T,W,C secondary
-    class AT,TT,B system
+    class A,T,C secondary
+    class AT,TT system
     class AGT,ATTT,CA junction
     class SE,WL integration
 ```
@@ -333,31 +278,31 @@ graph TD
 
 ### Data Flow Patterns
 
-- **Workflow Execution**: Workflows contain blueprints as JSONB, executions track progress
 - **Message Threading**: Messages maintain conversation history with proper role-based threading
 - **Template Instantiation**: `AgentTemplate` → `Agent` and `ToolTemplate` → `Tool` creation flows
 - **Agent-Tool Relationships**: Many-to-many relationships through `agent_tools` junction table
+- **Blueprint Storage**: Complex objects (agent/tool blueprints) stored as JSONB for flexibility
 
 ### Schema Evolution
 
-- **JSONB Storage**: Complex objects (blueprints, agent state, metadata) stored as JSONB for flexibility
-- **Removed Tables**: `nodes` and `edges` tables removed - data now stored within blueprint JSONB
+- **JSONB Storage**: Complex objects (agent state, tool blueprints, metadata) stored as JSONB for flexibility
+- **Removed Tables**: `workflows`, `blueprints`, `executions`, `nodes`, and `edges` tables removed - no repository implementations
 - **Environment Security**: Environment variables stored with encryption via `encrypted_value` field
-- **Conversation Agents**: Many-to-many relationship between conversations and agents
+- **Conversation Agents**: Many-to-many relationship between conversations and agents via junction table
 
 ### Technical Implementation Notes
 
 - **PostgreSQL Relationships**: Repository code uses foreign keys and JOIN operations for relationships
-- **Blueprint Storage**: Workflow blueprints contain nodes and edges as JSONB for better performance
 - **Agent State Management**: Agent runtime state stored as JSONB for flexible state tracking
 - **Tool Configuration**: Tools support flexible configuration via JSONB blueprint field
 - **Usage Tracking**: Comprehensive token usage tracking for billing and analytics
-- **Full-text Search**: GIN indexes on concatenated text fields for efficient search
+- **Full-text Search**: GIN indexes on concatenated text fields for efficient search across all major entities
+- **Junction Tables**: Proper many-to-many relationships via `agent_tools`, `agent_template_tool_templates`, and `conversation_agents`
 
-### Migration Changes (v2.0.0)
+### Migration Changes (v2.1.0)
 
-- **Environment Table**: Updated to use `encrypted_value` instead of `value` + `is_encrypted`
-- **Environment Table**: Added `description` and `created_by` fields
-- **Nodes/Edges Tables**: Completely removed - replaced with JSONB storage in blueprints
-- **Blueprint Structure**: Simplified to contain nodes and edges as embedded JSONB data
-- **Repository Alignment**: Schema now matches the actual repository implementations
+- **Removed Tables**: `workflows`, `blueprints`, and `executions` tables removed - no repository implementations exist
+- **Environment Table**: Uses `encrypted_value` with `description` and `created_by` tracking
+- **Nodes/Edges Tables**: Previously removed - data stored as JSONB within agent/tool blueprints
+- **Repository Alignment**: Schema strictly reflects actual repository implementations
+- **Full-text Search**: Added index for `agent_templates` table for marketplace search functionality

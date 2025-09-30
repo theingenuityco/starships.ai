@@ -1,8 +1,9 @@
 -- PostgreSQL Migration: Complete Database Schema
 -- Description: Complete database schema for starships.ai
 -- Author: Migration Script
--- Version: 2.0.0
+-- Version: 2.1.0
 -- Last Updated: 2025-09-30
+-- Note: Removed workflows, blueprints, and executions tables - no repository implementations exist
 
 -- Enable UUID extension for generating UUIDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -156,7 +157,7 @@ CREATE TABLE tools (
     UNIQUE(starship_id, slug)
 );
 
--- Tool indexes  
+-- Tool indexes
 CREATE INDEX idx_tools_starship_id ON tools(starship_id);
 CREATE INDEX idx_tools_template_id ON tools(template_id);
 CREATE INDEX idx_tools_name ON tools(name);
@@ -164,68 +165,11 @@ CREATE INDEX idx_tools_slug ON tools(slug);
 CREATE INDEX idx_tools_enabled ON tools(is_enabled);
 
 -- ============================================================================
--- WORKFLOWS TABLE
+-- NOTE: WORKFLOWS, BLUEPRINTS, AND EXECUTIONS TABLES REMOVED
 -- ============================================================================
-
-CREATE TABLE workflows (
-    id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    author_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    description TEXT,
-    category VARCHAR(255) NOT NULL DEFAULT 'general',
-    version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
-    usage_count INTEGER NOT NULL DEFAULT 0,
-    is_public BOOLEAN NOT NULL DEFAULT false,
-    tags JSONB DEFAULT '[]'::jsonb,
-    rating DECIMAL(3,2),
-    execution_mode VARCHAR(20) NOT NULL DEFAULT 'workflow' CHECK (execution_mode IN ('simple', 'workflow')),
-    allowed_starship_classes JSONB DEFAULT '[]'::jsonb,
-    timeout INTEGER DEFAULT 30000,
-    blueprint JSONB NOT NULL DEFAULT '{}'::jsonb,
-    starship_id VARCHAR(255) REFERENCES starships(id) ON DELETE SET NULL,
-    deployed_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- Workflow indexes
-CREATE INDEX idx_workflows_author_id ON workflows(author_id);
-CREATE INDEX idx_workflows_category ON workflows(category);
-CREATE INDEX idx_workflows_starship_id ON workflows(starship_id);
-CREATE INDEX idx_workflows_execution_mode ON workflows(execution_mode);
-CREATE INDEX idx_workflows_usage_count ON workflows(usage_count);
-CREATE INDEX idx_workflows_is_public ON workflows(is_public);
-CREATE INDEX idx_workflows_tags ON workflows USING GIN(tags);
-
--- ============================================================================
--- BLUEPRINTS TABLE
--- ============================================================================
-
-CREATE TABLE blueprints (
-    id VARCHAR(255) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    category VARCHAR(100) NOT NULL DEFAULT 'general',
-    version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
-    usage_count INTEGER NOT NULL DEFAULT 0,
-    is_public BOOLEAN NOT NULL DEFAULT false,
-    tags JSONB DEFAULT '[]'::jsonb,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- Blueprint indexes
-CREATE INDEX idx_blueprints_category ON blueprints(category);
-CREATE INDEX idx_blueprints_usage_count ON blueprints(usage_count);
-CREATE INDEX idx_blueprints_tags ON blueprints USING GIN(tags);
-
--- ============================================================================
--- NOTE: NODES AND EDGES TABLES REMOVED
--- ============================================================================
--- Nodes and edges are now stored as JSONB within blueprint fields
--- This provides better performance and simpler data management
--- EdgeRepository and NodeRepository are obsolete - blueprint data now stored as JSONB
+-- These tables have been removed as no repository implementations exist for them.
+-- If workflow functionality is needed in the future, repositories must be created first.
+-- Previous blueprint storage used JSONB for nodes/edges within agent and tool blueprints.
 
 -- ============================================================================
 -- CONVERSATIONS TABLE
@@ -269,29 +213,6 @@ CREATE INDEX idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX idx_messages_role ON messages(role);
 CREATE INDEX idx_messages_message_type ON messages(message_type);
 CREATE INDEX idx_messages_created_at ON messages(created_at);
-
--- ============================================================================
--- EXECUTIONS TABLE
--- ============================================================================
-
-CREATE TABLE executions (
-    id VARCHAR(255) PRIMARY KEY,
-    workflow_id VARCHAR(255) NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'paused')),
-    result JSONB,
-    error_message TEXT,
-    metadata JSONB DEFAULT '{}'::jsonb,
-    started_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- Execution indexes
-CREATE INDEX idx_executions_workflow_id ON executions(workflow_id);
-CREATE INDEX idx_executions_status ON executions(status);
-CREATE INDEX idx_executions_created_at ON executions(created_at);
-CREATE INDEX idx_executions_started_at ON executions(started_at);
 
 -- ============================================================================
 -- ENVIRONMENTS TABLE
@@ -402,8 +323,8 @@ CREATE TABLE conversation_agents (
 
 -- Create full-text search indexes using PostgreSQL's built-in text search
 CREATE INDEX idx_agents_search ON agents USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '') || ' ' || COALESCE(system_prompt, '')));
+CREATE INDEX idx_agent_templates_search ON agent_templates USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '')));
 CREATE INDEX idx_messages_search ON messages USING GIN(to_tsvector('english', content));
-CREATE INDEX idx_workflows_search ON workflows USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '')));
 CREATE INDEX idx_users_search ON users USING GIN(to_tsvector('english', COALESCE(display_name, '') || ' ' || COALESCE(email, '')));
 CREATE INDEX idx_starships_search ON starships USING GIN(to_tsvector('english', name || ' ' || COALESCE(slug, '')));
 CREATE INDEX idx_tools_search ON tools USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '')));
@@ -424,12 +345,9 @@ COMMENT ON TABLE agent_templates IS 'Reusable agent templates from the marketpla
 COMMENT ON TABLE agents IS 'Deployed agent instances associated with starships';
 COMMENT ON TABLE tool_templates IS 'Reusable tool templates from the marketplace';
 COMMENT ON TABLE tools IS 'Deployed tool instances associated with starships';
-COMMENT ON TABLE workflows IS 'Workflow definitions with execution blueprints';
-COMMENT ON TABLE blueprints IS 'Reusable workflow blueprints containing nodes and edges';
 COMMENT ON TABLE conversations IS 'Chat conversations within starships';
 COMMENT ON TABLE messages IS 'Individual messages within conversations';
-COMMENT ON TABLE executions IS 'Workflow execution instances with status and results';
-COMMENT ON TABLE environments IS 'Environment variables scoped to starships';
+COMMENT ON TABLE environments IS 'Environment variables scoped to starships with encryption';
 COMMENT ON TABLE usage IS 'LLM usage tracking for billing and analytics';
 COMMENT ON TABLE waitlist IS 'User waitlist for controlled access';
 COMMENT ON TABLE stripe_events IS 'Stripe webhook events for payment processing';

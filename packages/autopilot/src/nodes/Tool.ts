@@ -34,6 +34,8 @@ export class Tool extends BaseNode<ToolParams> {
       const params = this.getParams();
       const inputData = ExecutionItemUtils.unwrapSingle(input);
       
+      console.log(`[TOOL-DEBUG] ${params.name} execution started`);
+      
       // Check if this is the universal tool executor for parallel execution
       const isUniversalExecutor = params.name === 'universal_tool_executor';
       
@@ -200,7 +202,30 @@ export class Tool extends BaseNode<ToolParams> {
     const runner = await this.getRunner();
     const engineConfig = this.getEngineConfig();
     
-    return await runner.run(params.blueprint, toolExecution, engineConfig);
+    // Execute the tool blueprint
+    const rawResult = await runner.run(params.blueprint, toolExecution, engineConfig);
+    
+    // Transform to structured format expected by Agent mutations
+    const batchId = this.generateBatchId();
+    const timestamp = new Date().toISOString();
+    
+    // Wrap legacy result in the new structured format
+    const result = ExecutionItemUtils.wrapSingle({
+      batchId,
+      timestamp,
+      successful: [{
+        toolCallId: 'legacy_call',
+        toolName: params.name,
+        success: true,
+        data: ExecutionItemUtils.unwrapSingle(rawResult)
+      }],
+      failed: [],
+      processedIds: ['legacy_call'],
+      summary: { total: 1, successful: 1, failed: 0, successRate: '100%' }
+    });
+    
+    console.log(`[TOOL-DEBUG] ${params.name} completed successfully`);
+    return result;
   }
   
   /**

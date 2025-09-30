@@ -107,31 +107,32 @@ export class Agent implements NodeHandler {
           description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
           parameters: {
             condition: `{{(() => {
-              const last = $input();
+              const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
               const fr = last?.choices?.[0]?.finish_reason;
               
-              // Check for tool node errors
-              if (last?.nodeError) {
-                return "continue"; // Skip tool execution, continue conversation
+              // Handle undefined input (tool execution loop)
+              if (!last) {
+                console.log('[AGENT-DEBUG] Tool execution complete, ending workflow');
+                return "complete";
               }
               
               // Handle length (continue generation)
               if (fr === "length") return "continue";
               
-              // Check for tool calls
-              const calls = last?.choices?.[0]?.message?.tool_calls;
-              if (!Array.isArray(calls) || calls.length === 0) return "complete";
-              
-              // Check if already processed (avoid reprocessing)
-              const batchState = state?.lastProcessedBatch;
-              const currentCallIds = calls.map(c => c.id).sort().join(',');
-              const processedCallIds = batchState?.toolCallIds?.sort()?.join(',') || '';
-              
-              if (currentCallIds === processedCallIds) {
-                return "complete"; // Already processed this batch
+              // Key fix: Check finish_reason first (like original)
+              if (fr === "tool_calls") {
+                console.log('[AGENT-DEBUG] Executing tools via finish_reason');
+                return "call_tool";
               }
               
-              return "call_tool"; // Process tool calls (single or multiple)
+              // Fallback: Check for tool calls in message
+              const calls = last?.choices?.[0]?.message?.tool_calls;
+              if (Array.isArray(calls) && calls.length > 0) {
+                console.log('[AGENT-DEBUG] Executing tools via message check');
+                return "call_tool";
+              }
+              
+              return "complete";
             })()}}`
           },
         },

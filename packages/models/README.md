@@ -43,12 +43,13 @@ const starships = await starshipRepo.findAll();
 - **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`) and subscription billing
 - **Agents**: AI entities with deployment management and template system
 - **Tools**: Executable utilities deployed to starships with flexible blueprint configuration
-- **Workflows**: DAG-based automation blueprints with execution history stored as JSONB
 - **Users**: Authentication and authorization management
 - **Agent Templates**: Reusable agent configurations for rapid deployment
 - **Tool Templates**: Reusable tool configurations for rapid deployment
 - **Conversations**: Communication logs with agent relationships and structured metadata
+- **Messages**: Individual message storage with role-based threading
 - **Environments**: Encrypted environment variable management scoped to starships
+- **Usage**: Token usage tracking for billing and analytics
 
 ### Direct Repository Usage
 
@@ -93,15 +94,12 @@ try {
 | **ToolTemplateRepository**  | Reusable tool configurations and marketplace              |
 | **UserRepository**          | User accounts, authentication, and profiles               |
 | **ConversationRepository**  | Chat history, agent relationships, and communication logs |
-| **WorkflowRepository**      | Workflow definitions, execution, and history              |
-| **BlueprintRepository**     | Workflow blueprint storage and versioning                 |
-| **ExecutionRepository**     | Workflow execution tracking and results                   |
 | **MessageRepository**       | Individual message storage and retrieval                  |
 | **EnvironmentRepository**   | Environment variable management with encryption           |
 | **UsageRepository**         | Token usage tracking for billing and analytics            |
 | **WaitlistRepository**      | Early access user onboarding queue                        |
 
-> **Note:** `NodeRepository` and `EdgeRepository` have been removed in schema v2.0.0. Workflow nodes and edges are now stored as JSONB within blueprint entities for better performance.
+> **Note:** `WorkflowRepository`, `BlueprintRepository`, `ExecutionRepository`, `NodeRepository`, and `EdgeRepository` have been removed as no implementations exist. Blueprint data is stored as JSONB within agent and tool entities.
 
 ## Database Management
 
@@ -195,6 +193,9 @@ const template = await templateRepo.create({
   name: 'Data Analyst',
   category: 'analysis',
   isPublic: true,
+  model: 'gpt-4',
+  systemPrompt: 'You are a data analysis expert',
+  blueprint: {},
 });
 
 // Instantiate from template
@@ -202,45 +203,6 @@ const agentRepo = new AgentRepository();
 const agent = await agentRepo.createFromTemplate(template.id, 'starship-123', {
   name: 'My Data Agent',
 });
-```
-
-### Workflow Management
-
-```typescript
-import { WorkflowRepository } from '@starships/models';
-const workflowRepo = new WorkflowRepository();
-
-// Create workflow
-const workflow = await workflowRepo.create({
-  name: 'Data Processing Pipeline',
-  category: 'automation',
-  authorId: 'user-123',
-  starshipId: 'starship-456',
-  isPublic: false,
-  blueprint: {
-    nodes: [
-      { ref: 'start', type: 'start', name: 'Start', description: 'Begin workflow', parameters: {} },
-      {
-        ref: 'process',
-        type: 'agent',
-        name: 'Process Data',
-        description: 'AI data processing',
-        parameters: { agentId: 'agent-789' },
-      },
-      { ref: 'end', type: 'end', name: 'End', description: 'Complete workflow', parameters: {} },
-    ],
-    edges: [
-      { ref: 'start-to-process', from: 'start', to: 'process' },
-      { ref: 'process-to-end', from: 'process', to: 'end' },
-    ],
-  },
-});
-
-// Deploy workflow to starship
-await workflowRepo.updateStarshipId(workflow.id, 'starship-456');
-
-// Find workflows by category
-const automationWorkflows = await workflowRepo.findByCategory('automation');
 ```
 
 ### Conversation-Agent Relationships
@@ -581,19 +543,21 @@ This package is part of the starships.ai monorepo:
 
 ## Schema Evolution
 
-### Version 2.0.0 (Current)
+### Version 2.1.0 (Current)
 
-- **Environment Variables**: Updated to use `encrypted_value` field with `description` and `created_by` tracking
-- **Blueprint Storage**: Nodes and edges now stored as JSONB within blueprint entities (removed separate tables)
-- **Tool System**: Added comprehensive tool and tool template system with marketplace support
+- **Removed Tables**: `workflows`, `blueprints`, and `executions` tables removed as no repository implementations exist
+- **Environment Variables**: Uses `encrypted_value` field with `description` and `created_by` tracking
+- **Blueprint Storage**: Agent and tool blueprints stored as JSONB within their respective entities
+- **Tool System**: Comprehensive tool and tool template system with marketplace support
 - **Agent-Tool Relationships**: Many-to-many relationships via junction tables
 - **Performance Optimization**: JSONB storage for complex objects improves query performance
 
-### Migration Path
+### Migration Path from v2.0.0
 
-- Existing `nodes` and `edges` tables are no longer used - data migrated to blueprint JSONB fields
-- Environment variables require re-encryption during migration to new `encrypted_value` format
-- Junction tables added for proper many-to-many relationships between agents, tools, and conversations
+- `workflows`, `blueprints`, and `executions` tables removed - no repository support
+- `nodes` and `edges` tables previously removed - data stored as JSONB
+- Environment variables use `encrypted_value` format
+- Junction tables provide proper many-to-many relationships between agents, tools, and conversations
 
 ## Development Status
 

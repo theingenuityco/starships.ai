@@ -11,7 +11,6 @@
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "lint": "eslint src --ext .ts",
-    "migrate": "tsx src/scripts/migration-runner.ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",

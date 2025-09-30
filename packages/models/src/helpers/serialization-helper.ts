@@ -162,24 +162,16 @@ export function toDatabase(entity: unknown): Record<string, unknown> {
     throw new Error('Entity must be a valid object for serialization');
   }
 
-  // Use instanceToPlain to apply @Transform decorators for serialization
-  const serialized = instanceToPlain(entity, {
-    strategy: 'excludeAll', // Only serialize @Expose decorated properties
-    excludeExtraneousValues: true,
-    enableImplicitConversion: false,
-  });
+  // Use instanceToPlain to convert entity to plain object
+  // Key: don't filter nested properties - PostgreSQL JSONB handles objects directly
+  const serialized = instanceToPlain(entity);
 
   // Fail fast if serialization produces no result
   if (!serialized || typeof serialized !== 'object') {
     throw new Error(`Serialization failed for entity: ${entity.constructor?.name || 'Unknown'}`);
   }
 
-  // Fail fast if no properties are exposed for serialization
-  if (Object.keys(serialized).length === 0) {
-    throw new Error(`No properties exposed for serialization in entity: ${entity.constructor?.name || 'Unknown'}`);
-  }
-
-  // Remove undefined properties and convert to snake_case
+  // Remove undefined properties
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(serialized)) {
     if (value !== undefined) {
@@ -187,9 +179,9 @@ export function toDatabase(entity: unknown): Record<string, unknown> {
     }
   }
 
-  // Fail fast if all properties were undefined
+  // Fail fast if no properties to serialize
   if (Object.keys(result).length === 0) {
-    throw new Error(`All exposed properties are undefined in entity: ${entity.constructor?.name || 'Unknown'}`);
+    throw new Error(`No properties to serialize in entity: ${entity.constructor?.name || 'Unknown'}`);
   }
 
   // Convert camelCase keys to snake_case for PostgreSQL compatibility

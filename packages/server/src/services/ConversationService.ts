@@ -95,10 +95,12 @@ export class ConversationService {
   /**
    * Create a new conversation
    */
-  async createConversation(data: ConversationModel & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
+  async createConversation(
+    data: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'> & { starshipId: string; agentId?: string }
+  ): Promise<ConversationModel> {
     const conversation = await this.conversationRepository.create({
       title: data.title || 'New Conversation',
-      status: 'active',
+      status: data.status || 'active',
       starshipId: data.starshipId,
       agentId: data.agentId,
     });

@@ -69,7 +69,7 @@ CREATE TABLE agent_templates (
     category VARCHAR(100) NOT NULL,
     is_public BOOLEAN NOT NULL DEFAULT false,
     usage_count INTEGER NOT NULL DEFAULT 0,
-    tags JSONB DEFAULT '[]'::jsonb,
+    tags JSONB DEFAULT '{}'::jsonb,
     system_prompt TEXT,
     model VARCHAR(100) NOT NULL,
     temperature DECIMAL(3,2),
@@ -77,9 +77,9 @@ CREATE TABLE agent_templates (
     timeout INTEGER NOT NULL DEFAULT 30000,
     state JSONB NOT NULL DEFAULT '{}'::jsonb,
     blueprint JSONB NOT NULL DEFAULT '{}'::jsonb,
-    assigned_tool_slugs JSONB DEFAULT '[]'::jsonb,
+    assigned_tool_slugs JSONB DEFAULT '{}'::jsonb,
     icon VARCHAR(10),
-    preview_prompts JSONB DEFAULT '[]'::jsonb,
+    preview_prompts JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
@@ -127,7 +127,7 @@ CREATE TABLE tool_templates (
     slug VARCHAR(100) UNIQUE NOT NULL,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    parameters JSONB NOT NULL DEFAULT '{"type":"object","properties":{}}'::jsonb,
+    parameters JSONB NOT NULL DEFAULT '{}'::jsonb,
     blueprint JSONB NOT NULL DEFAULT '{}'::jsonb,
     transforms JSONB,
     mutations JSONB,
@@ -135,10 +135,10 @@ CREATE TABLE tool_templates (
     category VARCHAR(100) NOT NULL,
     is_public BOOLEAN NOT NULL DEFAULT false,
     usage_count INTEGER NOT NULL DEFAULT 0,
-    tags JSONB DEFAULT '[]'::jsonb,
+    tags JSONB DEFAULT '{}'::jsonb,
     example_usage TEXT,
     requires_api_key BOOLEAN DEFAULT false,
-    configuration_fields JSONB DEFAULT '[]'::jsonb,
+    configuration_fields JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );

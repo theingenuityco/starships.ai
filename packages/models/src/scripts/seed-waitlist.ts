@@ -28,7 +28,7 @@ export async function seedWaitlist(): Promise<void> {
     const connection = getConnection();
 
     // Create the waitlist repository
-    const waitlistRepo = new WaitlistRepository(connection);
+    const waitlistRepo = new WaitlistRepository();
 
     // Initialize schema using the repository's method
     await waitlistRepo.initializeSchema();

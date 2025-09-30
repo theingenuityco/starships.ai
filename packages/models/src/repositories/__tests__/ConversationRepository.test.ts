@@ -5,7 +5,6 @@
 import { ConversationRepository } from '@/repositories/ConversationRepository';
 import { DatabaseError, NotFoundError } from '@starships/errors';
 import { Conversation, ConversationModel } from '@starships/protocol';
-import { Neo4jConnection } from '@/helpers/database';
 
 // Define type aliases for test data
 type CreateConversationData = Conversation & { starshipId: string; agentId?: string };
@@ -47,7 +46,7 @@ describe('ConversationRepository', () => {
       executeWrite: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
-    repository = new ConversationRepository(mockConnection as unknown as Neo4jConnection);
+    repository = new ConversationRepository();
     jest.clearAllMocks();
   });
 

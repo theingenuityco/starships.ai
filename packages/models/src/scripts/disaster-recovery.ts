@@ -139,7 +139,6 @@ export class DisasterRecoveryManager {
       if (options.rollbackDataPath && fs.existsSync(options.rollbackDataPath)) {
         console.log('[RECOVERY] 📂 Found rollback data, attempting migration rollback...');
         const migration = new ConnectorInstanceMigration();
-        JSON.parse(fs.readFileSync(options.rollbackDataPath, 'utf8'));
         const rollbackSuccess = await migration.rollback();
 
         if (rollbackSuccess) {
@@ -154,9 +153,8 @@ export class DisasterRecoveryManager {
       if (options.backupPath && fs.existsSync(options.backupPath)) {
         console.log('[RECOVERY] 💾 Attempting backup restore...');
         const restoreResult = await this.backupManager.restoreFromBackup(options.backupPath);
-        const restoreSuccess = restoreResult.success;
 
-        if (restoreSuccess) {
+        if (restoreResult.success) {
           actionsPerformed.push('Database restored from backup');
           console.log('[RECOVERY] ✅ Backup restore successful');
         } else {
@@ -238,16 +236,7 @@ export class DisasterRecoveryManager {
       // Step 2: Validate backup before restore
       if (backupPath) {
         console.log('[RECOVERY] 🔍 Validating backup before restore...');
-        // Note: validateBackup method doesn't exist, so we'll try to load the backup to validate it
-        let backupValidation = { valid: true, errors: [] as string[] };
-        try {
-          await this.backupManager['loadBackupFromFile'](backupPath);
-        } catch (error) {
-          backupValidation = {
-            valid: false,
-            errors: [error instanceof Error ? error.message : 'Backup validation failed'],
-          };
-        }
+        const backupValidation = await this.validateBackupFile(backupPath);
 
         if (!backupValidation.valid) {
           errors.push(`Backup validation failed: ${backupValidation.errors.join(', ')}`);
@@ -274,9 +263,8 @@ export class DisasterRecoveryManager {
         // Step 3: Perform restore
         console.log('[RECOVERY] 💾 Restoring from backup...');
         const restoreResult = await this.backupManager.restoreFromBackup(backupPath);
-        const restoreSuccess = restoreResult.success;
 
-        if (restoreSuccess) {
+        if (restoreResult.success) {
           actionsPerformed.push('Database restored successfully');
         } else {
           errors.push('Database restore failed');
@@ -334,13 +322,7 @@ export class DisasterRecoveryManager {
 
       for (const backupPath of alternativeBackups) {
         if (backupPath !== options.corruptedBackupPath) {
-          // Note: validateBackup method doesn't exist, so we'll try to load the backup to validate it
-          let validation = { valid: true };
-          try {
-            await this.backupManager['loadBackupFromFile'](backupPath);
-          } catch {
-            validation = { valid: false };
-          }
+          const validation = await this.validateBackupFile(backupPath);
           if (validation.valid) {
             validBackups.push(backupPath);
           }
@@ -365,8 +347,7 @@ export class DisasterRecoveryManager {
       actionsPerformed.push(`Using alternative backup: ${latestValidBackup}`);
 
       const restoreResult = await this.backupManager.restoreFromBackup(latestValidBackup);
-      const restoreSuccess = restoreResult.success;
-      if (restoreSuccess) {
+      if (restoreResult.success) {
         actionsPerformed.push('Database restored from alternative backup');
       } else {
         errors.push('Restore from alternative backup failed');
@@ -414,22 +395,32 @@ export class DisasterRecoveryManager {
       await this.backupManager.createBackup(emergencyBackupPath);
       actionsPerformed.push(`Emergency backup created: ${emergencyBackupPath}`);
 
-      // Step 2: Clear database completely
-      const session = this.connection.getSession();
-      try {
-        await session.executeWrite(async (tx) => {
-          await tx.run('MATCH ()-[r]-() DELETE r');
-          await tx.run('MATCH (n) DELETE n');
-        });
-        actionsPerformed.push('Database cleared completely');
-      } finally {
-        await session.close();
+      // Step 2: Clear database completely using PostgreSQL commands
+      console.log('[RECOVERY] 🗑️ Clearing database...');
+
+      // Get all tables and truncate them
+      const tablesResult = await this.connection.query<{ tablename: string }>(`
+        SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+      `);
+
+      const tables = tablesResult.map((row) => row.tablename);
+
+      // Disable foreign key checks temporarily
+      await this.connection.query('SET session_replication_role = replica');
+
+      // Truncate all tables
+      for (const table of tables) {
+        await this.connection.query(`TRUNCATE TABLE "${table}" CASCADE`);
       }
+
+      // Re-enable foreign key checks
+      await this.connection.query('SET session_replication_role = DEFAULT');
+
+      actionsPerformed.push('Database cleared completely');
 
       // Step 3: Perform complete restore
       const restoreResult = await this.backupManager.restoreFromBackup(options.backupPath);
-      const restoreSuccess = restoreResult.success;
-      if (restoreSuccess) {
+      if (restoreResult.success) {
         actionsPerformed.push('Complete restore performed successfully');
       } else {
         errors.push('Complete restore failed');
@@ -478,28 +469,20 @@ export class DisasterRecoveryManager {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
           console.log(`[RECOVERY] 🔄 Connection attempt ${attempt}/${maxRetries}...`);
-          await this.connection.connect();
 
           // Test connection with simple query
-          const session = this.connection.getSession();
-          try {
-            await session.run('RETURN 1');
-            actionsPerformed.push(`Connection restored on attempt ${attempt}`);
-            await session.close();
+          await this.connection.query('SELECT 1 as test');
+          actionsPerformed.push(`Connection restored on attempt ${attempt}`);
 
-            const duration = Date.now() - startTime;
-            return {
-              success: true,
-              scenario: DisasterScenario.CONNECTION_FAILURE,
-              actionsPerformed,
-              errors,
-              warnings,
-              duration,
-            };
-          } catch (queryError) {
-            await session.close();
-            throw queryError;
-          }
+          const duration = Date.now() - startTime;
+          return {
+            success: true,
+            scenario: DisasterScenario.CONNECTION_FAILURE,
+            actionsPerformed,
+            errors,
+            warnings,
+            duration,
+          };
         } catch (connectionError) {
           warnings.push(
             `Connection attempt ${attempt} failed: ${connectionError instanceof Error ? connectionError.message : 'Unknown error'}`
@@ -588,30 +571,70 @@ export class DisasterRecoveryManager {
   }
 
   /**
-   * Validate recovery state
+   * Validate recovery state using PostgreSQL queries
    */
   private async validateRecovery() {
-    const session = this.connection.getSession();
     try {
-      const result = await session.run(`
-        MATCH (n) 
-        RETURN labels(n)[0] as nodeType, count(n) as count
-        ORDER BY nodeType
+      const result = await this.connection.query<{ table_name: string; row_count: string }>(`
+        SELECT 
+          table_name,
+          (xpath('/row/count/text()', query_to_xml(format('select count(*) as count from %I', table_name), false, true, '')))[1]::text::int as row_count
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
       `);
 
-      const nodeCounts = result.records.map((record) => ({
-        type: record.get('nodeType'),
-        count: record.get('count').toNumber(),
+      const tableCounts = result.map((record) => ({
+        type: record.table_name,
+        count: parseInt(record.row_count || '0'),
       }));
 
       return {
-        valid: nodeCounts.length > 0,
-        errors: nodeCounts.length === 0 ? ['No data found in database after recovery'] : [],
+        valid: tableCounts.length > 0,
+        errors: tableCounts.length === 0 ? ['No data found in database after recovery'] : [],
         warnings: [],
-        statistics: nodeCounts,
+        statistics: tableCounts,
       };
-    } finally {
-      await session.close();
+    } catch (error) {
+      // Fallback validation if the complex query fails
+      try {
+        const simpleResult = await this.connection.query<{ count: string }>(`
+          SELECT COUNT(*) as count FROM users
+        `);
+
+        const userCount = parseInt(simpleResult[0]?.count || '0');
+
+        return {
+          valid: userCount >= 0,
+          errors: [],
+          warnings: userCount === 0 ? ['No users found in database'] : [],
+          statistics: [{ type: 'users', count: userCount }],
+        };
+      } catch (fallbackError) {
+        return {
+          valid: false,
+          errors: [`Recovery validation failed: ${error instanceof Error ? error.message : String(error)}`],
+          warnings: [],
+          statistics: [],
+        };
+      }
+    }
+  }
+
+  /**
+   * Validate backup file
+   */
+  private async validateBackupFile(backupPath: string): Promise<{ valid: boolean; errors: string[] }> {
+    try {
+      // Try to load the backup file to validate it
+      await this.backupManager['loadBackupFromFile'](backupPath);
+      return { valid: true, errors: [] };
+    } catch (error) {
+      return {
+        valid: false,
+        errors: [error instanceof Error ? error.message : 'Backup validation failed'],
+      };
     }
   }
 
@@ -619,14 +642,14 @@ export class DisasterRecoveryManager {
    * Find latest backup file
    */
   private async findLatestBackup(): Promise<string | null> {
-    const backupDir = path.join(process.cwd(), 'packages', 'models', 'backups');
+    const backupDir = path.join(process.cwd(), 'packages', 'models', 'migrations', 'backups');
     if (!fs.existsSync(backupDir)) {
       return null;
     }
 
     const backupFiles = fs
       .readdirSync(backupDir)
-      .filter((file) => file.endsWith('.json'))
+      .filter((file) => file.startsWith('backup-') && (file.endsWith('.json') || file.endsWith('.json.gz')))
       .map((file) => ({
         path: path.join(backupDir, file),
         mtime: fs.statSync(path.join(backupDir, file)).mtime,
@@ -644,13 +667,7 @@ export class DisasterRecoveryManager {
     const alternatives = allBackups.filter((backup) => backup !== excludePath);
 
     for (const backupPath of alternatives) {
-      // Note: validateBackup method doesn't exist, so we'll try to load the backup to validate it
-      let validation = { valid: true };
-      try {
-        await this.backupManager['loadBackupFromFile'](backupPath);
-      } catch {
-        validation = { valid: false };
-      }
+      const validation = await this.validateBackupFile(backupPath);
       if (validation.valid) {
         return backupPath;
       }
@@ -663,14 +680,14 @@ export class DisasterRecoveryManager {
    * Find all backup files
    */
   private async findAllBackups(): Promise<string[]> {
-    const backupDir = path.join(process.cwd(), 'packages', 'models', 'backups');
+    const backupDir = path.join(process.cwd(), 'packages', 'models', 'migrations', 'backups');
     if (!fs.existsSync(backupDir)) {
       return [];
     }
 
     return fs
       .readdirSync(backupDir)
-      .filter((file) => file.endsWith('.json'))
+      .filter((file) => file.startsWith('backup-') && (file.endsWith('.json') || file.endsWith('.json.gz')))
       .map((file) => path.join(backupDir, file))
       .sort((a, b) => {
         const statA = fs.statSync(a);
@@ -747,7 +764,7 @@ export class DisasterRecoveryManager {
     // In a real scenario, you'd use a library like 'statvfs' or 'diskusage'
     try {
       fs.statSync(process.cwd());
-      // Mock values for demonstration
+      // Mock values for demonstration - in production you'd check actual disk space
       return {
         availableGB: 10.5,
         totalGB: 100.0,

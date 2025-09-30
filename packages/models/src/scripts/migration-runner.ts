@@ -2,7 +2,7 @@ import { getConnection } from '@/helpers/database';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 
-/** Migration runner with error handling and rollback capabilities */
+/** Migration runner with error handling and rollback capabilities for PostgreSQL */
 
 export interface MigrationInfo {
   id: string;
@@ -39,7 +39,7 @@ export class MigrationRunner {
     const startTime = Date.now();
     const result: MigrationResult = {
       success: false,
-      migrationId: '000_complete_schema',
+      migrationId: '000_postgresql_schema',
       executionTime: 0,
       errors: [],
       warnings: [],
@@ -49,7 +49,7 @@ export class MigrationRunner {
     try {
       // Check if schema is already initialized
       console.log('🔍 Checking for existing migration records...');
-      const isApplied = await this.isMigrationApplied('000_complete_schema');
+      const isApplied = await this.isMigrationApplied('000_postgresql_schema');
       console.log(`   └─ Schema initialization status: ${isApplied ? 'exists' : 'needed'}`);
 
       if (isApplied) {
@@ -64,13 +64,13 @@ export class MigrationRunner {
         } else {
           console.log('⚠️ Migration exists but verification failed, clearing incomplete migration and re-running...');
           // Clear the incomplete migration record and re-run
-          await this.getConnection().executeWrite('MATCH (m:Migration {id: "000_complete_schema"}) DELETE m');
+          await this.getConnection().query('DELETE FROM migration_history WHERE migration_id = $1', ['000_postgresql_schema']);
           console.log('   └─ Cleared incomplete migration record');
         }
       }
 
       // Validate migration file exists
-      const migrationPath = join(this.migrationsPath, '000_complete_schema.cypher');
+      const migrationPath = join(this.migrationsPath, '000_postgresql_schema.sql');
       if (!existsSync(migrationPath)) {
         result.errors?.push(`Schema file not found: ${migrationPath}`);
         return result;
@@ -87,6 +87,9 @@ export class MigrationRunner {
         console.error('❌ Migration content execution failed:', executionError);
         throw executionError;
       }
+
+      // Record migration as applied
+      await this.recordMigration('000_postgresql_schema', 'PostgreSQL Schema', 'Complete PostgreSQL database schema', '1.0.0');
 
       // Verify schema initialization
       const verificationResult = await this.verifySchemaInitialization();
@@ -111,7 +114,7 @@ export class MigrationRunner {
   async runMigration(migrationId: string): Promise<MigrationResult> {
     console.warn('⚠️  runMigration is deprecated. Use initializeSchema() instead.');
 
-    if (migrationId === '001_initialize_schema') {
+    if (migrationId === '001_initialize_schema' || migrationId === '000_postgresql_schema') {
       return this.initializeSchema();
     }
 
@@ -149,7 +152,7 @@ export class MigrationRunner {
       }
 
       // Find rollback file
-      const rollbackPath = join(this.migrationsPath, `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.cypher`);
+      const rollbackPath = join(this.migrationsPath, `${migrationId.replace(/^(\d+)_/, '$1_rollback_')}.sql`);
       if (!existsSync(rollbackPath)) {
         result.errors?.push(`Rollback file not found: ${rollbackPath}`);
         return result;
@@ -172,12 +175,29 @@ export class MigrationRunner {
   /** Get list of applied migrations */
   async getAppliedMigrations(): Promise<MigrationInfo[]> {
     try {
-      const result = await this.getConnection().executeQuery(
-        `MATCH (m:Migration)
-       RETURN m
-       ORDER BY m.appliedAt ASC`
-      );
-      return result.map((record: Record<string, unknown>) => record.m as MigrationInfo);
+      // First ensure migration_history table exists
+      await this.ensureMigrationTable();
+
+      const result = await this.getConnection().query<{
+        id: string;
+        name: string;
+        description: string;
+        version: string;
+        appliedAt: string;
+        appliedBy: string;
+      }>(`
+        SELECT migration_id as id, name, description, version, applied_at as "appliedAt", applied_by as "appliedBy"
+        FROM migration_history
+        ORDER BY applied_at ASC
+      `);
+      return result.map((record) => ({
+        id: record.id,
+        name: record.name,
+        description: record.description,
+        version: record.version,
+        appliedAt: record.appliedAt,
+        appliedBy: record.appliedBy,
+      }));
     } catch (error) {
       console.error('Failed to get applied migrations:', error);
       return [];
@@ -189,67 +209,66 @@ export class MigrationRunner {
     const appliedMigrations = await this.getAppliedMigrations();
     const appliedIds = new Set(appliedMigrations.map((m) => m.id));
 
-    // Scan the migrations directory for .cypher files (not rollback files)
+    // Scan the migrations directory for .sql files (not rollback files)
     const migrationFiles = readdirSync(this.migrationsPath)
-      .filter((file) => file.endsWith('.cypher') && !file.includes('rollback'))
-      .map((file) => file.replace('.cypher', ''))
+      .filter((file) => file.endsWith('.sql') && !file.includes('rollback'))
+      .map((file) => file.replace('.sql', ''))
       .sort();
 
     return migrationFiles.filter((id) => !appliedIds.has(id));
   }
 
-  /** Validate migration dependencies */
-  private async validateDependencies(migrationId: string): Promise<{
-    valid: boolean;
-    missing?: string[];
-  }> {
-    // Extract the migration number from the ID (e.g., "003" from "003_database_optimizations")
-    const migrationNumber = parseInt(migrationId.split('_')[0]);
-
-    if (isNaN(migrationNumber)) {
-      // No dependency validation for non-numbered migrations
-      return { valid: true };
-    }
-
-    const appliedMigrations = await this.getAppliedMigrations();
-    const appliedNumbers = appliedMigrations.map((m) => parseInt(m.id.split('_')[0])).filter((num) => !isNaN(num));
-
-    // Get all available migration files to understand which ones actually exist
-    const availableMigrationFiles = readdirSync(this.migrationsPath)
-      .filter((file) => file.endsWith('.cypher') && !file.includes('rollback'))
-      .map((file) => file.replace('.cypher', ''));
-
-    const availableNumbers = availableMigrationFiles
-      .map((id) => parseInt(id.split('_')[0]))
-      .filter((num) => !isNaN(num) && num < migrationNumber)
-      .sort((a, b) => a - b);
-
-    // Check if all available previous numbered migrations are applied
-    // This handles gaps in numbering by only checking for migrations that actually exist
-    const missing: string[] = [];
-    for (const availableNumber of availableNumbers) {
-      if (!appliedNumbers.includes(availableNumber)) {
-        missing.push(`${availableNumber.toString().padStart(3, '0')}_*`);
-      }
-    }
-
-    return {
-      valid: missing.length === 0,
-      missing: missing.length > 0 ? missing : undefined,
-    };
-  }
-
   /** Check if migration is already applied */
   private async isMigrationApplied(migrationId: string): Promise<boolean> {
     try {
-      const result = await this.getConnection().executeQuery('MATCH (m:Migration {id: $migrationId}) RETURN count(m) as count', {
-        migrationId,
-      });
-      return (result[0] as { count: number })?.count > 0;
+      // First ensure migration_history table exists
+      await this.ensureMigrationTable();
+
+      const result = await this.getConnection().query<{ count: string }>(
+        'SELECT COUNT(*) as count FROM migration_history WHERE migration_id = $1',
+        [migrationId]
+      );
+      return parseInt(result[0]?.count || '0') > 0;
     } catch (error) {
       console.error('Failed to check migration status:', error);
       return false;
     }
+  }
+
+  /** Ensure migration_history table exists */
+  private async ensureMigrationTable(): Promise<void> {
+    try {
+      await this.getConnection().query(`
+        CREATE TABLE IF NOT EXISTS migration_history (
+          migration_id VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          version VARCHAR(50) NOT NULL DEFAULT '1.0.0',
+          applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          applied_by VARCHAR(100) NOT NULL DEFAULT 'system'
+        )
+      `);
+    } catch (error) {
+      console.warn('Failed to ensure migration_history table:', error);
+    }
+  }
+
+  /** Record migration as applied */
+  private async recordMigration(migrationId: string, name: string, description: string, version: string): Promise<void> {
+    await this.ensureMigrationTable();
+    await this.getConnection().query(
+      `
+      INSERT INTO migration_history (migration_id, name, description, version, applied_at, applied_by)
+      VALUES ($1, $2, $3, $4, NOW(), 'system')
+      ON CONFLICT (migration_id) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        version = EXCLUDED.version,
+        applied_at = EXCLUDED.applied_at,
+        applied_by = EXCLUDED.applied_by
+    `,
+      [migrationId, name, description, version]
+    );
   }
 
   /** Execute migration content with transaction handling */
@@ -261,7 +280,7 @@ export class MigrationRunner {
     for (const line of lines) {
       const trimmedLine = line.trim();
       // Skip empty lines and comment-only lines
-      if (trimmedLine.length === 0 || trimmedLine.startsWith('//')) {
+      if (trimmedLine.length === 0 || trimmedLine.startsWith('--')) {
         continue;
       }
       cleanedLines.push(line);
@@ -285,7 +304,7 @@ export class MigrationRunner {
           // Show friendly progress without revealing statement content
           const statementType = this.getStatementType(statement);
           console.log(`  └─ Executing statement ${i + 1}/${statements.length}: ${statementType}...`);
-          await this.getConnection().executeWrite(statement);
+          await this.getConnection().query(statement);
         } catch (error) {
           console.error(`❌ Failed to execute statement ${i + 1}: ${this.getStatementType(statement)}`);
           throw new Error(`Failed to execute statement ${i + 1}: ${error instanceof Error ? error.message : String(error)}`);
@@ -300,40 +319,24 @@ export class MigrationRunner {
   private getStatementType(statement: string): string {
     const upperStatement = statement.toUpperCase().trim();
 
-    if (upperStatement.startsWith('CREATE CONSTRAINT')) {
-      return 'Creating database constraint';
-    } else if (upperStatement.startsWith('CREATE INDEX')) {
+    if (upperStatement.startsWith('CREATE TABLE')) {
+      return 'Creating table';
+    } else if (upperStatement.startsWith('CREATE UNIQUE INDEX') || upperStatement.startsWith('CREATE INDEX')) {
       return 'Creating database index';
-    } else if (upperStatement.startsWith('CREATE RANGE INDEX')) {
-      return 'Creating range index';
-    } else if (upperStatement.startsWith('CREATE FULLTEXT INDEX')) {
-      return 'Creating fulltext search index';
-    } else if (upperStatement.startsWith('CREATE (')) {
-      return 'Creating migration record';
-    } else if (upperStatement.startsWith('MATCH')) {
-      return 'Running verification query';
+    } else if (upperStatement.startsWith('CREATE EXTENSION')) {
+      return 'Creating database extension';
+    } else if (upperStatement.startsWith('CREATE OR REPLACE FUNCTION')) {
+      return 'Creating database function';
+    } else if (upperStatement.startsWith('CREATE TRIGGER')) {
+      return 'Creating database trigger';
+    } else if (upperStatement.startsWith('ALTER TABLE')) {
+      return 'Modifying table structure';
+    } else if (upperStatement.startsWith('COMMENT ON')) {
+      return 'Adding table comment';
+    } else if (upperStatement.startsWith('INSERT INTO')) {
+      return 'Inserting initial data';
     } else {
       return 'Executing database operation';
-    }
-  }
-
-  /** Create backup point before migration */
-  private async createBackupPoint(migrationId: string): Promise<void> {
-    try {
-      await this.getConnection().executeWrite(
-        `CREATE (bp:BackupPoint {
-          id: $backupId,
-          migrationId: $migrationId,
-          createdAt: datetime().epochMillis,
-          description: 'Pre-migration backup point'
-        })`,
-        {
-          backupId: `backup_${migrationId}_${Date.now()}`,
-          migrationId,
-        }
-      );
-    } catch (error) {
-      console.warn('Failed to create backup point:', error);
     }
   }
 
@@ -346,27 +349,32 @@ export class MigrationRunner {
 
     try {
       // Check if migration record was created
-      const migrationExists = await this.isMigrationApplied('000_complete_schema');
+      const migrationExists = await this.isMigrationApplied('000_postgresql_schema');
       if (!migrationExists) {
         errors.push('Schema initialization record not found');
       }
 
-      // Check constraints were created
-      const constraints = await this.getConnection().executeQuery('SHOW CONSTRAINTS');
-      if (constraints.length < 10) {
-        errors.push(`Expected at least 10 constraints, found ${constraints.length}`);
+      // Check key tables were created
+      const tableResult = await this.getConnection().query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name IN ('users', 'starships', 'agents', 'conversations', 'messages')
+      `);
+      const tableCount = parseInt(tableResult[0]?.count || '0');
+      if (tableCount < 5) {
+        errors.push(`Expected at least 5 core tables, found ${tableCount}`);
       }
 
       // Check indexes were created
-      const indexes = await this.getConnection().executeQuery('SHOW INDEXES');
-      if (indexes.length < 15) {
-        errors.push(`Expected at least 15 indexes, found ${indexes.length}`);
-      }
-
-      // Check that migration completed successfully
-      const migrationCheck = await this.getConnection().executeQuery('MATCH (m:Migration {id: "000_complete_schema"}) RETURN m');
-      if (!migrationCheck || migrationCheck.length === 0) {
-        errors.push('Migration record was not created properly');
+      const indexResult = await this.getConnection().query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+      `);
+      const indexCount = parseInt(indexResult[0]?.count || '0');
+      if (indexCount < 15) {
+        errors.push(`Expected at least 15 indexes, found ${indexCount}`);
       }
     } catch (error) {
       errors.push(`Schema verification failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -376,53 +384,6 @@ export class MigrationRunner {
       success: errors.length === 0,
       errors: errors.length > 0 ? errors : undefined,
     };
-  }
-
-  /** Verify migration was applied correctly (deprecated) */
-  private async verifyMigration(migrationId: string): Promise<{
-    success: boolean;
-    errors?: string[];
-  }> {
-    if (migrationId === '001_initialize_schema') {
-      return this.verifySchemaInitialization();
-    }
-
-    // For other migrations, just check if they exist (shouldn't happen)
-    const errors: string[] = [];
-    try {
-      const migrationExists = await this.isMigrationApplied(migrationId);
-      if (!migrationExists) {
-        errors.push('Migration record not found after execution');
-      }
-    } catch (error) {
-      errors.push(`Verification failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-
-    return {
-      success: errors.length === 0,
-      errors: errors.length > 0 ? errors : undefined,
-    };
-  }
-
-  /** Verify constraints and indexes were created */
-  private async verifyConstraintsAndIndexes(errors: string[]): Promise<void> {
-    try {
-      // Check basic constraints exist
-      const constraints = await this.getConnection().executeQuery('SHOW CONSTRAINTS YIELD name RETURN count(*) as count');
-
-      if ((constraints[0] as { count: number })?.count < 5) {
-        errors.push('Expected constraints not found');
-      }
-
-      // Check basic indexes exist
-      const indexes = await this.getConnection().executeQuery('SHOW INDEXES YIELD name RETURN count(*) as count');
-
-      if ((indexes[0] as { count: number })?.count < 5) {
-        errors.push('Expected indexes not found');
-      }
-    } catch (error) {
-      errors.push(`Constraint/index verification failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }
 
   /** Initialize database schema (replaces runAllPendingMigrations) */

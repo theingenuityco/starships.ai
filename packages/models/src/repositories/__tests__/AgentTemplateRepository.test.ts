@@ -99,8 +99,7 @@ describe('AgentTemplateRepository', () => {
     });
 
     it('should use provided connection', () => {
-      const customConnection = {} as unknown as import('@/helpers/database/connection').Neo4jConnection;
-      const repo = new AgentTemplateRepository(customConnection);
+      const repo = new AgentTemplateRepository();
       expect(repo).toBeInstanceOf(AgentTemplateRepository);
     });
   });

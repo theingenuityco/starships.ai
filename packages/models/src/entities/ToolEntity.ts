@@ -33,6 +33,18 @@ export class ToolEntity implements ToolModel {
   @IsISO8601()
   updatedAt!: string;
 
+  // Foreign key relationships
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  starshipId!: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  templateId?: string;
+
   // Core ToolParams fields
   @Expose()
   @IsString()
@@ -106,6 +118,8 @@ export class ToolEntity implements ToolModel {
         slug: dataRecord.slug || '',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
+        starshipId: dataRecord.starshipId || '',
+        templateId: dataRecord.templateId,
         name: dataRecord.name || '',
         description: dataRecord.description || '',
         parameters: dataRecord.parameters || { type: 'object', properties: {} },

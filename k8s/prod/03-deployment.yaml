@@ -219,8 +219,8 @@ spec:
 
           # Volume Mounts
           volumeMounts:
-            - name: neo4j-data
-              mountPath: /var/lib/neo4j/data
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
             - name: app-sessions
               mountPath: /app/data/sessions
 

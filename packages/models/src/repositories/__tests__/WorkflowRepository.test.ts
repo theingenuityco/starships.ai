@@ -11,8 +11,6 @@ import { RepositoryTestHelper } from '../../tests/repository-test-helper';
 // Mock the database connection
 jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(),
-  convertNeo4jIntsInObject: jest.fn((obj) => obj),
-  convertNeo4jIntsInArray: jest.fn((arr) => arr),
 }));
 
 // Mock nanoid for consistent ID generation
@@ -217,7 +215,7 @@ describe('WorkflowRepository', () => {
         });
       });
 
-      it('should create Neo4j relationship when starshipId provided', async () => {
+      it('should create PostgreSQL relationship when starshipId provided', async () => {
         const createdWorkflow = {
           id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
           name: 'Test Workflow',

@@ -1,12 +1,12 @@
 # @starships/models
 
-Comprehensive data access layer and repository implementations for starships.ai, providing Neo4j database integration, entity management, and automated migration system.
+Comprehensive data access layer and repository implementations for starships.ai, providing PostgreSQL database integration, entity management, and automated migration system.
 
 ## Overview
 
 This package provides:
 
-- **Neo4j Database Integration** - Graph database connectivity and session management
+- **PostgreSQL Database Integration** - Relational database connectivity and connection pooling
 - **Repository Pattern** - Standardized data access with direct repository imports
 - **Serialization System** - Professional data transformation using class-transformer
 - **Error Handling** - Unified error system with proper categorization
@@ -17,12 +17,13 @@ This package provides:
 ## Quick Start
 
 ```typescript
-import { StarshipRepository, AgentRepository, UserRepository, createConnection, Neo4jConfig } from '@starships/models';
+import { StarshipRepository, AgentRepository, UserRepository, createConnection, PostgresConfig } from '@starships/models';
 
 // 1. Initialize database connection
-const config: Neo4jConfig = {
-  uri: '[NEO4J-LOCAL-URL]',
-  username: 'neo4j',
+const config: PostgresConfig = {
+  host: 'localhost',
+  port: 5432,
+  user: 'postgres',
   password: 'password',
   database: 'starships',
 };
@@ -351,11 +352,12 @@ const result = await PerformanceMonitor.measure('starship-creation', () => stars
 Required environment variables:
 
 ```bash
-# Neo4j Configuration
-NEO4J_URI=[NEO4J-LOCAL-URL]
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your-password
-NEO4J_DATABASE=starships
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your-password
+POSTGRES_DATABASE=starships
 
 # Logging Configuration
 LOG_LEVEL=info
@@ -517,7 +519,7 @@ describe('Your Tool', () => {
 ├── src/
 │   ├── index.ts                 # Main exports
 │   ├── helpers/                 # Utilities and shared logic
-│   │   ├── database/            # Neo4j connection management
+│   │   ├── database/            # PostgreSQL connection management
 │   │   ├── errors/              # Error handling system
 │   │   └── logging/             # Structured logging
 │   ├── repositories/            # Data access implementations
@@ -531,7 +533,8 @@ describe('Your Tool', () => {
 
 ### Core Dependencies
 
-- **neo4j-driver** - Graph database connectivity (v5.28+)
+- **pg** - PostgreSQL database connectivity
+- **@types/pg** - TypeScript definitions for PostgreSQL
 - **@starships/protocol** - Shared type definitions
 - **@starships/errors** - Error handling system
 - **@starships/autopilot** - Workflow execution integration

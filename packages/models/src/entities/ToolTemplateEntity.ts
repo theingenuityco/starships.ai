@@ -57,7 +57,6 @@ export class ToolTemplateEntity implements ToolTemplateModel {
 
   @Expose()
   @Transformers.JsonTransform()
-  @IsOptional()
   @IsObject()
   parameters!: {
     type: 'object';
@@ -67,7 +66,6 @@ export class ToolTemplateEntity implements ToolTemplateModel {
 
   @Expose()
   @Transformers.JsonTransform()
-  @IsOptional()
   @IsObject()
   blueprint!: Blueprint;
 
@@ -141,8 +139,8 @@ export class ToolTemplateEntity implements ToolTemplateModel {
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         name: dataRecord.name || '',
         description: dataRecord.description || '',
-        parameters: dataRecord.parameters,
-        blueprint: dataRecord.blueprint,
+        parameters: dataRecord.parameters || { type: 'object', properties: {} },
+        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         transforms: dataRecord.transforms,
         mutations: dataRecord.mutations,
         condition: dataRecord.condition,

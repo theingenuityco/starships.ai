@@ -89,13 +89,11 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @Transformers.JsonTransform()
-  @IsOptional()
   @IsObject()
   state!: AgentState; // Runtime state with messages and tools
 
   @Expose()
   @Transformers.JsonTransform()
-  @IsOptional()
   @IsObject()
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
 
@@ -125,8 +123,8 @@ export class AgentEntity implements AgentModel {
         maxTokens: dataRecord.maxTokens,
         timeout: dataRecord.timeout ?? 30000,
         systemPrompt: dataRecord.systemPrompt,
-        state: dataRecord.state,
-        blueprint: dataRecord.blueprint,
+        state: dataRecord.state || { messages: [], tools: [] },
+        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         ...dataRecord,
       });
     } else {

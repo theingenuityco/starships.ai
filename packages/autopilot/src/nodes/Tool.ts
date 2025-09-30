@@ -114,6 +114,9 @@ export class Tool extends BaseNode<ToolParams> {
     // Pre-resolve ALL tools upfront (once)
     const toolRegistry = await this.buildToolRegistry();
 
+    // Augment calls when applicable (e.g., research complement: duckduckgo <-> wikipedia)
+    const allCalls = this.augmentResearchTools(toolCalls);
+
     // Proceed even if some tools are missing; per-call failures will be recorded
 
     // Atomic progress tracker
@@ -123,10 +126,10 @@ export class Tool extends BaseNode<ToolParams> {
       getProgress: () => ({
         completed: progressTracker.completed.size,
         failed: progressTracker.failed.size,
-        total: toolCalls.length,
-        remaining: toolCalls
-          .filter((call) => !progressTracker.completed.has(call.id) && !progressTracker.failed.has(call.id))
-          .map((call) => call.name),
+        total: allCalls.length,
+        remaining: allCalls
+          .filter((call: ToolCallData) => !progressTracker.completed.has(call.id) && !progressTracker.failed.has(call.id))
+          .map((call: ToolCallData) => call.name),
       }),
     };
 
@@ -134,13 +137,13 @@ export class Tool extends BaseNode<ToolParams> {
     await this.emitEvent('parallel_tools_started', {
       batchId,
       timestamp,
-      toolCount: toolCalls.length,
-      toolNames: toolCalls.map((call) => call.name),
+      toolCount: allCalls.length,
+      toolNames: allCalls.map((call: ToolCallData) => call.name),
     });
 
     // Execute all tools in parallel
     const results = await Promise.allSettled(
-      toolCalls.map(async (toolCall) => {
+      allCalls.map(async (toolCall: ToolCallData) => {
         const toolConfig = toolRegistry.get(toolCall.name.toLowerCase());
 
         // Emit progress started
@@ -192,7 +195,7 @@ export class Tool extends BaseNode<ToolParams> {
       summary: progressTracker.getProgress(),
     });
 
-    return this.combineResults(results, batchId, timestamp, toolCalls);
+    return this.combineResults(results, batchId, timestamp, allCalls);
   }
 
   /**
@@ -201,6 +204,12 @@ export class Tool extends BaseNode<ToolParams> {
    * Emit progress events so the server can persist tool_result messages for the UI
    */
   private async executeSingleToolCall(toolCall: ToolCallData): Promise<ExecutionItem[]> {
+    // If augmentation yields more than one call, delegate to the parallel path
+    const augmented = this.augmentResearchTools([toolCall]);
+    if (Array.isArray(augmented) && augmented.length > 1) {
+      return await this.executeMultipleTools(augmented);
+    }
+
     const toolRegistry = await this.buildToolRegistry();
     const toolConfig = toolRegistry.get(toolCall.name.toLowerCase());
 
@@ -459,6 +468,56 @@ export class Tool extends BaseNode<ToolParams> {
   }
 
   /**
+   * Augment research tool calls: if only duckduckgo_instant or wikipedia_search is provided,
+   * synthesize a complementary call so they can run in parallel.
+   * - duckduckgo_instant -> also add wikipedia_search summary
+   * - wikipedia_search -> also add duckduckgo_instant quick facts
+   */
+  private augmentResearchTools(calls: ToolCallData[]): ToolCallData[] {
+    try {
+      if (!Array.isArray(calls) || calls.length !== 1) return calls;
+
+      const only = calls[0];
+      if (!only || typeof only.name !== 'string') return calls;
+
+      const name = only.name.toLowerCase();
+      const args = only.arguments && typeof only.arguments === 'object' ? (only.arguments as Record<string, unknown>) : {};
+      const query = typeof (args as any).query === 'string' ? (args as any).query : '';
+
+      if (!query || query.trim().length === 0) return calls;
+
+      const sid = `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      if (name === 'duckduckgo_instant') {
+        // Complement with wikipedia summary
+        const wikiCall: ToolCallData = {
+          id: sid,
+          name: 'wikipedia_search',
+          arguments: { query, action: 'summary', limit: 1, language: 'en' },
+          callIndex: 1,
+          toolCallId: sid,
+        };
+        return [only, wikiCall];
+      }
+
+      if (name === 'wikipedia_search') {
+        // Complement with duckduckgo quick facts
+        const ddgCall: ToolCallData = {
+          id: sid,
+          name: 'duckduckgo_instant',
+          arguments: { query },
+          callIndex: 1,
+          toolCallId: sid,
+        };
+        return [only, ddgCall];
+      }
+
+      return calls;
+    } catch {
+      return calls;
+    }
+  }
+  /**
    * Get runner with pooling for parallel tools
    * Always use in-process LocalRunner for nested tool blueprints to avoid nested child processes
    */
@@ -533,15 +592,16 @@ export class Tool extends BaseNode<ToolParams> {
   }
 
   /**
-   * Emit generic event (using tool_started for batch events)
+   * Emit generic event (map batch lifecycle to tool events)
    */
   private async emitEvent(type: string, data: Record<string, unknown>): Promise<void> {
     const eventCallback = this.getEventCallback();
     if (!eventCallback) return;
 
-    // Use existing event types - map custom events to tool events
+    const eventType: 'tool_started' | 'tool_complete' = type.includes('completed') ? 'tool_complete' : 'tool_started';
+
     await eventCallback({
-      type: 'tool_started',
+      type: eventType,
       timestamp: new Date().toISOString(),
       executionDepth: this.getOptions()?.execution?.depth ?? 0,
       data: {

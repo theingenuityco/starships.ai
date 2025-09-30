@@ -130,6 +130,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   // Tool assignment - reference by slugs instead of embedding
   @Expose()
   @IsOptional()
+  @Transformers.PostgresArrayTransform()
   @IsArray()
   @IsString({ each: true })
   assignedToolSlugs?: string[];
@@ -153,7 +154,9 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @AgentTemplateTransformers.PreviewPromptsTransform()
+  @Transformers.PostgresArrayTransform()
+  @IsArray()
+  @IsString({ each: true })
   previewPrompts?: string[];
 
   /**

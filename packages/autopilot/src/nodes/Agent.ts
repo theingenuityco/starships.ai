@@ -174,53 +174,39 @@ export class Agent implements NodeHandler {
             },
             blueprint: null, // Tool node builds blueprints dynamically
 
-            // Simple approach: add tool results using multiple mutations
+            // Append ALL tool results (successful + failed) to state.messages so the next LLM pass can synthesize
+            // We replace the entire messages array with previous messages + new tool messages (dynamic count)
             mutations: [
-              // Tool result 1 (if exists)
               {
-                operation: 'add' as const,
-                path: '/state/messages/-',
-                value: `{{ 
+                operation: 'replace' as const,
+                path: '/state/messages',
+                value: `{{
                   (() => {
-                    const results = $lastOutputOf("${toolNodeRef}")[0]?.json;
-                    const successful = results?.successful || [];
-                    if (successful.length === 0) return null;
+                    const prev = (state && Array.isArray(state.messages)) ? state.messages : [];
+                    const results = $lastOutputOf("${toolNodeRef}")[0]?.json || {};
+                    const successful = Array.isArray(results.successful) ? results.successful : [];
+                    const failed = Array.isArray(results.failed) ? results.failed : [];
                     
-                    const result = successful[0];
-                    const actualData = result.data && typeof result.data === 'object' && result.data.json 
-                      ? result.data.json 
-                      : result.data;
-                    
-                    return {
-                      role: 'tool',
-                      tool_call_id: result.toolCallId,
-                      name: result.toolName,
-                      content: JSON.stringify(actualData)
+                    const toMessage = (r) => {
+                      const data = r && r.data && typeof r.data === 'object' && r.data.json ? r.data.json : (r ? r.data : undefined);
+                      let content;
+                      try { content = typeof data === 'string' ? data : JSON.stringify(data); } catch { content = String(data); }
+                      return {
+                        role: 'tool',
+                        tool_call_id: r?.toolCallId,
+                        name: r?.toolName,
+                        content
+                      };
                     };
-                  })()
-                }}`,
-              },
-              // Tool result 2 (if exists)
-              {
-                operation: 'add' as const,
-                path: '/state/messages/-',
-                value: `{{ 
-                  (() => {
-                    const results = $lastOutputOf("${toolNodeRef}")[0]?.json;
-                    const successful = results?.successful || [];
-                    if (successful.length < 2) return null;
                     
-                    const result = successful[1];
-                    const actualData = result.data && typeof result.data === 'object' && result.data.json 
-                      ? result.data.json 
-                      : result.data;
+                    const successMsgs = successful.map(toMessage);
+                    const failedMsgs = failed.map((r) => {
+                      const base = toMessage({ ...r, data: { error: r?.error || 'Unknown error' } });
+                      base.tool_failed = true;
+                      return base;
+                    });
                     
-                    return {
-                      role: 'tool',
-                      tool_call_id: result.toolCallId,
-                      name: result.toolName,
-                      content: JSON.stringify(actualData)
-                    };
+                    return [...prev, ...successMsgs, ...failedMsgs];
                   })()
                 }}`,
               },

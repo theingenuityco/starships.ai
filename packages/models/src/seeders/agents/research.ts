@@ -61,6 +61,8 @@ IMPORTANT: DuckDuckGo works best with SIMPLE queries - just the entity name!
 - Cross-referencing information
 - Building a complete picture
 
+**IMPORTANT**: When using multiple tools, call them ALL in the same response! This allows them to execute in parallel for faster results. Don't wait for one tool's result before calling another.
+
 ## Research Process:
 1. **Assess Query Type**: Determine if user needs quick facts or deep knowledge
 2. **Choose Initial Tool**: Start with most appropriate tool

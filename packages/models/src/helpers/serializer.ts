@@ -91,6 +91,30 @@ export const Transformers = {
     }),
 
   /**
+   * PostgreSQL TEXT[] array transformer - handles native PostgreSQL arrays
+   * PostgreSQL returns arrays as JavaScript arrays, so no parsing needed
+   */
+  PostgresArrayTransform: () =>
+    Transform(({ value, type }) => {
+      if (value === null || value === undefined) return undefined;
+
+      if (type === 0) {
+        // toClassOnly (deserializing from database)
+        // PostgreSQL driver returns arrays as JavaScript arrays
+        if (Array.isArray(value)) return value;
+        // Handle empty array case
+        if (value === '' || value === '{}') return [];
+        throw new Error(`Expected array from PostgreSQL but received: ${typeof value}`);
+      } else {
+        // toPlainOnly (serializing to database)
+        // Return as JavaScript array - PostgreSQL driver will handle conversion
+        if (Array.isArray(value)) return value;
+        if (value === '' || value === '{}') return [];
+        throw new Error(`Expected array for PostgreSQL but received: ${typeof value}`);
+      }
+    }),
+
+  /**
    * Strict number transformer - fails on invalid numbers
    */
   NumberTransform: () =>

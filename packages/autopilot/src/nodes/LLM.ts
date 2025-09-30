@@ -138,11 +138,31 @@ export class LLM extends BaseNode<LlmParams> {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Usage accounting (if present) is handled via SSE usage payload from the provider
-
-      // If streaming is disabled (tools present), return the full JSON (includes tool_calls)
+      // If streaming is disabled (tools present), synthesize streaming events then return full JSON
       if (!useStream) {
         const result = (await response.json()) as LLMResponse;
+
+        // Synthesize events so upstream streaming pipeline (server/UI) still progresses
+        const eventCallback = this.getEventCallback();
+        const executionDepth = this.getOptions()?.execution?.depth ?? 0;
+        if (eventCallback) {
+          try {
+            await eventCallback({
+              type: 'content_chunk',
+              timestamp: new Date().toISOString(),
+              executionDepth,
+              data: { chunk: result as unknown as Record<string, unknown> },
+            });
+            await eventCallback({
+              type: 'content_complete',
+              timestamp: new Date().toISOString(),
+              executionDepth,
+            });
+          } catch {
+            // ignore event emission errors
+          }
+        }
+
         return ExecutionItemUtils.wrapSingle(result, input?.[0]);
       }
 
@@ -150,6 +170,28 @@ export class LLM extends BaseNode<LlmParams> {
       const reader = response.body?.getReader();
       if (!reader) {
         const result = (await response.json()) as LLMResponse;
+
+        // Synthesize events so upstream streaming pipeline (server/UI) still progresses
+        const eventCallback = this.getEventCallback();
+        const executionDepth = this.getOptions()?.execution?.depth ?? 0;
+        if (eventCallback) {
+          try {
+            await eventCallback({
+              type: 'content_chunk',
+              timestamp: new Date().toISOString(),
+              executionDepth,
+              data: { chunk: result as unknown as Record<string, unknown> },
+            });
+            await eventCallback({
+              type: 'content_complete',
+              timestamp: new Date().toISOString(),
+              executionDepth,
+            });
+          } catch {
+            // ignore event emission errors
+          }
+        }
+
         return ExecutionItemUtils.wrapSingle(result, input?.[0]);
       }
 

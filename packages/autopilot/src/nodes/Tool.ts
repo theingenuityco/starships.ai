@@ -7,21 +7,20 @@
 
 import { BaseNode } from './BaseNode';
 import type { ToolParams } from '@/types/node-parameters';
-import { ValidationResult, ValidationError, ExecutionItem, Execution } from '@/types';
+import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { EngineConfig } from '@/engine/Engine';
 import { Blueprint } from '@/types/blueprint';
 import { LocalRunner } from '@/runner/LocalRunner';
-import { ChildProcessRunner } from '@/runner/ChildProcessRunner';
 import type { Runner } from '@/runner/Runner';
-import { ToolCallData, ToolExecutionResult, BatchExecutionResult } from '@/types/parallel-tools';
+import { ToolCallData, ToolExecutionResult } from '@/types/parallel-tools';
 
 export class Tool extends BaseNode<ToolParams> {
   // Resource Management
   private static localRunnerPool: LocalRunner[] = [];
   private static poolSize = 3;
-  
+
   constructor(params: ToolParams, options?: NodeHandlerOptions) {
     super(params, options);
   }
@@ -30,15 +29,16 @@ export class Tool extends BaseNode<ToolParams> {
    * Smart execute method - routes based on input type and node configuration
    */
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
+    let inputData: unknown;
     try {
       const params = this.getParams();
-      const inputData = ExecutionItemUtils.unwrapSingle(input);
-      
+      inputData = ExecutionItemUtils.unwrapSingle(input);
+
       console.log(`[TOOL-DEBUG] ${params.name} execution started`);
-      
+
       // Check if this is the universal tool executor for parallel execution
       const isUniversalExecutor = params.name === 'universal_tool_executor';
-      
+
       // Smart routing based on input and configuration
       if (isUniversalExecutor && Array.isArray(inputData)) {
         // Universal executor mode - handle array of tool calls
@@ -54,7 +54,7 @@ export class Tool extends BaseNode<ToolParams> {
             successful: [],
             failed: [],
             processedIds: [],
-            summary: { total: 0, successful: 0, failed: 0, successRate: '0%' }
+            summary: { total: 0, successful: 0, failed: 0, successRate: '0%' },
           });
         }
       } else {
@@ -62,23 +62,45 @@ export class Tool extends BaseNode<ToolParams> {
         return await this.executeLegacyToolExecution(input);
       }
     } catch (toolNodeError) {
-      // Hierarchical error recovery
+      // Hierarchical error recovery with per-call failure mapping
       const errorMessage = toolNodeError instanceof Error ? toolNodeError.message : 'Unknown error';
-      return [{
-        json: {
-          batchId: this.generateBatchId(),
-          successful: [],
-          failed: [{
-            error: 'Tool node execution failed',
-            details: errorMessage,
-            recovery: 'Continue conversation without tool results'
-          }],
-          summary: { total: 0, successful: 0, failed: 1 },
-          nodeError: true // Flag for Agent to handle gracefully
+      const params = this.getParams();
+      const calls: ToolCallData[] = Array.isArray(inputData) ? (inputData as ToolCallData[]) : [];
+      const failedEntries =
+        calls.length > 0
+          ? calls.map((call) => ({
+              toolCallId: call?.id ?? call?.toolCallId ?? 'unknown_call',
+              toolName: call?.name ?? params.name ?? 'unknown_tool',
+              success: false,
+              error: errorMessage,
+            }))
+          : [
+              {
+                toolCallId: 'unknown_call',
+                toolName: params.name ?? 'unknown_tool',
+                success: false,
+                error: errorMessage,
+              },
+            ];
+
+      const batchId = this.generateBatchId();
+      const timestamp = new Date().toISOString();
+
+      return [
+        {
+          json: {
+            batchId,
+            timestamp,
+            successful: [],
+            failed: failedEntries,
+            processedIds: failedEntries.map((f) => f.toolCallId).filter(Boolean),
+            summary: { total: failedEntries.length, successful: 0, failed: failedEntries.length, successRate: '0%' },
+            nodeError: true, // Flag for Agent to handle gracefully
+          },
+          error: errorMessage,
+          pairedItem: input?.[0]?.pairedItem || { item: 0 },
         },
-        error: errorMessage,
-        pairedItem: input?.[0]?.pairedItem || { item: 0 }
-      }];
+      ];
     }
   }
 
@@ -88,17 +110,12 @@ export class Tool extends BaseNode<ToolParams> {
   private async executeMultipleTools(toolCalls: ToolCallData[]): Promise<ExecutionItem[]> {
     const batchId = this.generateBatchId();
     const timestamp = new Date().toISOString();
-    
+
     // Pre-resolve ALL tools upfront (once)
     const toolRegistry = await this.buildToolRegistry();
-    
-    // Validate all tools exist before starting
-    for (const call of toolCalls) {
-      if (!toolRegistry.has(call.name.toLowerCase())) {
-        throw new Error(`Tool '${call.name}' not found in registry`);
-      }
-    }
-    
+
+    // Proceed even if some tools are missing; per-call failures will be recorded
+
     // Atomic progress tracker
     const progressTracker = {
       completed: new Set<string>(),
@@ -107,79 +124,203 @@ export class Tool extends BaseNode<ToolParams> {
         completed: progressTracker.completed.size,
         failed: progressTracker.failed.size,
         total: toolCalls.length,
-        remaining: toolCalls.filter(call => 
-          !progressTracker.completed.has(call.id) && 
-          !progressTracker.failed.has(call.id)
-        ).map(call => call.name)
-      })
+        remaining: toolCalls
+          .filter((call) => !progressTracker.completed.has(call.id) && !progressTracker.failed.has(call.id))
+          .map((call) => call.name),
+      }),
     };
-    
+
     // Emit batch started
     await this.emitEvent('parallel_tools_started', {
       batchId,
       timestamp,
       toolCount: toolCalls.length,
-      toolNames: toolCalls.map(call => call.name)
+      toolNames: toolCalls.map((call) => call.name),
     });
-    
+
     // Execute all tools in parallel
     const results = await Promise.allSettled(
       toolCalls.map(async (toolCall) => {
-        const toolConfig = toolRegistry.get(toolCall.name.toLowerCase())!;
-        
+        const toolConfig = toolRegistry.get(toolCall.name.toLowerCase());
+
         // Emit progress started
         await this.emitProgress(batchId, toolCall, 'started', progressTracker.getProgress());
-        
-        try {
-          const result = await this.executeWithToolConfig(toolCall, toolConfig);
-          progressTracker.completed.add(toolCall.id);
-          await this.emitProgress(batchId, toolCall, 'completed', progressTracker.getProgress(), result);
-          
-          return {
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            success: true,
-            data: ExecutionItemUtils.unwrapSingle(result)
-          };
-        } catch (error) {
+
+        if (!toolConfig) {
+          // Missing tool -> record failed without throwing to keep batch running
           progressTracker.failed.add(toolCall.id);
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          await this.emitProgress(batchId, toolCall, 'failed', progressTracker.getProgress(), null, errorMessage);
-          
+          const msg = `Tool '${toolCall.name}' not found in registry`;
+          await this.emitProgress(batchId, toolCall, 'failed', progressTracker.getProgress(), null, msg);
           return {
             toolCallId: toolCall.id,
             toolName: toolCall.name,
             success: false,
-            error: errorMessage
+            error: msg,
           };
+        }
+
+        try {
+          const result = await this.executeWithToolConfig(toolCall, toolConfig);
+          progressTracker.completed.add(toolCall.id);
+          await this.emitProgress(batchId, toolCall, 'completed', progressTracker.getProgress(), result);
+
+          return {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            success: true,
+            data: ExecutionItemUtils.unwrapSingle(result),
+          } as ToolExecutionResult;
+        } catch (error) {
+          progressTracker.failed.add(toolCall.id);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          await this.emitProgress(batchId, toolCall, 'failed', progressTracker.getProgress(), null, errorMessage);
+
+          return {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            success: false,
+            error: errorMessage,
+          } as ToolExecutionResult;
         }
       })
     );
-    
+
     // Emit batch completed
     await this.emitEvent('parallel_tools_completed', {
       batchId,
       timestamp,
-      summary: progressTracker.getProgress()
+      summary: progressTracker.getProgress(),
     });
-    
+
     return this.combineResults(results, batchId, timestamp, toolCalls);
   }
-  
+
   /**
    * Execute single tool call
+   * Wrap result into the same batch structure expected by Agent mutations
+   * Emit progress events so the server can persist tool_result messages for the UI
    */
   private async executeSingleToolCall(toolCall: ToolCallData): Promise<ExecutionItem[]> {
     const toolRegistry = await this.buildToolRegistry();
     const toolConfig = toolRegistry.get(toolCall.name.toLowerCase());
-    
+
+    const batchId = this.generateBatchId();
+    const timestamp = new Date().toISOString();
+
+    // Emit batch started (single-tool)
+    await this.emitEvent('parallel_tools_started', {
+      batchId,
+      timestamp,
+      toolCount: 1,
+      toolNames: [toolCall.name],
+    });
+
+    // Emit started progress
+    const getProgress = () => ({
+      completed: 0,
+      failed: 0,
+      total: 1,
+      remaining: [toolCall.name],
+    });
+    await this.emitProgress(batchId, toolCall, 'started', getProgress());
+
     if (!toolConfig) {
-      throw new Error(`Tool '${toolCall.name}' not found`);
+      const msg = `Tool '${toolCall.name}' not found in registry`;
+
+      // Emit failure progress
+      await this.emitProgress(batchId, toolCall, 'failed', { ...getProgress(), failed: 1, remaining: [] }, null, msg);
+
+      // Emit batch completed
+      await this.emitEvent('parallel_tools_completed', {
+        batchId,
+        timestamp,
+        summary: { completed: 0, failed: 1, total: 1, remaining: [] },
+      });
+
+      // Return structured failure (do not throw) so Agent can continue
+      return ExecutionItemUtils.wrapSingle({
+        batchId,
+        timestamp,
+        successful: [],
+        failed: [
+          {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            success: false,
+            error: msg,
+          },
+        ],
+        processedIds: [toolCall.id],
+        summary: { total: 1, successful: 0, failed: 1, successRate: '0%' },
+      });
     }
-    
-    return await this.executeWithToolConfig(toolCall, toolConfig);
+
+    try {
+      const raw = await this.executeWithToolConfig(toolCall, toolConfig);
+      const data = ExecutionItemUtils.unwrapSingle(raw);
+
+      // Emit completed progress
+      await this.emitProgress(
+        batchId,
+        toolCall,
+        'completed',
+        { completed: 1, failed: 0, total: 1, remaining: [] },
+        ExecutionItemUtils.wrapSingle(data)
+      );
+
+      // Emit batch completed
+      await this.emitEvent('parallel_tools_completed', {
+        batchId,
+        timestamp,
+        summary: { completed: 1, failed: 0, total: 1, remaining: [] },
+      });
+
+      return ExecutionItemUtils.wrapSingle({
+        batchId,
+        timestamp,
+        successful: [
+          {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            success: true,
+            data,
+          },
+        ],
+        failed: [],
+        processedIds: [toolCall.id],
+        summary: { total: 1, successful: 1, failed: 0, successRate: '100%' },
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+
+      // Emit failed progress
+      await this.emitProgress(batchId, toolCall, 'failed', { completed: 0, failed: 1, total: 1, remaining: [] }, null, msg);
+
+      // Emit batch completed
+      await this.emitEvent('parallel_tools_completed', {
+        batchId,
+        timestamp,
+        summary: { completed: 0, failed: 1, total: 1, remaining: [] },
+      });
+
+      return ExecutionItemUtils.wrapSingle({
+        batchId,
+        timestamp,
+        successful: [],
+        failed: [
+          {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            success: false,
+            error: msg,
+          },
+        ],
+        processedIds: [toolCall.id],
+        summary: { total: 1, successful: 0, failed: 1, successRate: '0%' },
+      });
+    }
   }
-  
+
   /**
    * Execute legacy single tool (backward compatibility)
    */
@@ -187,93 +328,94 @@ export class Tool extends BaseNode<ToolParams> {
     // This handles the existing single tool execution pattern
     // where Tool node has its own blueprint parameter
     const params = this.getParams();
-    
+
     if (!params.blueprint) {
       throw new Error(`Tool '${params.name}' missing blueprint parameter`);
     }
-    
+
     const inputData = ExecutionItemUtils.unwrapSingle(input);
     const parentExec = this.getOptions()?.execution;
-    const toolExecution = ExecutionItemUtils.createExecution(
-      ExecutionItemUtils.wrapSingle(inputData),
-      parentExec
-    );
-    
+    const toolExecution = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(inputData), parentExec);
+
     const runner = await this.getRunner();
     const engineConfig = this.getEngineConfig();
-    
+
     // Execute the tool blueprint
     const rawResult = await runner.run(params.blueprint, toolExecution, engineConfig);
-    
+
     // Transform to structured format expected by Agent mutations
     const batchId = this.generateBatchId();
     const timestamp = new Date().toISOString();
-    
+
     // Wrap legacy result in the new structured format
     const result = ExecutionItemUtils.wrapSingle({
       batchId,
       timestamp,
-      successful: [{
-        toolCallId: 'legacy_call',
-        toolName: params.name,
-        success: true,
-        data: ExecutionItemUtils.unwrapSingle(rawResult)
-      }],
+      successful: [
+        {
+          toolCallId: 'legacy_call',
+          toolName: params.name,
+          success: true,
+          data: ExecutionItemUtils.unwrapSingle(rawResult),
+        },
+      ],
       failed: [],
       processedIds: ['legacy_call'],
-      summary: { total: 1, successful: 1, failed: 0, successRate: '100%' }
+      summary: { total: 1, successful: 1, failed: 0, successRate: '100%' },
     });
-    
+
     console.log(`[TOOL-DEBUG] ${params.name} completed successfully`);
     return result;
   }
-  
+
   /**
    * Execute tool with pre-resolved config
    */
-  private async executeWithToolConfig(
-    toolCall: ToolCallData, 
-    toolConfig: ToolConfig
-  ): Promise<ExecutionItem[]> {
+  private async executeWithToolConfig(toolCall: ToolCallData, toolConfig: ToolConfig): Promise<ExecutionItem[]> {
     const parentExec = this.getOptions()?.execution;
-    
+
     // Add tool arguments to execution
-    const executionWithArgs = ExecutionItemUtils.createExecution(
-      ExecutionItemUtils.wrapSingle(toolCall.arguments),
-      parentExec
-    );
-    
+    const executionWithArgs = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolCall.arguments), parentExec);
+
     const runner = await this.getRunner();
     return await runner.run(toolConfig.blueprint, executionWithArgs, this.getEngineConfig());
   }
-  
+
   /**
    * Build tool registry with pre-resolved blueprints
    */
   private async buildToolRegistry(): Promise<Map<string, ToolConfig>> {
-    const state = this.getOptions()?.execution?.state as any;
-    const tools = Array.isArray(state?.tools) ? state.tools : [];
+    type ToolStateItem = { name: string; description?: string; blueprint?: Blueprint; parameters?: unknown };
+    const state = this.getOptions()?.execution?.state as { tools?: ToolStateItem[] } | undefined;
+    const tools: ToolStateItem[] = Array.isArray(state?.tools) ? (state!.tools as ToolStateItem[]) : [];
     const registry = new Map<string, ToolConfig>();
-    
-    tools.forEach((tool: any) => {
+
+    tools.forEach((tool) => {
       if (tool?.name && tool?.blueprint) {
         registry.set(tool.name.toLowerCase(), {
           name: tool.name,
           description: tool.description,
           blueprint: tool.blueprint,
-          parameters: tool.parameters
+          parameters: tool.parameters,
         });
       }
     });
-    
+
+    // Debug summary
+    try {
+      console.log(`[TOOL-DEBUG] Registry built: ${registry.size} tools -> ${JSON.stringify(Array.from(registry.keys()))}`);
+    } catch {
+      /* ignore logging errors */
+    }
+
     return registry;
   }
-  
+
   /**
    * Combine parallel execution results
    */
   private combineResults(
-    results: PromiseSettledResult<any>[], 
+    results: PromiseSettledResult<ToolExecutionResult>[],
     batchId: string,
     timestamp: string,
     toolCalls: ToolCallData[]
@@ -281,26 +423,26 @@ export class Tool extends BaseNode<ToolParams> {
     const successful: ToolExecutionResult[] = [];
     const failed: ToolExecutionResult[] = [];
     const processedIds: string[] = [];
-    
+
     results.forEach((result, index) => {
       processedIds.push(toolCalls[index].id);
-      
+
       if (result.status === 'fulfilled' && result.value.success) {
         successful.push(result.value);
       } else {
         failed.push(
-          result.status === 'fulfilled' 
-            ? result.value 
+          result.status === 'fulfilled'
+            ? result.value
             : {
                 toolCallId: toolCalls[index].id,
                 toolName: toolCalls[index].name,
                 success: false,
-                error: result.reason?.message || 'Unknown error'
+                error: result.reason?.message || 'Unknown error',
               }
         );
       }
     });
-    
+
     return ExecutionItemUtils.wrapSingle({
       batchId,
       timestamp,
@@ -311,38 +453,31 @@ export class Tool extends BaseNode<ToolParams> {
         total: results.length,
         successful: successful.length,
         failed: failed.length,
-        successRate: `${(successful.length / results.length * 100).toFixed(1)}%`
-      }
+        successRate: `${((successful.length / results.length) * 100).toFixed(1)}%`,
+      },
     });
   }
-  
+
   /**
    * Get runner with pooling for parallel tools
+   * Always use in-process LocalRunner for nested tool blueprints to avoid nested child processes
    */
   private async getRunner(): Promise<Runner> {
-    const depth = this.getOptions()?.execution?.depth ?? 0;
-    
-    if (depth === 0) {
-      return new ChildProcessRunner(); // Top-level only
-    }
-    
-    // For nested (parallel tools), use pooled LocalRunners
     if (Tool.localRunnerPool.length === 0) {
       for (let i = 0; i < Tool.poolSize; i++) {
         Tool.localRunnerPool.push(new LocalRunner());
       }
     }
-    
     return Tool.localRunnerPool[Math.floor(Math.random() * Tool.localRunnerPool.length)];
   }
-  
+
   /**
    * Generate unique batch ID
    */
   private generateBatchId(): string {
     return `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
-  
+
   /**
    * Get engine configuration
    */
@@ -350,10 +485,10 @@ export class Tool extends BaseNode<ToolParams> {
     return {
       eventCallback: this.getEventCallback(),
       failOnNodeError: false, // Continue with partial failures
-      secureEnv: this.getOptions()?.secureEnv
+      secureEnv: this.getOptions()?.secureEnv,
     };
   }
-  
+
   /**
    * Emit progress event with batch context
    */
@@ -361,32 +496,49 @@ export class Tool extends BaseNode<ToolParams> {
     batchId: string,
     toolCall: ToolCallData,
     status: 'started' | 'completed' | 'failed',
-    progress: any,
-    result?: any,
+    progress: { completed: number; failed: number; total: number; remaining: string[] },
+    result?: unknown,
     error?: string
   ): Promise<void> {
     const eventCallback = this.getEventCallback();
     if (!eventCallback) return;
-    
+
+    const resultPayload: Record<string, unknown> = {
+      batchId,
+      status,
+      progress,
+    };
+    if (result !== undefined) {
+      if (typeof result === 'object' && result !== null) {
+        Object.assign(resultPayload, result as Record<string, unknown>);
+      } else {
+        resultPayload.value = result;
+      }
+    }
+
+    const eventType: 'tool_started' | 'tool_complete' = status === 'started' ? 'tool_started' : 'tool_complete';
+
     await eventCallback({
-      type: 'tool_started',
+      type: eventType,
       timestamp: new Date().toISOString(),
       executionDepth: this.getOptions()?.execution?.depth ?? 0,
       data: {
         toolName: toolCall.name,
         toolCallId: toolCall.id,
-        arguments: toolCall.arguments
-      }
+        arguments: toolCall.arguments,
+        ...(status !== 'started' ? { result: resultPayload } : {}),
+        ...(error ? { error } : {}),
+      },
     });
   }
-  
+
   /**
    * Emit generic event (using tool_started for batch events)
    */
-  private async emitEvent(type: string, data: any): Promise<void> {
+  private async emitEvent(type: string, data: Record<string, unknown>): Promise<void> {
     const eventCallback = this.getEventCallback();
     if (!eventCallback) return;
-    
+
     // Use existing event types - map custom events to tool events
     await eventCallback({
       type: 'tool_started',
@@ -394,11 +546,11 @@ export class Tool extends BaseNode<ToolParams> {
       executionDepth: this.getOptions()?.execution?.depth ?? 0,
       data: {
         toolName: `batch_${type}`,
-        ...data
-      }
+        ...(data ? { result: data } : {}),
+      },
     });
   }
-  
+
   /**
    * Extract tool arguments from upstream input (legacy compatibility)
    */
@@ -455,20 +607,24 @@ export class Tool extends BaseNode<ToolParams> {
       }
     }
 
-    // Blueprint is required for all Tool nodes
-    if (!params.blueprint) {
-      errors.push({
-        code: 'MISSING_REQUIRED_FIELD',
-        message: 'Tool blueprint is required',
-      });
-    } else {
-      const nodes = params.blueprint.nodes || [];
-      const hasStartNode = Array.isArray(nodes) && nodes.some((n) => n.type === 'start');
-      if (!hasStartNode) {
+    // Blueprint validation
+    const isUniversalExecutor = params.name === 'universal_tool_executor';
+    // For universal executor, the blueprint is built dynamically; allow null/absent blueprint
+    if (!isUniversalExecutor) {
+      if (!params.blueprint) {
         errors.push({
-          code: 'MISSING_START_NODE',
-          message: 'Tool blueprint must have a start node',
+          code: 'MISSING_REQUIRED_FIELD',
+          message: 'Tool blueprint is required',
         });
+      } else {
+        const nodes = params.blueprint.nodes || [];
+        const hasStartNode = Array.isArray(nodes) && nodes.some((n) => n.type === 'start');
+        if (!hasStartNode) {
+          errors.push({
+            code: 'MISSING_START_NODE',
+            message: 'Tool blueprint must have a start node',
+          });
+        }
       }
     }
 
@@ -484,5 +640,5 @@ interface ToolConfig {
   name: string;
   description?: string;
   blueprint: Blueprint;
-  parameters?: any;
+  parameters?: unknown;
 }

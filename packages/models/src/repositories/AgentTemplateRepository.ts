@@ -112,25 +112,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
         // Create entity instance from plain object, then serialize
         const templateEntity = toEntityInstance(AgentTemplateEntity, templateProps);
-
-        // DEBUG: Log serialization process
-        console.log(
-          '🔍 [DEBUG] Before toDatabase - state:',
-          typeof templateEntity.state,
-          JSON.stringify(templateEntity.state).substring(0, 100)
-        );
-        console.log(
-          '🔍 [DEBUG] Before toDatabase - blueprint:',
-          typeof templateEntity.blueprint,
-          JSON.stringify(templateEntity.blueprint).substring(0, 100)
-        );
-
         const databaseFormat = toDatabase(templateEntity);
-
-        console.log('🔍 [DEBUG] After toDatabase - state field:', typeof databaseFormat.state, databaseFormat.state);
-        console.log('🔍 [DEBUG] After toDatabase - blueprint field:', typeof databaseFormat.blueprint, databaseFormat.blueprint);
-        console.log('🔍 [DEBUG] All database format keys:', Object.keys(databaseFormat));
-
         const result = await this.createEntity<Record<string, unknown>>('agent_templates', databaseFormat);
 
         const template = fromDatabase(AgentTemplateEntity, result);

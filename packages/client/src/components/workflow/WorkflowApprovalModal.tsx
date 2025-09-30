@@ -10,10 +10,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { CheckCircle2, XCircle, Clock, AlertTriangle, Loader2, Eye, MessageSquare } from 'lucide-react'
 import { WorkflowVisualization } from '@/components/workflow/WorkflowVisualization'
-import type { WorkflowModel } from '@starships/protocol'
 
 // Client-side workflow type for compatibility
-type WorkflowDSL = WorkflowModel | any
+type WorkflowDSL = any
 
 export interface WorkflowApprovalModalProps {
   workflow: WorkflowDSL | null

@@ -23,10 +23,8 @@ export type TemplateCategory =
 export * from './domains/agent';
 export * from './domains/agent-template';
 export * from './domains/auth';
-export * from './domains/blueprint';
 export * from './domains/conversation';
 export * from './domains/edge';
-export * from './domains/execution';
 export * from './domains/message';
 export * from './domains/node';
 export * from './domains/starship';
@@ -34,7 +32,6 @@ export * from './domains/environment';
 export * from './domains/tool';
 export * from './domains/user';
 export * from './domains/waitlist';
-export * from './domains/workflow';
 export * from './domains/usage';
 
 // Export API contracts

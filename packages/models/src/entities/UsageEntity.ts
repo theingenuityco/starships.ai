@@ -5,7 +5,6 @@
  * Starship and Conversation. This replaces message-level usage storage.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { UsageModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsISO8601, IsNumber, IsOptional, IsString, Length, Min, validate, ValidationError } from 'class-validator';
@@ -29,25 +28,21 @@ export class UsageEntity implements UsageModel {
 
   // Provider-reported usage
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
   prompt_tokens!: number;
 
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
   completion_tokens!: number;
 
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
   total_tokens!: number;
 
   @Expose()
-  @Transformers.NumberTransform()
   @IsNumber()
   @Min(0)
   cost!: number;
@@ -61,12 +56,10 @@ export class UsageEntity implements UsageModel {
 
   // Timestamps
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 

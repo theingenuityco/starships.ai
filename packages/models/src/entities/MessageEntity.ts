@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by ConversationEntity.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { MessageModel, MessageType } from '@starships/protocol';
 import type { LlmToolCall } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
@@ -18,12 +17,10 @@ export class MessageEntity implements MessageModel {
   id!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -69,7 +66,6 @@ export class MessageEntity implements MessageModel {
   // Optional tool_calls persisted for assistant messages when function calling is used (autopilot types)
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   tool_calls?: LlmToolCall[];
 
   // Optional tool_call_id for tool result messages - references the tool call that generated this result

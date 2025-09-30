@@ -297,8 +297,35 @@ export class ConversationService {
         secureEnv,
       });
 
+      // Diagnostics: count tool messages with/without tool_call_id to detect invalid history
+      try {
+        const toolMsgs = messages.filter((m) => m.role === 'tool');
+        const invalidToolMsgs = toolMsgs.filter((m) => !m.tool_call_id);
+        console.warn('[CONVERSATION-SERVICE][DIAG] Tool message stats before LLM call:', {
+          conversationId: data.conversationId,
+          total: messages.length,
+          toolCount: toolMsgs.length,
+          invalidToolCount: invalidToolMsgs.length,
+        });
+      } catch {
+        /* ignore diag errors */
+      }
+
+      // Filter out invalid tool messages without tool_call_id to satisfy OpenRouter/OpenAI contract
+      const sanitizedMessages = messages.filter((m) => m.role !== 'tool' || !!m.tool_call_id);
+      if (sanitizedMessages.length !== messages.length) {
+        try {
+          console.warn('[CONVERSATION-SERVICE][FIX] Removed invalid tool messages without tool_call_id', {
+            conversationId: data.conversationId,
+            removed: messages.length - sanitizedMessages.length,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+
       // Convert database messages to LLM format, preserving tool_calls and tool results
-      const llmMessages = messages.map((msg) => ({
+      const llmMessages = sanitizedMessages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
         ...(msg.reasoning && { reasoning: msg.reasoning }),
@@ -992,6 +1019,14 @@ export class ConversationService {
       case 'tool_complete': {
         const toolEvt = event as ToolEvent;
         console.log('[STREAMING] Tool completed:', toolEvt.data?.toolName);
+        try {
+          const name = toolEvt.data?.toolName as unknown as string | undefined;
+          const tcid = toolEvt.data?.toolCallId as unknown as string | undefined;
+          const isBatch = typeof name === 'string' && name.startsWith('batch_');
+          console.warn('[STREAMING][DIAG] tool_complete meta', { conversationId, toolName: name, toolCallId: tcid, isBatch });
+        } catch {
+          /* ignore diag errors */
+        }
 
         // Do NOT drop nested tool executions here.
         // Tools execute in nested contexts (executionDepth > 0), but their results must surface to the UI.
@@ -999,8 +1034,18 @@ export class ConversationService {
         // Track persistence as an async task so workflow_completed can await before emitting "complete"
         const persistTask = (async () => {
           try {
+            const name = toolEvt.data?.toolName as unknown as string | undefined;
+            const tcid = toolEvt.data?.toolCallId as unknown as string | undefined;
+            const isBatch = typeof name === 'string' && name.startsWith('batch_');
+
+            // Only persist concrete tool call results; skip batch lifecycle and missing toolCallId
+            if (!tcid || isBatch) {
+              console.warn('[STREAMING][FIX] Skipping persistence for non-call tool event', { conversationId, name, tcid, isBatch });
+              return;
+            }
+
             // Persist tool_result for both success (result) and failure (error)
-            if (toolEvt.data?.toolName && (toolEvt.data?.result !== undefined || toolEvt.data?.error)) {
+            if (name && (toolEvt.data?.result !== undefined || toolEvt.data?.error)) {
               const toolContent =
                 toolEvt.data?.result !== undefined
                   ? typeof toolEvt.data.result === 'string'
@@ -1013,7 +1058,7 @@ export class ConversationService {
                 role: 'tool',
                 content: toolContent,
                 messageType: 'tool_result',
-                ...(toolEvt.data?.toolCallId ? { tool_call_id: toolEvt.data.toolCallId } : {}),
+                tool_call_id: tcid,
               });
 
               console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);

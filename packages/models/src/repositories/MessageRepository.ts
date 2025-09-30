@@ -76,6 +76,8 @@ export class MessageRepository extends BaseRepository {
         }
 
         // Build message data with all required fields including foreign keys
+        // Note: tool_calls arguments normalization should be handled upstream (in ConversationService)
+        // to ensure empty/invalid arguments are converted to valid JSON strings like "{}"
         const messageData = {
           createdAt: now,
           updatedAt: now,

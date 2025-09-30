@@ -43,64 +43,6 @@ function convertKeysToCamelCase(obj: Record<string, unknown>): Record<string, un
 }
 
 /**
- * Safely deserialize database record to entity with error handling
- */
-function safeDeserialize<T>(
-  entityClass: new () => T,
-  data: unknown,
-  options: {
-    enableImplicitConversion?: boolean;
-    excludeExtraneousValues?: boolean;
-    strategy?: 'excludeAll' | 'exposeAll';
-  } = {}
-): T {
-  // Check if entityClass is valid
-  if (!entityClass || typeof entityClass !== 'function') {
-    throw new Error('Invalid entity class provided');
-  }
-
-  if (data === null || data === undefined) {
-    throw new Error('Cannot deserialize null or undefined data');
-  }
-
-  if (typeof data !== 'object') {
-    throw new Error(`Expected object for ${entityClass.name} deserialization`);
-  }
-
-  const defaultOptions = {
-    strategy: 'excludeAll' as const, // Respect @Expose decorators
-    excludeExtraneousValues: true, // Filter out non-exposed properties
-    enableImplicitConversion: false, // Let @Transform decorators handle conversions explicitly
-    ...options,
-  };
-
-  const entity = plainToInstance(entityClass, data, defaultOptions);
-
-  if (!entity) {
-    throw new Error(`Failed to create ${entityClass.name} instance from data`);
-  }
-
-  return entity;
-}
-
-/**
- * Safely deserialize array of database records to entities
- */
-function safeDeserializeArray<T>(entityClass: new () => T, dataArray: unknown[], options?: Parameters<typeof safeDeserialize>[2]): T[] {
-  if (!Array.isArray(dataArray)) {
-    throw new Error(`Expected array for ${entityClass.name} array deserialization, got ${typeof dataArray}`);
-  }
-
-  return dataArray.map((item, index) => {
-    try {
-      return safeDeserialize(entityClass, item, options);
-    } catch (error) {
-      throw new Error(`Array deserialization failed at index ${index}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  });
-}
-
-/**
  * Standardized method to deserialize single database record to entity
  * Replaces fromDatabaseRecord static methods on entities
  * Automatically converts snake_case to camelCase
@@ -122,7 +64,14 @@ export function fromDatabase<T>(entityClass: new () => T, data: unknown): T {
   const record = data as Record<string, unknown>;
   // Convert snake_case keys to camelCase for entity compatibility
   const camelCaseRecord = convertKeysToCamelCase(record);
-  return safeDeserialize(entityClass, camelCaseRecord);
+
+  // For entities with JSONB fields, we need to preserve nested object structure
+  // Use less restrictive deserialization to avoid stripping nested properties
+  return plainToInstance(entityClass, camelCaseRecord, {
+    strategy: 'exposeAll', // Include all properties by default
+    excludeExtraneousValues: false, // Don't filter out non-decorated nested properties
+    enableImplicitConversion: true, // Allow type conversions
+  });
 }
 
 /**
@@ -130,7 +79,27 @@ export function fromDatabase<T>(entityClass: new () => T, data: unknown): T {
  * Replaces fromDatabaseRecord static methods on entities for arrays
  */
 export function fromDatabaseArray<T>(entityClass: new () => T, dataArray: unknown[]): T[] {
-  return safeDeserializeArray(entityClass, dataArray);
+  if (!Array.isArray(dataArray)) {
+    throw new Error(`Expected array for ${entityClass.name} array deserialization, got ${typeof dataArray}`);
+  }
+
+  return dataArray.map((item, index) => {
+    try {
+      // Convert snake_case keys to camelCase for each item
+      if (item && typeof item === 'object') {
+        const camelCaseItem = convertKeysToCamelCase(item as Record<string, unknown>);
+        // Use less restrictive deserialization to preserve nested JSONB structures
+        return plainToInstance(entityClass, camelCaseItem, {
+          strategy: 'exposeAll',
+          excludeExtraneousValues: false,
+          enableImplicitConversion: true,
+        });
+      }
+      throw new Error(`Invalid item at index ${index}`);
+    } catch (error) {
+      throw new Error(`Array deserialization failed at index ${index}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
 }
 
 /**

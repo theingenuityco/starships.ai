@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 
 interface ConversationInterfaceProps {
-  starshipId?: string
+  starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
 }

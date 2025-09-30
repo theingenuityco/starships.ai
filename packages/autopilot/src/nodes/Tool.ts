@@ -114,8 +114,8 @@ export class Tool extends BaseNode<ToolParams> {
     // Pre-resolve ALL tools upfront (once)
     const toolRegistry = await this.buildToolRegistry();
 
-    // Augment calls when applicable (e.g., research complement: duckduckgo <-> wikipedia)
-    const allCalls = this.augmentResearchTools(toolCalls);
+    // Use the tool calls as provided by the LLM - no augmentation
+    const allCalls = toolCalls;
 
     // Proceed even if some tools are missing; per-call failures will be recorded
 
@@ -204,11 +204,6 @@ export class Tool extends BaseNode<ToolParams> {
    * Emit progress events so the server can persist tool_result messages for the UI
    */
   private async executeSingleToolCall(toolCall: ToolCallData): Promise<ExecutionItem[]> {
-    // If augmentation yields more than one call, delegate to the parallel path
-    const augmented = this.augmentResearchTools([toolCall]);
-    if (Array.isArray(augmented) && augmented.length > 1) {
-      return await this.executeMultipleTools(augmented);
-    }
 
     const toolRegistry = await this.buildToolRegistry();
     const toolConfig = toolRegistry.get(toolCall.name.toLowerCase());
@@ -468,56 +463,6 @@ export class Tool extends BaseNode<ToolParams> {
   }
 
   /**
-   * Augment research tool calls: if only duckduckgo_instant or wikipedia_search is provided,
-   * synthesize a complementary call so they can run in parallel.
-   * - duckduckgo_instant -> also add wikipedia_search summary
-   * - wikipedia_search -> also add duckduckgo_instant quick facts
-   */
-  private augmentResearchTools(calls: ToolCallData[]): ToolCallData[] {
-    try {
-      if (!Array.isArray(calls) || calls.length !== 1) return calls;
-
-      const only = calls[0];
-      if (!only || typeof only.name !== 'string') return calls;
-
-      const name = only.name.toLowerCase();
-      const args = only.arguments && typeof only.arguments === 'object' ? (only.arguments as Record<string, unknown>) : {};
-      const query = typeof (args as any).query === 'string' ? (args as any).query : '';
-
-      if (!query || query.trim().length === 0) return calls;
-
-      const sid = `synthetic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      if (name === 'duckduckgo_instant') {
-        // Complement with wikipedia summary
-        const wikiCall: ToolCallData = {
-          id: sid,
-          name: 'wikipedia_search',
-          arguments: { query, action: 'summary', limit: 1, language: 'en' },
-          callIndex: 1,
-          toolCallId: sid,
-        };
-        return [only, wikiCall];
-      }
-
-      if (name === 'wikipedia_search') {
-        // Complement with duckduckgo quick facts
-        const ddgCall: ToolCallData = {
-          id: sid,
-          name: 'duckduckgo_instant',
-          arguments: { query },
-          callIndex: 1,
-          toolCallId: sid,
-        };
-        return [only, ddgCall];
-      }
-
-      return calls;
-    } catch {
-      return calls;
-    }
-  }
-  /**
    * Get runner with pooling for parallel tools
    * Always use in-process LocalRunner for nested tool blueprints to avoid nested child processes
    */
@@ -534,7 +479,7 @@ export class Tool extends BaseNode<ToolParams> {
    * Generate unique batch ID
    */
   private generateBatchId(): string {
-    return `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `batch_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 
   /**
@@ -611,25 +556,6 @@ export class Tool extends BaseNode<ToolParams> {
     });
   }
 
-  /**
-   * Extract tool arguments from upstream input (legacy compatibility)
-   */
-  private extractToolArguments(inputData: unknown): Record<string, unknown> {
-    // Allow no-argument calls by returning an empty object
-    if (inputData == null) {
-      return {};
-    }
-    if (typeof inputData === 'string') {
-      if (inputData.trim().length === 0) {
-        return {};
-      }
-      throw new Error('Tool arguments must be provided as a plain object input.');
-    }
-    if (typeof inputData === 'object' && !Array.isArray(inputData)) {
-      return inputData as Record<string, unknown>;
-    }
-    throw new Error('Tool arguments must be provided as a plain object input.');
-  }
 
   /**
    * Validate tool configuration

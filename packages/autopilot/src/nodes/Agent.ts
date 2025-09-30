@@ -106,34 +106,8 @@ export class Agent implements NodeHandler {
           name: 'Check Tool Calls',
           description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
           parameters: {
-            condition: `{{(() => {
-              const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const fr = last?.choices?.[0]?.finish_reason;
-              
-              // Handle undefined input (tool execution loop)
-              if (!last) {
-                console.log('[AGENT-DEBUG] Tool execution complete, ending workflow');
-                return "complete";
-              }
-              
-              // Handle length (continue generation)
-              if (fr === "length") return "continue";
-              
-              // Key fix: Check finish_reason first (like original)
-              if (fr === "tool_calls") {
-                console.log('[AGENT-DEBUG] Executing tools via finish_reason');
-                return "call_tool";
-              }
-              
-              // Fallback: Check for tool calls in message
-              const calls = last?.choices?.[0]?.message?.tool_calls;
-              if (Array.isArray(calls) && calls.length > 0) {
-                console.log('[AGENT-DEBUG] Executing tools via message check');
-                return "call_tool";
-              }
-              
-              return "complete";
-            })()}}`
+            condition:
+              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.tool_calls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
           },
         },
         // Prepare arguments for Tool (extract ALL tool calls)
@@ -154,10 +128,24 @@ export class Agent implements NodeHandler {
               }
               
               // Return the WHOLE array - Tool node handles distribution
+              // Robust arg handling:
+              // - Prefer arguments_json when it's an object
+              // - Fallback to parsing function.arguments string
+              // - Default to {} on empty/invalid
               return toolCalls.map((call, index) => ({
                 id: call.id,
                 name: call.function?.name || '',
-                arguments: call.function?.arguments_json || {},
+                arguments: (() => {
+                  const aj = call.function?.arguments_json;
+                  if (aj && typeof aj === 'object') return aj;
+                  const s = typeof call.function?.arguments === 'string' ? call.function.arguments : '';
+                  if (!s || s.trim().length === 0) return {};
+                  try {
+                    return JSON.parse(s);
+                  } catch {
+                    return {};
+                  }
+                })(),
                 callIndex: index,
                 toolCallId: call.id
               }));
@@ -180,12 +168,12 @@ export class Agent implements NodeHandler {
               properties: {
                 toolCalls: {
                   type: 'array',
-                  items: { type: 'object' }
-                }
-              }
+                  items: { type: 'object' },
+                },
+              },
             },
             blueprint: null, // Tool node builds blueprints dynamically
-            
+
             // Single state mutation after ALL tools complete
             mutations: [
               {
@@ -233,7 +221,7 @@ export class Agent implements NodeHandler {
                     
                     return messages;
                   })()
-                }}`
+                }}`,
               },
               // Update batch tracking
               {
@@ -248,10 +236,10 @@ export class Agent implements NodeHandler {
                       completedAt: new Date().toISOString()
                     };
                   })()
-                }}`
-              }
-            ]
-          }
+                }}`,
+              },
+            ],
+          },
         },
       ],
       edges: [

@@ -826,38 +826,125 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
-        // console.log('Execution >>>', JSON.stringify(event.data?.execution, null, 2));
-        // Just before emitting "complete", finalize the assistant placeholder so UIs see the finished state
-        // (but not earlier to avoid client prematurely closing the SSE on streaming=false).
-        if (this.streamingService && this.streamingService.isActive(conversationId)) {
-          try {
-            await this.streamingService.broadcastDelta(conversationId, {
-              op: 'replace',
-              path: '/messages/-1/streaming',
-              value: false,
-            });
-          } catch (_) {
-            // ignore
-          }
+        // Best-effort finalization path:
+        // If no streaming placeholder was created (e.g., model produced no delta chunks),
+        // attempt to extract the last LLM message from execution results and persist it,
+        // so the UI is not left stuck at the tool_call stage.
+        const execEvent = event as ExecutionEvent;
+        const exec = execEvent.data?.execution;
 
-          // Yield a tick to allow the streaming=false patch to flush before emitting 'complete'
-          await new Promise<void>((resolve) => {
-            if (typeof setImmediate !== 'undefined') {
-              setImmediate(resolve);
-            } else {
-              setTimeout(resolve, 0);
+        const hasActiveStream = this.streamingService && this.streamingService.isActive(conversationId);
+        const hadPlaceholder = this.streamingContent.has(conversationId);
+
+        if (!hadPlaceholder && exec && Array.isArray(exec.results)) {
+          try {
+            // Walk results from the end to find an LLM-like payload
+            // Expect shape: { choices: [{ message: { role, content, reasoning?, tool_calls? }, finish_reason }], ... }
+            let finalContent = '';
+            let finalReasoning = '';
+            let finalToolCalls: any[] = [];
+
+            for (let i = exec.results.length - 1; i >= 0; i--) {
+              const items = exec.results[i]?.items || [];
+              if (items.length === 0) continue;
+              const payload = items[0]?.json as any;
+              const choices = Array.isArray(payload?.choices) ? payload.choices : [];
+              if (choices.length > 0 && choices[0]?.message) {
+                const msg = choices[0].message || {};
+                finalContent = typeof msg.content === 'string' ? msg.content : '';
+                finalReasoning = typeof msg.reasoning === 'string' ? msg.reasoning : '';
+                // Normalize tool_calls if present with non-empty function name
+                const tcs = Array.isArray(msg.tool_calls) ? msg.tool_calls : [];
+                finalToolCalls = tcs
+                  .filter((tc: any) => typeof tc?.function?.name === 'string' && tc.function.name.length > 0)
+                  .map((tc: any) => {
+                    const args = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
+                    // Try to derive arguments_json if provided
+                    const argsJson =
+                      tc?.function?.arguments_json && typeof tc.function.arguments_json === 'object'
+                        ? tc.function.arguments_json
+                        : undefined;
+                    return {
+                      id: tc?.id,
+                      type: 'function',
+                      function: {
+                        name: tc.function.name,
+                        arguments: args,
+                        ...(argsJson ? { arguments_json: argsJson } : {}),
+                      },
+                    };
+                  });
+                break;
+              }
             }
-          });
+
+            // Persist only if we actually found something meaningful
+            if (
+              (finalContent && finalContent.trim().length > 0) ||
+              (finalReasoning && finalReasoning.trim().length > 0) ||
+              (Array.isArray(finalToolCalls) && finalToolCalls.length > 0)
+            ) {
+              const assistantMessage = await this.messageService.createMessage({
+                conversationId,
+                role: 'assistant',
+                content: finalContent || '',
+                messageType: 'agent_response',
+                ...(finalReasoning ? { reasoning: finalReasoning } : {}),
+                ...(finalToolCalls.length > 0 ? { tool_calls: finalToolCalls } : {}),
+              });
+
+              if (hasActiveStream) {
+                // Broadcast as a full message append
+                await this.streamingService.broadcastDelta(conversationId, {
+                  op: 'add',
+                  path: '/messages/-',
+                  value: assistantMessage,
+                });
+              }
+            }
+          } catch (e) {
+            console.warn('[STREAMING] Fallback finalization failed:', e);
+          }
+        }
+
+        // Standard completion signalling
+        if (hasActiveStream) {
+          // Only set streaming=false when a placeholder exists; otherwise skip this patch
+          if (hadPlaceholder) {
+            try {
+              await this.streamingService.broadcastDelta(conversationId, {
+                op: 'replace',
+                path: '/messages/-1/streaming',
+                value: false,
+              });
+            } catch (_) {
+              // ignore
+            }
+
+            // Yield a tick to allow the streaming=false patch to flush before emitting 'complete'
+            await new Promise<void>((resolve) => {
+              if (typeof setImmediate !== 'undefined') {
+                setImmediate(resolve);
+              } else {
+                setTimeout(resolve, 0);
+              }
+            });
+          }
 
           // Now emit stream completion for the entire workflow (top-level only)
           await this.streamingService.broadcastComplete(conversationId, {
             source: 'agent',
             content: 'Workflow completed',
-            agentId: 'agent', // agent id not critical for client-side terminal handling
+            agentId: 'agent',
             scope: 'workflow',
             conversationId,
           });
         }
+        // Always clear trackers on completion
+        this.streamingContent.delete(conversationId);
+        this.streamingToolCalls.delete(conversationId);
+        this.streamingReasoning.delete(conversationId);
+
         break;
       }
 
@@ -906,10 +993,8 @@ export class ConversationService {
         const toolEvt = event as ToolEvent;
         console.log('[STREAMING] Tool completed:', toolEvt.data?.toolName);
 
-        // Depth-based guard: drop nested tool executions (keep only top-level where executionDepth === 0)
-        if ((event.executionDepth ?? 0) > 0) {
-          break;
-        }
+        // Do NOT drop nested tool executions here.
+        // Tools execute in nested contexts (executionDepth > 0), but their results must surface to the UI.
 
         // Track persistence as an async task so workflow_completed can await before emitting "complete"
         const persistTask = (async () => {

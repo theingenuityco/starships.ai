@@ -75,7 +75,11 @@ CREATE TABLE agent_templates (
     temperature DECIMAL(3,2),
     max_tokens INTEGER,
     timeout INTEGER NOT NULL DEFAULT 30000,
+    state JSONB NOT NULL DEFAULT '{}'::jsonb,
     blueprint JSONB NOT NULL DEFAULT '{}'::jsonb,
+    assigned_tool_slugs JSONB DEFAULT '[]'::jsonb,
+    icon VARCHAR(10),
+    preview_prompts JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );

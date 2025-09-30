@@ -113,10 +113,12 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsObject()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   state!: AgentState;
 
   @Expose()
   @IsObject()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   blueprint!: Blueprint;
 
   // Tool assignment - reference by slugs instead of embedding

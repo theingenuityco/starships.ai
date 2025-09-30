@@ -7,7 +7,7 @@
 
 import type { ToolModel } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
-import { Expose } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean, IsArray } from 'class-validator';
 
 export class ToolEntity implements ToolModel {
@@ -55,6 +55,7 @@ export class ToolEntity implements ToolModel {
 
   @Expose()
   @IsObject()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   parameters!: {
     type: 'object';
     properties: Record<string, ToolParameterSchema>;
@@ -63,17 +64,20 @@ export class ToolEntity implements ToolModel {
 
   @Expose()
   @IsObject()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   blueprint!: Blueprint;
 
   // BaseParams fields
   @Expose()
   @IsOptional()
   @IsArray()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   transforms?: TransformOperation[];
 
   @Expose()
   @IsOptional()
   @IsArray()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   mutations?: TransformOperation[];
 
   @Expose()
@@ -85,6 +89,7 @@ export class ToolEntity implements ToolModel {
   @Expose()
   @IsOptional()
   @IsObject()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   configuration?: Record<string, unknown>;
 
   @Expose()

@@ -283,10 +283,13 @@ export class ConversationService {
         ...starshipEnv,
       };
 
+      // Guard against NULL/undefined persisted JSONB state (now nullable)
+      const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
+
       const agentWithTools: AgentParams = {
         ...agentModel,
         state: {
-          ...agentModel.state,
+          ...baseState,
           tools: resolvedTools,
           // Do not inject secrets into state
           starshipId: starship.id,

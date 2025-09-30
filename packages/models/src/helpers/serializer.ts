@@ -12,19 +12,26 @@ import 'reflect-metadata';
  */
 export const Transformers = {
   /**
-   * Transform JSON string to object and vice versa - lean and strict
+   * Transform JSON values for JSONB columns with NULL-friendly behavior
+   * - Deserialization (toClassOnly): parse strings if they look like JSON, otherwise return as-is (including null)
+   * - Serialization (toPlainOnly): omit null/undefined (so DB default NULL applies), pass through objects/arrays as native JS
    */
   JsonTransform: () =>
     Transform(({ value, type }) => {
       if (type === 0) {
-        // toClassOnly (deserializing from database) - parse strings only
+        // toClassOnly (deserializing from database)
         if (typeof value === 'string') {
-          return JSON.parse(value); // Let JSON.parse throw on invalid JSON
+          try {
+            return JSON.parse(value);
+          } catch {
+            return value;
+          }
         }
-        return value; // Pass through non-strings as-is
+        return value; // Pass through objects/arrays/null as-is
       } else {
-        // toPlainOnly (serializing to database) - stringify everything
-        return JSON.stringify(value); // Let JSON.stringify throw on circular refs
+        // toPlainOnly (serializing to database)
+        if (value === null || value === undefined) return undefined; // let DB store NULL default
+        return value; // Pass native objects/arrays directly for JSONB bindings
       }
     }),
 

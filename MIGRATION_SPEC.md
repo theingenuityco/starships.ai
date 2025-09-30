@@ -6,7 +6,7 @@
 
 **Rationale**: The current Neo4j implementation can be simplified to PostgreSQL since the application doesn't heavily leverage graph-specific features like complex traversals or graph algorithms. PostgreSQL offers better ecosystem support, simpler deployment, and more familiar SQL operations.
 
-**Status**: 🟡 **In Progress** (88% Complete)
+**Status**: 🟡 **In Progress** (92% Complete)
 
 ---
 
@@ -48,20 +48,20 @@
 
 ### 🟡 **IN PROGRESS TASKS**
 
-- [ ] **Repository Conversion Phase** (31% Complete - CURRENT FOCUS)
+- [ ] **Repository Conversion Phase** (73% Complete - CURRENT FOCUS)
   - [x] [`UserRepository`](packages/models/src/repositories/UserRepository.ts) ✅ Completed
   - [x] [`StarshipRepository`](packages/models/src/repositories/StarshipRepository.ts) ✅ Completed
   - [x] [`AgentRepository`](packages/models/src/repositories/AgentRepository.ts) ✅ Completed
   - [x] [`ConversationRepository`](packages/models/src/repositories/ConversationRepository.ts) ✅ Completed
   - [x] [`MessageRepository`](packages/models/src/repositories/MessageRepository.ts) ✅ Completed
-  - [ ] `WorkflowRepository` (Started - Basic CRUD converted)
-  - [ ] `ExecutionRepository`
-  - [ ] `BlueprintRepository`
-  - [ ] `NodeRepository`
-  - [ ] `EdgeRepository`
-  - [ ] `ToolRepository`
-  - [ ] `ToolTemplateRepository`
-  - [ ] `AgentTemplateRepository`
+  - [x] [`WorkflowRepository`](packages/models/src/repositories/WorkflowRepository.ts) ✅ Completed
+  - [x] [`ExecutionRepository`](packages/models/src/repositories/ExecutionRepository.ts) ✅ Completed
+  - [x] [`BlueprintRepository`](packages/models/src/repositories/BlueprintRepository.ts) ✅ Completed (simplified with JSONB)
+  - [x] `NodeRepository` ✅ Obsolete (replaced by JSONB in blueprints)
+  - [x] `EdgeRepository` ✅ Obsolete (replaced by JSONB in blueprints)
+  - [x] [`AgentTemplateRepository`](packages/models/src/repositories/AgentTemplateRepository.ts) ✅ Completed (with junction table)
+  - [x] [`ToolRepository`](packages/models/src/repositories/ToolRepository.ts) ✅ Completed (with foreign keys)
+  - [ ] `ToolTemplateRepository` (Next priority)
   - [ ] `EnvironmentRepository`
   - [ ] `UsageRepository`
   - [ ] `WaitlistRepository`
@@ -244,11 +244,10 @@ interface PostgresConfig {
 
    ```bash
    # Convert remaining repositories in this order:
-   1. AgentRepository (next priority - complex relationships)
-   2. ConversationRepository & MessageRepository (related)
-   3. WorkflowRepository & ExecutionRepository (related)
-   4. Blueprint/Node/Edge repositories (graph-like data)
-   5. Remaining repositories
+   1. ToolTemplateRepository (next priority - complex relationships)
+   2. EnvironmentRepository (encrypted API keys)
+   3. UsageRepository (analytics and tracking)
+   4. WaitlistRepository (user onboarding)
    ```
 
 2. **Repository Conversion Process**:
@@ -382,7 +381,7 @@ For each repository conversion, follow the **UserRepository & StarshipRepository
 4. **Data Migration**: We'll need data export/import scripts if there's existing Neo4j data
 5. **Testing**: Each converted repository should be tested before moving to services
 
-**Current State**: The foundation is rock solid. PostgreSQL connection, schema, and base repository are complete. **Enhanced serialization system** with automatic conversion eliminates boilerplate code. **Clean conversion patterns established** with UserRepository (simple) and StarshipRepository (complex with relationships, Stripe integration, business logic). The remaining 14 repositories can now follow these proven patterns systematically.
+**Current State**: Excellent progress! 73% of repositories converted with proven patterns established. **Enhanced serialization system** working perfectly with automatic snake_case ↔ camelCase conversion. **Complex relationship patterns proven** with junction tables (AgentTemplateRepository), foreign keys (ToolRepository), and JSONB storage (BlueprintRepository). Only 4 repositories remaining.
 
 **Key Achievements**:
 
@@ -394,5 +393,5 @@ For each repository conversion, follow the **UserRepository & StarshipRepository
 
 ---
 
-_Last Updated: 2025-01-29 23:24 UTC_
-_Next Milestone: Convert remaining 14 repositories using established patterns_
+_Last Updated: 2025-09-29 23:56 UTC_
+_Next Milestone: Convert remaining 4 repositories (ToolTemplateRepository, EnvironmentRepository, UsageRepository, WaitlistRepository)_

@@ -118,12 +118,10 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   systemPrompt?: string;
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   state!: AgentState;
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint;
 

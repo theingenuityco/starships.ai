@@ -8,7 +8,7 @@
 import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
-import { Expose } from 'class-transformer';
+import { Expose, Transform } from 'class-transformer';
 import { IsISO8601, IsNumber, IsObject, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 export class AgentEntity implements AgentModel {
@@ -83,10 +83,12 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @IsObject()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   state!: AgentState; // Runtime state with messages and tools
 
   @Expose()
   @IsObject()
+  @Transform(({ value }) => value, { toPlainOnly: true })
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
 
   /**

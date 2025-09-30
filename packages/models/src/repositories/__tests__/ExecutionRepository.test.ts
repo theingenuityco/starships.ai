@@ -13,8 +13,6 @@ jest.mock('../../helpers/database', () => ({
     executeQuery: jest.fn(),
     executeWrite: jest.fn(),
   })),
-  convertNeo4jIntsInArray: jest.fn((arr) => arr),
-  convertNeo4jIntsInObject: jest.fn((obj) => obj),
 }));
 
 // Use real ExecutionEntity instead of mocking

@@ -171,7 +171,7 @@ describe('AgentRepository', () => {
         await expect(repository.create(mockAgentData, 'starship-123')).rejects.toThrow(DatabaseError);
       });
 
-      it('should create Neo4j relationship', async () => {
+      it('should create PostgreSQL relationship', async () => {
         const mockCreatedAgent = {
           id: 'test-nanoid-1234',
           name: 'Test Agent',

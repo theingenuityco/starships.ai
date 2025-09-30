@@ -1,5 +1,5 @@
 -- PostgreSQL Migration: Complete Database Schema
--- Description: Convert Neo4j graph database to PostgreSQL relational database
+-- Description: Complete database schema for starships.ai
 -- Author: Migration Script
 -- Version: 1.0.0
 

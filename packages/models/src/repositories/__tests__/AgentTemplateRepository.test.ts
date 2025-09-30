@@ -58,7 +58,7 @@ describe('AgentTemplateRepository', () => {
     ...overrides,
   });
 
-  // Helper to create mock template as it would be stored in Neo4j (serialized)
+  // Helper to create mock template as it would be stored in PostgreSQL (serialized)
   const createMockRawTemplate = (overrides: Record<string, unknown> = {}): Record<string, unknown> => {
     const template = createMockTemplate(overrides as Partial<AgentTemplateModel>);
     return {

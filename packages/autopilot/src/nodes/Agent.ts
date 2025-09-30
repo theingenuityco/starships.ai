@@ -99,77 +99,158 @@ export class Agent implements NodeHandler {
             ],
           },
         },
-        // Conditional node for tool call detection + streaming length handling
+        // Conditional node for tool call detection + streaming length handling + batch processing
         {
           ref: conditionalNodeRef,
           type: 'conditional' as const,
           name: 'Check Tool Calls',
           description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
           parameters: {
-            // Returns:
-            //  - "continue" when choices[0].finish_reason === "length" (continue generation)
-            //  - "call_tool" when finish_reason === "tool_calls" OR tool_calls[] exist (route to tool execution)
-            //  - "complete" otherwise (end)
-            // Use $input() (the LLM node output passed into this Conditional) to avoid cross-scope lookup issues.
-            // Trimmed single-template string for full-only evaluation
-            condition:
-              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.tool_calls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
+            condition: `{{(() => {
+              const last = $input();
+              const fr = last?.choices?.[0]?.finish_reason;
+              
+              // Check for tool node errors
+              if (last?.nodeError) {
+                return "continue"; // Skip tool execution, continue conversation
+              }
+              
+              // Handle length (continue generation)
+              if (fr === "length") return "continue";
+              
+              // Check for tool calls
+              const calls = last?.choices?.[0]?.message?.tool_calls;
+              if (!Array.isArray(calls) || calls.length === 0) return "complete";
+              
+              // Check if already processed (avoid reprocessing)
+              const batchState = state?.lastProcessedBatch;
+              const currentCallIds = calls.map(c => c.id).sort().join(',');
+              const processedCallIds = batchState?.toolCallIds?.sort()?.join(',') || '';
+              
+              if (currentCallIds === processedCallIds) {
+                return "complete"; // Already processed this batch
+              }
+              
+              return "call_tool"; // Process tool calls (single or multiple)
+            })()}}`
           },
         },
-        // Prepare arguments for Tool (materialize arguments_json as plain object)
+        // Prepare arguments for Tool (extract ALL tool calls)
         {
           ref: argsNodeRef,
           type: 'code' as const,
           name: 'Prepare Tool Args',
-          description: 'Materialize arguments_json into a plain object for Tool input',
+          description: 'Extract ALL tool calls for parallel execution',
           parameters: {
             code: `
               const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const j = last?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments_json;
-              if (j && typeof j === 'object') { return j; }
-              throw new Error('Missing tool_call function.arguments_json');
+              const toolCalls = last?.choices?.[0]?.message?.tool_calls || [];
+              
+              // Handle empty tool calls gracefully (return empty array instead of error)
+              if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
+                // Return empty array - Tool node will handle appropriately
+                return [];
+              }
+              
+              // Return the WHOLE array - Tool node handles distribution
+              return toolCalls.map((call, index) => ({
+                id: call.id,
+                name: call.function?.name || '',
+                arguments: call.function?.arguments_json || {},
+                callIndex: index,
+                toolCallId: call.id
+              }));
             `,
             timeout: 3000,
           },
         },
-        // Tool execution node - receives the complete tool definition via template resolution
+        // Tool execution node - universal tool executor for parallel execution
         {
           ref: toolNodeRef,
           type: 'tool' as const,
-          name: 'Execute Tool',
-          description: 'Execute tool and add result to conversation',
+          name: 'Execute Tools',
+          description: 'Execute tools based on input data',
           parameters: {
-            // Resolve tool definition from state using the tool name from LLM response (normalized)
-            name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
-            description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
-            parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
-            blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
-            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
+            // Static configuration - Tool node builds blueprints dynamically
+            name: 'universal_tool_executor',
+            description: 'Execute tools based on input data',
+            parameters: {
+              type: 'object',
+              properties: {
+                toolCalls: {
+                  type: 'array',
+                  items: { type: 'object' }
+                }
+              }
+            },
+            blueprint: null, // Tool node builds blueprints dynamically
+            
+            // Single state mutation after ALL tools complete
             mutations: [
               {
-                operation: 'add' as const,
-                path: '/state/messages/-',
-                value: {
-                  role: 'tool',
-                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
-                  name: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.name ?? "" }}`,
-                  content: `{{ JSON.stringify((() => { const _i = $lastOutputOf("${toolNodeRef}")[0]; const j = _i?.json; if (j !== undefined) { return j; } if (_i && _i.error !== undefined) { return { ok: false, error: _i.error }; } return {}; })()) }}`,
-                },
+                operation: 'add',
+                path: '/state/messages',
+                value: `{{ 
+                  (() => {
+                    const results = $lastOutputOf("${toolNodeRef}")[0]?.json;
+                    if (!results) return [];
+                    
+                    const batchId = results.batchId;
+                    const timestamp = results.timestamp;
+                    
+                    // Add batch metadata first  
+                    const messages = [{
+                      role: 'assistant',
+                      content: '',
+                      tool_batch_id: batchId,
+                      tool_batch_timestamp: timestamp,
+                      tool_batch_count: results.successful?.length + results.failed?.length || 0
+                    }];
+                    
+                    // Add successful tool messages
+                    if (results.successful) {
+                      messages.push(...results.successful.map(result => ({
+                        role: 'tool',
+                        tool_call_id: result.toolCallId,
+                        name: result.toolName,
+                        content: JSON.stringify(result.data),
+                        tool_batch_id: batchId
+                      })));
+                    }
+                    
+                    // Add failed tool messages  
+                    if (results.failed) {
+                      messages.push(...results.failed.map(result => ({
+                        role: 'tool',
+                        tool_call_id: result.toolCallId,
+                        name: result.toolName,
+                        content: JSON.stringify({ error: result.error }),
+                        tool_batch_id: batchId,
+                        tool_failed: true
+                      })));
+                    }
+                    
+                    return messages;
+                  })()
+                }}`
               },
-              // Ensure processedToolCalls array exists (idempotent)
+              // Update batch tracking
               {
-                operation: 'add' as const,
-                path: '/state/processedToolCalls',
-                value: `{{ Array.isArray(state?.processedToolCalls) ? state.processedToolCalls : [] }}`,
-              },
-              // Track executed tool_call id to prevent re-executing the same call
-              {
-                operation: 'add' as const,
-                path: '/state/processedToolCalls/-',
-                value: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
-              },
-            ],
-          },
+                operation: 'replace',
+                path: '/state/lastProcessedBatch',
+                value: `{{ 
+                  (() => {
+                    const results = $lastOutputOf("${toolNodeRef}")[0]?.json;
+                    return {
+                      batchId: results?.batchId,
+                      toolCallIds: results?.processedIds || [],
+                      completedAt: new Date().toISOString()
+                    };
+                  })()
+                }}`
+              }
+            ]
+          }
         },
       ],
       edges: [

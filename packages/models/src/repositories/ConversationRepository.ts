@@ -37,20 +37,19 @@ export class ConversationRepository extends BaseRepository {
   async create(entity: Conversation & { starshipId: string; agentId?: string }): Promise<ConversationModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Use lean validation from ConversationEntity
-        const { starshipId, agentId, ...conversationInput } = entity;
-        await ConversationEntity.validate(conversationInput, 'create');
-
         const now = new Date().toISOString();
 
-        // Prepare conversation data with defaults and validation
+        // Prepare conversation data with defaults - include starshipId for validation
         const conversationData = {
-          ...conversationInput,
-          starshipId, // Add starship_id foreign key directly
+          title: entity.title,
           status: entity.status || 'active',
+          starshipId: entity.starshipId,
           createdAt: now,
           updatedAt: now,
         };
+
+        // Validate with starshipId included
+        await ConversationEntity.validate(conversationData, 'create');
 
         // Create entity instance from plain object, then serialize
         const conversationEntity = toEntityInstance(ConversationEntity, conversationData);
@@ -58,8 +57,8 @@ export class ConversationRepository extends BaseRepository {
         const conversation = fromDatabase(ConversationEntity, result);
 
         // Create junction table relationship with agent if provided
-        if (agentId) {
-          await this.linkToAgent(conversation.id, agentId);
+        if (entity.agentId) {
+          await this.linkToAgent(conversation.id, entity.agentId);
         }
 
         return conversation;

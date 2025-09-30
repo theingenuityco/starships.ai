@@ -4,10 +4,10 @@ import React, { useCallback, useMemo } from 'react'
 import { ReactFlow, Node, Edge, Background, useNodesState, useEdgesState, addEdge, Connection, ReactFlowProvider, MarkerType, Position, Handle, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Play, CheckCircle2, Zap, User, AlertTriangle, Eye, Clock } from 'lucide-react'
-import type { WorkflowModel, AgentModel } from '@starships/protocol'
+import type { AgentModel } from '@starships/protocol'
 
 // Client-side workflow types for compatibility
-type WorkflowDSL = WorkflowModel | any
+type WorkflowDSL = any
 type WorkflowDSLNode = any
 
 export interface WorkflowVisualizationProps {

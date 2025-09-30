@@ -25,60 +25,62 @@ fi
 export STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}"
 export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-}"
 
-# Check if NEO4J_URI is already set (from K8s secrets, docker-compose, or environment)
-if [ -n "$NEO4J_URI" ]; then
-    echo "Using Neo4j URI from environment: $NEO4J_URI"
+# Check if POSTGRES_HOST is already set (from K8s secrets, docker-compose, or environment)
+if [ -n "$POSTGRES_HOST" ]; then
+    echo "Using PostgreSQL host from environment: $POSTGRES_HOST"
     
-    # Check if it's localhost - then we need to start internal Neo4j
-    if echo "$NEO4J_URI" | grep -q "localhost\|127.0.0.1"; then
-        echo "Neo4j URI points to localhost, starting internal Neo4j..."
+    # Check if it's localhost - then we need to start internal PostgreSQL
+    if echo "$POSTGRES_HOST" | grep -q "localhost\|127.0.0.1"; then
+        echo "PostgreSQL host points to localhost, starting internal PostgreSQL..."
         
-        # Check if supervisor is managing Neo4j (when running with supervisor)
+        # Check if supervisor is managing PostgreSQL (when running with supervisor)
         if [ -f /var/run/supervisord.pid ]; then
-            echo "Neo4j is managed by supervisor"
+            echo "PostgreSQL is managed by supervisor"
         else
-            echo "Starting Neo4j manually..."
-            # Start Neo4j in background if not using supervisor
-            /opt/neo4j/bin/neo4j start
+            echo "Starting PostgreSQL manually..."
+            # Start PostgreSQL in background if not using supervisor
+            su postgres -c 'pg_ctl start -D /var/lib/postgresql/data' || true
         fi
         
-        # Extract port from NEO4J_URI for health check
-        NEO4J_CHECK_PORT=$(echo "$NEO4J_URI" | sed 's/.*://' | sed 's/\/.*//')
+        # Use configured port or default
+        POSTGRES_CHECK_PORT=${POSTGRES_PORT:-5432}
         
-        # Wait for internal Neo4j to be ready
-        echo "Waiting for internal Neo4j to start on port $NEO4J_CHECK_PORT..."
-        max_attempts=60
+        # Wait for internal PostgreSQL to be ready
+        echo "Waiting for internal PostgreSQL to start on port $POSTGRES_CHECK_PORT..."
+        max_attempts=30
         attempt=0
         while [ $attempt -lt $max_attempts ]; do
-            if nc -z localhost "$NEO4J_CHECK_PORT" 2>/dev/null; then
-                echo "Internal Neo4j is ready!"
+            if nc -z localhost "$POSTGRES_CHECK_PORT" 2>/dev/null; then
+                echo "Internal PostgreSQL is ready!"
                 break
             fi
             attempt=$((attempt + 1))
-            echo "Waiting for Neo4j... (attempt $attempt/$max_attempts)"
+            echo "Waiting for PostgreSQL... (attempt $attempt/$max_attempts)"
             sleep 2
         done
         
         if [ $attempt -eq $max_attempts ]; then
-            echo "Internal Neo4j failed to start after $max_attempts attempts"
+            echo "Internal PostgreSQL failed to start after $max_attempts attempts"
             exit 1
         fi
     else
-        echo "Neo4j URI points to external service: $NEO4J_URI"
-        echo "Skipping internal Neo4j startup..."
+        echo "PostgreSQL host points to external service: $POSTGRES_HOST"
+        echo "Skipping internal PostgreSQL startup..."
     fi
 else
-    echo "ERROR: NEO4J_URI environment variable is not set!"
-    echo "Please set NEO4J_URI in your environment or deployment configuration."
+    echo "ERROR: POSTGRES_HOST environment variable is not set!"
+    echo "Please set POSTGRES_HOST in your environment or deployment configuration."
     exit 1
 fi
 
-# Display Neo4j connection info
+# Display PostgreSQL connection info
 echo "========================================="
-echo "Neo4j Configuration:"
-echo "  URI: $NEO4J_URI"
-echo "  Username: ${NEO4J_USERNAME}"
-echo "  Database: ${NEO4J_DATABASE}"
+echo "PostgreSQL Configuration:"
+echo "  Host: $POSTGRES_HOST"
+echo "  Port: ${POSTGRES_PORT:-5432}"
+echo "  User: ${POSTGRES_USER:-postgres}"
+echo "  Database: ${POSTGRES_DATABASE:-starships}"
+echo "  SSL: ${POSTGRES_SSL:-false}"
 echo "========================================="
 
 # Skip installation and building in production since it's done in Dockerfile
@@ -130,12 +132,11 @@ else
     echo "  - Backend service starting..."
 fi
 
-# Check if Neo4j is running locally and extract port from URI
-if echo "$NEO4J_URI" | grep -q "localhost\|127.0.0.1"; then
-    # Extract port from NEO4J_URI (e.g., bolt://localhost:7687 -> 7687)
-    NEO4J_PORT=$(echo "$NEO4J_URI" | sed 's/.*://' | sed 's/\/.*//')
-    # Neo4j Browser is typically on port-100 (7687->7587) or could be on 7474
-    echo "  - Neo4j at: $NEO4J_URI"
+# Check if PostgreSQL is running locally
+if echo "$POSTGRES_HOST" | grep -q "localhost\|127.0.0.1"; then
+    # Use configured port or default
+    POSTGRES_PORT_DISPLAY=${POSTGRES_PORT:-5432}
+    echo "  - PostgreSQL at: $POSTGRES_HOST:$POSTGRES_PORT_DISPLAY"
 fi
 
 exec npx concurrently \

@@ -174,58 +174,50 @@ export class Agent implements NodeHandler {
             },
             blueprint: null, // Tool node builds blueprints dynamically
 
-            // Single state mutation after ALL tools complete
+            // Mutation to append tool messages to state
             mutations: [
               {
-                operation: 'add',
+                operation: 'replace' as const,
                 path: '/state/messages',
                 value: `{{ 
                   (() => {
                     const results = $lastOutputOf("${toolNodeRef}")[0]?.json;
-                    if (!results) return [];
+                    if (!results) return state.messages || [];
                     
-                    const batchId = results.batchId;
-                    const timestamp = results.timestamp;
-                    
-                    // Add batch metadata first  
-                    const messages = [{
-                      role: 'assistant',
-                      content: '',
-                      tool_batch_id: batchId,
-                      tool_batch_timestamp: timestamp,
-                      tool_batch_count: results.successful?.length + results.failed?.length || 0
-                    }];
+                    // Start with existing messages
+                    const existingMessages = state.messages || [];
+                    const newMessages = [...existingMessages];
                     
                     // Add successful tool messages
                     if (results.successful) {
-                      messages.push(...results.successful.map(result => ({
-                        role: 'tool',
-                        tool_call_id: result.toolCallId,
-                        name: result.toolName,
-                        content: JSON.stringify(result.data),
-                        tool_batch_id: batchId
-                      })));
+                      results.successful.forEach(result => {
+                        newMessages.push({
+                          role: 'tool',
+                          tool_call_id: result.toolCallId,
+                          name: result.toolName,
+                          content: JSON.stringify(result.data)
+                        });
+                      });
                     }
                     
                     // Add failed tool messages  
                     if (results.failed) {
-                      messages.push(...results.failed.map(result => ({
-                        role: 'tool',
-                        tool_call_id: result.toolCallId,
-                        name: result.toolName,
-                        content: JSON.stringify({ error: result.error }),
-                        tool_batch_id: batchId,
-                        tool_failed: true
-                      })));
+                      results.failed.forEach(result => {
+                        newMessages.push({
+                          role: 'tool',
+                          tool_call_id: result.toolCallId,
+                          name: result.toolName,
+                          content: JSON.stringify({ error: result.error })
+                        });
+                      });
                     }
                     
-                    return messages;
+                    return newMessages;
                   })()
                 }}`,
               },
-              // Update batch tracking
               {
-                operation: 'replace',
+                operation: 'replace' as const,
                 path: '/state/lastProcessedBatch',
                 value: `{{ 
                   (() => {

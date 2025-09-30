@@ -22,7 +22,7 @@ export async function seedToolTemplates(): Promise<void> {
     const connection = getConnection();
 
     // Create repository
-    const toolTemplateRepo = new ToolTemplateRepository(connection);
+    const toolTemplateRepo = new ToolTemplateRepository();
 
     logger.info('Seeding database with default tool templates...');
 
@@ -85,4 +85,3 @@ export async function seedToolTemplates(): Promise<void> {
     // Do not throw; seeding failure should not block startup
   }
 }
-

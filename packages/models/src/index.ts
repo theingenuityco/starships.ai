@@ -23,17 +23,16 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 export { BlueprintRepository } from './repositories/BlueprintRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EnvironmentRepository } from './repositories/EnvironmentRepository';
-export { EdgeRepository } from './repositories/EdgeRepository';
+// EdgeRepository and NodeRepository are obsolete - blueprint data now stored as JSONB
 export { ExecutionRepository } from './repositories/ExecutionRepository';
 export { MessageRepository } from './repositories/MessageRepository';
-export { NodeRepository } from './repositories/NodeRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { ToolRepository } from './repositories/ToolRepository';
 export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';
+export { UsageRepository } from './repositories/UsageRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WaitlistRepository } from './repositories/WaitlistRepository';
 export { WorkflowRepository } from './repositories/WorkflowRepository';
-export { UsageRepository } from './repositories/UsageRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

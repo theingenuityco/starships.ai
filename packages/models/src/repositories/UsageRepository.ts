@@ -2,21 +2,19 @@ import { UsageEntity } from '@/entities/UsageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
 import type { UsageModel, LLMUsage } from '@starships/protocol';
-import type { Neo4jConnection } from '@/helpers/database';
 
 /**
  * UsageRepository
  *
- * Persists per-turn usage records and links them to both Starship and Conversation:
- *   (Starship)-[:HAS_USAGE]->(Usage)<-[:HAS_USAGE]-(Conversation)
+ * Persists per-turn usage records linked to both Starship and Conversation via foreign keys
  */
 export class UsageRepository extends BaseRepository {
-  constructor(connection?: Neo4jConnection) {
-    super('UsageRepository', connection);
+  constructor() {
+    super('UsageRepository');
   }
 
   /**
-   * Create a Usage node and link it to Starship and Conversation
+   * Create a Usage record linked to Starship and Conversation
    */
   async createAndLink(data: {
     starshipId: string;
@@ -26,55 +24,37 @@ export class UsageRepository extends BaseRepository {
     total_tokens: number;
     cost: number;
     model?: string;
+    provider?: string;
     createdAt?: string;
     updatedAt?: string;
   }): Promise<UsageModel> {
     return this.executeWithErrorHandling(
       async () => {
+        const now = new Date().toISOString();
+
+        // Prepare usage data
+        const usageData = {
+          starshipId: data.starshipId,
+          conversationId: data.conversationId,
+          prompt_tokens: data.prompt_tokens,
+          completion_tokens: data.completion_tokens,
+          total_tokens: data.total_tokens,
+          cost: data.cost,
+          model: data.model || 'unknown',
+          provider: data.provider || 'unknown',
+          createdAt: data.createdAt || now,
+          updatedAt: data.updatedAt || now,
+        };
+
         // Validate entity first
-        await UsageEntity.validate(
-          {
-            starshipId: data.starshipId,
-            conversationId: data.conversationId,
-            prompt_tokens: data.prompt_tokens,
-            completion_tokens: data.completion_tokens,
-            total_tokens: data.total_tokens,
-            cost: data.cost,
-            model: data.model,
-            createdAt: data.createdAt || new Date().toISOString(),
-            updatedAt: data.updatedAt || new Date().toISOString(),
-          },
-          'create'
-        );
+        await UsageEntity.validate(usageData, 'create');
 
-        // Serialize and create Usage node with auto id
-        const usageEntity = toEntityInstance(UsageEntity, {
-          ...data,
-          createdAt: data.createdAt || new Date().toISOString(),
-          updatedAt: data.updatedAt || new Date().toISOString(),
-        });
-        const created = await this.createEntityWithAutoId<UsageModel>('Usage', toDatabase(usageEntity));
+        // Create entity instance from plain object, then serialize
+        const usageEntity = toEntityInstance(UsageEntity, usageData);
+        const databaseFormat = toDatabase(usageEntity);
+        const result = await this.createEntity<Record<string, unknown>>('usage', databaseFormat);
 
-        // Link to Starship and Conversation
-        const conn = this.getConnection();
-        const linkKey = `${data.starshipId}_${data.conversationId}_${created.id}`;
-
-        await conn.executeWrite(
-          `
-        MATCH (s:Starship {id: $starshipId}), (c:Conversation {id: $conversationId}), (u:Usage {id: $usageId})
-        CREATE (s)-[:HAS_USAGE {key: $key}]->(u)
-        CREATE (c)-[:HAS_USAGE {key: $key2}]->(u)
-        `,
-          {
-            starshipId: data.starshipId,
-            conversationId: data.conversationId,
-            usageId: created.id,
-            key: linkKey,
-            key2: linkKey,
-          }
-        );
-
-        return fromDatabase(UsageEntity, created);
+        return fromDatabase(UsageEntity, result);
       },
       'createAndLink',
       'Usage'
@@ -87,31 +67,32 @@ export class UsageRepository extends BaseRepository {
   async getTotalsByConversation(conversationId: string): Promise<LLMUsage> {
     return this.executeWithErrorHandling(
       async () => {
-        const conn = this.getConnection();
-        const result = await conn.executeQuery<LLMUsage>(
-          `
-        MATCH (:Conversation {id: $conversationId})-[:HAS_USAGE]->(u:Usage)
-        RETURN
-          coalesce(sum(u.prompt_tokens), 0) AS prompt_tokens,
-          coalesce(sum(u.completion_tokens), 0) AS completion_tokens,
-          coalesce(sum(u.total_tokens), 0) AS total_tokens,
-          coalesce(sum(u.cost), 0) AS cost
-        `,
-          { conversationId }
+        if (!conversationId?.trim()) {
+          throw new Error('conversationId is required');
+        }
+
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{
+          prompt_tokens: string;
+          completion_tokens: string;
+          total_tokens: string;
+          cost: string;
+        }>(
+          `SELECT
+            COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+            COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(cost), 0) AS cost
+           FROM usage
+           WHERE conversation_id = $1`,
+          [conversationId]
         );
 
-        const row: LLMUsage = result?.[0] || {
-          prompt_tokens: 0,
-          completion_tokens: 0,
-          total_tokens: 0,
-          cost: 0,
-        };
-
         return {
-          prompt_tokens: Number(row.prompt_tokens) || 0,
-          completion_tokens: Number(row.completion_tokens) || 0,
-          total_tokens: Number(row.total_tokens) || 0,
-          cost: Number(row.cost) || 0,
+          prompt_tokens: Number(result?.prompt_tokens) || 0,
+          completion_tokens: Number(result?.completion_tokens) || 0,
+          total_tokens: Number(result?.total_tokens) || 0,
+          cost: Number(result?.cost) || 0,
         };
       },
       'getTotalsByConversation',
@@ -126,31 +107,32 @@ export class UsageRepository extends BaseRepository {
   async getTotalsByStarship(starshipId: string): Promise<LLMUsage> {
     return this.executeWithErrorHandling(
       async () => {
-        const conn = this.getConnection();
-        const result = await conn.executeQuery<LLMUsage>(
-          `
-        MATCH (:Starship {id: $starshipId})-[:HAS_USAGE]->(u:Usage)
-        RETURN
-          coalesce(sum(u.prompt_tokens), 0) AS prompt_tokens,
-          coalesce(sum(u.completion_tokens), 0) AS completion_tokens,
-          coalesce(sum(u.total_tokens), 0) AS total_tokens,
-          coalesce(sum(u.cost), 0) AS cost
-        `,
-          { starshipId }
+        if (!starshipId?.trim()) {
+          throw new Error('starshipId is required');
+        }
+
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{
+          prompt_tokens: string;
+          completion_tokens: string;
+          total_tokens: string;
+          cost: string;
+        }>(
+          `SELECT
+            COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+            COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(cost), 0) AS cost
+           FROM usage
+           WHERE starship_id = $1`,
+          [starshipId]
         );
 
-        const row: LLMUsage = result?.[0] || {
-          prompt_tokens: 0,
-          completion_tokens: 0,
-          total_tokens: 0,
-          cost: 0,
-        };
-
         return {
-          prompt_tokens: Number(row.prompt_tokens) || 0,
-          completion_tokens: Number(row.completion_tokens) || 0,
-          total_tokens: Number(row.total_tokens) || 0,
-          cost: Number(row.cost) || 0,
+          prompt_tokens: Number(result?.prompt_tokens) || 0,
+          completion_tokens: Number(result?.completion_tokens) || 0,
+          total_tokens: Number(result?.total_tokens) || 0,
+          cost: Number(result?.cost) || 0,
         };
       },
       'getTotalsByStarship',
@@ -165,24 +147,23 @@ export class UsageRepository extends BaseRepository {
   async listByConversation(conversationId: string, options: { limit?: number; offset?: number } = {}): Promise<UsageModel[]> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!conversationId?.trim()) {
+          throw new Error('conversationId is required');
+        }
+
         const limit = Math.max(1, Math.min(200, options.limit ?? 100));
         const offset = Math.max(0, options.offset ?? 0);
 
-        const conn = this.getConnection();
-        const result = await conn.executeQuery<{ u: UsageModel }>(
-          `
-        MATCH (:Conversation {id: $conversationId})-[:HAS_USAGE]->(u:Usage)
-        RETURN u
-        ORDER BY u.createdAt ASC
-        SKIP $offset LIMIT $limit
-        `,
-          { conversationId, offset, limit }
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT * FROM usage
+           WHERE conversation_id = $1
+           ORDER BY created_at ASC
+           LIMIT $2 OFFSET $3`,
+          [conversationId, limit, offset]
         );
 
-        return fromDatabaseArray(
-          UsageEntity,
-          result.map((r) => r.u)
-        );
+        return fromDatabaseArray(UsageEntity, result);
       },
       'listByConversation',
       'Usage',

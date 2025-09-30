@@ -20,7 +20,7 @@ export async function seedAgentTemplates(): Promise<void> {
     const connection = getConnection();
 
     // Create the agent template repository
-    const templateRepo = new AgentTemplateRepository(connection);
+    const templateRepo = new AgentTemplateRepository();
 
     logger.info('Seeding database with default agent templates...');
 
@@ -94,4 +94,3 @@ export async function seedAgentTemplates(): Promise<void> {
     // Don't throw - we don't want to prevent server startup if template seeding fails
   }
 }
-

@@ -2,7 +2,7 @@
  * WaitlistRepository Unit Tests
  */
 
-import { Neo4jConnection } from '@/helpers/database';
+import { PostgresConnection } from '@/helpers/database';
 import { WaitlistRepository } from '@/repositories/WaitlistRepository';
 import { ConflictError, DatabaseError, ValidationError } from '@starships/errors';
 import type { WaitlistEntryModel } from '@starships/protocol';
@@ -20,7 +20,7 @@ describe('WaitlistRepository', () => {
       executeWrite: jest.fn(),
     } as unknown as jest.Mocked<Neo4jConnection>;
 
-    repository = new WaitlistRepository(mockConnection);
+    repository = new WaitlistRepository();
     jest.clearAllMocks();
   });
 

@@ -1,7 +1,8 @@
 -- PostgreSQL Migration: Complete Database Schema
 -- Description: Complete database schema for starships.ai
 -- Author: Migration Script
--- Version: 1.0.0
+-- Version: 2.0.0
+-- Last Updated: 2025-09-30
 
 -- Enable UUID extension for generating UUIDs
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -220,44 +221,11 @@ CREATE INDEX idx_blueprints_usage_count ON blueprints(usage_count);
 CREATE INDEX idx_blueprints_tags ON blueprints USING GIN(tags);
 
 -- ============================================================================
--- NODES TABLE
+-- NOTE: NODES AND EDGES TABLES REMOVED
 -- ============================================================================
-
-CREATE TABLE nodes (
-    id VARCHAR(255) PRIMARY KEY,
-    ref VARCHAR(255) NOT NULL,
-    type VARCHAR(100) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    parameters JSONB DEFAULT '{}'::jsonb,
-    position JSONB DEFAULT '{}'::jsonb,
-    blueprint_id VARCHAR(255) NOT NULL REFERENCES blueprints(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- Node indexes
-CREATE INDEX idx_nodes_blueprint_id ON nodes(blueprint_id);
-CREATE INDEX idx_nodes_type ON nodes(type);
-CREATE INDEX idx_nodes_ref ON nodes(ref);
-
--- ============================================================================
--- EDGES TABLE
--- ============================================================================
-
-CREATE TABLE edges (
-    id VARCHAR(255) PRIMARY KEY,
-    ref VARCHAR(255) NOT NULL,
-    from_node_id VARCHAR(255) NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-    to_node_id VARCHAR(255) NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-    blueprint_id VARCHAR(255) NOT NULL REFERENCES blueprints(id) ON DELETE CASCADE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- Edge indexes
-CREATE INDEX idx_edges_blueprint_id ON edges(blueprint_id);
-CREATE INDEX idx_edges_from_node_id ON edges(from_node_id);
-CREATE INDEX idx_edges_to_node_id ON edges(to_node_id);
+-- Nodes and edges are now stored as JSONB within blueprint fields
+-- This provides better performance and simpler data management
+-- EdgeRepository and NodeRepository are obsolete - blueprint data now stored as JSONB
 
 -- ============================================================================
 -- CONVERSATIONS TABLE
@@ -333,10 +301,11 @@ CREATE TABLE environments (
     id VARCHAR(255) PRIMARY KEY,
     starship_id VARCHAR(255) NOT NULL REFERENCES starships(id) ON DELETE CASCADE,
     key VARCHAR(255) NOT NULL,
-    value TEXT,
-    is_encrypted BOOLEAN NOT NULL DEFAULT false,
+    encrypted_value TEXT NOT NULL,
+    description VARCHAR(500),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    created_by VARCHAR(255) NOT NULL,
     
     UNIQUE(starship_id, key)
 );
@@ -344,6 +313,7 @@ CREATE TABLE environments (
 -- Environment indexes
 CREATE INDEX idx_environments_starship_id ON environments(starship_id);
 CREATE INDEX idx_environments_key ON environments(key);
+CREATE INDEX idx_environments_created_by ON environments(created_by);
 
 -- ============================================================================
 -- USAGE TABLE
@@ -456,8 +426,6 @@ COMMENT ON TABLE tool_templates IS 'Reusable tool templates from the marketplace
 COMMENT ON TABLE tools IS 'Deployed tool instances associated with starships';
 COMMENT ON TABLE workflows IS 'Workflow definitions with execution blueprints';
 COMMENT ON TABLE blueprints IS 'Reusable workflow blueprints containing nodes and edges';
-COMMENT ON TABLE nodes IS 'Individual workflow nodes within blueprints';
-COMMENT ON TABLE edges IS 'Connections between workflow nodes';
 COMMENT ON TABLE conversations IS 'Chat conversations within starships';
 COMMENT ON TABLE messages IS 'Individual messages within conversations';
 COMMENT ON TABLE executions IS 'Workflow execution instances with status and results';

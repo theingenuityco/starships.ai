@@ -42,10 +42,13 @@ const starships = await starshipRepo.findAll();
 
 - **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`) and subscription billing
 - **Agents**: AI entities with deployment management and template system
-- **Workflows**: DAG-based automation blueprints with execution history
+- **Tools**: Executable utilities deployed to starships with flexible blueprint configuration
+- **Workflows**: DAG-based automation blueprints with execution history stored as JSONB
 - **Users**: Authentication and authorization management
 - **Agent Templates**: Reusable agent configurations for rapid deployment
+- **Tool Templates**: Reusable tool configurations for rapid deployment
 - **Conversations**: Communication logs with agent relationships and structured metadata
+- **Environments**: Encrypted environment variable management scoped to starships
 
 ### Direct Repository Usage
 
@@ -53,10 +56,11 @@ Direct repository instantiation for clean and simple data access:
 
 ```typescript
 // Import and instantiate repositories directly
-import { StarshipRepository, AgentRepository, UserRepository } from '@starships/models';
+import { StarshipRepository, AgentRepository, ToolRepository, UserRepository } from '@starships/models';
 
 const starshipRepo = new StarshipRepository();
 const agentRepo = new AgentRepository();
+const toolRepo = new ToolRepository();
 const userRepo = new UserRepository();
 ```
 
@@ -85,16 +89,19 @@ try {
 | **StarshipRepository**      | Starship CRUD, agent deployment, subscription management  |
 | **AgentRepository**         | Agent lifecycle management and template instantiation     |
 | **AgentTemplateRepository** | Reusable agent configurations and marketplace             |
+| **ToolRepository**          | Tool lifecycle management and deployment                  |
+| **ToolTemplateRepository**  | Reusable tool configurations and marketplace              |
 | **UserRepository**          | User accounts, authentication, and profiles               |
 | **ConversationRepository**  | Chat history, agent relationships, and communication logs |
 | **WorkflowRepository**      | Workflow definitions, execution, and history              |
 | **BlueprintRepository**     | Workflow blueprint storage and versioning                 |
 | **ExecutionRepository**     | Workflow execution tracking and results                   |
-| **NodeRepository**          | Workflow node definitions and parameters                  |
-| **EdgeRepository**          | Workflow edge connections and routing                     |
-| **MemoryRepository**        | Agent memory and conversation context                     |
 | **MessageRepository**       | Individual message storage and retrieval                  |
+| **EnvironmentRepository**   | Environment variable management with encryption           |
+| **UsageRepository**         | Token usage tracking for billing and analytics            |
 | **WaitlistRepository**      | Early access user onboarding queue                        |
+
+> **Note:** `NodeRepository` and `EdgeRepository` have been removed in schema v2.0.0. Workflow nodes and edges are now stored as JSONB within blueprint entities for better performance.
 
 ## Database Management
 
@@ -571,6 +578,22 @@ This package is part of the starships.ai monorepo:
 - [`@starships/client`](../client/) - Frontend application
 - [`@starships/autopilot`](../autopilot/) - Workflow execution engine
 - [`@starships/errors`](../errors/) - Comprehensive error handling system
+
+## Schema Evolution
+
+### Version 2.0.0 (Current)
+
+- **Environment Variables**: Updated to use `encrypted_value` field with `description` and `created_by` tracking
+- **Blueprint Storage**: Nodes and edges now stored as JSONB within blueprint entities (removed separate tables)
+- **Tool System**: Added comprehensive tool and tool template system with marketplace support
+- **Agent-Tool Relationships**: Many-to-many relationships via junction tables
+- **Performance Optimization**: JSONB storage for complex objects improves query performance
+
+### Migration Path
+
+- Existing `nodes` and `edges` tables are no longer used - data migrated to blueprint JSONB fields
+- Environment variables require re-encryption during migration to new `encrypted_value` format
+- Junction tables added for proper many-to-many relationships between agents, tools, and conversations
 
 ## Development Status
 

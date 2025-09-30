@@ -42,7 +42,7 @@ Both **conversations** and **starships** have been successfully migrated to foll
 │  packages/models/src/repositories/StarshipRepository.ts            │
 │  • Database operations and queries                                 │
 │  • Data access abstraction                                         │
-│  • Neo4j relationship management                                   │
+│  • PostgreSQL relationship management                              │
 └─────────────────────────────────────────────────────────────────────┘
                                     ↕ Entity transformation
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -166,7 +166,7 @@ export class ConversationEntity implements ConversationModel {
 - **Base Repository Inheritance**: Extends `BaseRepository` for common functionality
 - **Error Handling Wrapper**: Uses `executeWithErrorHandling` for consistent error management
 - **Entity Integration**: Uses `ConversationEntity` for data transformation
-- **Relationship Management**: Handles Neo4j graph relationships
+- **Relationship Management**: Handles PostgreSQL foreign key relationships
 
 #### Repository Logic Boundaries
 
@@ -188,7 +188,7 @@ export class ConversationEntity implements ConversationModel {
 - Cross-entity business logic
 - Conditional business flows
 
-#### Neo4j Relationship Management Pattern
+#### PostgreSQL Relationship Management Pattern
 
 ```typescript
 // Relationship creation with proper error handling
@@ -196,14 +196,11 @@ async linkToStarship(conversationId: string, starshipId: string): Promise<void> 
   return this.executeWithErrorHandling(
     async () => {
       const connection = this.getConnection();
-      await connection.executeWrite(
-        `MATCH (s:Starship {id: $starshipId}), (conversation:Conversation {id: $conversationId})
-         CREATE (s)-[:HAS_CONVERSATION {key: $key}]->(conversation)`,
-        {
-          starshipId,
-          conversationId,
-          key: `${starshipId}_${conversationId}`, // Composite key for relationship
-        }
+      await connection.query(
+        `UPDATE conversations
+         SET starship_id = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [starshipId, conversationId]
       );
     },
     'linkToStarship',
@@ -249,7 +246,7 @@ export class ConversationRepository extends BaseRepository {
 **Responsibilities:**
 
 - Abstract database-specific operations
-- Manage Neo4j relationships and queries
+- Manage PostgreSQL relationships and queries
 - Provide consistent error handling
 - Use entities for data transformation and validation
 - Implement CRUD operations with business rules

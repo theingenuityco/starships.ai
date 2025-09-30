@@ -1,15 +1,15 @@
 # ==========================================
 # Starships.ai - All-in-One Fat Container
-# Contains: Frontend + Backend + Neo4j Database
+# Contains: Frontend + Backend + PostgreSQL Database
 # ==========================================
 
 FROM node:20-alpine
 WORKDIR /app
 
-# Install system dependencies including Java 17 for Neo4j
+# Install system dependencies including PostgreSQL
 RUN apk add --no-cache \
     python3 make g++ git bash wget curl netcat-openbsd \
-    openjdk17-jre-headless \
+    postgresql postgresql-contrib postgresql-client \
     supervisor \
     ca-certificates
 
@@ -29,39 +29,24 @@ RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
     chown -R nodejs:node /home/nodejs/.cache && \
     chmod -R 777 /home/nodejs/.cache
 
-# Download and install Neo4j Community Edition
-ENV NEO4J_VERSION=5.13.0
-ENV NEO4J_HOME=/opt/neo4j
+# Configure PostgreSQL
+ENV POSTGRES_VERSION=15
+ENV PGDATA=/var/lib/postgresql/data
 
-# Download Neo4j with multiple fallback URLs and proper error handling
-RUN set -eux && \
-    echo "Downloading Neo4j ${NEO4J_VERSION}..." && \
-    (wget --progress=dot:giga --timeout=300 --tries=3 \
-        -O neo4j.tar.gz \
-        "https://dist.neo4j.com/neo4j-community-${NEO4J_VERSION}-unix.tar.gz" || \
-    wget --progress=dot:giga --timeout=300 --tries=3 \
-        -O neo4j.tar.gz \
-        "https://neo4j.com/artifact.php?name=neo4j-community-${NEO4J_VERSION}-unix.tar.gz" || \
-    curl -L --progress-bar --retry 3 --retry-delay 5 \
-        -o neo4j.tar.gz \
-        "https://dist.neo4j.com/neo4j-community-${NEO4J_VERSION}-unix.tar.gz") && \
-    echo "Download complete. Extracting Neo4j..." && \
-    tar -xzf neo4j.tar.gz && \
-    mv neo4j-community-${NEO4J_VERSION} ${NEO4J_HOME} && \
-    rm neo4j.tar.gz && \
-    echo "Neo4j ${NEO4J_VERSION} installed successfully at ${NEO4J_HOME}"
-
-# Configure Neo4j
-RUN echo "server.default_listen_address=0.0.0.0" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "server.bolt.listen_address=:7687" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "server.http.listen_address=:7474" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "server.https.listen_address=:7473" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "dbms.security.auth_enabled=false" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "dbms.memory.heap.initial_size=512m" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "dbms.memory.heap.max_size=1G" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "dbms.memory.pagecache.size=512m" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "dbms.connector.bolt.enabled=true" >> ${NEO4J_HOME}/conf/neo4j.conf && \
-    echo "dbms.connector.http.enabled=true" >> ${NEO4J_HOME}/conf/neo4j.conf
+# Install su-exec for user switching and configure PostgreSQL
+RUN apk add --no-cache su-exec && \
+    mkdir -p /var/lib/postgresql/data && \
+    chown -R postgres:postgres /var/lib/postgresql && \
+    chmod 700 /var/lib/postgresql/data && \
+    # Initialize PostgreSQL cluster as postgres user
+    su-exec postgres initdb -D /var/lib/postgresql/data && \
+    # Configure PostgreSQL
+    echo "listen_addresses = '*'" >> /var/lib/postgresql/data/postgresql.conf && \
+    echo "port = 5432" >> /var/lib/postgresql/data/postgresql.conf && \
+    echo "max_connections = 100" >> /var/lib/postgresql/data/postgresql.conf && \
+    echo "shared_buffers = 128MB" >> /var/lib/postgresql/data/postgresql.conf && \
+    echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf && \
+    echo "local all all trust" >> /var/lib/postgresql/data/pg_hba.conf
 
 # Enable pnpm
 RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
@@ -97,22 +82,22 @@ RUN --mount=type=secret,id=stripe_secret_key \
 
 # Create necessary directories
 RUN mkdir -p data/sessions data/starships data/docker && \
-    mkdir -p /var/lib/neo4j/data /var/lib/neo4j/logs && \
+    mkdir -p /var/lib/postgresql/data /var/log/postgresql && \
     chown -R nodejs:node data && \
-    chown -R nodejs:node /var/lib/neo4j && \
-    chown -R nodejs:node ${NEO4J_HOME}
+    chown -R postgres:postgres /var/lib/postgresql && \
+    chown -R postgres:postgres /var/log/postgresql
 
 # Supervisor config will be created dynamically by supervisor-entrypoint.sh
-# based on whether NEO4J_EXTERNAL_URI is set
+# based on whether POSTGRES_EXTERNAL_HOST is set
 
 # Expose all ports
-EXPOSE 3000 4000 7474 7687
+EXPOSE 3000 4000 5432
 
 # Health check for all services
 HEALTHCHECK --interval=30s --timeout=10s --start-period=180s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000 && \
       wget --no-verbose --tries=1 --spider http://localhost:4000/health && \
-      wget --no-verbose --tries=1 --spider http://localhost:7474
+      pg_isready -h localhost -p 5432
 
 # Start supervisor to manage all services
 CMD ["/app/supervisor-entrypoint.sh"]

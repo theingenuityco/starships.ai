@@ -225,7 +225,7 @@ graph TD
 
 ### Technical Implementation Notes
 
-- **Neo4j Relationships**: Repository code maintains both FK references and Neo4j relationship patterns
-- **JSON Storage**: Complex objects (workflow parameters, execution results, metadata) stored as JSON
+- **PostgreSQL Relationships**: Repository code uses foreign keys and JOIN operations for relationships
+- **JSON Storage**: Complex objects (workflow parameters, execution results, metadata) stored as JSONB
 - **Soft References**: Agent IDs in missions stored as string arrays for flexibility
 - **Slug Generation**: Starship slugs are auto-generated with collision handling

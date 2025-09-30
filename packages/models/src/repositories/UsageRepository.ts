@@ -24,9 +24,7 @@ export class UsageRepository extends BaseRepository {
     total_tokens: number;
     cost: number;
     model?: string;
-    provider?: string;
     createdAt?: string;
-    updatedAt?: string;
   }): Promise<UsageModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -41,9 +39,7 @@ export class UsageRepository extends BaseRepository {
           total_tokens: data.total_tokens,
           cost: data.cost,
           model: data.model || 'unknown',
-          provider: data.provider || 'unknown',
           createdAt: data.createdAt || now,
-          updatedAt: data.updatedAt || now,
         };
 
         // Validate entity first

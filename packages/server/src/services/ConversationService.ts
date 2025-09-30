@@ -751,26 +751,53 @@ export class ConversationService {
             (finalReasoning && finalReasoning.trim().length > 0)
           ) {
             try {
+              // Build tool_calls with proper argument parsing for PostgreSQL JSONB
+              // JSONB can store nested objects, so parse the arguments string into an actual object
+              const toolCallsForDb = validToolCalls.map((tc) => {
+                let args = tc.function?.arguments || '';
+
+                // Parse arguments string into actual object for JSONB storage
+                // This prevents double-encoding issues (string -> JSON string -> escaped string)
+                let argsObject: unknown = {};
+
+                if (!args || args.trim() === '' || args === '""' || args === "''") {
+                  argsObject = {};
+                } else {
+                  try {
+                    argsObject = JSON.parse(args);
+                  } catch {
+                    console.warn('[STREAMING] Invalid tool_call arguments, using empty object:', args);
+                    argsObject = {};
+                  }
+                }
+
+                // Log for debugging
+                console.log('[DEBUG] Tool call before DB insert:', {
+                  toolName: tc.function.name,
+                  rawArgumentsString: tc.function?.arguments,
+                  parsedArgumentsObject: argsObject,
+                });
+
+                return {
+                  id: tc.id,
+                  type: 'function' as const,
+                  function: {
+                    name: tc.function.name,
+                    // Store as parsed object - JSONB handles nested objects without double-encoding
+                    arguments: argsObject,
+                  },
+                };
+              });
+
+              console.log('[DEBUG] Final tool_calls structure:', JSON.stringify(toolCallsForDb, null, 2));
+
               const assistantMessage = await this.messageService.createMessage({
                 conversationId,
                 role: 'assistant',
                 content: finalContent,
                 messageType: 'agent_response',
                 ...(finalReasoning && { reasoning: finalReasoning }),
-                ...(validToolCalls.length > 0 && {
-                  tool_calls: validToolCalls.map((tc) => ({
-                    id: tc.id,
-                    type: 'function',
-                    function: {
-                      name: tc.function.name,
-                      arguments: tc.function?.arguments || '',
-                      ...(() => {
-                        const obj = this.parseToolArguments(tc.function?.arguments);
-                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
-                      })(),
-                    },
-                  })),
-                }),
+                ...(validToolCalls.length > 0 && { tool_calls: toolCallsForDb }),
               });
 
               await this.streamingService.broadcastDelta(conversationId, {

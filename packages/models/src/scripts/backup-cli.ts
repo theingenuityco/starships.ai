@@ -124,7 +124,7 @@ Examples:
   const result = await backupManager.restoreFromBackup(backupPath);
   if (result.success) {
     console.log('✅ Restore completed successfully!');
-    console.log(`📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`);
+    console.log(`📊 Restored: ${result.restoredTables} tables, ${result.restoredRecords} records`);
   } else {
     console.error('❌ Restore failed!');
     result.errors.forEach((error) => console.error(`   - ${error}`));

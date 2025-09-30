@@ -54,14 +54,10 @@ export class UsageEntity implements UsageModel {
   @Length(1, 255)
   model?: string;
 
-  // Timestamps
+  // Timestamp
   @Expose()
   @IsISO8601()
   createdAt!: string;
-
-  @Expose()
-  @IsISO8601()
-  updatedAt!: string;
 
   /**
    * Validation method leveraging class-validator
@@ -85,7 +81,6 @@ export class UsageEntity implements UsageModel {
         cost: dataRecord.cost,
         model: dataRecord.model,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
-        updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         ...dataRecord,
       });
     } else {

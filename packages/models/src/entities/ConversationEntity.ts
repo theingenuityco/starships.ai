@@ -31,6 +31,12 @@ export class ConversationEntity implements ConversationModel {
   @IsISO8601()
   updatedAt?: string;
 
+  // Foreign key relationship
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  starshipId!: string;
+
   @Expose()
   @IsString()
   @Length(1, 100)
@@ -58,6 +64,7 @@ export class ConversationEntity implements ConversationModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt,
+        starshipId: dataRecord.starshipId || '',
         title: dataRecord.title, // Don't provide default during validation
         status: dataRecord.status || 'active',
         ...dataRecord,

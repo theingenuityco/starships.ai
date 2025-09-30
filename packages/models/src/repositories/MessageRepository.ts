@@ -59,31 +59,38 @@ export class MessageRepository extends BaseRepository {
   async create(entity: Message & { conversationId: string; starshipId?: string }): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Extract relationship IDs before validation since they're not part of MessageEntity
-        const { conversationId, starshipId, ...messageInput } = entity;
-
-        // Validate using Entity (without relationship IDs)
-        await MessageEntity.validate(messageInput, 'create');
-
         const now = new Date().toISOString();
+        const conversationId = entity.conversationId;
 
+        // Get starshipId from conversation if not provided
+        let starshipId = entity.starshipId;
+        if (!starshipId) {
+          const connection = this.getConnection();
+          const conversation = await connection.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [
+            conversationId,
+          ]);
+          if (!conversation) {
+            throw new Error(`Conversation ${conversationId} not found`);
+          }
+          starshipId = conversation.starship_id;
+        }
+
+        // Build message data with all required fields including foreign keys
         const messageData = {
-          // Additional database fields
           createdAt: now,
           updatedAt: now,
-          // PostgreSQL foreign keys
           conversationId,
           starshipId,
-          // From base Message interface
           role: entity.role,
           content: entity.content,
           messageType: entity.messageType || 'user_input',
           ...(entity.reasoning ? { reasoning: entity.reasoning } : {}),
-          // Persist tool_calls when provided (assistant function calling)
           ...(entity.tool_calls ? { tool_calls: entity.tool_calls } : {}),
-          // Persist tool_call_id when provided (tool_result linking)
           ...(entity.tool_call_id ? { tool_call_id: entity.tool_call_id } : {}),
         };
+
+        // Validate with all required fields present
+        await MessageEntity.validate(messageData, 'create');
 
         // Create entity instance from plain object, then serialize
         const messageEntity = toEntityInstance(MessageEntity, messageData);

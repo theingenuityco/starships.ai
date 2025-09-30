@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
  */
 
-import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import type { AgentState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel, TemplateCategory } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
@@ -63,12 +62,10 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   slug!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -91,7 +88,6 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.TemperatureTransform()
   @IsNumber()
   @Min(0)
   @Max(2)
@@ -99,14 +95,12 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.MaxTokensTransform()
   @IsNumber()
   @Min(1)
   @Max(100000)
   maxTokens?: number;
 
   @Expose()
-  @LLMTransformers.TimeoutTransform()
   @IsNumber()
   @Min(1000)
   @Max(300000)
@@ -128,7 +122,6 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   // Tool assignment - reference by slugs instead of embedding
   @Expose()
   @IsOptional()
-  @Transformers.PostgresArrayTransform()
   @IsArray()
   @IsString({ each: true })
   assignedToolSlugs?: string[];
@@ -152,7 +145,6 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @IsOptional()
-  @Transformers.PostgresArrayTransform()
   @IsArray()
   @IsString({ each: true })
   previewPrompts?: string[];

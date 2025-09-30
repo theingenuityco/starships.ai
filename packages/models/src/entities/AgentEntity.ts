@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import { LLMTransformers, Transformers } from '@/helpers/serializer';
 import { AgentState } from '@starships/autopilot';
 import { Blueprint } from '@starships/autopilot/src/types';
 import type { AgentModel } from '@starships/protocol';
@@ -20,12 +19,10 @@ export class AgentEntity implements AgentModel {
   id!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -61,7 +58,6 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.TemperatureTransform()
   @IsNumber()
   @Min(0)
   @Max(2)
@@ -69,14 +65,12 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @IsOptional()
-  @LLMTransformers.MaxTokensTransform()
   @IsNumber()
   @Min(1)
   @Max(100000)
   maxTokens?: number;
 
   @Expose()
-  @LLMTransformers.TimeoutTransform()
   @IsNumber()
   @Min(1000)
   @Max(300000)

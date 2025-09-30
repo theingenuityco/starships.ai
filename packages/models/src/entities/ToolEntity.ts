@@ -57,7 +57,6 @@ export class ToolEntity implements ToolModel {
   description!: string;
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   parameters!: {
     type: 'object';
@@ -66,20 +65,17 @@ export class ToolEntity implements ToolModel {
   };
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint;
 
   // BaseParams fields
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsArray()
   transforms?: TransformOperation[];
 
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsArray()
   mutations?: TransformOperation[];
 
@@ -91,7 +87,6 @@ export class ToolEntity implements ToolModel {
   // Tool-specific fields
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsObject()
   configuration?: Record<string, unknown>;
 

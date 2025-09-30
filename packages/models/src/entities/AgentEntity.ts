@@ -88,12 +88,10 @@ export class AgentEntity implements AgentModel {
   systemPrompt?: string; // System prompt moved to root level
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   state!: AgentState; // Runtime state with messages and tools
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint; // Blueprint - keeping flexible for now
 

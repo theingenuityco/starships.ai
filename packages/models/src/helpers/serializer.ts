@@ -3,7 +3,7 @@
  * Provides reusable serialize/deserialize methods for common patterns across repositories
  */
 
-import { Transform } from 'class-transformer';
+import { Transform, TransformationType } from 'class-transformer';
 import 'reflect-metadata';
 
 /**
@@ -16,16 +16,21 @@ export const Transformers = {
    */
   JsonTransform: () =>
     Transform(({ value, type }) => {
-      if (type === 0) {
-        // toClassOnly (deserializing from database) - parse strings only
+      // Use explicit TransformationType constants to avoid numeric confusion
+      if (type === TransformationType.PLAIN_TO_CLASS) {
+        // Deserializing from DB result into class
         if (typeof value === 'string') {
-          return JSON.parse(value); // Let JSON.parse throw on invalid JSON
+          return JSON.parse(value); // parse JSON strings if any
         }
-        return value; // Pass through non-strings as-is
-      } else {
-        // toPlainOnly (serializing to database) - stringify everything
-        return JSON.stringify(value); // Let JSON.stringify throw on circular refs
+        // pg returns JSONB as native objects already
+        return value;
       }
+      if (type === TransformationType.CLASS_TO_PLAIN) {
+        // Serializing to plain for DB - pass object through, let pg driver encode JSONB
+        return value;
+      }
+      // CLASS_TO_CLASS or unknown – pass-through
+      return value;
     }),
 
   /**
@@ -34,50 +39,40 @@ export const Transformers = {
    */
   DateTransform: () =>
     Transform(({ value, type }) => {
-      if (type === 0) {
-        // toClassOnly (deserializing) - ensure consistent ISO string format
+      if (type === TransformationType.PLAIN_TO_CLASS) {
+        // Deserializing
         if (value === null || value === undefined) return undefined;
         if (value instanceof Date) {
-          if (isNaN(value.getTime())) {
-            throw new Error('Invalid Date object encountered during deserialization');
-          }
+          if (isNaN(value.getTime())) throw new Error('Invalid Date object encountered during deserialization');
           return value.toISOString();
         }
         if (typeof value === 'string') {
           const date = new Date(value);
-          if (isNaN(date.getTime())) {
-            throw new Error(`Invalid date string: ${value}`);
-          }
+          if (isNaN(date.getTime())) throw new Error(`Invalid date string: ${value}`);
           return date.toISOString();
         }
-        // Handle numbers (timestamps)
         if (typeof value === 'number') {
           const date = new Date(value);
-          if (isNaN(date.getTime())) {
-            throw new Error(`Invalid timestamp: ${value}`);
-          }
+          if (isNaN(date.getTime())) throw new Error(`Invalid timestamp: ${value}`);
           return date.toISOString();
         }
         throw new Error(`Unsupported date value type: ${typeof value}`);
-      } else {
-        // toPlainOnly (serializing)
+      }
+      if (type === TransformationType.CLASS_TO_PLAIN) {
+        // Serializing
         if (value === null || value === undefined) return undefined;
         if (value instanceof Date) {
-          if (isNaN(value.getTime())) {
-            throw new Error('Invalid Date object encountered during serialization');
-          }
+          if (isNaN(value.getTime())) throw new Error('Invalid Date object encountered during serialization');
           return value.toISOString();
         }
         if (typeof value === 'string') {
-          // Validate that string is a valid ISO date
           const date = new Date(value);
-          if (isNaN(date.getTime())) {
-            throw new Error(`Invalid date string during serialization: ${value}`);
-          }
+          if (isNaN(date.getTime())) throw new Error(`Invalid date string during serialization: ${value}`);
           return value;
         }
         throw new Error(`Unsupported date value for serialization: ${typeof value}`);
       }
+      return value;
     }),
 
   /**
@@ -98,20 +93,19 @@ export const Transformers = {
     Transform(({ value, type }) => {
       if (value === null || value === undefined) return undefined;
 
-      if (type === 0) {
-        // toClassOnly (deserializing from database)
-        // PostgreSQL driver returns arrays as JavaScript arrays
+      if (type === TransformationType.PLAIN_TO_CLASS) {
+        // Deserializing from DB
         if (Array.isArray(value)) return value;
-        // Handle empty array case
         if (value === '' || value === '{}') return [];
         throw new Error(`Expected array from PostgreSQL but received: ${typeof value}`);
-      } else {
-        // toPlainOnly (serializing to database)
-        // Return as JavaScript array - PostgreSQL driver will handle conversion
+      }
+      if (type === TransformationType.CLASS_TO_PLAIN) {
+        // Serializing for DB
         if (Array.isArray(value)) return value;
         if (value === '' || value === '{}') return [];
         throw new Error(`Expected array for PostgreSQL but received: ${typeof value}`);
       }
+      return value;
     }),
 
   /**

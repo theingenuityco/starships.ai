@@ -21,6 +21,7 @@ export * from './node-handler';
 // Runtime execution state and context (includes streaming types)
 export * from './execution';
 export * from './events';
+export * from './parallel-tools';
 
 // ===== VALIDATION TYPES =====
 // Validation and error reporting

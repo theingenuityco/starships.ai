@@ -173,7 +173,7 @@ export class ConversationService {
     orderBy: 'createdAt' = 'createdAt',
     orderDirection: 'asc' | 'desc' = 'asc'
   ): Promise<MessageModel[]> {
-    return this.conversationRepository.getConversationMessages(conversationId, orderBy, orderDirection);
+    return this.conversationRepository.getConversationMessages(conversationId, orderDirection);
   }
 
   /**

@@ -1,5 +1,5 @@
 import { NotFoundError } from '@starships/errors';
-import { BlueprintRepository, EdgeRepository, NodeRepository } from '@starships/models';
+import { BlueprintRepository } from '@starships/models';
 import { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '@starships/protocol';
 
 /**
@@ -7,13 +7,9 @@ import { BlueprintModel, CreateBlueprintRequest, UpdateBlueprintRequest } from '
  */
 export class BlueprintService {
   private blueprintRepository: BlueprintRepository;
-  private nodeRepository: NodeRepository;
-  private edgeRepository: EdgeRepository;
 
   constructor() {
     this.blueprintRepository = new BlueprintRepository();
-    this.nodeRepository = new NodeRepository();
-    this.edgeRepository = new EdgeRepository();
   }
 
   /**

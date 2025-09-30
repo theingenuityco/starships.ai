@@ -3,7 +3,6 @@
  * Creates default tool templates available for agents and marketplace
  */
 
-import { getConnection } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
 import { generateSlug } from '@/helpers/slugUtils';
@@ -17,9 +16,6 @@ import { ALL_TOOL_TEMPLATES } from '@/seeders/tools';
 export async function seedToolTemplates(): Promise<void> {
   try {
     logger.info('Starting tool template seeding...');
-
-    // Get the existing connection that was initialized by the server
-    const connection = getConnection();
 
     // Create repository
     const toolTemplateRepo = new ToolTemplateRepository();

@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by ConversationEntity and AgentEntity.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { UserModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
 import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, validate, ValidationError } from 'class-validator';
@@ -72,12 +71,10 @@ export class UserEntity implements UserModel {
   id!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   @IsOptional()
   updatedAt?: string;

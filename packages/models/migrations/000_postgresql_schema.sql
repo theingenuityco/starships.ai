@@ -82,7 +82,7 @@ CREATE TABLE agent_templates (
 CREATE INDEX idx_agent_templates_category ON agent_templates(category);
 CREATE INDEX idx_agent_templates_usage_count ON agent_templates(usage_count);
 CREATE INDEX idx_agent_templates_is_public ON agent_templates(is_public);
-CREATE GIN INDEX idx_agent_templates_tags ON agent_templates USING GIN(tags);
+CREATE INDEX idx_agent_templates_tags ON agent_templates USING GIN(tags);
 
 -- ============================================================================
 -- AGENTS TABLE
@@ -133,7 +133,7 @@ CREATE TABLE tool_templates (
 -- Tool template indexes
 CREATE INDEX idx_tool_templates_category ON tool_templates(category);
 CREATE INDEX idx_tool_templates_usage_count ON tool_templates(usage_count);
-CREATE GIN INDEX idx_tool_templates_tags ON tool_templates USING GIN(tags);
+CREATE INDEX idx_tool_templates_tags ON tool_templates USING GIN(tags);
 
 -- ============================================================================
 -- TOOLS TABLE
@@ -194,7 +194,7 @@ CREATE INDEX idx_workflows_starship_id ON workflows(starship_id);
 CREATE INDEX idx_workflows_execution_mode ON workflows(execution_mode);
 CREATE INDEX idx_workflows_usage_count ON workflows(usage_count);
 CREATE INDEX idx_workflows_is_public ON workflows(is_public);
-CREATE GIN INDEX idx_workflows_tags ON workflows USING GIN(tags);
+CREATE INDEX idx_workflows_tags ON workflows USING GIN(tags);
 
 -- ============================================================================
 -- BLUEPRINTS TABLE
@@ -217,7 +217,7 @@ CREATE TABLE blueprints (
 -- Blueprint indexes
 CREATE INDEX idx_blueprints_category ON blueprints(category);
 CREATE INDEX idx_blueprints_usage_count ON blueprints(usage_count);
-CREATE GIN INDEX idx_blueprints_tags ON blueprints USING GIN(tags);
+CREATE INDEX idx_blueprints_tags ON blueprints USING GIN(tags);
 
 -- ============================================================================
 -- NODES TABLE
@@ -440,33 +440,9 @@ CREATE INDEX idx_tools_search ON tools USING GIN(to_tsvector('english', name || 
 CREATE INDEX idx_tool_templates_search ON tool_templates USING GIN(to_tsvector('english', name || ' ' || COALESCE(description, '')));
 
 -- ============================================================================
--- TRIGGERS FOR UPDATED_AT
+-- NOTE: Triggers removed for simplicity
+-- Application code will handle updated_at timestamps manually
 -- ============================================================================
-
--- Function to automatically update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create triggers for all tables with updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_starships_updated_at BEFORE UPDATE ON starships FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_agent_templates_updated_at BEFORE UPDATE ON agent_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_agents_updated_at BEFORE UPDATE ON agents FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_tool_templates_updated_at BEFORE UPDATE ON tool_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_tools_updated_at BEFORE UPDATE ON tools FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_workflows_updated_at BEFORE UPDATE ON workflows FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_blueprints_updated_at BEFORE UPDATE ON blueprints FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_nodes_updated_at BEFORE UPDATE ON nodes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_edges_updated_at BEFORE UPDATE ON edges FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_messages_updated_at BEFORE UPDATE ON messages FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_executions_updated_at BEFORE UPDATE ON executions FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_environments_updated_at BEFORE UPDATE ON environments FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
 -- COMMENTS FOR DOCUMENTATION

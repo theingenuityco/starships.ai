@@ -29,7 +29,7 @@
     "backup:create": "cd deploy && npm run backup:create",
     "backup:restore": "cd deploy && npm run backup:restore",
     "backup:list": "cd deploy && npm run backup:list",
-    "postgres:install": "docker run -d --name starships-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_DB=starships postgres:15 || echo 'Container may already exist. Use postgres:reset to recreate.'",
+    "postgres:install": "docker run -d --name starships-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_DB=starships postgres:18 || echo 'Container may already exist. Use postgres:reset to recreate.'",
     "postgres:reset": "docker stop starships-postgres 2>/dev/null || true && docker rm starships-postgres 2>/dev/null || true && echo 'PostgreSQL container cleaned up. Use postgres:install to recreate.'",
     "postgres:shell": "docker exec -it starships-postgres psql -U postgres -d starships || echo 'Container not running. Use postgres:start first.'",
     "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'"

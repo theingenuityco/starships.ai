@@ -254,7 +254,7 @@ export class AgentTemplateRepository extends BaseRepository {
            END as relevance
            FROM agent_templates
            WHERE LOWER(name) LIKE LOWER($1) OR LOWER(description) LIKE LOWER($1)
-           ORDER BY relevance DESC, usage_count DESC, rating DESC`,
+           ORDER BY relevance DESC, usage_count DESC`,
           [`%${query}%`]
         );
         return fromDatabaseArray(AgentTemplateEntity, result);

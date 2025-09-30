@@ -263,8 +263,7 @@ CREATE TABLE usage (
     prompt_tokens INTEGER NOT NULL DEFAULT 0,
     completion_tokens INTEGER NOT NULL DEFAULT 0,
     total_tokens INTEGER NOT NULL DEFAULT 0,
-    model VARCHAR(100) NOT NULL,
-    provider VARCHAR(100) NOT NULL,
+    model VARCHAR(100),
     cost DECIMAL(10,6) DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );

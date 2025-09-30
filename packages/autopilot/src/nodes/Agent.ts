@@ -80,7 +80,55 @@ export class Agent implements NodeHandler {
           description: 'AI model with state-driven tool support',
           parameters: {
             model: this.params.model,
-            messages: '{{ state.messages }}',
+            messages: `{{ 
+              (() => {
+                const baseMessages = state.messages || [];
+                
+                // Check if we have tool results to append (safely handle when tool node hasn't run)
+                let toolResults;
+                try {
+                  toolResults = $lastOutputOf("${toolNodeRef}")[0]?.json;
+                } catch (e) {
+                  // Tool node hasn't executed yet, just return base messages
+                  return baseMessages;
+                }
+                
+                if (!toolResults) return baseMessages;
+                
+                const messagesWithTools = [...baseMessages];
+                
+                // Add successful tool messages
+                if (toolResults.successful) {
+                  toolResults.successful.forEach(result => {
+                    // Extract the actual tool result from the execution item wrapper
+                    const actualData = result.data && typeof result.data === 'object' && result.data.json 
+                      ? result.data.json 
+                      : result.data;
+                    
+                    messagesWithTools.push({
+                      role: 'tool',
+                      tool_call_id: result.toolCallId,
+                      name: result.toolName,
+                      content: JSON.stringify(actualData)
+                    });
+                  });
+                }
+                
+                // Add failed tool messages  
+                if (toolResults.failed) {
+                  toolResults.failed.forEach(result => {
+                    messagesWithTools.push({
+                      role: 'tool',
+                      tool_call_id: result.toolCallId,
+                      name: result.toolName,
+                      content: JSON.stringify({ error: result.error })
+                    });
+                  });
+                }
+                
+                return messagesWithTools;
+              })()
+            }}`,
             tools: '{{ state.tools }}', // Always use state - Engine handles empty arrays
             ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
             ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
@@ -174,48 +222,8 @@ export class Agent implements NodeHandler {
             },
             blueprint: null, // Tool node builds blueprints dynamically
 
-            // Mutation to append tool messages to state
+            // Only track batch info, not tool messages (they're temporary)
             mutations: [
-              {
-                operation: 'replace' as const,
-                path: '/state/messages',
-                value: `{{ 
-                  (() => {
-                    const results = $lastOutputOf("${toolNodeRef}")[0]?.json;
-                    if (!results) return state.messages || [];
-                    
-                    // Start with existing messages
-                    const existingMessages = state.messages || [];
-                    const newMessages = [...existingMessages];
-                    
-                    // Add successful tool messages
-                    if (results.successful) {
-                      results.successful.forEach(result => {
-                        newMessages.push({
-                          role: 'tool',
-                          tool_call_id: result.toolCallId,
-                          name: result.toolName,
-                          content: JSON.stringify(result.data)
-                        });
-                      });
-                    }
-                    
-                    // Add failed tool messages  
-                    if (results.failed) {
-                      results.failed.forEach(result => {
-                        newMessages.push({
-                          role: 'tool',
-                          tool_call_id: result.toolCallId,
-                          name: result.toolName,
-                          content: JSON.stringify({ error: result.error })
-                        });
-                      });
-                    }
-                    
-                    return newMessages;
-                  })()
-                }}`,
-              },
               {
                 operation: 'replace' as const,
                 path: '/state/lastProcessedBatch',

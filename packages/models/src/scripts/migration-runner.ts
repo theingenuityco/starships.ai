@@ -110,23 +110,59 @@ export class MigrationRunner {
     return result;
   }
 
-  /** Execute a migration with full error handling (deprecated - use initializeSchema) */
+  /** Execute a specific migration file (supports arbitrary IDs in /migrations) */
   async runMigration(migrationId: string): Promise<MigrationResult> {
-    console.warn('⚠️  runMigration is deprecated. Use initializeSchema() instead.');
-
-    if (migrationId === '001_initialize_schema' || migrationId === '000_postgresql_schema') {
-      return this.initializeSchema();
-    }
-
-    // Return error for other migration IDs since they no longer exist
-    return {
+    const startTime = Date.now();
+    const result: MigrationResult = {
       success: false,
       migrationId,
       executionTime: 0,
-      errors: [`Migration ${migrationId} no longer exists. Use initializeSchema() instead.`],
+      errors: [],
       warnings: [],
       rollbackAvailable: false,
     };
+
+    try {
+      // Legacy aliases: initialize schema
+      if (migrationId === '001_initialize_schema' || migrationId === '000_postgresql_schema') {
+        return this.initializeSchema();
+      }
+
+      await this.ensureMigrationTable();
+
+      // Skip if already applied
+      if (await this.isMigrationApplied(migrationId)) {
+        result.warnings?.push(`Migration ${migrationId} already applied`);
+        result.success = true;
+        result.executionTime = Date.now() - startTime;
+        return result;
+      }
+
+      // Validate file exists
+      const migrationPath = join(this.migrationsPath, `${migrationId}.sql`);
+      if (!existsSync(migrationPath)) {
+        result.errors?.push(`Migration file not found: ${migrationPath}`);
+        return result;
+      }
+
+      // Execute content
+      const content = readFileSync(migrationPath, 'utf-8');
+      console.log(`🚀 Running migration ${migrationId}...`);
+      await this.executeMigrationContent(content);
+
+      // Record as applied
+      await this.recordMigration(migrationId, migrationId, `Applied migration ${migrationId}`, '1.0.0');
+
+      result.success = true;
+      result.executionTime = Date.now() - startTime;
+      console.log(`✅ Migration ${migrationId} completed in ${result.executionTime}ms`);
+      return result;
+    } catch (error) {
+      result.errors?.push(`Migration ${migrationId} failed: ${error instanceof Error ? error.message : String(error)}`);
+      result.executionTime = Date.now() - startTime;
+      console.error(`❌ Migration ${migrationId} failed:`, error);
+      return result;
+    }
   }
 
   /** Rollback a migration */
@@ -386,19 +422,44 @@ export class MigrationRunner {
     };
   }
 
-  /** Initialize database schema (replaces runAllPendingMigrations) */
+  /** Initialize database schema and then run any remaining pending migrations */
   async runAllPendingMigrations(): Promise<MigrationResult[]> {
     console.log('🚀 Checking database schema...');
 
-    const result = await this.initializeSchema();
+    const results: MigrationResult[] = [];
 
-    if (result.success) {
-      console.log('✅ Database schema is ready');
-    } else {
-      console.error('❌ Database schema initialization failed:', result.errors);
+    // Always ensure base schema first
+    const initResult = await this.initializeSchema();
+    results.push(initResult);
+
+    if (!initResult.success) {
+      console.error('❌ Database schema initialization failed:', initResult.errors);
+      return results;
     }
 
-    return [result];
+    console.log('🔍 Scanning for pending migrations...');
+    const pending = await this.getPendingMigrations();
+
+    // Filter out base initializer if present
+    const toRun = pending.filter((id) => id !== '000_postgresql_schema');
+
+    if (toRun.length === 0) {
+      console.log('✅ No pending migrations to apply');
+      return results;
+    }
+
+    console.log(`🧩 Applying ${toRun.length} pending migration(s): ${toRun.join(', ')}`);
+
+    for (const id of toRun) {
+      const res = await this.runMigration(id);
+      results.push(res);
+      if (!res.success) {
+        console.error(`❌ Migration ${id} failed:`, res.errors);
+        // Continue applying others to surface all issues; caller can decide how to handle failures
+      }
+    }
+
+    return results;
   }
 }
 

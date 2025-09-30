@@ -236,6 +236,39 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('AgentTemplate', templateId);
         }
 
+        // Minimal blueprint validator (ensures nodes exist and a start node is present)
+        const isValidBlueprint = (bp: unknown): boolean => {
+          if (!bp || typeof bp !== 'object') return false;
+          const rec = bp as Record<string, unknown>;
+          const nodes = Array.isArray(rec.nodes) ? rec.nodes : [];
+          if (nodes.length === 0) return false;
+          return nodes.some(
+            (n) => typeof n === 'object' && n !== null && 'type' in (n as object) && (n as { type: string }).type === 'start'
+          );
+        };
+
+        // Robustly select a blueprint: prefer customizations, then template, else fallback
+        const candidate = (customizations?.blueprint ?? template.blueprint) as unknown;
+        let ensuredBlueprint = isValidBlueprint(candidate) ? candidate : template.blueprint;
+
+        if (!isValidBlueprint(ensuredBlueprint)) {
+          // Final safety fallback to a minimal valid blueprint
+          const startRef = 'start_default';
+          const endRef = 'end_default';
+          ensuredBlueprint = {
+            nodes: [
+              { ref: startRef, type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+              { ref: endRef, type: 'end', name: 'End', description: 'End node', parameters: {} },
+            ],
+            edges: [{ ref: 'edge_start_end_default', from: startRef, to: endRef }],
+            metadata: {
+              generatedBy: 'AgentRepository.createFromTemplate',
+              createdAt: new Date().toISOString(),
+            },
+          };
+          this.log('warn', `[${this.serviceName}] Applied minimal fallback blueprint for agent created from template ${templateId}`);
+        }
+
         // Create agent from template with optional customizations
         const agentData = {
           name: customizations?.name || template.name,
@@ -246,7 +279,7 @@ export class AgentRepository extends BaseRepository {
           timeout: customizations?.timeout ?? template.timeout,
           systemPrompt: customizations?.systemPrompt || template.systemPrompt,
           state: customizations?.state || template.state,
-          blueprint: customizations?.blueprint || template.blueprint,
+          blueprint: ensuredBlueprint,
         };
 
         // Create agent with template_id foreign key
@@ -259,6 +292,9 @@ export class AgentRepository extends BaseRepository {
           createdAt: now,
           updatedAt: now,
         };
+
+        // Validate full payload before persistence to avoid leaking {} defaults to DB
+        await AgentEntity.validate(agentProps, 'create');
 
         const agentEntity = toEntityInstance(AgentEntity, agentProps);
         const result = await this.createEntity<Record<string, unknown>>('agents', toDatabase(agentEntity));

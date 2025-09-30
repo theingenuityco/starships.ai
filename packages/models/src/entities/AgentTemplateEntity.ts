@@ -119,11 +119,13 @@ export class AgentTemplateEntity implements AgentTemplateModel {
 
   @Expose()
   @Transformers.JsonTransform()
+  @IsOptional()
   @IsObject()
   state!: AgentState;
 
   @Expose()
   @Transformers.JsonTransform()
+  @IsOptional()
   @IsObject()
   blueprint!: Blueprint;
 
@@ -184,8 +186,8 @@ export class AgentTemplateEntity implements AgentTemplateModel {
         maxTokens: dataRecord.maxTokens,
         timeout: dataRecord.timeout ?? 30000,
         systemPrompt: dataRecord.systemPrompt,
-        state: dataRecord.state || { messages: [], tools: [] },
-        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
+        state: dataRecord.state,
+        blueprint: dataRecord.blueprint,
         assignedToolSlugs: dataRecord.assignedToolSlugs || [],
         category: dataRecord.category || 'general',
         usageCount: dataRecord.usageCount ?? 0,

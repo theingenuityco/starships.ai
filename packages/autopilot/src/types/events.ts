@@ -22,7 +22,7 @@ export interface LLMEvent extends BaseEvent {
     model?: string;
     /**
      * Provider-reported usage/cost metadata, emitted on content_complete.
-     * Uses OpenRouter/OpenAI-style snake_case for token fields to match upstream payloads.
+     * Uses camelCase (normalized from OpenRouter/OpenAI snake_case responses).
      */
     usage?: Partial<LLMUsage>;
   };

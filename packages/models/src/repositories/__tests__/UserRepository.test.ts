@@ -50,11 +50,11 @@ describe('UserRepository', () => {
         global.createMockUser({ id: 'user-2', email: 'user2@example.com' }),
       ];
 
-      testHelper.mockFindQuery(mockUsers, 'u');
+      testHelper.mockConnection.query.mockResolvedValue(mockUsers);
 
       const result = await repository.findAll();
 
-      expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) RETURN u ORDER BY u.createdAt DESC');
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM users ORDER BY created_at DESC');
       expect(result).toHaveLength(mockUsers.length);
       expect(result[0]).toBeInstanceOf(UserEntity);
       expect(result[0].id).toBe(mockUsers[0].id);
@@ -67,7 +67,7 @@ describe('UserRepository', () => {
     });
 
     it('should return empty array when no users found', async () => {
-      testHelper.mockFindQuery([]);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findAll();
 
@@ -75,7 +75,7 @@ describe('UserRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      testHelper.mockDatabaseError();
+      testHelper.mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
@@ -84,11 +84,11 @@ describe('UserRepository', () => {
   describe('findById', () => {
     it('should return user by ID', async () => {
       const mockUser = global.createMockUser();
-      testHelper.mockFindQuery(mockUser, 'u');
+      testHelper.mockConnection.query.mockResolvedValue([mockUser]);
 
       const result = await repository.findById('user-123');
 
-      expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.id = $id RETURN u', { id: 'user-123' });
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM users WHERE id = $1', ['user-123']);
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).not.toBeNull();
       expect(result!.id).toBe(mockUser.id);
@@ -97,7 +97,7 @@ describe('UserRepository', () => {
     });
 
     it('should return null when user not found', async () => {
-      testHelper.mockFindQuery(null);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findById('non-existent');
 
@@ -108,13 +108,11 @@ describe('UserRepository', () => {
   describe('findByEmail', () => {
     it('should return user by email', async () => {
       const mockUser = global.createMockUser({ email: 'test@example.com' });
-      testHelper.mockFindQuery(mockUser, 'u');
+      testHelper.mockConnection.query.mockResolvedValue([mockUser]);
 
       const result = await repository.findByEmail('test@example.com');
 
-      expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (u:User) WHERE u.email = $email RETURN u', {
-        email: 'test@example.com',
-      });
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM users WHERE email = $1', ['test@example.com']);
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).not.toBeNull();
       expect(result!.id).toBe(mockUser.id);
@@ -123,7 +121,7 @@ describe('UserRepository', () => {
     });
 
     it('should return null when email not found', async () => {
-      testHelper.mockFindQuery(null);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findByEmail('notfound@example.com');
 
@@ -146,7 +144,7 @@ describe('UserRepository', () => {
         createdAt: mockTimestamp,
       };
 
-      testHelper.mockMergeWrite(createdUser);
+      testHelper.mockConnection.query.mockResolvedValue([createdUser]);
 
       const result = await repository.create(userData);
 
@@ -173,7 +171,7 @@ describe('UserRepository', () => {
         displayName: 'Updated Name',
       });
 
-      testHelper.mockMergeWrite(existingUser);
+      testHelper.mockConnection.query.mockResolvedValue([existingUser]);
 
       const result = await repository.create(userData);
 
@@ -200,7 +198,7 @@ describe('UserRepository', () => {
         updatedAt: mockTimestamp,
       });
 
-      testHelper.mockUpdateWrite(updatedUser, 'u');
+      testHelper.mockConnection.query.mockResolvedValue([updatedUser]);
 
       const result = await repository.update('user-123', updates);
 
@@ -225,7 +223,7 @@ describe('UserRepository', () => {
         updatedAt: mockTimestamp,
       });
 
-      testHelper.mockUpdateWrite(existingUser, 'u');
+      testHelper.mockConnection.query.mockResolvedValue([existingUser]);
 
       // With strict serialization, empty updates might fail
       // This test now expects either success or appropriate error handling
@@ -243,7 +241,7 @@ describe('UserRepository', () => {
     });
 
     it('should throw NotFoundError when user does not exist', async () => {
-      testHelper.mockUpdateWrite(null);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       await expect(repository.update('non-existent', { displayName: 'New Name' })).rejects.toThrow(NotFoundError);
       expect(UserEntity.validate).toHaveBeenCalledWith({ displayName: 'New Name' }, 'update');
@@ -263,21 +261,21 @@ describe('UserRepository', () => {
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
       });
-      testHelper.mockUpdateWrite(updatedUser, 'u');
+      testHelper.mockConnection.query.mockResolvedValue([updatedUser]);
 
       const result = await repository.update('user-123', updates);
 
-      const query = testHelper.mockConnection.executeWrite.mock.calls[0][0];
-      const params = testHelper.mockConnection.executeWrite.mock.calls[0][1];
+      const query = testHelper.mockConnection.query.mock.calls[0][0];
+      const params = testHelper.mockConnection.query.mock.calls[0][1];
 
-      expect(query).toContain('SET u.displayName = $displayName');
-      expect(query).not.toContain('SET u.id =');
-      expect(query).not.toContain('SET u.createdAt =');
+      expect(query).toContain('UPDATE users');
+      expect(query).toContain('SET');
+      expect(query).toContain('display_name');
+      expect(query).not.toContain('id =');
+      expect(query).not.toContain('created_at =');
 
-      expect(params.displayName).toBe('Valid Update');
-      // updatedAt is handled in the query itself, not necessarily in params
-      // The id in params should be the actual user ID, not the ignored one
-      expect(params.id).toBe('user-123');
+      expect(params).toContain('Valid Update');
+      expect(params).toContain('user-123');
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).not.toBeNull();
       expect(result!.id).toBe(updatedUser.id);
@@ -287,19 +285,16 @@ describe('UserRepository', () => {
 
   describe('delete', () => {
     it('should delete user successfully', async () => {
-      testHelper.mockDeleteWrite(true);
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 1 } as unknown as unknown[]);
 
       const result = await repository.delete('user-123');
 
-      expect(testHelper.mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (u:User) WHERE u.id = $id DETACH DELETE u RETURN count(u) as deletedCount',
-        { id: 'user-123' }
-      );
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('DELETE FROM users WHERE id = $1', ['user-123']);
       expect(result).toBe(true);
     });
 
     it('should return false when user does not exist', async () => {
-      testHelper.mockDeleteWrite(false);
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 0 } as unknown as unknown[]);
 
       const result = await repository.delete('non-existent');
 
@@ -310,14 +305,11 @@ describe('UserRepository', () => {
   describe('findByStripeCustomerId', () => {
     it('should return user by Stripe customer ID', async () => {
       const mockUser = global.createMockUser({ stripeCustomerId: 'cus_123' });
-      testHelper.mockFindQuery(mockUser, 'user');
+      testHelper.mockConnection.query.mockResolvedValue([mockUser]);
 
       const result = await repository.findByStripeCustomerId('cus_123');
 
-      expect(testHelper.mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (user:User {stripeCustomerId: $stripeCustomerId})'),
-        { stripeCustomerId: 'cus_123' }
-      );
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM users WHERE stripe_customer_id = $1', ['cus_123']);
       expect(result).toBeInstanceOf(UserEntity);
       expect(result).not.toBeNull();
       expect(result!.id).toBe(mockUser.id);
@@ -325,7 +317,7 @@ describe('UserRepository', () => {
     });
 
     it('should return null when Stripe customer ID not found', async () => {
-      testHelper.mockFindQuery(null);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findByStripeCustomerId('cus_nonexistent');
 
@@ -335,14 +327,14 @@ describe('UserRepository', () => {
 
   describe('updateStripeCustomerId', () => {
     it('should update user with Stripe customer ID', async () => {
-      testHelper.mockConnection.executeWrite.mockResolvedValue([]);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       await repository.updateStripeCustomerId('user-123', 'cus_123');
 
-      expect(testHelper.mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('MATCH (user:User {id: $userId})'), {
-        userId: 'user-123',
-        stripeCustomerId: 'cus_123',
-      });
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith(
+        'UPDATE users SET stripe_customer_id = $1, updated_at = NOW() WHERE id = $2',
+        ['cus_123', 'user-123']
+      );
     });
 
     it('should validate required parameters', async () => {
@@ -353,29 +345,30 @@ describe('UserRepository', () => {
 
   describe('error handling', () => {
     it('should handle database errors', async () => {
-      testHelper.mockDatabaseError();
+      testHelper.mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.findById('user-123')).rejects.toThrow(DatabaseError);
-      expect(testHelper.mockConnection.executeQuery).toHaveBeenCalled();
+      expect(testHelper.mockConnection.query).toHaveBeenCalled();
     });
 
     it('should handle unique constraint violations', async () => {
-      testHelper.mockConstraintError();
+      const constraintError = Object.assign(new Error('unique constraint violation'), { code: '23505' });
+      testHelper.mockConnection.query.mockRejectedValue(constraintError);
 
       const duplicateUser = {
         email: 'existing@example.com',
       };
 
       await expect(repository.create(duplicateUser)).rejects.toThrow(ConflictError);
-      expect(testHelper.mockConnection.executeWrite).toHaveBeenCalled();
+      expect(testHelper.mockConnection.query).toHaveBeenCalled();
     });
 
     it('should handle query timeout errors', async () => {
       const timeoutError = new Error('QueryTimeout');
-      testHelper.mockConnection.executeQuery.mockRejectedValue(timeoutError);
+      testHelper.mockConnection.query.mockRejectedValue(timeoutError);
 
       await expect(repository.findAll()).rejects.toThrow(DatabaseError);
-      expect(testHelper.mockConnection.executeQuery).toHaveBeenCalled();
+      expect(testHelper.mockConnection.query).toHaveBeenCalled();
     });
   });
 
@@ -386,7 +379,7 @@ describe('UserRepository', () => {
         displayName: 'New User',
       };
 
-      testHelper.mockFindQuery(null, 'u');
+      testHelper.mockConnection.query.mockResolvedValueOnce([]);
 
       const mockTimestamp = new Date().toISOString();
       const createdUser = {
@@ -394,7 +387,7 @@ describe('UserRepository', () => {
         id: 'generated-test-id-123',
         createdAt: mockTimestamp,
       };
-      testHelper.mockMergeWrite(createdUser);
+      testHelper.mockConnection.query.mockResolvedValueOnce([createdUser]);
 
       const existingUser = await repository.findByEmail(userData.email);
       expect(existingUser).toBeNull();
@@ -425,7 +418,7 @@ describe('UserRepository', () => {
         updatedAt: mockTimestamp,
       };
 
-      testHelper.mockUpdateWrite(updatedUser, 'u');
+      testHelper.mockConnection.query.mockResolvedValue([updatedUser]);
 
       const result = await repository.update(userId, updates);
 
@@ -438,12 +431,12 @@ describe('UserRepository', () => {
     it('should handle user deletion flow', async () => {
       const userId = 'user-to-delete';
 
-      testHelper.mockDeleteWrite(true);
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 1 } as unknown as unknown[]);
 
       const deleted = await repository.delete(userId);
 
       expect(deleted).toBe(true);
-      expect(testHelper.mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE'), { id: userId });
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('DELETE FROM users WHERE id = $1', [userId]);
     });
   });
 });

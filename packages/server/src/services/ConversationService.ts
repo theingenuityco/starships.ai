@@ -57,42 +57,6 @@ export class ConversationService {
   }
 
   /**
-   * Best-effort parser for tool_call function.arguments into JSON
-   * - Handles already-object input
-   * - Handles quoted/double-encoded JSON strings
-   * - Returns undefined when parsing fails
-   */
-  private parseToolArguments(raw: unknown): Record<string, unknown> | undefined {
-    try {
-      if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
-      if (typeof raw !== 'string') return undefined;
-      let s = raw.replace(/\r/g, '').trim();
-      for (let i = 0; i < 3; i++) {
-        const first = s[0];
-        const last = s[s.length - 1];
-        if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-          s = s.slice(1, -1);
-        }
-        try {
-          const parsed = JSON.parse(s);
-          if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
-        } catch {
-          /* ignore */
-        }
-      }
-      try {
-        const parsed = JSON.parse(s);
-        if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>;
-      } catch {
-        /* ignore */
-      }
-      return undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /**
    * Create a new conversation
    */
   async createConversation(
@@ -459,36 +423,6 @@ export class ConversationService {
               return '';
             }
           };
-          // Best-effort parser for tool_call function.arguments into JSON
-          const tryParseToolArgs = (raw: any): any => {
-            try {
-              if (raw && typeof raw === 'object') return raw;
-              if (typeof raw !== 'string') return undefined;
-              let s = raw.replace(/\r/g, '').trim();
-              for (let i = 0; i < 3; i++) {
-                const first = s[0];
-                const last = s[s.length - 1];
-                if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
-                  s = s.slice(1, -1);
-                }
-                try {
-                  const parsed = JSON.parse(s);
-                  if (parsed && typeof parsed === 'object') return parsed;
-                } catch {
-                  /* ignore */
-                }
-              }
-              try {
-                const parsed = JSON.parse(s);
-                if (parsed && typeof parsed === 'object') return parsed;
-              } catch {
-                /* ignore */
-              }
-              return undefined;
-            } catch {
-              return undefined;
-            }
-          };
           const reasoningFromDelta = extractReasoning(delta);
           const reasoningFromMessage = extractReasoning(messageNode);
           const hasReasoning =
@@ -610,34 +544,51 @@ export class ConversationService {
 
                   // Ensure slot only for the referenced index; do not pre-fill earlier indices
                   if (!acc[idx]) {
-                    acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
+                    acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: {} } };
                   }
 
                   const target = acc[idx];
                   if (rawTc?.id) target.id = rawTc.id;
                   if (rawTc?.function?.name) target.function.name = rawTc.function.name;
+
+                  // Parse arguments string from LLM into object immediately
                   if (typeof rawTc?.function?.arguments === 'string') {
-                    target.function.arguments = (target.function.arguments || '') + rawTc.function.arguments;
+                    const argsStr = (target.function.arguments as any) || '';
+                    const newArgsStr = argsStr + rawTc.function.arguments;
+                    try {
+                      target.function.arguments = JSON.parse(newArgsStr);
+                    } catch {
+                      // Keep accumulating until we get valid JSON
+                      (target.function as any).arguments = newArgsStr;
+                    }
                   }
                 }
 
                 this.streamingToolCalls.set(conversationId, acc);
 
                 // Only broadcast valid tool calls (those with a non-empty function name)
+                // Parse arguments string into object immediately
                 const toolCallsValue = acc
                   .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
-                  .map((tc) => ({
-                    id: tc.id,
-                    type: 'function',
-                    function: {
-                      name: tc.function.name,
-                      arguments: tc.function?.arguments || '',
-                      ...(() => {
-                        const obj = this.parseToolArguments(tc.function?.arguments);
-                        return obj && typeof obj === 'object' ? { arguments_json: obj } : {};
-                      })(),
-                    },
-                  }));
+                  .map((tc) => {
+                    const argsStr = tc.function?.arguments || '';
+                    let argsObj: unknown = {};
+                    if (argsStr) {
+                      try {
+                        argsObj = JSON.parse(argsStr);
+                      } catch {
+                        argsObj = {};
+                      }
+                    }
+                    return {
+                      id: tc.id,
+                      type: 'function',
+                      function: {
+                        name: tc.function.name,
+                        arguments: argsObj, // Store as parsed object
+                      },
+                    };
+                  });
 
                 await this.streamingService.broadcastDelta(conversationId, {
                   op: 'replace',
@@ -646,16 +597,23 @@ export class ConversationService {
                 });
               } else if (toolCallsFromMessage.length > 0) {
                 // Snapshot tool_calls from message node (no incremental indices)
+                // Parse arguments immediately into objects
                 const normalized = toolCallsFromMessage.map((tc: any) => {
-                  const args = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
-                  const obj = this.parseToolArguments(args);
+                  const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
+                  let argsObj: unknown = {};
+                  if (argsStr) {
+                    try {
+                      argsObj = JSON.parse(argsStr);
+                    } catch {
+                      argsObj = {};
+                    }
+                  }
                   return {
                     id: tc?.id,
                     type: 'function',
                     function: {
                       name: tc?.function?.name,
-                      arguments: args,
-                      ...(obj && typeof obj === 'object' ? { arguments_json: obj } : {}),
+                      arguments: argsObj, // Store as parsed object
                     },
                   };
                 });
@@ -751,31 +709,16 @@ export class ConversationService {
             (finalReasoning && finalReasoning.trim().length > 0)
           ) {
             try {
-              // Build tool_calls with proper argument parsing for PostgreSQL JSONB
-              // JSONB can store nested objects, so parse the arguments string into an actual object
+              // validToolCalls already have parsed arguments from streaming accumulation
+              // Just pass them through for database storage
               const toolCallsForDb = validToolCalls.map((tc) => {
-                let args = tc.function?.arguments || '';
-
-                // Parse arguments string into actual object for JSONB storage
-                // This prevents double-encoding issues (string -> JSON string -> escaped string)
-                let argsObject: unknown = {};
-
-                if (!args || args.trim() === '' || args === '""' || args === "''") {
-                  argsObject = {};
-                } else {
-                  try {
-                    argsObject = JSON.parse(args);
-                  } catch {
-                    console.warn('[STREAMING] Invalid tool_call arguments, using empty object:', args);
-                    argsObject = {};
-                  }
-                }
+                // Arguments are already parsed objects from streaming accumulation
+                const argsObj = tc.function?.arguments ?? {};
 
                 // Log for debugging
                 console.log('[DEBUG] Tool call before DB insert:', {
                   toolName: tc.function.name,
-                  rawArgumentsString: tc.function?.arguments,
-                  parsedArgumentsObject: argsObject,
+                  arguments: argsObj,
                 });
 
                 return {
@@ -783,8 +726,7 @@ export class ConversationService {
                   type: 'function' as const,
                   function: {
                     name: tc.function.name,
-                    // Store as parsed object - JSONB handles nested objects without double-encoding
-                    arguments: argsObject,
+                    arguments: argsObj, // Already a parsed object
                   },
                 };
               });

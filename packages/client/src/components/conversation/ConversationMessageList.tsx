@@ -79,7 +79,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
         }
       }
 
-      // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or tool_calls).
+      // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or toolCalls).
       // Preserve if it's actively streaming (so caret can show) and only drop if non-streaming.
       if (cur?.role === 'assistant' && !(typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-'))) {
         const streaming = Boolean((cur as any)?.streaming)
@@ -161,8 +161,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       }
     }
 
-    // UI guard: drop blank assistant shells (no content/chunks/reasoning and no tool_calls).
-    // NOTE: Do NOT treat toolResults alone as renderable; without tool_calls the tool panel won't show.
+    // UI guard: drop blank assistant shells (no content/chunks/reasoning and no toolCalls).
+    // NOTE: Do NOT treat toolResults alone as renderable; without toolCalls the tool panel won't show.
     const pruned = groupedMessages.filter(msg => {
       if (msg.role !== 'assistant' || msg.messageType === 'tool_result') return true
       const a: any = msg as any

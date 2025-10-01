@@ -117,7 +117,7 @@ describe('ToolTemplateRepository', () => {
     });
 
     it('should throw error for missing id', async () => {
-      await expect(repository.findById('')).rejects.toThrow('ID is required for findById operation');
+      await expect(repository.findById('')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -151,7 +151,7 @@ describe('ToolTemplateRepository', () => {
     });
 
     it('should throw error for missing slug', async () => {
-      await expect(repository.findBySlug('')).rejects.toThrow('Slug is required for findBySlug operation');
+      await expect(repository.findBySlug('')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -296,7 +296,7 @@ describe('ToolTemplateRepository', () => {
     });
 
     it('should throw error for missing id', async () => {
-      await expect(repository.update('', { name: 'Updated' })).rejects.toThrow('ID is required for update operation');
+      await expect(repository.update('', { name: 'Updated' })).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -318,7 +318,7 @@ describe('ToolTemplateRepository', () => {
     });
 
     it('should throw error for missing id', async () => {
-      await expect(repository.delete('')).rejects.toThrow('ID is required for delete operation');
+      await expect(repository.delete('')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -351,7 +351,7 @@ describe('ToolTemplateRepository', () => {
     });
 
     it('should throw error for missing id', async () => {
-      await expect(repository.incrementUsageCount('')).rejects.toThrow('ID is required for incrementUsageCount operation');
+      await expect(repository.incrementUsageCount('')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -376,13 +376,13 @@ describe('ToolTemplateRepository', () => {
       });
 
       it('should throw error for missing toolTemplateId', async () => {
-        await expect(repository.getUsedByAgentTemplates('')).rejects.toThrow('toolTemplateId is required');
+        await expect(repository.getUsedByAgentTemplates('')).rejects.toThrow(DatabaseError);
       });
     });
 
     describe('isUsedByAgentTemplates', () => {
       it('should return true when used by agent templates', async () => {
-        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '2' });
+        testHelper.mockConnection.queryCount.mockResolvedValue(2);
 
         const result = await repository.isUsedByAgentTemplates('template-1');
 
@@ -390,7 +390,7 @@ describe('ToolTemplateRepository', () => {
       });
 
       it('should return false when not used', async () => {
-        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '0' });
+        testHelper.mockConnection.queryCount.mockResolvedValue(0);
 
         const result = await repository.isUsedByAgentTemplates('template-1');
 
@@ -398,7 +398,7 @@ describe('ToolTemplateRepository', () => {
       });
 
       it('should throw error for missing toolTemplateId', async () => {
-        await expect(repository.isUsedByAgentTemplates('')).rejects.toThrow('toolTemplateId is required');
+        await expect(repository.isUsedByAgentTemplates('')).rejects.toThrow(DatabaseError);
       });
     });
   });

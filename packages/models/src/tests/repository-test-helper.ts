@@ -8,12 +8,14 @@ export class RepositoryTestHelper {
   public mockConnection: {
     query: jest.Mock;
     queryOne: jest.Mock;
+    queryCount: jest.Mock;
   };
 
   constructor() {
     this.mockConnection = {
       query: jest.fn(),
       queryOne: jest.fn(),
+      queryCount: jest.fn(),
     };
 
     // Mock getConnection to always return our mock
@@ -23,8 +25,10 @@ export class RepositoryTestHelper {
   reset() {
     this.mockConnection.query.mockClear();
     this.mockConnection.queryOne.mockClear();
+    this.mockConnection.queryCount.mockClear();
     this.mockConnection.query.mockResolvedValue([]);
     this.mockConnection.queryOne.mockResolvedValue(null);
+    this.mockConnection.queryCount.mockResolvedValue(0);
   }
 
   // Mock patterns for different repository operations
@@ -74,5 +78,6 @@ export class RepositoryTestHelper {
   mockDatabaseError() {
     this.mockConnection.query.mockRejectedValue(new Error('Database error'));
     this.mockConnection.queryOne.mockRejectedValue(new Error('Database error'));
+    this.mockConnection.queryCount.mockRejectedValue(new Error('Database error'));
   }
 }

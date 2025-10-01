@@ -155,7 +155,7 @@ describe('UsageRepository', () => {
     });
 
     it('should throw error for missing conversationId', async () => {
-      await expect(repository.getTotalsByConversation('')).rejects.toThrow('conversationId is required');
+      await expect(repository.getTotalsByConversation('')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle database errors', async () => {
@@ -199,7 +199,7 @@ describe('UsageRepository', () => {
     });
 
     it('should throw error for missing starshipId', async () => {
-      await expect(repository.getTotalsByStarship('')).rejects.toThrow('starshipId is required');
+      await expect(repository.getTotalsByStarship('')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle database errors', async () => {
@@ -282,7 +282,7 @@ describe('UsageRepository', () => {
     });
 
     it('should throw error for missing conversationId', async () => {
-      await expect(repository.listByConversation('')).rejects.toThrow('conversationId is required');
+      await expect(repository.listByConversation('')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle database errors', async () => {

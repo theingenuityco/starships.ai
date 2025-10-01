@@ -144,11 +144,7 @@ export class Agent implements NodeHandler {
               {
                 operation: 'add' as const,
                 path: '/state/messages/-',
-                value: {
-                  role: 'tool',
-                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
-                  content: `{{ JSON.stringify($lastOutputOf("${toolNodeRef}")[0]?.json ?? {}) }}`,
-                },
+                value: `{{ { role: "tool", tool_call_id: $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "", content: JSON.stringify($lastOutputOf("${toolNodeRef}")[0]?.json ?? {}) } }}`,
               },
             ],
           },

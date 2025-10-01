@@ -103,8 +103,8 @@ export class MessageEntity implements MessageModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        starshipId: dataRecord.starshipId || '',
-        conversationId: dataRecord.conversationId || '',
+        starshipId: dataRecord.starshipId || 'temp-starship-id', // Temp value for validation
+        conversationId: dataRecord.conversationId || 'temp-conversation-id', // Temp value for validation
         role: dataRecord.role, // Don't provide defaults during validation
         content: dataRecord.content, // Don't provide defaults during validation
         messageType: dataRecord.messageType, // Don't provide defaults during validation

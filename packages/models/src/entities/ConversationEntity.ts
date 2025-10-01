@@ -61,7 +61,7 @@ export class ConversationEntity implements ConversationModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt,
-        starshipId: dataRecord.starshipId || '',
+        starshipId: dataRecord.starshipId || 'temp-starship-id', // Temp value for validation
         title: dataRecord.title, // Don't provide default during validation
         status: dataRecord.status || 'active',
         ...dataRecord,

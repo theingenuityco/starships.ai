@@ -85,13 +85,6 @@ export class LLM extends BaseNode<LlmParams> {
       );
     }
 
-    console.log('[DEBUG LLM.execute] starting', {
-      hasInput: !!input,
-      inputLength: input?.length,
-      hasMessages: !!params.messages,
-      messagesLength: Array.isArray(params.messages) ? params.messages.length : 'not-array',
-    });
-
     try {
       // Use input data as user message if no explicit messages provided
       let messages = params.messages;
@@ -130,8 +123,6 @@ export class LLM extends BaseNode<LlmParams> {
         (requestBody as { reasoning?: unknown }).reasoning = params.reasoning as unknown;
       }
 
-      console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
-
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -168,7 +159,6 @@ export class LLM extends BaseNode<LlmParams> {
       }
 
       const llmResponse = await this.processStreamingResponse(reader);
-      console.log('<<RESPONSE<< ', JSON.stringify(llmResponse, null, 2));
       return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
       throw this.handleExecutionError(error, 'LLM execution failed');
@@ -266,11 +256,6 @@ export class LLM extends BaseNode<LlmParams> {
       }
 
       const final = this.buildFinalResponse(responseMetadata, choices, usage);
-      console.log('[DEBUG LLM.processStreamingResponse] final', {
-        model: final.model,
-        finishReason: final.choices?.[0]?.finishReason,
-        hasToolCalls: Array.isArray(final.choices?.[0]?.message?.toolCalls) && final.choices?.[0]?.message?.toolCalls?.length > 0,
-      });
       return final;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';

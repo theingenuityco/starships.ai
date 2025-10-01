@@ -90,12 +90,6 @@ export class Tool extends BaseNode<ToolParams> {
         });
       }
 
-      console.log('[DEBUG Tool.execute] complete', {
-        name: params.name,
-        toolCallId: params.toolCallId,
-        depth: eventDepth,
-        resultType: typeof result,
-      });
       return ExecutionItemUtils.wrapSingle(result, input?.[0]);
     } catch (error) {
       // Emit tool_complete event with error and structured result payload for consumers

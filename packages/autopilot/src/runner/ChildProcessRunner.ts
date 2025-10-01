@@ -76,13 +76,6 @@ export class ChildProcessRunner implements Runner {
       serialization: 'advanced',
     });
 
-    console.log('🚀 [CHILD-PROCESS-RUNNER] Starting execution in child process:', {
-      pid: child.pid,
-      memoryLimitMB: this.options?.memoryLimitMB || 'unlimited',
-      timeoutMs: this.options?.timeoutMs || 'no timeout',
-      execArgv: execArgv.length ? execArgv : 'none',
-    });
-
     return await new Promise<ExecutionItem[]>((resolvePromise, rejectPromise) => {
       let settled = false;
       let killTimer: ReturnType<typeof setTimeout> | undefined;

@@ -7,7 +7,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
 function createDaedalusBlueprint(): Blueprint {
   const agent = new Agent({
     name: 'Daedalus Toolwright',
-    model: 'anthropic/claude-sonnet-4',
+    model: 'openai/gpt-5',
     // Using system defaults for temperature and maxTokens
   });
 

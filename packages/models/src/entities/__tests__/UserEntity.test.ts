@@ -120,11 +120,11 @@ describe('UserEntity (no-username)', () => {
       expect(serialized).toEqual({
         id: 'user-123',
         email: 'test@example.com',
-        displayName: 'Test User',
+        display_name: 'Test User',
         avatar: 'https://example.com/avatar.jpg',
         password: 'securepassword123',
-        stripeCustomerId: 'cus_123456789',
-        createdAt: '2024-01-01T00:00:00.000Z',
+        stripe_customer_id: 'cus_123456789',
+        created_at: '2024-01-01T00:00:00.000Z',
       });
     });
 
@@ -136,10 +136,10 @@ describe('UserEntity (no-username)', () => {
       const serialized = toDatabase(user);
 
       expect(serialized.email).toBeUndefined();
-      expect(serialized.displayName).toBeUndefined();
+      expect(serialized.display_name).toBeUndefined();
       expect(serialized.avatar).toBeUndefined();
       expect(serialized.password).toBeUndefined();
-      expect(serialized.stripeCustomerId).toBeUndefined();
+      expect(serialized.stripe_customer_id).toBeUndefined();
     });
   });
 

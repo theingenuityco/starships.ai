@@ -1,61 +1,46 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
-import type { ApiResponse } from '@starships/protocol'
+import type { OpenRouterModel, OpenRouterModelsResponse } from '@starships/protocol'
 
-// Types for OpenRouter models response
-export interface OpenRouterModel {
-  id: string
-  canonical_slug?: string
-  name?: string
-  description?: string
-  context_length?: number
-  architecture?: {
-    modality?: string
-    input_modalities?: string[]
-    output_modalities?: string[]
-    tokenizer?: string | null
-    instruct_type?: string | null
-  }
-  pricing?: {
-    prompt?: string
-    completion?: string
-    request?: string
-    image?: string
-    web_search?: string
-    internal_reasoning?: string
-    input_cache_read?: string
-    input_cache_write?: string
-  }
-  top_provider?: {
-    context_length?: number
-    max_completion_tokens?: number | null
-    is_moderated?: boolean
-  } | null
-  per_request_limits?: Record<string, unknown> | null
-  supported_parameters?: string[]
-}
+/** Cache TTLs */
+const OPENROUTER_MODELS_STALE_MS = 6 * 60 * 60 * 1000 // 6h
+const OPENROUTER_MODELS_GC_MS = 24 * 60 * 60 * 1000 // 24h
 
-type OpenRouterModelsResponse = ApiResponse<OpenRouterModel[]>
-
-// Fetch OpenRouter models catalog (public endpoint)
+/**
+ * Fetch OpenRouter models via server proxy (uses OpenRouter /api/v1/models/user).
+ * Returns an empty array on unexpected shapes (and logs a warning) instead of throwing.
+ */
 async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
-  // Server proxy uses OpenRouter: GET /api/v1/models/user (Provider Preferences)
   const res = await api.get<OpenRouterModelsResponse>('/api/v1/openrouter/models')
-  const data = res.data.data
-  return Array.isArray(data) ? data : []
+
+  // Explicit guards against undefined/null shapes
+  const payload = res?.data
+  const models = payload && Array.isArray(payload.data) ? payload.data : undefined
+
+  if (!models) {
+    console.warn('[openrouter] Unexpected /models response shape:', payload)
+    return []
+  }
+
+  return models
 }
 
-// Hook to cache models catalog
+/**
+ * Cache-aware hook for the OpenRouter model catalog (filtered by account Provider Preferences).
+ */
 export function useOpenRouterModels() {
   return useQuery({
     queryKey: ['openrouter', 'models'],
     queryFn: () => fetchOpenRouterModels(),
-    staleTime: 6 * 60 * 60 * 1000, // 6 hours
-    gcTime: 24 * 60 * 60 * 1000, // 24 hours
+    staleTime: OPENROUTER_MODELS_STALE_MS,
+    gcTime: OPENROUTER_MODELS_GC_MS,
   })
 }
 
-// Exact match only: require canonical OpenRouter IDs
+/**
+ * Find a model by exact OpenRouter slug.
+ * Matches against id or canonical_slug (e.g., "openai/gpt-4o-mini").
+ */
 export function findMatchingModel(models: OpenRouterModel[], rawId: string | null | undefined): OpenRouterModel | null {
   if (!rawId) return null
   const id = rawId.trim()
@@ -63,6 +48,10 @@ export function findMatchingModel(models: OpenRouterModel[], rawId: string | nul
   return models.find(m => m.id === id || m.canonical_slug === id) || null
 }
 
+/**
+ * Resolve the effective context window for a model.
+ * Prefers provider-specific context_length (top_provider) and falls back to model-level context_length.
+ */
 export function getModelContextLength(model: OpenRouterModel | null | undefined): number | undefined {
   if (!model) return undefined
   const providerCtx = model.top_provider?.context_length

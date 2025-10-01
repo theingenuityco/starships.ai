@@ -228,6 +228,13 @@ export class Engine {
       const visits = (execution.visitCounts[currentNode.ref] || 0) + 1;
       execution.visitCounts[currentNode.ref] = visits;
 
+      console.log('[DEBUG Engine.executeLoop] iteration_start', {
+        node: currentNode?.ref,
+        type: currentNode?.type,
+        visits,
+        status: execution.status,
+      });
+
       if (visits > config.MAX_NODE_VISITS) {
         execution.status = 'completed';
         await this.emitEvent('workflow_completed', execution);
@@ -238,6 +245,7 @@ export class Engine {
         const incomingEdge = blueprint.edges.find((edge) => edge.to === currentNode!.ref);
         execution.currentNodeInputRef = incomingEdge?.from;
 
+        console.log('[DEBUG Engine.executeLoop] before_execute_node', { node: currentNode?.ref });
         await this.executeNode(currentNode, execution);
         console.log('[DEBUG Engine.executeLoop] node_completed', {
           node: currentNode?.ref,
@@ -354,12 +362,23 @@ export class Engine {
 
   async executeNode(currentNode: Node, execution: Execution): Promise<ExecutionItem[]> {
     execution.currentNodeRef = currentNode.ref;
+    console.log('[DEBUG Engine.executeNode] starting', {
+      nodeRef: currentNode.ref,
+      nodeType: currentNode.type,
+      hasParameters: !!currentNode.parameters,
+    });
     await this.emitEvent('node_started', execution);
 
     try {
       // Get input items for current node
       const initialInputItems = this.findNodeResult(execution, '__initial__');
       const nodeInputItems = currentNode.type === 'start' && initialInputItems ? initialInputItems : this.getNodeInput(execution);
+
+      console.log('[DEBUG Engine.executeNode] got_input', {
+        nodeRef: currentNode.ref,
+        hasInput: !!nodeInputItems,
+        inputLength: nodeInputItems?.length,
+      });
 
       // Resolve node parameters with templates (exclude inline fields until after execution)
       const inputData = ExecutionItemUtils.unwrapSingle(nodeInputItems);
@@ -403,10 +422,26 @@ export class Engine {
       let processedInputItems = nodeInputItems;
 
       // Execute the handler first (inline transforms will run after on the output)
-      let outputItems = await handler.execute(processedInputItems);
+      console.log('[DEBUG Engine.executeNode] executing_handler', { nodeRef: currentNode.ref });
+      let outputItems: ExecutionItem[];
+      try {
+        outputItems = await handler.execute(processedInputItems);
+        console.log('[DEBUG Engine.executeNode] handler_complete', {
+          nodeRef: currentNode.ref,
+          outputLength: outputItems?.length,
+        });
+      } catch (error) {
+        console.error('[ERROR Engine.executeNode] handler_failed', {
+          nodeRef: currentNode.ref,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        throw error;
+      }
 
       // Record primary node output immediately (as a normal node result)
       execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
+      console.log('[DEBUG Engine.executeNode] recorded_output', { nodeRef: currentNode.ref });
 
       // Execute inline transforms AFTER handler if present, transforming the node output.
       // IMPORTANT: Skip when the current node IS the dedicated transform node to avoid double-processing.
@@ -417,7 +452,20 @@ export class Engine {
       // Execute inline mutations if present (mutations can use lastOutputOf/current state).
       // IMPORTANT: Skip when the current node IS the dedicated mutate node to avoid double-processing.
       if (inlineParams?.mutations?.length && currentNode.type !== 'mutate') {
-        await this.executeInlineMutate(inlineParams.mutations, execution);
+        console.log('[DEBUG Engine.executeNode] executing_inline_mutations', {
+          nodeRef: currentNode.ref,
+          mutationCount: inlineParams.mutations.length,
+        });
+        try {
+          await this.executeInlineMutate(inlineParams.mutations, execution);
+          console.log('[DEBUG Engine.executeNode] inline_mutations_complete', { nodeRef: currentNode.ref });
+        } catch (error) {
+          console.error('[ERROR Engine.executeNode] inline_mutations_failed', {
+            nodeRef: currentNode.ref,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
+        }
         // Mutations modify state; keep primary output as-is unless you intend otherwise
         // Optionally, could attach mutate result to primary result if desired
       }

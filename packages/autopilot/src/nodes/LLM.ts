@@ -85,6 +85,13 @@ export class LLM extends BaseNode<LlmParams> {
       );
     }
 
+    console.log('[DEBUG LLM.execute] starting', {
+      hasInput: !!input,
+      inputLength: input?.length,
+      hasMessages: !!params.messages,
+      messagesLength: Array.isArray(params.messages) ? params.messages.length : 'not-array',
+    });
+
     try {
       // Use input data as user message if no explicit messages provided
       let messages = params.messages;
@@ -123,7 +130,7 @@ export class LLM extends BaseNode<LlmParams> {
         (requestBody as { reasoning?: unknown }).reasoning = params.reasoning as unknown;
       }
 
-      // console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
+      console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -135,7 +142,14 @@ export class LLM extends BaseNode<LlmParams> {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorBody = await response.text();
+        console.error('[LLM HTTP ERROR]', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          requestMessages: requestBody.messages,
+        });
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorBody}`);
       }
 
       // Usage accounting (if present) is handled via SSE usage payload from the provider

@@ -85,11 +85,36 @@ export class Agent implements NodeHandler {
             ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
             ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
             ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
+            // Append assistant in OpenRouter-compliant format:
+            // - Convert camelCase toolCalls -> snake_case tool_calls
+            // - Ensure function.arguments is a JSON string (per OpenRouter docs Step 3)
             mutations: [
               {
                 operation: 'add' as const,
                 path: '/state/messages/-',
-                value: '{{ $lastOutputOf("' + llmNodeRef + '")[0].json.choices[0].message }}',
+                value: `{{ (() => {
+                  const msg = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message ?? {};
+                  const content = typeof msg.content === "string" ? msg.content : "";
+                  const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+                  if (calls.length > 0) {
+                    const tool_calls = calls.map(tc => ({
+                      id: tc?.id ?? "",
+                      type: "function",
+                      function: {
+                        name: tc?.function?.name ?? "",
+                        arguments: (() => {
+                          try {
+                            const a = tc?.function?.arguments;
+                            if (typeof a === "string") return a;
+                            return JSON.stringify(a ?? {});
+                          } catch { return "{}"; }
+                        })()
+                      }
+                    }));
+                    return { role: "assistant", content, tool_calls };
+                  }
+                  return { role: "assistant", content };
+                })() }}`,
               },
             ],
           },
@@ -120,7 +145,8 @@ export class Agent implements NodeHandler {
           parameters: {
             code: `
               const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
+              let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
+              if (typeof j === 'string') { try { j = JSON.parse(j); } catch {} }
               if (j && typeof j === 'object') { return j; }
               throw new Error('Missing toolCall function.arguments');
             `,

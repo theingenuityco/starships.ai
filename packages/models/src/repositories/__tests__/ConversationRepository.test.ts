@@ -12,8 +12,8 @@ type CreateConversationData = Conversation & { starshipId: string; agentId?: str
 // Mock the database connection only
 jest.mock('../../helpers/database', () => ({
   getConnection: jest.fn(() => ({
-    executeQuery: jest.fn(),
-    executeWrite: jest.fn(),
+    query: jest.fn(),
+    queryOne: jest.fn(),
   })),
 }));
 
@@ -36,14 +36,14 @@ describe('ConversationRepository', () => {
   });
   let repository: ConversationRepository;
   let mockConnection: {
-    executeQuery: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
-    executeWrite: jest.MockedFunction<(query: string, params?: Record<string, unknown>) => Promise<unknown[]>>;
+    query: jest.Mock;
+    queryOne: jest.Mock;
   };
 
   beforeEach(() => {
     mockConnection = {
-      executeQuery: jest.fn(),
-      executeWrite: jest.fn(),
+      query: jest.fn(),
+      queryOne: jest.fn(),
     };
     (getConnection as jest.Mock).mockReturnValue(mockConnection);
     repository = new ConversationRepository();
@@ -63,18 +63,18 @@ describe('ConversationRepository', () => {
         createMockConversation({ id: 'conv-2', status: 'completed' }),
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([{ c: mockConversations[0] }, { c: mockConversations[1] }]);
+      mockConnection.query.mockResolvedValue(mockConversations);
 
       const result = await repository.findAll();
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (c:Conversation) RETURN c ORDER BY c.createdAt DESC');
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM conversations ORDER BY created_at DESC');
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual(expect.objectContaining({ id: 'conv-1', status: 'active' }));
       expect(result[1]).toEqual(expect.objectContaining({ id: 'conv-2', status: 'completed' }));
     });
 
     it('should return empty array when no conversations found', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findAll();
 
@@ -82,7 +82,7 @@ describe('ConversationRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
+      mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.findAll()).rejects.toThrow();
     });
@@ -91,16 +91,16 @@ describe('ConversationRepository', () => {
   describe('findById', () => {
     it('should return conversation by ID', async () => {
       const mockConversation = createMockConversation();
-      mockConnection.executeQuery.mockResolvedValue([{ c: mockConversation }]);
+      mockConnection.query.mockResolvedValue([mockConversation]);
 
       const result = await repository.findById('conv-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (c:Conversation) WHERE c.id = $id RETURN c', { id: 'conv-123' });
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM conversations WHERE id = $1', ['conv-123']);
       expect(result).toEqual(expect.objectContaining({ id: 'conversation-123', status: 'active' }));
     });
 
     it('should return null when conversation not found', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findById('non-existent');
 
@@ -123,20 +123,11 @@ describe('ConversationRepository', () => {
         updatedAt: '2024-01-01T00:00:00.000Z',
       };
 
-      // Mock the createEntityWithAutoId method from BaseRepository
-      jest
-        .spyOn(
-          repository as unknown as {
-            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
-          },
-          'createEntityWithAutoId'
-        )
-        .mockResolvedValue(createdConversation);
-      jest.spyOn(repository, 'linkToStarship').mockResolvedValue(undefined);
+      mockConnection.query.mockResolvedValue([createdConversation]);
 
       const result = await repository.create(conversationData);
 
-      expect(repository.linkToStarship).toHaveBeenCalledWith(createdConversation.id, 'starship-123');
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO conversations'), expect.any(Array));
       // The result will be a ConversationEntity with proper date transformations
       expect(result).toMatchObject({
         id: 'test-nanoid-123',
@@ -189,32 +180,25 @@ describe('ConversationRepository', () => {
         ...updates,
       });
 
-      mockConnection.executeWrite.mockResolvedValue([{ c: updatedConversation }]);
+      mockConnection.query.mockResolvedValue([updatedConversation]);
 
       const result = await repository.update('conv-123', updates);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (c:Conversation) WHERE c.id = $id'),
-        expect.objectContaining({
-          id: 'conv-123',
-          status: 'completed',
-        })
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE conversations'), expect.any(Array));
       expect(result).toEqual(expect.objectContaining({ id: 'conv-123', status: 'completed' }));
     });
 
     it('should return existing conversation when no updates provided', async () => {
       const existingConversation = createMockConversation({ id: 'conv-123' });
-      jest.spyOn(repository, 'findById').mockResolvedValue(existingConversation);
+      mockConnection.query.mockResolvedValue([existingConversation]);
 
       const result = await repository.update('conv-123', {});
 
-      expect(repository.findById).toHaveBeenCalledWith('conv-123');
-      expect(result).toEqual(existingConversation);
+      expect(result).toEqual(expect.objectContaining({ id: 'conv-123' }));
     });
 
     it('should throw NotFoundError when conversation does not exist', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       await expect(repository.update('non-existent', { status: 'completed' })).rejects.toThrow(NotFoundError);
     });
@@ -232,19 +216,16 @@ describe('ConversationRepository', () => {
 
   describe('delete', () => {
     it('should delete conversation successfully', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 1 }]);
+      mockConnection.query.mockResolvedValue({ rowCount: 1 } as unknown as unknown[]);
 
       const result = await repository.delete('conv-123');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (c:Conversation) WHERE c.id = $id DETACH DELETE c RETURN count(c) as deletedCount',
-        { id: 'conv-123' }
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith('DELETE FROM conversations WHERE id = $1', ['conv-123']);
       expect(result).toBe(true);
     });
 
     it('should return false when conversation does not exist', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 0 }]);
+      mockConnection.query.mockResolvedValue({ rowCount: 0 } as unknown as unknown[]);
 
       const result = await repository.delete('non-existent');
 
@@ -256,21 +237,20 @@ describe('ConversationRepository', () => {
     it('should return conversations for a specific starship', async () => {
       const mockConversations: ConversationModel[] = [createMockConversation({ id: 'conv-1' }), createMockConversation({ id: 'conv-2' })];
 
-      mockConnection.executeQuery.mockResolvedValue([{ c: mockConversations[0] }, { c: mockConversations[1] }]);
+      mockConnection.query.mockResolvedValue(mockConversations);
 
       const result = await repository.findByStarship('starship-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (starship:Starship {id: $starshipId})-[:HAS_CONVERSATION]->(c:Conversation)'),
-        { starshipId: 'starship-123' }
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM conversations WHERE starship_id = $1 ORDER BY created_at DESC', [
+        'starship-123',
+      ]);
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual(expect.objectContaining({ id: 'conv-1', status: 'active' }));
       expect(result[1]).toEqual(expect.objectContaining({ id: 'conv-2', status: 'active' }));
     });
 
     it('should return empty array when no conversations found for starship', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findByStarship('starship-123');
 
@@ -281,19 +261,16 @@ describe('ConversationRepository', () => {
   describe('getConversationStarship', () => {
     it('should return starship associated with conversation', async () => {
       const mockStarship = { id: 'starship-123', name: 'Test Starship', slug: 'test-starship' };
-      mockConnection.executeQuery.mockResolvedValue([{ starship: mockStarship }]);
+      mockConnection.queryOne.mockResolvedValue(mockStarship);
 
       const result = await repository.getConversationStarship('conv-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (starship:Starship)-[:HAS_CONVERSATION]->(c:Conversation {id: $conversationId})'),
-        { conversationId: 'conv-123' }
-      );
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(expect.stringContaining('SELECT s.* FROM starships s'), ['conv-123']);
       expect(result).toMatchObject(mockStarship);
     });
 
     it('should return null when conversation has no associated starship', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      mockConnection.queryOne.mockResolvedValue(null);
 
       const result = await repository.getConversationStarship('conv-123');
 
@@ -303,51 +280,39 @@ describe('ConversationRepository', () => {
 
   describe('linkToStarship', () => {
     it('should create relationship between conversation and starship', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       await repository.linkToStarship('conv-123', 'starship-456');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (s:Starship {id: $starshipId}), (conversation:Conversation {id: $conversationId})'),
-        {
-          starshipId: 'starship-456',
-          conversationId: 'conv-123',
-          key: 'starship-456_conv-123',
-        }
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith('UPDATE conversations SET starship_id = $1, updated_at = NOW() WHERE id = $2', [
+        'starship-456',
+        'conv-123',
+      ]);
     });
   });
 
   describe('unlinkFromStarship', () => {
     it('should remove relationship between conversation and starship', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       await repository.unlinkFromStarship('conv-123');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (s:Starship)-[r:HAS_CONVERSATION]->(conversation:Conversation {id: $conversationId})'),
-        { conversationId: 'conv-123' }
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith('UPDATE conversations SET starship_id = NULL, updated_at = NOW() WHERE id = $1', [
+        'conv-123',
+      ]);
     });
   });
 
   describe('error handling', () => {
     it('should handle database connection errors', async () => {
-      mockConnection.executeQuery.mockRejectedValue(new Error('Connection failed'));
+      mockConnection.query.mockRejectedValue(new Error('Connection failed'));
 
       await expect(repository.findById('conv-123')).rejects.toThrow();
     });
 
     it('should handle constraint violations during create', async () => {
-      const error = new Error('unique constraint violation');
-      jest
-        .spyOn(
-          repository as unknown as {
-            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
-          },
-          'createEntityWithAutoId'
-        )
-        .mockRejectedValue(error);
+      const error = Object.assign(new Error('unique constraint violation'), { code: '23505' });
+      mockConnection.query.mockRejectedValue(error);
 
       const conversationData = {
         starshipId: 'starship-123',
@@ -360,7 +325,7 @@ describe('ConversationRepository', () => {
 
     it('should handle query timeout errors', async () => {
       const timeoutError = new Error('Query timeout');
-      mockConnection.executeQuery.mockRejectedValue(timeoutError);
+      mockConnection.query.mockRejectedValue(timeoutError);
 
       await expect(repository.findAll()).rejects.toThrow();
     });
@@ -376,30 +341,20 @@ describe('ConversationRepository', () => {
 
       // Create conversation
       const createdConversation = createMockConversation(conversationData);
-      jest
-        .spyOn(
-          repository as unknown as {
-            createEntityWithAutoId: (nodeLabel: string, props: Record<string, unknown>) => Promise<ConversationModel>;
-          },
-          'createEntityWithAutoId'
-        )
-        .mockResolvedValue(createdConversation);
+      mockConnection.query.mockResolvedValue([createdConversation]);
 
       const newConversation = await repository.create(conversationData);
       expect(newConversation.status).toBe('active');
 
-      // The business logic methods (updateActivity, incrementMessageCount, etc.)
-      // have been moved to ConversationService and are no longer part of the repository
-      // But create() still calls linkToStarship which uses executeWrite once
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(1);
+      expect(mockConnection.query).toHaveBeenCalled();
     });
 
     it('should handle starship relationship operations', async () => {
       const conversationId = 'conv-123';
       const starshipId = 'starship-456';
 
-      mockConnection.executeWrite.mockResolvedValue([]);
-      mockConnection.executeQuery.mockResolvedValue([{ starship: { id: starshipId, name: 'Test', slug: 'test' } }]);
+      mockConnection.query.mockResolvedValue([]);
+      mockConnection.queryOne.mockResolvedValue({ id: starshipId, name: 'Test', slug: 'test' });
 
       // Link to starship
       await repository.linkToStarship(conversationId, starshipId);
@@ -411,19 +366,19 @@ describe('ConversationRepository', () => {
       // Unlink from starship
       await repository.unlinkFromStarship(conversationId);
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledTimes(2);
+      expect(mockConnection.query).toHaveBeenCalledTimes(2);
     });
 
     it('should handle conversation deletion with cascade', async () => {
       const conversationId = 'conv-to-delete';
 
-      // Mock successful deletion (DETACH DELETE handles cascading)
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 1 }]);
+      // Mock successful deletion
+      mockConnection.query.mockResolvedValue({ rowCount: 1 } as unknown as unknown[]);
 
       const success = await repository.delete(conversationId);
 
       expect(success).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE'), { id: conversationId });
+      expect(mockConnection.query).toHaveBeenCalledWith('DELETE FROM conversations WHERE id = $1', [conversationId]);
     });
   });
 });

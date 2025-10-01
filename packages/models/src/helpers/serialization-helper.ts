@@ -133,7 +133,11 @@ export function toDatabase(entity: unknown): Record<string, unknown> {
 
   // Use instanceToPlain to convert entity to plain object
   // Key: don't filter nested properties - PostgreSQL JSONB handles objects directly
-  const serialized = instanceToPlain(entity);
+  // exposeUnsetFields: false prevents undefined from being serialized
+  const serialized = instanceToPlain(entity, {
+    exposeUnsetFields: false,
+    enableCircularCheck: true,
+  });
 
   // Fail fast if serialization produces no result
   if (!serialized || typeof serialized !== 'object') {

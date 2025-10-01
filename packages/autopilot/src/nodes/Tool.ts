@@ -34,7 +34,6 @@ export class Tool extends BaseNode<ToolParams> {
       const params = this.getParams();
       inputData = ExecutionItemUtils.unwrapSingle(input);
 
-      console.log(`[TOOL-DEBUG] ${params.name} execution started`);
 
       // Check if this is the universal tool executor for parallel execution
       const isUniversalExecutor = params.name === 'universal_tool_executor';
@@ -368,7 +367,6 @@ export class Tool extends BaseNode<ToolParams> {
       summary: { total: 1, successful: 1, failed: 0, successRate: '100%' },
     });
 
-    console.log(`[TOOL-DEBUG] ${params.name} completed successfully`);
     return result;
   }
 
@@ -404,13 +402,6 @@ export class Tool extends BaseNode<ToolParams> {
         });
       }
     });
-
-    // Debug summary
-    try {
-      console.log(`[TOOL-DEBUG] Registry built: ${registry.size} tools -> ${JSON.stringify(Array.from(registry.keys()))}`);
-    } catch {
-      /* ignore logging errors */
-    }
 
     return registry;
   }

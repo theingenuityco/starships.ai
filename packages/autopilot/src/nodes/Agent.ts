@@ -93,7 +93,7 @@ export class Agent implements NodeHandler {
                   role: 'assistant',
                   content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
                   reasoning: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.reasoning }}`,
-                  tool_calls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.tool_calls }}`,
+                  toolCalls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.toolCalls }}`,
                 },
               },
             ],
@@ -113,7 +113,7 @@ export class Agent implements NodeHandler {
             // Use $input() (the LLM node output passed into this Conditional) to avoid cross-scope lookup issues.
             // Trimmed single-template string for full-only evaluation
             condition:
-              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.tool_calls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
+              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
           },
         },
         // Prepare arguments for Tool (materialize arguments_json as plain object)
@@ -125,9 +125,9 @@ export class Agent implements NodeHandler {
           parameters: {
             code: `
               const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const j = last?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments_json;
+              const j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments_json;
               if (j && typeof j === 'object') { return j; }
-              throw new Error('Missing tool_call function.arguments_json');
+              throw new Error('Missing toolCall function.arguments_json');
             `,
             timeout: 3000,
           },
@@ -140,19 +140,19 @@ export class Agent implements NodeHandler {
           description: 'Execute tool and add result to conversation',
           parameters: {
             // Resolve tool definition from state using the tool name from LLM response (normalized)
-            name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
-            description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
-            parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
-            blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
-            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
+            name: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.name ?? (norm ?? ""); })() }}`,
+            description: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.description ?? ("Tool '" + (norm ?? "unknown") + "' not found"); })() }}`,
+            parameters: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
+            blueprint: `{{ (() => { const calls = $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls; const rawName = calls?.[0]?.function?.name; const norm = typeof rawName === 'string' ? rawName.split('.').pop() : rawName; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.name === 'string' && t.name.toLowerCase() === String(norm ?? '').toLowerCase()); return tool?.blueprint; })() }}`,
+            toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
             mutations: [
               {
                 operation: 'add' as const,
                 path: '/state/messages/-',
                 value: {
                   role: 'tool',
-                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
-                  name: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.function?.name ?? "" }}`,
+                  toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
+                  name: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.function?.name ?? "" }}`,
                   content: `{{ JSON.stringify((() => { const _i = $lastOutputOf("${toolNodeRef}")[0]; const j = _i?.json; if (j !== undefined) { return j; } if (_i && _i.error !== undefined) { return { ok: false, error: _i.error }; } return {}; })()) }}`,
                 },
               },
@@ -162,11 +162,11 @@ export class Agent implements NodeHandler {
                 path: '/state/processedToolCalls',
                 value: `{{ Array.isArray(state?.processedToolCalls) ? state.processedToolCalls : [] }}`,
               },
-              // Track executed tool_call id to prevent re-executing the same call
+              // Track executed toolCall id to prevent re-executing the same call
               {
                 operation: 'add' as const,
                 path: '/state/processedToolCalls/-',
-                value: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.tool_calls?.[0]?.id ?? "" }}`,
+                value: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
               },
             ],
           },

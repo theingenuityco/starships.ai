@@ -31,7 +31,7 @@ export class ConversationService {
   private usageService: UsageService;
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
-  // Track accumulated tool_calls during streaming per conversation
+  // Track accumulated toolCalls during streaming per conversation
   private streamingToolCalls: Map<string, any[]> = new Map();
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
@@ -266,13 +266,13 @@ export class ConversationService {
         secureEnv,
       });
 
-      // Convert database messages to LLM format, preserving tool_calls and tool results
+      // Convert database messages to LLM format, preserving toolCalls and tool results
       const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
         ...(msg.reasoning && { reasoning: msg.reasoning }),
-        ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
-        ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
+        ...(msg.toolCalls && { toolCalls: msg.toolCalls }),
+        ...(msg.toolCallId && { toolCallId: msg.toolCallId }),
       }));
 
       // Prepare input for agent execution - Agent will handle memory state and ordering internally
@@ -355,8 +355,8 @@ export class ConversationService {
           const contentFromMessage = typeof messageNode?.content === 'string' ? messageNode.content : '';
           const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
 
-          const toolCallsFromDelta: any[] = Array.isArray(delta?.tool_calls) ? delta.tool_calls : [];
-          const toolCallsFromMessage: any[] = Array.isArray(messageNode?.tool_calls) ? messageNode.tool_calls : [];
+          const toolCallsFromDelta: any[] = Array.isArray(delta?.toolCalls) ? delta.toolCalls : [];
+          const toolCallsFromMessage: any[] = Array.isArray(messageNode?.toolCalls) ? messageNode.toolCalls : [];
           const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
           // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
@@ -428,13 +428,13 @@ export class ConversationService {
           const hasReasoning =
             (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
 
-          // Guard: if no active accumulator and we have content OR tool_calls OR reasoning, start a new placeholder stream.
+          // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
           // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
           if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
             if (this.streamingService.isActive(conversationId)) {
               // Acquire lock upfront to avoid race between parallel content_chunk events
               this.streamingContent.set(conversationId, '');
-              // Clear tool_calls accumulator for this new stream to prevent reuse from previous LLM calls
+              // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
               this.streamingToolCalls.delete(conversationId);
 
               const assistantMessage: MessageModel = {
@@ -454,7 +454,7 @@ export class ConversationService {
                   streaming: true,
                   chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
                   reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
-                  tool_calls: [], // Initialize empty tool_calls array for replace operations
+                  toolCalls: [], // Initialize empty toolCalls array for replace operations
                 },
               };
               await this.streamingService.broadcastDelta(conversationId, shell);
@@ -533,7 +533,7 @@ export class ConversationService {
             }
           }
 
-          // Process tool_calls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
+          // Process toolCalls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
           if (hasToolCalls) {
             try {
               if (toolCallsFromDelta.length > 0) {
@@ -584,11 +584,11 @@ export class ConversationService {
 
                 await this.streamingService.broadcastDelta(conversationId, {
                   op: 'replace',
-                  path: '/messages/-1/tool_calls',
+                  path: '/messages/-1/toolCalls',
                   value: toolCallsValue,
                 });
               } else if (toolCallsFromMessage.length > 0) {
-                // Snapshot tool_calls from message node (no incremental indices)
+                // Snapshot toolCalls from message node (no incremental indices)
                 // Parse arguments immediately into objects
                 const normalized = toolCallsFromMessage.map((tc: any) => {
                   const argsStr = typeof tc?.function?.arguments === 'string' ? tc.function.arguments : '';
@@ -615,12 +615,12 @@ export class ConversationService {
                 // Broadcast only valid entries (non-empty function name)
                 await this.streamingService.broadcastDelta(conversationId, {
                   op: 'replace',
-                  path: '/messages/-1/tool_calls',
+                  path: '/messages/-1/toolCalls',
                   value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
                 });
               }
             } catch (e) {
-              // ignore tool_call parse errors to avoid breaking streaming
+              // ignore toolCall parse errors to avoid breaking streaming
               console.warn('[STREAMING] Tool call processing error:', e);
             }
           }
@@ -694,7 +694,7 @@ export class ConversationService {
           // Content was already incrementally streamed to /messages/-1/content during chunks
 
           // Persist and patch id/updatedAt while placeholder is still active.
-          // Persist if we have content OR at least one valid tool_call (tool-only responses).
+          // Persist if we have content OR at least one valid toolCall (tool-only responses).
           if (
             (finalContent && finalContent.trim().length > 0) ||
             validToolCalls.length > 0 ||
@@ -738,7 +738,7 @@ export class ConversationService {
                 content: finalContent,
                 messageType: 'agent_response',
                 ...(finalReasoning && { reasoning: finalReasoning }),
-                ...(validToolCalls.length > 0 && { tool_calls: toolCallsForDb }),
+                ...(validToolCalls.length > 0 && { toolCalls: toolCallsForDb }),
               });
 
               await this.streamingService.broadcastDelta(conversationId, {
@@ -773,7 +773,7 @@ export class ConversationService {
               console.error('[STREAMING] Failed saving assistant message on content_complete:', persistError);
             }
           } else {
-            console.log('[STREAMING] Skipping persistence - empty content and no valid tool_calls');
+            console.log('[STREAMING] Skipping persistence - empty content and no valid toolCalls');
           }
 
           // Defer streaming=false and chunks removal to workflow_completed to avoid premature client close
@@ -901,7 +901,7 @@ export class ConversationService {
                 role: 'tool',
                 content: toolContent,
                 messageType: 'tool_result',
-                ...(toolEvt.data?.toolCallId ? { tool_call_id: toolEvt.data.toolCallId } : {}),
+                ...(toolEvt.data?.toolCallId ? { toolCallId: toolEvt.data.toolCallId } : {}),
               });
 
               console.log('[STREAMING] Successfully persisted tool result message:', toolResultMessage.id);

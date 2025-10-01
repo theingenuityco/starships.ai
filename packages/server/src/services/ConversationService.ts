@@ -566,29 +566,8 @@ export class ConversationService {
 
                 this.streamingToolCalls.set(conversationId, acc);
 
-                // Only broadcast valid tool calls (those with a non-empty function name)
-                // Parse arguments string into object immediately
-                const toolCallsValue = acc
-                  .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
-                  .map((tc) => {
-                    const argsStr = tc.function?.arguments || '';
-                    let argsObj: unknown = {};
-                    if (argsStr) {
-                      try {
-                        argsObj = JSON.parse(argsStr);
-                      } catch {
-                        argsObj = {};
-                      }
-                    }
-                    return {
-                      id: tc.id,
-                      type: 'function',
-                      function: {
-                        name: tc.function.name,
-                        arguments: argsObj, // Store as parsed object
-                      },
-                    };
-                  });
+                // Broadcast valid tool calls (already have parsed arguments from accumulation above)
+                const toolCallsValue = acc.filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0);
 
                 await this.streamingService.broadcastDelta(conversationId, {
                   op: 'replace',

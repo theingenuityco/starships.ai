@@ -33,6 +33,12 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
     return `$${v.toFixed(6)}`
   }
   const formatPerK = (v: number) => (v > 0 && v < 1e-6 ? `$${v.toFixed(9)}/1k` : `$${v.toFixed(6)}/1k`)
+  const formatCompactTokens = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  const formatPercent = (p: number) => {
+    const clamped = Math.max(0, Math.min(100, p))
+    const digits = clamped >= 10 ? 0 : 1
+    return `${clamped.toFixed(digits)}%`
+  }
 
   return (
     <div className={cn('sticky top-0 z-10 border-b border-border/50 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60', className)}>
@@ -55,8 +61,8 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
           <div className="flex items-center justify-between text-[11px] mb-2">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Token:</span>
-              <span className="text-foreground font-medium">
-                {formatTokens(total)} / {formatTokens(budgetTokens)} tokens used
+              <span className="text-foreground font-medium" title={`${formatTokens(total)} / ${formatTokens(budgetTokens)} tokens used`}>
+                {formatCompactTokens(total)} / {formatCompactTokens(budgetTokens)} tokens used ({formatPercent(pct)})
               </span>
             </div>
             <div className="hidden sm:flex items-center gap-3">

@@ -3,6 +3,8 @@
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateConversation, useConversationStreamed } from '@/hooks/useConversations'
+import { useConversationUsageTotals } from '@/hooks/useUsage'
+import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
@@ -47,6 +49,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Use streamedQuery-based conversation hook
     const { sendMessage: sendMessageFn, isSending, isResponding } = useConversationStreamed(conversationId ?? null)
     const isStreamingEffective = isResponding
+
+    // Usage and context control
+    const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
+    const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model || null)
+    const tokensUsed = Number(totalsData?.total_tokens ?? 0)
+    const contextLimit = Number(agentContextLength ?? 0)
+    const hardLimitActive = !!conversationId && contextLimit > 0
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
@@ -251,6 +260,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const getPlaceholder = () => {
       if (isStreamingEffective) return selectedAgent ? `${selectedAgent.name} is responding...` : 'AI is responding...'
       if (sending) return selectedAgent ? `${selectedAgent.name} is thinking...` : 'Thinking...'
+      if (hardLimitActive && tokensUsed >= contextLimit) return selectedAgent ? `Context limit reached for ${selectedAgent.name}` : 'Context limit reached'
       return selectedAgent ? `Ask ${selectedAgent.name}...` : 'Select an agent to start chatting'
     }
 

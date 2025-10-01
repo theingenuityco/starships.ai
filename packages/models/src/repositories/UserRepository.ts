@@ -75,7 +75,10 @@ export class UserRepository extends BaseRepository {
       const result = await this.updateEntity<Record<string, unknown>>('users', id, filteredUpdateData);
 
       // Convert back to entity format (snake_case → camelCase automatically)
-      return result ? fromDatabase(UserEntity, result) : null;
+      if (!result) {
+        this.handleNotFound('User', id);
+      }
+      return fromDatabase(UserEntity, result);
     }, 'update');
   }
 

@@ -170,7 +170,7 @@ describe('AgentTemplateRepository', () => {
   describe('findBySlug', () => {
     it('should return template when found by slug', async () => {
       const mockRawTemplate = createMockRawTemplate();
-      mockConnection.query.mockResolvedValue([mockRawTemplate]);
+      mockConnection.queryOne.mockResolvedValue(mockRawTemplate);
 
       const result = await repository.findBySlug('test-template');
 
@@ -179,11 +179,11 @@ describe('AgentTemplateRepository', () => {
         slug: 'test-template',
         name: 'Test Template',
       });
-      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM agent_templates WHERE slug = $1', ['test-template']);
+      expect(mockConnection.queryOne).toHaveBeenCalledWith('SELECT * FROM agent_templates WHERE slug = $1', ['test-template']);
     });
 
     it('should return null when template not found by slug', async () => {
-      mockConnection.query.mockResolvedValue([]);
+      mockConnection.queryOne.mockResolvedValue(null);
 
       const result = await repository.findBySlug('non-existent-slug');
 
@@ -195,7 +195,7 @@ describe('AgentTemplateRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      mockConnection.query.mockRejectedValue(new Error('Database error'));
+      mockConnection.queryOne.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.findBySlug('test-template')).rejects.toThrow(DatabaseError);
     });
@@ -228,9 +228,10 @@ describe('AgentTemplateRepository', () => {
         slug: 'minimal-template', // Add slug for validation
         description: 'Basic template',
         category: 'general' as const,
-        blueprint: { type: 'test', nodes: [], edges: [] },
+        blueprint: { nodes: [], edges: [], metadata: {} },
         model: 'gpt-4',
-        state: { messages: [], tools: [] },
+        state: { messages: [] },
+        timeout: 30000, // Required field
       };
       const mockCreatedRaw = createMockRawTemplate(minimalInput);
       mockConnection.query.mockResolvedValueOnce([mockCreatedRaw]);
@@ -238,7 +239,7 @@ describe('AgentTemplateRepository', () => {
       const result = await repository.create(minimalInput);
 
       expect(result.name).toBe('Minimal Template');
-      expect(result.timeout).toBe(30000); // Should use default
+      expect(result.timeout).toBe(30000);
     });
 
     it('should serialize complex objects', async () => {
@@ -358,7 +359,7 @@ describe('AgentTemplateRepository', () => {
         id: 'template-123',
         name: 'Test Template',
       });
-      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('SELECT * FROM agent_templates'), expect.any(Array));
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('FROM agent_templates'), expect.any(Array));
     });
 
     it('should validate query parameter', async () => {

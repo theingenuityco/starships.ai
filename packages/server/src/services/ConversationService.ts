@@ -325,13 +325,29 @@ export class ConversationService {
       }
 
       // Convert database messages to LLM format, preserving tool_calls and tool results
-      const llmMessages = sanitizedMessages.map((msg) => ({
+      const mappedMessages = sanitizedMessages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
         ...(msg.reasoning && { reasoning: msg.reasoning }),
         ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
+
+      // Add tool execution rules if tools are available and not already present
+      const systemRules = {
+        role: 'system' as const,
+        content: 'TOOL CALLING RULE:\nOnly call a tool when you have ACTUAL values for all its arguments.\nNever guess, estimate, or use placeholder values.\nIf you need data from Tool A to call Tool B, wait for Tool A to complete first.'
+      };
+
+      // Check if rules already exist to avoid duplicates
+      const hasToolRules = mappedMessages.some(msg => 
+        msg.role === 'system' && 
+        msg.content?.includes('TOOL CALLING RULE')
+      );
+
+      const llmMessages = (resolvedTools.length > 0 && !hasToolRules) 
+        ? [systemRules, ...mappedMessages]
+        : mappedMessages;
 
       // Prepare input for agent execution - Agent will handle memory state and ordering internally
       const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);

@@ -201,6 +201,7 @@ describe('LLM Node Handler', () => {
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
+        text: async () => 'Authentication failed',
       });
 
       const llm = new LLM(params, { secureEnv: { OPEN_ROUTER_KEY: 'test-api-key-123' } });

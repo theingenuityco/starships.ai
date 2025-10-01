@@ -89,12 +89,7 @@ export class Agent implements NodeHandler {
               {
                 operation: 'add' as const,
                 path: '/state/messages/-',
-                value: {
-                  role: 'assistant',
-                  content: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.content }}`,
-                  reasoning: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.reasoning }}`,
-                  toolCalls: `{{ $lastOutputOf("${llmNodeRef}")[0].json.choices[0].message.toolCalls }}`,
-                },
+                value: '{{ $lastOutputOf("' + llmNodeRef + '")[0].json.choices[0].message }}',
               },
             ],
           },
@@ -116,18 +111,18 @@ export class Agent implements NodeHandler {
               '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
           },
         },
-        // Prepare arguments for Tool (materialize arguments_json as plain object)
+        // Prepare arguments for Tool (materialize arguments as plain object)
         {
           ref: argsNodeRef,
           type: 'code' as const,
           name: 'Prepare Tool Args',
-          description: 'Materialize arguments_json into a plain object for Tool input',
+          description: 'Materialize arguments into a plain object for Tool input',
           parameters: {
             code: `
               const last = $lastOutputOf("${llmNodeRef}")[0]?.json;
-              const j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments_json;
+              const j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
               if (j && typeof j === 'object') { return j; }
-              throw new Error('Missing toolCall function.arguments_json');
+              throw new Error('Missing toolCall function.arguments');
             `,
             timeout: 3000,
           },
@@ -151,22 +146,9 @@ export class Agent implements NodeHandler {
                 path: '/state/messages/-',
                 value: {
                   role: 'tool',
-                  toolCallId: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
-                  name: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.function?.name ?? "" }}`,
-                  content: `{{ JSON.stringify((() => { const _i = $lastOutputOf("${toolNodeRef}")[0]; const j = _i?.json; if (j !== undefined) { return j; } if (_i && _i.error !== undefined) { return { ok: false, error: _i.error }; } return {}; })()) }}`,
+                  tool_call_id: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
+                  content: `{{ JSON.stringify($lastOutputOf("${toolNodeRef}")[0]?.json ?? {}) }}`,
                 },
-              },
-              // Ensure processedToolCalls array exists (idempotent)
-              {
-                operation: 'add' as const,
-                path: '/state/processedToolCalls',
-                value: `{{ Array.isArray(state?.processedToolCalls) ? state.processedToolCalls : [] }}`,
-              },
-              // Track executed toolCall id to prevent re-executing the same call
-              {
-                operation: 'add' as const,
-                path: '/state/processedToolCalls/-',
-                value: `{{ $lastOutputOf("${llmNodeRef}")[0]?.json?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
               },
             ],
           },

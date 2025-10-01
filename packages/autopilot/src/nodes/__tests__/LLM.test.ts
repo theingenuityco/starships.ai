@@ -85,7 +85,7 @@ describe('LLM Node Handler', () => {
       expect(response.choices).toHaveLength(1);
       expect(response.choices[0].message.content).toBe('Hello there!');
       expect(response.choices[0].message.role).toBe('assistant');
-      expect(response.usage?.total_tokens).toBe(15);
+      expect(response.usage?.totalTokens).toBe(15);
 
       // Verify API call was made correctly
       expect(mockFetch).toHaveBeenCalledWith(

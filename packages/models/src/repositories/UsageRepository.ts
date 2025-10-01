@@ -19,9 +19,9 @@ export class UsageRepository extends BaseRepository {
   async createAndLink(data: {
     starshipId: string;
     conversationId: string;
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
     cost: number;
     model?: string;
     createdAt?: string;
@@ -30,13 +30,13 @@ export class UsageRepository extends BaseRepository {
       async () => {
         const now = new Date().toISOString();
 
-        // Prepare usage data
+        // Prepare usage data (camelCase - serialization-helper handles DB conversion)
         const usageData = {
           starshipId: data.starshipId,
           conversationId: data.conversationId,
-          prompt_tokens: data.prompt_tokens,
-          completion_tokens: data.completion_tokens,
-          total_tokens: data.total_tokens,
+          promptTokens: data.promptTokens,
+          completionTokens: data.completionTokens,
+          totalTokens: data.totalTokens,
           cost: data.cost,
           model: data.model || 'unknown',
           createdAt: data.createdAt || now,
@@ -45,11 +45,12 @@ export class UsageRepository extends BaseRepository {
         // Validate entity first
         await UsageEntity.validate(usageData, 'create');
 
-        // Create entity instance from plain object, then serialize
+        // Create entity instance from plain object, then serialize (automatic snake_case conversion)
         const usageEntity = toEntityInstance(UsageEntity, usageData);
         const databaseFormat = toDatabase(usageEntity);
         const result = await this.createEntity<Record<string, unknown>>('usage', databaseFormat);
 
+        // fromDatabase automatically converts snake_case to camelCase
         return fromDatabase(UsageEntity, result);
       },
       'createAndLink',
@@ -84,10 +85,11 @@ export class UsageRepository extends BaseRepository {
           [conversationId]
         );
 
+        // DB returns snake_case, convert to camelCase LLMUsage
         return {
-          prompt_tokens: Number(result?.prompt_tokens) || 0,
-          completion_tokens: Number(result?.completion_tokens) || 0,
-          total_tokens: Number(result?.total_tokens) || 0,
+          promptTokens: Number(result?.prompt_tokens) || 0,
+          completionTokens: Number(result?.completion_tokens) || 0,
+          totalTokens: Number(result?.total_tokens) || 0,
           cost: Number(result?.cost) || 0,
         };
       },
@@ -124,10 +126,11 @@ export class UsageRepository extends BaseRepository {
           [starshipId]
         );
 
+        // DB returns snake_case, convert to camelCase LLMUsage
         return {
-          prompt_tokens: Number(result?.prompt_tokens) || 0,
-          completion_tokens: Number(result?.completion_tokens) || 0,
-          total_tokens: Number(result?.total_tokens) || 0,
+          promptTokens: Number(result?.prompt_tokens) || 0,
+          completionTokens: Number(result?.completion_tokens) || 0,
+          totalTokens: Number(result?.total_tokens) || 0,
           cost: Number(result?.cost) || 0,
         };
       },
@@ -159,6 +162,7 @@ export class UsageRepository extends BaseRepository {
           [conversationId, limit, offset]
         );
 
+        // fromDatabaseArray automatically converts snake_case to camelCase
         return fromDatabaseArray(UsageEntity, result);
       },
       'listByConversation',

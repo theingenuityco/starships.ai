@@ -680,16 +680,16 @@ export class ConversationService {
         const model = llmEvent.data?.model;
 
         // Build a strongly-typed usage payload with required numeric fields
-        // Defaults ensure compatibility with MessageUsage (prompt_tokens/completion_tokens/total_tokens are required)
+        // LLMUsage now uses camelCase - pass directly to UsageService
         const usagePayload = llmUsage
           ? {
-              prompt_tokens: typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0,
-              completion_tokens: typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0,
-              total_tokens:
-                typeof llmUsage.total_tokens === 'number'
-                  ? llmUsage.total_tokens
-                  : (typeof llmUsage.prompt_tokens === 'number' ? llmUsage.prompt_tokens : 0) +
-                    (typeof llmUsage.completion_tokens === 'number' ? llmUsage.completion_tokens : 0),
+              promptTokens: typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0,
+              completionTokens: typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0,
+              totalTokens:
+                typeof llmUsage.totalTokens === 'number'
+                  ? llmUsage.totalTokens
+                  : (typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0) +
+                    (typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0),
               // Cost in USD (OpenRouter usage.cost). Mandatory; default to 0 if missing.
               cost: Number(llmUsage.cost) || 0,
               ...(typeof model === 'string' ? { model } : {}),
@@ -706,9 +706,9 @@ export class ConversationService {
               await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,
-                prompt_tokens: usagePayload.prompt_tokens,
-                completion_tokens: usagePayload.completion_tokens,
-                total_tokens: usagePayload.total_tokens,
+                promptTokens: usagePayload.promptTokens,
+                completionTokens: usagePayload.completionTokens,
+                totalTokens: usagePayload.totalTokens,
                 cost: usagePayload.cost,
                 model: usagePayload.model,
               });

@@ -19,15 +19,15 @@ interface StreamChoice {
   // Optional accumulated reasoning text for reasoning-capable providers
   reasoning?: string;
   // Optional accumulated reasoning details (OpenRouter unified)
-  reasoning_details?: ReasoningDetail[];
+  reasoningDetails?: ReasoningDetail[];
   finishReason: string | null;
-  tool_calls?: {
+  toolCalls?: {
     id?: string;
     function: {
       name?: string;
       arguments?: string;
       // Accumulated parse (best-effort) of arguments into JSON, when possible
-      arguments_json?: unknown;
+      argumentsJson?: unknown;
     };
   }[];
 }
@@ -224,18 +224,12 @@ export class LLM extends BaseNode<LlmParams> {
 
       const eventCallback = this.getEventCallback();
       if (eventCallback) {
-        // Normalize usage from stream payload only (usage.include=true)
-        const promptTokens = typeof usage?.prompt_tokens === 'number' ? usage.prompt_tokens : undefined;
-        const completionTokens = typeof usage?.completion_tokens === 'number' ? usage.completion_tokens : undefined;
-        const totalTokens =
-          typeof usage?.total_tokens === 'number'
-            ? usage.total_tokens
-            : typeof promptTokens === 'number' && typeof completionTokens === 'number'
-              ? promptTokens + completionTokens
-              : undefined;
-
-        // Cost provided by OpenRouter usage payload (USD)
-        const cost = typeof usage?.cost === 'number' ? usage.cost : undefined;
+        // Normalize usage from stream payload (OpenRouter snake_case to camelCase)
+        const normalizedUsage = usage ? this.normalizeUsage(usage) : undefined;
+        const promptTokens = normalizedUsage?.promptTokens;
+        const completionTokens = normalizedUsage?.completionTokens;
+        const totalTokens = normalizedUsage?.totalTokens;
+        const cost = normalizedUsage?.cost;
 
         // Prefer model from response metadata; no header dependency
         const usageModel = responseMetadata.model && responseMetadata.model.length > 0 ? responseMetadata.model : undefined;
@@ -257,7 +251,13 @@ export class LLM extends BaseNode<LlmParams> {
         });
       }
 
-      return this.buildFinalResponse(responseMetadata, choices, usage);
+      const final = this.buildFinalResponse(responseMetadata, choices, usage);
+      console.log('[DEBUG LLM.processStreamingResponse] final', {
+        model: final.model,
+        finishReason: final.choices?.[0]?.finishReason,
+        hasToolCalls: Array.isArray(final.choices?.[0]?.message?.toolCalls) && final.choices?.[0]?.message?.toolCalls?.length > 0,
+      });
+      return final;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Streaming failed';
       throw new Error(`LLM streaming execution failed: ${errorMessage}`);
@@ -313,7 +313,7 @@ export class LLM extends BaseNode<LlmParams> {
 
         const finishReason = choice.finish_reason || null;
 
-        // Extract reasoning_details (unified OpenRouter shape)
+        // Extract reasoning_details (unified OpenRouter shape - snake_case from API)
         // They may appear in delta.reasoning_details (streaming) or message.reasoning_details (snapshot)
         const detailsFromDelta: unknown =
           (delta && typeof delta === 'object' && (delta as Record<string, unknown>).reasoning_details) || undefined;
@@ -354,26 +354,26 @@ export class LLM extends BaseNode<LlmParams> {
           choices[index].reasoning += reasoning;
         }
 
-        // Accumulate reasoning_details if present
+        // Accumulate reasoningDetails if present (normalized to camelCase)
         if (mergedDetails.length > 0) {
-          if (!choices[index].reasoning_details) choices[index].reasoning_details = [];
-          choices[index].reasoning_details.push(...mergedDetails);
+          if (!choices[index].reasoningDetails) choices[index].reasoningDetails = [];
+          choices[index].reasoningDetails.push(...mergedDetails);
         }
 
-        // Accumulate tool_calls if present (OpenAI/OpenRouter-style streaming)
+        // Accumulate toolCalls if present (OpenAI/OpenRouter-style streaming with snake_case from API)
         if (hasDeltaToolCalls) {
-          if (!choices[index].tool_calls) {
-            choices[index].tool_calls = [];
+          if (!choices[index].toolCalls) {
+            choices[index].toolCalls = [];
           }
           // Use ToolCallDelta type defined above
           for (const tc of deltaToolCalls) {
             const t = tc || {};
             const tcIndex = typeof t.index === 'number' ? t.index : 0;
-            // Ensure tool_call slot
-            while ((choices[index].tool_calls?.length || 0) <= tcIndex) {
-              choices[index].tool_calls?.push({ id: undefined, function: { name: undefined, arguments: '' } });
+            // Ensure toolCall slot
+            while ((choices[index].toolCalls?.length || 0) <= tcIndex) {
+              choices[index].toolCalls?.push({ id: undefined, function: { name: undefined, arguments: '' } });
             }
-            const target = choices[index].tool_calls![tcIndex];
+            const target = choices[index].toolCalls![tcIndex];
             if (t.id) target.id = t.id;
             if (t.function?.name) target.function.name = t.function.name;
             if (t.function?.arguments) {
@@ -382,7 +382,7 @@ export class LLM extends BaseNode<LlmParams> {
             }
           }
         } else if (hasMessageToolCalls) {
-          type NormalizedToolCall = { id?: string; function: { name?: string; arguments: string; arguments_json?: unknown } };
+          type NormalizedToolCall = { id?: string; function: { name?: string; arguments: string; argumentsJson?: unknown } };
           const normalized: NormalizedToolCall[] = messageToolCalls.map((tc) => {
             const args = typeof tc.function?.arguments === 'string' ? tc.function.arguments : '';
             let parsed: unknown;
@@ -414,7 +414,7 @@ export class LLM extends BaseNode<LlmParams> {
               function: {
                 name: typeof tc.function?.name === 'string' ? tc.function.name : undefined,
                 arguments: args,
-                ...(parsed && typeof parsed === 'object' ? { arguments_json: parsed } : {}),
+                ...(parsed && typeof parsed === 'object' ? { argumentsJson: parsed } : {}),
               },
             };
           });
@@ -422,10 +422,10 @@ export class LLM extends BaseNode<LlmParams> {
             (tc): tc is { id?: string; function: { name: string; arguments: string } } =>
               typeof tc.function.name === 'string' && tc.function.name.length > 0
           );
-          if (!choices[index].tool_calls) {
-            choices[index].tool_calls = [];
+          if (!choices[index].toolCalls) {
+            choices[index].toolCalls = [];
           }
-          choices[index].tool_calls = valid;
+          choices[index].toolCalls = valid;
         }
 
         if (finishReason) {
@@ -527,7 +527,7 @@ export class LLM extends BaseNode<LlmParams> {
 
       appendFromRaw(raw);
 
-      // Also gather from reasoning_details chunks when provided
+      // Also gather from reasoning_details chunks when provided (snake_case from API)
       const details = rec.reasoning_details as unknown;
       if (Array.isArray(details)) {
         for (const d of details as unknown[]) {
@@ -548,6 +548,7 @@ export class LLM extends BaseNode<LlmParams> {
 
   /**
    * Build final response from accumulated streaming data
+   * Normalizes OpenRouter snake_case to our camelCase types
    */
   private buildFinalResponse(
     metadata: { id: string; model: string; created: number; object: string },
@@ -556,14 +557,17 @@ export class LLM extends BaseNode<LlmParams> {
   ): LLMResponse {
     const choices = streamChoices.length > 0 ? streamChoices : [{ content: '', finishReason: 'stop' }];
 
-    // Narrow tool_calls entries to those with a non-empty function name (guards against placeholder chunks)
+    // Narrow toolCalls entries to those with a non-empty function name (guards against placeholder chunks)
     type ToolCallCandidate = { id?: string; function?: { name?: unknown; arguments?: unknown } };
-    type ValidToolCall = { id?: string; function: { name: string; arguments?: string; arguments_json?: unknown } };
+    type ValidToolCall = { id?: string; function: { name: string; arguments?: string; argumentsJson?: unknown } };
     const isValidToolCall = (tc: unknown): tc is ValidToolCall => {
       if (!tc || typeof tc !== 'object') return false;
       const cand = tc as ToolCallCandidate;
       return typeof cand.function?.name === 'string' && cand.function.name.length > 0;
     };
+
+    // Normalize usage if present (OpenRouter snake_case to camelCase)
+    const normalizedUsage = usage ? this.normalizeUsage(usage) : undefined;
 
     return {
       id: metadata.id,
@@ -576,15 +580,17 @@ export class LLM extends BaseNode<LlmParams> {
           role: 'assistant' as LLMMessageRole,
           content: choice.content,
           ...(choice.reasoning ? { reasoning: choice.reasoning } : {}),
-          ...(choice.tool_calls && choice.tool_calls.some(isValidToolCall)
+          ...(choice.reasoningDetails ? { reasoningDetails: choice.reasoningDetails } : {}),
+          ...(choice.toolCalls && choice.toolCalls.some(isValidToolCall)
             ? {
-                toolCalls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
-                  // Always parse arguments_json from the final accumulated arguments string
+                toolCalls: (choice.toolCalls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
+                  // Parse accumulated arguments string to object for LlmFunctionCall.arguments
                   const argsStr = typeof tc.function.arguments === 'string' ? tc.function.arguments : '';
-                  let argsJson: unknown = undefined;
+                  let argsObj: unknown = {};
                   if (argsStr) {
                     try {
                       let s = argsStr.replace(/\r/g, '').trim();
+                      let parsed = false;
                       for (let k = 0; k < 3; k++) {
                         const first = s[0],
                           last = s[s.length - 1];
@@ -592,23 +598,25 @@ export class LLM extends BaseNode<LlmParams> {
                           s = s.slice(1, -1);
                         }
                         try {
-                          const parsed = JSON.parse(s);
-                          if (parsed && typeof parsed === 'object') {
-                            argsJson = parsed as unknown;
+                          const result = JSON.parse(s);
+                          if (result && typeof result === 'object') {
+                            argsObj = result as unknown;
+                            parsed = true;
                             break;
                           }
                         } catch {
                           /* ignore */
                         }
                       }
-                      if (argsJson === undefined) {
-                        const parsed = JSON.parse(s);
-                        if (parsed && typeof parsed === 'object') {
-                          argsJson = parsed as unknown;
+                      if (!parsed) {
+                        const result = JSON.parse(s);
+                        if (result && typeof result === 'object') {
+                          argsObj = result as unknown;
                         }
                       }
                     } catch {
-                      /* ignore */
+                      // If parsing fails, use empty object
+                      argsObj = {};
                     }
                   }
                   return {
@@ -616,17 +624,38 @@ export class LLM extends BaseNode<LlmParams> {
                     type: 'function',
                     function: {
                       name: tc.function.name, // guaranteed string by isValidToolCall
-                      arguments: argsStr,
-                      ...(argsJson !== undefined ? { arguments_json: argsJson } : {}),
+                      arguments: argsObj, // Parsed object per LlmFunctionCall type
                     },
                   };
                 }),
               }
             : {}),
         },
-        finish_reason: choice.finishReason || 'stop',
+        finishReason: choice.finishReason || 'stop',
       })),
-      usage,
+      usage: normalizedUsage,
+    };
+  }
+
+  /**
+   * Normalize OpenRouter usage response (snake_case) to our LLMUsage type (camelCase)
+   */
+  private normalizeUsage(usage: unknown): LLMUsage {
+    if (!usage || typeof usage !== 'object') {
+      return { promptTokens: 0, completionTokens: 0, totalTokens: 0, cost: 0 };
+    }
+
+    const usageObj = usage as Record<string, unknown>;
+    const promptTokens = typeof usageObj.prompt_tokens === 'number' ? usageObj.prompt_tokens : 0;
+    const completionTokens = typeof usageObj.completion_tokens === 'number' ? usageObj.completion_tokens : 0;
+    const totalTokens = typeof usageObj.total_tokens === 'number' ? usageObj.total_tokens : promptTokens + completionTokens;
+    const cost = typeof usageObj.cost === 'number' ? usageObj.cost : 0;
+
+    return {
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      cost,
     };
   }
 

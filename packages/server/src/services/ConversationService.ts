@@ -544,30 +544,43 @@ export class ConversationService {
 
                   // Ensure slot only for the referenced index; do not pre-fill earlier indices
                   if (!acc[idx]) {
-                    acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: {} } };
+                    acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
                   }
 
                   const target = acc[idx];
                   if (rawTc?.id) target.id = rawTc.id;
                   if (rawTc?.function?.name) target.function.name = rawTc.function.name;
 
-                  // Parse arguments string from LLM into object immediately
+                  // Accumulate arguments as string, parse later when complete
                   if (typeof rawTc?.function?.arguments === 'string') {
-                    const argsStr = (target.function.arguments as any) || '';
-                    const newArgsStr = argsStr + rawTc.function.arguments;
-                    try {
-                      target.function.arguments = JSON.parse(newArgsStr);
-                    } catch {
-                      // Keep accumulating until we get valid JSON
-                      (target.function as any).arguments = newArgsStr;
-                    }
+                    target.function.arguments = (target.function.arguments as string) + rawTc.function.arguments;
                   }
                 }
 
                 this.streamingToolCalls.set(conversationId, acc);
 
-                // Broadcast valid tool calls (already have parsed arguments from accumulation above)
-                const toolCallsValue = acc.filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0);
+                // Parse accumulated arguments strings into objects for broadcasting
+                const toolCallsValue = acc
+                  .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
+                  .map((tc) => {
+                    let argsObj: unknown = {};
+                    const argsStr = tc.function?.arguments;
+                    if (typeof argsStr === 'string' && argsStr) {
+                      try {
+                        argsObj = JSON.parse(argsStr);
+                      } catch {
+                        argsObj = {}; // If parsing fails, use empty object
+                      }
+                    }
+                    return {
+                      id: tc.id,
+                      type: tc.type,
+                      function: {
+                        name: tc.function.name,
+                        arguments: argsObj, // Now it's a parsed object
+                      },
+                    };
+                  });
 
                 await this.streamingService.broadcastDelta(conversationId, {
                   op: 'replace',
@@ -688,16 +701,32 @@ export class ConversationService {
             (finalReasoning && finalReasoning.trim().length > 0)
           ) {
             try {
-              // validToolCalls already have parsed arguments from streaming accumulation
-              // Just pass them through for database storage
+              // Parse accumulated arguments strings into objects for database storage
               const toolCallsForDb = validToolCalls.map((tc) => {
-                // Arguments are already parsed objects from streaming accumulation
-                const argsObj = tc.function?.arguments ?? {};
+                let argsObj: unknown = {};
+                const argsStr = tc.function?.arguments;
+
+                // Arguments accumulated as strings, parse them now
+                if (typeof argsStr === 'string') {
+                  if (argsStr === '' || !argsStr.trim()) {
+                    argsObj = {};
+                  } else {
+                    try {
+                      argsObj = JSON.parse(argsStr);
+                    } catch {
+                      console.warn('[DEBUG] Failed to parse tool arguments, using empty object:', argsStr);
+                      argsObj = {};
+                    }
+                  }
+                } else {
+                  argsObj = argsStr ?? {};
+                }
 
                 // Log for debugging
                 console.log('[DEBUG] Tool call before DB insert:', {
                   toolName: tc.function.name,
-                  arguments: argsObj,
+                  argumentsString: argsStr,
+                  argumentsObject: argsObj,
                 });
 
                 return {
@@ -705,7 +734,7 @@ export class ConversationService {
                   type: 'function' as const,
                   function: {
                     name: tc.function.name,
-                    arguments: argsObj, // Already a parsed object
+                    arguments: argsObj, // Parsed object for JSONB storage
                   },
                 };
               });

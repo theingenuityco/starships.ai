@@ -536,7 +536,7 @@ export class LLM extends BaseNode<LlmParams> {
           ...(choice.reasoning ? { reasoning: choice.reasoning } : {}),
           ...(choice.tool_calls && choice.tool_calls.some(isValidToolCall)
             ? {
-                tool_calls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
+                toolCalls: (choice.tool_calls.filter(isValidToolCall) as ValidToolCall[]).map((tc, i) => {
                   // Always parse arguments_json from the final accumulated arguments string
                   const argsStr = typeof tc.function.arguments === 'string' ? tc.function.arguments : '';
                   let argsJson: unknown = undefined;

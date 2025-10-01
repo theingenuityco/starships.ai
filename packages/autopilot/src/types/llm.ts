@@ -53,10 +53,10 @@ export interface LlmMessage {
   /**
    * The ID of the tool call this message is a result of.
    * For tool role messages emitted after executing a function/tool, providers use this to link
-   * the tool result back to the originating assistant tool_call.
+   * the tool result back to the originating assistant toolCall.
    */
-  tool_call_id?: string;
-  tool_calls?: LlmToolCall[];
+  toolCallId?: string;
+  toolCalls?: LlmToolCall[];
 }
 
 export interface LLMUsage {

@@ -56,7 +56,7 @@ export class MessageEntity implements MessageModel {
     (o: MessageEntity) =>
       !(
         o.role === 'assistant' &&
-        ((Array.isArray(o.tool_calls) && o.tool_calls.length > 0) || (typeof o.reasoning === 'string' && o.reasoning.length > 0))
+        ((Array.isArray(o.toolCalls) && o.toolCalls.length > 0) || (typeof o.reasoning === 'string' && o.reasoning.length > 0))
       )
   )
   @MinLength(1) // Ensure non-empty when required; no max length cap
@@ -74,17 +74,17 @@ export class MessageEntity implements MessageModel {
   @Length(1, 200000)
   reasoning?: string;
 
-  // Optional tool_calls persisted for assistant messages when function calling is used (autopilot types)
+  // Optional toolCalls persisted for assistant messages when function calling is used (autopilot types)
   @Expose()
   @IsOptional()
   @IsArray()
-  tool_calls?: LlmToolCall[];
+  toolCalls?: LlmToolCall[];
 
-  // Optional tool_call_id for tool result messages - references the tool call that generated this result
+  // Optional toolCallId for tool result messages - references the tool call that generated this result
   @Expose()
   @IsOptional()
   @IsString()
-  tool_call_id?: string;
+  toolCallId?: string;
 
   /**
    * Simple validation function using class-validator

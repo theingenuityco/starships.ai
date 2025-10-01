@@ -85,21 +85,21 @@ export class MessageRepository extends BaseRepository {
           content: entity.content,
           messageType: entity.messageType || 'user_input',
           ...(entity.reasoning ? { reasoning: entity.reasoning } : {}),
-          ...(entity.tool_calls ? { tool_calls: entity.tool_calls } : {}),
-          ...(entity.tool_call_id ? { tool_call_id: entity.tool_call_id } : {}),
+          ...(entity.toolCalls ? { toolCalls: entity.toolCalls } : {}),
+          ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),
         };
 
-        // Validate with all required fields present (tool_calls must be an array for validation)
+        // Validate with all required fields present (toolCalls must be an array for validation)
         await MessageEntity.validate(messageData, 'create');
 
         // Create entity instance from plain object, then serialize
         const messageEntity = toEntityInstance(MessageEntity, messageData);
         const serializedData = toDatabase(messageEntity);
 
-        // CRITICAL: Stringify tool_calls array for JSONB column AFTER validation
+        // CRITICAL: Stringify toolCalls array for JSONB column AFTER validation
         // node-postgres treats top-level Arrays as PostgreSQL arrays, not JSON
-        if (serializedData.tool_calls && Array.isArray(serializedData.tool_calls)) {
-          serializedData.tool_calls = JSON.stringify(serializedData.tool_calls);
+        if (serializedData.toolCalls && Array.isArray(serializedData.toolCalls)) {
+          serializedData.toolCalls = JSON.stringify(serializedData.toolCalls);
         }
 
         const result = await this.createEntity<Record<string, unknown>>('messages', serializedData);

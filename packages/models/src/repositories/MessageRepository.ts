@@ -98,8 +98,9 @@ export class MessageRepository extends BaseRepository {
 
         // CRITICAL: Stringify toolCalls array for JSONB column AFTER validation
         // node-postgres treats top-level Arrays as PostgreSQL arrays, not JSON
-        if (serializedData.toolCalls && Array.isArray(serializedData.toolCalls)) {
-          serializedData.toolCalls = JSON.stringify(serializedData.toolCalls);
+        // Note: After toDatabase(), property names are in snake_case
+        if (serializedData.tool_calls && Array.isArray(serializedData.tool_calls)) {
+          serializedData.tool_calls = JSON.stringify(serializedData.tool_calls);
         }
 
         const result = await this.createEntity<Record<string, unknown>>('messages', serializedData);

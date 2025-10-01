@@ -104,16 +104,16 @@ export class Agent implements NodeHandler {
           ref: conditionalNodeRef,
           type: 'conditional' as const,
           name: 'Check Tool Calls',
-          description: 'Check if LLM made any tool calls or needs to continue due to length finish_reason',
+          description: 'Check if LLM made any tool calls or needs to continue due to length finishReason',
           parameters: {
             // Returns:
-            //  - "continue" when choices[0].finish_reason === "length" (continue generation)
-            //  - "call_tool" when finish_reason === "tool_calls" OR tool_calls[] exist (route to tool execution)
+            //  - "continue" when choices[0].finishReason === "length" (continue generation)
+            //  - "call_tool" when finishReason === "tool_calls" OR tool_calls[] exist (route to tool execution)
             //  - "complete" otherwise (end)
             // Use $input() (the LLM node output passed into this Conditional) to avoid cross-scope lookup issues.
             // Trimmed single-template string for full-only evaluation
             condition:
-              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finish_reason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
+              '{{(() => { const last = $input(); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; if (fr==="tool_calls") return "call_tool"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "call_tool" : "complete"; })()}}',
           },
         },
         // Prepare arguments for Tool (materialize arguments_json as plain object)
@@ -177,7 +177,7 @@ export class Agent implements NodeHandler {
         { ref: 'edge_start_llm', from: startRef, to: llmNodeRef },
         // LLM -> Conditional
         { ref: 'edge_llm_conditional', from: llmNodeRef, to: conditionalNodeRef },
-        // Conditional -> LLM (if finish_reason === "length")
+        // Conditional -> LLM (if finishReason === "length")
         { ref: 'edge_conditional_llm_length', from: conditionalNodeRef, to: llmNodeRef, condition: 'continue' },
         // Conditional -> Prepare Args (if tool_calls exist)
         { ref: 'edge_conditional_args', from: conditionalNodeRef, to: argsNodeRef, condition: 'call_tool' },

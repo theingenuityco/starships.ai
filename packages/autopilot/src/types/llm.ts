@@ -49,7 +49,7 @@ export interface LlmMessage {
   // Optional model-provided reasoning/thinking text (for reasoning-capable models)
   reasoning?: string;
   // Optional unified reasoning details (OpenRouter normalized)
-  reasoning_details?: ReasoningDetail[];
+  reasoningDetails?: ReasoningDetail[];
   /**
    * The ID of the tool call this message is a result of.
    * For tool role messages emitted after executing a function/tool, providers use this to link
@@ -60,9 +60,9 @@ export interface LlmMessage {
 }
 
 export interface LLMUsage {
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
   // OpenRouter usage accounting: total amount charged (credits/USD)
   cost: number;
 }
@@ -74,7 +74,7 @@ export interface LLMResponse {
   model: string;
   choices: {
     message: LlmMessage;
-    finish_reason: string | null;
+    finishReason: string | null;
     index: number;
   }[];
   usage?: LLMUsage;

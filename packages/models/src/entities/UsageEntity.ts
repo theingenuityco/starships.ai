@@ -3,6 +3,7 @@
  *
  * Persists provider-reported usage per assistant turn and links it to both
  * Starship and Conversation. This replaces message-level usage storage.
+ * Uses camelCase properties - serialization-helper converts to/from snake_case for database.
  */
 
 import type { UsageModel } from '@starships/protocol';
@@ -26,21 +27,21 @@ export class UsageEntity implements UsageModel {
   @Length(1, 255)
   conversationId!: string;
 
-  // Provider-reported usage
+  // Provider-reported usage (camelCase - serialization-helper handles DB conversion)
   @Expose()
   @IsNumber()
   @Min(0)
-  prompt_tokens!: number;
+  promptTokens!: number;
 
   @Expose()
   @IsNumber()
   @Min(0)
-  completion_tokens!: number;
+  completionTokens!: number;
 
   @Expose()
   @IsNumber()
   @Min(0)
-  total_tokens!: number;
+  totalTokens!: number;
 
   @Expose()
   @IsNumber()
@@ -75,9 +76,9 @@ export class UsageEntity implements UsageModel {
         id: dataRecord.id || 'temp-id', // replaced by repository auto-id
         starshipId: dataRecord.starshipId,
         conversationId: dataRecord.conversationId,
-        prompt_tokens: dataRecord.prompt_tokens,
-        completion_tokens: dataRecord.completion_tokens,
-        total_tokens: dataRecord.total_tokens,
+        promptTokens: dataRecord.promptTokens,
+        completionTokens: dataRecord.completionTokens,
+        totalTokens: dataRecord.totalTokens,
         cost: dataRecord.cost,
         model: dataRecord.model,
         createdAt: dataRecord.createdAt || new Date().toISOString(),

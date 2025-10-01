@@ -239,6 +239,10 @@ export class Engine {
         execution.currentNodeInputRef = incomingEdge?.from;
 
         await this.executeNode(currentNode, execution);
+        console.log('[DEBUG Engine.executeLoop] node_completed', {
+          node: currentNode?.ref,
+          resultCount: this.findNodeResult(execution, currentNode?.ref || '')?.length || 0,
+        });
         const nextNode = this.getNextNode(blueprint, execution);
 
         if (!nextNode) {
@@ -506,10 +510,18 @@ export class Engine {
     }
 
     if (!targetEdge) {
+      console.warn('[DEBUG Engine.getNextNode] No matching edge', { current: execution.currentNodeRef, edgeCondition, outgoingEdges });
       return null;
     }
 
-    return blueprint.nodes.find((node) => node.ref === targetEdge.to) || null;
+    const next = blueprint.nodes.find((node) => node.ref === targetEdge.to) || null;
+    console.log('[DEBUG Engine.getNextNode] selected', {
+      current: execution.currentNodeRef,
+      edgeCondition,
+      selectedEdge: targetEdge,
+      nextRef: next ? next.ref : null,
+    });
+    return next;
   }
 
   // Extract final output from End node (if its handler produced a result)

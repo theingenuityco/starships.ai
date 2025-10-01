@@ -76,8 +76,6 @@ export class MessageRepository extends BaseRepository {
         }
 
         // Build message data with all required fields including foreign keys
-        // Note: tool_calls arguments normalization should be handled upstream (in ConversationService)
-        // to ensure empty/invalid arguments are converted to valid JSON strings like "{}"
         const messageData = {
           createdAt: now,
           updatedAt: now,
@@ -91,12 +89,20 @@ export class MessageRepository extends BaseRepository {
           ...(entity.tool_call_id ? { tool_call_id: entity.tool_call_id } : {}),
         };
 
-        // Validate with all required fields present
+        // Validate with all required fields present (tool_calls must be an array for validation)
         await MessageEntity.validate(messageData, 'create');
 
         // Create entity instance from plain object, then serialize
         const messageEntity = toEntityInstance(MessageEntity, messageData);
-        const result = await this.createEntity<Record<string, unknown>>('messages', toDatabase(messageEntity));
+        const serializedData = toDatabase(messageEntity);
+
+        // CRITICAL: Stringify tool_calls array for JSONB column AFTER validation
+        // node-postgres treats top-level Arrays as PostgreSQL arrays, not JSON
+        if (serializedData.tool_calls && Array.isArray(serializedData.tool_calls)) {
+          serializedData.tool_calls = JSON.stringify(serializedData.tool_calls);
+        }
+
+        const result = await this.createEntity<Record<string, unknown>>('messages', serializedData);
 
         return fromDatabase(MessageEntity, result);
       },

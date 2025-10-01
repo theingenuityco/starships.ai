@@ -89,6 +89,16 @@ export class MessageRepository extends BaseRepository {
           ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),
         };
 
+        // Debug log for tool calls
+        if (entity.toolCalls) {
+          console.log('[MessageRepository] Creating message with toolCalls:', {
+            role: entity.role,
+            contentLength: entity.content?.length || 0,
+            toolCallsCount: entity.toolCalls.length,
+            toolCallsSample: JSON.stringify(entity.toolCalls[0] || null).slice(0, 200),
+          });
+        }
+
         // Validate with all required fields present (toolCalls must be an array for validation)
         await MessageEntity.validate(messageData, 'create');
 
@@ -100,10 +110,13 @@ export class MessageRepository extends BaseRepository {
         // node-postgres treats top-level Arrays as PostgreSQL arrays, not JSON
         // Note: After toDatabase(), property names are in snake_case
         if (serializedData.tool_calls && Array.isArray(serializedData.tool_calls)) {
+          console.log('[MessageRepository] Stringifying tool_calls for JSONB storage, count:', serializedData.tool_calls.length);
           serializedData.tool_calls = JSON.stringify(serializedData.tool_calls);
         }
 
         const result = await this.createEntity<Record<string, unknown>>('messages', serializedData);
+
+        console.log('[MessageRepository] Message created successfully with id:', result.id);
 
         return fromDatabase(MessageEntity, result);
       },

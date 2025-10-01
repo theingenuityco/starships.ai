@@ -285,11 +285,11 @@ describe('WaitlistRepository', () => {
 
   describe('getApprovedCount', () => {
     it('should return count of approved emails', async () => {
-      testHelper.mockConnection.queryOne.mockResolvedValue({ count: '5' });
+      testHelper.mockConnection.queryCount.mockResolvedValue(5);
 
       const result = await repository.getApprovedCount();
 
-      expect(testHelper.mockConnection.queryOne).toHaveBeenCalledWith(
+      expect(testHelper.mockConnection.queryCount).toHaveBeenCalledWith(
         expect.stringContaining('SELECT COUNT(*) FROM waitlist WHERE status'),
         ['approved']
       );

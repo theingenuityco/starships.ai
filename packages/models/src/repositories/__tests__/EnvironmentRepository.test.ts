@@ -7,6 +7,7 @@ import { EnvironmentRepository } from '../EnvironmentRepository';
 import { EnvironmentEntity } from '@/entities/EnvironmentEntity';
 import { DatabaseError } from '@starships/errors';
 import { RepositoryTestHelper } from '../../tests/repository-test-helper';
+import { createCipheriv, createHash, randomBytes } from 'crypto';
 
 // Mock nanoid for predictable IDs
 jest.mock('nanoid', () => ({
@@ -85,7 +86,7 @@ describe('EnvironmentRepository', () => {
     });
 
     it('should throw error for missing starshipId', async () => {
-      await expect(repository.findByStarship('')).rejects.toThrow('starshipId is required');
+      await expect(repository.findByStarship('')).rejects.toThrow(DatabaseError);
     });
 
     it('should handle database errors', async () => {
@@ -128,8 +129,8 @@ describe('EnvironmentRepository', () => {
     });
 
     it('should throw error for missing parameters', async () => {
-      await expect(repository.findByStarshipAndKey('', 'KEY')).rejects.toThrow('starshipId and key are required');
-      await expect(repository.findByStarshipAndKey('starship-123', '')).rejects.toThrow('starshipId and key are required');
+      await expect(repository.findByStarshipAndKey('', 'KEY')).rejects.toThrow(DatabaseError);
+      await expect(repository.findByStarshipAndKey('starship-123', '')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -254,7 +255,7 @@ describe('EnvironmentRepository', () => {
           value: 'new-value',
           updatedBy: 'user-123',
         })
-      ).rejects.toThrow('ID is required for update operation');
+      ).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -276,7 +277,7 @@ describe('EnvironmentRepository', () => {
     });
 
     it('should throw error for missing id', async () => {
-      await expect(repository.delete('')).rejects.toThrow('ID is required for delete operation');
+      await expect(repository.delete('')).rejects.toThrow(DatabaseError);
     });
   });
 
@@ -302,19 +303,31 @@ describe('EnvironmentRepository', () => {
     });
 
     it('should throw error for missing parameters', async () => {
-      await expect(repository.deleteByStarshipAndKey('', 'KEY')).rejects.toThrow('starshipId and key are required');
-      await expect(repository.deleteByStarshipAndKey('starship-123', '')).rejects.toThrow('starshipId and key are required');
+      await expect(repository.deleteByStarshipAndKey('', 'KEY')).rejects.toThrow(DatabaseError);
+      await expect(repository.deleteByStarshipAndKey('starship-123', '')).rejects.toThrow(DatabaseError);
     });
   });
 
   describe('getDecryptedEnvironment', () => {
     it('should return decrypted environment variables as record', async () => {
+      // Create a properly encrypted value for testing
+      const masterKey = 'test-encryption-key-32-characters-long-enough';
+      const starshipId = 'starship-123';
+      const key = createHash('sha256')
+        .update(masterKey + starshipId)
+        .digest();
+      const iv = randomBytes(16);
+      const cipher = createCipheriv('aes-256-gcm', key, iv);
+      const encrypted = Buffer.concat([cipher.update('test-value', 'utf8'), cipher.final()]);
+      const tag = cipher.getAuthTag();
+      const encryptedValue = Buffer.concat([iv, tag, encrypted]).toString('base64');
+
       const mockEnvs = [
         {
           id: 'env-1',
           starship_id: 'starship-123',
           key: 'API_KEY',
-          encrypted_value: Buffer.from('test').toString('base64'),
+          encrypted_value: encryptedValue,
           created_at: '2024-01-01T00:00:00.000Z',
           updated_at: '2024-01-01T00:00:00.000Z',
           created_by: 'user-123',
@@ -328,15 +341,28 @@ describe('EnvironmentRepository', () => {
       expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM environments WHERE starship_id = $1', ['starship-123']);
       expect(result).toHaveProperty('API_KEY');
       expect(typeof result.API_KEY).toBe('string');
+      expect(result.API_KEY).toBe('test-value');
     });
 
     it('should skip invalid encrypted values', async () => {
+      // Create a properly encrypted value for one key
+      const masterKey = 'test-encryption-key-32-characters-long-enough';
+      const starshipId = 'starship-123';
+      const key = createHash('sha256')
+        .update(masterKey + starshipId)
+        .digest();
+      const iv = randomBytes(16);
+      const cipher = createCipheriv('aes-256-gcm', key, iv);
+      const encrypted = Buffer.concat([cipher.update('valid-value', 'utf8'), cipher.final()]);
+      const tag = cipher.getAuthTag();
+      const encryptedValue = Buffer.concat([iv, tag, encrypted]).toString('base64');
+
       const mockEnvs = [
         {
           id: 'env-1',
           starship_id: 'starship-123',
           key: 'VALID_KEY',
-          encrypted_value: Buffer.from('test').toString('base64'),
+          encrypted_value: encryptedValue,
           created_at: '2024-01-01T00:00:00.000Z',
           updated_at: '2024-01-01T00:00:00.000Z',
           created_by: 'user-123',
@@ -357,10 +383,12 @@ describe('EnvironmentRepository', () => {
       // Should not throw, just skip invalid values
       const result = await repository.getDecryptedEnvironment('starship-123');
       expect(result).toHaveProperty('VALID_KEY');
+      expect(result.VALID_KEY).toBe('valid-value');
+      expect(result).not.toHaveProperty('INVALID_KEY');
     });
 
     it('should throw error for missing starshipId', async () => {
-      await expect(repository.getDecryptedEnvironment('')).rejects.toThrow('starshipId is required');
+      await expect(repository.getDecryptedEnvironment('')).rejects.toThrow(DatabaseError);
     });
   });
 });

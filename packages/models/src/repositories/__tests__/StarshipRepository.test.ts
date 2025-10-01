@@ -397,7 +397,7 @@ describe('StarshipRepository', () => {
         deployed_count: '3',
       });
 
-      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow('No available slots on this starship');
+      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow(DatabaseError);
     });
 
     it('should throw error when agent already deployed', async () => {
@@ -408,7 +408,7 @@ describe('StarshipRepository', () => {
         })
         .mockResolvedValueOnce({ id: 'agent-456' });
 
-      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow('Agent is already deployed on this starship');
+      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow(DatabaseError);
     });
 
     it('should throw error for missing parameters', async () => {

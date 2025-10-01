@@ -16,11 +16,11 @@ Current behavior (from logs)
 
 - LLM exposes correct tool functions via function-calling (tool_create, tool_update, tool_get, tool_list, blueprint_lint, tool_test).
 - Daedalus calls tool_list once, then returns a long planning monologue and stops; it does not call blueprint_lint/tool_create.
-- secureEnv is present (tool_list succeeds). state.tools is correctly wired (LLM tool_calls emitted).
+- secureEnv is present (tool_list succeeds). state.tools is correctly wired (LLM toolCalls emitted).
 
 Root causes
 
-- Prompt lacks a strict "act over explain" protocol, so the LLM narrates instead of continuing tool_calls.
+- Prompt lacks a strict "act over explain" protocol, so the LLM narrates instead of continuing toolCalls.
 - Misconceptions reinforced by prompt text (e.g., blueprint_lint signature confusion; “minimal create then patch”).
 - Function name vs slug can remain ambiguous unless spelled out (snake_case function name vs kebab-case slug).
 

@@ -336,7 +336,7 @@ export class ConversationService {
       // Add tool execution rules if tools are available and not already present
       const systemRules = {
         role: 'system' as const,
-        content: 'TOOL CALLING RULE:\nOnly call a tool when you have ACTUAL values for all its arguments.\nNever guess, estimate, or use placeholder values.\nIf you need data from Tool A to call Tool B, wait for Tool A to complete first.'
+        content: 'TOOL CALLING RULES:\n1. Only call a tool when you have ACTUAL values for all its arguments - never guess or use placeholders.\n2. When tools are INDEPENDENT (don\'t need each other\'s output), call them ALL in the same response for parallel execution.\n3. When tools are DEPENDENT (Tool B needs Tool A\'s output), wait for Tool A to complete before calling Tool B.\n4. Example: Searching Wikipedia and DuckDuckGo can run in parallel. But if you need to search for something based on a previous tool\'s result, that must be sequential.'
       };
 
       // Check if rules already exist to avoid duplicates

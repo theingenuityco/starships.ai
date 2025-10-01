@@ -206,11 +206,14 @@ export class LLM extends BaseNode<LlmParams> {
             // console.log({ parsed: JSON.stringify(parsed, null, 2) });
 
             if (eventCallback) {
+              // Normalize tool_calls to toolCalls for consistency across the application
+              const normalizedChunk = this.normalizeToolCallsInChunk(parsed);
+
               await eventCallback({
                 type: 'content_chunk',
                 timestamp: new Date().toISOString(),
                 executionDepth,
-                data: { chunk: parsed },
+                data: { chunk: normalizedChunk as Record<string, unknown> },
               });
             }
           } catch (error) {
@@ -430,6 +433,45 @@ export class LLM extends BaseNode<LlmParams> {
         }
       }
     }
+  }
+
+  /**
+   * Normalize tool_calls (snake_case) to toolCalls (camelCase) in streaming chunks
+   * This ensures consistency across the application regardless of provider format
+   */
+  private normalizeToolCallsInChunk(chunk: StreamChunk): StreamChunk {
+    if (!chunk.choices || !Array.isArray(chunk.choices)) {
+      return chunk;
+    }
+
+    const normalizedChoices = chunk.choices.map((choice) => {
+      const normalizedChoice = { ...choice };
+
+      // Normalize delta.tool_calls to delta.toolCalls
+      if (choice.delta) {
+        const delta = choice.delta as Record<string, unknown>;
+        if ('tool_calls' in delta) {
+          const { tool_calls, ...rest } = delta;
+          normalizedChoice.delta = { ...rest, toolCalls: tool_calls } as typeof choice.delta;
+        }
+      }
+
+      // Normalize message.tool_calls to message.toolCalls
+      if (choice.message) {
+        const message = choice.message as Record<string, unknown>;
+        if ('tool_calls' in message) {
+          const { tool_calls, ...rest } = message;
+          normalizedChoice.message = { ...rest, toolCalls: tool_calls } as typeof choice.message;
+        }
+      }
+
+      return normalizedChoice;
+    });
+
+    return {
+      ...chunk,
+      choices: normalizedChoices,
+    };
   }
 
   /**

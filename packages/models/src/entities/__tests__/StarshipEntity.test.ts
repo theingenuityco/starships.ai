@@ -127,17 +127,17 @@ describe('StarshipEntity', () => {
       expect(serialized).toEqual({
         id: 'starship-123',
         slug: 'test-starship',
-        ownerId: 'user-123',
+        owner_id: 'user-123',
         class: 'scout',
         name: 'Test Starship',
-        maxAgents: 3,
+        max_agents: 3,
         status: 'active',
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-        subscriptionId: 'sub_123456789',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+        subscription_id: 'sub_123456789',
         plan: 'scout',
-        billingPeriod: 'monthly',
-        stripeCustomerId: 'cus_123456789',
+        billing_period: 'monthly',
+        stripe_customer_id: 'cus_123456789',
       });
     });
 
@@ -155,10 +155,10 @@ describe('StarshipEntity', () => {
 
       const serialized = toDatabase(starship);
 
-      expect(serialized.subscriptionId).toBeUndefined();
+      expect(serialized.subscription_id).toBeUndefined();
       expect(serialized.plan).toBeUndefined();
-      expect(serialized.billingPeriod).toBeUndefined();
-      expect(serialized.stripeCustomerId).toBeUndefined();
+      expect(serialized.billing_period).toBeUndefined();
+      expect(serialized.stripe_customer_id).toBeUndefined();
     });
   });
 

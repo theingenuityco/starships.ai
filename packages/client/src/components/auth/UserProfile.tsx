@@ -20,6 +20,10 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
   const router = useRouter()
   const [showTooltip, setShowTooltip] = useState(false)
 
+  const handleGoToProfile = (): void => {
+    router.push('/profile')
+  }
+
   const handleLogout = async () => {
     await logout()
     // Redirect to home page after logout
@@ -54,16 +58,11 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
           <div className="p-3">
             {/* Action buttons only */}
             <div className="space-y-1">
-              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
+              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent" onClick={handleGoToProfile}>
                 <User className="w-4 h-4 mr-3" />
                 My Profile
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={handleLogout}
-              >
+              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-3" />
                 Sign Out
               </Button>
@@ -98,16 +97,11 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded' }
         <div className="p-3">
           {/* Action buttons only */}
           <div className="space-y-1">
-            <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
+            <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent" onClick={handleGoToProfile}>
               <User className="w-4 h-4 mr-3" />
               My Profile
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={handleLogout}
-            >
+            <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-destructive hover:text-destructive-foreground" onClick={handleLogout}>
               <LogOut className="w-4 h-4 mr-3" />
               Sign Out
             </Button>

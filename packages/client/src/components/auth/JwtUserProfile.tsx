@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { User } from 'lucide-react'
 import React, { useState } from 'react'
 import { JwtLogoutButton } from '@/components/auth/JwtLogoutButton'
+import { useRouter } from 'next/navigation'
 
 interface JwtUserProfileProps {
   mode?: 'collapsed' | 'expanded'
@@ -18,6 +19,11 @@ interface JwtUserProfileProps {
 export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expanded' }: JwtUserProfileProps) {
   const { user, userName, userEmail, isAuthenticated } = useAuth()
   const [showTooltip, setShowTooltip] = useState(false)
+  const router = useRouter()
+
+  const handleGoToProfile = (): void => {
+    router.push('/profile')
+  }
 
   if (!isAuthenticated || !user) {
     return null
@@ -46,7 +52,7 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expan
           <div className="p-3">
             {/* Action buttons only */}
             <div className="space-y-1">
-              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
+              <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent" onClick={handleGoToProfile}>
                 <User className="w-4 h-4 mr-3" />
                 My Profile
               </Button>
@@ -84,7 +90,7 @@ export const JwtUserProfile = React.memo(function JwtUserProfile({ mode = 'expan
         <div className="p-3">
           {/* Action buttons only */}
           <div className="space-y-1">
-            <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent">
+            <Button variant="ghost" size="sm" className="w-full justify-start h-9 hover:bg-accent" onClick={handleGoToProfile}>
               <User className="w-4 h-4 mr-3" />
               My Profile
             </Button>

@@ -248,7 +248,7 @@ Returns complete, executable blueprints with:
                               value: {
                                 role: 'assistant',
                                 content: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.content }}',
-                                tool_calls: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls }}'
+                                toolCalls: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls }}'
                               }
                             }
                           ]
@@ -259,7 +259,7 @@ Returns complete, executable blueprints with:
                         type: 'conditional',
                         name: 'Check Tool Calls',
                         parameters: {
-                          condition: '{{ $exists($lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls) ? "execute" : "done" }}'
+                          condition: '{{ $exists($lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls) ? "execute" : "done" }}'
                         }
                       },
                       {
@@ -268,7 +268,7 @@ Returns complete, executable blueprints with:
                         name: 'Prepare Tool Arguments',
                         parameters: {
                           code: \`
-                            const toolCall = $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0];
+                            const toolCall = $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0];
                             return toolCall.function.arguments_json || JSON.parse(toolCall.function.arguments);
                           \`,
                           timeout: 2000
@@ -279,18 +279,18 @@ Returns complete, executable blueprints with:
                         type: 'tool',
                         name: 'Execute Tool',
                         parameters: {
-                          name: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].function.name }}',
+                          name: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name }}',
                           description: 'Dynamic tool execution',
-                          parameters: '{{ (() => { const tools = state.tools; const name = $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].function.name; return tools.find(t => t.name === name)?.parameters || { type: "object", properties: {} }; })() }}',
-                          blueprint: '{{ (() => { const tools = state.tools; const name = $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].function.name; return tools.find(t => t.name === name)?.blueprint; })() }}',
+                          parameters: '{{ (() => { const tools = state.tools; const name = $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name; return tools.find(t => t.name === name)?.parameters || { type: "object", properties: {} }; })() }}',
+                          blueprint: '{{ (() => { const tools = state.tools; const name = $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name; return tools.find(t => t.name === name)?.blueprint; })() }}',
                           mutations: [
                             {
                               operation: 'add',
                               path: '/state/messages/-',
                               value: {
                                 role: 'tool',
-                                tool_call_id: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].id }}',
-                                name: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.tool_calls[0].function.name }}',
+                                toolCallId: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].id }}',
+                                name: '{{ $lastOutputOf("llm_1")[0].json.choices[0].message.toolCalls[0].function.name }}',
                                 content: '{{ JSON.stringify($lastOutputOf("tool_1")[0].json) }}'
                               }
                             }

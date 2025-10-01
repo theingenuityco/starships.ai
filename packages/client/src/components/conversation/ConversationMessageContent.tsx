@@ -126,7 +126,7 @@ export function ConversationMessageContent({
   }, [reasoning, reasoningChunks, isStreaming])
 
   // Determine whether reasoning panel should auto-open.
-  // Keep it open only while reasoning-only is streaming; collapse once content OR tool_calls start (and on reload).
+  // Keep it open only while reasoning-only is streaming; collapse once content OR toolCalls start (and on reload).
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0

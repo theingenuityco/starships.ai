@@ -120,11 +120,6 @@ export class Conditional implements NodeHandler {
         ...(edgeCondition !== undefined && { edgeCondition }),
       };
 
-      console.log('[DEBUG Conditional.execute]', {
-        condition: this.params.condition,
-        result: conditionalResult.result,
-        edgeCondition: conditionalResult.edgeCondition,
-      });
       return ExecutionItemUtils.wrapSingle(conditionalResult, input?.[0]);
     } catch (error) {
       throw new Error(`Conditional evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

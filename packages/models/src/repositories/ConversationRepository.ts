@@ -91,7 +91,10 @@ export class ConversationRepository extends BaseRepository {
         }
 
         const result = await this.updateEntity<Record<string, unknown>>('conversations', id, filteredUpdateData);
-        return result ? fromDatabase(ConversationEntity, result) : null;
+        if (!result) {
+          this.handleNotFound('Conversation', id);
+        }
+        return fromDatabase(ConversationEntity, result);
       },
       'update',
       'Conversation',

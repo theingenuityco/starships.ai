@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { getEnvConfig } from '@starships/env';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
+import type { OpenRouterModel } from '@starships/protocol';
 
 const router: Router = Router();
 
@@ -33,17 +34,18 @@ router.get('/openrouter/models', jwtAuthMiddleware, async (req: Request, res: Re
       sendError(res, 'SERVICE_UNAVAILABLE', `OpenRouter responded with ${resp.status}`, resp.status, { body });
       return;
     }
-
-    // Normalize to { data: Model[] }
+    // Normalize to { data: OpenRouterModel[] }
     const payload: unknown = await resp.json();
-    let models: unknown = payload;
-    if (payload && typeof payload === 'object' && 'data' in (payload as Record<string, unknown>)) {
-      models = (payload as Record<string, unknown>)['data'];
-    }
-    sendSuccess(res, models);
+
+    const models: OpenRouterModel[] = Array.isArray((payload as { data?: unknown }).data)
+      ? ((payload as { data: unknown[] }).data as OpenRouterModel[])
+      : Array.isArray(payload)
+        ? (payload as OpenRouterModel[])
+        : [];
+
+    sendSuccess<OpenRouterModel[]>(res, models);
   } catch (error) {
     handleError(error, res, 'fetching OpenRouter models (filtered)');
   }
 });
-
 export default router;

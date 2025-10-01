@@ -36,6 +36,7 @@ export * from './domains/user';
 export * from './domains/waitlist';
 export * from './domains/workflow';
 export * from './domains/usage';
+export * from './domains/openrouter';
 
 // Export API contracts
 export * from './contracts/api-response';

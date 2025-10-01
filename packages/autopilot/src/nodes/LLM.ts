@@ -207,7 +207,6 @@ export class LLM extends BaseNode<LlmParams> {
             }
 
             const eventCallback = this.getEventCallback();
-            // console.log({ parsed: JSON.stringify(parsed, null, 2) });
 
             if (eventCallback) {
               // Normalize tool_calls to toolCalls for consistency across the application

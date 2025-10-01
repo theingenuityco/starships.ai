@@ -347,27 +347,10 @@ export class ConversationService {
         // Stream content chunks in real-time (supports both delta.* and message.* providers)
         const chunkContent = (event as LLMEvent).data?.chunk;
 
-        console.log('[STREAMING] content_chunk event received:', {
-          conversationId,
-          hasChunk: !!chunkContent,
-          hasChoices: Array.isArray(chunkContent?.choices),
-          choicesLength: Array.isArray(chunkContent?.choices) ? chunkContent.choices.length : 0,
-        });
-
         if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
           const choice0: any = chunkContent.choices[0] || {};
           const delta: any = choice0?.delta || {};
           const messageNode: any = choice0?.message || {};
-
-          console.log('[STREAMING] Processing chunk choice:', {
-            conversationId,
-            hasDelta: !!delta,
-            hasMessage: !!messageNode,
-            deltaKeys: Object.keys(delta || {}),
-            messageKeys: Object.keys(messageNode || {}),
-            deltaToolCalls: Array.isArray(delta?.toolCalls),
-            messageToolCalls: Array.isArray(messageNode?.toolCalls),
-          });
 
           const contentFromDelta = typeof delta?.content === 'string' ? delta.content : '';
           const contentFromMessage = typeof messageNode?.content === 'string' ? messageNode.content : '';
@@ -376,15 +359,6 @@ export class ConversationService {
           const toolCallsFromDelta: any[] = Array.isArray(delta?.toolCalls) ? delta.toolCalls : [];
           const toolCallsFromMessage: any[] = Array.isArray(messageNode?.toolCalls) ? messageNode.toolCalls : [];
           const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
-
-          if (hasToolCalls) {
-            console.log('[STREAMING] Detected toolCalls in chunk:', {
-              conversationId,
-              fromDelta: toolCallsFromDelta.length,
-              fromMessage: toolCallsFromMessage.length,
-              messageSample: toolCallsFromMessage[0] ? JSON.stringify(toolCallsFromMessage[0]).slice(0, 150) : null,
-            });
-          }
 
           // Extract reasoning from known provider patterns (reasoning, thinking, and reasoning_details)
           const extractReasoning = (node: unknown): string => {
@@ -637,12 +611,6 @@ export class ConversationService {
                   };
                 });
 
-                console.log('[STREAMING] Storing snapshot toolCalls:', {
-                  conversationId,
-                  count: normalized.length,
-                  sample: normalized[0] ? JSON.stringify(normalized[0]).slice(0, 150) : null,
-                });
-
                 this.streamingToolCalls.set(conversationId, normalized);
 
                 // Broadcast only valid entries (non-empty function name)
@@ -670,7 +638,6 @@ export class ConversationService {
         // (tool-only responses may not have content stream but still need persistence)
         const hasToolCalls = this.streamingToolCalls.has(conversationId) && (this.streamingToolCalls.get(conversationId)?.length || 0) > 0;
         if (!this.streamingContent.has(conversationId) && !hasToolCalls) {
-          console.log('[STREAMING] Skipping content_complete - no active stream and no tool calls');
           break;
         }
 
@@ -722,22 +689,9 @@ export class ConversationService {
         const finalReasoning = this.streamingReasoning.get(conversationId) || '';
         const finalToolCallsAcc = this.streamingToolCalls.get(conversationId) || [];
 
-        console.log('[STREAMING] Retrieved toolCalls in content_complete:', {
-          conversationId,
-          hasMap: this.streamingToolCalls.has(conversationId),
-          rawCount: finalToolCallsAcc.length,
-          sample: finalToolCallsAcc[0] ? JSON.stringify(finalToolCallsAcc[0]).slice(0, 150) : null,
-        });
-
         const validToolCalls = finalToolCallsAcc.filter(
           (tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0
         );
-
-        console.log('[STREAMING] Filtered valid toolCalls:', {
-          validCount: validToolCalls.length,
-          filteredOut: finalToolCallsAcc.length - validToolCalls.length,
-        });
-
         // Build finalization task: ensure final patches and persistence complete in order.
         try {
           // Content was already incrementally streamed to /messages/-1/content during chunks
@@ -781,14 +735,6 @@ export class ConversationService {
                 };
               });
 
-              console.log('[STREAMING] Creating assistant message:', {
-                conversationId,
-                contentLength: finalContent?.length || 0,
-                hasReasoning: !!finalReasoning,
-                toolCallsCount: toolCallsForDb.length,
-                toolCallsSample: toolCallsForDb.length > 0 ? JSON.stringify(toolCallsForDb[0]).slice(0, 200) : null,
-              });
-
               const assistantMessage = await this.messageService.createMessage({
                 conversationId,
                 role: 'assistant',
@@ -797,8 +743,6 @@ export class ConversationService {
                 ...(finalReasoning && { reasoning: finalReasoning }),
                 ...(validToolCalls.length > 0 && { toolCalls: toolCallsForDb }),
               });
-
-              console.log('[STREAMING] Assistant message created successfully:', assistantMessage.id);
 
               await this.streamingService.broadcastDelta(conversationId, {
                 op: 'replace',
@@ -917,21 +861,8 @@ export class ConversationService {
       }
 
       case 'tool_started': {
-        // Log argument preview to verify parsing/shape reaching the Tool node
-        try {
-          const tEvent = event as ToolEvent;
-          const args = tEvent.data?.arguments;
-          const preview = args !== undefined ? JSON.stringify(args).slice(0, 1000) : undefined;
-          console.log('[STREAMING] Tool started:', tEvent.data?.toolName, {
-            toolCallId: tEvent.data?.toolCallId,
-            argsType: typeof args,
-            argsPreview: preview,
-          });
-        } catch {
-          const tEvent = event as ToolEvent;
-          console.log('[STREAMING] Tool started:', tEvent.data?.toolName);
-        }
-        // Tool started - we can optionally broadcast this or track it
+        const toolEvt = event as ToolEvent;
+        console.log('[STREAMING] Tool started:', toolEvt.data?.toolName);
         break;
       }
 

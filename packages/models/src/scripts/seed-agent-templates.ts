@@ -95,3 +95,8 @@ export async function seedAgentTemplates(): Promise<void> {
   }
 }
 
+// Run the seeding when this script is executed directly
+if (require.main === module) {
+  seedAgentTemplates();
+}
+

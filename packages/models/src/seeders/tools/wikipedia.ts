@@ -7,13 +7,13 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const wikipediaTool: ToolParams = {
   name: 'wikipedia_search',
-  description: 'Search and retrieve comprehensive information from Wikipedia using REST API',
+  description: 'Search and retrieve comprehensive information from Wikipedia using REST API. Works best with broad, established topic names that likely have dedicated articles. Avoid overly specific combinations or descriptive phrases.',
   parameters: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
-        description: 'Search query or exact page title for Wikipedia'
+        description: 'Search query or exact page title for Wikipedia. Use established topic names that likely have dedicated articles. Broader, well-known terms work better than specific combinations.'
       },
       action: {
         type: 'string',

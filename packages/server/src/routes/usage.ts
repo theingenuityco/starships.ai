@@ -71,4 +71,29 @@ router.get('/starships/:starshipId/usage/totals', jwtAuthMiddleware, async (req:
   }
 });
 
+/**
+ * GET /users/:userId/usage/totals
+ * Returns aggregate usage totals across all owned starships for a user
+ */
+router.get('/users/:userId/usage/totals', jwtAuthMiddleware, async (req: Request, res: Response) => {
+  try {
+    const paramValidation = validateData(z.object({ userId: NanoidSchema }), req.params, res, 'user parameter');
+    if (!paramValidation) return;
+    const { userId } = paramValidation;
+
+    // Authorization: Users can only view their own usage
+    if (req.user?.id !== userId) {
+      sendError(res, 'ACCESS_DENIED', 'You can only access your own usage', 403);
+      return;
+    }
+
+    const usageService = new UsageService();
+    const totals = await usageService.getTotalsByUser(userId);
+
+    sendSuccess(res, totals, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching user usage totals');
+  }
+});
+
 export default router;

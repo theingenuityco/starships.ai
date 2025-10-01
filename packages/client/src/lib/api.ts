@@ -244,7 +244,12 @@ const waitForTokenProvider = (): Promise<void> => {
 api.interceptors.request.use(
   async (config: RequestConfig) => {
     // Check if this is an authenticated endpoint
-    const requiresAuth = config.url?.includes('/api/v1/starships') || config.url?.includes('/api/v1/agents') || config.url?.includes('/api/v1/users') || config.url?.includes('/api/v1/conversations')
+    const requiresAuth =
+      config.url?.includes('/api/v1/starships') ||
+      config.url?.includes('/api/v1/agents') ||
+      config.url?.includes('/api/v1/users') ||
+      config.url?.includes('/api/v1/conversations') ||
+      config.url?.includes('/api/v1/openrouter')
 
     if (requiresAuth) {
       try {

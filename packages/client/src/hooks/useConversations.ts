@@ -340,6 +340,11 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
         if (!event.data) return
         const parsed = JSON.parse(event.data)
         const evt = (event as any).event || null
+        
+        // Ignore all events after we've seen complete
+        if (seenComplete) {
+          return
+        }
 
         switch (evt) {
           case 'message': {
@@ -435,12 +440,20 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             break
           }
           case 'complete': {
+            console.log('[DEBUG-FRONTEND] 🎯 Received complete event', { conversationId, evt })
             // Ensure we flip streaming=false before completion (UI caret off)
             push({ type: 'mark_last_assistant_streaming', streaming: false })
             push({ type: 'complete' })
-            // Allow trailing finalize patches (id/content/reasoning), then end shortly
+            // Immediately end the stream to update fetchStatus
             seenComplete = true
-            schedulePostCompleteEnd()
+            console.log('[DEBUG-FRONTEND] 📡 About to end() and abort connection')
+            end()
+            try {
+              localController.abort()
+              console.log('[DEBUG-FRONTEND] ✅ Connection aborted successfully')
+            } catch (e) {
+              console.log('[DEBUG-FRONTEND] ❌ Error aborting connection:', e)
+            }
             break
           }
           case 'error': {
@@ -457,9 +470,11 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
       }
     },
     onclose() {
+      console.log('[DEBUG-FRONTEND] 🔒 SSE connection closed:', { conversationId })
       end()
     },
     onerror(err) {
+      console.log('[DEBUG-FRONTEND] ❌ SSE connection error:', { err, conversationId })
       push({ type: 'error', error: err })
       // Let the stream finish; streamedQuery will treat further chunks/end accordingly
       end()
@@ -611,17 +626,33 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
     }
     case 'mark_last_assistant_streaming': {
       const messages = clone(acc)
-      for (let i = messages.length - 1; i >= 0; i--) {
+      console.log('[DEBUG-FRONTEND] 🎯 mark_last_assistant_streaming - processing messages:', {
+        messageCount: messages.length,
+        assistantMessages: messages.filter(m => m.role === 'assistant').map((m, i) => ({
+          index: i,
+          streaming: (m as any).streaming,
+          content: m.content?.substring(0, 50) + '...',
+          id: m.id
+        }))
+      })
+      
+      let updatedCount = 0
+      // Update ALL assistant messages to streaming=false, not just the last one
+      for (let i = 0; i < messages.length; i++) {
         if (messages[i].role === 'assistant' && (messages[i] as any).streaming) {
+          console.log('[DEBUG-FRONTEND] 🎯 Found streaming assistant at index:', i, 'setting streaming=false')
           const hasFinal = typeof messages[i].content === 'string' && messages[i].content.trim().length > 0
           const next: any = { ...(messages[i] as any), streaming: false }
           if (hasFinal) {
             next.chunks = undefined
           }
           messages[i] = next
-          break
+          updatedCount++
         }
       }
+      
+      console.log('[DEBUG-FRONTEND] ✅ Updated', updatedCount, 'assistant messages to streaming=false')
+      
       return messages
     }
     case 'complete':
@@ -674,7 +705,11 @@ export function useConversationStreamed(conversationId: string | null) {
   }, [chunks, conversationId, queryClient])
 
   // Derived streaming flags
-  const isAssistantStreaming = useMemo(() => computedMessages.some(m => (m as any)?.streaming === true), [computedMessages])
+  const isAssistantStreaming = useMemo(() => {
+    const result = computedMessages.some(m => (m as any)?.streaming === true)
+    console.log('[DEBUG-FRONTEND] 🔄 isAssistantStreaming calculated:', { result, messagesCount: computedMessages.length })
+    return result
+  }, [computedMessages])
 
   // Awaiting assistant = after the last user message, no assistant progress yet and the stream is open
   const isAwaitingAssistant = useMemo(() => {
@@ -705,13 +740,28 @@ export function useConversationStreamed(conversationId: string | null) {
       }
     }
 
-    if (!hasAssistantAfter) return messagesQuery.fetchStatus === 'fetching'
-    if (!hasAssistantProgress) return messagesQuery.fetchStatus === 'fetching'
-    return false
+    const result1 = !hasAssistantAfter ? messagesQuery.fetchStatus === 'fetching' : false
+    const result2 = !hasAssistantProgress ? messagesQuery.fetchStatus === 'fetching' : false
+    const finalResult = result1 || result2
+    console.log('[DEBUG-FRONTEND] 🔄 isAwaitingAssistant calculated:', { 
+      hasAssistantAfter, 
+      hasAssistantProgress, 
+      fetchStatus: messagesQuery.fetchStatus,
+      result1,
+      result2,
+      finalResult
+    })
+    return finalResult
   }, [computedMessages, messagesQuery.fetchStatus])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
+  console.log('[DEBUG-FRONTEND] 🎯 Final isResponding state:', { 
+    isAssistantStreaming, 
+    isAwaitingAssistant, 
+    isResponding,
+    conversationId 
+  })
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {

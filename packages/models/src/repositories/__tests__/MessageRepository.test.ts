@@ -68,6 +68,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.findAll();
 
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM messages ORDER BY created_at DESC');
       expect(result).toHaveLength(2);
     });
 
@@ -93,6 +94,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.findById('message-123');
 
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM messages WHERE id = $1', ['message-123']);
       expect(result).toMatchObject({
         id: 'message-123',
         content: 'Hello, world!',
@@ -121,16 +123,20 @@ describe('MessageRepository', () => {
 
       const result = await repository.findByRole('assistant');
 
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM messages WHERE role = $1 ORDER BY created_at DESC', ['assistant']);
       expect(result).toHaveLength(1);
     });
 
     it('should filter by role and starship', async () => {
       const mockMessages = [createMockMessage({ role: 'user' })];
-      mockConnection.queryOne.mockResolvedValue({ starship_id: 'starship-123' });
       mockConnection.query.mockResolvedValue(mockMessages);
 
       const result = await repository.findByRole('user', 'starship-123');
 
+      expect(mockConnection.query).toHaveBeenCalledWith(
+        'SELECT * FROM messages WHERE role = $1 AND starship_id = $2 ORDER BY created_at DESC',
+        ['user', 'starship-123']
+      );
       expect(result).toHaveLength(1);
     });
   });
@@ -144,6 +150,8 @@ describe('MessageRepository', () => {
 
       const result = await repository.create(createInput);
 
+      expect(mockConnection.queryOne).toHaveBeenCalledWith('SELECT starship_id FROM conversations WHERE id = $1', ['conversation-123']);
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO messages'), expect.any(Array));
       expect(result).toMatchObject({
         role: 'user',
         content: 'Hello, world!',
@@ -195,6 +203,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.update('message-123', updates);
 
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE messages'), expect.any(Array));
       expect(result).toMatchObject(updates);
     });
 
@@ -243,7 +252,10 @@ describe('MessageRepository', () => {
 
       await repository.linkToConversation('message-123', 'conversation-456');
 
-      expect(mockConnection.query).toHaveBeenCalled();
+      expect(mockConnection.query).toHaveBeenCalledWith('UPDATE messages SET conversation_id = $1, updated_at = NOW() WHERE id = $2', [
+        'conversation-456',
+        'message-123',
+      ]);
     });
   });
 
@@ -253,7 +265,9 @@ describe('MessageRepository', () => {
 
       await repository.unlinkFromConversation('message-123');
 
-      expect(mockConnection.query).toHaveBeenCalled();
+      expect(mockConnection.query).toHaveBeenCalledWith('UPDATE messages SET conversation_id = NULL, updated_at = NOW() WHERE id = $1', [
+        'message-123',
+      ]);
     });
   });
 
@@ -264,6 +278,7 @@ describe('MessageRepository', () => {
 
       const result = await repository.getMessageConversation('message-123');
 
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(expect.stringContaining('SELECT c.id, c.title, c.status'), ['message-123']);
       expect(result).toEqual(mockConversation);
     });
 

@@ -11,6 +11,7 @@ import type { Agent } from '@/lib/api'
 import { Sparkles, Users } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
+import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 
 interface ConversationInterfaceProps {
   starshipId?: string
@@ -23,6 +24,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model)
+  const budgetTokens = agentContextLength ?? 0
 
   // UI state (conversation id only; message presence is derived from store)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
@@ -186,7 +189,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       {/* Messages Area or Welcome Screen */}
       {showMessagesArea ? (
         <>
-          <ConversationContextBar conversationId={currentConversationId} />
+          <ConversationContextBar conversationId={currentConversationId} budgetTokens={budgetTokens} />
           <div className="flex-1 min-h-0">
             <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
           </div>

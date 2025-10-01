@@ -23,16 +23,18 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
   const pct = Math.max(0, Math.min(100, budgetTokens > 0 ? (total / budgetTokens) * 100 : 0))
   const pctIn = total > 0 ? (prompt / total) * 100 : 0
   const pctOut = total > 0 ? (completion / total) * 100 : 0
-  const costPerK = total > 0 ? cost / (total / 1000) : 0 // Cost per 1k tokens
 
   // Formatters
-  const formatTokens = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 })
-  const formatUSD6 = (v: number) => {
-    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.000000'
-    if (v > 0 && v < 1e-6) return `$${v.toFixed(9)}`
-    return `$${v.toFixed(6)}`
+  const formatUSD2 = (v: number) => {
+    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.00'
+    return `$${v.toFixed(2)}`
   }
-  const formatPerK = (v: number) => (v > 0 && v < 1e-6 ? `$${v.toFixed(9)}/1k` : `$${v.toFixed(6)}/1k`)
+  const formatCompactTokens = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  const formatPercent = (p: number) => {
+    const clamped = Math.max(0, Math.min(100, p))
+    const digits = clamped >= 10 ? 0 : 1
+    return `${clamped.toFixed(digits)}%`
+  }
 
   return (
     <div className={cn('sticky top-0 z-10 border-b border-border/50 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60', className)}>
@@ -45,7 +47,7 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
             <div className="flex items-center gap-1.5 rounded-full bg-muted/60 px-2.5 py-1 text-[11px] border border-border/50">
               <Coins className="w-3 h-3 text-amber-500" />
               <span className="text-muted-foreground">Cost</span>
-              <span className="font-medium text-foreground">{formatUSD6(cost)}</span>
+              <span className="font-medium text-foreground">{formatUSD2(cost)}</span>
             </div>
           </div>
         </div>
@@ -55,18 +57,18 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
           <div className="flex items-center justify-between text-[11px] mb-2">
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">Token:</span>
-              <span className="text-foreground font-medium">
-                {formatTokens(total)} / {formatTokens(budgetTokens)} tokens used
+              <span className="text-foreground font-medium" title={`${formatCompactTokens(total)} / ${formatCompactTokens(budgetTokens)} tokens used`}>
+                {formatCompactTokens(total)} / {formatCompactTokens(budgetTokens)} tokens used ({formatPercent(pct)})
               </span>
             </div>
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <ArrowDown className="w-3 h-3 text-sky-500" aria-label="In" />
-                <span className="text-foreground font-medium">{formatTokens(prompt)}</span>
+                <span className="text-foreground font-medium">{formatCompactTokens(prompt)}</span>
               </div>
               <div className="flex items-center gap-1">
                 <ArrowUp className="w-3 h-3 text-violet-500" aria-label="Out" />
-                <span className="text-foreground font-medium">{formatTokens(completion)}</span>
+                <span className="text-foreground font-medium">{formatCompactTokens(completion)}</span>
               </div>
             </div>
           </div>

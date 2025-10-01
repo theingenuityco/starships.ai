@@ -1,7 +1,7 @@
 import { UsageEntity } from '@/entities/UsageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
-import type { UsageModel, LLMUsage } from '@starships/protocol';
+import type { UsageModel, LLMUsage, UserUsageTotals } from '@starships/protocol';
 import type { Neo4jConnection } from '@/helpers/database';
 
 /**
@@ -187,6 +187,57 @@ export class UsageRepository extends BaseRepository {
       'listByConversation',
       'Usage',
       conversationId
+    );
+  }
+
+  /**
+   * Aggregate totals for a user across all owned starships.
+   * Returns summed token/cost totals and total request count (usage records).
+   */
+  async getTotalsByUser(userId: string): Promise<UserUsageTotals> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const conn = this.getConnection();
+        const result = await conn.executeQuery<{
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+          cost: number;
+          requestCount: number;
+        }>(
+          `
+        MATCH (s:Starship {ownerId: $userId})-[:HAS_USAGE]->(u:Usage)
+        RETURN
+          coalesce(sum(u.prompt_tokens), 0) AS prompt_tokens,
+          coalesce(sum(u.completion_tokens), 0) AS completion_tokens,
+          coalesce(sum(u.total_tokens), 0) AS total_tokens,
+          coalesce(sum(u.cost), 0) AS cost,
+          count(u) AS requestCount
+        `,
+          { userId }
+        );
+
+        const row = result?.[0] || {
+          prompt_tokens: 0,
+          completion_tokens: 0,
+          total_tokens: 0,
+          cost: 0,
+          requestCount: 0,
+        };
+
+        return {
+          totals: {
+            prompt_tokens: Number(row.prompt_tokens) || 0,
+            completion_tokens: Number(row.completion_tokens) || 0,
+            total_tokens: Number(row.total_tokens) || 0,
+            cost: Number(row.cost) || 0,
+          },
+          requestCount: Number(row.requestCount) || 0,
+        };
+      },
+      'getTotalsByUser',
+      'Usage',
+      userId
     );
   }
 }

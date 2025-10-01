@@ -5,6 +5,8 @@ import { PageLayout } from '@/components/layout/PageLayout'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Activity, CreditCard, Rocket, User as UserIcon } from 'lucide-react'
 
+import { UserUsage } from '@/components/profile/UserUsage'
+
 export default function ProfilePage(): React.JSX.Element {
   return (
     <PageLayout>
@@ -68,9 +70,10 @@ export default function ProfilePage(): React.JSX.Element {
 
               <TabsContent value="usage">
                 <section aria-labelledby="usage-section" className="rounded-xl border border-border/40 bg-background p-6">
-                  <h3 id="usage-section" className="text-lg font-semibold">
+                  <h3 id="usage-section" className="sr-only">
                     Usage
                   </h3>
+                  <UserUsage />
                 </section>
               </TabsContent>
             </Tabs>

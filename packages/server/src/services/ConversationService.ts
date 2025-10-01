@@ -722,13 +722,6 @@ export class ConversationService {
                   argsObj = argsStr ?? {};
                 }
 
-                // Log for debugging
-                console.log('[DEBUG] Tool call before DB insert:', {
-                  toolName: tc.function.name,
-                  argumentsString: argsStr,
-                  argumentsObject: argsObj,
-                });
-
                 return {
                   id: tc.id,
                   type: 'function' as const,
@@ -738,8 +731,6 @@ export class ConversationService {
                   },
                 };
               });
-
-              console.log('[DEBUG] Final tool_calls structure:', JSON.stringify(toolCallsForDb, null, 2));
 
               const assistantMessage = await this.messageService.createMessage({
                 conversationId,

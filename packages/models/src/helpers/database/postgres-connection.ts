@@ -77,13 +77,37 @@ export class PostgresConnection {
   async query<T = Record<string, unknown>>(text: string, params: unknown[] = []): Promise<T[]> {
     const pool = this.getPool();
 
+    // Serialize JSONB/JSON fields to strings manually to avoid double-escaping
+    // The pg library has issues with nested objects in JSONB columns
+    const processedParams = params.map((param) => {
+      // For arrays or objects (but not null/undefined), stringify for JSONB columns
+      if (param && typeof param === 'object' && !(param instanceof Date)) {
+        return JSON.stringify(param);
+      }
+      return param;
+    });
+
     try {
-      const result = await pool.query(text, params);
+      // Debug logging for messages table with tool_calls
+      if (text.includes('INSERT INTO messages') && params.length > 0) {
+        const toolCallsParam = params[7]; // tool_calls is the 8th parameter (index 7)
+        if (toolCallsParam) {
+          console.log('[DEBUG] postgres-connection - tool_calls param:', {
+            type: typeof toolCallsParam,
+            isArray: Array.isArray(toolCallsParam),
+            value: toolCallsParam,
+            stringified: JSON.stringify(toolCallsParam),
+            processedValue: processedParams[7],
+          });
+        }
+      }
+
+      const result = await pool.query(text, processedParams);
       return result.rows as T[];
     } catch (error) {
       console.error('PostgreSQL query error:', error);
       console.error('Query:', text);
-      console.error('Params:', params);
+      console.error('Params:', processedParams);
       throw error;
     }
   }

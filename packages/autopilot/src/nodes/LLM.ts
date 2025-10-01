@@ -123,7 +123,6 @@ export class LLM extends BaseNode<LlmParams> {
         (requestBody as { reasoning?: unknown }).reasoning = params.reasoning as unknown;
       }
 
-      console.log('>>REQUEST>> ', JSON.stringify(requestBody, null, 2));
 
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -196,7 +195,6 @@ export class LLM extends BaseNode<LlmParams> {
       }
 
       const llmResponse = await this.processStreamingResponse(reader);
-      console.log('<<RESPONSE<< ', JSON.stringify(llmResponse, null, 2));
       return ExecutionItemUtils.wrapSingle(llmResponse, input?.[0]);
     } catch (error) {
       throw this.handleExecutionError(error, 'LLM execution failed');
@@ -245,7 +243,6 @@ export class LLM extends BaseNode<LlmParams> {
             }
 
             const eventCallback = this.getEventCallback();
-            // console.log({ parsed: JSON.stringify(parsed, null, 2) });
 
             if (eventCallback) {
               await eventCallback({

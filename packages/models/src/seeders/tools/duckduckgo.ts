@@ -7,13 +7,13 @@ import type { ToolTemplateModel } from '@starships/protocol';
  */
 export const duckduckgoTool: ToolParams = {
   name: 'duckduckgo_instant',
-  description: 'Get instant answers, definitions, calculations, and quick facts from DuckDuckGo',
+  description: 'Get instant answers, definitions, calculations, and quick facts from DuckDuckGo. Works best with simple, direct terms (1-2 words). Use specific entities or common concepts rather than complex phrases or questions.',
   parameters: {
     type: 'object',
     properties: {
       query: {
         type: 'string',
-        description: 'Search query for instant answers, facts, or calculations'
+        description: 'Search query for instant answers, facts, or calculations. Use simple, direct terms and avoid complex phrases or full questions.'
       },
       skipDisambiguation: {
         type: 'boolean',

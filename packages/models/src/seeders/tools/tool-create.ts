@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: tool_create
- * Create a new Tool instance on a starship via server REST API
+ * Create a new Tool instance on a starship via server REST API or UI form
  */
 export const toolCreateTool: ToolParams = {
   name: 'tool_create',
@@ -12,14 +12,19 @@ export const toolCreateTool: ToolParams = {
 ## Purpose
 Creates executable tools that can be invoked by agents, with complete Autopilot workflow blueprints that define their behavior.
 
+## Creation Modes
+- **Direct API Creation** (use_ui_form: false): Creates tool directly via API, immediate execution
+- **Interactive UI Form** (use_ui_form: true): Opens form drawer for user review and modification before creation
+
 ## Required Parameters
 - **name**: Human-readable tool name (e.g., "Weather Lookup", "Send Email")
-- **slug**: Unique kebab-case identifier (e.g., "weather-lookup", "send-email") 
+- **slug**: Unique kebab-case identifier (e.g., "weather-lookup", "send-email")
 - **description**: Clear description of tool functionality and usage
 - **parameters**: JSON Schema defining tool input structure with validation rules
 - **blueprint**: Complete Autopilot workflow blueprint with nodes, edges, and execution logic
 
 ## Optional Parameters
+- **use_ui_form**: Boolean to open UI form for interactive creation (default: false)
 - **configuration**: Instance-specific settings (endpoints, flags, timeouts)
 - **isEnabled**: Tool availability status (default: true)
 
@@ -82,6 +87,10 @@ Automatically inferred from agent state (do not pass manually):
         description:
           'Optional instance-specific configuration settings including endpoints (object with string values), timeouts (object with default/http/llm integer values), retries (object with maxAttempts/backoffMs), and feature flags (object with boolean values)',
       },
+      use_ui_form: {
+        type: 'boolean',
+        description: 'Open interactive form for user review before creation. Useful for collaborative tool design.',
+      },
       isEnabled: {
         type: 'boolean',
         description: 'Whether the tool is available for use after creation (default: true)',
@@ -93,10 +102,51 @@ Automatically inferred from agent state (do not pass manually):
     nodes: [
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
+        ref: 'check_ui_mode',
+        type: 'conditional',
+        name: 'Check UI Mode',
+        description: 'Check if UI form should be used',
+        parameters: {
+          condition: 'input.use_ui_form === true',
+        },
+      },
+      {
+        ref: 'prepare_ui_data',
+        type: 'code',
+        name: 'Prepare UI Data',
+        description: 'Prepare data for UI form (returns special response for client)',
+        parameters: {
+          code: `
+            // Prepare form data for client-side rendering
+            const formData = {
+              name: input.name,
+              description: input.description,
+              category: input.category || 'general',
+              exampleUsage: input.exampleUsage || '',
+              requiresApiKey: input.requiresApiKey || false,
+              parameters: typeof input.parameters === 'object'
+                ? JSON.stringify(input.parameters, null, 2)
+                : input.parameters,
+              blueprint: typeof input.blueprint === 'object'
+                ? JSON.stringify(input.blueprint, null, 2)
+                : input.blueprint,
+            };
+
+            // Return special response that client will detect and handle
+            return {
+              __ui_action: 'open_tool_form',
+              formData,
+              success: true
+            };
+          `,
+          timeout: 3000,
+        },
+      },
+      {
         ref: 'prepare',
         type: 'code',
         name: 'Prepare Request',
-        description: 'Build URL, headers and body',
+        description: 'Build URL, headers and body for API creation',
         parameters: {
           code: `
             const baseUrl = (env('BASE_URL') || '').replace(/\\/+$/, '');
@@ -140,7 +190,8 @@ Automatically inferred from agent state (do not pass manually):
                 'Authorization': \`Bearer \${authToken}\`,
                 'Content-Type': 'application/json'
               },
-              body
+              body,
+              mode: 'direct_api'
             };
           `,
           timeout: 3000,
@@ -160,19 +211,31 @@ Automatically inferred from agent state (do not pass manually):
         },
       },
       {
-        ref: 'end_1',
+        ref: 'end_ui',
         type: 'end',
-        name: 'End',
-        description: '',
+        name: 'End UI Mode',
+        description: 'End for UI form mode',
+        parameters: {
+          output: '{{ $lastOutputOf("prepare_ui_data")[0].json }}',
+        },
+      },
+      {
+        ref: 'end_api',
+        type: 'end',
+        name: 'End API Mode',
+        description: 'End for direct API mode',
         parameters: {
           output: '{{ $lastOutputOf("http_create")[0].json }}',
         },
       },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_create' },
-      { ref: 'e3', from: 'http_create', to: 'end_1' },
+      { ref: 'e1', from: 'start_1', to: 'check_ui_mode' },
+      { ref: 'e2', from: 'check_ui_mode', to: 'prepare_ui_data', condition: 'input.use_ui_form === true' },
+      { ref: 'e3', from: 'check_ui_mode', to: 'prepare', condition: 'input.use_ui_form !== true' },
+      { ref: 'e4', from: 'prepare_ui_data', to: 'end_ui' },
+      { ref: 'e5', from: 'prepare', to: 'http_create' },
+      { ref: 'e6', from: 'http_create', to: 'end_api' },
     ],
     metadata: {},
   },

@@ -173,6 +173,38 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     toolFormDrawerRef.current?.resetForm()
   }, [])
 
+  // Detect special UI action responses from tools
+  useEffect(() => {
+    if (!currentConversationId || !liveMessages.length) return
+
+    // Check the last assistant message for UI actions
+    const lastMessage = liveMessages[liveMessages.length - 1]
+    if (lastMessage?.role === 'assistant' && lastMessage?.content) {
+      try {
+        // Try to parse content if it's a string
+        const content = typeof lastMessage.content === 'string' ? JSON.parse(lastMessage.content) : lastMessage.content
+
+        // Check for UI action
+        if (content?.__ui_action === 'open_tool_form' && content?.formData) {
+          // Open form with data
+          setTimeout(() => {
+            toolFormDrawerRef.current?.resetForm()
+            setToolFormDrawerOpen(true)
+            setTimeout(() => {
+              if (toolFormDrawerRef.current) {
+                Object.entries(content.formData).forEach(([field, value]) => {
+                  toolFormDrawerRef.current?.updateField(field as any, value as any)
+                })
+              }
+            }, 150)
+          }, 100)
+        }
+      } catch {
+        // Not JSON or doesn't have UI action, ignore
+      }
+    }
+  }, [currentConversationId, liveMessages])
+
   // Register tool form controller for programmatic access
   useEffect(() => {
     const controller = {

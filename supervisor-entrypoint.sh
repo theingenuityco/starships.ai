@@ -31,6 +31,36 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
         echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
         echo "local all all trust" >> /var/lib/postgresql/data/pg_hba.conf
         
+        # Run initialization scripts (standard PostgreSQL Docker pattern)
+        if [ -d "/docker-entrypoint-initdb.d" ]; then
+            echo "Running initialization scripts from /docker-entrypoint-initdb.d/..."
+            
+            # Start PostgreSQL temporarily for initialization
+            su-exec postgres pg_ctl -D /var/lib/postgresql/data -w start
+            
+            # Run all .sh and .sql scripts
+            for f in /docker-entrypoint-initdb.d/*; do
+                case "$f" in
+                    *.sh)
+                        if [ -x "$f" ]; then
+                            echo "Running $f"
+                            su-exec postgres "$f"
+                        fi
+                        ;;
+                    *.sql)
+                        echo "Running $f"
+                        su-exec postgres psql -v ON_ERROR_STOP=1 --username postgres < "$f"
+                        ;;
+                    *)
+                        echo "Ignoring $f"
+                        ;;
+                esac
+            done
+            
+            # Stop PostgreSQL
+            su-exec postgres pg_ctl -D /var/lib/postgresql/data -w stop
+        fi
+        
         echo "PostgreSQL initialization complete!"
     else
         echo "PostgreSQL data directory already initialized."

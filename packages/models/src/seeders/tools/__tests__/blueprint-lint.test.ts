@@ -4,21 +4,38 @@
  */
 
 import { blueprintLintTool, blueprintLintToolTemplate } from '../blueprint-lint';
-import { ToolTestHelper, CommonToolTestData } from './tool-test-helper';
+import { Tool, ExecutionItemUtils } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, BatchExecutionResult } from '@starships/autopilot';
+import { CommonToolTestData } from './tool-test-helper';
 
 describe('Blueprint Lint Tool', () => {
-  let testHelper: ToolTestHelper;
+  async function executeTool(input: unknown) {
+    const options: NodeHandlerOptions = {
+      eventCallback: jest.fn(),
+    };
 
-  beforeEach(() => {
-    testHelper = new ToolTestHelper(blueprintLintTool, blueprintLintToolTemplate, 'blueprint_lint');
-    testHelper.clearEventLogs();
-  });
+    const toolNode = new Tool(blueprintLintTool, options);
+
+    // Validate tool first
+    const validation = toolNode.validate();
+    expect(validation.valid).toBe(true);
+
+    const inputData = input || {};
+    const executionItem: ExecutionItem = {
+      json: inputData,
+      pairedItem: { item: 0 },
+    };
+
+    const result = await toolNode.execute([executionItem]);
+    return ExecutionItemUtils.unwrapSingle(result);
+  }
 
   describe('Tool Structure', () => {
     it('should have valid tool structure', () => {
-      const result = testHelper.testToolStructure();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      expect(blueprintLintTool.name).toBe('blueprint_lint');
+      expect(blueprintLintTool.description).toBeDefined();
+      expect(blueprintLintTool.parameters).toBeDefined();
+      expect(blueprintLintTool.blueprint).toBeDefined();
     });
 
     it('should have correct tool name', () => {
@@ -33,9 +50,9 @@ describe('Blueprint Lint Tool', () => {
 
   describe('Parameter Schema', () => {
     it('should have valid parameter schema', () => {
-      const result = testHelper.testParameterSchema();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      expect(blueprintLintTool.parameters).toBeDefined();
+      expect(blueprintLintTool.parameters.type).toBe('object');
+      expect(blueprintLintTool.parameters.properties).toBeDefined();
     });
 
     it('should require blueprint parameter', () => {
@@ -55,9 +72,9 @@ describe('Blueprint Lint Tool', () => {
 
   describe('Blueprint Structure', () => {
     it('should have valid blueprint structure', () => {
-      const result = testHelper.testBlueprintStructure();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      const blueprint = blueprintLintTool.blueprint;
+      expect(Array.isArray(blueprint.nodes)).toBe(true);
+      expect(Array.isArray(blueprint.edges)).toBe(true);
     });
 
     it('should have start and end nodes', () => {
@@ -88,9 +105,10 @@ describe('Blueprint Lint Tool', () => {
 
   describe('Template Configuration', () => {
     it('should have consistent template configuration', () => {
-      const result = testHelper.testTemplateConsistency();
-      expect(result.valid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      expect(blueprintLintToolTemplate.name).toBe(blueprintLintTool.name);
+      expect(blueprintLintToolTemplate.description).toBe(blueprintLintTool.description);
+      expect(blueprintLintToolTemplate.parameters).toEqual(blueprintLintTool.parameters);
+      expect(blueprintLintToolTemplate.blueprint).toEqual(blueprintLintTool.blueprint);
     });
 
     it('should have correct template metadata', () => {
@@ -113,24 +131,30 @@ describe('Blueprint Lint Tool', () => {
         blueprint: CommonToolTestData.VALID_BLUEPRINT,
       };
 
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      expect(result.result).toBeDefined();
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
 
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as {
-          ok: boolean;
-          issues: string[];
-          summary: { nodeCount: number; edgeCount: number; types: Record<string, number> };
-        };
-        expect(lintResult.ok).toBe(true);
-        expect(lintResult.issues).toHaveLength(0);
-        expect(lintResult.summary.nodeCount).toBe(2);
-        expect(lintResult.summary.edgeCount).toBe(1);
-        expect(lintResult.summary.types.start).toBe(1);
-        expect(lintResult.summary.types.end).toBe(1);
-      }
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as {
+        ok: boolean;
+        issues: string[];
+        summary: { nodeCount: number; edgeCount: number; types: Record<string, number> };
+      };
+      expect(lintResult.ok).toBe(true);
+      expect(lintResult.issues).toHaveLength(0);
+      expect(lintResult.summary.nodeCount).toBe(2);
+      expect(lintResult.summary.edgeCount).toBe(1);
+      expect(lintResult.summary.types.start).toBe(1);
+      expect(lintResult.summary.types.end).toBe(1);
     });
 
     it('should validate a complex valid blueprint', async () => {
@@ -152,23 +176,31 @@ describe('Blueprint Lint Tool', () => {
       };
 
       const input = { blueprint: complexBlueprint };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as {
-          ok: boolean;
-          issues: string[];
-          summary: { nodeCount: number; edgeCount: number; types: Record<string, number> };
-        };
-        expect(lintResult.ok).toBe(true);
-        expect(lintResult.issues).toHaveLength(0);
-        expect(lintResult.summary.nodeCount).toBe(5);
-        expect(lintResult.summary.edgeCount).toBe(4);
-        expect(lintResult.summary.types.llm).toBe(1);
-        expect(lintResult.summary.types.http_request).toBe(1);
-        expect(lintResult.summary.types.conditional).toBe(1);
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as {
+        ok: boolean;
+        issues: string[];
+        summary: { nodeCount: number; edgeCount: number; types: Record<string, number> };
+      };
+      expect(lintResult.ok).toBe(true);
+      expect(lintResult.issues).toHaveLength(0);
+      expect(lintResult.summary.nodeCount).toBe(5);
+      expect(lintResult.summary.edgeCount).toBe(4);
+      expect(lintResult.summary.types.llm).toBe(1);
+      expect(lintResult.summary.types.http_request).toBe(1);
+      expect(lintResult.summary.types.conditional).toBe(1);
     });
 
     it('should detect missing start node', async () => {
@@ -179,14 +211,22 @@ describe('Blueprint Lint Tool', () => {
       };
 
       const input = { blueprint: invalidBlueprint };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as { ok: boolean; issues: string[] };
-        expect(lintResult.ok).toBe(false);
-        expect(lintResult.issues).toContain('Missing start node');
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues).toContain('Missing start node');
     });
 
     it('should detect missing end node', async () => {
@@ -197,14 +237,22 @@ describe('Blueprint Lint Tool', () => {
       };
 
       const input = { blueprint: invalidBlueprint };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as { ok: boolean; issues: string[] };
-        expect(lintResult.ok).toBe(false);
-        expect(lintResult.issues).toContain('Missing end node');
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues).toContain('Missing end node');
     });
 
     it('should detect duplicate node refs', async () => {
@@ -218,14 +266,22 @@ describe('Blueprint Lint Tool', () => {
       };
 
       const input = { blueprint: invalidBlueprint };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as { ok: boolean; issues: string[] };
-        expect(lintResult.ok).toBe(false);
-        expect(lintResult.issues.some((issue) => issue.includes('Duplicate node ref'))).toBe(true);
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues.some((issue) => issue.includes('Duplicate node ref'))).toBe(true);
     });
 
     it('should detect invalid node types', async () => {
@@ -243,14 +299,22 @@ describe('Blueprint Lint Tool', () => {
       };
 
       const input = { blueprint: invalidBlueprint };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as { ok: boolean; issues: string[] };
-        expect(lintResult.ok).toBe(false);
-        expect(lintResult.issues.some((issue) => issue.includes('Unsupported node type'))).toBe(true);
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues.some((issue) => issue.includes('Unsupported node type'))).toBe(true);
     });
 
     it('should detect edges referencing unknown nodes', async () => {
@@ -267,14 +331,22 @@ describe('Blueprint Lint Tool', () => {
       };
 
       const input = { blueprint: invalidBlueprint };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as { ok: boolean; issues: string[] };
-        expect(lintResult.ok).toBe(false);
-        expect(lintResult.issues.some((issue) => issue.includes('references unknown node'))).toBe(true);
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues.some((issue) => issue.includes('references unknown node'))).toBe(true);
     });
 
     it('should detect missing node refs', async () => {
@@ -288,72 +360,138 @@ describe('Blueprint Lint Tool', () => {
       };
 
       const input = { blueprint: invalidBlueprint };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as { ok: boolean; issues: string[] };
-        expect(lintResult.ok).toBe(false);
-        expect(lintResult.issues.some((issue) => issue.includes('missing valid "ref"'))).toBe(true);
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues.some((issue) => issue.includes('missing valid "ref"'))).toBe(true);
     });
 
     it('should emit proper events during execution', async () => {
       const input = { blueprint: CommonToolTestData.VALID_BLUEPRINT };
-      await testHelper.executeToolViaEngine(input);
-
-      const events = testHelper.getEventLogs();
-      expect(events.length).toBeGreaterThan(0);
+      const eventCallback = jest.fn();
+      
+      const options: NodeHandlerOptions = {
+        eventCallback,
+      };
+      
+      const toolNode = new Tool(blueprintLintTool, options);
+      const executionItem: ExecutionItem = {
+        json: input,
+        pairedItem: { item: 0 },
+      };
+      
+      await toolNode.execute([executionItem]);
+      expect(eventCallback).toHaveBeenCalled();
     });
 
     it('should complete within reasonable time', async () => {
       const input = { blueprint: CommonToolTestData.VALID_BLUEPRINT };
-      const result = await testHelper.executeToolViaEngine(input);
+      const startTime = Date.now();
+      const result = await executeTool(input) as BatchExecutionResult;
+      const duration = Date.now() - startTime;
 
-      expect(result.success).toBe(true);
-      expect(result.duration).toBeLessThan(4000); // Should complete within 4 seconds
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+      expect(duration).toBeLessThan(4000); // Should complete within 4 seconds
     });
   });
 
   describe('Error Handling', () => {
     it('should handle missing blueprint parameter', async () => {
       const input = {}; // Missing blueprint
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('blueprint');
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('blueprint')
+            })
+          })
+        ])
+      });
     });
 
     it('should handle invalid blueprint structure (not object)', async () => {
       const input = { blueprint: 'invalid-blueprint' };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('object with nodes');
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('object with nodes')
+            })
+          })
+        ])
+      });
     });
 
     it('should handle blueprint without nodes array', async () => {
       const input = { blueprint: { edges: [] } };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('nodes must be an array');
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('nodes must be an array')
+            })
+          })
+        ])
+      });
     });
 
     it('should handle blueprint without edges array', async () => {
       const input = { blueprint: { nodes: [] } };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('edges must be an array');
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('edges must be an array')
+            })
+          })
+        ])
+      });
     });
 
     it('should handle null blueprint', async () => {
       const input = { blueprint: null };
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('object with nodes');
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('object with nodes')
+            })
+          })
+        ])
+      });
     });
 
     it('should handle malformed nodes', async () => {
@@ -367,26 +505,41 @@ describe('Blueprint Lint Tool', () => {
         },
       };
 
-      const result = await testHelper.executeToolViaEngine(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result.success).toBe(true);
-      if (result.result && typeof result.result === 'object') {
-        const lintResult = result.result as { ok: boolean; issues: string[] };
-        expect(lintResult.ok).toBe(false);
-        expect(lintResult.issues.some((issue) => issue.includes('Node entry must be an object'))).toBe(true);
-      }
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues.some((issue) => issue.includes('Node entry must be an object'))).toBe(true);
     });
   });
 
   describe('All Validation Tests', () => {
     it('should pass comprehensive validation', () => {
-      const validation = testHelper.runAllValidationTests();
-
-      expect(validation.structureValid).toBe(true);
-      expect(validation.parametersValid).toBe(true);
-      expect(validation.blueprintValid).toBe(true);
-      expect(validation.templateValid).toBe(true);
-      expect(validation.errors).toHaveLength(0);
+      // Tool structure validation
+      expect(blueprintLintTool.name).toBe('blueprint_lint');
+      expect(blueprintLintTool.description).toBeDefined();
+      expect(blueprintLintTool.parameters).toBeDefined();
+      expect(blueprintLintTool.blueprint).toBeDefined();
+      
+      // Blueprint structure validation
+      const blueprint = blueprintLintTool.blueprint;
+      expect(Array.isArray(blueprint.nodes)).toBe(true);
+      expect(Array.isArray(blueprint.edges)).toBe(true);
+      
+      // Template consistency validation
+      expect(blueprintLintToolTemplate.name).toBe(blueprintLintTool.name);
+      expect(blueprintLintToolTemplate.description).toBe(blueprintLintTool.description);
     });
   });
 });

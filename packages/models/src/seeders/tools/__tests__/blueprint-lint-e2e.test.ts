@@ -5,7 +5,7 @@
 
 import { blueprintLintTool, blueprintLintToolTemplate } from '../blueprint-lint';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, BatchExecutionResult } from '@starships/autopilot';
 
 describe('Blueprint Lint Tool (E2E)', () => {
   async function executeTool(input: unknown) {
@@ -62,19 +62,30 @@ describe('Blueprint Lint Tool (E2E)', () => {
     };
 
     it('should validate a simple valid blueprint', async () => {
-      const result = (await executeTool({ blueprint: VALID_BLUEPRINT })) as {
+      const result = await executeTool({ blueprint: VALID_BLUEPRINT }) as BatchExecutionResult;
+
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as {
         ok: boolean;
         issues: string[];
         summary: { nodeCount: number; edgeCount: number; types: Record<string, number> };
       };
-
-      expect(result).toBeDefined();
-      expect(result.ok).toBe(true);
-      expect(result.issues).toHaveLength(0);
-      expect(result.summary.nodeCount).toBe(2);
-      expect(result.summary.edgeCount).toBe(1);
-      expect(result.summary.types.start).toBe(1);
-      expect(result.summary.types.end).toBe(1);
+      expect(lintResult.ok).toBe(true);
+      expect(lintResult.issues).toHaveLength(0);
+      expect(lintResult.summary.nodeCount).toBe(2);
+      expect(lintResult.summary.edgeCount).toBe(1);
+      expect(lintResult.summary.types.start).toBe(1);
+      expect(lintResult.summary.types.end).toBe(1);
     });
 
     it('should detect missing start node', async () => {
@@ -83,9 +94,21 @@ describe('Blueprint Lint Tool (E2E)', () => {
         edges: [],
         metadata: {},
       };
-      const result = (await executeTool({ blueprint: invalid })) as { ok: boolean; issues: string[] };
-      expect(result.ok).toBe(false);
-      expect(result.issues).toEqual(expect.arrayContaining(['Missing start node']));
+      const result = await executeTool({ blueprint: invalid }) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues).toEqual(expect.arrayContaining(['Missing start node']));
     });
 
     it('should detect invalid node types and edge issues', async () => {
@@ -102,22 +125,53 @@ describe('Blueprint Lint Tool (E2E)', () => {
         ],
         metadata: {},
       };
-      const result = (await executeTool({ blueprint: invalid })) as { ok: boolean; issues: string[] };
-      expect(result.ok).toBe(false);
-      expect(result.issues.some((i) => i.includes('Unsupported node type'))).toBe(true);
-      expect(result.issues.some((i) => i.includes('references unknown node'))).toBe(true);
+      const result = await executeTool({ blueprint: invalid }) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const lintResult = successfulResult.data as { ok: boolean; issues: string[] };
+      expect(lintResult.ok).toBe(false);
+      expect(lintResult.issues.some((i) => i.includes('Unsupported node type'))).toBe(true);
+      expect(lintResult.issues.some((i) => i.includes('references unknown node'))).toBe(true);
     });
 
     it('should handle malformed blueprint inputs', async () => {
       // Not an object
-      await expect(executeTool({ blueprint: 'invalid-blueprint' })).resolves.toBeDefined();
+      const invalidResult = await executeTool({ blueprint: 'invalid-blueprint' }) as BatchExecutionResult;
+      expect(invalidResult).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
 
       // Missing arrays
-      const noNodes = await executeTool({ blueprint: { edges: [] } });
-      const noEdges = await executeTool({ blueprint: { nodes: [] } });
+      const noNodes = await executeTool({ blueprint: { edges: [] } }) as BatchExecutionResult;
+      const noEdges = await executeTool({ blueprint: { nodes: [] } }) as BatchExecutionResult;
 
-      expect(noNodes && typeof noNodes === 'object').toBe(true);
-      expect(noEdges && typeof noEdges === 'object').toBe(true);
+      expect(noNodes).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+      expect(noEdges).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
     });
   });
 });
@@ -148,8 +202,20 @@ describe('Tool.execute return value - blueprint_lint', () => {
     const item = raw[0];
     expect(item.pairedItem).toEqual({ item: 9 });
 
-    // Lint result shape
-    const lint = item.json as { ok: boolean; issues: string[]; summary: { nodeCount: number; edgeCount: number } };
+    // The batch result is nested inside the json property
+    const batchResult = item.json as BatchExecutionResult;
+    expect(batchResult).toMatchObject({
+      successful: expect.arrayContaining([
+        expect.objectContaining({
+          success: true
+        })
+      ])
+    });
+
+    // Extract the data from the successful result
+    const successfulResult = batchResult.successful?.[0];
+    expect(successfulResult).toBeDefined();
+    const lint = successfulResult.data as { ok: boolean; issues: string[]; summary: { nodeCount: number; edgeCount: number } };
     expect(lint).toBeDefined();
     expect(lint.ok).toBe(true);
     expect(lint.issues).toEqual([]);

@@ -5,7 +5,7 @@
 
 import { toolListTool, toolListToolTemplate } from '../tool-list';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions, Edge } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, Edge, BatchExecutionResult } from '@starships/autopilot';
 
 // Helper to create a realistic Fetch Response-like object for our HttpRequest node
 function createMockResponse(
@@ -144,7 +144,7 @@ describe('Tool List Tool', () => {
     }
 
     it('should handle missing environment variables gracefully', async () => {
-      const result = await executeToolWithMockEnv({}, {});
+      const result = await executeToolWithMockEnv({}, {}) as BatchExecutionResult;
       expect(result).toMatchObject({
         successful: expect.arrayContaining([
           expect.objectContaining({
@@ -164,7 +164,7 @@ describe('Tool List Tool', () => {
         // Missing AUTH_TOKEN
       };
 
-      const result = await executeToolWithMockEnv({}, mockEnv);
+      const result = await executeToolWithMockEnv({}, mockEnv) as BatchExecutionResult;
       expect(result).toMatchObject({
         successful: expect.arrayContaining([
           expect.objectContaining({
@@ -184,7 +184,7 @@ describe('Tool List Tool', () => {
         // Missing STARSHIP_ID
       };
 
-      const result = await executeToolWithMockEnv({}, mockEnv);
+      const result = await executeToolWithMockEnv({}, mockEnv) as BatchExecutionResult;
       expect(result).toMatchObject({
         successful: expect.arrayContaining([
           expect.objectContaining({
@@ -226,7 +226,7 @@ describe('Tool List Tool', () => {
 
       (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(mockResponseData));
 
-      const result = await executeToolWithMockEnv({}, mockEnv);
+      const result = await executeToolWithMockEnv({}, mockEnv) as BatchExecutionResult;
 
       expect(result).toBeDefined();
       expect(result).toMatchObject({
@@ -271,7 +271,7 @@ describe('Tool List Tool', () => {
       // Mock network failure
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
 
-      const result = await executeToolWithMockEnv({}, mockEnv);
+      const result = await executeToolWithMockEnv({}, mockEnv) as BatchExecutionResult;
       expect(result).toMatchObject({
         successful: expect.arrayContaining([
           expect.objectContaining({
@@ -294,7 +294,7 @@ describe('Tool List Tool', () => {
       const mockResponseData = { data: [] };
       (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse(mockResponseData));
 
-      const result = await executeToolWithMockEnv({}, mockEnv);
+      const result = await executeToolWithMockEnv({}, mockEnv) as BatchExecutionResult;
 
       expect(result).toBeDefined();
       expect(result).toMatchObject({
@@ -344,7 +344,7 @@ describe('Tool List Tool', () => {
         text: async () => JSON.stringify({ error: 'Starship not found' }),
       });
 
-      const result = await executeToolWithMockEnv({}, mockEnv);
+      const result = await executeToolWithMockEnv({}, mockEnv) as BatchExecutionResult;
       expect(result).toMatchObject({
         successful: expect.arrayContaining([
           expect.objectContaining({
@@ -462,7 +462,7 @@ describe('Tool.execute return value - tool_list', () => {
     expect(item.pairedItem).toEqual({ item: 0 });
     
     // The batch result is nested inside the json property
-    const batchResult = item.json;
+    const batchResult = item.json as BatchExecutionResult;
     expect(batchResult).toMatchObject({
       successful: expect.arrayContaining([
         expect.objectContaining({

@@ -5,7 +5,7 @@
 
 import { calculatorTool, calculatorToolTemplate } from '../calculator';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, BatchExecutionResult } from '@starships/autopilot';
 
 describe('Calculator Tool', () => {
   async function executeTool(input: unknown) {
@@ -89,12 +89,20 @@ describe('Calculator Tool', () => {
   describe('Real Tool Execution', () => {
     it('should execute simple addition', async () => {
       const input = { expression: '5 + 3' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
 
-      const calcResult = result as { expression: string; result: number; type: string };
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { expression: string; result: number; type: string };
       expect(calcResult.expression).toBe('5 + 3');
       expect(calcResult.result).toBe(8);
       expect(calcResult.type).toBe('calculation');
@@ -102,11 +110,20 @@ describe('Calculator Tool', () => {
 
     it('should execute expression with precedence', async () => {
       const input = { expression: '2 + 3 * 4' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
 
-      const calcResult = result as { expression: string; result: number; type: string };
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { expression: string; result: number; type: string };
       expect(calcResult.expression).toBe('2 + 3 * 4');
       expect(calcResult.result).toBe(14); // Proper precedence: 2 + (3 * 4) = 14
       expect(calcResult.type).toBe('calculation');
@@ -114,64 +131,134 @@ describe('Calculator Tool', () => {
 
     it('should execute simple multiplication', async () => {
       const input = { expression: '6 * 7' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      const calcResult = result as { result: number };
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect(calcResult.result).toBe(42);
     });
 
     it('should handle single numbers', async () => {
       const input = { expression: '42' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      const calcResult = result as { result: number };
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect(calcResult.result).toBe(42);
     });
 
     it('should handle expressions with parentheses', async () => {
       const input = { expression: '(10 + 5) * 2' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      const calcResult = result as { result: number };
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect(calcResult.result).toBe(30); // (10 + 5) * 2 = 15 * 2 = 30
     });
 
     it('should handle decimal numbers', async () => {
       const input = { expression: '3.5 + 2.5' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      const calcResult = result as { result: number };
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect(calcResult.result).toBe(6);
     });
 
     it('should handle division', async () => {
       const input = { expression: '15 / 3' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      const calcResult = result as { result: number };
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect(calcResult.result).toBe(5);
     });
 
     it('should handle division by zero', async () => {
       const input = { expression: '5 / 0' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      const calcResult = result as { result: number };
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect([Infinity, 'Infinity']).toContain(calcResult.result);
     });
 
     it('should handle complex expressions', async () => {
       const input = { expression: '(10 + 5) * 2.5 / 3' };
-      const result = await executeTool(input);
+      const result = await executeTool(input) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
-      const calcResult = result as { result: number };
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect(typeof calcResult.result).toBe('number');
       // (15 * 2.5) / 3 = 37.5 / 3 = 12.5
       expect(calcResult.result).toBeCloseTo(12.5);
@@ -182,45 +269,80 @@ describe('Calculator Tool', () => {
     it('should handle missing expression', async () => {
       const input = {}; // Missing expression
 
-      await expect(executeTool(input)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Expression is required'),
+      const result = await executeTool(input) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('Expression is required')
+            })
+          })
+        ])
       });
     });
 
     it('should handle invalid expression type', async () => {
       const input = { expression: 123 }; // Should be string
 
-      await expect(executeTool(input)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('must be a string'),
+      const result = await executeTool(input) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('must be a string')
+            })
+          })
+        ])
       });
     });
 
     it('should handle expressions with invalid characters', async () => {
       const input = { expression: '2 + 3; alert("hack")' };
 
-      await expect(executeTool(input)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('invalid characters'),
+      const result = await executeTool(input) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('invalid characters')
+            })
+          })
+        ])
       });
     });
 
     it('should handle complex unsupported expressions', async () => {
       const input = { expression: 'Math.pow(2, 8)' };
 
-      await expect(executeTool(input)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Complex expressions not supported'),
+      const result = await executeTool(input) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('Complex expressions not supported')
+            })
+          })
+        ])
       });
     });
 
     it('should handle empty expression', async () => {
       const input = { expression: '' };
 
-      await expect(executeTool(input)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Expression is required'),
+      const result = await executeTool(input) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('Expression is required')
+            })
+          })
+        ])
       });
     });
 
@@ -236,9 +358,16 @@ describe('Calculator Tool', () => {
       for (const expr of dangerousExpressions) {
         const input = { expression: expr };
 
-        await expect(executeTool(input)).resolves.toMatchObject({
-          ok: false,
-          error: expect.stringContaining('invalid characters'),
+        const result = await executeTool(input) as BatchExecutionResult;
+        expect(result).toMatchObject({
+          successful: expect.arrayContaining([
+            expect.objectContaining({
+              success: true,
+              data: expect.objectContaining({
+                error: expect.stringContaining('invalid characters')
+              })
+            })
+          ])
         });
       }
     });
@@ -252,10 +381,19 @@ describe('Calculator Tool', () => {
         expect(allowedChars.includes(char)).toBe(true);
       }
 
-      const result = await executeTool(input);
-      expect(result).toBeDefined();
+      const result = await executeTool(input) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
 
-      const calcResult = result as { result: number };
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const calcResult = successfulResult.data as { result: number };
       expect(typeof calcResult.result).toBe('number');
     });
 

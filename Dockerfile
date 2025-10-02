@@ -19,15 +19,15 @@ RUN mkdir -p /etc/supervisor/conf.d
 # Fix pnpm cache permissions for all users
 # The node:20-alpine image already has a 'node' user with uid 1000
 RUN mkdir -p /root/.cache/node/corepack/v1/pnpm && \
-    chmod -R 777 /root/.cache && \
+    chmod -R 755 /root/.cache && \
     mkdir -p /home/node/.cache/node/corepack/v1/pnpm && \
     chown -R node:node /home/node/.cache && \
-    chmod -R 777 /home/node/.cache && \
+    chmod -R 755 /home/node/.cache && \
     # Also create a nodejs user as an alias for compatibility
     adduser -D -u 1001 -G node nodejs && \
     mkdir -p /home/nodejs/.cache/node/corepack/v1/pnpm && \
     chown -R nodejs:node /home/nodejs/.cache && \
-    chmod -R 777 /home/nodejs/.cache
+    chmod -R 755 /home/nodejs/.cache
 
 # Configure PostgreSQL
 ENV POSTGRES_VERSION=15

@@ -1,6 +1,6 @@
 # starships.ai – AI-Powered Agent Orchestration
 
-A comprehensive TypeScript monorepo for orchestrating AI-driven agents and workflows. Built with Next.js 15, Express.js, Neo4j, and advanced workflow automation for transforming vision into reality.
+A comprehensive TypeScript monorepo for orchestrating AI-driven agents and workflows. Built with Next.js 15, Express.js, PostgreSQL, and advanced workflow automation for transforming vision into reality.
 
 > **Project Status:** Production-ready with live waitlist system and operational core features.
 
@@ -24,8 +24,8 @@ A comprehensive TypeScript monorepo for orchestrating AI-driven agents and workf
 
 - Node.js 20+
 - pnpm 10.12.4+
-- Docker (for Neo4j database)
-- Neo4j database
+- Docker (for PostgreSQL database)
+- PostgreSQL 18 database
 
 ### Installation
 
@@ -45,10 +45,27 @@ cp .env.example .env
 
 2. Configure essential services:
 
-- **Neo4j**: Run with Docker: `docker run -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/[NEO4J-PASSWORD] neo4j`
+- **PostgreSQL**: Start PostgreSQL 18 with Docker: `pnpm run postgres:install`
+- **Database Schema**: Apply schema: `PGPASSWORD=password psql -h localhost -U postgres -d starships -f packages/models/migrations/000_postgresql_schema.sql`
 - **JWT Authentication**: Built-in JWT token-based authentication system
 - **OpenAI/Anthropic**: Add your API keys
 - **Stripe**: Configure for payments (optional for development)
+
+### PostgreSQL Database Setup
+
+```bash
+# Start PostgreSQL 18 container
+pnpm run postgres:install
+
+# Reset PostgreSQL container (if needed)
+pnpm run postgres:reset
+
+# Connect to PostgreSQL shell
+pnpm run postgres:shell
+
+# Create database backup
+pnpm run postgres:backup
+```
 
 ### Development
 
@@ -68,7 +85,7 @@ pnpm lint         # Run ESLint
 | [`@starships/client`](./packages/client/README.md)               | Next.js 15 frontend with starship management, agent control, and conversation interfaces             |
 | [`@starships/server`](./packages/server/README.md)               | Express.js API server with JWT authentication, Stripe billing, and comprehensive endpoints           |
 | [`@starships/autopilot`](./packages/autopilot/README.md)         | Workflow execution engine with DAG-based flows, agent system, AI model integration, and tool calling |
-| [`@starships/models`](./packages/models/README.md)               | Neo4j database models, repositories, migration system, and comprehensive data access layer           |
+| [`@starships/models`](./packages/models/README.md)               | PostgreSQL database models, repositories, migration system, and comprehensive data access layer      |
 | [`@starships/reverse-proxy`](./packages/reverse-proxy/README.md) | Development reverse proxy for unified local development routing                                      |
 | [`@starships/protocol`](./packages/protocol/README.md)           | Shared TypeScript types, domain models, and API contracts                                            |
 | [`@starships/errors`](./packages/errors/README.md)               | Comprehensive error handling system with automatic categorization and developer-friendly API         |
@@ -94,7 +111,7 @@ pnpm lint         # Run ESLint
 ### Backend Stack
 
 - **API**: Express.js 5+ with comprehensive middleware
-- **Database**: Neo4j graph database with driver
+- **Database**: PostgreSQL 18 relational database with connection pooling
 - **Authentication**: Kinde OAuth with JWT
 - **Payments**: Stripe with webhook idempotency
 
@@ -180,7 +197,7 @@ graph TD
 
 **Database & Data Management**
 
-- Neo4j graph database with automated migrations
+- PostgreSQL 18 relational database with automated migrations
 - Comprehensive repository pattern with 15+ repositories
 - Entity serialization with class-transformer integration
 - Performance monitoring and health checks
@@ -274,7 +291,7 @@ kubectl logs -n starships-prod -l app=starships-ai --follow
 - **SSL Certificates**: Automatic Let's Encrypt provisioning
 - **Health Monitoring**: Comprehensive health checks and metrics
 - **Load Balancing**: NGINX Ingress with production-ready configuration
-- **Data Persistence**: 40GB Neo4j storage + 5GB session storage
+- **Data Persistence**: 40GB PostgreSQL storage + 5GB session storage
 
 ---
 
@@ -292,7 +309,7 @@ kubectl logs -n starships-prod -l app=starships-ai --follow
 
 - **Health Endpoints**: `/health`, `/health/detailed`
 - **System Metrics**: Memory, CPU, server status
-- **Database Monitoring**: Neo4j connection and query performance
+- **Database Monitoring**: PostgreSQL connection and query performance
 - **Error Tracking**: Comprehensive error handling and logging
 
 ---
@@ -375,7 +392,7 @@ Simple and efficient debug configurations for development:
 - ✅ Conversation system with structured chat interfaces
 - ✅ Autopilot workflow execution engine with advanced memory
 - ✅ Stripe subscription management with webhook handling
-- ✅ Neo4j database with automated migrations
+- ✅ PostgreSQL database with automated migrations
 - ✅ Production-ready error handling and monitoring
 - ✅ Docker containerization and health checks
 

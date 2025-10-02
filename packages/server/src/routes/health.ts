@@ -71,7 +71,7 @@ router.get('/health', async (req: Request, res: Response): Promise<void> => {
     try {
       const dbStart = Date.now();
       const connection = getConnection();
-      await connection.executeQuery('RETURN 1 as health_check');
+      await connection.queryOne('SELECT 1 as health_check');
 
       healthCheck.services.database = {
         status: 'healthy',
@@ -190,25 +190,36 @@ router.get('/health/detailed', async (req: Request, res: Response): Promise<void
       const connection = getConnection();
 
       // Test basic connectivity
-      await connection.executeQuery('RETURN 1 as health_check');
+      await connection.queryOne('SELECT 1 as health_check');
 
       // Test database schema
-      const schemaCheck = await connection.executeQuery(`
-        CALL db.schema.visualization() YIELD nodes, relationships
-        RETURN count(nodes) as nodeTypes, count(relationships) as relationshipTypes
+      const schemaCheck = await connection.query(`
+        SELECT
+          COUNT(*) as table_count,
+          (SELECT COUNT(*) FROM information_schema.table_constraints
+           WHERE constraint_type = 'FOREIGN KEY') as foreign_key_count
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
       `);
 
       // Test database performance
       const perfStart = Date.now();
-      await connection.executeQuery('MATCH (n) RETURN count(n) as totalNodes LIMIT 1');
+      const totalRecords = await connection.query(`
+        SELECT
+          (SELECT COUNT(*) FROM users) +
+          (SELECT COUNT(*) FROM starships) +
+          (SELECT COUNT(*) FROM agents) +
+          (SELECT COUNT(*) FROM conversations) as total_records
+      `);
       const perfTime = Date.now() - perfStart;
 
       healthCheck.services.database = {
         status: 'healthy',
         responseTime: Date.now() - dbStart,
         details: {
-          nodeTypes: schemaCheck[0]?.nodeTypes || 0,
-          relationshipTypes: schemaCheck[0]?.relationshipTypes || 0,
+          tableCount: schemaCheck[0]?.table_count || 0,
+          foreignKeyCount: schemaCheck[0]?.foreign_key_count || 0,
+          totalRecords: totalRecords[0]?.total_records || 0,
           queryPerformance: perfTime,
         },
       };
@@ -325,7 +336,7 @@ router.get('/health/ready', async (req: Request, res: Response): Promise<void> =
   try {
     // Check if system is ready to accept requests
     const connection = getConnection();
-    await connection.executeQuery('RETURN 1 as readiness_check');
+    await connection.queryOne('SELECT 1 as readiness_check');
 
     // Check if essential repositories are available
     const starshipRepo = new StarshipRepository();

@@ -5,7 +5,6 @@
  * using class-transformer decorators and class-validator for lean validation.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { ConversationModel } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
 import { IsIn, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
@@ -21,15 +20,19 @@ export class ConversationEntity implements ConversationModel {
   id!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsOptional()
   @IsISO8601()
   updatedAt?: string;
+
+  // Foreign key relationship
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  starshipId!: string;
 
   @Expose()
   @IsString()
@@ -58,6 +61,7 @@ export class ConversationEntity implements ConversationModel {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt,
+        starshipId: dataRecord.starshipId || 'temp-starship-id', // Temp value for validation
         title: dataRecord.title, // Don't provide default during validation
         status: dataRecord.status || 'active',
         ...dataRecord,

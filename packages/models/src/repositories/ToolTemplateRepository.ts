@@ -1,6 +1,5 @@
 import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
@@ -13,21 +12,15 @@ import type {
 } from '@starships/protocol';
 
 export class ToolTemplateRepository extends BaseRepository {
-  constructor(connection?: Neo4jConnection) {
-    super('ToolTemplateRepository', connection);
+  constructor() {
+    super('ToolTemplateRepository');
   }
 
   async findAll(): Promise<ToolTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>(
-          'MATCH (tt:ToolTemplate) RETURN tt ORDER BY tt.createdAt DESC'
-        );
-        return fromDatabaseArray(
-          ToolTemplateEntity,
-          result.map((record) => record.tt)
-        );
+        const result = await super.findAllEntities<Record<string, unknown>>('tool_templates', 'created_at DESC');
+        return fromDatabaseArray(ToolTemplateEntity, result);
       },
       'findAll',
       'ToolTemplate'
@@ -37,12 +30,12 @@ export class ToolTemplateRepository extends BaseRepository {
   async findById(id: string): Promise<ToolTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>('MATCH (tt:ToolTemplate) WHERE tt.id = $id RETURN tt', {
-          id,
-        });
-        const toolTemplate = result[0]?.tt || null;
-        return toolTemplate ? fromDatabase(ToolTemplateEntity, toolTemplate) : null;
+        if (!id?.trim()) {
+          throw new Error('ID is required for findById operation');
+        }
+
+        const result = await super.findEntityById<Record<string, unknown>>('tool_templates', id);
+        return result ? fromDatabase(ToolTemplateEntity, result) : null;
       },
       'findById',
       'ToolTemplate',
@@ -53,12 +46,13 @@ export class ToolTemplateRepository extends BaseRepository {
   async findBySlug(slug: string): Promise<ToolTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!slug?.trim()) {
+          throw new Error('Slug is required for findBySlug operation');
+        }
+
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>('MATCH (tt:ToolTemplate) WHERE tt.slug = $slug RETURN tt', {
-          slug,
-        });
-        const toolTemplate = result[0]?.tt || null;
-        return toolTemplate ? fromDatabase(ToolTemplateEntity, toolTemplate) : null;
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE slug = $1', [slug]);
+        return result ? fromDatabase(ToolTemplateEntity, result) : null;
       },
       'findBySlug',
       'ToolTemplate',
@@ -70,38 +64,38 @@ export class ToolTemplateRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        let query = 'MATCH (tt:ToolTemplate)';
+        let query = 'SELECT * FROM tool_templates';
         const whereConditions: string[] = [];
-        const queryParams: Record<string, unknown> = {};
+        const queryParams: unknown[] = [];
+        let paramIndex = 1;
 
         if (params.category) {
-          whereConditions.push('tt.category = $category');
-          queryParams.category = params.category;
+          whereConditions.push(`category = $${paramIndex}`);
+          queryParams.push(params.category);
+          paramIndex++;
         }
 
         if (params.requiresApiKey !== undefined) {
-          whereConditions.push('tt.requiresApiKey = $requiresApiKey');
-          queryParams.requiresApiKey = params.requiresApiKey;
+          whereConditions.push(`requires_api_key = $${paramIndex}`);
+          queryParams.push(params.requiresApiKey);
+          paramIndex++;
         }
 
         if (params.query) {
-          whereConditions.push('(tt.name CONTAINS $query OR tt.description CONTAINS $query)');
-          queryParams.query = params.query;
+          whereConditions.push(`(LOWER(name) LIKE LOWER($${paramIndex}) OR LOWER(description) LIKE LOWER($${paramIndex + 1}))`);
+          queryParams.push(`%${params.query}%`);
+          queryParams.push(`%${params.query}%`);
+          paramIndex += 2;
         }
 
         if (whereConditions.length > 0) {
           query += ' WHERE ' + whereConditions.join(' AND ');
         }
 
-        query += ' RETURN tt ORDER BY tt.usageCount DESC, tt.createdAt DESC';
+        query += ' ORDER BY usage_count DESC, created_at DESC';
 
-        const result = await connection.executeQuery<{ tt: ToolTemplateModel }>(query, queryParams);
-        return result && result.length > 0
-          ? fromDatabaseArray(
-              ToolTemplateEntity,
-              result.map((record) => record.tt)
-            )
-          : [];
+        const result = await connection.query<Record<string, unknown>>(query, queryParams);
+        return fromDatabaseArray(ToolTemplateEntity, result);
       },
       'search',
       'ToolTemplate'
@@ -120,7 +114,7 @@ export class ToolTemplateRepository extends BaseRepository {
 
         const now = new Date().toISOString();
 
-        // Create tool template properties without ID (Neo4j will generate it)
+        // Create tool template properties
         const toolTemplateProps = {
           // Core ToolParams fields
           name: data.name,
@@ -146,9 +140,10 @@ export class ToolTemplateRepository extends BaseRepository {
 
         // Create entity instance from plain object, then serialize
         const toolTemplateEntity = toEntityInstance(ToolTemplateEntity, toolTemplateProps);
-        const toolTemplate = await this.createEntityWithAutoId<ToolTemplateModel>('ToolTemplate', toDatabase(toolTemplateEntity));
+        const databaseFormat = toDatabase(toolTemplateEntity);
+        const result = await this.createEntity<Record<string, unknown>>('tool_templates', databaseFormat);
 
-        return fromDatabase(ToolTemplateEntity, toolTemplate);
+        return fromDatabase(ToolTemplateEntity, result);
       },
       'create',
       'ToolTemplate'
@@ -158,22 +153,30 @@ export class ToolTemplateRepository extends BaseRepository {
   async update(id: string, updates: UpdateToolTemplateRequest): Promise<ToolTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
+        if (!id?.trim()) {
+          throw new Error('ID is required for update operation');
+        }
+
+        await ToolTemplateEntity.validate(updates, 'update');
+
         const updateProps = {
           ...updates,
           updatedAt: new Date().toISOString(),
         };
 
-        const result = await connection.executeWrite<{ tt: ToolTemplateModel }>(
-          'MATCH (tt:ToolTemplate) WHERE tt.id = $id SET tt += $updates RETURN tt',
-          {
-            id,
-            updates: toDatabase(toEntityInstance(ToolTemplateEntity, updateProps)),
-          }
-        );
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(ToolTemplateEntity, updateProps));
 
-        const toolTemplate = result[0]?.tt || null;
-        return toolTemplate ? fromDatabase(ToolTemplateEntity, toolTemplate) : null;
+        // Filter out protected fields (id, createdAt)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return await this.findById(id);
+        }
+
+        const result = await this.updateEntity<Record<string, unknown>>('tool_templates', id, filteredUpdateData);
+        return result ? fromDatabase(ToolTemplateEntity, result) : null;
       },
       'update',
       'ToolTemplate',
@@ -184,18 +187,12 @@ export class ToolTemplateRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
+        if (!id?.trim()) {
+          throw new Error('ID is required for delete operation');
+        }
 
-        // Clean up all relationships:
-        // - AgentTemplate-[:USES_TOOL_TEMPLATE]->ToolTemplate
-        // - Tool-[:CREATED_FROM]->ToolTemplate
-        // DETACH DELETE will automatically remove all relationships
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (tt:ToolTemplate) WHERE tt.id = $id DETACH DELETE tt RETURN count(tt) as deletedCount',
-          { id }
-        );
-
-        return result[0]?.deletedCount > 0;
+        // Delete will cascade to remove relationships via foreign key constraints
+        return await this.deleteEntity('tool_templates', id);
       },
       'delete',
       'ToolTemplate',
@@ -206,17 +203,17 @@ export class ToolTemplateRepository extends BaseRepository {
   async incrementUsageCount(id: string): Promise<ToolTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!id?.trim()) {
+          throw new Error('ID is required for incrementUsageCount operation');
+        }
+
         const connection = this.getConnection();
-        const result = await connection.executeWrite<{ tt: ToolTemplateModel }>(
-          'MATCH (tt:ToolTemplate) WHERE tt.id = $id SET tt.usageCount = tt.usageCount + 1, tt.updatedAt = $timestamp RETURN tt',
-          {
-            id,
-            timestamp: new Date().toISOString(),
-          }
+        const result = await connection.queryOne<Record<string, unknown>>(
+          'UPDATE tool_templates SET usage_count = usage_count + 1, updated_at = $2 WHERE id = $1 RETURNING *',
+          [id, new Date().toISOString()]
         );
 
-        const toolTemplate = result[0]?.tt || null;
-        return toolTemplate ? fromDatabase(ToolTemplateEntity, toolTemplate) : null;
+        return result ? fromDatabase(ToolTemplateEntity, result) : null;
       },
       'incrementUsageCount',
       'ToolTemplate',
@@ -240,16 +237,15 @@ export class ToolTemplateRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const query = `
-          MATCH (at:AgentTemplate)-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate {id: $toolTemplateId})
-          RETURN at
+          SELECT at.*
+          FROM agent_templates at
+          JOIN agent_template_tool_templates attt ON at.id = attt.agent_template_id
+          WHERE attt.tool_template_id = $1
           ORDER BY at.name
         `;
 
-        const result = await connection.executeQuery<{ at: AgentTemplateModel }>(query, { toolTemplateId });
-        return fromDatabaseArray(
-          AgentTemplateEntity,
-          result.map((record) => record.at)
-        );
+        const result = await connection.query<Record<string, unknown>>(query, [toolTemplateId]);
+        return fromDatabaseArray(AgentTemplateEntity, result);
       },
       'getUsedByAgentTemplates',
       'ToolTemplate',
@@ -269,12 +265,13 @@ export class ToolTemplateRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const query = `
-          MATCH (at:AgentTemplate)-[:USES_TOOL_TEMPLATE]->(tt:ToolTemplate {id: $toolTemplateId})
-          RETURN count(at) as count
+          SELECT COUNT(*) as count
+          FROM agent_template_tool_templates
+          WHERE tool_template_id = $1
         `;
 
-        const result = await connection.executeQuery<{ count: number }>(query, { toolTemplateId });
-        return (result[0]?.count || 0) > 0;
+        const count = await connection.queryCount(query, [toolTemplateId]);
+        return count > 0;
       },
       'isUsedByAgentTemplates',
       'ToolTemplate',

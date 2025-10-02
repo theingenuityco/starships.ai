@@ -29,8 +29,6 @@ import {
   User,
   Workflow,
   Blueprint,
-  Node,
-  Edge,
   Execution,
   Conversation,
   Message,
@@ -47,8 +45,6 @@ import {
 - [`User`](src/domains/user.ts) - User management and authentication
 - [`Workflow`](src/domains/workflow.ts) - Workflow execution definitions
 - [`Blueprint`](src/domains/blueprint.ts) - Workflow blueprint specifications
-- [`Node`](src/domains/node.ts) - Workflow node definitions and parameters
-- [`Edge`](src/domains/edge.ts) - Workflow edge connections and routing
 - [`Execution`](src/domains/execution.ts) - Workflow execution tracking and results
 - [`Conversation`](src/domains/conversation.ts) - Chat and communication logs
 - [`Message`](src/domains/message.ts) - Individual message storage and retrieval

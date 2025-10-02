@@ -3,9 +3,9 @@ set -e
 
 echo "Starting Starships.ai with supervisor..."
 
-# Create supervisor config dynamically based on NEO4J_EXTERNAL_URI
-if [ -n "$NEO4J_EXTERNAL_URI" ]; then
-    echo "Configuring for external Neo4j..."
+# Create supervisor config dynamically based on POSTGRES_EXTERNAL_HOST
+if [ -n "$POSTGRES_EXTERNAL_HOST" ]; then
+    echo "Configuring for external PostgreSQL..."
     cat > /etc/supervisor/conf.d/supervisord.conf << 'EOL'
 [supervisord]
 nodaemon=true
@@ -28,7 +28,7 @@ stderr_logfile=/dev/stderr
 stderr_logfile_maxbytes=0
 EOL
 else
-    echo "Configuring for internal Neo4j..."
+    echo "Configuring for internal PostgreSQL..."
     cat > /etc/supervisor/conf.d/supervisord.conf << 'EOL'
 [supervisord]
 nodaemon=true
@@ -36,12 +36,11 @@ user=root
 logfile=/var/log/supervisord.log
 pidfile=/var/run/supervisord.pid
 
-[program:neo4j]
-command=/opt/neo4j/bin/neo4j console
+[program:postgres]
+command=su-exec postgres postgres -D /var/lib/postgresql/data
 autostart=true
 autorestart=true
-user=nodejs
-environment=HOME="/home/nodejs",USER="nodejs"
+user=root
 stdout_logfile=/dev/stdout
 stdout_logfile_maxbytes=0
 stderr_logfile=/dev/stderr

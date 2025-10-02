@@ -1,5 +1,4 @@
 import { EnvironmentEntity } from '@/entities/EnvironmentEntity';
-import { Neo4jConnection } from '@/helpers/database';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { EnvironmentModel, EnvironmentSummary } from '@starships/protocol';
@@ -11,8 +10,8 @@ export class EnvironmentRepository extends BaseRepository {
   private static readonly IV_LENGTH = 16;
   private static readonly TAG_LENGTH = 16;
 
-  constructor(connection?: Neo4jConnection) {
-    super('EnvironmentRepository', connection);
+  constructor() {
+    super('EnvironmentRepository');
   }
 
   /**
@@ -65,14 +64,17 @@ export class EnvironmentRepository extends BaseRepository {
   async findByStarship(starshipId: string): Promise<EnvironmentSummary[]> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!starshipId?.trim()) {
+          throw new Error('starshipId is required');
+        }
+
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ e: EnvironmentModel }>(
-          'MATCH (e:Environment) WHERE e.starshipId = $starshipId RETURN e ORDER BY e.key',
-          { starshipId }
-        );
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM environments WHERE starship_id = $1 ORDER BY key', [
+          starshipId,
+        ]);
 
         return result.map((record) => {
-          const env = fromDatabase(EnvironmentEntity, record.e);
+          const env = fromDatabase(EnvironmentEntity, record);
           // Return summary without encrypted value
           return {
             id: env.id,
@@ -93,14 +95,17 @@ export class EnvironmentRepository extends BaseRepository {
   async findByStarshipAndKey(starshipId: string, key: string): Promise<EnvironmentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!starshipId?.trim() || !key?.trim()) {
+          throw new Error('starshipId and key are required');
+        }
+
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ e: EnvironmentModel }>(
-          'MATCH (e:Environment) WHERE e.starshipId = $starshipId AND e.key = $key RETURN e',
-          { starshipId, key }
+        const result = await connection.queryOne<Record<string, unknown>>(
+          'SELECT * FROM environments WHERE starship_id = $1 AND key = $2',
+          [starshipId, key]
         );
 
-        const env = result[0]?.e || null;
-        return env ? fromDatabase(EnvironmentEntity, env) : null;
+        return result ? fromDatabase(EnvironmentEntity, result) : null;
       },
       'findByStarshipAndKey',
       'Environment'
@@ -131,12 +136,12 @@ export class EnvironmentRepository extends BaseRepository {
 
         await EnvironmentEntity.validate(envData, 'create');
 
-        const environment = await this.createEntityWithAutoId<EnvironmentModel>(
-          'Environment',
-          toDatabase(toEntityInstance(EnvironmentEntity, envData))
-        );
+        // Create entity instance from plain object, then serialize
+        const environmentEntity = toEntityInstance(EnvironmentEntity, envData);
+        const databaseFormat = toDatabase(environmentEntity);
+        const result = await this.createEntity<Record<string, unknown>>('environments', databaseFormat);
 
-        return fromDatabase(EnvironmentEntity, environment);
+        return fromDatabase(EnvironmentEntity, result);
       },
       'create',
       'Environment'
@@ -153,21 +158,26 @@ export class EnvironmentRepository extends BaseRepository {
   ): Promise<EnvironmentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!id?.trim()) {
+          throw new Error('ID is required for update operation');
+        }
+
         const connection = this.getConnection();
 
         // Get existing environment to get starshipId for encryption
-        const existing = await connection.executeQuery<{ e: EnvironmentModel }>('MATCH (e:Environment) WHERE e.id = $id RETURN e', { id });
+        const existing = await connection.queryOne<Record<string, unknown>>('SELECT * FROM environments WHERE id = $1', [id]);
 
-        if (!existing[0]?.e) {
+        if (!existing) {
           return null;
         }
 
+        const existingEnv = fromDatabase(EnvironmentEntity, existing);
         const updateProps: Record<string, unknown> = {
           updatedAt: new Date().toISOString(),
         };
 
         if (updates.value !== undefined) {
-          updateProps.encryptedValue = this.encrypt(updates.value, existing[0].e.starshipId);
+          updateProps.encryptedValue = this.encrypt(updates.value, existingEnv.starshipId);
         }
 
         if (updates.description !== undefined) {
@@ -176,13 +186,19 @@ export class EnvironmentRepository extends BaseRepository {
 
         await EnvironmentEntity.validate(updateProps, 'update');
 
-        const result = await connection.executeWrite<{ e: EnvironmentModel }>(
-          'MATCH (e:Environment) WHERE e.id = $id SET e += $updates RETURN e',
-          { id, updates: updateProps }
-        );
+        // Convert entity updates to database format
+        const updateData = toDatabase(toEntityInstance(EnvironmentEntity, updateProps));
 
-        const env = result[0]?.e || null;
-        return env ? fromDatabase(EnvironmentEntity, env) : null;
+        // Filter out protected fields (id, createdAt)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        if (Object.keys(filteredUpdateData).length === 0) {
+          return existingEnv;
+        }
+
+        const result = await this.updateEntity<Record<string, unknown>>('environments', id, filteredUpdateData);
+        return result ? fromDatabase(EnvironmentEntity, result) : null;
       },
       'update',
       'Environment',
@@ -193,13 +209,11 @@ export class EnvironmentRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (e:Environment) WHERE e.id = $id DELETE e RETURN count(e) as deletedCount',
-          { id }
-        );
+        if (!id?.trim()) {
+          throw new Error('ID is required for delete operation');
+        }
 
-        return result[0]?.deletedCount > 0;
+        return await this.deleteEntity('environments', id);
       },
       'delete',
       'Environment',
@@ -210,13 +224,17 @@ export class EnvironmentRepository extends BaseRepository {
   async deleteByStarshipAndKey(starshipId: string, key: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!starshipId?.trim() || !key?.trim()) {
+          throw new Error('starshipId and key are required');
+        }
+
         const connection = this.getConnection();
-        const result = await connection.executeWrite<{ deletedCount: number }>(
-          'MATCH (e:Environment) WHERE e.starshipId = $starshipId AND e.key = $key DELETE e RETURN count(e) as deletedCount',
-          { starshipId, key }
+        const result = await connection.query<Record<string, unknown>>(
+          'DELETE FROM environments WHERE starship_id = $1 AND key = $2 RETURNING id',
+          [starshipId, key]
         );
 
-        return result[0]?.deletedCount > 0;
+        return result.length > 0;
       },
       'deleteByStarshipAndKey',
       'Environment'
@@ -229,16 +247,17 @@ export class EnvironmentRepository extends BaseRepository {
   async getDecryptedEnvironment(starshipId: string): Promise<Record<string, string>> {
     return this.executeWithErrorHandling(
       async () => {
+        if (!starshipId?.trim()) {
+          throw new Error('starshipId is required');
+        }
+
         const connection = this.getConnection();
-        const result = await connection.executeQuery<{ e: EnvironmentModel }>(
-          'MATCH (e:Environment) WHERE e.starshipId = $starshipId RETURN e',
-          { starshipId }
-        );
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM environments WHERE starship_id = $1', [starshipId]);
 
         const env: Record<string, string> = {};
 
         for (const record of result) {
-          const environment = fromDatabase(EnvironmentEntity, record.e);
+          const environment = fromDatabase(EnvironmentEntity, record);
           try {
             env[environment.key] = this.decrypt(environment.encryptedValue, starshipId);
           } catch (error) {

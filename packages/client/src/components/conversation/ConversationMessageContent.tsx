@@ -33,7 +33,7 @@ interface MessageContentProps {
   reasoning?: string
   reasoningChunks?: StreamChunk[]
   agentName?: string
-  toolCalls?: NonNullable<MessageModel['tool_calls']>
+  toolCalls?: NonNullable<MessageModel['toolCalls']>
   toolResults?: any[]
   messageType?: MessageModel['messageType']
 }
@@ -126,7 +126,7 @@ export function ConversationMessageContent({
   }, [reasoning, reasoningChunks, isStreaming])
 
   // Determine whether reasoning panel should auto-open.
-  // Keep it open only while reasoning-only is streaming; collapse once content OR tool_calls start (and on reload).
+  // Keep it open only while reasoning-only is streaming; collapse once content OR toolCalls start (and on reload).
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
@@ -390,14 +390,14 @@ export function ConversationMessageContent({
                   const funcName = (tc as any)?.function?.name || 'unknown'
 
                   // Normalize tool call id from multiple potential fields to be resilient across providers
-                  const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.tool_call_id ?? (tc as any)?.function?.id ?? null
+                  const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.toolCallId ?? (tc as any)?.function?.id ?? null
 
                   const toolCallId = rawCallId != null ? String(rawCallId) : ''
                   const combinedBlockId = `${messageId}-tool-all-${idx}`
 
                   // Find matching tool result using multiple possible id fields, normalized to strings
                   const matchingResult = toolResults?.find((result: any) => {
-                    const rid = (result as any)?.tool_call_id ?? (result as any)?.call_id ?? (result as any)?.id
+                    const rid = (result as any)?.toolCallId ?? (result as any)?.call_id ?? (result as any)?.id
                     if (rid == null) return false
                     return String(rid) === toolCallId
                   })

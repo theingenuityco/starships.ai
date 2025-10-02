@@ -23,7 +23,7 @@ interface MessageNotification {
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
-  starshipId?: string
+  starshipId: string
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
   onMessageSent?: () => void // Simplified callback for UI state updates
@@ -100,9 +100,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const messageToSend = message.trim()
       if (!messageToSend || sending || disabled) return
 
-      // Validation for agent
+      // Validation for agent and starship
       if (!selectedAgent) {
         console.error('No agent selected')
+        return
+      }
+
+      if (!starshipId) {
+        console.error('No starship selected')
         return
       }
 
@@ -175,9 +180,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       async (suggestionText: string) => {
         if (!suggestionText || sending || disabled) return
 
-        // Validation for agent
+        // Validation for agent and starship
         if (!selectedAgent) {
           console.error('No agent selected')
+          return
+        }
+
+        if (!starshipId) {
+          console.error('No starship selected')
           return
         }
 

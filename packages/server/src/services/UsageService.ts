@@ -4,9 +4,9 @@ import type { UsageModel, LLMUsage } from '@starships/protocol';
 export interface CreateUsageForTurnParams {
   starshipId: string;
   conversationId: string;
-  prompt_tokens: number;
-  completion_tokens: number;
-  total_tokens: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
   cost: number;
   model?: string;
 }
@@ -24,14 +24,14 @@ export class UsageService {
   }
 
   async createUsageForTurn(params: CreateUsageForTurnParams): Promise<UsageModel> {
-    const { starshipId, conversationId, prompt_tokens, completion_tokens, total_tokens, cost, model } = params;
+    const { starshipId, conversationId, promptTokens, completionTokens, totalTokens, cost, model } = params;
 
     return this.repo.createAndLink({
       starshipId,
       conversationId,
-      prompt_tokens,
-      completion_tokens,
-      total_tokens,
+      promptTokens,
+      completionTokens,
+      totalTokens,
       cost,
       model,
     });

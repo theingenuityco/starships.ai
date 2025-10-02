@@ -1,172 +1,221 @@
 # Starships.ai Entity Relationship Diagram
 
+## Overview
+
+This ER diagram reflects the **actual implemented database schema** with repository support. Tables shown here have corresponding repository implementations in `packages/models/src/repositories/`.
+
+**Note:** Workflows, blueprints, and executions tables have been removed as no repository implementations exist for them. If workflow functionality is needed in the future, repositories must be created first.
+
 ## Comprehensive Data Model
 
 ```mermaid
 erDiagram
     %% Core User and Starship System
-    User {
+    users {
         string id PK
-        string username
-        string email
-        string displayName
+        string email UK
+        string display_name
         string avatar
-        string stripeCustomerId "Stripe integration"
-        string createdAt
+        string password
+        string stripe_customer_id UK
+        timestamp created_at
+        timestamp updated_at
     }
 
-    Starship {
+    starships {
         string id PK
         string slug UK "Unique per owner"
-        string ownerId FK
+        string owner_id FK
         string class "scout|cruiser|draught"
         string name
-        int maxAgents "Class-based limits"
+        int max_agents "Class-based limits"
         string status "active|inactive|restricted|disabled|pending_payment"
-        string subscriptionId
+        string subscription_id UK
         string plan "scout|cruiser|draught"
-        string billingPeriod "monthly|yearly"
-        string stripeCustomerId "Stripe integration"
-        string createdAt
-        string updatedAt
+        string billing_period "monthly|yearly"
+        string stripe_customer_id
+        timestamp created_at
+        timestamp updated_at
     }
 
-    Vision {
+    %% Agent Templates and Agents
+    agent_templates {
         string id PK
-        string starshipId FK
-        string statement
-        float confidence
-        int refinementCount
-        string lastRefined
-        boolean isActive
-        float clarityScore
-        float specificityScore
-        float actionabilityScore
-        float inspirationalScore
-        float overallQuality
-        boolean hasObjectives
-        boolean hasTimeframe
-        boolean hasMeasurables
-        string createdAt
-        string updatedAt
-    }
-
-    %% AI Agent System
-    LLM {
-        string id PK
+        string slug UK
         string name
-        string provider "openai|anthropic"
-        int maxTokens
-        float temperature
-        boolean supportsStreaming
-        boolean supportsTools
-        float costPer1kTokens
-        string createdAt
+        text description
+        string category
+        boolean is_public
+        int usage_count
+        jsonb tags
+        text system_prompt
+        string model
+        decimal temperature
+        int max_tokens
+        int timeout
+        jsonb blueprint
+        timestamp created_at
+        timestamp updated_at
     }
 
-    AgentTemplate {
+    agents {
         string id PK
         string name
         string description
-        string category "general|coding|creative|analysis|support"
-        string[] tags
-        string model FK "References LLM.id"
-        float temperature
-        int maxTokens
-        string authorId FK
-        boolean isPublic
-        int usageCount
-        float rating
-        string icon
-        string[] previewPrompts
-        string createdAt
-        string updatedAt
+        string model
+        decimal temperature
+        int max_tokens
+        int timeout
+        text system_prompt
+        jsonb state "Agent runtime state"
+        jsonb blueprint "Agent workflow blueprint"
+        string starship_id FK
+        string template_id FK
+        timestamp deployed_at
+        timestamp created_at
+        timestamp updated_at
     }
 
-    Agent {
+    %% Tool Templates and Tools
+    tool_templates {
         string id PK
-        string starshipId FK "Direct FK - Key Change"
+        string slug UK
         string name
-        string model FK "References LLM.id"
-        string description
-        string[] tags
-        string category "general|coding|creative|analysis|support"
-        string authorId FK
-        boolean isPublic
-        string version
-        int usageCount
-        float rating
-        float temperature
-        int maxTokens
-        string[] allowedStarshipClasses
-        string[] requiredPermissions
-        string createdAt
-        string updatedAt
+        text description
+        string category
+        boolean is_public
+        int usage_count
+        jsonb tags
+        jsonb blueprint
+        timestamp created_at
+        timestamp updated_at
     }
 
-    %% Workflow System
-
-    WorkflowNode {
+    tools {
         string id PK
-        string workflowId FK
-        string type "agent|conditional|user_prompt|output|start|end"
         string name
+        string slug
+        text description
+        boolean is_enabled
+        jsonb blueprint
+        string starship_id FK
+        string template_id FK
+        timestamp deployed_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Conversation and Message System
+    conversations {
+        string id PK
+        string title
+        string status "active|paused|completed|archived"
+        string starship_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    messages {
+        string id PK
+        string role "system|user|assistant|tool"
+        text content
+        string message_type "user_input|agent_response|system_notification|system_instruction|workflow_output|error|tool_result"
+        text reasoning
+        jsonb tool_calls
+        string tool_call_id
+        string starship_id FK
+        string conversation_id FK
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% Environment Variables
+    environments {
+        string id PK
+        string starship_id FK
+        string key
+        text encrypted_value
         string description
-        int estimatedTime "In minutes"
-        json parameters "Node-specific parameters"
-        json position "For visual layout"
-        json metadata "Additional node metadata"
+        string created_by
+        timestamp created_at
+        timestamp updated_at
     }
 
-    WorkflowEdge {
+    %% Usage Tracking
+    usage {
         string id PK
-        string workflowId FK
-        string from FK "Source node ID"
-        string to FK "Target node ID"
-        string condition "Condition key for routing"
-        string label "Human-readable edge label"
-        json metadata "Additional edge metadata"
+        string starship_id FK
+        string conversation_id FK
+        int prompt_tokens
+        int completion_tokens
+        int total_tokens
+        string model
+        string provider
+        decimal cost
+        timestamp created_at
     }
 
-    WorkflowRuntimeState {
-        string id PK
-        string workflowId FK
-        string currentNodeId FK
-        string status "not_started|running|paused|completed|failed|cancelled"
-        json executionResults "Map of nodeId to result"
-        string startTime
-        string endTime
-        string pausedAt
-        json error
-        string createdAt
-        string updatedAt
+    %% Waitlist System
+    waitlist {
+        string email PK
+        string status "pending|approved|rejected"
+        text notes
+        timestamp created_at
     }
 
+    %% Payment Integration
+    stripe_events {
+        string event_id PK
+        string event_type
+        timestamp processed_at
+        jsonb data
+    }
 
-    %% Stripe Integration
-    StripeEvent {
-        string eventId PK
-        string eventType
-        string processedAt
+    %% Junction Tables for Many-to-Many Relationships
+    agent_tools {
+        string agent_id PK FK
+        string tool_id PK FK
+        timestamp created_at
+    }
+
+    agent_template_tool_templates {
+        string agent_template_id PK FK
+        string tool_template_id PK FK
+        timestamp created_at
+    }
+
+    conversation_agents {
+        string conversation_id PK FK
+        string agent_id PK FK
+        timestamp linked_at
     }
 
     %% Primary Relationships
-    User ||--o{ Starship : "OWNS"
-    User ||--o{ Agent : "CREATES"
-    User ||--o{ AgentTemplate : "CREATES"
+    users ||--o{ starships : "owns"
 
     %% Starship Relationships
-    Starship ||--|| Vision : "HAS_VISION"
-    Starship ||--o{ Agent : "DEPLOYED_ON"
+    starships ||--o{ agents : "hosts"
+    starships ||--o{ tools : "hosts"
+    starships ||--o{ conversations : "contains"
+    starships ||--o{ messages : "belongs_to"
+    starships ||--o{ environments : "has_vars"
+    starships ||--o{ usage : "tracks_usage"
 
     %% Agent System Relationships
-    LLM ||--o{ AgentTemplate : "REFERENCES"
-    LLM ||--o{ Agent : "REFERENCES"
-    AgentTemplate ||--o{ Agent : "CREATES_FROM"
+    agent_templates ||--o{ agents : "instantiated_from"
+    agents ||--o{ agent_tools : "uses"
+    tools ||--o{ agent_tools : "used_by"
+    agent_templates ||--o{ agent_template_tool_templates : "uses_template"
+    tool_templates ||--o{ agent_template_tool_templates : "used_by_template"
 
-    %% Workflow Relationships
-    WorkflowNode ||--o{ WorkflowEdge : "FLOWS_FROM"
-    WorkflowNode ||--o{ WorkflowEdge : "FLOWS_TO"
+    %% Tool System Relationships
+    tool_templates ||--o{ tools : "instantiated_from"
+
+    %% Conversation System
+    conversations ||--o{ messages : "contains"
+    conversations ||--o{ conversation_agents : "involves"
+    agents ||--o{ conversation_agents : "participates_in"
+    conversations ||--o{ usage : "tracks_usage"
 
 ```
 
@@ -176,56 +225,84 @@ erDiagram
 graph TD
     %% Core Entities
     U[User] --> S[Starship]
-    S --> V[Vision]
     S --> A[Agent]
+    S --> T[Tool]
+    S --> C[Conversation]
+    S --> E[Environment]
 
-    %% Agent System
-    U --> AT[AgentTemplate]
-    AT --> A
-    L[LLM] --> AT
-    L --> A
+    %% Template System
+    AT[AgentTemplate] --> A
+    TT[ToolTemplate] --> T
 
-    %% Workflow System
-    WN[WorkflowNode] --> WE[WorkflowEdge]
-    WRS[WorkflowRuntimeState]
+    %% Conversation System
+    C --> M[Message]
+    C --> CA[ConversationAgent]
+    A --> CA
 
-    %% Stripe Integration
+    %% Usage Tracking
+    S --> US[Usage]
+    C --> US
+
+    %% Junction Tables
+    A --> AGT[AgentTools]
+    T --> AGT
+    AT --> ATTT[AgentTemplateToolTemplates]
+    TT --> ATTT
+
+    %% Payment Integration
     SE[StripeEvent] -.-> S
+    WL[Waitlist] -.-> U
 
     %% Styling
     classDef primary fill:#e1f5fe
     classDef secondary fill:#f3e5f5
     classDef system fill:#e8f5e8
-    classDef security fill:#ffebee
+    classDef junction fill:#fff9c4
     classDef integration fill:#fff3e0
 
     class U,S primary
-    class A,V secondary
-    class L,AT system
-    class SE integration
+    class A,T,C secondary
+    class AT,TT system
+    class AGT,ATTT,CA junction
+    class SE,WL integration
 ```
 
 ## Key Relationships and Constraints
 
 ### Core Business Logic
 
-- **Starship Classes**: Scout (3 agents, 3 missions), Cruiser (5 agents, 6 missions), Draught (10 agents, 10 missions)
-- **Vision**: Each starship has exactly one vision that can be refined over time
-- **Agent Deployment**: Agents are deployed to specific starships via `starshipId` FK
+- **Starship Classes**: Scout (3 agents), Cruiser (5 agents), Draught (10 agents)
+- **Agent Deployment**: Agents are deployed to specific starships with `starship_id` FK
+- **Tool Deployment**: Tools are deployed to specific starships and linked to agents via junction table
+- **Template System**: Both agents and tools use templates for rapid deployment
 
 ### Data Flow Patterns
 
-- **Workflow Execution**: Workflow runtime state tracks execution progress
-- **Message Threading**: Message entities maintain conversation history with proper threading
-- **Template System**: `AgentTemplate` → `Agent` creation flow with usage tracking
+- **Message Threading**: Messages maintain conversation history with proper role-based threading
+- **Template Instantiation**: `AgentTemplate` → `Agent` and `ToolTemplate` → `Tool` creation flows
+- **Agent-Tool Relationships**: Many-to-many relationships through `agent_tools` junction table
+- **Blueprint Storage**: Complex objects (agent/tool blueprints) stored as JSONB for flexibility
 
-### Security & Integration
+### Schema Evolution
 
-- **Stripe Integration**: `StripeEvent` ensures webhook idempotency; `User.stripeCustomerId` and `Starship.stripeCustomerId` link to Stripe
+- **JSONB Storage**: Complex objects (agent state, tool blueprints, metadata) stored as JSONB for flexibility
+- **Removed Tables**: `workflows`, `blueprints`, `executions`, `nodes`, and `edges` tables removed - no repository implementations
+- **Environment Security**: Environment variables stored with encryption via `encrypted_value` field
+- **Conversation Agents**: Many-to-many relationship between conversations and agents via junction table
 
 ### Technical Implementation Notes
 
-- **Neo4j Relationships**: Repository code maintains both FK references and Neo4j relationship patterns
-- **JSON Storage**: Complex objects (workflow parameters, execution results, metadata) stored as JSON
-- **Soft References**: Agent IDs in missions stored as string arrays for flexibility
-- **Slug Generation**: Starship slugs are auto-generated with collision handling
+- **PostgreSQL Relationships**: Repository code uses foreign keys and JOIN operations for relationships
+- **Agent State Management**: Agent runtime state stored as JSONB for flexible state tracking
+- **Tool Configuration**: Tools support flexible configuration via JSONB blueprint field
+- **Usage Tracking**: Comprehensive token usage tracking for billing and analytics
+- **Full-text Search**: GIN indexes on concatenated text fields for efficient search across all major entities
+- **Junction Tables**: Proper many-to-many relationships via `agent_tools`, `agent_template_tool_templates`, and `conversation_agents`
+
+### Migration Changes (v2.1.0)
+
+- **Removed Tables**: `workflows`, `blueprints`, and `executions` tables removed - no repository implementations exist
+- **Environment Table**: Uses `encrypted_value` with `description` and `created_by` tracking
+- **Nodes/Edges Tables**: Previously removed - data stored as JSONB within agent/tool blueprints
+- **Repository Alignment**: Schema strictly reflects actual repository implementations
+- **Full-text Search**: Added index for `agent_templates` table for marketplace search functionality

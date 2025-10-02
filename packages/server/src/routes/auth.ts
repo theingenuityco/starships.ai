@@ -27,8 +27,7 @@ const JWT_AUDIENCE = 'starships-users';
 
 // Initialize waitlist service
 const initWaitlistService = () => {
-  const connection = getConnection();
-  const waitlistRepo = new WaitlistRepository(connection);
+  const waitlistRepo = new WaitlistRepository();
   return new WaitlistService(waitlistRepo);
 };
 

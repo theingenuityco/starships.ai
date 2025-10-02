@@ -1,7 +1,7 @@
 import { getConnection } from '@/helpers/database';
 
 /**
- * Schema Validation and Data Integrity Checker
+ * Schema Validation and Data Integrity Checker for PostgreSQL
  *
  * Provides comprehensive validation of database schema,
  * data integrity checks, and performance monitoring.
@@ -72,74 +72,90 @@ export class SchemaValidator {
    */
   private async validateConstraints(results: ValidationResult[]): Promise<void> {
     try {
-      // Check unique constraints
-      const uniqueConstraints = await this.connection.executeQuery<{
-        name: string;
-        type: string;
-        entityType: string;
-        labelsOrTypes: string[];
-        properties: string[];
-      }>(
-        `SHOW CONSTRAINTS 
-         YIELD name, type, entityType, labelsOrTypes, properties 
-         WHERE type = 'UNIQUENESS'`
-      );
+      // Check primary key constraints
+      const primaryKeys = await this.connection.query<{
+        table_name: string;
+        constraint_name: string;
+      }>(`
+        SELECT tc.table_name, tc.constraint_name
+        FROM information_schema.table_constraints tc
+        WHERE tc.constraint_type = 'PRIMARY KEY'
+        AND tc.table_schema = 'public'
+      `);
 
-      // Expedition system was removed - commenting out expedition constraints
-      const expectedUniqueConstraints: string[] = [
-        // 'expedition_id_unique',
-        // 'expedition_task_id_unique',
-        // 'expedition_message_id_unique',
-        // 'expedition_result_id_unique'
-      ];
-
-      for (const expected of expectedUniqueConstraints) {
-        const found = uniqueConstraints.some((c) => c.name === expected);
-        results.push({
-          category: 'Constraints',
-          test: `Unique constraint: ${expected}`,
-          passed: found,
-          message: found ? 'Constraint exists' : 'Missing unique constraint',
-          severity: found ? 'info' : 'error',
-        });
-      }
-
-      // Check property existence constraints
-      const existenceConstraints = await this.connection.executeQuery<{
-        name: string;
-        type: string;
-      }>(
-        `SHOW CONSTRAINTS 
-         YIELD name, type 
-         WHERE type = 'NODE_PROPERTY_EXISTENCE'`
-      );
+      const expectedTables = ['users', 'starships', 'agents', 'conversations', 'messages', 'workflows'];
+      const missingPks = expectedTables.filter((table) => !primaryKeys.some((pk) => pk.table_name === table));
 
       results.push({
         category: 'Constraints',
-        test: 'Property existence constraints',
-        passed: existenceConstraints.length >= 7,
-        message: `Found ${existenceConstraints.length} property existence constraints`,
-        severity: existenceConstraints.length >= 7 ? 'info' : 'warning',
-        details: { count: existenceConstraints.length, expected: 7 },
+        test: 'Primary key constraints',
+        passed: missingPks.length === 0,
+        message:
+          missingPks.length === 0
+            ? `All ${expectedTables.length} core tables have primary keys`
+            : `Missing primary keys: ${missingPks.join(', ')}`,
+        severity: missingPks.length === 0 ? 'info' : 'error',
+        details: { found: primaryKeys.length, expected: expectedTables.length, missing: missingPks },
       });
 
-      // Check property type constraints
-      const typeConstraints = await this.connection.executeQuery<{
-        name: string;
-        type: string;
-      }>(
-        `SHOW CONSTRAINTS 
-         YIELD name, type 
-         WHERE type = 'NODE_PROPERTY_TYPE'`
-      );
+      // Check foreign key constraints
+      const foreignKeys = await this.connection.query<{
+        table_name: string;
+        constraint_name: string;
+      }>(`
+        SELECT tc.table_name, tc.constraint_name
+        FROM information_schema.table_constraints tc
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+        AND tc.table_schema = 'public'
+      `);
 
       results.push({
         category: 'Constraints',
-        test: 'Property type constraints',
-        passed: typeConstraints.length >= 10,
-        message: `Found ${typeConstraints.length} property type constraints`,
-        severity: typeConstraints.length >= 10 ? 'info' : 'warning',
-        details: { count: typeConstraints.length, expected: 10 },
+        test: 'Foreign key constraints',
+        passed: foreignKeys.length >= 10,
+        message: `Found ${foreignKeys.length} foreign key constraints`,
+        severity: foreignKeys.length >= 10 ? 'info' : 'warning',
+        details: { count: foreignKeys.length, expected: 10 },
+      });
+
+      // Check unique constraints
+      const uniqueConstraints = await this.connection.query<{
+        table_name: string;
+        constraint_name: string;
+      }>(`
+        SELECT tc.table_name, tc.constraint_name
+        FROM information_schema.table_constraints tc
+        WHERE tc.constraint_type = 'UNIQUE'
+        AND tc.table_schema = 'public'
+      `);
+
+      results.push({
+        category: 'Constraints',
+        test: 'Unique constraints',
+        passed: uniqueConstraints.length >= 5,
+        message: `Found ${uniqueConstraints.length} unique constraints`,
+        severity: uniqueConstraints.length >= 5 ? 'info' : 'warning',
+        details: { count: uniqueConstraints.length, expected: 5 },
+      });
+
+      // Check check constraints
+      const checkConstraints = await this.connection.query<{
+        table_name: string;
+        constraint_name: string;
+      }>(`
+        SELECT tc.table_name, tc.constraint_name
+        FROM information_schema.table_constraints tc
+        WHERE tc.constraint_type = 'CHECK'
+        AND tc.table_schema = 'public'
+      `);
+
+      results.push({
+        category: 'Constraints',
+        test: 'Check constraints',
+        passed: checkConstraints.length >= 3,
+        message: `Found ${checkConstraints.length} check constraints`,
+        severity: checkConstraints.length >= 3 ? 'info' : 'warning',
+        details: { count: checkConstraints.length, expected: 3 },
       });
     } catch (error) {
       results.push({
@@ -158,52 +174,46 @@ export class SchemaValidator {
   private async validateIndexes(results: ValidationResult[]): Promise<void> {
     try {
       // Check basic indexes
-      const indexes = await this.connection.executeQuery<{
-        name: string;
-        type: string;
-        entityType: string;
-        labelsOrTypes: string[];
-        properties: string[];
-      }>(
-        `SHOW INDEXES 
-         YIELD name, type, entityType, labelsOrTypes, properties`
-      );
+      const indexes = await this.connection.query<{
+        tablename: string;
+        indexname: string;
+        indexdef: string;
+      }>(`
+        SELECT tablename, indexname, indexdef
+        FROM pg_indexes 
+        WHERE schemaname = 'public'
+        ORDER BY tablename, indexname
+      `);
 
-      // Expedition system was removed - skipping expedition index checks
-      // const expeditionIndexes = indexes.filter(i =>
-      //   i.name.includes('expedition') ||
-      //   i.labelsOrTypes.some(l => l.includes('Expedition'))
-      // );
-
-      // results.push({
-      //   category: 'Indexes',
-      //   test: 'Expedition-related indexes',
-      //   passed: expeditionIndexes.length >= 15,
-      //   message: `Found ${expeditionIndexes.length} expedition-related indexes`,
-      //   severity: expeditionIndexes.length >= 15 ? 'info' : 'warning',
-      //   details: { count: expeditionIndexes.length, expected: 15 }
-      // });
-
-      // Check composite indexes
-      const compositeIndexes = indexes.filter((i) => i.properties.length > 1);
       results.push({
         category: 'Indexes',
-        test: 'Composite indexes',
-        passed: compositeIndexes.length >= 10,
-        message: `Found ${compositeIndexes.length} composite indexes`,
-        severity: compositeIndexes.length >= 10 ? 'info' : 'warning',
-        details: { count: compositeIndexes.length, expected: 10 },
+        test: 'Total indexes',
+        passed: indexes.length >= 15,
+        message: `Found ${indexes.length} indexes`,
+        severity: indexes.length >= 15 ? 'info' : 'warning',
+        details: { count: indexes.length, expected: 15 },
       });
 
-      // Check range indexes
-      const rangeIndexes = indexes.filter((i) => i.type === 'RANGE');
+      // Check GIN indexes (for JSONB and full-text search)
+      const ginIndexes = indexes.filter((i) => i.indexdef.includes('USING gin'));
       results.push({
         category: 'Indexes',
-        test: 'Range indexes for date queries',
-        passed: rangeIndexes.length >= 8,
-        message: `Found ${rangeIndexes.length} range indexes`,
-        severity: rangeIndexes.length >= 8 ? 'info' : 'warning',
-        details: { count: rangeIndexes.length, expected: 8 },
+        test: 'GIN indexes for JSONB/full-text',
+        passed: ginIndexes.length >= 5,
+        message: `Found ${ginIndexes.length} GIN indexes`,
+        severity: ginIndexes.length >= 5 ? 'info' : 'warning',
+        details: { count: ginIndexes.length, expected: 5 },
+      });
+
+      // Check unique indexes
+      const uniqueIndexes = indexes.filter((i) => i.indexdef.includes('UNIQUE'));
+      results.push({
+        category: 'Indexes',
+        test: 'Unique indexes',
+        passed: uniqueIndexes.length >= 8,
+        message: `Found ${uniqueIndexes.length} unique indexes`,
+        severity: uniqueIndexes.length >= 8 ? 'info' : 'warning',
+        details: { count: uniqueIndexes.length, expected: 8 },
       });
     } catch (error) {
       results.push({
@@ -221,62 +231,58 @@ export class SchemaValidator {
    */
   private async validateRelationships(results: ValidationResult[]): Promise<void> {
     try {
-      // Expedition system was removed - skipping orphaned expedition checks
-      // const orphanedExpeditions = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition)
-      //    WHERE NOT EXISTS((s:Starship)-[:HAS_EXPEDITION]->(e))
-      //    RETURN count(e) as count`
-      // );
-      // results.push({
-      //   category: 'Relationships',
-      //   test: 'Orphaned expeditions',
-      //   passed: orphanedExpeditions[0]?.count === 0,
-      //   message: `Found ${orphanedExpeditions[0]?.count || 0} orphaned expeditions`,
-      //   severity: orphanedExpeditions[0]?.count === 0 ? 'info' : 'error',
-      //   details: { count: orphanedExpeditions[0]?.count || 0 }
-      // });
-      // Expedition system was removed - skipping orphaned task checks
-      // const orphanedTasks = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (t:ExpeditionTask)
-      //    WHERE NOT EXISTS((e:Expedition)-[:HAS_TASK]->(t))
-      //    RETURN count(t) as count`
-      // );
-      // results.push({
-      //   category: 'Relationships',
-      //   test: 'Orphaned tasks',
-      //   passed: orphanedTasks[0]?.count === 0,
-      //   message: `Found ${orphanedTasks[0]?.count || 0} orphaned tasks`,
-      //   severity: orphanedTasks[0]?.count === 0 ? 'info' : 'error',
-      //   details: { count: orphanedTasks[0]?.count || 0 }
-      // });
-      // Expedition system was removed - skipping orphaned message checks
-      // const orphanedMessages = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (m:ExpeditionMessage)
-      //    WHERE NOT EXISTS((e:Expedition)-[:HAS_MESSAGE]->(m))
-      //    RETURN count(m) as count`
-      // );
-      // results.push({
-      //   category: 'Relationships',
-      //   test: 'Orphaned messages',
-      //   passed: orphanedMessages[0]?.count === 0,
-      //   message: `Found ${orphanedMessages[0]?.count || 0} orphaned messages`,
-      //   severity: orphanedMessages[0]?.count === 0 ? 'info' : 'warning',
-      //   details: { count: orphanedMessages[0]?.count || 0 }
-      // });
-      // Expedition system was removed - skipping circular task dependency checks
-      // const circularDependencies = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (t:ExpeditionTask)
-      //    WHERE EXISTS((t)-[:DEPENDS_ON*]->(t))
-      //    RETURN count(t) as count`
-      // );
-      // results.push({
-      //   category: 'Relationships',
-      //   test: 'Circular task dependencies',
-      //   passed: circularDependencies[0]?.count === 0,
-      //   message: `Found ${circularDependencies[0]?.count || 0} tasks with circular dependencies`,
-      //   severity: circularDependencies[0]?.count === 0 ? 'info' : 'error',
-      //   details: { count: circularDependencies[0]?.count || 0 }
-      // });
+      // Check for orphaned records (records that should have foreign key relationships but don't)
+
+      // Check for agents without starships (if starship_id is required)
+      const orphanedAgents = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM agents a
+        LEFT JOIN starships s ON a.starship_id = s.id
+        WHERE a.starship_id IS NOT NULL AND s.id IS NULL
+      `);
+
+      results.push({
+        category: 'Relationships',
+        test: 'Orphaned agents',
+        passed: parseInt(orphanedAgents[0]?.count || '0') === 0,
+        message: `Found ${orphanedAgents[0]?.count || 0} orphaned agents`,
+        severity: parseInt(orphanedAgents[0]?.count || '0') === 0 ? 'info' : 'warning',
+        details: { count: parseInt(orphanedAgents[0]?.count || '0') },
+      });
+
+      // Check for conversations without starships
+      const orphanedConversations = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM conversations c
+        LEFT JOIN starships s ON c.starship_id = s.id
+        WHERE c.starship_id IS NOT NULL AND s.id IS NULL
+      `);
+
+      results.push({
+        category: 'Relationships',
+        test: 'Orphaned conversations',
+        passed: parseInt(orphanedConversations[0]?.count || '0') === 0,
+        message: `Found ${orphanedConversations[0]?.count || 0} orphaned conversations`,
+        severity: parseInt(orphanedConversations[0]?.count || '0') === 0 ? 'info' : 'warning',
+        details: { count: parseInt(orphanedConversations[0]?.count || '0') },
+      });
+
+      // Check for messages without conversations
+      const orphanedMessages = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM messages m
+        LEFT JOIN conversations c ON m.conversation_id = c.id
+        WHERE m.conversation_id IS NOT NULL AND c.id IS NULL
+      `);
+
+      results.push({
+        category: 'Relationships',
+        test: 'Orphaned messages',
+        passed: parseInt(orphanedMessages[0]?.count || '0') === 0,
+        message: `Found ${orphanedMessages[0]?.count || 0} orphaned messages`,
+        severity: parseInt(orphanedMessages[0]?.count || '0') === 0 ? 'info' : 'error',
+        details: { count: parseInt(orphanedMessages[0]?.count || '0') },
+      });
     } catch (error) {
       results.push({
         category: 'Relationships',
@@ -293,62 +299,71 @@ export class SchemaValidator {
    */
   private async validateDataIntegrity(results: ValidationResult[]): Promise<void> {
     try {
-      // Expedition system was removed - skipping expedition status validation
-      // const invalidExpeditionStatuses = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition)
-      //    WHERE NOT e.status IN ['draft', 'planning', 'in-progress', 'review', 'completed', 'failed', 'cancelled']
-      //    RETURN count(e) as count`
-      // );
-      // results.push({
-      //   category: 'Data Integrity',
-      //   test: 'Valid expedition statuses',
-      //   passed: invalidExpeditionStatuses[0]?.count === 0,
-      //   message: `Found ${invalidExpeditionStatuses[0]?.count || 0} expeditions with invalid status`,
-      //   severity: invalidExpeditionStatuses[0]?.count === 0 ? 'info' : 'error',
-      //   details: { count: invalidExpeditionStatuses[0]?.count || 0 }
-      // });
-      // Expedition system was removed - skipping expedition title validation
-      // const expeditionsWithoutTitle = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition)
-      //    WHERE e.title IS NULL OR e.title = ''
-      //    RETURN count(e) as count`
-      // );
-      // results.push({
-      //   category: 'Data Integrity',
-      //   test: 'Expeditions with titles',
-      //   passed: expeditionsWithoutTitle[0]?.count === 0,
-      //   message: `Found ${expeditionsWithoutTitle[0]?.count || 0} expeditions without titles`,
-      //   severity: expeditionsWithoutTitle[0]?.count === 0 ? 'info' : 'error',
-      //   details: { count: expeditionsWithoutTitle[0]?.count || 0 }
-      // });
-      // Expedition system was removed - skipping expedition date validation
-      // const invalidDates = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (e:Expedition)
-      //    WHERE e.createdAt IS NULL OR NOT e.createdAt =~ '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*'
-      //    RETURN count(e) as count`
-      // );
-      // results.push({
-      //   category: 'Data Integrity',
-      //   test: 'Valid date formats',
-      //   passed: invalidDates[0]?.count === 0,
-      //   message: `Found ${invalidDates[0]?.count || 0} records with invalid date formats`,
-      //   severity: invalidDates[0]?.count === 0 ? 'info' : 'warning',
-      //   details: { count: invalidDates[0]?.count || 0 }
-      // });
-      // Expedition system was removed - skipping starship expedition capacity checks
-      // const overCapacityStarships = await this.connection.executeQuery<{ count: number }>(
-      //   `MATCH (s:Starship)
-      //    WHERE s.activeExpeditions > s.maxActiveExpeditions
-      //    RETURN count(s) as count`
-      // );
-      // results.push({
-      //   category: 'Data Integrity',
-      //   test: 'Starship capacity constraints',
-      //   passed: overCapacityStarships[0]?.count === 0,
-      //   message: `Found ${overCapacityStarships[0]?.count || 0} starships over capacity`,
-      //   severity: overCapacityStarships[0]?.count === 0 ? 'info' : 'warning',
-      //   details: { count: overCapacityStarships[0]?.count || 0 }
-      // });
+      // Check for valid starship statuses
+      const invalidStarshipStatuses = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM starships
+        WHERE status NOT IN ('active', 'inactive', 'restricted', 'disabled', 'pending_payment')
+      `);
+
+      results.push({
+        category: 'Data Integrity',
+        test: 'Valid starship statuses',
+        passed: parseInt(invalidStarshipStatuses[0]?.count || '0') === 0,
+        message: `Found ${invalidStarshipStatuses[0]?.count || 0} starships with invalid status`,
+        severity: parseInt(invalidStarshipStatuses[0]?.count || '0') === 0 ? 'info' : 'error',
+        details: { count: parseInt(invalidStarshipStatuses[0]?.count || '0') },
+      });
+
+      // Check for starships without names
+      const starshipsWithoutNames = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM starships
+        WHERE name IS NULL OR name = ''
+      `);
+
+      results.push({
+        category: 'Data Integrity',
+        test: 'Starships with names',
+        passed: parseInt(starshipsWithoutNames[0]?.count || '0') === 0,
+        message: `Found ${starshipsWithoutNames[0]?.count || 0} starships without names`,
+        severity: parseInt(starshipsWithoutNames[0]?.count || '0') === 0 ? 'info' : 'error',
+        details: { count: parseInt(starshipsWithoutNames[0]?.count || '0') },
+      });
+
+      // Check for valid email formats in users table
+      const invalidEmails = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM users
+        WHERE email IS NOT NULL 
+        AND email != ''
+        AND email !~ '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'
+      `);
+
+      results.push({
+        category: 'Data Integrity',
+        test: 'Valid email formats',
+        passed: parseInt(invalidEmails[0]?.count || '0') === 0,
+        message: `Found ${invalidEmails[0]?.count || 0} users with invalid email formats`,
+        severity: parseInt(invalidEmails[0]?.count || '0') === 0 ? 'info' : 'warning',
+        details: { count: parseInt(invalidEmails[0]?.count || '0') },
+      });
+
+      // Check for valid date formats (created_at, updated_at)
+      const invalidDates = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM starships
+        WHERE created_at IS NULL OR updated_at IS NULL
+      `);
+
+      results.push({
+        category: 'Data Integrity',
+        test: 'Valid timestamp fields',
+        passed: parseInt(invalidDates[0]?.count || '0') === 0,
+        message: `Found ${invalidDates[0]?.count || 0} records with invalid timestamps`,
+        severity: parseInt(invalidDates[0]?.count || '0') === 0 ? 'info' : 'warning',
+        details: { count: parseInt(invalidDates[0]?.count || '0') },
+      });
     } catch (error) {
       results.push({
         category: 'Data Integrity',
@@ -368,11 +383,12 @@ export class SchemaValidator {
       // Test query performance for common operations
       const startTime = Date.now();
 
-      // Expedition system was removed - using basic starship query instead
-      await this.connection.executeQuery(
-        `MATCH (s:Starship {id: 'test'})
-         RETURN count(s) as count`
-      );
+      await this.connection.query(`
+        SELECT COUNT(*) as count
+        FROM starships
+        WHERE status = 'active'
+        LIMIT 100
+      `);
 
       const queryTime = Date.now() - startTime;
 
@@ -385,24 +401,53 @@ export class SchemaValidator {
         details: { executionTime: queryTime, threshold: 100 },
       });
 
-      // Check index usage
-      const indexStats = await this.connection.executeQuery<{
-        relationshipCount: number;
-        nodeCount: number;
-      }>(
-        `CALL db.stats.retrieve('GRAPH COUNTS') YIELD data
-         RETURN data.relationships as relationshipCount, data.nodes as nodeCount`
-      );
+      // Check database size
+      const dbSize = await this.connection.query<{
+        size: string;
+        table_count: string;
+      }>(`
+        SELECT 
+          pg_size_pretty(pg_database_size(current_database())) as size,
+          (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public') as table_count
+      `);
 
-      const nodeCount = Number(indexStats[0]?.nodeCount || 0);
+      const tableCount = parseInt(dbSize[0]?.table_count || '0');
       results.push({
         category: 'Performance',
-        test: 'Database size check',
-        passed: nodeCount < 1000000,
-        message: `Database contains ${nodeCount} nodes`,
-        severity: nodeCount < 1000000 ? 'info' : 'warning',
-        details: { nodeCount, threshold: 1000000 },
+        test: 'Database structure check',
+        passed: tableCount >= 15,
+        message: `Database contains ${tableCount} tables, size: ${dbSize[0]?.size || 'unknown'}`,
+        severity: tableCount >= 15 ? 'info' : 'warning',
+        details: { tableCount, expectedTables: 15, size: dbSize[0]?.size },
       });
+
+      // Check for unused indexes (this is a complex query and might be slow)
+      try {
+        const unusedIndexes = await this.connection.query<{ count: string }>(`
+          SELECT COUNT(*) as count
+          FROM pg_stat_user_indexes 
+          WHERE idx_scan = 0
+          AND schemaname = 'public'
+        `);
+
+        results.push({
+          category: 'Performance',
+          test: 'Unused indexes check',
+          passed: parseInt(unusedIndexes[0]?.count || '0') < 5,
+          message: `Found ${unusedIndexes[0]?.count || 0} unused indexes`,
+          severity: parseInt(unusedIndexes[0]?.count || '0') < 5 ? 'info' : 'warning',
+          details: { count: parseInt(unusedIndexes[0]?.count || '0'), threshold: 5 },
+        });
+      } catch {
+        // Ignore if pg_stat_user_indexes is not available
+        results.push({
+          category: 'Performance',
+          test: 'Unused indexes check',
+          passed: true,
+          message: 'Index usage statistics not available',
+          severity: 'info',
+        });
+      }
     } catch (error) {
       results.push({
         category: 'Performance',
@@ -419,44 +464,58 @@ export class SchemaValidator {
    */
   private async validateFullTextSearch(results: ValidationResult[]): Promise<void> {
     try {
-      // Check full-text indexes exist
-      const fullTextIndexes = await this.connection.executeQuery<{ name: string }>(
-        `CALL db.index.fulltext.listAvailableAnalyzers() 
-         YIELD analyzer 
-         RETURN analyzer as name`
-      );
+      // Check if pg_trgm extension is available
+      const extensions = await this.connection.query<{ extname: string }>(`
+        SELECT extname
+        FROM pg_extension
+        WHERE extname = 'pg_trgm'
+      `);
 
       results.push({
         category: 'Full-Text Search',
-        test: 'Full-text analyzers available',
-        passed: fullTextIndexes.length > 0,
-        message: `Found ${fullTextIndexes.length} full-text analyzers`,
-        severity: fullTextIndexes.length > 0 ? 'info' : 'warning',
-        details: { count: fullTextIndexes.length },
+        test: 'pg_trgm extension',
+        passed: extensions.length > 0,
+        message: extensions.length > 0 ? 'pg_trgm extension is installed' : 'pg_trgm extension not found',
+        severity: extensions.length > 0 ? 'info' : 'warning',
+      });
+
+      // Check for full-text search indexes (GIN indexes with to_tsvector)
+      const ftsIndexes = await this.connection.query<{ count: string }>(`
+        SELECT COUNT(*) as count
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+        AND indexdef LIKE '%to_tsvector%'
+        AND indexdef LIKE '%gin%'
+      `);
+
+      results.push({
+        category: 'Full-Text Search',
+        test: 'Full-text search indexes',
+        passed: parseInt(ftsIndexes[0]?.count || '0') >= 5,
+        message: `Found ${ftsIndexes[0]?.count || 0} full-text search indexes`,
+        severity: parseInt(ftsIndexes[0]?.count || '0') >= 5 ? 'info' : 'warning',
+        details: { count: parseInt(ftsIndexes[0]?.count || '0'), expected: 5 },
       });
 
       // Test search functionality
       try {
-        // Expedition system was removed - skipping expedition search test
-        // await this.connection.executeQuery(
-        //   `CALL db.index.fulltext.queryNodes("expeditionSearch", "test")
-        //    YIELD node, score
-        //    RETURN count(node) as results`
-        // );
+        await this.connection.query(`
+          SELECT to_tsvector('english', 'test search functionality')
+        `);
 
         results.push({
           category: 'Full-Text Search',
-          test: 'Full-text search analyzers available',
+          test: 'Full-text search functionality',
           passed: true,
-          message: 'Full-text search analyzers are available (expedition search skipped)',
+          message: 'Full-text search is functional',
           severity: 'info',
         });
       } catch {
         results.push({
           category: 'Full-Text Search',
-          test: 'Full-text search analyzers available',
+          test: 'Full-text search functionality',
           passed: false,
-          message: 'Full-text search analyzers check failed',
+          message: 'Full-text search functionality test failed',
           severity: 'warning',
         });
       }
@@ -487,6 +546,7 @@ export class SchemaValidator {
     if (performanceIssues.length > 0) {
       recommendations.push('🚀 Consider running ANALYZE to update query planner statistics');
       recommendations.push('📊 Monitor query performance and consider additional indexes for slow queries');
+      recommendations.push('🔍 Review unused indexes and consider dropping them to save space');
     }
 
     if (integrityIssues.length > 0) {
@@ -496,13 +556,19 @@ export class SchemaValidator {
 
     const missingIndexes = results.filter((r) => r.category === 'Indexes' && !r.passed && r.severity === 'warning');
     if (missingIndexes.length > 0) {
-      recommendations.push('🔍 Run migration 003 and 004 to add missing performance indexes');
+      recommendations.push('🔍 Consider adding missing performance indexes for better query performance');
     }
 
     const constraintIssues = results.filter((r) => r.category === 'Constraints' && !r.passed && r.severity === 'error');
     if (constraintIssues.length > 0) {
       recommendations.push('⚠️ Critical: Missing database constraints may lead to data corruption');
-      recommendations.push('🛠️ Run constraint migrations immediately to ensure data integrity');
+      recommendations.push('🛠️ Run schema migrations immediately to ensure data integrity');
+    }
+
+    const ftsIssues = results.filter((r) => r.category === 'Full-Text Search' && !r.passed);
+    if (ftsIssues.length > 0) {
+      recommendations.push('🔎 Install pg_trgm extension for improved full-text search performance');
+      recommendations.push('📝 Consider adding full-text search indexes for better search performance');
     }
 
     recommendations.push('📈 Schedule regular validation checks to maintain database health');

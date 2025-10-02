@@ -65,7 +65,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { title?: string; starshipId?: string; agentId?: string }): Promise<ConversationModel> => {
+    mutationFn: async (data: { title?: string; starshipId: string; agentId?: string }): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },
@@ -355,7 +355,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
             const addMessageRe = /^\/messages\/(?:-|\d+)$/i
             const addChunkRe = /^\/messages\/(?:-1|\d+)\/chunks\/-$/i
             const addReasoningChunkRe = /^\/messages\/(?:-1|\d+)\/reasoningChunks\/-$/i
-            const replaceToolCallsRe = /^\/messages\/(?:-1|\d+)\/tool_calls$/i
+            const replaceToolCallsRe = /^\/messages\/(?:-1|\d+)\/toolCalls$/i
             const replaceContentRe = /^\/messages\/(?:-1|\d+)\/content$/i
             const replaceReasoningRe = /^\/messages\/(?:-1|\d+)\/reasoning$/i
             const replaceIdRe = /^\/messages\/(?:-1|\d+)\/id$/i
@@ -394,7 +394,7 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
               break
             }
 
-            // Replace tool_calls
+            // Replace toolCalls
             if (op === 'replace' && replaceToolCallsRe.test(path)) {
               const value = Array.isArray(raw.value) ? raw.value : []
               push({ type: 'replace_tool_calls', value })
@@ -569,7 +569,7 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       const messages = clone(acc)
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i].role === 'assistant') {
-          ;(messages[i] as any).tool_calls = chunk.value
+          ;(messages[i] as any).toolCalls = chunk.value
           break
         }
       }

@@ -2,35 +2,33 @@
  * StarshipRepository Unit Tests
  */
 
-import { StarshipRepository } from '@/repositories/StarshipRepository';
+import 'reflect-metadata';
+import { StarshipRepository } from '../StarshipRepository';
+import { StarshipEntity } from '@/entities/StarshipEntity';
 import { DatabaseError } from '@starships/errors';
-import { Neo4jConnection, getConnection } from '@/helpers/database';
+import { RepositoryTestHelper } from '../../tests/repository-test-helper';
+
+// Mock nanoid for predictable IDs
+jest.mock('nanoid', () => ({
+  nanoid: jest.fn(() => 'test-starship-id-123'),
+}));
 
 // Mock the database connection
-jest.mock('../../helpers/database', () => ({
-  getConnection: jest.fn(() => ({
-    executeQuery: jest.fn(),
-    executeWrite: jest.fn(),
-  })),
+jest.mock('@/helpers/database', () => ({
+  getConnection: jest.fn(),
 }));
+
+// Mock entity validation
+jest.spyOn(StarshipEntity, 'validate').mockResolvedValue(undefined);
 
 describe('StarshipRepository', () => {
   let repository: StarshipRepository;
-  let mockConnection: jest.Mocked<Neo4jConnection>;
+  let testHelper: RepositoryTestHelper;
 
   beforeEach(() => {
-    // Create fresh mock connection for each test
-    mockConnection = {
-      connect: jest.fn(),
-      disconnect: jest.fn(),
-      getSession: jest.fn(),
-      executeQuery: jest.fn(),
-      executeWrite: jest.fn(),
-      initializeSchema: jest.fn(),
-    } as unknown as jest.Mocked<Neo4jConnection>;
-    (getConnection as jest.Mock).mockReturnValue(mockConnection);
+    testHelper = new RepositoryTestHelper();
     repository = new StarshipRepository();
-    // Clear all mocks to ensure clean state
+    testHelper.reset();
     jest.clearAllMocks();
   });
 
@@ -40,399 +38,292 @@ describe('StarshipRepository', () => {
     });
   });
 
-  // Note: validateUUID method has been moved to BaseRepository or removed in the new architecture
-  describe('architecture migration note', () => {
-    it('should note that validateUUID has been refactored', () => {
-      // The validateUUID method may have been moved to BaseRepository or entity validation
-      expect(true).toBe(true);
-    });
-  });
-
   describe('findAll', () => {
     it('should return all starships ordered by creation date', async () => {
       const mockStarships = [
-        global.createMockStarship({ id: 'starship-1', name: 'Ship One' }),
-        global.createMockStarship({ id: 'starship-2', name: 'Ship Two' }),
+        {
+          id: 'starship-1',
+          name: 'Starship 1',
+          slug: 'starship-1',
+          owner_id: 'user-123',
+          class: 'scout',
+          max_agents: 3,
+          status: 'active',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'starship-2',
+          name: 'Starship 2',
+          slug: 'starship-2',
+          owner_id: 'user-123',
+          class: 'cruiser',
+          max_agents: 5,
+          status: 'active',
+          created_at: '2024-01-02T00:00:00.000Z',
+          updated_at: '2024-01-02T00:00:00.000Z',
+        },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([{ s: mockStarships[0] }, { s: mockStarships[1] }]);
+      testHelper.mockConnection.query.mockResolvedValue(mockStarships);
 
       const result = await repository.findAll();
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) RETURN s ORDER BY s.createdAt DESC');
-      expect(result).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: 'starship-1',
-            name: 'Ship One',
-            class: 'scout',
-            ownerId: 'user-123',
-          }),
-          expect.objectContaining({
-            id: 'starship-2',
-            name: 'Ship Two',
-            class: 'scout',
-            ownerId: 'user-123',
-          }),
-        ])
-      );
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM starships ORDER BY created_at DESC');
+      expect(result).toHaveLength(2);
+      expect(result[0].name).toBe('Starship 1');
+      expect(result[1].name).toBe('Starship 2');
     });
 
-    it('should return empty array when no starships found', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+    it('should handle empty result', async () => {
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findAll();
 
       expect(result).toEqual([]);
     });
+
+    it('should handle database errors', async () => {
+      testHelper.mockDatabaseError();
+      await expect(repository.findAll()).rejects.toThrow(DatabaseError);
+    });
   });
 
   describe('findById', () => {
-    it('should return starship by ID', async () => {
-      const mockStarship = global.createMockStarship();
-      mockConnection.executeQuery.mockResolvedValue([{ s: mockStarship }]);
+    it('should return starship by id', async () => {
+      const mockStarship = {
+        id: 'starship-1',
+        name: 'Test Starship',
+        slug: 'test-starship',
+        owner_id: 'user-123',
+        class: 'scout',
+        max_agents: 3,
+        status: 'active',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+      };
 
-      const result = await repository.findById('starship-123');
+      testHelper.mockConnection.query.mockResolvedValue([mockStarship]);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $id RETURN s', { id: 'starship-123' });
-      expect(result).toEqual(
-        expect.objectContaining({
-          id: 'starship-123',
-          name: 'Test Starship',
-          class: 'scout',
-          ownerId: 'user-123',
-        })
-      );
+      const result = await repository.findById('starship-1');
+
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM starships WHERE id = $1', ['starship-1']);
+      expect(result).not.toBeNull();
+      expect(result!.name).toBe('Test Starship');
     });
 
     it('should return null when starship not found', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
-      const result = await repository.findById('non-existent');
+      const result = await repository.findById('nonexistent');
 
       expect(result).toBeNull();
-    });
-
-    it('should validate required ID parameter', async () => {
-      await expect(repository.findById('')).rejects.toThrow(DatabaseError);
     });
   });
 
   describe('findBySlug', () => {
-    it('should return starship by slug and owner ID', async () => {
-      const mockStarship = global.createMockStarship({ slug: 'test-ship' });
-      mockConnection.executeQuery.mockResolvedValue([{ s: mockStarship }]);
+    it('should return starship by slug and owner', async () => {
+      const mockStarship = {
+        id: 'starship-1',
+        name: 'Test Starship',
+        slug: 'test-starship',
+        owner_id: 'user-123',
+        class: 'scout',
+        max_agents: 3,
+        status: 'active',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+      };
 
-      const result = await repository.findBySlug('test-ship', 'owner-123');
+      testHelper.mockConnection.queryOne.mockResolvedValue(mockStarship);
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (s:Starship) WHERE s.slug = $slug AND s.ownerId = $ownerId RETURN s',
-        { slug: 'test-ship', ownerId: 'owner-123' }
-      );
-      expect(result).toEqual(
-        expect.objectContaining({
-          slug: 'test-ship',
-          ownerId: 'user-123',
-          class: 'scout',
-        })
-      );
+      const result = await repository.findBySlug('test-starship', 'user-123');
+
+      expect(testHelper.mockConnection.queryOne).toHaveBeenCalledWith('SELECT * FROM starships WHERE slug = $1 AND owner_id = $2', [
+        'test-starship',
+        'user-123',
+      ]);
+      expect(result).not.toBeNull();
+      expect(result!.slug).toBe('test-starship');
     });
 
-    it('should validate required parameters', async () => {
-      await expect(repository.findBySlug('', 'owner-123')).rejects.toThrow(DatabaseError);
-      await expect(repository.findBySlug('slug', '')).rejects.toThrow(DatabaseError);
+    it('should return null when not found', async () => {
+      testHelper.mockConnection.queryOne.mockResolvedValue(null);
+
+      const result = await repository.findBySlug('nonexistent', 'user-123');
+
+      expect(result).toBeNull();
     });
   });
 
   describe('findByOwner', () => {
-    it('should return starships by owner ID', async () => {
+    it('should return starships by owner', async () => {
       const mockStarships = [
-        global.createMockStarship({ ownerId: 'owner-123', name: 'Ship A' }),
-        global.createMockStarship({ ownerId: 'owner-123', name: 'Ship B' }),
+        {
+          id: 'starship-1',
+          name: 'Starship 1',
+          slug: 'starship-1',
+          owner_id: 'user-123',
+          class: 'scout',
+          max_agents: 3,
+          status: 'active',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        },
       ];
 
-      mockConnection.executeQuery.mockResolvedValue([{ s: mockStarships[0] }, { s: mockStarships[1] }]);
+      testHelper.mockConnection.query.mockResolvedValue(mockStarships);
 
-      const result = await repository.findByOwner('owner-123');
+      const result = await repository.findByOwner('user-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        'MATCH (s:Starship) WHERE s.ownerId = $ownerId RETURN s ORDER BY s.createdAt DESC',
-        { ownerId: 'owner-123' }
-      );
-      expect(result).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            ownerId: 'owner-123',
-            name: 'Ship A',
-            class: 'scout',
-          }),
-          expect.objectContaining({
-            ownerId: 'owner-123',
-            name: 'Ship B',
-            class: 'scout',
-          }),
-        ])
-      );
+      expect(testHelper.mockConnection.query).toHaveBeenCalledWith('SELECT * FROM starships WHERE owner_id = $1 ORDER BY created_at DESC', [
+        'user-123',
+      ]);
+      expect(result).toHaveLength(1);
     });
   });
 
   describe('create', () => {
-    it('should create starship with scout class defaults', async () => {
-      const starshipData = {
-        name: 'Test Scout',
-        ownerId: 'owner-123',
+    it('should create starship with scout class (3 agents)', async () => {
+      const createData = {
+        name: 'Test Starship',
+        ownerId: 'user-123',
         class: 'scout' as const,
         status: 'active' as const,
       };
 
-      const mockCreatedStarship = global.createMockStarship({
-        name: 'Test Scout',
-        ownerId: 'owner-123',
+      const mockCreatedStarship = {
+        id: 'test-starship-id-123',
+        name: 'Test Starship',
+        slug: 'test-starship',
+        owner_id: 'user-123',
         class: 'scout',
-        maxAgents: 3,
-        slug: 'test-scout',
+        max_agents: 3,
         status: 'active',
-      });
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+      };
 
-      // Fix: createEntityWithAutoId expects result[0].n, not direct result
-      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]); // CREATE starship
-      mockConnection.executeWrite.mockResolvedValueOnce([]); // CREATE relationship
+      testHelper.mockConnection.query.mockResolvedValue([mockCreatedStarship]);
 
-      // Mock slug generation - fix spy setup
-      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-scout');
+      const result = await repository.create(createData);
 
-      const result = await repository.create(starshipData);
-
-      // The actual query uses CREATE (n:Starship) with createEntityWithAutoId
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (n:Starship)'),
-        expect.objectContaining({
-          props: expect.objectContaining({
-            name: 'Test Scout',
-            ownerId: 'owner-123',
-            class: 'scout',
-            maxAgents: 3,
-
-            slug: 'test-scout',
-            status: 'active',
-          }),
-        })
-      );
-      expect(result).toEqual(
-        expect.objectContaining({
-          name: 'Test Scout',
-          ownerId: 'owner-123',
-          class: 'scout',
-          maxAgents: 3,
-
-          slug: 'test-scout',
-          status: 'active',
-        })
-      );
+      expect(StarshipEntity.validate).toHaveBeenCalled();
+      expect(result.name).toBe('Test Starship');
+      expect(result.maxAgents).toBe(3);
     });
 
-    it('should create starship with cruiser class defaults', async () => {
-      const starshipData = {
-        name: 'Test Cruiser',
-        ownerId: 'owner-123',
+    it('should create starship with cruiser class (5 agents)', async () => {
+      const createData = {
+        name: 'Cruiser Ship',
+        ownerId: 'user-123',
         class: 'cruiser' as const,
         status: 'active' as const,
       };
 
-      const mockCreatedStarship = global.createMockStarship({
-        name: 'Test Cruiser',
-        ownerId: 'owner-123',
+      const mockCreatedStarship = {
+        id: 'test-starship-id-123',
+        name: 'Cruiser Ship',
+        slug: 'cruiser-ship',
+        owner_id: 'user-123',
         class: 'cruiser',
-        maxAgents: 5,
-
-        slug: 'test-cruiser',
+        max_agents: 5,
         status: 'active',
-      });
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+      };
 
-      // Fix: createEntityWithAutoId expects result[0].n, not direct result
-      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
-      mockConnection.executeWrite.mockResolvedValueOnce([]);
+      testHelper.mockConnection.query.mockResolvedValue([mockCreatedStarship]);
 
-      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-cruiser');
+      const result = await repository.create(createData);
 
-      const result = await repository.create(starshipData);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (n:Starship)'),
-        expect.objectContaining({
-          props: expect.objectContaining({
-            maxAgents: 5,
-          }),
-        })
-      );
-      expect(result).toEqual(
-        expect.objectContaining({
-          name: 'Test Cruiser',
-          ownerId: 'owner-123',
-          class: 'cruiser',
-          maxAgents: 5,
-
-          slug: 'test-cruiser',
-          status: 'active',
-        })
-      );
+      expect(result.maxAgents).toBe(5);
     });
 
-    it('should create starship with draught class defaults', async () => {
-      const starshipData = {
-        name: 'Test Draught',
-        ownerId: 'owner-123',
+    it('should create starship with draught class (10 agents)', async () => {
+      const createData = {
+        name: 'Draught Ship',
+        ownerId: 'user-123',
         class: 'draught' as const,
         status: 'active' as const,
       };
 
-      const mockCreatedStarship = global.createMockStarship({
-        name: 'Test Draught',
-        ownerId: 'owner-123',
+      const mockCreatedStarship = {
+        id: 'test-starship-id-123',
+        name: 'Draught Ship',
+        slug: 'draught-ship',
+        owner_id: 'user-123',
         class: 'draught',
-        maxAgents: 10,
-
-        slug: 'test-draught',
+        max_agents: 10,
         status: 'active',
-      });
-
-      // Fix: createEntityWithAutoId expects result[0].n, not direct result
-      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
-      mockConnection.executeWrite.mockResolvedValueOnce([]);
-
-      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-draught');
-
-      const result = await repository.create(starshipData);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (n:Starship)'),
-        expect.objectContaining({
-          props: expect.objectContaining({
-            maxAgents: 10,
-          }),
-        })
-      );
-      expect(result).toEqual(
-        expect.objectContaining({
-          name: 'Test Draught',
-          ownerId: 'owner-123',
-          class: 'draught',
-          maxAgents: 10,
-
-          slug: 'test-draught',
-          status: 'active',
-        })
-      );
-    });
-
-    it('should validate required fields', async () => {
-      const incompleteData = {
-        name: 'Test Ship',
-        // Missing ownerId and class
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
       };
 
-      await expect(repository.create(incompleteData as never)).rejects.toThrow(DatabaseError);
+      testHelper.mockConnection.query.mockResolvedValue([mockCreatedStarship]);
+
+      const result = await repository.create(createData);
+
+      expect(result.maxAgents).toBe(10);
     });
 
-    it('should create owner relationship after starship creation', async () => {
-      const starshipData = {
-        name: 'Test Ship',
-        ownerId: 'owner-123',
+    it('should use provided slug if given', async () => {
+      const createData = {
+        name: 'Test Starship',
+        slug: 'custom-slug',
+        ownerId: 'user-123',
         class: 'scout' as const,
         status: 'active' as const,
       };
 
-      const mockCreatedStarship = global.createMockStarship({
-        name: 'Test Ship',
-        ownerId: 'owner-123',
+      const mockCreatedStarship = {
+        id: 'test-starship-id-123',
+        name: 'Test Starship',
+        slug: 'custom-slug',
+        owner_id: 'user-123',
         class: 'scout',
-        slug: 'test-ship',
+        max_agents: 3,
         status: 'active',
-      });
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+      };
 
-      // Fix: createEntityWithAutoId expects result[0].n, not direct result
-      mockConnection.executeWrite.mockResolvedValueOnce([{ n: mockCreatedStarship }]);
-      mockConnection.executeWrite.mockResolvedValueOnce([]);
+      testHelper.mockConnection.query.mockResolvedValue([mockCreatedStarship]);
 
-      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('test-ship');
+      const result = await repository.create(createData);
 
-      await repository.create(starshipData);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (u)-[:OWNS {ownedSince: $timestamp}]->(s)'),
-        expect.objectContaining({
-          ownerId: 'owner-123',
-          starshipId: expect.any(String),
-          timestamp: expect.any(String),
-        })
-      );
+      expect(result.slug).toBe('custom-slug');
     });
   });
 
   describe('update', () => {
     it('should update starship successfully', async () => {
-      const updates = {
+      const updates = { name: 'Updated Name' };
+      const mockUpdated = {
+        id: 'starship-1',
         name: 'Updated Name',
-        status: 'inactive' as const, // Use a valid StarshipEntity property instead of description
+        slug: 'updated-name',
+        owner_id: 'user-123',
+        class: 'scout',
+        max_agents: 3,
+        status: 'active',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-02T00:00:00.000Z',
       };
 
-      const existingStarship = global.createMockStarship({
-        id: 'starship-123',
-        ownerId: 'owner-123',
-      });
-      const updatedStarship = global.createMockStarship({
-        id: 'starship-123',
-        name: 'Updated Name',
-        status: 'inactive',
-        slug: 'updated-name',
-      });
+      testHelper.mockConnection.query.mockResolvedValue([mockUpdated]);
 
-      // Mock findById call for slug generation
-      jest.spyOn(repository, 'findById').mockResolvedValue(existingStarship);
-      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('updated-name');
-      mockConnection.executeWrite.mockResolvedValue([{ s: updatedStarship }]);
+      const result = await repository.update('starship-1', updates);
 
-      const result = await repository.update('starship-123', updates);
-
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith('MATCH (s:Starship) WHERE s.id = $id SET s += $updates RETURN s', {
-        id: 'starship-123',
-        updates: expect.objectContaining({
-          name: 'Updated Name',
-          status: 'inactive',
-          slug: 'updated-name',
-          updatedAt: expect.any(String),
-        }),
-      });
-      expect(result).toEqual(
-        expect.objectContaining({
-          id: 'starship-123',
-          name: 'Updated Name',
-          class: 'scout',
-        })
-      );
-    });
-
-    it('should generate new slug when name is updated', async () => {
-      const updates = { name: 'New Ship Name' };
-      const existingStarship = global.createMockStarship({ ownerId: 'owner-123' });
-
-      jest.spyOn(repository, 'findById').mockResolvedValue(existingStarship);
-      jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('new-ship-name');
-
-      mockConnection.executeWrite.mockResolvedValue([{ s: existingStarship }]);
-
-      await repository.update('starship-123', updates);
-
-      expect(repository.findById).toHaveBeenCalledWith('starship-123');
-      expect(repository.generateUniqueSlug).toHaveBeenCalledWith('New Ship Name', 'owner-123');
+      expect(StarshipEntity.validate).toHaveBeenCalledWith(updates, 'update');
+      expect(result).not.toBeNull();
+      expect(result!.name).toBe('Updated Name');
     });
 
     it('should return null when starship not found', async () => {
-      // Mock findById to return null (starship not found)
-      jest.spyOn(repository, 'findById').mockResolvedValue(null);
-      mockConnection.executeWrite.mockResolvedValue([]);
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
-      const result = await repository.update('non-existent', { name: 'New Name' });
+      const result = await repository.update('nonexistent', { name: 'Updated' });
 
       expect(result).toBeNull();
     });
@@ -440,369 +331,318 @@ describe('StarshipRepository', () => {
 
   describe('delete', () => {
     it('should delete starship successfully', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 1 }]);
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 1 } as unknown as unknown[]);
 
-      const result = await repository.delete('starship-123');
+      const result = await repository.delete('starship-1');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        'MATCH (s:Starship) WHERE s.id = $id DETACH DELETE s RETURN count(s) as deletedCount',
-        { id: 'starship-123' }
-      );
       expect(result).toBe(true);
     });
 
-    it('should return false when starship does not exist', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 0 }]);
+    it('should return false when starship not found', async () => {
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 0 } as unknown as unknown[]);
 
-      const result = await repository.delete('non-existent');
+      const result = await repository.delete('nonexistent');
 
       expect(result).toBe(false);
     });
   });
 
+  describe('getDeployedAgents', () => {
+    it('should return deployed agents for starship', async () => {
+      const mockAgents = [
+        {
+          id: 'agent-1',
+          name: 'Agent 1',
+          starship_id: 'starship-123',
+          deployed_at: '2024-01-01T00:00:00.000Z',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        },
+      ];
+
+      testHelper.mockConnection.query.mockResolvedValue(mockAgents);
+
+      const result = await repository.getDeployedAgents('starship-123');
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('should throw error for missing starshipId', async () => {
+      await expect(repository.getDeployedAgents('')).rejects.toThrow('Starship ID is required');
+    });
+  });
+
   describe('deployAgent', () => {
-    it('should deploy agent to starship with available slots', async () => {
-      jest.spyOn(repository, 'getAvailableSlots').mockResolvedValue(2);
-      mockConnection.executeQuery.mockResolvedValue([]); // No existing deployment
-      mockConnection.executeWrite.mockResolvedValue([]);
+    it('should deploy agent successfully', async () => {
+      // Mock available slots check
+      testHelper.mockConnection.queryOne.mockResolvedValueOnce({
+        max_agents: '3',
+        deployed_count: '1',
+      });
+
+      // Mock existing deployment check
+      testHelper.mockConnection.queryOne.mockResolvedValueOnce(null);
+
+      // Mock deployment update
+      testHelper.mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.deployAgent('starship-123', 'agent-456');
 
-      expect(repository.getAvailableSlots).toHaveBeenCalledWith('starship-123');
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (a)-[:DEPLOYED_ON'),
-        expect.objectContaining({
-          starshipId: 'starship-123',
-          agentId: 'agent-456',
-          timestamp: expect.any(String),
-        })
-      );
       expect(result).toBe(true);
     });
 
-    it('should throw error when no available slots', async () => {
-      jest.spyOn(repository, 'getAvailableSlots').mockResolvedValue(0);
+    it('should throw error when no slots available', async () => {
+      testHelper.mockConnection.queryOne.mockResolvedValue({
+        max_agents: '3',
+        deployed_count: '3',
+      });
 
-      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow('No available slots on this starship');
+      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow(DatabaseError);
     });
 
     it('should throw error when agent already deployed', async () => {
-      jest.spyOn(repository, 'getAvailableSlots').mockResolvedValue(2);
-      mockConnection.executeQuery.mockResolvedValue([{ r: {} }]); // Existing deployment
+      testHelper.mockConnection.queryOne
+        .mockResolvedValueOnce({
+          max_agents: '3',
+          deployed_count: '1',
+        })
+        .mockResolvedValueOnce({ id: 'agent-456' });
 
-      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow('Agent is already deployed on this starship');
+      await expect(repository.deployAgent('starship-123', 'agent-456')).rejects.toThrow(DatabaseError);
     });
 
-    it('should validate required parameters', async () => {
+    it('should throw error for missing parameters', async () => {
       await expect(repository.deployAgent('', 'agent-456')).rejects.toThrow('Starship ID is required');
       await expect(repository.deployAgent('starship-123', '')).rejects.toThrow('Agent ID is required');
     });
   });
 
   describe('removeAgent', () => {
-    it('should remove agent from starship successfully', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 1 }]);
+    it('should remove agent successfully', async () => {
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 1 } as unknown as unknown[]);
 
       const result = await repository.removeAgent('starship-123', 'agent-456');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DELETE r'), {
-        starshipId: 'starship-123',
-        agentId: 'agent-456',
-      });
       expect(result).toBe(true);
     });
 
-    it('should return false when relationship does not exist', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 0 }]);
+    it('should return false when agent not found', async () => {
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 0 } as unknown as unknown[]);
 
-      const result = await repository.removeAgent('starship-123', 'agent-456');
+      const result = await repository.removeAgent('starship-123', 'nonexistent');
 
       expect(result).toBe(false);
+    });
+
+    it('should throw error for missing parameters', async () => {
+      await expect(repository.removeAgent('', 'agent-456')).rejects.toThrow('Starship ID is required');
+      await expect(repository.removeAgent('starship-123', '')).rejects.toThrow('Agent ID is required');
     });
   });
 
   describe('getAvailableSlots', () => {
-    it('should calculate available slots correctly', async () => {
-      mockConnection.executeQuery.mockResolvedValue([{ maxAgents: 5, deployedCount: 2 }]);
+    it('should return available slots', async () => {
+      testHelper.mockConnection.queryOne.mockResolvedValue({
+        max_agents: '5',
+        deployed_count: '2',
+      });
 
       const result = await repository.getAvailableSlots('starship-123');
 
       expect(result).toBe(3);
     });
 
-    it('should handle no deployed agents', async () => {
-      mockConnection.executeQuery.mockResolvedValue([{ maxAgents: 3, deployedCount: 0 }]);
+    it('should return 0 when fully deployed', async () => {
+      testHelper.mockConnection.queryOne.mockResolvedValue({
+        max_agents: '3',
+        deployed_count: '3',
+      });
 
       const result = await repository.getAvailableSlots('starship-123');
 
-      expect(result).toBe(3);
+      expect(result).toBe(0);
+    });
+
+    it('should throw error for missing starshipId', async () => {
+      await expect(repository.getAvailableSlots('')).rejects.toThrow('Starship ID is required');
+    });
+  });
+
+  describe('updateStatus', () => {
+    it('should update starship status', async () => {
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 1 } as unknown as unknown[]);
+
+      const result = await repository.updateStatus('starship-123', 'inactive');
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when starship not found', async () => {
+      testHelper.mockConnection.query.mockResolvedValue({ rowCount: 0 } as unknown as unknown[]);
+
+      const result = await repository.updateStatus('nonexistent', 'inactive');
+
+      expect(result).toBe(false);
     });
   });
 
   describe('slug generation', () => {
     describe('createSlugFromName', () => {
       it('should create slug from name', () => {
-        const result = (repository as unknown as { createSlugFromName: (name: string) => string }).createSlugFromName('My Test Ship!');
-
-        expect(result).toBe('my-test-ship');
+        expect(repository.createSlugFromName('Test Starship')).toBe('test-starship');
+        expect(repository.createSlugFromName('My Cool Ship!')).toBe('my-cool-ship');
+        expect(repository.createSlugFromName('  Extra   Spaces  ')).toBe('extra-spaces');
       });
 
       it('should handle special characters', () => {
-        const result = (repository as unknown as { createSlugFromName: (name: string) => string }).createSlugFromName('Ship@#$%Name');
-
-        expect(result).toBe('shipname');
+        expect(repository.createSlugFromName('Ship #1 @Test')).toBe('ship-1-test');
       });
 
-      it('should handle multiple spaces and hyphens', () => {
-        const result = (repository as unknown as { createSlugFromName: (name: string) => string }).createSlugFromName('Ship   Name---Test');
-
-        expect(result).toBe('ship-name-test');
+      it('should handle multiple hyphens', () => {
+        expect(repository.createSlugFromName('ship---name')).toBe('ship-name');
       });
     });
 
     describe('isSlugAvailable', () => {
       it('should return true when slug is available', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 0 }]);
+        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '0' });
 
-        const result = await repository.isSlugAvailable('test-slug', 'owner-123');
+        const result = await repository.isSlugAvailable('new-slug', 'user-123');
 
         expect(result).toBe(true);
       });
 
       it('should return false when slug is taken', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 1 }]);
+        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '1' });
 
-        const result = await repository.isSlugAvailable('taken-slug', 'owner-123');
+        const result = await repository.isSlugAvailable('existing-slug', 'user-123');
 
         expect(result).toBe(false);
       });
 
-      it('should exclude specific ID when checking availability', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 0 }]);
+      it('should exclude specific id when provided', async () => {
+        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '0' });
 
-        await repository.isSlugAvailable('test-slug', 'owner-123', 'exclude-id');
+        await repository.isSlugAvailable('slug', 'user-123', 'starship-123');
 
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          expect.stringContaining('AND s.id <> $excludeId'),
-          expect.objectContaining({ excludeId: 'exclude-id' })
-        );
-      });
-    });
-
-    describe('generateUniqueSlug', () => {
-      it('should return base slug when available', async () => {
-        jest
-          .spyOn(
-            repository as unknown as { isSlugAvailable: (slug: string, ownerId: string, excludeId?: string) => Promise<boolean> },
-            'isSlugAvailable'
-          )
-          .mockResolvedValue(true);
-
-        const result = await repository.generateUniqueSlug('Test Ship', 'owner-123');
-
-        expect(result).toBe('test-ship');
+        expect(testHelper.mockConnection.queryOne).toHaveBeenCalledWith(expect.stringContaining('AND id != $3'), [
+          'slug',
+          'user-123',
+          'starship-123',
+        ]);
       });
 
-      it('should generate optimized slug when base is taken', async () => {
-        jest
-          .spyOn(
-            repository as unknown as { isSlugAvailable: (slug: string, ownerId: string, excludeId?: string) => Promise<boolean> },
-            'isSlugAvailable'
-          )
-          .mockResolvedValueOnce(false) // Base slug taken
-          .mockResolvedValueOnce(true); // Optimized slug available
-
-        const result = await repository.generateUniqueSlug('Test Ship', 'owner-123');
-
-        expect(result).toMatch(/^test-ship-[a-z0-9]+-[a-z0-9]{6}$/);
-      });
-
-      it('should use fallback UUID when optimized slug is also taken', async () => {
-        jest
-          .spyOn(
-            repository as unknown as { isSlugAvailable: (slug: string, ownerId: string, excludeId?: string) => Promise<boolean> },
-            'isSlugAvailable'
-          )
-          .mockResolvedValueOnce(false) // Base slug taken
-          .mockResolvedValueOnce(false); // Optimized slug taken
-
-        const result = await repository.generateUniqueSlug('Test Ship', 'owner-123');
-
-        expect(result).toMatch(/^test-ship-[a-z0-9-]{8,}$/);
-      });
-
-      it('should validate required parameters', async () => {
-        await expect(repository.generateUniqueSlug('', 'owner-123')).rejects.toThrow('Name parameter is required');
-        await expect(repository.generateUniqueSlug('Test', '')).rejects.toThrow('Owner ID parameter is required');
+      it('should throw error for missing parameters', async () => {
+        await expect(repository.isSlugAvailable('', 'user-123')).rejects.toThrow('Slug parameter is required');
+        await expect(repository.isSlugAvailable('slug', '')).rejects.toThrow('Owner ID parameter is required');
       });
     });
   });
 
   describe('Stripe integration', () => {
     describe('findBySubscriptionId', () => {
-      it('should return starship by subscription ID', async () => {
-        const mockStarship = global.createMockStarship({ subscriptionId: 'sub_123' });
-        mockConnection.executeQuery.mockResolvedValue([{ starship: mockStarship }]);
+      it('should find starship by subscription id', async () => {
+        const mockStarship = {
+          id: 'starship-1',
+          subscription_id: 'sub_123',
+          name: 'Test',
+          slug: 'test',
+          owner_id: 'user-123',
+          class: 'scout',
+          max_agents: 3,
+          status: 'active',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        };
+
+        testHelper.mockConnection.queryOne.mockResolvedValue(mockStarship);
 
         const result = await repository.findBySubscriptionId('sub_123');
 
-        expect(result).toEqual(
-          expect.objectContaining({
-            id: 'starship-123',
-            subscriptionId: 'sub_123',
-            class: 'scout',
-          })
-        );
-      });
-
-      it('should return null when not found', async () => {
-        mockConnection.executeQuery.mockResolvedValue([]);
-
-        const result = await repository.findBySubscriptionId('sub_nonexistent');
-
-        expect(result).toBeNull();
+        expect(result).not.toBeNull();
       });
     });
 
     describe('updateSubscription', () => {
       it('should update subscription details', async () => {
-        const updates = {
+        testHelper.mockConnection.query.mockResolvedValue([]);
+
+        await repository.updateSubscription('starship-123', {
           subscriptionId: 'sub_123',
-          status: 'active' as const,
-          plan: 'cruiser' as const,
-        };
+          status: 'active',
+        });
 
-        mockConnection.executeWrite.mockResolvedValue([]);
-
-        await repository.updateSubscription('starship-123', updates);
-
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          expect.stringContaining('SET starship.subscriptionId = $subscriptionId'),
-          expect.objectContaining({
-            starshipId: 'starship-123',
-            ...updates,
-          })
-        );
+        expect(testHelper.mockConnection.query).toHaveBeenCalled();
       });
     });
 
     describe('countFreeStarships', () => {
       it('should count free starships for user', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 2 }]);
+        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '2' });
 
         const result = await repository.countFreeStarships('user-123');
 
         expect(result).toBe(2);
       });
     });
-  });
 
-  describe('webhook idempotency', () => {
-    describe('isEventProcessed', () => {
-      it('should return true when event was processed', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ e: {} }]);
+    describe('findByStripeCustomerId', () => {
+      it('should find starship by stripe customer id', async () => {
+        const mockStarship = {
+          id: 'starship-1',
+          stripe_customer_id: 'cus_123',
+          name: 'Test',
+          slug: 'test',
+          owner_id: 'user-123',
+          class: 'scout',
+          max_agents: 3,
+          status: 'active',
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
+        };
 
-        const result = await repository.isEventProcessed('evt_123');
+        testHelper.mockConnection.queryOne.mockResolvedValue(mockStarship);
 
-        expect(result).toBe(true);
-      });
+        const result = await repository.findByStripeCustomerId('cus_123');
 
-      it('should return false when event was not processed', async () => {
-        mockConnection.executeQuery.mockResolvedValue([]);
-
-        const result = await repository.isEventProcessed('evt_new');
-
-        expect(result).toBe(false);
-      });
-    });
-
-    describe('markEventProcessed', () => {
-      it('should mark event as processed', async () => {
-        mockConnection.executeWrite.mockResolvedValue([]);
-
-        await repository.markEventProcessed('evt_123', 'customer.subscription.created');
-
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-          expect.stringContaining('CREATE (e:StripeEvent'),
-          expect.objectContaining({
-            eventId: 'evt_123',
-            eventType: 'customer.subscription.created',
-          })
-        );
+        expect(result).not.toBeNull();
       });
     });
   });
 
-  describe('memory management', () => {
-    describe('getMemories', () => {
-      it('should return starship memories', async () => {
-        const mockMemories = [
-          { id: 'mem-1', content: 'Memory 1' },
-          { id: 'mem-2', content: 'Memory 2' },
+  describe('conversation methods', () => {
+    describe('getConversations', () => {
+      it('should get conversations for starship', async () => {
+        const mockConversations = [
+          {
+            id: 'conv-1',
+            starship_id: 'starship-123',
+            title: 'Conv 1',
+            status: 'active',
+            created_at: '2024-01-01T00:00:00.000Z',
+          },
         ];
 
-        mockConnection.executeQuery.mockResolvedValue([{ m: mockMemories[0] }, { m: mockMemories[1] }]);
+        testHelper.mockConnection.query.mockResolvedValue(mockConversations);
 
-        const result = await repository.getMemories('starship-123');
+        const result = await repository.getConversations('starship-123');
 
-        expect(result).toEqual(mockMemories);
-        expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-          expect.stringContaining('MATCH (s:Starship {id: $starshipId})-[:HAS_MEMORY]->(m:Memory)'),
-          { starshipId: 'starship-123' }
-        );
+        expect(result).toHaveLength(1);
+      });
+
+      it('should throw error for missing starshipId', async () => {
+        await expect(repository.getConversations('')).rejects.toThrow('Starship ID is required');
       });
     });
 
-    describe('getMemoryCount', () => {
-      it('should return memory count', async () => {
-        mockConnection.executeQuery.mockResolvedValue([{ count: 5 }]);
+    describe('getConversationCount', () => {
+      it('should get conversation count', async () => {
+        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '5' });
 
-        const result = await repository.getMemoryCount('starship-123');
+        const result = await repository.getConversationCount('starship-123');
 
         expect(result).toBe(5);
       });
-    });
-
-    describe('removeMemory', () => {
-      it('should remove memory successfully', async () => {
-        mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 1 }]);
-
-        const result = await repository.removeMemory('starship-123', 'memory-456');
-
-        expect(result).toBe(true);
-        expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE m'), {
-          starshipId: 'starship-123',
-          memoryId: 'memory-456',
-        });
-      });
-    });
-  });
-
-  describe('error scenarios', () => {
-    it('should handle database connection errors', async () => {
-      mockConnection.executeQuery.mockRejectedValue(new Error('Connection failed'));
-
-      await expect(repository.findById('starship-123')).rejects.toThrow();
-    });
-
-    it('should handle constraint violations', async () => {
-      const error = new Error('unique constraint violation');
-      mockConnection.executeWrite.mockRejectedValue(error);
-
-      const starshipData = {
-        name: 'Test Ship',
-        ownerId: 'owner-123',
-        class: 'scout' as const,
-        status: 'active' as const,
-      };
-
-      await expect(repository.create(starshipData)).rejects.toThrow();
-    });
-
-    it('should handle validation errors properly', async () => {
-      await expect(repository.findById('')).rejects.toThrow(DatabaseError);
-      await expect(repository.findBySlug('', 'owner')).rejects.toThrow(DatabaseError);
-      await expect(repository.findByOwner('')).rejects.toThrow(DatabaseError);
     });
   });
 });

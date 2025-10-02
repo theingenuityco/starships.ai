@@ -97,7 +97,7 @@ describe('BaseRepository', () => {
 
   describe('handleDatabaseError', () => {
     it('should handle constraint violation error', () => {
-      const error = { message: 'constraint violation error', code: 'UNIQUE_CONSTRAINT' };
+      const error = { message: 'constraint violation error', code: '23505' }; // PostgreSQL unique_violation
 
       expect(() => {
         repository.testHandleDatabaseError(error, 'create', 'User', 'user-123');
@@ -297,13 +297,13 @@ describe('BaseRepository', () => {
   describe('error detection methods', () => {
     it('should detect constraint violation errors', () => {
       const constraintErrors = [
-        { message: 'constraint violation', code: '' },
-        { message: 'unique constraint failed', code: '' },
-        { message: 'duplicate key error', code: '' },
-        { message: 'foreign key constraint', code: '' },
-        { message: 'check constraint failed', code: '' },
-        { message: 'not null constraint', code: '' },
-        { message: 'primary key violation', code: '' },
+        { message: 'constraint violation', code: '23000' }, // integrity_constraint_violation
+        { message: 'unique constraint failed', code: '23505' }, // unique_violation
+        { message: 'duplicate key error', code: '23505' }, // unique_violation
+        { message: 'foreign key constraint', code: '23503' }, // foreign_key_violation
+        { message: 'check constraint failed', code: '23514' }, // check_violation
+        { message: 'not null constraint', code: '23502' }, // not_null_violation
+        { message: 'primary key violation', code: '23505' }, // unique_violation
       ];
 
       constraintErrors.forEach((error) => {

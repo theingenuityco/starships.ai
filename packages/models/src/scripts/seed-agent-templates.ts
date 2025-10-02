@@ -3,7 +3,6 @@
  * Creates default agent templates that can be used across starships
  */
 
-import { getConnection } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
 import { ALL_AGENT_TEMPLATES } from '@/seeders/agents';
@@ -16,11 +15,8 @@ export async function seedAgentTemplates(): Promise<void> {
   try {
     logger.info('Starting agent template seeding...');
 
-    // Get the existing connection that was initialized by the server
-    const connection = getConnection();
-
     // Create the agent template repository
-    const templateRepo = new AgentTemplateRepository(connection);
+    const templateRepo = new AgentTemplateRepository();
 
     logger.info('Seeding database with default agent templates...');
 
@@ -94,4 +90,3 @@ export async function seedAgentTemplates(): Promise<void> {
     // Don't throw - we don't want to prevent server startup if template seeding fails
   }
 }
-

@@ -5,7 +5,6 @@
  * Follows the layered architecture pattern established by AgentEntity.
  */
 
-import { Transformers } from '@/helpers/serializer';
 import type { ToolTemplateModel, TemplateCategory } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
@@ -35,12 +34,10 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   slug!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   createdAt!: string;
 
   @Expose()
-  @Transformers.DateTransform()
   @IsISO8601()
   updatedAt!: string;
 
@@ -56,7 +53,6 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   description!: string;
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   parameters!: {
     type: 'object';
@@ -65,20 +61,17 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   };
 
   @Expose()
-  @Transformers.JsonTransform()
   @IsObject()
   blueprint!: Blueprint;
 
   // BaseParams fields
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsArray()
   transforms?: TransformOperation[];
 
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsArray()
   mutations?: TransformOperation[];
 
@@ -110,7 +103,6 @@ export class ToolTemplateEntity implements ToolTemplateModel {
 
   @Expose()
   @IsOptional()
-  @Transformers.JsonTransform()
   @IsArray()
   configurationFields?: Array<{
     name: string;

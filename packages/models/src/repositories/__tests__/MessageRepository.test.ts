@@ -19,15 +19,15 @@ jest.mock('nanoid', () => ({
 describe('MessageRepository', () => {
   let repository: MessageRepository;
   let mockConnection: {
-    executeQuery: jest.Mock;
-    executeWrite: jest.Mock;
+    query: jest.Mock;
+    queryOne: jest.Mock;
   };
 
   beforeEach(() => {
     // Create simple mock connection
     mockConnection = {
-      executeQuery: jest.fn(),
-      executeWrite: jest.fn(),
+      query: jest.fn(),
+      queryOne: jest.fn(),
     };
 
     // Mock getConnection to return our mock connection
@@ -64,16 +64,16 @@ describe('MessageRepository', () => {
   describe('findAll', () => {
     it('should return all messages ordered by timestamp', async () => {
       const mockMessages = [createMockMessage({ id: 'message-1' }), createMockMessage({ id: 'message-2' })];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
+      mockConnection.query.mockResolvedValue(mockMessages);
 
       const result = await repository.findAll();
 
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM messages ORDER BY created_at DESC');
       expect(result).toHaveLength(2);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('ORDER BY m.timestamp DESC'));
     });
 
     it('should return empty array when no messages found', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findAll();
 
@@ -81,7 +81,7 @@ describe('MessageRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
+      mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
@@ -90,19 +90,19 @@ describe('MessageRepository', () => {
   describe('findById', () => {
     it('should return message when found', async () => {
       const mockMessage = createMockMessage();
-      mockConnection.executeQuery.mockResolvedValue([{ m: mockMessage }]);
+      mockConnection.query.mockResolvedValue([mockMessage]);
 
       const result = await repository.findById('message-123');
 
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM messages WHERE id = $1', ['message-123']);
       expect(result).toMatchObject({
         id: 'message-123',
         content: 'Hello, world!',
       });
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.id = $id'), { id: 'message-123' });
     });
 
     it('should return null when message not found', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.findById('non-existent');
 
@@ -110,7 +110,7 @@ describe('MessageRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      mockConnection.executeQuery.mockRejectedValue(new Error('Database error'));
+      mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.findById('message-123')).rejects.toThrow(DatabaseError);
     });
@@ -119,25 +119,25 @@ describe('MessageRepository', () => {
   describe('findByRole', () => {
     it('should return messages by role', async () => {
       const mockMessages = [createMockMessage({ role: 'assistant' })];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
+      mockConnection.query.mockResolvedValue(mockMessages);
 
       const result = await repository.findByRole('assistant');
 
+      expect(mockConnection.query).toHaveBeenCalledWith('SELECT * FROM messages WHERE role = $1 ORDER BY created_at DESC', ['assistant']);
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE m.role = $role'), { role: 'assistant' });
     });
 
     it('should filter by role and starship', async () => {
       const mockMessages = [createMockMessage({ role: 'user' })];
-      mockConnection.executeQuery.mockResolvedValue(mockMessages.map((m) => ({ m })));
+      mockConnection.query.mockResolvedValue(mockMessages);
 
       const result = await repository.findByRole('user', 'starship-123');
 
+      expect(mockConnection.query).toHaveBeenCalledWith(
+        'SELECT * FROM messages WHERE role = $1 AND starship_id = $2 ORDER BY created_at DESC',
+        ['user', 'starship-123']
+      );
       expect(result).toHaveLength(1);
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(expect.stringContaining('AND m.starshipId = $starshipId'), {
-        role: 'user',
-        starshipId: 'starship-123',
-      });
     });
   });
 
@@ -145,25 +145,18 @@ describe('MessageRepository', () => {
     it('should create message successfully', async () => {
       const createInput = createMockCreateInput();
       const mockCreated = createMockMessage();
-      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
+      mockConnection.queryOne.mockResolvedValue({ starship_id: 'starship-123' });
+      mockConnection.query.mockResolvedValue([mockCreated]);
 
       const result = await repository.create(createInput);
 
+      expect(mockConnection.queryOne).toHaveBeenCalledWith('SELECT starship_id FROM conversations WHERE id = $1', ['conversation-123']);
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO messages'), expect.any(Array));
       expect(result).toMatchObject({
         role: 'user',
         content: 'Hello, world!',
         messageType: 'user_input',
       });
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('CREATE (n:Message)'),
-        expect.objectContaining({
-          props: expect.objectContaining({
-            role: 'user',
-            content: 'Hello, world!',
-            messageType: 'user_input',
-          }),
-        })
-      );
     });
 
     it('should validate required fields', async () => {
@@ -186,7 +179,8 @@ describe('MessageRepository', () => {
         messageType: 'user_input' as const,
       };
       const mockCreated = createMockMessage(inputWithoutMessageType);
-      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
+      mockConnection.queryOne.mockResolvedValue({ starship_id: 'starship-123' });
+      mockConnection.query.mockResolvedValue([mockCreated]);
 
       const result = await repository.create(inputWithoutMessageType);
 
@@ -194,7 +188,7 @@ describe('MessageRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
+      mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.create(createMockCreateInput())).rejects.toThrow(DatabaseError);
     });
@@ -205,24 +199,16 @@ describe('MessageRepository', () => {
       const updates = { content: 'Updated content' };
       const mockUpdated = createMockMessage(updates);
 
-      mockConnection.executeWrite.mockResolvedValue([{ m: mockUpdated }]);
+      mockConnection.query.mockResolvedValue([mockUpdated]);
 
       const result = await repository.update('message-123', updates);
 
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE messages'), expect.any(Array));
       expect(result).toMatchObject(updates);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('SET m += $updates'),
-        expect.objectContaining({
-          id: 'message-123',
-          updates: expect.objectContaining({
-            content: 'Updated content',
-          }),
-        })
-      );
     });
 
     it('should return null when message not found', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       const result = await repository.update('non-existent', { content: 'New content' });
 
@@ -230,7 +216,7 @@ describe('MessageRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
+      mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.update('message-123', { content: 'New' })).rejects.toThrow(DatabaseError);
     });
@@ -238,16 +224,15 @@ describe('MessageRepository', () => {
 
   describe('delete', () => {
     it('should delete message successfully', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 1 }]);
+      mockConnection.query.mockResolvedValue({ rowCount: 1 });
 
       const result = await repository.delete('message-123');
 
       expect(result).toBe(true);
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(expect.stringContaining('DETACH DELETE m'), { id: 'message-123' });
     });
 
     it('should return false when message not found', async () => {
-      mockConnection.executeWrite.mockResolvedValue([{ deletedCount: 0 }]);
+      mockConnection.query.mockResolvedValue({ rowCount: 0 });
 
       const result = await repository.delete('non-existent');
 
@@ -255,7 +240,7 @@ describe('MessageRepository', () => {
     });
 
     it('should handle database errors', async () => {
-      mockConnection.executeWrite.mockRejectedValue(new Error('Database error'));
+      mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.delete('message-123')).rejects.toThrow(DatabaseError);
     });
@@ -263,50 +248,42 @@ describe('MessageRepository', () => {
 
   describe('linkToConversation', () => {
     it('should create relationship between message and conversation', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       await repository.linkToConversation('message-123', 'conversation-456');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (c:Conversation {id: $conversationId}), (m:Message {id: $messageId})'),
-        {
-          conversationId: 'conversation-456',
-          messageId: 'message-123',
-          key: 'conversation-456_message-123',
-        }
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith('UPDATE messages SET conversation_id = $1, updated_at = NOW() WHERE id = $2', [
+        'conversation-456',
+        'message-123',
+      ]);
     });
   });
 
   describe('unlinkFromConversation', () => {
     it('should remove relationship between message and conversation', async () => {
-      mockConnection.executeWrite.mockResolvedValue([]);
+      mockConnection.query.mockResolvedValue([]);
 
       await repository.unlinkFromConversation('message-123');
 
-      expect(mockConnection.executeWrite).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (c:Conversation)-[r:HAS_MESSAGE]->(m:Message {id: $messageId})'),
-        { messageId: 'message-123' }
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith('UPDATE messages SET conversation_id = NULL, updated_at = NOW() WHERE id = $1', [
+        'message-123',
+      ]);
     });
   });
 
   describe('getMessageConversation', () => {
     it('should return conversation associated with message', async () => {
       const mockConversation = { id: 'conversation-123', title: 'Test Conversation', status: 'active' };
-      mockConnection.executeQuery.mockResolvedValue([{ c: mockConversation }]);
+      mockConnection.queryOne.mockResolvedValue(mockConversation);
 
       const result = await repository.getMessageConversation('message-123');
 
-      expect(mockConnection.executeQuery).toHaveBeenCalledWith(
-        expect.stringContaining('MATCH (c:Conversation)-[:HAS_MESSAGE]->(m:Message {id: $messageId})'),
-        { messageId: 'message-123' }
-      );
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(expect.stringContaining('SELECT c.id, c.title, c.status'), ['message-123']);
       expect(result).toEqual(mockConversation);
     });
 
     it('should return null when message has no associated conversation', async () => {
-      mockConnection.executeQuery.mockResolvedValue([]);
+      mockConnection.queryOne.mockResolvedValue(null);
 
       const result = await repository.getMessageConversation('message-123');
 
@@ -319,7 +296,8 @@ describe('MessageRepository', () => {
       const longContent = 'x'.repeat(10000);
       const createInput = createMockCreateInput({ content: longContent });
       const mockCreated = createMockMessage({ content: longContent });
-      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
+      mockConnection.queryOne.mockResolvedValue({ starship_id: 'starship-123' });
+      mockConnection.query.mockResolvedValue([mockCreated]);
 
       const result = await repository.create(createInput);
 
@@ -330,7 +308,8 @@ describe('MessageRepository', () => {
       const specialContent = 'Message with émojis 🚀 and "quotes" & symbols: <>&';
       const createInput = createMockCreateInput({ content: specialContent });
       const mockCreated = createMockMessage({ content: specialContent });
-      mockConnection.executeWrite.mockResolvedValue([{ n: mockCreated }]);
+      mockConnection.queryOne.mockResolvedValue({ starship_id: 'starship-123' });
+      mockConnection.query.mockResolvedValue([mockCreated]);
 
       const result = await repository.create(createInput);
 

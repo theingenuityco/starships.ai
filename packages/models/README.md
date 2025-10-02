@@ -1,12 +1,12 @@
 # @starships/models
 
-Comprehensive data access layer and repository implementations for starships.ai, providing Neo4j database integration, entity management, and automated migration system.
+Comprehensive data access layer and repository implementations for starships.ai, providing PostgreSQL database integration, entity management, and automated migration system.
 
 ## Overview
 
 This package provides:
 
-- **Neo4j Database Integration** - Graph database connectivity and session management
+- **PostgreSQL Database Integration** - Relational database connectivity and connection pooling
 - **Repository Pattern** - Standardized data access with direct repository imports
 - **Serialization System** - Professional data transformation using class-transformer
 - **Error Handling** - Unified error system with proper categorization
@@ -17,12 +17,13 @@ This package provides:
 ## Quick Start
 
 ```typescript
-import { StarshipRepository, AgentRepository, UserRepository, createConnection, Neo4jConfig } from '@starships/models';
+import { StarshipRepository, AgentRepository, UserRepository, createConnection, PostgresConfig } from '@starships/models';
 
 // 1. Initialize database connection
-const config: Neo4jConfig = {
-  uri: '[NEO4J-LOCAL-URL]',
-  username: 'neo4j',
+const config: PostgresConfig = {
+  host: 'localhost',
+  port: 5432,
+  user: 'postgres',
   password: 'password',
   database: 'starships',
 };
@@ -41,10 +42,14 @@ const starships = await starshipRepo.findAll();
 
 - **Starships**: Configurable AI platforms with different classes (`scout`, `cruiser`, `draught`) and subscription billing
 - **Agents**: AI entities with deployment management and template system
-- **Workflows**: DAG-based automation blueprints with execution history
+- **Tools**: Executable utilities deployed to starships with flexible blueprint configuration
 - **Users**: Authentication and authorization management
 - **Agent Templates**: Reusable agent configurations for rapid deployment
+- **Tool Templates**: Reusable tool configurations for rapid deployment
 - **Conversations**: Communication logs with agent relationships and structured metadata
+- **Messages**: Individual message storage with role-based threading
+- **Environments**: Encrypted environment variable management scoped to starships
+- **Usage**: Token usage tracking for billing and analytics
 
 ### Direct Repository Usage
 
@@ -52,10 +57,11 @@ Direct repository instantiation for clean and simple data access:
 
 ```typescript
 // Import and instantiate repositories directly
-import { StarshipRepository, AgentRepository, UserRepository } from '@starships/models';
+import { StarshipRepository, AgentRepository, ToolRepository, UserRepository } from '@starships/models';
 
 const starshipRepo = new StarshipRepository();
 const agentRepo = new AgentRepository();
+const toolRepo = new ToolRepository();
 const userRepo = new UserRepository();
 ```
 
@@ -84,16 +90,16 @@ try {
 | **StarshipRepository**      | Starship CRUD, agent deployment, subscription management  |
 | **AgentRepository**         | Agent lifecycle management and template instantiation     |
 | **AgentTemplateRepository** | Reusable agent configurations and marketplace             |
+| **ToolRepository**          | Tool lifecycle management and deployment                  |
+| **ToolTemplateRepository**  | Reusable tool configurations and marketplace              |
 | **UserRepository**          | User accounts, authentication, and profiles               |
 | **ConversationRepository**  | Chat history, agent relationships, and communication logs |
-| **WorkflowRepository**      | Workflow definitions, execution, and history              |
-| **BlueprintRepository**     | Workflow blueprint storage and versioning                 |
-| **ExecutionRepository**     | Workflow execution tracking and results                   |
-| **NodeRepository**          | Workflow node definitions and parameters                  |
-| **EdgeRepository**          | Workflow edge connections and routing                     |
-| **MemoryRepository**        | Agent memory and conversation context                     |
 | **MessageRepository**       | Individual message storage and retrieval                  |
+| **EnvironmentRepository**   | Environment variable management with encryption           |
+| **UsageRepository**         | Token usage tracking for billing and analytics            |
 | **WaitlistRepository**      | Early access user onboarding queue                        |
+
+> **Note:** `WorkflowRepository`, `BlueprintRepository`, `ExecutionRepository`, `NodeRepository`, and `EdgeRepository` have been removed as no implementations exist. Blueprint data is stored as JSONB within agent and tool entities.
 
 ## Database Management
 
@@ -187,6 +193,9 @@ const template = await templateRepo.create({
   name: 'Data Analyst',
   category: 'analysis',
   isPublic: true,
+  model: 'gpt-4',
+  systemPrompt: 'You are a data analysis expert',
+  blueprint: {},
 });
 
 // Instantiate from template
@@ -194,45 +203,6 @@ const agentRepo = new AgentRepository();
 const agent = await agentRepo.createFromTemplate(template.id, 'starship-123', {
   name: 'My Data Agent',
 });
-```
-
-### Workflow Management
-
-```typescript
-import { WorkflowRepository } from '@starships/models';
-const workflowRepo = new WorkflowRepository();
-
-// Create workflow
-const workflow = await workflowRepo.create({
-  name: 'Data Processing Pipeline',
-  category: 'automation',
-  authorId: 'user-123',
-  starshipId: 'starship-456',
-  isPublic: false,
-  blueprint: {
-    nodes: [
-      { ref: 'start', type: 'start', name: 'Start', description: 'Begin workflow', parameters: {} },
-      {
-        ref: 'process',
-        type: 'agent',
-        name: 'Process Data',
-        description: 'AI data processing',
-        parameters: { agentId: 'agent-789' },
-      },
-      { ref: 'end', type: 'end', name: 'End', description: 'Complete workflow', parameters: {} },
-    ],
-    edges: [
-      { ref: 'start-to-process', from: 'start', to: 'process' },
-      { ref: 'process-to-end', from: 'process', to: 'end' },
-    ],
-  },
-});
-
-// Deploy workflow to starship
-await workflowRepo.updateStarshipId(workflow.id, 'starship-456');
-
-// Find workflows by category
-const automationWorkflows = await workflowRepo.findByCategory('automation');
 ```
 
 ### Conversation-Agent Relationships
@@ -351,11 +321,12 @@ const result = await PerformanceMonitor.measure('starship-creation', () => stars
 Required environment variables:
 
 ```bash
-# Neo4j Configuration
-NEO4J_URI=[NEO4J-LOCAL-URL]
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your-password
-NEO4J_DATABASE=starships
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=your-password
+POSTGRES_DATABASE=starships
 
 # Logging Configuration
 LOG_LEVEL=info
@@ -517,7 +488,7 @@ describe('Your Tool', () => {
 ├── src/
 │   ├── index.ts                 # Main exports
 │   ├── helpers/                 # Utilities and shared logic
-│   │   ├── database/            # Neo4j connection management
+│   │   ├── database/            # PostgreSQL connection management
 │   │   ├── errors/              # Error handling system
 │   │   └── logging/             # Structured logging
 │   ├── repositories/            # Data access implementations
@@ -531,7 +502,8 @@ describe('Your Tool', () => {
 
 ### Core Dependencies
 
-- **neo4j-driver** - Graph database connectivity (v5.28+)
+- **pg** - PostgreSQL database connectivity
+- **@types/pg** - TypeScript definitions for PostgreSQL
 - **@starships/protocol** - Shared type definitions
 - **@starships/errors** - Error handling system
 - **@starships/autopilot** - Workflow execution integration
@@ -568,6 +540,24 @@ This package is part of the starships.ai monorepo:
 - [`@starships/client`](../client/) - Frontend application
 - [`@starships/autopilot`](../autopilot/) - Workflow execution engine
 - [`@starships/errors`](../errors/) - Comprehensive error handling system
+
+## Schema Evolution
+
+### Version 2.1.0 (Current)
+
+- **Removed Tables**: `workflows`, `blueprints`, and `executions` tables removed as no repository implementations exist
+- **Environment Variables**: Uses `encrypted_value` field with `description` and `created_by` tracking
+- **Blueprint Storage**: Agent and tool blueprints stored as JSONB within their respective entities
+- **Tool System**: Comprehensive tool and tool template system with marketplace support
+- **Agent-Tool Relationships**: Many-to-many relationships via junction tables
+- **Performance Optimization**: JSONB storage for complex objects improves query performance
+
+### Migration Path from v2.0.0
+
+- `workflows`, `blueprints`, and `executions` tables removed - no repository support
+- `nodes` and `edges` tables previously removed - data stored as JSONB
+- Environment variables use `encrypted_value` format
+- Junction tables provide proper many-to-many relationships between agents, tools, and conversations
 
 ## Development Status
 

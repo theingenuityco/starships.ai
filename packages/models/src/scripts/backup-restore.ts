@@ -1,69 +1,37 @@
 import { getConnection } from '@/helpers/database';
-import { Session } from 'neo4j-driver';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as zlib from 'zlib';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 export interface BackupMetadata {
   timestamp: string;
   version: string;
   environment: string;
-  nodeCount: number;
-  relationshipCount: number;
+  tableCount: number;
+  recordCount: number;
   backupType: 'full' | 'incremental';
   compressionUsed: boolean;
+  databaseSize: string;
 }
 
 export interface BackupData {
   metadata: BackupMetadata;
-  nodes: BackupNode[];
-  relationships: BackupRelationship[];
-  constraints: BackupConstraint[];
-  indexes: BackupIndex[];
-}
-
-interface BackupNode {
-  labels: string[];
-  properties: Record<string, unknown>;
-}
-
-interface BackupRelationship {
-  start: {
-    labels: string[];
-    properties: Record<string, unknown>;
-  };
-  relationship: {
-    type: string;
-    properties: Record<string, unknown>;
-  };
-  end: {
-    labels: string[];
-    properties: Record<string, unknown>;
-  };
-}
-
-interface BackupConstraint {
-  name?: string;
-  createStatement?: string;
-  [key: string]: unknown;
-}
-
-interface BackupIndex {
-  name?: string;
-  createStatement?: string;
-  [key: string]: unknown;
+  sqlDump: string;
 }
 
 export interface RestoreResult {
   success: boolean;
-  restoredNodes: number;
-  restoredRelationships: number;
+  restoredTables: number;
+  restoredRecords: number;
   errors: string[];
   duration: number;
 }
 
 /**
- * Comprehensive backup and restore manager for Neo4j database
+ * Comprehensive backup and restore manager for PostgreSQL database
  */
 export class BackupManager {
   private connection = getConnection();
@@ -75,45 +43,45 @@ export class BackupManager {
   }
 
   /**
-   * Create a comprehensive backup of the database
+   * Create a comprehensive backup of the database using pg_dump
    */
   async createBackup(backupPath?: string): Promise<string> {
     const startTime = Date.now();
     console.log('[BACKUP] 💾 Creating database backup...');
 
     const finalBackupPath = backupPath || this.generateBackupPath('manual');
-    let session: Session | null = null;
 
     try {
-      session = this.connection.getSession();
-
       // Gather metadata
-      const metadata = await this.gatherBackupMetadata(session);
-      console.log(`[BACKUP] 📊 Backup metadata: ${metadata.nodeCount} nodes, ${metadata.relationshipCount} relationships`);
+      const metadata = await this.gatherBackupMetadata();
+      console.log(`[BACKUP] 📊 Backup metadata: ${metadata.tableCount} tables, ${metadata.recordCount} records`);
 
-      // Export all nodes
-      console.log('[BACKUP] 📦 Exporting nodes...');
-      const nodes = await this.exportNodes(session);
+      // Get PostgreSQL connection parameters from environment
+      const host = process.env.POSTGRES_HOST || 'localhost';
+      const port = process.env.POSTGRES_PORT || '5432';
+      const user = process.env.POSTGRES_USER || 'postgres';
+      const database = process.env.POSTGRES_DATABASE || 'starships';
 
-      // Export all relationships
-      console.log('[BACKUP] 🔗 Exporting relationships...');
-      const relationships = await this.exportRelationships(session);
+      // Use pg_dump to create backup
+      console.log('[BACKUP] 📦 Creating database dump...');
+      const dumpCommand = `pg_dump -h ${host} -p ${port} -U ${user} -d ${database} --no-password --clean --if-exists --create`;
 
-      // Export constraints
-      console.log('[BACKUP] 📋 Exporting constraints...');
-      const constraints = await this.exportConstraints(session);
+      // Set PGPASSWORD environment variable for authentication
+      const env = { ...process.env };
+      if (process.env.POSTGRES_PASSWORD) {
+        env.PGPASSWORD = process.env.POSTGRES_PASSWORD;
+      }
 
-      // Export indexes
-      console.log('[BACKUP] 🚀 Exporting indexes...');
-      const indexes = await this.exportIndexes(session);
+      const { stdout, stderr } = await execAsync(dumpCommand, { env, maxBuffer: 50 * 1024 * 1024 }); // 50MB buffer
+
+      if (stderr && !stderr.includes('NOTICE:')) {
+        console.warn('[BACKUP] ⚠️ pg_dump warnings:', stderr);
+      }
 
       // Create backup data structure
       const backupData: BackupData = {
         metadata,
-        nodes,
-        relationships,
-        constraints,
-        indexes,
+        sqlDump: stdout,
       };
 
       // Write backup to file
@@ -126,15 +94,11 @@ export class BackupManager {
     } catch (error) {
       console.error('[BACKUP] ❌ Backup failed:', error);
       throw new Error(`Backup failed: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      if (session) {
-        await session.close();
-      }
     }
   }
 
   /**
-   * Restore database from backup
+   * Restore database from backup using psql
    */
   async restoreFromBackup(backupPath: string): Promise<RestoreResult> {
     const startTime = Date.now();
@@ -142,46 +106,59 @@ export class BackupManager {
 
     const result: RestoreResult = {
       success: false,
-      restoredNodes: 0,
-      restoredRelationships: 0,
+      restoredTables: 0,
+      restoredRecords: 0,
       errors: [],
       duration: 0,
     };
 
-    let session: Session | null = null;
-
     try {
       // Load backup data
       const backupData = await this.loadBackupFromFile(backupPath);
-      console.log(`[RESTORE] 📊 Backup contains: ${backupData.nodes.length} nodes, ${backupData.relationships.length} relationships`);
+      console.log(`[RESTORE] 📊 Backup from: ${backupData.metadata.timestamp}`);
 
-      session = this.connection.getSession();
+      // Get PostgreSQL connection parameters
+      const host = process.env.POSTGRES_HOST || 'localhost';
+      const port = process.env.POSTGRES_PORT || '5432';
+      const user = process.env.POSTGRES_USER || 'postgres';
+      const database = process.env.POSTGRES_DATABASE || 'starships';
 
-      // Clear existing data (with confirmation)
-      console.log('[RESTORE] 🗑️ Clearing existing data...');
-      await this.clearDatabase(session);
+      // Write SQL dump to temporary file
+      const tempSqlFile = path.join(this.backupDir, `temp_restore_${Date.now()}.sql`);
+      fs.writeFileSync(tempSqlFile, backupData.sqlDump, 'utf8');
 
-      // Restore constraints first
-      console.log('[RESTORE] 📋 Restoring constraints...');
-      await this.restoreConstraints(session, backupData.constraints);
+      try {
+        // Use psql to restore database
+        console.log('[RESTORE] 🔄 Executing database restore...');
+        const restoreCommand = `psql -h ${host} -p ${port} -U ${user} -d ${database} --no-password -f ${tempSqlFile}`;
 
-      // Restore indexes
-      console.log('[RESTORE] 🚀 Restoring indexes...');
-      await this.restoreIndexes(session, backupData.indexes);
+        const env = { ...process.env };
+        if (process.env.POSTGRES_PASSWORD) {
+          env.PGPASSWORD = process.env.POSTGRES_PASSWORD;
+        }
 
-      // Restore nodes
-      console.log('[RESTORE] 📦 Restoring nodes...');
-      result.restoredNodes = await this.restoreNodes(session, backupData.nodes);
+        const { stderr } = await execAsync(restoreCommand, { env, maxBuffer: 50 * 1024 * 1024 });
 
-      // Restore relationships
-      console.log('[RESTORE] 🔗 Restoring relationships...');
-      result.restoredRelationships = await this.restoreRelationships(session, backupData.relationships);
+        if (stderr && !stderr.includes('NOTICE:') && !stderr.includes('already exists')) {
+          console.warn('[RESTORE] ⚠️ psql warnings:', stderr);
+        }
 
-      result.success = true;
-      result.duration = Date.now() - startTime;
+        // Count restored data
+        const postRestoreMetadata = await this.gatherBackupMetadata();
+        result.restoredTables = postRestoreMetadata.tableCount;
+        result.restoredRecords = postRestoreMetadata.recordCount;
 
-      console.log(`[RESTORE] ✅ Restore completed in ${result.duration}ms`);
-      console.log(`[RESTORE] 📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`);
+        result.success = true;
+        result.duration = Date.now() - startTime;
+
+        console.log(`[RESTORE] ✅ Restore completed in ${result.duration}ms`);
+        console.log(`[RESTORE] 📊 Restored: ${result.restoredTables} tables, ${result.restoredRecords} records`);
+      } finally {
+        // Clean up temporary file
+        if (fs.existsSync(tempSqlFile)) {
+          fs.unlinkSync(tempSqlFile);
+        }
+      }
 
       return result;
     } catch (error) {
@@ -189,10 +166,6 @@ export class BackupManager {
       result.duration = Date.now() - startTime;
       console.error('[RESTORE] ❌ Restore failed:', error);
       return result;
-    } finally {
-      if (session) {
-        await session.close();
-      }
     }
   }
 
@@ -250,98 +223,37 @@ export class BackupManager {
   /**
    * Gather backup metadata
    */
-  private async gatherBackupMetadata(session: Session): Promise<BackupMetadata> {
-    const result = await session.run(`
-      MATCH (n) WITH count(n) as nodeCount
-      MATCH ()-[r]->() WITH nodeCount, count(r) as relCount
-      RETURN nodeCount, relCount
+  private async gatherBackupMetadata(): Promise<BackupMetadata> {
+    const tableCountResult = await this.connection.query<{ count: string }>(`
+      SELECT COUNT(*) as count
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
     `);
 
-    const record = result.records[0];
-    const nodeCount = record ? record.get('nodeCount').toNumber() : 0;
-    const relationshipCount = record ? record.get('relCount').toNumber() : 0;
+    const recordCountResult = await this.connection.query<{ total: string }>(`
+      SELECT 
+        (SELECT COUNT(*) FROM users) +
+        (SELECT COUNT(*) FROM starships) +
+        (SELECT COUNT(*) FROM agents) +
+        (SELECT COUNT(*) FROM conversations) +
+        (SELECT COUNT(*) FROM messages) +
+        (SELECT COUNT(*) FROM workflows) as total
+    `);
+
+    const sizeResult = await this.connection.query<{ size: string }>(`
+      SELECT pg_size_pretty(pg_database_size(current_database())) as size
+    `);
 
     return {
       timestamp: new Date().toISOString(),
       version: '1.0.0',
       environment: process.env.NODE_ENV || 'development',
-      nodeCount,
-      relationshipCount,
+      tableCount: parseInt(tableCountResult[0]?.count || '0'),
+      recordCount: parseInt(recordCountResult[0]?.total || '0'),
       backupType: 'full',
       compressionUsed: true,
+      databaseSize: sizeResult[0]?.size || 'unknown',
     };
-  }
-
-  /**
-   * Export all nodes from the database
-   */
-  private async exportNodes(session: Session): Promise<BackupNode[]> {
-    const result = await session.run(`
-      MATCH (n)
-      RETURN labels(n) as labels, properties(n) as properties
-    `);
-
-    return result.records.map((record) => ({
-      labels: record.get('labels'),
-      properties: record.get('properties'),
-    }));
-  }
-
-  /**
-   * Export all relationships from the database
-   */
-  private async exportRelationships(session: Session): Promise<BackupRelationship[]> {
-    const result = await session.run(`
-      MATCH (start)-[r]->(end)
-      RETURN
-        labels(start) as startLabels,
-        properties(start) as startProperties,
-        type(r) as relationshipType,
-        properties(r) as relationshipProperties,
-        labels(end) as endLabels,
-        properties(end) as endProperties
-    `);
-
-    return result.records.map((record) => ({
-      start: {
-        labels: record.get('startLabels'),
-        properties: record.get('startProperties'),
-      },
-      relationship: {
-        type: record.get('relationshipType'),
-        properties: record.get('relationshipProperties'),
-      },
-      end: {
-        labels: record.get('endLabels'),
-        properties: record.get('endProperties'),
-      },
-    }));
-  }
-
-  /**
-   * Export database constraints
-   */
-  private async exportConstraints(session: Session): Promise<BackupConstraint[]> {
-    try {
-      const result = await session.run('SHOW CONSTRAINTS');
-      return result.records.map((record) => record.toObject() as BackupConstraint);
-    } catch (error) {
-      console.warn('[BACKUP] ⚠️ Could not export constraints:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Export database indexes
-   */
-  private async exportIndexes(session: Session): Promise<BackupIndex[]> {
-    try {
-      const result = await session.run('SHOW INDEXES');
-      return result.records.map((record) => record.toObject() as BackupIndex);
-    } catch (error) {
-      console.warn('[BACKUP] ⚠️ Could not export indexes:', error);
-      return [];
-    }
   }
 
   /**
@@ -351,8 +263,12 @@ export class BackupManager {
     const jsonData = JSON.stringify(backupData, null, 2);
 
     if (backupPath.endsWith('.gz')) {
-      // Compress the data
-      const compressed = zlib.gzipSync(jsonData);
+      // Use gzip compression
+      const { gzip } = await import('zlib');
+      const { promisify } = await import('util');
+      const gzipAsync = promisify(gzip);
+
+      const compressed = await gzipAsync(jsonData);
       fs.writeFileSync(backupPath, compressed);
     } else {
       // Write uncompressed
@@ -372,114 +288,19 @@ export class BackupManager {
 
     if (backupPath.endsWith('.gz')) {
       // Decompress the data
+      const { gunzip } = await import('zlib');
+      const { promisify } = await import('util');
+      const gunzipAsync = promisify(gunzip);
+
       const compressed = fs.readFileSync(backupPath);
-      jsonData = zlib.gunzipSync(compressed).toString('utf8');
+      const decompressed = await gunzipAsync(compressed);
+      jsonData = decompressed.toString('utf8');
     } else {
       // Read uncompressed
       jsonData = fs.readFileSync(backupPath, 'utf8');
     }
 
     return JSON.parse(jsonData);
-  }
-
-  /**
-   * Clear all data from the database
-   */
-  private async clearDatabase(session: Session): Promise<void> {
-    console.log('[RESTORE] ⚠️ WARNING: This will delete all data in the database!');
-
-    // Delete all relationships first
-    await session.run('MATCH ()-[r]->() DELETE r');
-
-    // Then delete all nodes
-    await session.run('MATCH (n) DELETE n');
-
-    console.log('[RESTORE] 🗑️ Database cleared');
-  }
-
-  /**
-   * Restore constraints from backup
-   */
-  private async restoreConstraints(session: Session, constraints: BackupConstraint[]): Promise<void> {
-    for (const constraint of constraints) {
-      try {
-        if (constraint.createStatement) {
-          await session.run(constraint.createStatement);
-        }
-      } catch (error) {
-        console.warn(`[RESTORE] ⚠️ Could not restore constraint: ${error}`);
-      }
-    }
-  }
-
-  /**
-   * Restore indexes from backup
-   */
-  private async restoreIndexes(session: Session, indexes: BackupIndex[]): Promise<void> {
-    for (const index of indexes) {
-      try {
-        if (index.createStatement) {
-          await session.run(index.createStatement);
-        }
-      } catch (error) {
-        console.warn(`[RESTORE] ⚠️ Could not restore index: ${error}`);
-      }
-    }
-  }
-
-  /**
-   * Restore nodes from backup
-   */
-  private async restoreNodes(session: Session, nodes: BackupNode[]): Promise<number> {
-    let restoredCount = 0;
-
-    for (const node of nodes) {
-      try {
-        const labels = node.labels.join(':');
-        const query = `CREATE (n:${labels}) SET n = $properties`;
-        await session.run(query, { properties: node.properties });
-        restoredCount++;
-      } catch (error) {
-        console.warn(`[RESTORE] ⚠️ Could not restore node: ${error}`);
-      }
-    }
-
-    return restoredCount;
-  }
-
-  /**
-   * Restore relationships from backup
-   */
-  private async restoreRelationships(session: Session, relationships: BackupRelationship[]): Promise<number> {
-    let restoredCount = 0;
-
-    for (const rel of relationships) {
-      try {
-        // This is a simplified approach - in practice, you'd need to match nodes by unique properties
-        const startLabels = rel.start.labels.join(':');
-        const endLabels = rel.end.labels.join(':');
-        const relType = rel.relationship.type;
-
-        const query = `
-          MATCH (start:${startLabels}), (end:${endLabels})
-          WHERE start = $startProps AND end = $endProps
-          CREATE (start)-[r:${relType}]->(end)
-          SET r = $relProps
-        `;
-
-        await session.run(query, {
-          startProps: rel.start.properties,
-          endProps: rel.end.properties,
-          relProps: rel.relationship.properties,
-        });
-
-        restoredCount++;
-      } catch (error) {
-        console.warn(`[RESTORE] ⚠️ Could not restore relationship: ${error}`);
-      }
-    }
-
-    return restoredCount;
   }
 
   /**
@@ -533,7 +354,7 @@ export async function runRestore(): Promise<void> {
 
     if (result.success) {
       console.log('\n✅ Restore completed successfully!');
-      console.log(`📊 Restored: ${result.restoredNodes} nodes, ${result.restoredRelationships} relationships`);
+      console.log(`📊 Restored: ${result.restoredTables} tables, ${result.restoredRecords} records`);
     } else {
       console.error('\n❌ Restore failed!');
       result.errors.forEach((error) => console.error(`   - ${error}`));

@@ -31,55 +31,48 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
         echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
         echo "local all all trust" >> /var/lib/postgresql/data/pg_hba.conf
         
-        # Run initialization scripts (standard PostgreSQL Docker pattern)
-        if [ -d "/docker-entrypoint-initdb.d" ]; then
-            echo "Running initialization scripts from /docker-entrypoint-initdb.d/..."
-            
-            # Start PostgreSQL temporarily for initialization
-            su-exec postgres pg_ctl -D /var/lib/postgresql/data -w start
-            
-            # Wait for PostgreSQL to be ready
-            for i in $(seq 1 30); do
-                if su-exec postgres pg_isready -q; then
-                    echo "PostgreSQL is ready for initialization"
-                    break
-                fi
-                echo "Waiting for PostgreSQL to be ready... ($i/30)"
-                sleep 1
-            done
-            
-            # Export environment variables for init scripts
-            export POSTGRES_DATABASE="${POSTGRES_DATABASE:-starships}"
-            export POSTGRES_USER="${POSTGRES_USER:-postgres}"
-            export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-password}"
-            
-            # Run all .sh and .sql scripts
-            for f in /docker-entrypoint-initdb.d/*; do
-                case "$f" in
-                    *.sh)
-                        if [ -x "$f" ]; then
-                            echo "Running $f"
-                            su-exec postgres sh -c "POSTGRES_DATABASE='$POSTGRES_DATABASE' POSTGRES_USER='$POSTGRES_USER' POSTGRES_PASSWORD='$POSTGRES_PASSWORD' $f"
-                        fi
-                        ;;
-                    *.sql)
-                        echo "Running $f"
-                        su-exec postgres psql -v ON_ERROR_STOP=1 --username postgres --dbname postgres < "$f"
-                        ;;
-                    *)
-                        echo "Ignoring $f"
-                        ;;
-                esac
-            done
-            
-            # Stop PostgreSQL
-            su-exec postgres pg_ctl -D /var/lib/postgresql/data -w stop
-        fi
-        
         echo "PostgreSQL initialization complete!"
     else
         echo "PostgreSQL data directory already initialized."
     fi
+    
+    # Always check and create database if it doesn't exist (even on restart)
+    # This handles cases where volume was partially initialized
+    echo "Ensuring database exists..."
+    
+    # Start PostgreSQL temporarily to check/create database
+    su-exec postgres pg_ctl -D /var/lib/postgresql/data -w start
+    
+    # Wait for PostgreSQL to be ready
+    for i in $(seq 1 30); do
+        if su-exec postgres pg_isready -q; then
+            echo "PostgreSQL is ready"
+            break
+        fi
+        echo "Waiting for PostgreSQL to be ready... ($i/30)"
+        sleep 1
+    done
+    
+    # Export environment variables
+    export POSTGRES_DATABASE="${POSTGRES_DATABASE:-starships}"
+    export POSTGRES_USER="${POSTGRES_USER:-postgres}"
+    export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-password}"
+    
+    # Check if database exists, create if not
+    DB_EXISTS=$(su-exec postgres psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$POSTGRES_DATABASE'")
+    
+    if [ "$DB_EXISTS" != "1" ]; then
+        echo "Database '$POSTGRES_DATABASE' does not exist. Creating..."
+        su-exec postgres psql -U postgres -c "CREATE DATABASE $POSTGRES_DATABASE;"
+        su-exec postgres psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE $POSTGRES_DATABASE TO $POSTGRES_USER;"
+        su-exec postgres psql -U postgres -c "ALTER DATABASE $POSTGRES_DATABASE OWNER TO $POSTGRES_USER;"
+        echo "✓ Database '$POSTGRES_DATABASE' created successfully!"
+    else
+        echo "✓ Database '$POSTGRES_DATABASE' already exists"
+    fi
+    
+    # Stop PostgreSQL
+    su-exec postgres pg_ctl -D /var/lib/postgresql/data -w stop
 fi
 
 # Create supervisor config dynamically based on POSTGRES_EXTERNAL_HOST

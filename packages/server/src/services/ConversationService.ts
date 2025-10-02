@@ -297,57 +297,15 @@ export class ConversationService {
         secureEnv,
       });
 
-      // Diagnostics: count tool messages with/without tool_call_id to detect invalid history
-      try {
-        const toolMsgs = messages.filter((m) => m.role === 'tool');
-        const invalidToolMsgs = toolMsgs.filter((m) => !m.tool_call_id);
-        console.warn('[CONVERSATION-SERVICE][DIAG] Tool message stats before LLM call:', {
-          conversationId: data.conversationId,
-          total: messages.length,
-          toolCount: toolMsgs.length,
-          invalidToolCount: invalidToolMsgs.length,
-        });
-      } catch {
-        /* ignore diag errors */
-      }
-
-      // Filter out invalid tool messages without tool_call_id to satisfy OpenRouter/OpenAI contract
-      const sanitizedMessages = messages.filter((m) => m.role !== 'tool' || !!m.tool_call_id);
-      if (sanitizedMessages.length !== messages.length) {
-        try {
-          console.warn('[CONVERSATION-SERVICE][FIX] Removed invalid tool messages without tool_call_id', {
-            conversationId: data.conversationId,
-            removed: messages.length - sanitizedMessages.length,
-          });
-        } catch {
-          /* ignore */
-        }
-      }
-
       // Convert database messages to LLM format, preserving tool_calls and tool results
-      const mappedMessages = sanitizedMessages.map((msg) => ({
+      // Tool message sanitization and rule injection now handled by Agent.ts
+      const llmMessages = messages.map((msg) => ({
         role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
         content: msg.content,
         ...(msg.reasoning && { reasoning: msg.reasoning }),
         ...(msg.tool_calls && { tool_calls: msg.tool_calls }),
         ...(msg.tool_call_id && { tool_call_id: msg.tool_call_id }),
       }));
-
-      // Add tool execution rules if tools are available and not already present
-      const systemRules = {
-        role: 'system' as const,
-        content: 'TOOL CALLING RULES:\n1. Only call a tool when you have ACTUAL values for all its arguments - never guess or use placeholders.\n2. When tools are INDEPENDENT (don\'t need each other\'s output), call them ALL in the same response for parallel execution.\n3. When tools are DEPENDENT (Tool B needs Tool A\'s output), wait for Tool A to complete before calling Tool B.\n4. Example: Searching Wikipedia and DuckDuckGo can run in parallel. But if you need to search for something based on a previous tool\'s result, that must be sequential.'
-      };
-
-      // Check if rules already exist to avoid duplicates
-      const hasToolRules = mappedMessages.some(msg => 
-        msg.role === 'system' && 
-        msg.content?.includes('TOOL CALLING RULE')
-      );
-
-      const llmMessages = (resolvedTools.length > 0 && !hasToolRules) 
-        ? [systemRules, ...mappedMessages]
-        : mappedMessages;
 
       // Prepare input for agent execution - Agent will handle memory state and ordering internally
       const input: ExecutionItem[] = ExecutionItemUtils.wrapSingle(llmMessages);

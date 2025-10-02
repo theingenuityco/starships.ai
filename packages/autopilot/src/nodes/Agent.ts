@@ -245,6 +245,62 @@ export class Agent implements NodeHandler {
   }
 
   // =============================================================================
+  // MESSAGE PROCESSING METHODS
+  // =============================================================================
+
+  /**
+   * Sanitize tool messages by removing invalid ones without tool_call_id
+   * This ensures compatibility with OpenRouter/OpenAI requirements
+   */
+  private sanitizeToolMessages(messages: LlmMessage[]): LlmMessage[] {
+    const toolMsgs = messages.filter((m) => m.role === 'tool');
+    const invalidToolMsgs = toolMsgs.filter((m) => !m.tool_call_id);
+    
+    if (invalidToolMsgs.length > 0) {
+      console.warn('[AGENT] Removing invalid tool messages without tool_call_id:', {
+        total: messages.length,
+        toolCount: toolMsgs.length,
+        invalidCount: invalidToolMsgs.length,
+      });
+      
+      // Filter out invalid tool messages without tool_call_id
+      return messages.filter((m) => m.role !== 'tool' || !!m.tool_call_id);
+    }
+    
+    return messages;
+  }
+
+  /**
+   * Inject tool calling rules if tools are available and not already present
+   * These generic rules enable all agents to understand parallel vs sequential execution
+   */
+  private injectToolCallingRules(messages: LlmMessage[]): LlmMessage[] {
+    const tools = this.state.tools || [];
+    
+    // Only inject if we have tools
+    if (tools.length === 0) return messages;
+    
+    // Check if rules already exist to avoid duplicates
+    const hasToolRules = messages.some((msg) => 
+      msg.role === 'system' && msg.content?.includes('TOOL CALLING RULE')
+    );
+    
+    if (!hasToolRules) {
+      const systemRules: LlmMessage = {
+        role: 'system',
+        content: 'TOOL CALLING RULES:\n' +
+          '1. Only call a tool when you have ACTUAL values for all its arguments - never guess or use placeholders.\n' +
+          '2. When tools are INDEPENDENT (don\'t need each other\'s output), call them ALL in the same response for parallel execution.\n' +
+          '3. When tools are DEPENDENT (Tool B needs Tool A\'s output), wait for Tool A to complete before calling Tool B.'
+      };
+      
+      return [systemRules, ...messages];
+    }
+    
+    return messages;
+  }
+
+  // =============================================================================
   // EXECUTION METHODS
   // =============================================================================
 
@@ -289,7 +345,11 @@ export class Agent implements NodeHandler {
       if (input && input.length > 0) {
         const inputData = ExecutionItemUtils.unwrapSingle(input);
         if (isLlmMessageArray(inputData)) {
-          orderedMessages.push(...inputData);
+          // Process messages: sanitize tool messages and inject tool calling rules
+          let processedMessages = this.sanitizeToolMessages(inputData);
+          processedMessages = this.injectToolCallingRules(processedMessages);
+          
+          orderedMessages.push(...processedMessages);
         }
         // Silently ignore non-LlmMessage inputs
       }

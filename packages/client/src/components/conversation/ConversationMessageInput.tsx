@@ -53,7 +53,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
     const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model || null)
-    const tokensUsed = Number(totalsData?.total_tokens ?? 0)
+    const tokensUsed = Number(totalsData?.totalTokens ?? 0)
     const contextLimit = Number(agentContextLength ?? 0)
     const hardLimitActive = !!conversationId && contextLimit > 0
     // Track previous streaming state to detect transition to complete and refocus input

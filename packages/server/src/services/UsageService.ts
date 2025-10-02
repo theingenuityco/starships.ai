@@ -1,5 +1,5 @@
 import { UsageRepository } from '@starships/models';
-import type { UsageModel, LLMUsage, UserUsageTotals } from '@starships/protocol';
+import type { UsageModel, LLMUsage, UserUsageTotals, DailyUsageRow, DailyModelUsageRow } from '@starships/protocol';
 
 export interface CreateUsageForTurnParams {
   starshipId: string;
@@ -52,6 +52,40 @@ export class UsageService {
   // Aggregate totals across all starships owned by a user
   async getTotalsByUser(userId: string): Promise<UserUsageTotals> {
     return this.repo.getTotalsByUser(userId);
+  }
+
+  // List usage records across all starships owned by a user (paginated + filters)
+  async listByUser(
+    userId: string,
+    options?: { limit?: number; offset?: number; day?: string; model?: string; order?: 'ASC' | 'DESC' }
+  ): Promise<UsageModel[]> {
+    return this.repo.listByUser(userId, options ?? {});
+  }
+
+  // Count usage records for a user with optional filters (for pagination totals)
+  async countByUser(userId: string, options?: { day?: string; model?: string }): Promise<number> {
+    return this.repo.countByUser(userId, options ?? {});
+  }
+
+  // Daily aggregates (Day)
+  async listDailyByUser(userId: string, options?: { limit?: number; offset?: number; order?: 'ASC' | 'DESC' }): Promise<DailyUsageRow[]> {
+    return this.repo.listDailyByUser(userId, options ?? {});
+  }
+
+  async countDailyByUser(userId: string): Promise<number> {
+    return this.repo.countDailyByUser(userId);
+  }
+
+  // Daily+Model aggregates (Day + Model)
+  async listDailyModelByUser(
+    userId: string,
+    options?: { limit?: number; offset?: number; order?: 'ASC' | 'DESC' }
+  ): Promise<DailyModelUsageRow[]> {
+    return this.repo.listDailyModelByUser(userId, options ?? {});
+  }
+
+  async countDailyModelByUser(userId: string): Promise<number> {
+    return this.repo.countDailyModelByUser(userId);
   }
 }
 

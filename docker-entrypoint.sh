@@ -43,7 +43,7 @@ if [ -n "$POSTGRES_HOST" ]; then
             chown -R postgres:postgres /run/postgresql /var/log/postgresql
             chmod 775 /run/postgresql
             # Start PostgreSQL in background if not using supervisor
-            su postgres -c 'pg_ctl start -D /var/lib/postgresql/data' || true
+            su postgres -c "pg_ctl start -D ${PGDATA:-/var/lib/postgresql/data}" || true
         fi
         
         # Use configured port or default

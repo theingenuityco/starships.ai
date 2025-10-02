@@ -3,6 +3,9 @@ set -e
 
 echo "Starting Starships.ai with supervisor..."
 
+# Ensure PGDATA is set consistently
+export PGDATA="${PGDATA:-/var/lib/postgresql/data}"
+
 # Initialize PostgreSQL data directory if empty (when using volume mounts)
 if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
     echo "Checking PostgreSQL data directory..."
@@ -13,23 +16,24 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
     chmod 775 /run/postgresql
     
     # Check if data directory is empty or uninitialized
-    if [ ! -f "/var/lib/postgresql/data/postgresql.conf" ]; then
+    if [ ! -f "$PGDATA/postgresql.conf" ]; then
         echo "PostgreSQL data directory is not initialized. Initializing now..."
         
         # Ensure correct ownership
         chown -R postgres:postgres /var/lib/postgresql
-        chmod 700 /var/lib/postgresql/data
+        mkdir -p "$PGDATA"
+        chmod 700 "$PGDATA"
         
         # Initialize PostgreSQL cluster as postgres user
-        su-exec postgres initdb -D /var/lib/postgresql/data
+        su-exec postgres initdb -D "$PGDATA"
         
         # Configure PostgreSQL
-        echo "listen_addresses = '*'" >> /var/lib/postgresql/data/postgresql.conf
-        echo "port = 5432" >> /var/lib/postgresql/data/postgresql.conf
-        echo "max_connections = 100" >> /var/lib/postgresql/data/postgresql.conf
-        echo "shared_buffers = 128MB" >> /var/lib/postgresql/data/postgresql.conf
-        echo "host all all 0.0.0.0/0 md5" >> /var/lib/postgresql/data/pg_hba.conf
-        echo "local all all trust" >> /var/lib/postgresql/data/pg_hba.conf
+        echo "listen_addresses = '*'" >> "$PGDATA/postgresql.conf"
+        echo "port = 5432" >> "$PGDATA/postgresql.conf"
+        echo "max_connections = 100" >> "$PGDATA/postgresql.conf"
+        echo "shared_buffers = 128MB" >> "$PGDATA/postgresql.conf"
+        echo "host all all 0.0.0.0/0 md5" >> "$PGDATA/pg_hba.conf"
+        echo "local all all trust" >> "$PGDATA/pg_hba.conf"
         
         echo "PostgreSQL initialization complete!"
     else
@@ -41,7 +45,7 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
     echo "Ensuring database exists..."
     
     # Start PostgreSQL temporarily to check/create database
-    su-exec postgres pg_ctl -D /var/lib/postgresql/data -w start
+    su-exec postgres pg_ctl -D "$PGDATA" -w start
     
     # Wait for PostgreSQL to be ready
     for i in $(seq 1 30); do
@@ -72,7 +76,7 @@ if [ -z "$POSTGRES_EXTERNAL_HOST" ]; then
     fi
     
     # Stop PostgreSQL
-    su-exec postgres pg_ctl -D /var/lib/postgresql/data -w stop
+    su-exec postgres pg_ctl -D "$PGDATA" -w stop
 fi
 
 # Create supervisor config dynamically based on POSTGRES_EXTERNAL_HOST
@@ -101,7 +105,7 @@ stderr_logfile_maxbytes=0
 EOL
 else
     echo "Configuring for internal PostgreSQL..."
-    cat > /etc/supervisor/conf.d/supervisord.conf << 'EOL'
+    cat > /etc/supervisor/conf.d/supervisord.conf << EOL
 [supervisord]
 nodaemon=true
 user=root
@@ -109,7 +113,7 @@ logfile=/var/log/supervisord.log
 pidfile=/var/run/supervisord.pid
 
 [program:postgres]
-command=su-exec postgres postgres -D /var/lib/postgresql/data
+command=su-exec postgres postgres -D ${PGDATA}
 autostart=true
 autorestart=true
 user=root

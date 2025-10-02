@@ -274,6 +274,8 @@ docker build -t starships-client ./packages/client
 docker build -t starships-server ./packages/server
 ```
 
+**Important:** When using volume mounts for PostgreSQL (as configured in docker-compose.yml), the PostgreSQL data directory is automatically initialized on first container startup. This ensures proper operation with persistent volumes without manual initialization.
+
 ### Kubernetes Deployment
 
 ```bash

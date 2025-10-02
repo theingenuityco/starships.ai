@@ -5,7 +5,7 @@
 
 import { toolUpdateTool, toolUpdateToolTemplate } from '../tool-update';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions, Edge } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, Edge, BatchExecutionResult } from '@starships/autopilot';
 
 // Helper to create a realistic Fetch Response-like object for our HttpRequest node
 function createMockResponse(
@@ -120,25 +120,53 @@ describe('Tool Update Tool', () => {
     }
 
     it('should fail when missing BASE_URL', async () => {
-      await expect(executeToolWithMockEnv({ slug: 'calc', name: 'N' }, {})).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('baseUrl is required'),
+      const result = await executeToolWithMockEnv({ slug: 'calc', name: 'N' }, {}) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'validate',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('baseUrl is required')
+                  })
+                ])
+              })
+            ])
+          })
+        ])
       });
     });
 
     it('should fail without auth token', async () => {
       const env = { BASE_URL: 'https://api.test.com' };
-      await expect(executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('authToken is required'),
+      const result = await executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env as never) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('authToken is required')
+            })
+          })
+        ])
       });
     });
 
     it('should fail without starship ID when resolving by slug', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('starshipId is required'),
+      const result = await executeToolWithMockEnv({ slug: 'calc', name: 'N' }, env as never) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('starshipId is required')
+            })
+          })
+        ])
       });
     });
 
@@ -156,9 +184,15 @@ describe('Tool Update Tool', () => {
         );
 
       const input = { slug: 'calc', name: 'Updated' };
-      const result = await executeToolWithMockEnv(input, env as never);
+      const result = await executeToolWithMockEnv(input, env as never) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
     });
 
     it('should resolve id by slug then update', async () => {
@@ -173,9 +207,15 @@ describe('Tool Update Tool', () => {
         );
 
       const input = { slug: 'calc', isEnabled: false };
-      const result = await executeToolWithMockEnv(input, env);
+      const result = await executeToolWithMockEnv(input, env) as BatchExecutionResult;
 
-      expect(result).toBeDefined();
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
 
       // Verify calls
       expect((global.fetch as jest.Mock).mock.calls.length).toBe(2);
@@ -189,9 +229,16 @@ describe('Tool Update Tool', () => {
 
     it('should error when no update fields provided', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
-      await expect(executeToolWithMockEnv({ slug: 'tool-1' }, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('No update fields provided'),
+      const result = await executeToolWithMockEnv({ slug: 'tool-1' }, env) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('No update fields provided')
+            })
+          })
+        ])
       });
     });
 
@@ -210,9 +257,16 @@ describe('Tool Update Tool', () => {
           text: async () => JSON.stringify({ error: 'Not found' }),
         });
 
-      await expect(executeToolWithMockEnv({ slug: 'nope', name: 'N' }, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('HTTP request failed'),
+      const result = await executeToolWithMockEnv({ slug: 'nope', name: 'N' }, env) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('HTTP request failed')
+            })
+          })
+        ])
       });
     });
 
@@ -220,9 +274,16 @@ describe('Tool Update Tool', () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-1' };
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
 
-      await expect(executeToolWithMockEnv({ slug: 'x', name: 'N' }, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Network error'),
+      const result = await executeToolWithMockEnv({ slug: 'x', name: 'N' }, env) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('Network error')
+            })
+          })
+        ])
       });
     });
 
@@ -302,8 +363,20 @@ describe('Tool.execute return value - tool_update', () => {
     const item = raw[0];
     expect(item.pairedItem).toEqual({ item: 5 });
 
-    // Ensure HttpResponse shape
-    const http = item.json as { status: number; url: string; body?: unknown };
+    // The batch result is nested inside the json property
+    const batchResult = item.json as BatchExecutionResult;
+    expect(batchResult).toMatchObject({
+      successful: expect.arrayContaining([
+        expect.objectContaining({
+          success: true
+        })
+      ])
+    });
+
+    // Extract the data from the successful result - should contain HTTP response
+    const successfulResult = batchResult.successful?.[0];
+    expect(successfulResult).toBeDefined();
+    const http = successfulResult.data as { status: number; url: string; body?: unknown };
     expect(http).toBeDefined();
     expect(typeof http.status).toBe('number');
     expect(http.url).toBe('https://api.test.com/tools/tool-123');

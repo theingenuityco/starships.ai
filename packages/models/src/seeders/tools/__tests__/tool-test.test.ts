@@ -5,7 +5,7 @@
 
 import { toolTestTool, toolTestToolTemplate } from '../tool-test';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
-import type { ExecutionItem, NodeHandlerOptions } from '@starships/autopilot';
+import type { ExecutionItem, NodeHandlerOptions, BatchExecutionResult } from '@starships/autopilot';
 
 // Helper to create a realistic Fetch Response-like object for our HttpRequest node
 function createMockResponse(
@@ -139,33 +139,61 @@ describe('Tool Test Tool', () => {
     }
 
     it('should fail when missing environment variables', async () => {
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, {})).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('baseUrl is required'),
+      const result = await executeToolWithMockEnv({ targetSlug: 'demo' }, {}) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('baseUrl is required')
+            })
+          })
+        ])
       });
     });
 
     it('should fail without auth token', async () => {
       const env = { BASE_URL: 'https://api.test.com', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('authToken is required'),
+      const result = await executeToolWithMockEnv({ targetSlug: 'demo' }, env as never) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('authToken is required')
+            })
+          })
+        ])
       });
     });
 
     it('should fail without starship ID', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't' };
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env as never)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('starshipId is required'),
+      const result = await executeToolWithMockEnv({ targetSlug: 'demo' }, env as never) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('starshipId is required')
+            })
+          })
+        ])
       });
     });
 
     it('should fail when targetSlug is missing', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 't', STARSHIP_ID: 's1' };
-      await expect(executeToolWithMockEnv({}, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('targetSlug is required'),
+      const result = await executeToolWithMockEnv({}, env) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('targetSlug is required')
+            })
+          })
+        ])
       });
     });
 
@@ -180,17 +208,28 @@ describe('Tool Test Tool', () => {
       // HttpRequest returns HttpResponse with body = responseBody
       (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ blueprint: nested }));
 
-      const result = (await executeToolWithMockEnv(input, env)) as {
+      const result = await executeToolWithMockEnv(input, env) as BatchExecutionResult;
+
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const data = successfulResult.data as {
         ok: boolean;
         durationMs: number;
         result: Record<string, unknown>;
       };
-
-      expect(result).toBeDefined();
-      expect(result.ok).toBe(true);
-      expect(typeof result.durationMs).toBe('number');
-      expect(result.durationMs).toBeGreaterThanOrEqual(0);
-      expect(result.result).toEqual({ foo: 'bar', n: 7 });
+      expect(data.ok).toBe(true);
+      expect(typeof data.durationMs).toBe('number');
+      expect(data.durationMs).toBeGreaterThanOrEqual(0);
+      expect(data.result).toEqual({ foo: 'bar', n: 7 });
 
       // Verify correct API call was made
       expect(global.fetch).toHaveBeenCalledWith(
@@ -215,18 +254,32 @@ describe('Tool Test Tool', () => {
         text: async () => JSON.stringify({ error: 'Tool not found' }),
       });
 
-      await expect(executeToolWithMockEnv({ targetSlug: 'missing' }, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('HTTP request failed'),
+      const result = await executeToolWithMockEnv({ targetSlug: 'missing' }, env) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('HTTP request failed')
+            })
+          })
+        ])
       });
     });
 
     it('should handle network failure', async () => {
       const env = { BASE_URL: 'https://api.test.com', AUTH_TOKEN: 'abc', STARSHIP_ID: 'star-9' };
       (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error: Connection refused'));
-      await expect(executeToolWithMockEnv({ targetSlug: 'demo' }, env)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('Network error'),
+      const result = await executeToolWithMockEnv({ targetSlug: 'demo' }, env) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              error: expect.stringContaining('Network error')
+            })
+          })
+        ])
       });
     });
 
@@ -245,12 +298,24 @@ describe('Tool Test Tool', () => {
       (global.fetch as jest.Mock).mockImplementation(async () => createMockResponse({ blueprint: nested }));
 
       const args = { a: 1, b: { deep: true } };
-      const result = (await executeToolWithMockEnv({ targetSlug: 'echoer', arguments: args }, env)) as {
+      const result = await executeToolWithMockEnv({ targetSlug: 'echoer', arguments: args }, env) as BatchExecutionResult;
+      expect(result).toMatchObject({
+        successful: expect.arrayContaining([
+          expect.objectContaining({
+            success: true
+          })
+        ])
+      });
+
+      // Extract the data from the successful result
+      const successfulResult = result.successful?.[0];
+      expect(successfulResult).toBeDefined();
+      const data = successfulResult.data as {
         ok: boolean;
         result: Record<string, unknown>;
       };
-      expect(result.ok).toBe(true);
-      expect(result.result).toEqual(args);
+      expect(data.ok).toBe(true);
+      expect(data.result).toEqual(args);
     });
   });
 
@@ -333,8 +398,20 @@ describe('Tool.execute return value - tool_test', () => {
     const item = raw[0];
     expect(item.pairedItem).toEqual({ item: 7 });
 
-    // Final payload should be the End node "output" extracted by Engine, not wrapped
-    const payload = item.json as { ok: boolean; durationMs: number; result: Record<string, unknown> };
+    // The batch result is nested inside the json property
+    const batchResult = item.json as BatchExecutionResult;
+    expect(batchResult).toMatchObject({
+      successful: expect.arrayContaining([
+        expect.objectContaining({
+          success: true
+        })
+      ])
+    });
+
+    // Extract the data from the successful result
+    const successfulResult = batchResult.successful?.[0];
+    expect(successfulResult).toBeDefined();
+    const payload = successfulResult.data as { ok: boolean; durationMs: number; result: Record<string, unknown> };
     expect(payload).toBeDefined();
     expect(payload.ok).toBe(true);
     expect(typeof payload.durationMs).toBe('number');

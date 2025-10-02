@@ -290,7 +290,7 @@ export class Agent implements NodeHandler {
    */
   private sanitizeToolMessages(messages: LlmMessage[]): LlmMessage[] {
     const toolMsgs = messages.filter((m) => m.role === 'tool');
-    const invalidToolMsgs = toolMsgs.filter((m) => !m.tool_call_id);
+    const invalidToolMsgs = toolMsgs.filter((m) => !m.toolCallId);
     
     if (invalidToolMsgs.length > 0) {
       console.warn('[AGENT] Removing invalid tool messages without tool_call_id:', {
@@ -300,7 +300,7 @@ export class Agent implements NodeHandler {
       });
       
       // Filter out invalid tool messages without tool_call_id
-      return messages.filter((m) => m.role !== 'tool' || !!m.tool_call_id);
+      return messages.filter((m) => m.role !== 'tool' || !!m.toolCallId);
     }
     
     return messages;

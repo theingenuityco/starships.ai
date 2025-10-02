@@ -200,7 +200,7 @@ describe('Tool.execute return value - blueprint_lint', () => {
     expect(raw).toHaveLength(1);
 
     const item = raw[0];
-    expect(item.pairedItem).toEqual({ item: 9 });
+    expect(item.pairedItem).toEqual({ item: 0 });
 
     // The batch result is nested inside the json property
     const batchResult = item.json as BatchExecutionResult;

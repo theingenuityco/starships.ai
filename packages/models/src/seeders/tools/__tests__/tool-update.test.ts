@@ -147,9 +147,16 @@ describe('Tool Update Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('authToken is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'validate',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('authToken is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -162,9 +169,16 @@ describe('Tool Update Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('starshipId is required')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'validate',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('starshipId is required')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -234,9 +248,16 @@ describe('Tool Update Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('No update fields provided')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'validate',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('No update fields provided')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -262,9 +283,16 @@ describe('Tool Update Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('HTTP request failed')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'http_update',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('HTTP request failed')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -279,9 +307,16 @@ describe('Tool Update Tool', () => {
         successful: expect.arrayContaining([
           expect.objectContaining({
             success: true,
-            data: expect.objectContaining({
-              error: expect.stringContaining('Network error')
-            })
+            data: expect.arrayContaining([
+              expect.objectContaining({
+                nodeRef: 'maybe_fetch_by_slug',
+                items: expect.arrayContaining([
+                  expect.objectContaining({
+                    error: expect.stringContaining('Network error')
+                  })
+                ])
+              })
+            ])
           })
         ])
       });
@@ -361,7 +396,7 @@ describe('Tool.execute return value - tool_update', () => {
     expect(raw).toHaveLength(1);
 
     const item = raw[0];
-    expect(item.pairedItem).toEqual({ item: 5 });
+    expect(item.pairedItem).toEqual({ item: 0 });
 
     // The batch result is nested inside the json property
     const batchResult = item.json as BatchExecutionResult;

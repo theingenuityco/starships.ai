@@ -423,7 +423,10 @@ describe('Blueprint Lint Tool', () => {
           expect.objectContaining({
             success: true,
             data: expect.objectContaining({
-              error: expect.stringContaining('blueprint')
+              ok: false,
+              issues: expect.arrayContaining([
+                expect.stringMatching(/nodes must be an array/)
+              ])
             })
           })
         ])
@@ -439,7 +442,10 @@ describe('Blueprint Lint Tool', () => {
           expect.objectContaining({
             success: true,
             data: expect.objectContaining({
-              error: expect.stringContaining('object with nodes')
+              ok: false,
+              issues: expect.arrayContaining([
+                expect.stringMatching(/object with nodes/)
+              ])
             })
           })
         ])
@@ -455,7 +461,10 @@ describe('Blueprint Lint Tool', () => {
           expect.objectContaining({
             success: true,
             data: expect.objectContaining({
-              error: expect.stringContaining('nodes must be an array')
+              ok: false,
+              issues: expect.arrayContaining([
+                expect.stringMatching(/nodes must be an array/)
+              ])
             })
           })
         ])
@@ -471,7 +480,10 @@ describe('Blueprint Lint Tool', () => {
           expect.objectContaining({
             success: true,
             data: expect.objectContaining({
-              error: expect.stringContaining('edges must be an array')
+              ok: false,
+              issues: expect.arrayContaining([
+                expect.stringMatching(/edges must be an array/)
+              ])
             })
           })
         ])
@@ -487,7 +499,10 @@ describe('Blueprint Lint Tool', () => {
           expect.objectContaining({
             success: true,
             data: expect.objectContaining({
-              error: expect.stringContaining('object with nodes')
+              ok: false,
+              issues: expect.arrayContaining([
+                expect.stringMatching(/object with nodes/)
+              ])
             })
           })
         ])

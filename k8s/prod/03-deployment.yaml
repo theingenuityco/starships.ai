@@ -208,6 +208,10 @@ spec:
                   name: starships-secrets
                   key: GA_MEASUREMENT_ID
 
+            # PostgreSQL Data Directory
+            - name: PGDATA
+              value: '/var/lib/postgresql/data/pgdata'
+
           # Resource Limits
           resources:
             requests:
@@ -221,6 +225,7 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
+              subPath: data
             - name: app-sessions
               mountPath: /app/data/sessions
 
